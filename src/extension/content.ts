@@ -228,8 +228,31 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       align-items: center;
       display: grid;
       gap: 12px;
-      grid-template-columns: 24px minmax(0, 1fr);
+      grid-template-columns: 24px minmax(0, 1fr) auto;
       min-height: 32px;
+    }
+
+    .sum-input {
+      background: #f7faf8;
+      border: 1px solid #d8e3de;
+      border-radius: 5px;
+      color: #172026;
+      font-family: inherit;
+      font-size: 12px;
+      height: 26px;
+      outline: none;
+      padding: 0 6px;
+      text-align: right;
+      width: 68px;
+    }
+
+    .sum-input:focus {
+      border-color: #1f8f5f;
+    }
+
+    .sum-input::placeholder {
+      color: #8a9a92;
+      font-size: 11px;
     }
 
     .site-icon {
@@ -418,6 +441,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
   header.append(siteIcon, title);
 
+  const sumInput = document.createElement("input");
+  sumInput.className = "sum-input";
+  sumInput.type = "text";
+  sumInput.inputMode = "numeric";
+  sumInput.placeholder = "Kjøpesum";
+
+  header.append(sumInput);
+
+  const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
+
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
 
@@ -436,6 +469,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
     const offerReward = document.createElement("span");
     offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
+    rewardLabels.push({ element: offerReward, offer: currentOffer });
 
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
@@ -451,6 +485,19 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     wrapper.append(offerLink);
     offerList.append(wrapper);
   }
+
+  sumInput.addEventListener("input", () => {
+    const raw = sumInput.value.replace(/[^0-9]/g, "");
+    const amount = raw.length > 0 ? Number.parseInt(raw, 10) : 0;
+    for (const { element, offer } of rewardLabels) {
+      if (amount > 0) {
+        const result = calculateCashback(offer, amount);
+        element.textContent = result !== "" ? result : formatRewardLabel(offer.reward, offer.provider);
+      } else {
+        element.textContent = formatRewardLabel(offer.reward, offer.provider);
+      }
+    }
+  });
 
   body.append(header, offerList);
 
@@ -471,7 +518,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     supportLink.href = pick.url;
     supportLink.target = "_blank";
     supportLink.rel = "noreferrer";
-    supportLink.textContent = `St\u00f8tt oppdateringer: ${pick.text}`;
+    supportLink.textContent = pick.text;
     support.append(supportLink);
 
     panel.append(topLine, body, support);
@@ -623,7 +670,7 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   if (provider === "sas") {
-    return "SAS EuroBonus";
+    return "SAS EB";
   }
 
   if (provider === "tfbank") {
@@ -631,6 +678,66 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   return "Klarna";
+}
+
+function calculateCashback(offer: CashbackOffer, amount: number): string {
+  const reward = offer.reward.trim();
+
+  // Percentage range: "2-3,5 %"
+  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (rangeMatch !== null) {
+    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minKr = Math.round(amount * minPct / 100);
+    const maxKr = Math.round(amount * maxPct / 100);
+    const label = minKr === maxKr ? `${minKr} kr` : `${minKr}-${maxKr} kr`;
+    return addEbSuffix(label, minPct, maxPct, amount, offer.provider);
+  }
+
+  // Single percentage: "6,2 %"
+  const pctMatch = reward.match(/^([\d,]+)\s*%$/);
+  if (pctMatch !== null) {
+    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const kr = Math.round(amount * pct / 100);
+    return addEbSuffix(`${kr} kr`, pct, pct, amount, offer.provider);
+  }
+
+  // SAS rate: "15 poeng per 100 kr"
+  const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (sasRateMatch !== null) {
+    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    const eb = Math.round(amount * points / 100);
+    const kr = Math.round(eb / EB_PER_TRUMF_KR);
+    return `~${kr} kr (~${eb} EB)`;
+  }
+
+  // SAS fixed: "500 poeng"
+  const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
+  if (sasFixedMatch !== null) {
+    const points = Number.parseInt(sasFixedMatch[1].replace(/\s/g, ""), 10);
+    const kr = Math.round(points / EB_PER_TRUMF_KR);
+    return `~${kr} kr (~${points} EB)`;
+  }
+
+  // Klarna "5.5%"
+  const klarnaMatch = reward.match(/^([\d.]+)%$/);
+  if (klarnaMatch !== null) {
+    const pct = Number.parseFloat(klarnaMatch[1]);
+    const kr = Math.round(amount * pct / 100);
+    return `${kr} kr`;
+  }
+
+  return "";
+}
+
+function addEbSuffix(label: string, minPct: number, maxPct: number, amount: number, provider: string): string {
+  if (provider === "trumf") {
+    const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+    const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+    const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
+    return `${label} (${ebStr})`;
+  }
+  return label;
 }
 
 function findSiteIconUrl(): string {
@@ -673,65 +780,38 @@ function hasRateBreakdown(terms: string): boolean {
 
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
-  const maxPrefix = "Opptil ";
-
-  if (trimmedReward.toLowerCase().startsWith(maxPrefix.toLowerCase())) {
-    const inner = trimmedReward.slice(maxPrefix.length);
-    const short = shortenReward(inner, provider);
-    const converted = convertReward(inner, provider);
-    return converted !== "" ? `${short} (opptil, ${converted})` : `${short} (opptil)`;
-  }
 
   if (trimmedReward.length === 0) {
     return "Cashback";
   }
 
-  const short = shortenReward(trimmedReward, provider);
-  const converted = convertReward(trimmedReward, provider);
-  return converted !== "" ? `${short} (${converted})` : short;
-}
-
-function shortenReward(reward: string, provider: string): string {
-  if (provider !== "sas") {
-    return reward;
-  }
-  // "2 000 poeng" → "2000p"
-  const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
-  if (fixedMatch !== null) {
-    return `${fixedMatch[1].replace(/\s/g, "")}p`;
-  }
-  // "15 poeng per 100 kr" → "15p/100kr"
-  const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-  if (rateMatch !== null) {
-    return `${rateMatch[1].replace(/\s/g, "")}p/100kr`;
-  }
-  return reward;
-}
-
-function convertReward(reward: string, provider: string): string {
+  // For SAS, convert to percentage-first display
   if (provider === "sas") {
-    return convertSasToKr(reward);
+    const converted = convertSasToPercent(trimmedReward);
+    return converted !== "" ? converted : trimmedReward;
   }
+
+  // For Trumf, show original reward + EB conversion
   if (provider === "trumf") {
-    return convertTrumfToEb(reward);
+    const converted = convertTrumfToEb(trimmedReward);
+    return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
   }
-  return "";
+
+  return trimmedReward;
 }
 
-function convertSasToKr(reward: string): string {
-  // "500 poeng" → ~37 kr
+function convertSasToPercent(reward: string): string {
   const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (fixedMatch !== null) {
     const points = Number.parseInt(fixedMatch[1].replace(/\s/g, ""), 10);
     const kr = Math.round(points / EB_PER_TRUMF_KR);
-    return `~${kr} kr`;
+    return `~${kr} kr (~${points.toLocaleString("nb-NO")} EB)`;
   }
-  // "15 poeng per 100 kr" → ~1,1%
   const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (rateMatch !== null) {
     const points = Number.parseInt(rateMatch[1].replace(/\s/g, ""), 10);
     const pct = points / EB_PER_TRUMF_KR;
-    return `~${formatNo(pct)}%`;
+    return `~${formatNo(pct)} % (~${points} EB/100kr)`;
   }
   return "";
 }

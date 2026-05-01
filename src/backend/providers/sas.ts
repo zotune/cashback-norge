@@ -15,6 +15,9 @@ type SasShop = {
   commission_type: string;
   points: number;
   fixed_cashback_text: string | null;
+  has_campaign: number;
+  points_campaign: number | null;
+  campaign_ends_date: string | null;
 };
 
 type SasShopsResponse = {
@@ -84,7 +87,7 @@ function parseSasShop(
     reward,
     sourceUrl,
     activationUrl: sourceUrl,
-    terms: "",
+    terms: formatSasTerms(shop),
     updatedAt: generatedAt,
   };
 }
@@ -145,11 +148,28 @@ function formatSasReward(shop: SasShop): string {
     return shop.fixed_cashback_text;
   }
 
+  const points = shop.has_campaign === 1 && shop.points_campaign !== null && shop.points_campaign > 0
+    ? shop.points_campaign
+    : shop.points;
+
   if (shop.commission_type === "variable") {
-    return `${shop.points} poeng per 100 kr`;
+    return `${points} poeng per 100 kr`;
   }
 
-  return `${formatPoints(shop.points)} poeng`;
+  return `${formatPoints(points)} poeng`;
+}
+
+function formatSasTerms(shop: SasShop): string {
+  if (shop.has_campaign !== 1 || shop.points_campaign === null || shop.points_campaign <= 0) {
+    return "";
+  }
+
+  const parts: string[] = [];
+  parts.push(`Kampanje: ${shop.points_campaign} poeng (normalt ${shop.points})`);
+  if (shop.campaign_ends_date !== null && shop.campaign_ends_date.length > 0) {
+    parts.push(`Gyldig til ${shop.campaign_ends_date}`);
+  }
+  return parts.join("\n");
 }
 
 function formatPoints(points: number): string {
@@ -175,6 +195,9 @@ function isSasShop(value: unknown): value is SasShop {
     typeof value.name === "string" &&
     typeof value.slug === "string" &&
     typeof value.commission_type === "string" &&
-    typeof value.points === "number"
+    typeof value.points === "number" &&
+    typeof value.has_campaign === "number" &&
+    (value.points_campaign === null || typeof value.points_campaign === "number") &&
+    (value.campaign_ends_date === null || typeof value.campaign_ends_date === "string")
   );
 }

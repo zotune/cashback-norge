@@ -21,10 +21,13 @@ type PopupState =
 
 export function PopupApp(): ReactElement {
   const [state, setState] = useState<PopupState>({ status: "loading" });
+  const [sumInput, setSumInput] = useState("");
 
   useEffect(() => {
     loadCurrentTabOffers(setState);
   }, []);
+
+  const amount = sumInput.length > 0 ? Number.parseInt(sumInput.replace(/[^0-9]/g, ""), 10) || 0 : 0;
 
   if (state.status === "loading") {
     return (
@@ -47,14 +50,27 @@ export function PopupApp(): ReactElement {
 
   return (
     <main className="popup">
-      <p className="eyebrow">{state.hostname}</p>
-      <h1>{state.offers.length > 0 ? "Cashback offers" : "No cashback"}</h1>
+      <div className="popup-header">
+        <div>
+          <p className="eyebrow">{state.hostname}</p>
+          <h1>{state.offers.length > 0 ? "Cashback offers" : "No cashback"}</h1>
+        </div>
+        <input
+          className="sum-input"
+          type="text"
+          inputMode="numeric"
+          placeholder="Kjøpesum"
+          value={sumInput}
+          onChange={(e) => setSumInput(e.target.value.replace(/[^0-9]/g, ""))}
+        />
+      </div>
       <div className="offers">
         {state.offers.map((offer) => {
           return (
             <OfferRow
               key={`${offer.provider}:${offer.sourceUrl}`}
               offer={offer}
+              amount={amount}
             />
           );
         })}
@@ -63,8 +79,16 @@ export function PopupApp(): ReactElement {
   );
 }
 
-function OfferRow(props: { offer: CashbackOffer }): ReactElement {
+function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement {
   const hasBreakdown = props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms);
+
+  let rewardText: string;
+  if (props.amount > 0) {
+    const result = calculateCashback(props.offer, props.amount);
+    rewardText = result !== "" ? result : formatRewardLabel(props.offer.reward, props.offer.provider);
+  } else {
+    rewardText = formatRewardLabel(props.offer.reward, props.offer.provider);
+  }
 
   return (
     <div className="offer-wrapper" style={{ position: "relative" }}>
@@ -79,7 +103,7 @@ function OfferRow(props: { offer: CashbackOffer }): ReactElement {
       >
         <div>
           <p className="merchant">
-            <span>{formatRewardLabel(props.offer.reward, props.offer.provider)}</span>
+            <span>{rewardText}</span>
             <span
               className={`provider-badge provider-${props.offer.provider}`}
             >
@@ -100,61 +124,38 @@ const EB_PER_TRUMF_KR = 13.5;
 
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
-  const maxPrefix = "Opptil ";
-
-  if (trimmedReward.toLowerCase().startsWith(maxPrefix.toLowerCase())) {
-    const inner = trimmedReward.slice(maxPrefix.length);
-    const short = shortenReward(inner, provider);
-    const converted = convertReward(inner, provider);
-    return converted !== "" ? `${short} (opptil, ${converted})` : `${short} (opptil)`;
-  }
 
   if (trimmedReward.length === 0) {
     return "Cashback";
   }
 
-  const short = shortenReward(trimmedReward, provider);
-  const converted = convertReward(trimmedReward, provider);
-  return converted !== "" ? `${short} (${converted})` : short;
-}
-
-function shortenReward(reward: string, provider: string): string {
-  if (provider !== "sas") {
-    return reward;
-  }
-  const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
-  if (fixedMatch !== null) {
-    return `${fixedMatch[1].replace(/\s/g, "")}p`;
-  }
-  const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-  if (rateMatch !== null) {
-    return `${rateMatch[1].replace(/\s/g, "")}p/100kr`;
-  }
-  return reward;
-}
-
-function convertReward(reward: string, provider: string): string {
+  // For SAS, convert to percentage-first display
   if (provider === "sas") {
-    return convertSasToKr(reward);
+    const converted = convertSasToPercent(trimmedReward);
+    return converted !== "" ? converted : trimmedReward;
   }
+
+  // For Trumf, show original reward + EB conversion
   if (provider === "trumf") {
-    return convertTrumfToEb(reward);
+    const converted = convertTrumfToEb(trimmedReward);
+    return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
   }
-  return "";
+
+  return trimmedReward;
 }
 
-function convertSasToKr(reward: string): string {
+function convertSasToPercent(reward: string): string {
   const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (fixedMatch !== null) {
     const points = Number.parseInt(fixedMatch[1].replace(/\s/g, ""), 10);
     const kr = Math.round(points / EB_PER_TRUMF_KR);
-    return `~${kr} kr`;
+    return `~${kr} kr (~${points.toLocaleString("nb-NO")} EB)`;
   }
   const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (rateMatch !== null) {
     const points = Number.parseInt(rateMatch[1].replace(/\s/g, ""), 10);
     const pct = points / EB_PER_TRUMF_KR;
-    return `~${formatNo(pct)}%`;
+    return `~${formatNo(pct)} % (~${points} EB/100kr)`;
   }
   return "";
 }
@@ -197,7 +198,7 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   if (provider === "sas") {
-    return "SAS EuroBonus";
+    return "SAS EB";
   }
 
   if (provider === "tfbank") {
@@ -205,6 +206,61 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   return "Klarna";
+}
+
+function calculateCashback(offer: CashbackOffer, amount: number): string {
+  const reward = offer.reward.trim();
+
+  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (rangeMatch !== null) {
+    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minKr = Math.round(amount * minPct / 100);
+    const maxKr = Math.round(amount * maxPct / 100);
+    const label = minKr === maxKr ? `${minKr} kr` : `${minKr}-${maxKr} kr`;
+    return addEbSuffix(label, minPct, maxPct, amount, offer.provider);
+  }
+
+  const pctMatch = reward.match(/^([\d,]+)\s*%$/);
+  if (pctMatch !== null) {
+    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const kr = Math.round(amount * pct / 100);
+    return addEbSuffix(`${kr} kr`, pct, pct, amount, offer.provider);
+  }
+
+  const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (sasRateMatch !== null) {
+    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    const eb = Math.round(amount * points / 100);
+    const kr = Math.round(eb / EB_PER_TRUMF_KR);
+    return `~${kr} kr (~${eb} EB)`;
+  }
+
+  const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
+  if (sasFixedMatch !== null) {
+    const points = Number.parseInt(sasFixedMatch[1].replace(/\s/g, ""), 10);
+    const kr = Math.round(points / EB_PER_TRUMF_KR);
+    return `~${kr} kr (~${points} EB)`;
+  }
+
+  const klarnaMatch = reward.match(/^([\d.]+)%$/);
+  if (klarnaMatch !== null) {
+    const pct = Number.parseFloat(klarnaMatch[1]);
+    const kr = Math.round(amount * pct / 100);
+    return `${kr} kr`;
+  }
+
+  return "";
+}
+
+function addEbSuffix(label: string, minPct: number, maxPct: number, amount: number, provider: string): string {
+  if (provider === "trumf") {
+    const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+    const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+    const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
+    return `${label} (${ebStr})`;
+  }
+  return label;
 }
 
 function loadCurrentTabOffers(

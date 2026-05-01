@@ -76,6 +76,36 @@ h1 {
   text-decoration: none;
 }
 
+.popup-header {
+  align-items: start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.sum-input {
+  background: #ffffff;
+  border: 1px solid #d6e1dc;
+  border-radius: 5px;
+  color: #172026;
+  font-family: inherit;
+  font-size: 12px;
+  height: 26px;
+  outline: none;
+  padding: 0 6px;
+  text-align: right;
+  width: 68px;
+}
+
+.sum-input:focus {
+  border-color: #1f8f5f;
+}
+
+.sum-input::placeholder {
+  color: #8a9a92;
+  font-size: 11px;
+}
+
 .merchant {
   align-items: center;
   display: flex;
