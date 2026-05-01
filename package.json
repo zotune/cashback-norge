@@ -1,0 +1,29 @@
+{
+  "name": "klarna-cashback-varsler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm run build:backend && pnpm run build:extension",
+    "build:backend": "tsc --project tsconfig.backend.json",
+    "build:extension": "vite build --config vite.extension.config.ts",
+    "check": "tsc --project tsconfig.json --noEmit",
+    "crawl": "tsx src/backend/index.ts"
+  },
+  "dependencies": {
+    "crawlee": "^3.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.0",
+    "@types/node": "^22.7.7",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0"
+  },
+  "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b"
+}

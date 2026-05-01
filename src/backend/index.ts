@@ -1,0 +1,117 @@
+import { resolve } from "node:path";
+import { buildCashbackIndex, uniqueOffers } from "../shared/cashback.js";
+import { writeJsonFile } from "./json-file.js";
+import { createConsoleLogger } from "./logger.js";
+import { readManualOffers } from "./manual-offers.js";
+import { readProviderOverrides } from "./provider-overrides.js";
+import { crawlRemember } from "./providers/remember.js";
+import { crawlTrumf } from "./providers/trumf.js";
+
+type CliConfig = {
+  outputPath: string;
+  manualOffersPath: string;
+  providerOverridesPath: string;
+  rememberStartUrl: string;
+  trumfStartUrl: string;
+  maxRequestsPerCrawl: number;
+  skipRemember: boolean;
+  skipTrumf: boolean;
+};
+
+async function main(): Promise<void> {
+  const logger = createConsoleLogger();
+  const config = readCliConfig(process.argv.slice(2));
+  const generatedAt = new Date().toISOString();
+  const manualOffers = await readManualOffers(config.manualOffersPath);
+  const providerOverrides = await readProviderOverrides(
+    config.providerOverridesPath,
+  );
+  const rememberOffers = config.skipRemember
+    ? []
+    : await crawlRemember({
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides,
+        startUrl: config.rememberStartUrl,
+      });
+  const trumfOffers = config.skipTrumf
+    ? []
+    : await crawlTrumf({
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides,
+        startUrl: config.trumfStartUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...rememberOffers, ...trumfOffers]);
+  const cashbackIndex = buildCashbackIndex(offers, generatedAt);
+
+  await writeJsonFile(config.outputPath, cashbackIndex);
+  logger.info(
+    `Wrote ${cashbackIndex.offers.length} offers to ${config.outputPath}`,
+  );
+}
+
+function readCliConfig(args: string[]): CliConfig {
+  return {
+    outputPath: resolve(readArgumentValue(args, "--output") ?? "data/cashback-index.json"),
+    manualOffersPath: resolve(
+      readArgumentValue(args, "--manual-offers") ?? "data/manual-offers.json",
+    ),
+    providerOverridesPath: resolve(
+      readArgumentValue(args, "--provider-overrides") ??
+        "data/provider-overrides.json",
+    ),
+    rememberStartUrl:
+      readArgumentValue(args, "--remember-start-url") ??
+      "https://www.remember.no/reward/rabatt",
+    trumfStartUrl:
+      readArgumentValue(args, "--trumf-start-url") ??
+      "https://trumfnetthandel.no/kategori",
+    maxRequestsPerCrawl: readPositiveIntegerArgument(
+      args,
+      "--max-requests",
+      250,
+    ),
+    skipRemember: args.includes("--skip-remember"),
+    skipTrumf: args.includes("--skip-trumf"),
+  };
+}
+
+function readArgumentValue(args: string[], name: string): string | undefined {
+  const nameIndex = args.indexOf(name);
+
+  if (nameIndex === -1) {
+    return undefined;
+  }
+
+  return args[nameIndex + 1];
+}
+
+function readPositiveIntegerArgument(
+  args: string[],
+  name: string,
+  fallbackValue: number,
+): number {
+  const rawValue = readArgumentValue(args, name);
+
+  if (rawValue === undefined) {
+    return fallbackValue;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+
+  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+
+  return parsedValue;
+}
+
+main().catch((error: unknown) => {
+  const logger = createConsoleLogger();
+  const message = error instanceof Error ? error.message : "Unknown error";
+  logger.error(message);
+  process.exitCode = 1;
+});

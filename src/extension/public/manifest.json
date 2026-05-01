@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Cashback Varsler",
+  "description": "Shows cashback offers for supported stores.",
+  "version": "0.1.0",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["assets/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Cashback Varsler",
+    "default_popup": "popup.html"
+  }
+}

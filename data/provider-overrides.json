@@ -1,0 +1,8 @@
+{
+  "trumf": {
+    "lyko-trumf": ["lyko.com"],
+    "trumfhotels-no": ["hotels.com", "no.hotels.com"]
+  },
+  "klarna": {},
+  "remember": {}
+}
