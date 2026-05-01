@@ -422,6 +422,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   const supportLinks = [
     { text: "200 kr gratis i fond \u2192", url: "https://kron.no/app/invitert/nvu4d" },
     { text: "Kj\u00f8p en kaffe til utvikler \u2192", url: "https://buymeacoffee.com/adore" },
+    { text: "1% cashback i 30 dager med Curve \u2192", url: "https://www.curve.com/join#D5GXXJJD" },
+    { text: "Opptil 2 500 kr med Revolut \u2192", url: "https://revolut.com/referrals?r=FELPJK" },
+    { text: "500 poeng gratis i Horde \u2192", url: "https://app.horde.no/66CS/verve?code=kloube" },
   ];
   const pick = supportLinks[Math.floor(Math.random() * supportLinks.length)];
 
