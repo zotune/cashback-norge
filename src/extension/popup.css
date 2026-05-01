@@ -156,20 +156,19 @@ h1 {
 }
 
 .provider-dnb {
-  background: #007272;
+  background: #14555a;
   color: #ffffff;
 }
 
-.reward {
+.copy-code-btn {
   align-items: center;
-  background: #1f8f5f;
-  border-radius: 6px;
-  color: #ffffff;
+  color: #1f8f5f;
+  cursor: pointer;
   display: inline-flex;
-  font-size: 13px;
-  font-weight: 700;
-  min-height: 32px;
-  padding: 0 10px;
-  text-decoration: none;
-  white-space: nowrap;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.copy-code-btn:hover {
+  color: #166b47;
 }

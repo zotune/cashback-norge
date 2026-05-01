@@ -92,6 +92,11 @@ export async function fetchTfBank(
     const searchParam = encodeURIComponent(firstDomain.replace(/\.(no|com|se)$/, ""));
     const dealUrl = `https://tfbank.dealpass.no/deal/${deal.id}?search=${searchParam}`;
 
+    const voucherCode = deal.claim?.voucher?.code;
+    const discountCode = typeof voucherCode === "string" && voucherCode.trim() !== ""
+      ? voucherCode.trim()
+      : undefined;
+
     offers.push({
       provider: "tfbank",
       merchantName,
@@ -100,6 +105,7 @@ export async function fetchTfBank(
       sourceUrl: dealUrl,
       activationUrl: dealUrl,
       terms: deal.disclaimer ?? "",
+      ...(discountCode !== undefined ? { discountCode } : {}),
       updatedAt: input.generatedAt,
     });
   }

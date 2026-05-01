@@ -244,9 +244,15 @@ async function resolveDomainsForOffers(
           );
         }
 
+        const resolvedDomains = uniqueStrings(domains.map(normalizeDomainInput));
+        const searchDomain = resolvedDomains[0] ?? encodeURIComponent(offer.merchantName);
+        const klarnaSearchUrl = `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchDomain}`;
+
         return {
           ...offer,
-          domains: uniqueStrings(domains.map(normalizeDomainInput)),
+          domains: resolvedDomains,
+          sourceUrl: klarnaSearchUrl,
+          activationUrl: klarnaSearchUrl,
         };
       }),
     );

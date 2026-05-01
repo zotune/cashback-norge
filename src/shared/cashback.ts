@@ -8,6 +8,7 @@ export type CashbackOffer = {
   sourceUrl: string;
   activationUrl: string;
   terms: string;
+  discountCode?: string;
   updatedAt: string;
 };
 
@@ -40,6 +41,7 @@ export function isCashbackOffer(value: unknown): value is CashbackOffer {
     typeof value.sourceUrl === "string" &&
     typeof value.activationUrl === "string" &&
     typeof value.terms === "string" &&
+    (value.discountCode === undefined || typeof value.discountCode === "string") &&
     typeof value.updatedAt === "string"
   );
 }

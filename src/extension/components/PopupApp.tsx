@@ -81,6 +81,7 @@ export function PopupApp(): ReactElement {
 
 function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement {
   const hasBreakdown = props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms);
+  const [copied, setCopied] = useState(false);
 
   let rewardText: string;
   if (props.amount > 0) {
@@ -88,6 +89,18 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
     rewardText = result !== "" ? result : formatRewardLabel(props.offer.reward, props.offer.provider);
   } else {
     rewardText = formatRewardLabel(props.offer.reward, props.offer.provider);
+  }
+
+  const discountCode = props.offer.discountCode;
+
+  function handleCopyClick(e: React.MouseEvent): void {
+    if (discountCode === undefined) return;
+    e.preventDefault();
+    e.stopPropagation();
+    navigator.clipboard.writeText(discountCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
   }
 
   return (
@@ -112,9 +125,20 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
           </p>
           <p className="muted">{props.offer.merchantName}</p>
         </div>
-        <span className="reward" aria-hidden="true">
-          Open
-        </span>
+        {discountCode !== undefined && (
+          <span
+            className="copy-code-btn"
+            title={copied ? "Kopiert!" : `Kopier rabattkode: ${discountCode}`}
+            onClick={handleCopyClick}
+            role="button"
+          >
+            {copied ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            )}
+          </span>
+        )}
       </a>
     </div>
   );

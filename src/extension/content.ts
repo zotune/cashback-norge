@@ -6,6 +6,7 @@ type CashbackOffer = {
   sourceUrl: string;
   activationUrl: string;
   terms: string;
+  discountCode?: string;
   updatedAt: string;
 };
 
@@ -341,15 +342,41 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     }
 
     .provider-dnb {
-      background: #007272;
+      background: #14555a;
       color: #ffffff;
     }
 
-    .offer-open {
+    .copy-code-btn {
+      align-items: center;
       color: #1f8f5f;
-      font-size: 12px;
-      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      padding: 4px;
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .copy-code-btn:hover {
+      color: #166b47;
+    }
+
+    .copy-code-tooltip {
+      background: #1a1a2e;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.3;
+      padding: 5px 8px;
+      pointer-events: none;
+      position: fixed;
       white-space: nowrap;
+      z-index: 2147483647;
+      display: none;
+    }
+
+    .copy-code-tooltip.visible {
+      display: block;
     }
 
     .offer-link-wrapper {
@@ -481,12 +508,49 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
     providerBadge.textContent = formatProviderName(currentOffer.provider);
 
-    const offerOpen = document.createElement("span");
-    offerOpen.className = "offer-open";
-    offerOpen.textContent = "Open";
-
     offerLabel.append(offerReward, providerBadge);
-    offerLink.append(offerLabel, offerOpen);
+
+    if (currentOffer.discountCode !== undefined) {
+      const code = currentOffer.discountCode;
+      const copyBtn = document.createElement("span");
+      copyBtn.className = "copy-code-btn";
+      copyBtn.innerHTML = COPY_ICON_SVG;
+
+      const copyTooltip = document.createElement("div");
+      copyTooltip.className = "copy-code-tooltip";
+      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+      shadowRoot.append(copyTooltip);
+
+      copyBtn.addEventListener("mouseenter", () => {
+        const rect = copyBtn.getBoundingClientRect();
+        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        copyTooltip.style.top = `${rect.top - 30}px`;
+        copyTooltip.style.transform = "translateX(-50%)";
+        copyTooltip.classList.add("visible");
+      });
+      copyBtn.addEventListener("mouseleave", () => {
+        copyTooltip.classList.remove("visible");
+      });
+
+      copyBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigator.clipboard.writeText(code).then(() => {
+          copyBtn.innerHTML = CHECK_ICON_SVG;
+          copyTooltip.textContent = "Kopiert!";
+          copyTooltip.classList.add("visible");
+          setTimeout(() => {
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+            copyTooltip.classList.remove("visible");
+          }, 1500);
+        });
+      });
+
+      offerLink.append(offerLabel, copyBtn);
+    } else {
+      offerLink.append(offerLabel);
+    }
 
     wrapper.append(offerLink);
     offerList.append(wrapper);
@@ -654,14 +718,15 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
     typeof value.sourceUrl === "string" &&
     typeof value.activationUrl === "string" &&
     typeof value.terms === "string" &&
+    (value.discountCode === undefined || typeof value.discountCode === "string") &&
     typeof value.updatedAt === "string"
   );
 }
 
 function isCashbackProvider(
   value: unknown,
-): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank";
+): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" {
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -804,6 +869,10 @@ function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
 }
 
 const EB_PER_TRUMF_KR = 13.5;
+
+const COPY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+const CHECK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
 function hasRateBreakdown(terms: string): boolean {
   return terms.includes("\n") && /\d+.*%/.test(terms);

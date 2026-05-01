@@ -72,16 +72,17 @@ export async function fetchDnb(
       continue;
     }
 
+    const dnbUrl = "https://www.dnb.no/kundeprogram/fordeler/faste-rabatter";
+
     offers.push({
       provider: "dnb",
       merchantName: discount.title,
       domains: [domain],
       reward,
-      sourceUrl: "https://www.dnb.no/kundeprogram/fordeler/faste-rabatter",
-      activationUrl: discount.url.href.startsWith("http")
-        ? discount.url.href
-        : `https://${discount.url.href.replace(/^\/+/, "")}`,
+      sourceUrl: dnbUrl,
+      activationUrl: dnbUrl,
       terms: "Rabattkode DNB4935 i handlekurven. Betal med DNB-kort.",
+      discountCode: "DNB4935",
       updatedAt: input.generatedAt,
     });
   }
