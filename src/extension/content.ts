@@ -220,7 +220,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
 
     .panel {
-      width: min(380px, calc(100vw - 42px));
+      width: min(400px, calc(100vw - 42px));
       color: #172026;
       background: #ffffff;
       border: 1px solid #c9d7cf;
@@ -782,9 +782,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const bestBonusKr = bestBonusEb / EB_PER_TRUMF_KR;
       const mainMaxKr = mainOffers.reduce((max, o) => Math.max(max, calculateCashbackMaxKr(o, amount)), 0);
       const totalKr = mainMaxKr + bestBonusKr;
-      chipsToggleText.textContent = `Ekstra cashback (totalt opptil ~${formatKr(totalKr)} kr)`;
+      chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatKr(totalKr)} kr)`;
     } else {
-      chipsToggleText.textContent = "Ekstra cashback (totalt opptil +~0,74%)";
+      const mainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
+      const totalPct = mainMaxPct + 0.74;
+      chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(totalPct)}%)`;
     }
   });
 
@@ -817,7 +819,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sasAmexBadge.textContent = "SAS Amex";
   sasAmexChip.append(sasAmexLabel, sasAmexBadge);
   freeItems.append(sasAmexChip);
-  addChipTooltip(sasAmexChip, "10 EB/100 kr. Gratis kort.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).", shadowRoot);
+  addChipTooltip(sasAmexChip, "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).", shadowRoot);
 
   const sasMcChip = document.createElement("a");
   sasMcChip.className = "bonus-chip";
@@ -947,7 +949,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   chipsToggleArrow.textContent = "\u25BC";
 
   const chipsToggleText = document.createElement("span");
-  chipsToggleText.textContent = "Ekstra cashback (totalt opptil +~0,74%)";
+  const defaultMainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
+  const defaultTotalPct = defaultMainMaxPct + 0.74;
+  chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(defaultTotalPct)}%)`;
 
   chipsToggle.append(chipsToggleArrow, chipsToggleText);
   chipsToggle.addEventListener("click", () => {
@@ -1204,6 +1208,24 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
     return `${label} (${ebStr})`;
   }
   return label;
+}
+
+function getMaxRewardPercent(offer: CashbackOffer): number {
+  const reward = offer.reward.trim();
+  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (rangeMatch !== null) {
+    return Number.parseFloat(rangeMatch[2].replace(",", "."));
+  }
+  const pctMatch = reward.match(/^([\d,]+)\s*%$/);
+  if (pctMatch !== null) {
+    return Number.parseFloat(pctMatch[1].replace(",", "."));
+  }
+  const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (sasRateMatch !== null) {
+    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    return points / EB_PER_TRUMF_KR;
+  }
+  return 0;
 }
 
 function calculateCashbackMaxKr(offer: CashbackOffer, amount: number): number {
