@@ -394,14 +394,28 @@ function extractReward(store: RememberStore): string {
     if (min !== max) {
       return `${formatRewardNumber(min)}-${formatRewardNumber(max)} %`;
     }
+
+    return `${formatRewardNumber(max)} %`;
+  }
+
+  if (percentageCommissions.length === 1 && percentageCommissions[0] !== undefined) {
+    return `${formatRewardNumber(percentageCommissions[0].value)} %`;
   }
 
   if (store.maxPercentageValue > 0) {
-    return `Opptil ${formatRewardNumber(store.maxPercentageValue)} %`;
+    return `${formatRewardNumber(store.maxPercentageValue)} %`;
+  }
+
+  const fixedCommissions = store.commission.filter(
+    (c) => c.type === "FIXED" && c.value > 0,
+  );
+
+  if (fixedCommissions.length === 1 && fixedCommissions[0] !== undefined) {
+    return `${formatRewardNumber(fixedCommissions[0].value)} kr`;
   }
 
   if (store.maxFixedValue > 0) {
-    return `Opptil ${formatRewardNumber(store.maxFixedValue)} kr`;
+    return `${formatRewardNumber(store.maxFixedValue)} kr`;
   }
 
   const maxPercentageCommission = findMaxCommissionValue(
@@ -410,13 +424,13 @@ function extractReward(store: RememberStore): string {
   );
 
   if (maxPercentageCommission > 0) {
-    return `Opptil ${formatRewardNumber(maxPercentageCommission)} %`;
+    return `${formatRewardNumber(maxPercentageCommission)} %`;
   }
 
   const maxFixedCommission = findMaxCommissionValue(store.commission, "FIXED");
 
   if (maxFixedCommission > 0) {
-    return `Opptil ${formatRewardNumber(maxFixedCommission)} kr`;
+    return `${formatRewardNumber(maxFixedCommission)} kr`;
   }
 
   return "";

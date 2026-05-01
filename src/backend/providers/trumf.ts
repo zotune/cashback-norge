@@ -311,14 +311,13 @@ async function discoverDomains(
   logger: Logger,
 ): Promise<string[]> {
   const candidates = buildDomainCandidates(merchantName);
-
-  for (const domain of candidates) {
-    if (await canResolve(domain)) {
-      return [domain];
-    }
-  }
-
-  return [];
+  const results = await Promise.all(
+    candidates.map(async (domain) => {
+      const resolved = await canResolve(domain);
+      return resolved ? domain : undefined;
+    }),
+  );
+  return results.filter((d): d is string => d !== undefined);
 }
 
 function buildDomainCandidates(merchantName: string): string[] {

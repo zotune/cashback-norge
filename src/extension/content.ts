@@ -504,14 +504,17 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     shadowRoot.append(tooltip);
 
     wrapper.addEventListener("mouseenter", () => {
-      const rect = wrapper.getBoundingClientRect();
-      // Show off-screen to measure, then position
+      const panelEl = shadowRoot.querySelector(".panel");
+      const panelRect = panelEl?.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      // Show off-screen to measure, then position to right of panel
       tooltip.style.left = "-9999px";
       tooltip.style.top = "-9999px";
       tooltip.classList.add("visible");
       const tooltipHeight = tooltip.offsetHeight;
-      tooltip.style.left = `${rect.left}px`;
-      tooltip.style.top = `${rect.top - tooltipHeight - 6}px`;
+      const rightEdge = panelRect ? panelRect.right + 6 : wrapperRect.right + 6;
+      tooltip.style.left = `${rightEdge}px`;
+      tooltip.style.top = `${wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2}px`;
     });
     wrapper.addEventListener("mouseleave", () => {
       tooltip.classList.remove("visible");
