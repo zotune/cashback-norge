@@ -3,7 +3,20 @@
     "lyko-trumf": ["lyko.com"],
     "trumfhotels-no": ["hotels.com", "no.hotels.com"]
   },
-  "klarna": {},
+  "klarna": {
+    "autodude.no--valostore.no": ["autodude.no", "valostore.no"],
+    "by-malene-birger-ab": ["bymalenebirger.com"],
+    "cpyou-b.v.": ["cpcompany.com"],
+    "ecco-shoes": ["ecco.com"],
+    "fever-labs-inc.": ["feverup.com"],
+    "haglfs-ab": ["haglofs.com"],
+    "hunkemller": ["hunkemoller.no"],
+    "iherb-inc": ["iherb.com"],
+    "lyko-online-ab": ["lyko.com"],
+    "new-vetzoo.no-kco-v.3-b2b-recurring": ["vetzoo.no"],
+    "only--sons": ["onlyandsons.com"],
+    "wakakuu-ab": ["wakakuu.com"]
+  },
   "remember": {},
   "sas": {}
 }

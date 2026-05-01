@@ -4,6 +4,7 @@ import { writeJsonFile } from "./json-file.js";
 import { createConsoleLogger } from "./logger.js";
 import { readManualOffers } from "./manual-offers.js";
 import { readProviderOverrides } from "./provider-overrides.js";
+import { crawlKlarna } from "./providers/klarna.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
 import { crawlTrumf } from "./providers/trumf.js";
@@ -12,10 +13,13 @@ type CliConfig = {
   outputPath: string;
   manualOffersPath: string;
   providerOverridesPath: string;
+  klarnaStartUrl: string;
+  klarnaMaxPages: number;
   rememberStartUrl: string;
   trumfStartUrl: string;
   sasApiUrl: string;
   maxRequestsPerCrawl: number;
+  skipKlarna: boolean;
   skipRemember: boolean;
   skipTrumf: boolean;
   skipSas: boolean;
@@ -29,6 +33,15 @@ async function main(): Promise<void> {
   const providerOverrides = await readProviderOverrides(
     config.providerOverridesPath,
   );
+  const klarnaOffers = config.skipKlarna
+    ? []
+    : await crawlKlarna({
+        generatedAt,
+        logger,
+        maxPages: config.klarnaMaxPages,
+        overrides: providerOverrides,
+        startUrl: config.klarnaStartUrl,
+      });
   const rememberOffers = config.skipRemember
     ? []
     : await crawlRemember({
@@ -55,7 +68,7 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
         apiUrl: config.sasApiUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...rememberOffers, ...trumfOffers, ...sasOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -74,6 +87,14 @@ function readCliConfig(args: string[]): CliConfig {
       readArgumentValue(args, "--provider-overrides") ??
         "data/provider-overrides.json",
     ),
+    klarnaStartUrl:
+      readArgumentValue(args, "--klarna-start-url") ??
+      "https://www.klarna.com/no/store/?type=CASHBACK",
+    klarnaMaxPages: readPositiveIntegerArgument(
+      args,
+      "--klarna-max-pages",
+      5,
+    ),
     rememberStartUrl:
       readArgumentValue(args, "--remember-start-url") ??
       "https://www.remember.no/reward/rabatt",
@@ -88,6 +109,7 @@ function readCliConfig(args: string[]): CliConfig {
       "--max-requests",
       250,
     ),
+    skipKlarna: args.includes("--skip-klarna"),
     skipRemember: args.includes("--skip-remember"),
     skipTrumf: args.includes("--skip-trumf"),
     skipSas: args.includes("--skip-sas"),
