@@ -156,6 +156,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       border-radius: 4px;
     }
 
+    .notice.collapsed .side-tab.side-tab-curve .side-tab-text {
+      background: #000000;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+
     .side-tab-arrow {
       font-size: 16px;
       font-weight: 700;
@@ -343,6 +350,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
     .provider-dnb {
       background: #14555a;
+      color: #ffffff;
+    }
+
+    .provider-curve {
+      background: #000000;
       color: #ffffff;
     }
 
@@ -725,8 +737,8 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
 
 function isCashbackProvider(
   value: unknown,
-): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb";
+): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" {
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -756,6 +768,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "dnb") {
     return "DNB";
+  }
+
+  if (provider === "curve") {
+    return "Curve";
   }
 
   return "Klarna";

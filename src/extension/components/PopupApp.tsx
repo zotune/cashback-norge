@@ -233,6 +233,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "DNB";
   }
 
+  if (provider === "curve") {
+    return "Curve";
+  }
+
   return "Klarna";
 }
 

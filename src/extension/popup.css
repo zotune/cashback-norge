@@ -160,6 +160,11 @@ h1 {
   color: #ffffff;
 }
 
+.provider-curve {
+  background: #000000;
+  color: #ffffff;
+}
+
 .copy-code-btn {
   align-items: center;
   color: #1f8f5f;
