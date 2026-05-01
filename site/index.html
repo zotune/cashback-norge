@@ -238,20 +238,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
     <button class="bonus-toggle" type="button">
       <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
     </button>
-    <div class="bonus-chips" style="display:none">
-      <a class="bonus-chip" href="https://www.americanexpress.com/nb-no/kredittkort/sas-classic/" target="_blank" rel="noreferrer">
-        +~0,74% <span class="badge badge-sas-amex">SAS Amex</span>
-      </a>
-      <a class="bonus-chip" href="https://saseurobonusmastercard.no/kortene/mastercard/" target="_blank" rel="noreferrer">
-        +~0,74% <span class="badge badge-sas-amex">SAS MC</span>
-      </a>
-      <a class="bonus-chip" href="https://www.lunar.app/no/privat/sas-eurobonus" target="_blank" rel="noreferrer">
-        +~0,59% <span class="badge badge-lunar">Lunar EB</span>
-      </a>
-      <a class="bonus-chip" href="https://www.banknorwegian.no/kredittkort/cashback/" target="_blank" rel="noreferrer">
-        +0,5% <span class="badge badge-norwegian">Norwegian</span>
-      </a>
-    </div>
+    <div class="bonus-chips" style="display:none"></div>
   </div>
   <div class="count"></div>
   <div class="results"></div>
@@ -281,6 +268,7 @@ async function init() {
     const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
     currentAmount = raw.length > 0 ? parseFloat(raw) : 0;
     render(document.querySelector(".search").value);
+    renderBonusChips();
   });
 }
 
@@ -447,9 +435,35 @@ function renderTips() {
   ).join("");
 }
 
+const BONUS_CARDS = [
+  { pct: 0.0074, label: "SAS Amex", badge: "badge-sas-amex", url: "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/" },
+  { pct: 0.0074, label: "SAS MC", badge: "badge-sas-amex", url: "https://saseurobonusmastercard.no/kortene/mastercard/" },
+  { pct: 0.0059, label: "Lunar EB", badge: "badge-lunar", url: "https://www.lunar.app/no/privat/sas-eurobonus" },
+  { pct: 0.005, label: "Norwegian", badge: "badge-norwegian", url: "https://www.banknorwegian.no/kredittkort/cashback/" },
+];
+
+function renderBonusChips() {
+  const chips = document.querySelector(".bonus-chips");
+  chips.innerHTML = BONUS_CARDS.map(c => {
+    const amt = currentAmount > 0 ? currentAmount : 0;
+    let rewardText;
+    if (amt > 0) {
+      const kr = Math.round(amt * c.pct);
+      rewardText = `+${kr} kr`;
+    } else {
+      const pctStr = (c.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+      rewardText = c.pct === 0.005 ? `+${pctStr}%` : `+~${pctStr}%`;
+    }
+    return `<a class="bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
+      ${rewardText} <span class="badge ${c.badge}">${esc(c.label)}</span>
+    </a>`;
+  }).join("");
+}
+
 function setupBonusToggle() {
   const btn = document.querySelector(".bonus-toggle");
   const chips = document.querySelector(".bonus-chips");
+  renderBonusChips();
   btn.addEventListener("click", () => {
     const open = chips.style.display !== "none";
     chips.style.display = open ? "none" : "flex";
