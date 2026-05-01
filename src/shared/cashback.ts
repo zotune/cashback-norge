@@ -172,7 +172,8 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
   const byKey = new Map<string, CashbackOffer>();
 
   for (const offer of offers) {
-    const key = `${offer.provider}:${offer.merchantName.toLowerCase()}`;
+    const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
+    const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
     // Keep the offer with more domain info, or the later one
     if (existing === undefined || offer.domains.length >= existing.domains.length) {
