@@ -1,5 +1,5 @@
 type CashbackOffer = {
-  provider: "trumf" | "klarna" | "remember";
+  provider: "trumf" | "klarna" | "remember" | "sas";
   merchantName: string;
   domains: string[];
   reward: string;
@@ -143,6 +143,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
     .notice.collapsed .side-tab.side-tab-trumf .side-tab-text {
       background: #07006b;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+
+    .notice.collapsed .side-tab.side-tab-sas .side-tab-text {
+      background: #00005c;
       color: #ffffff;
       padding: 4px 2px;
       border-radius: 4px;
@@ -300,6 +307,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       color: #ffffff;
     }
 
+    .provider-sas {
+      background: #00005c;
+      color: #ffffff;
+    }
+
     .offer-open {
       color: #1f8f5f;
       font-size: 12px;
@@ -413,17 +425,21 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   ];
   const pick = supportLinks[Math.floor(Math.random() * supportLinks.length)];
 
-  const support = document.createElement("div");
-  support.className = "support";
+  if (pick !== undefined) {
+    const support = document.createElement("div");
+    support.className = "support";
 
-  const supportLink = document.createElement("a");
-  supportLink.href = pick.url;
-  supportLink.target = "_blank";
-  supportLink.rel = "noreferrer";
-  supportLink.textContent = `St\u00f8tt oppdateringer: ${pick.text}`;
-  support.append(supportLink);
+    const supportLink = document.createElement("a");
+    supportLink.href = pick.url;
+    supportLink.target = "_blank";
+    supportLink.rel = "noreferrer";
+    supportLink.textContent = `St\u00f8tt oppdateringer: ${pick.text}`;
+    support.append(supportLink);
 
-  panel.append(topLine, body, support);
+    panel.append(topLine, body, support);
+  } else {
+    panel.append(topLine, body);
+  }
   notice.append(sideTab, panel);
 
   // Apply initial collapsed state before inserting into DOM (no transition flash)
@@ -516,8 +532,8 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
 
 function isCashbackProvider(
   value: unknown,
-): value is "trumf" | "klarna" | "remember" {
-  return value === "trumf" || value === "klarna" || value === "remember";
+): value is "trumf" | "klarna" | "remember" | "sas" {
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -535,6 +551,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "trumf") {
     return "Trumf";
+  }
+
+  if (provider === "sas") {
+    return "SAS EuroBonus";
   }
 
   return "Klarna";

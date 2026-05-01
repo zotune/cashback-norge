@@ -1,4 +1,4 @@
-export type CashbackProvider = "trumf" | "klarna" | "remember";
+export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas";
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -23,7 +23,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember";
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas";
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {
@@ -206,7 +206,7 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
 }
 
 type RewardValue = {
-  kind: "percentage" | "fixed" | "unknown";
+  kind: "percentage" | "fixed" | "points" | "unknown";
   amount: number;
 };
 
@@ -229,6 +229,15 @@ function parseRewardValue(reward: string): RewardValue {
     };
   }
 
+  const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
+
+  if (pointsMatch !== null) {
+    return {
+      kind: "points",
+      amount: parseLocalizedNumber((pointsMatch[1] ?? "0").replace(/\s/g, "")),
+    };
+  }
+
   return {
     kind: "unknown",
     amount: 0,
@@ -242,10 +251,14 @@ function parseLocalizedNumber(value: string): number {
 
 function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "percentage") {
-    return 3;
+    return 4;
   }
 
   if (kind === "fixed") {
+    return 3;
+  }
+
+  if (kind === "points") {
     return 2;
   }
 

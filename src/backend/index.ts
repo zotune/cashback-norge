@@ -5,6 +5,7 @@ import { createConsoleLogger } from "./logger.js";
 import { readManualOffers } from "./manual-offers.js";
 import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlRemember } from "./providers/remember.js";
+import { fetchSas } from "./providers/sas.js";
 import { crawlTrumf } from "./providers/trumf.js";
 
 type CliConfig = {
@@ -13,9 +14,11 @@ type CliConfig = {
   providerOverridesPath: string;
   rememberStartUrl: string;
   trumfStartUrl: string;
+  sasApiUrl: string;
   maxRequestsPerCrawl: number;
   skipRemember: boolean;
   skipTrumf: boolean;
+  skipSas: boolean;
 };
 
 async function main(): Promise<void> {
@@ -44,7 +47,15 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
         startUrl: config.trumfStartUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...rememberOffers, ...trumfOffers]);
+  const sasOffers = config.skipSas
+    ? []
+    : await fetchSas({
+        generatedAt,
+        logger,
+        overrides: providerOverrides,
+        apiUrl: config.sasApiUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...rememberOffers, ...trumfOffers, ...sasOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -69,6 +80,9 @@ function readCliConfig(args: string[]): CliConfig {
     trumfStartUrl:
       readArgumentValue(args, "--trumf-start-url") ??
       "https://trumfnetthandel.no/kategori",
+    sasApiUrl:
+      readArgumentValue(args, "--sas-api-url") ??
+      "https://onlineshopping.loyaltykey.com/api/v1/shops?filter%5Bchannel%5D=SAS&filter%5Blanguage%5D=nb&filter%5Bcountry%5D=NO&filter%5Bamount%5D=5000",
     maxRequestsPerCrawl: readPositiveIntegerArgument(
       args,
       "--max-requests",
@@ -76,6 +90,7 @@ function readCliConfig(args: string[]): CliConfig {
     ),
     skipRemember: args.includes("--skip-remember"),
     skipTrumf: args.includes("--skip-trumf"),
+    skipSas: args.includes("--skip-sas"),
   };
 }
 

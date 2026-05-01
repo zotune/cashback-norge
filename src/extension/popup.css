@@ -89,6 +89,11 @@ h1 {
   color: #ffffff;
 }
 
+.provider-sas {
+  background: #00005c;
+  color: #ffffff;
+}
+
 .reward {
   align-items: center;
   background: #1f8f5f;
