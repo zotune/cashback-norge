@@ -7,6 +7,7 @@ import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
+import { fetchTfBank } from "./providers/tfbank.js";
 import { crawlTrumf } from "./providers/trumf.js";
 
 type CliConfig = {
@@ -18,11 +19,13 @@ type CliConfig = {
   rememberStartUrl: string;
   trumfStartUrl: string;
   sasApiUrl: string;
+  tfBankApiUrl: string;
   maxRequestsPerCrawl: number;
   skipKlarna: boolean;
   skipRemember: boolean;
   skipTrumf: boolean;
   skipSas: boolean;
+  skipTfBank: boolean;
 };
 
 async function main(): Promise<void> {
@@ -68,7 +71,14 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
         apiUrl: config.sasApiUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers]);
+  const tfBankOffers = config.skipTfBank
+    ? []
+    : await fetchTfBank({
+        generatedAt,
+        logger,
+        apiUrl: config.tfBankApiUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -104,6 +114,9 @@ function readCliConfig(args: string[]): CliConfig {
     sasApiUrl:
       readArgumentValue(args, "--sas-api-url") ??
       "https://onlineshopping.loyaltykey.com/api/v1/shops?filter%5Bchannel%5D=SAS&filter%5Blanguage%5D=nb&filter%5Bcountry%5D=NO&filter%5Bamount%5D=5000",
+    tfBankApiUrl:
+      readArgumentValue(args, "--tfbank-api-url") ??
+      "https://tfbank.dealpass.no/ajax/deals",
     maxRequestsPerCrawl: readPositiveIntegerArgument(
       args,
       "--max-requests",
@@ -113,6 +126,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipRemember: args.includes("--skip-remember"),
     skipTrumf: args.includes("--skip-trumf"),
     skipSas: args.includes("--skip-sas"),
+    skipTfBank: args.includes("--skip-tfbank"),
   };
 }
 

@@ -185,6 +185,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "SAS EuroBonus";
   }
 
+  if (provider === "tfbank") {
+    return "TF Bank";
+  }
+
   return "Klarna";
 }
 

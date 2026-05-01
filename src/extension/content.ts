@@ -312,6 +312,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       color: #ffffff;
     }
 
+    .provider-tfbank {
+      background: #e30613;
+      color: #ffffff;
+    }
+
     .offer-open {
       color: #1f8f5f;
       font-size: 12px;
@@ -424,7 +429,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     { text: "Kj\u00f8p en kaffe til utvikler \u2192", url: "https://buymeacoffee.com/adore" },
     { text: "1% cashback i 30 dager med Curve \u2192", url: "https://www.curve.com/join#D5GXXJJD" },
     { text: "Opptil 2 500 kr med Revolut \u2192", url: "https://revolut.com/referrals?r=FELPJK" },
-    { text: "500 poeng gratis i Horde \u2192", url: "https://app.horde.no/66CS/verve?code=kloube" },
+    { text: "Horde: 500p bonus, oversikt og nedbetaling kredittkort \u2192", url: "https://app.horde.no/66CS/verve?code=kloube" },
   ];
   const pick = supportLinks[Math.floor(Math.random() * supportLinks.length)];
 
@@ -535,8 +540,8 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
 
 function isCashbackProvider(
   value: unknown,
-): value is "trumf" | "klarna" | "remember" | "sas" {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas";
+): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" {
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -558,6 +563,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "sas") {
     return "SAS EuroBonus";
+  }
+
+  if (provider === "tfbank") {
+    return "TF Bank";
   }
 
   return "Klarna";

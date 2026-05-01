@@ -1,4 +1,4 @@
-export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas";
+export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank";
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -23,7 +23,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas";
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank";
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {
