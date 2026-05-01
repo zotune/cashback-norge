@@ -1,10 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Cashback Varsler",
+  "name": "Cashback Norge",
   "description": "Shows cashback offers for supported stores.",
   "version": "0.1.0",
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "assets/background.js",
     "type": "module"
