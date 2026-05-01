@@ -48,12 +48,19 @@ export function PopupApp(): ReactElement {
     );
   }
 
+  const mainOffers = state.offers.filter((o) => o.provider !== "curve");
+  const curveOffer = state.offers.find((o) => o.provider === "curve");
+
+  const klarnaMinKr = amount > 0 ? formatKr(amount * 0.5 / 100) : null;
+  const klarnaMaxKr = amount > 0 ? formatKr(amount * 1 / 100) : null;
+  const curveKr = amount > 0 ? formatKr(amount * 1 / 100) : null;
+
   return (
     <main className="popup">
       <div className="popup-header">
         <div>
           <p className="eyebrow">{state.hostname}</p>
-          <h1>{state.offers.length > 0 ? "Cashback offers" : "No cashback"}</h1>
+          <h1>{mainOffers.length > 0 ? "Cashback offers" : "No cashback"}</h1>
         </div>
         <input
           className="sum-input"
@@ -65,7 +72,7 @@ export function PopupApp(): ReactElement {
         />
       </div>
       <div className="offers">
-        {state.offers.map((offer) => {
+        {mainOffers.map((offer) => {
           return (
             <OfferRow
               key={`${offer.provider}:${offer.sourceUrl}`}
@@ -74,6 +81,34 @@ export function PopupApp(): ReactElement {
             />
           );
         })}
+      </div>
+      <div className="bonus-chips">
+        {curveOffer !== undefined && (
+          <a
+            className="bonus-chip"
+            href={curveOffer.activationUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="bonus-chip-label">
+              {curveKr !== null ? `+${curveKr} kr` : "+1 %"}
+            </span>
+            <span className="provider-badge provider-curve">Curve Pro</span>
+          </a>
+        )}
+        <a
+          className="bonus-chip"
+          href="https://www.klarna.com/no/medlemskap/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="bonus-chip-label">
+            {klarnaMinKr !== null && klarnaMaxKr !== null
+              ? `+${klarnaMinKr}-${klarnaMaxKr} kr`
+              : "+0,5-1 %"}
+          </span>
+          <span className="provider-badge provider-klarna">Klarna+</span>
+        </a>
       </div>
     </main>
   );
@@ -234,7 +269,7 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   if (provider === "curve") {
-    return "Curve";
+    return "Curve Pro";
   }
 
   return "Klarna";

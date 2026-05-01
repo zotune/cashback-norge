@@ -177,3 +177,40 @@ h1 {
 .copy-code-btn:hover {
   color: #166b47;
 }
+
+.bonus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 14px 10px;
+}
+
+.bonus-chip {
+  align-items: center;
+  background: #f0f4f2;
+  border: 1px solid #d8e3de;
+  border-radius: 20px;
+  color: #172026;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+  line-height: 1;
+  padding: 5px 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bonus-chip:hover {
+  background: #e4ebe7;
+}
+
+.bonus-chip-label {
+  font-weight: 800;
+}
+
+.bonus-chip .provider-badge {
+  font-size: 9px;
+  min-height: 16px;
+  padding: 0 5px;
+}

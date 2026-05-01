@@ -391,6 +391,42 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       display: block;
     }
 
+    .bonus-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .bonus-chip {
+      align-items: center;
+      background: #f0f4f2;
+      border: 1px solid #d8e3de;
+      border-radius: 20px;
+      color: #172026;
+      display: inline-flex;
+      font-size: 11px;
+      font-weight: 600;
+      gap: 4px;
+      line-height: 1;
+      padding: 5px 10px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .bonus-chip:hover {
+      background: #e4ebe7;
+    }
+
+    .bonus-chip-label {
+      font-weight: 800;
+    }
+
+    .bonus-chip .provider-badge {
+      font-size: 9px;
+      min-height: 16px;
+      padding: 0 5px;
+    }
+
     .offer-link-wrapper {
       position: relative;
     }
@@ -434,7 +470,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     }
   `;
 
-  const offer = offers[0];
+  const mainOffers = offers.filter((o) => o.provider !== "curve");
+  const curveOffer = offers.find((o) => o.provider === "curve");
+
+  const offer = mainOffers[0];
 
   if (offer === undefined) {
     return;
@@ -499,7 +538,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
 
-  for (const currentOffer of offers) {
+  for (const currentOffer of mainOffers) {
     const wrapper = document.createElement("div");
     wrapper.className = "offer-link-wrapper";
 
@@ -584,14 +623,64 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
         ? formatBreakdownWithAmounts(offer.terms, amount)
         : offer.terms;
     }
+    for (const { element, pct } of bonusChipLabels) {
+      if (amount > 0) {
+        const kr = amount * pct / 100;
+        element.textContent = `+${formatKr(kr)} kr`;
+      } else {
+        element.textContent = `+${pct} %`;
+      }
+    }
+    if (amount > 0) {
+      const minKr = amount * 0.5 / 100;
+      const maxKr = amount * 1 / 100;
+      klarnaLabel.textContent = `+${formatKr(minKr)}-${formatKr(maxKr)} kr`;
+    } else {
+      klarnaLabel.textContent = "+0,5-1 %";
+    }
   });
 
-  body.append(header, offerList);
+  const bonusChipLabels: { element: HTMLSpanElement; pct: number }[] = [];
+
+  const bonusChips = document.createElement("div");
+  bonusChips.className = "bonus-chips";
+
+  if (curveOffer !== undefined) {
+    const curveChip = document.createElement("a");
+    curveChip.className = "bonus-chip";
+    curveChip.href = curveOffer.activationUrl;
+    curveChip.target = "_blank";
+    curveChip.rel = "noreferrer";
+    const curveLabel = document.createElement("span");
+    curveLabel.className = "bonus-chip-label";
+    curveLabel.textContent = "+1 %";
+    bonusChipLabels.push({ element: curveLabel, pct: 1 });
+    const curveBadge = document.createElement("span");
+    curveBadge.className = "provider-badge provider-curve";
+    curveBadge.textContent = "Curve Pro";
+    curveChip.append(curveLabel, curveBadge);
+    bonusChips.append(curveChip);
+  }
+
+  const klarnaChip = document.createElement("a");
+  klarnaChip.className = "bonus-chip";
+  klarnaChip.href = "https://www.klarna.com/no/medlemskap/";
+  klarnaChip.target = "_blank";
+  klarnaChip.rel = "noreferrer";
+  const klarnaLabel = document.createElement("span");
+  klarnaLabel.className = "bonus-chip-label";
+  klarnaLabel.textContent = "+0,5-1 %";
+  const klarnaBadge = document.createElement("span");
+  klarnaBadge.className = "provider-badge provider-klarna";
+  klarnaBadge.textContent = "Klarna+";
+  klarnaChip.append(klarnaLabel, klarnaBadge);
+  bonusChips.append(klarnaChip);
+
+  body.append(header, offerList, bonusChips);
 
   const supportLinks = [
     { text: "200 kr gratis i fond \u2192", url: "https://kron.no/app/invitert/nvu4d" },
     { text: "Kj\u00f8p en kaffe til utvikler \u2192", url: "https://buymeacoffee.com/adore" },
-    { text: "1% cashback i 30 dager med Curve \u2192", url: "https://www.curve.com/join#D5GXXJJD" },
     { text: "Opptil 2 500 kr med Revolut \u2192", url: "https://revolut.com/referrals?r=FELPJK" },
     { text: "Horde: 500p bonus, oversikt og nedbetaling kredittkort \u2192", url: "https://app.horde.no/66CS/verve?code=kloube" },
   ];
@@ -626,8 +715,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
   // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
   const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
-  for (let idx = 0; idx < offers.length; idx++) {
-    const currentOffer = offers[idx];
+  for (let idx = 0; idx < mainOffers.length; idx++) {
+    const currentOffer = mainOffers[idx];
     if (currentOffer === undefined || !hasRateBreakdown(currentOffer.terms)) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
@@ -771,7 +860,7 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   if (provider === "curve") {
-    return "Curve";
+    return "Curve Pro";
   }
 
   return "Klarna";

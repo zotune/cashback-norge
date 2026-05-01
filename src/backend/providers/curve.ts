@@ -13,6 +13,7 @@ export type FetchCurveInput = {
 
 export function fetchCurve(input: FetchCurveInput): CashbackOffer[] {
   const curveUrl = "https://help.curve.com/en_gb/1-cashback-retailers-rk1gJoBMh";
+  const curveInviteUrl = "https://www.curve.com/join#D5GXXJJD";
   const offers: CashbackOffer[] = [];
 
   for (const retailer of CURVE_RETAILERS) {
@@ -22,7 +23,7 @@ export function fetchCurve(input: FetchCurveInput): CashbackOffer[] {
       domains: retailer.domains,
       reward: "1 %",
       sourceUrl: curveUrl,
-      activationUrl: curveUrl,
+      activationUrl: curveInviteUrl,
       terms: "Krever Curve Pro eller Pro+. Velg butikken i Curve-appen. Maks 6 (Pro) eller 12 (Pro+) butikker.",
       updatedAt: input.generatedAt,
     });
