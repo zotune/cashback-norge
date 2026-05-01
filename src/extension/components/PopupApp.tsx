@@ -136,8 +136,8 @@ export function PopupApp(): ReactElement {
               >
                 <span className="bonus-chip-label">
                   {amount > 0
-                    ? `+${Math.round(amount * 10 / 100)} EB (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
-                    : "+10 EB/100kr"}
+                    ? `+~0,74% (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
+                    : "+~0,74% (~10 EB/100kr)"}
                 </span>
                 <span className="provider-badge provider-sas-amex">SAS Amex</span>
               </a>
@@ -150,8 +150,8 @@ export function PopupApp(): ReactElement {
               >
                 <span className="bonus-chip-label">
                   {amount > 0
-                    ? `+${Math.round(amount * 10 / 100)} EB (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
-                    : "+10 EB/100kr"}
+                    ? `+~0,74% (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
+                    : "+~0,74% (~10 EB/100kr)"}
                 </span>
                 <span className="provider-badge provider-sas-amex">SAS MC</span>
               </a>
@@ -164,8 +164,8 @@ export function PopupApp(): ReactElement {
               >
                 <span className="bonus-chip-label">
                   {amount > 0
-                    ? `+${Math.round(amount * 8 / 100)} EB (~${formatKr(Math.round(amount * 8 / 100) / 13.5)} kr)`
-                    : "+8 EB/100kr"}
+                    ? `+~0,59% (~${formatKr(Math.round(amount * 8 / 100) / 13.5)} kr)`
+                    : "+~0,59% (~8 EB/100kr)"}
                 </span>
                 <span className="provider-badge provider-lunar">Lunar EB</span>
               </a>

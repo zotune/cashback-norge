@@ -764,18 +764,18 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (amount > 0) {
       const eb = Math.round(amount * 10 / 100);
       const kr = eb / EB_PER_TRUMF_KR;
-      sasAmexLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
-      sasMcLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
+      sasAmexLabel.textContent = `+~0,74% (~${formatKr(kr)} kr)`;
+      sasMcLabel.textContent = `+~0,74% (~${formatKr(kr)} kr)`;
     } else {
-      sasAmexLabel.textContent = "+10 EB/100kr";
-      sasMcLabel.textContent = "+10 EB/100kr";
+      sasAmexLabel.textContent = "+~0,74% (~10 EB/100kr)";
+      sasMcLabel.textContent = "+~0,74% (~10 EB/100kr)";
     }
     if (amount > 0) {
       const eb = Math.round(amount * 8 / 100);
       const kr = eb / EB_PER_TRUMF_KR;
-      lunarEbLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
+      lunarEbLabel.textContent = `+~0,59% (~${formatKr(kr)} kr)`;
     } else {
-      lunarEbLabel.textContent = "+8 EB/100kr";
+      lunarEbLabel.textContent = "+~0,59% (~8 EB/100kr)";
     }
     if (amount > 0) {
       const bestBonusEb = Math.round(amount * 10 / 100);
@@ -784,7 +784,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const totalKr = mainMaxKr + bestBonusKr;
       chipsToggleText.textContent = `Ekstra cashback (totalt opptil ~${formatKr(totalKr)} kr)`;
     } else {
-      chipsToggleText.textContent = "Ekstra cashback (opptil +10 EB/100kr)";
+      chipsToggleText.textContent = "Ekstra cashback (opptil +~0,74%)";
     }
   });
 
@@ -811,7 +811,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sasAmexChip.rel = "noreferrer";
   const sasAmexLabel = document.createElement("span");
   sasAmexLabel.className = "bonus-chip-label";
-  sasAmexLabel.textContent = "+10 EB/100kr";
+  sasAmexLabel.textContent = "+~0,74% (~10 EB/100kr)";
   const sasAmexBadge = document.createElement("span");
   sasAmexBadge.className = "provider-badge provider-sas-amex";
   sasAmexBadge.textContent = "SAS Amex";
@@ -826,7 +826,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sasMcChip.rel = "noreferrer";
   const sasMcLabel = document.createElement("span");
   sasMcLabel.className = "bonus-chip-label";
-  sasMcLabel.textContent = "+10 EB/100kr";
+  sasMcLabel.textContent = "+~0,74% (~10 EB/100kr)";
   const sasMcBadge = document.createElement("span");
   sasMcBadge.className = "provider-badge provider-sas-amex";
   sasMcBadge.textContent = "SAS MC";
@@ -841,7 +841,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   lunarEbChip.rel = "noreferrer";
   const lunarEbLabel = document.createElement("span");
   lunarEbLabel.className = "bonus-chip-label";
-  lunarEbLabel.textContent = "+8 EB/100kr";
+  lunarEbLabel.textContent = "+~0,59% (~8 EB/100kr)";
   const lunarEbBadge = document.createElement("span");
   lunarEbBadge.className = "provider-badge provider-lunar";
   lunarEbBadge.textContent = "Lunar EB";
@@ -947,7 +947,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   chipsToggleArrow.textContent = "\u25BC";
 
   const chipsToggleText = document.createElement("span");
-  chipsToggleText.textContent = "Ekstra cashback (opptil +10 EB/100kr)";
+  chipsToggleText.textContent = "Ekstra cashback (opptil +~0,74%)";
 
   chipsToggle.append(chipsToggleArrow, chipsToggleText);
   chipsToggle.addEventListener("click", () => {
