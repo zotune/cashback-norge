@@ -765,8 +765,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const eb = Math.round(amount * 10 / 100);
       const kr = eb / EB_PER_TRUMF_KR;
       sasAmexLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
+      sasMcLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
     } else {
       sasAmexLabel.textContent = "+10 EB/100kr";
+      sasMcLabel.textContent = "+10 EB/100kr";
     }
     if (amount > 0) {
       const eb = Math.round(amount * 8 / 100);
@@ -774,6 +776,15 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       lunarEbLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
     } else {
       lunarEbLabel.textContent = "+8 EB/100kr";
+    }
+    if (amount > 0) {
+      const bestBonusEb = Math.round(amount * 10 / 100);
+      const bestBonusKr = bestBonusEb / EB_PER_TRUMF_KR;
+      const mainMaxKr = mainOffers.reduce((max, o) => Math.max(max, calculateCashbackMaxKr(o, amount)), 0);
+      const totalKr = mainMaxKr + bestBonusKr;
+      chipsToggleText.textContent = `Ekstra cashback (totalt opptil ~${formatKr(totalKr)} kr)`;
+    } else {
+      chipsToggleText.textContent = "Ekstra cashback (opptil +10 EB/100kr)";
     }
   });
 
@@ -793,21 +804,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   freeGroup.append(freeLabel, freeItems);
 
   const norwegianChip = document.createElement("a");
-  norwegianChip.className = "bonus-chip";
-  norwegianChip.href = "https://www.banknorwegian.no/kredittkort/cashback/";
-  norwegianChip.target = "_blank";
-  norwegianChip.rel = "noreferrer";
-  const norwegianLabel = document.createElement("span");
-  norwegianLabel.className = "bonus-chip-label";
-  norwegianLabel.textContent = "+0,5 %";
-  bonusChipLabels.push({ element: norwegianLabel, pct: 0.5 });
-  const norwegianBadge = document.createElement("span");
-  norwegianBadge.className = "provider-badge provider-norwegian";
-  norwegianBadge.textContent = "Norwegian";
-  norwegianChip.append(norwegianLabel, norwegianBadge);
-  freeItems.append(norwegianChip);
-  addChipTooltip(norwegianChip, "0,5 % cashback (1:1 kr mot faktura) eller CashPoints (flyreiser). Gratis kort, ingen årsavgift.", shadowRoot);
-
   const sasAmexChip = document.createElement("a");
   sasAmexChip.className = "bonus-chip";
   sasAmexChip.href = "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/";
@@ -821,7 +817,22 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sasAmexBadge.textContent = "SAS Amex";
   sasAmexChip.append(sasAmexLabel, sasAmexBadge);
   freeItems.append(sasAmexChip);
-  addChipTooltip(sasAmexChip, "Classic: 10 EB/100 kr (gratis)\nPremium: 15 EB/100 kr (150 kr/mnd)\nElite: 20 EB/100 kr (575 kr/mnd)\n1 EB \u2248 0,07 kr.", shadowRoot);
+  addChipTooltip(sasAmexChip, "10 EB/100 kr. Gratis kort.\n1 EB \u2248 0,07 kr.", shadowRoot);
+
+  const sasMcChip = document.createElement("a");
+  sasMcChip.className = "bonus-chip";
+  sasMcChip.href = "https://saseurobonusmastercard.no/kortene/mastercard/";
+  sasMcChip.target = "_blank";
+  sasMcChip.rel = "noreferrer";
+  const sasMcLabel = document.createElement("span");
+  sasMcLabel.className = "bonus-chip-label";
+  sasMcLabel.textContent = "+10 EB/100kr";
+  const sasMcBadge = document.createElement("span");
+  sasMcBadge.className = "provider-badge provider-sas-amex";
+  sasMcBadge.textContent = "SAS MC";
+  sasMcChip.append(sasMcLabel, sasMcBadge);
+  freeItems.append(sasMcChip);
+  addChipTooltip(sasMcChip, "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\n1 EB \u2248 0,07 kr.", shadowRoot);
 
   const lunarEbChip = document.createElement("a");
   lunarEbChip.className = "bonus-chip";
@@ -836,7 +847,22 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   lunarEbBadge.textContent = "Lunar EB";
   lunarEbChip.append(lunarEbLabel, lunarEbBadge);
   freeItems.append(lunarEbChip);
-  addChipTooltip(lunarEbChip, "8 EB/100 kr (netthandel)\n20 EB/100 kr på SAS.no\nGratis kort.", shadowRoot);
+  addChipTooltip(lunarEbChip, "8 EB/100 kr (netthandel)\n20 EB/100 kr p\u00e5 SAS.no\nGratis kort.", shadowRoot);
+
+  norwegianChip.className = "bonus-chip";
+  norwegianChip.href = "https://www.banknorwegian.no/kredittkort/cashback/";
+  norwegianChip.target = "_blank";
+  norwegianChip.rel = "noreferrer";
+  const norwegianLabel = document.createElement("span");
+  norwegianLabel.className = "bonus-chip-label";
+  norwegianLabel.textContent = "+0,5 %";
+  bonusChipLabels.push({ element: norwegianLabel, pct: 0.5 });
+  const norwegianBadge = document.createElement("span");
+  norwegianBadge.className = "provider-badge provider-norwegian";
+  norwegianBadge.textContent = "Norwegian";
+  norwegianChip.append(norwegianLabel, norwegianBadge);
+  freeItems.append(norwegianChip);
+  addChipTooltip(norwegianChip, "0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr p\u00e5 Norwegian.no).\nGratis kort, ingen \u00e5rsavgift.", shadowRoot);
 
   bonusChips.append(freeGroup);
 
@@ -921,7 +947,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   chipsToggleArrow.textContent = "\u25BC";
 
   const chipsToggleText = document.createElement("span");
-  chipsToggleText.textContent = "Kort og medlemskap";
+  chipsToggleText.textContent = "Ekstra cashback (opptil +10 EB/100kr)";
 
   chipsToggle.append(chipsToggleArrow, chipsToggleText);
   chipsToggle.addEventListener("click", () => {
@@ -1178,6 +1204,29 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
     return `${label} (${ebStr})`;
   }
   return label;
+}
+
+function calculateCashbackMaxKr(offer: CashbackOffer, amount: number): number {
+  const reward = offer.reward.trim();
+  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (rangeMatch !== null) {
+    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    return amount * maxPct / 100;
+  }
+  const pctMatch = reward.match(/^([\d,]+)\s*%$/);
+  if (pctMatch !== null) {
+    return amount * Number.parseFloat(pctMatch[1].replace(",", ".")) / 100;
+  }
+  const klarnaMatch = reward.match(/^([\d.]+)%$/);
+  if (klarnaMatch !== null) {
+    return amount * Number.parseFloat(klarnaMatch[1]) / 100;
+  }
+  const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (sasRateMatch !== null) {
+    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    return amount * points / 100 / EB_PER_TRUMF_KR;
+  }
+  return 0;
 }
 
 function formatBreakdownWithAmounts(terms: string, amount: number): string {

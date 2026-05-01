@@ -121,7 +121,7 @@ export function PopupApp(): ReactElement {
           }}
         >
           <span className="bonus-chips-toggle-arrow">{"\u25BE"}</span>
-          <span>Kort og medlemskap</span>
+          <span>Ekstra cashback</span>
         </button>
         <div className="bonus-chips">
           <div className="chip-group">
@@ -129,22 +129,10 @@ export function PopupApp(): ReactElement {
             <div className="chip-group-items">
               <a
                 className="bonus-chip"
-                href="https://www.banknorwegian.no/kredittkort/cashback/"
-                target="_blank"
-                rel="noreferrer"
-                title={"0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr på Norwegian.no).\nGratis kort, ingen årsavgift."}
-              >
-                <span className="bonus-chip-label">
-                  {amount > 0 ? `+${formatKr(amount * 0.5 / 100)} kr` : "+0,5 %"}
-                </span>
-                <span className="provider-badge provider-norwegian">Norwegian</span>
-              </a>
-              <a
-                className="bonus-chip"
                 href="https://www.americanexpress.com/nb-no/kredittkort/sas-classic/"
                 target="_blank"
                 rel="noreferrer"
-                title={"Classic: 10 EB/100 kr (gratis)\nPremium: 15 EB/100 kr (150 kr/mnd)\nElite: 20 EB/100 kr (575 kr/mnd)\n1 EB ≈ 0,07 kr."}
+                title={"10 EB/100 kr. Gratis kort.\n1 EB ≈ 0,07 kr."}
               >
                 <span className="bonus-chip-label">
                   {amount > 0
@@ -152,6 +140,20 @@ export function PopupApp(): ReactElement {
                     : "+10 EB/100kr"}
                 </span>
                 <span className="provider-badge provider-sas-amex">SAS Amex</span>
+              </a>
+              <a
+                className="bonus-chip"
+                href="https://saseurobonusmastercard.no/kortene/mastercard/"
+                target="_blank"
+                rel="noreferrer"
+                title={"10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\n1 EB ≈ 0,07 kr."}
+              >
+                <span className="bonus-chip-label">
+                  {amount > 0
+                    ? `+${Math.round(amount * 10 / 100)} EB (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
+                    : "+10 EB/100kr"}
+                </span>
+                <span className="provider-badge provider-sas-amex">SAS MC</span>
               </a>
               <a
                 className="bonus-chip"
@@ -166,6 +168,18 @@ export function PopupApp(): ReactElement {
                     : "+8 EB/100kr"}
                 </span>
                 <span className="provider-badge provider-lunar">Lunar EB</span>
+              </a>
+              <a
+                className="bonus-chip"
+                href="https://www.banknorwegian.no/kredittkort/cashback/"
+                target="_blank"
+                rel="noreferrer"
+                title={"0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr på Norwegian.no).\nGratis kort, ingen årsavgift."}
+              >
+                <span className="bonus-chip-label">
+                  {amount > 0 ? `+${formatKr(amount * 0.5 / 100)} kr` : "+0,5 %"}
+                </span>
+                <span className="provider-badge provider-norwegian">Norwegian</span>
               </a>
             </div>
           </div>
