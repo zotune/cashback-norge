@@ -118,7 +118,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
 
     *, *::before, *::after {
-      font-family: inherit;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     .notice {
@@ -784,7 +784,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const totalKr = mainMaxKr + bestBonusKr;
       chipsToggleText.textContent = `Ekstra cashback (totalt opptil ~${formatKr(totalKr)} kr)`;
     } else {
-      chipsToggleText.textContent = "Ekstra cashback (opptil +~0,74%)";
+      chipsToggleText.textContent = "Ekstra cashback (totalt opptil +~0,74%)";
     }
   });
 
@@ -947,7 +947,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   chipsToggleArrow.textContent = "\u25BC";
 
   const chipsToggleText = document.createElement("span");
-  chipsToggleText.textContent = "Ekstra cashback (opptil +~0,74%)";
+  chipsToggleText.textContent = "Ekstra cashback (totalt opptil +~0,74%)";
 
   chipsToggle.append(chipsToggleArrow, chipsToggleText);
   chipsToggle.addEventListener("click", () => {
