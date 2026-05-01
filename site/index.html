@@ -17,6 +17,8 @@ body {
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 20px; }
 .search-wrap {
+  display: flex;
+  gap: 8px;
   position: relative;
   margin-bottom: 20px;
 }
@@ -30,10 +32,27 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   height: 48px;
   outline: none;
   padding: 0 14px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 .search:focus { border-color: #1f8f5f; }
 .search::placeholder { color: #8a9a92; }
+.global-sum {
+  background: #fff;
+  border: 1px solid #d6e1dc;
+  border-radius: 10px;
+  color: #172026;
+  font: inherit;
+  font-size: 16px;
+  height: 48px;
+  outline: none;
+  padding: 0 14px;
+  text-align: right;
+  width: 110px;
+  flex-shrink: 0;
+}
+.global-sum:focus { border-color: #1f8f5f; }
+.global-sum::placeholder { color: #8a9a92; }
 .results { display: grid; gap: 12px; }
 .merchant {
   background: #fff;
@@ -143,21 +162,99 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .tip:active { background: #f0f4f2; }
 .tip-emoji { font-size: 16px; flex-shrink: 0; }
 .tip-text { overflow-wrap: anywhere; }
+.bonus-section {
+  margin-bottom: 16px;
+}
+.bonus-toggle {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: none;
+  color: #5d6b71;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 0;
+}
+.bonus-toggle:hover { color: #172026; }
+.bonus-toggle-arrow {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+.bonus-toggle.open .bonus-toggle-arrow {
+  transform: rotate(90deg);
+}
+.bonus-label {
+  color: #8a9a92;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.bonus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.bonus-chip {
+  align-items: center;
+  background: #f0f4f2;
+  border: 1px solid #d8e3de;
+  border-radius: 20px;
+  color: #172026;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+  line-height: 1;
+  padding: 5px 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.bonus-chip:active { background: #e4ebe7; }
+.bonus-chip .badge { font-size: 9px; min-height: 16px; padding: 0 5px; }
+.badge-sas-amex { background: #00005c; color: #fff; }
+.badge-norwegian { background: #d81939; color: #fff; }
+.badge-lunar { background: #2bb24c; color: #fff; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
+  <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
   <div class="search-wrap">
     <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
+    <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
   </div>
   <div class="tips"></div>
+  <div class="bonus-section">
+    <button class="bonus-toggle" type="button">
+      <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
+    </button>
+    <div class="bonus-chips" style="display:none">
+      <a class="bonus-chip" href="https://www.americanexpress.com/nb-no/kredittkort/sas-classic/" target="_blank" rel="noreferrer">
+        +~0,74% <span class="badge badge-sas-amex">SAS Amex</span>
+      </a>
+      <a class="bonus-chip" href="https://saseurobonusmastercard.no/kortene/mastercard/" target="_blank" rel="noreferrer">
+        +~0,74% <span class="badge badge-sas-amex">SAS MC</span>
+      </a>
+      <a class="bonus-chip" href="https://www.lunar.app/no/privat/sas-eurobonus" target="_blank" rel="noreferrer">
+        +~0,59% <span class="badge badge-lunar">Lunar EB</span>
+      </a>
+      <a class="bonus-chip" href="https://www.banknorwegian.no/kredittkort/cashback/" target="_blank" rel="noreferrer">
+        +0,5% <span class="badge badge-norwegian">Norwegian</span>
+      </a>
+    </div>
+  </div>
   <div class="count"></div>
   <div class="results"></div>
-  <div class="footer">
-    <p>Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
-  </div>
 </div>
 <script>
 const PROVIDER_NAMES = {
@@ -168,8 +265,11 @@ const EB_PER_TRUMF_KR = 13.5;
 
 let allMerchants = [];
 
+let currentAmount = 0;
+
 async function init() {
   renderTips();
+  setupBonusToggle();
   const res = await fetch("cashback-index.json");
   const data = await res.json();
   allMerchants = groupByMerchant(data.offers);
@@ -177,6 +277,22 @@ async function init() {
   document.querySelector(".search").addEventListener("input", (e) => {
     render(e.target.value);
   });
+  document.querySelector(".global-sum").addEventListener("input", (e) => {
+    const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+    currentAmount = raw.length > 0 ? parseFloat(raw) : 0;
+    render(document.querySelector(".search").value);
+  });
+}
+
+function getMaxPct(o) {
+  const r = o.reward.trim();
+  const range = r.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (range) return parseFloat(range[2].replace(",", "."));
+  const pct = r.match(/^([\d,]+)\s*%$/);
+  if (pct) return parseFloat(pct[1].replace(",", "."));
+  const sas = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (sas) return parseInt(sas[1].replace(/\s/g, ""), 10) / EB_PER_TRUMF_KR;
+  return 0;
 }
 
 function groupByMerchant(offers) {
@@ -186,7 +302,11 @@ function groupByMerchant(offers) {
     if (!map.has(key)) map.set(key, { name: o.merchantName, domains: o.domains, offers: [] });
     map.get(key).offers.push(o);
   }
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "nb"));
+  const merchants = [...map.values()];
+  for (const m of merchants) {
+    m.offers.sort((a, b) => getMaxPct(b) - getMaxPct(a));
+  }
+  return merchants.sort((a, b) => a.name.localeCompare(b.name, "nb"));
 }
 
 function render(query) {
@@ -209,14 +329,15 @@ function render(query) {
     return;
   }
 
-  const show = q.length > 0 ? filtered : filtered.slice(0, 50);
-  container.innerHTML = show.map(m => {
+  container.innerHTML = filtered.map(m => {
+    const key = m.name.toLowerCase();
     const domain = m.domains[0] || "";
     const icon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
     const offerHtml = m.offers.map(o => {
       const url = o.provider === "trumf" ? o.sourceUrl : o.activationUrl;
+      const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatReward(o);
       return `<a class="offer" href="${esc(url)}" target="_blank" rel="noreferrer">
-        <span class="offer-reward">${esc(formatReward(o))}</span>
+        <span class="offer-reward">${esc(label)}</span>
         <span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a>`;
     }).join("");
@@ -227,7 +348,7 @@ function render(query) {
       </div>
       <div class="offers">${offerHtml}</div>
     </div>`;
-  }).join("") + (q.length === 0 && filtered.length > 50 ? '<div class="empty">Søk for å se flere...</div>' : "");
+  }).join("");
 }
 
 function formatReward(o) {
@@ -260,6 +381,51 @@ function formatReward(o) {
   return r;
 }
 
+function calcReward(o, amount) {
+  const r = o.reward.trim();
+  const fmt = (n) => n.toFixed(2).replace(".", ",").replace(/,00$/, "");
+  // range percent
+  const range = r.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (range) {
+    const min = parseFloat(range[1].replace(",", "."));
+    const max = parseFloat(range[2].replace(",", "."));
+    const minKr = amount * min / 100;
+    const maxKr = amount * max / 100;
+    if (o.provider === "trumf") {
+      const minEb = Math.round(amount * min * EB_PER_TRUMF_KR / 100);
+      const maxEb = Math.round(amount * max * EB_PER_TRUMF_KR / 100);
+      return `${fmt(minKr)}-${fmt(maxKr)} kr (~${minEb}-${maxEb} EB)`;
+    }
+    return `${fmt(minKr)}-${fmt(maxKr)} kr`;
+  }
+  // single percent
+  const pct = r.match(/^([\d,]+)\s*%$/);
+  if (pct) {
+    const p = parseFloat(pct[1].replace(",", "."));
+    const kr = amount * p / 100;
+    if (o.provider === "trumf") {
+      const eb = Math.round(amount * p * EB_PER_TRUMF_KR / 100);
+      return `${fmt(kr)} kr (~${eb} EB)`;
+    }
+    return `${fmt(kr)} kr`;
+  }
+  // SAS rate
+  const sas = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (sas) {
+    const pts = parseInt(sas[1].replace(/\s/g, ""), 10);
+    const eb = Math.round(amount * pts / 100);
+    const kr = eb / EB_PER_TRUMF_KR;
+    return `~${fmt(kr)} kr (~${eb} EB)`;
+  }
+  // SAS fixed
+  const sasFixed = r.match(/^([\d\s]+)\s*poeng$/i);
+  if (sasFixed) {
+    const pts = parseInt(sasFixed[1].replace(/\s/g, ""), 10);
+    return `~${Math.round(pts / EB_PER_TRUMF_KR)} kr (~${pts.toLocaleString("nb-NO")} EB)`;
+  }
+  return r;
+}
+
 function esc(s) {
   const d = document.createElement("div");
   d.textContent = s;
@@ -279,6 +445,16 @@ function renderTips() {
       <span class="tip-text">${esc(t.text)}</span>
     </a>`
   ).join("");
+}
+
+function setupBonusToggle() {
+  const btn = document.querySelector(".bonus-toggle");
+  const chips = document.querySelector(".bonus-chips");
+  btn.addEventListener("click", () => {
+    const open = chips.style.display !== "none";
+    chips.style.display = open ? "none" : "flex";
+    btn.classList.toggle("open", !open);
+  });
 }
 
 init();
