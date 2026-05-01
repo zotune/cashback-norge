@@ -817,7 +817,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sasAmexBadge.textContent = "SAS Amex";
   sasAmexChip.append(sasAmexLabel, sasAmexBadge);
   freeItems.append(sasAmexChip);
-  addChipTooltip(sasAmexChip, "10 EB/100 kr. Gratis kort.\n1 EB \u2248 0,07 kr.", shadowRoot);
+  addChipTooltip(sasAmexChip, "10 EB/100 kr. Gratis kort.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).", shadowRoot);
 
   const sasMcChip = document.createElement("a");
   sasMcChip.className = "bonus-chip";
@@ -832,7 +832,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sasMcBadge.textContent = "SAS MC";
   sasMcChip.append(sasMcLabel, sasMcBadge);
   freeItems.append(sasMcChip);
-  addChipTooltip(sasMcChip, "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\n1 EB \u2248 0,07 kr.", shadowRoot);
+  addChipTooltip(sasMcChip, "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).", shadowRoot);
 
   const lunarEbChip = document.createElement("a");
   lunarEbChip.className = "bonus-chip";

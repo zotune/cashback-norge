@@ -132,7 +132,7 @@ export function PopupApp(): ReactElement {
                 href="https://www.americanexpress.com/nb-no/kredittkort/sas-classic/"
                 target="_blank"
                 rel="noreferrer"
-                title={"10 EB/100 kr. Gratis kort.\n1 EB ≈ 0,07 kr."}
+                title={"10 EB/100 kr. Gratis kort.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)."}
               >
                 <span className="bonus-chip-label">
                   {amount > 0
@@ -146,7 +146,7 @@ export function PopupApp(): ReactElement {
                 href="https://saseurobonusmastercard.no/kortene/mastercard/"
                 target="_blank"
                 rel="noreferrer"
-                title={"10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\n1 EB ≈ 0,07 kr."}
+                title={"10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)."}
               >
                 <span className="bonus-chip-label">
                   {amount > 0
