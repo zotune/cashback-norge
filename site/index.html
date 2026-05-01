@@ -75,6 +75,14 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   padding: 3px;
   width: 28px;
 }
+.merchant-icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f8f5f;
+}
 .merchant-name {
   font-size: 15px;
   font-weight: 700;
@@ -200,7 +208,60 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .bonus-chips {
   display: flex;
   flex-wrap: wrap;
+  gap: 12px;
+}
+.chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chip-group-label {
+  color: #8a9a92;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.chip-group-items {
+  display: flex;
+  flex-wrap: wrap;
   gap: 5px;
+}
+.tooltip-wrap {
+  position: relative;
+}
+.tooltip {
+  background: #172026;
+  border-radius: 8px;
+  bottom: calc(100% + 6px);
+  color: #fff;
+  font-size: 12px;
+  left: 50%;
+  line-height: 1.45;
+  opacity: 0;
+  padding: 8px 12px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  transition: opacity 0.15s;
+  white-space: pre-line;
+  width: max-content;
+  max-width: 260px;
+  z-index: 10;
+}
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #172026;
+}
+.tooltip-wrap:hover .tooltip,
+.tooltip-wrap.active .tooltip {
+  opacity: 1;
+  pointer-events: auto;
 }
 .bonus-chip {
   align-items: center;
@@ -222,6 +283,25 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .badge-sas-amex { background: #00005c; color: #fff; }
 .badge-norwegian { background: #d81939; color: #fff; }
 .badge-lunar { background: #2bb24c; color: #fff; }
+.badge-klarna { background: #ffb3c7; color: #17120f; }
+.float-tooltip {
+  background: #172026;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 260px;
+  opacity: 0;
+  padding: 8px 12px;
+  pointer-events: none;
+  position: fixed;
+  transition: opacity 0.15s;
+  white-space: pre-line;
+  z-index: 100;
+}
+.float-tooltip.visible {
+  opacity: 1;
+}
 </style>
 </head>
 <body>
@@ -238,15 +318,33 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
     <button class="bonus-toggle" type="button">
       <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
     </button>
-    <div class="bonus-chips" style="display:none"></div>
+    <div class="bonus-chips" style="display:none">
+      <div class="chip-group">
+        <span class="chip-group-label">Gratis</span>
+        <div class="chip-group-items" id="free-chips"></div>
+      </div>
+      <div class="chip-group">
+        <span class="chip-group-label">Premium</span>
+        <div class="chip-group-items" id="premium-chips"></div>
+      </div>
+    </div>
   </div>
   <div class="count"></div>
   <div class="results"></div>
+  <div class="float-tooltip" id="floatTip"></div>
 </div>
 <script>
 const PROVIDER_NAMES = {
   trumf: "Trumf", klarna: "Klarna", remember: "re:member",
   sas: "SAS EB", tfbank: "TF Bank", dnb: "DNB", curve: "Curve"
+};
+const PROVIDER_TIPS = {
+  trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
+  klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
+  remember: "re:member kredittkort.\nAktiver tilbud i re:member-appen før kjøp.",
+  sas: "SAS EuroBonus-poeng.\nAktiver tilbud på SAS sine sider.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
+  tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
+  dnb: "DNB Spare. Aktiver i DNB-appen.",
 };
 const EB_PER_TRUMF_KR = 13.5;
 
@@ -283,12 +381,66 @@ function getMaxPct(o) {
   return 0;
 }
 
+const MERCHANT_ALIASES = {
+  "auto europe no": "auto europe",
+  "christiania glassmagasin": "christiania glasmagasin",
+  "hunkemöller": "hunkemøller",
+  "jakt og friluft": "jakt & friluft",
+  "kinoklubben": "kinoklubb",
+  "kitchn": "kitch'n",
+  "l\u00b4occitane": "l'occitane",
+  "nordic print": "nordicprint",
+  "nordicprint": "nordicprint",
+  "pyret og snäckan": "pyret & snäckan",
+  "racketspesialisten": "racketspecialisten",
+  "sky showtime": "skyshowtime",
+  "scandic hotels": "scandic",
+  "ellos no": "ellos",
+  "elite hotels of sweden": "elite hotels",
+  "db journey": "db",
+  "budget leiebiler": "budget",
+  "amisol travel": "amisol",
+  "radisson hotels": "radisson hotel group",
+  "norton by symantec": "norton",
+  "marshall-hodetelefoner": "marshall",
+};
+
+function normalizeName(name) {
+  let n = name
+    .replace(/\s*Direct Deals$/i, "")
+    .replace(/\.com$/i, "")
+    .replace(/\.no$/i, "")
+    .replace(/\.se$/i, "")
+    .replace(/\.eu$/i, "")
+    .trim();
+  const key = n.toLowerCase();
+  if (MERCHANT_ALIASES[key]) {
+    // find original casing from first encounter, but use alias key for grouping
+    return MERCHANT_ALIASES[key];
+  }
+  return n;
+}
+
 function groupByMerchant(offers) {
   const map = new Map();
   for (const o of offers) {
-    const key = o.merchantName.toLowerCase();
-    if (!map.has(key)) map.set(key, { name: o.merchantName, domains: o.domains, offers: [] });
-    map.get(key).offers.push(o);
+    if (!o.reward || !o.reward.trim()) continue;
+    if (o.provider === "curve") continue;
+    const name = normalizeName(o.merchantName);
+    const key = name.toLowerCase();
+    if (!map.has(key)) map.set(key, { name, domains: [], offers: [] });
+    const m = map.get(key);
+    // Prefer a nicely capitalized name (not all-caps, not all-lower)
+    const current = m.name;
+    if (current === current.toLowerCase() || current === current.toUpperCase()) {
+      if (name !== name.toLowerCase() && name !== name.toUpperCase()) {
+        m.name = name;
+      }
+    }
+    for (const d of (o.domains || [])) {
+      if (!m.domains.includes(d)) m.domains.push(d);
+    }
+    m.offers.push(o);
   }
   const merchants = [...map.values()];
   for (const m of merchants) {
@@ -319,19 +471,24 @@ function render(query) {
 
   container.innerHTML = filtered.map(m => {
     const key = m.name.toLowerCase();
-    const domain = m.domains[0] || "";
-    const icon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+    const domain = m.domains.find(d => !d.includes("sjv.io") && !d.includes("emjcd.com")) || m.domains[0] || "";
+    const hasIcon = domain.length > 0;
+    const letter = esc(m.name.charAt(0).toUpperCase());
+    const iconHtml = hasIcon
+      ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64'">`
+      : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
     const offerHtml = m.offers.map(o => {
       const url = o.provider === "trumf" ? o.sourceUrl : o.activationUrl;
       const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatReward(o);
-      return `<a class="offer" href="${esc(url)}" target="_blank" rel="noreferrer">
+      const tip = PROVIDER_TIPS[o.provider] || "";
+      return `<a class="offer" href="${esc(url)}" target="_blank" rel="noreferrer" data-tip="${esc(tip)}">
         <span class="offer-reward">${esc(label)}</span>
         <span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a>`;
     }).join("");
     return `<div class="merchant">
       <div class="merchant-header">
-        <img class="merchant-icon" src="${esc(icon)}" alt="" loading="lazy">
+        ${iconHtml}
         <span class="merchant-name">${esc(m.name)}</span>
       </div>
       <div class="offers">${offerHtml}</div>
@@ -435,16 +592,25 @@ function renderTips() {
   ).join("");
 }
 
-const BONUS_CARDS = [
-  { pct: 0.0074, label: "SAS Amex", badge: "badge-sas-amex", url: "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/" },
-  { pct: 0.0074, label: "SAS MC", badge: "badge-sas-amex", url: "https://saseurobonusmastercard.no/kortene/mastercard/" },
-  { pct: 0.0059, label: "Lunar EB", badge: "badge-lunar", url: "https://www.lunar.app/no/privat/sas-eurobonus" },
-  { pct: 0.005, label: "Norwegian", badge: "badge-norwegian", url: "https://www.banknorwegian.no/kredittkort/cashback/" },
+const FREE_CARDS = [
+  { pct: 0.0074, label: "SAS Amex", badge: "badge-sas-amex", url: "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/", approx: true,
+    tip: "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)." },
+  { pct: 0.0074, label: "SAS MC", badge: "badge-sas-amex", url: "https://saseurobonusmastercard.no/kortene/mastercard/", approx: true,
+    tip: "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)." },
+  { pct: 0.0059, label: "Lunar EB", badge: "badge-lunar", url: "https://www.lunar.app/no/privat/sas-eurobonus", approx: true,
+    tip: "8 EB/100 kr (netthandel)\n20 EB/100 kr på SAS.no\nGratis kort." },
+  { pct: 0.005, label: "Norwegian", badge: "badge-norwegian", url: "https://www.banknorwegian.no/kredittkort/cashback/", approx: false,
+    tip: "0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr på Norwegian.no).\nGratis kort, ingen årsavgift." },
+];
+const PREMIUM_CARDS = [
+  { pct: 0.01, label: "Curve", badge: "badge-curve", url: "https://www.curve.com/", approx: false,
+    tip: "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback." },
+  { pct: 0.0075, label: "Klarna+", badge: "badge-klarna", url: "https://www.klarna.com/no/medlemskap/", approx: false,
+    tip: "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback." },
 ];
 
-function renderBonusChips() {
-  const chips = document.querySelector(".bonus-chips");
-  chips.innerHTML = BONUS_CARDS.map(c => {
+function renderChipGroup(cards, container) {
+  container.innerHTML = cards.map(c => {
     const amt = currentAmount > 0 ? currentAmount : 0;
     let rewardText;
     if (amt > 0) {
@@ -452,12 +618,20 @@ function renderBonusChips() {
       rewardText = `+${kr} kr`;
     } else {
       const pctStr = (c.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
-      rewardText = c.pct === 0.005 ? `+${pctStr}%` : `+~${pctStr}%`;
+      rewardText = c.approx ? `+~${pctStr}%` : `+${pctStr}%`;
     }
-    return `<a class="bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
-      ${rewardText} <span class="badge ${c.badge}">${esc(c.label)}</span>
-    </a>`;
+    return `<span class="tooltip-wrap">
+      <span class="tooltip">${esc(c.tip)}</span>
+      <a class="bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
+        ${rewardText} <span class="badge ${c.badge}">${esc(c.label)}</span>
+      </a>
+    </span>`;
   }).join("");
+}
+
+function renderBonusChips() {
+  renderChipGroup(FREE_CARDS, document.getElementById("free-chips"));
+  renderChipGroup(PREMIUM_CARDS, document.getElementById("premium-chips"));
 }
 
 function setupBonusToggle() {
@@ -468,6 +642,36 @@ function setupBonusToggle() {
     const open = chips.style.display !== "none";
     chips.style.display = open ? "none" : "flex";
     btn.classList.toggle("open", !open);
+  });
+
+  // Tap-to-show tooltips on mobile
+  const floatTip = document.getElementById("floatTip");
+  let activeOffer = null;
+  document.addEventListener("click", (e) => {
+    // Bonus chip tooltips
+    const wrap = e.target.closest(".tooltip-wrap");
+    document.querySelectorAll(".tooltip-wrap.active").forEach(el => {
+      if (el !== wrap) el.classList.remove("active");
+    });
+    if (wrap) {
+      wrap.classList.toggle("active");
+    }
+
+    // Offer row tooltips
+    const offer = e.target.closest(".offer[data-tip]");
+    if (offer && offer.dataset.tip && offer !== activeOffer) {
+      e.preventDefault();
+      activeOffer = offer;
+      floatTip.textContent = offer.dataset.tip;
+      const rect = offer.getBoundingClientRect();
+      floatTip.style.left = Math.max(8, rect.left) + "px";
+      floatTip.style.top = (rect.top - 6) + "px";
+      floatTip.style.transform = "translateY(-100%)";
+      floatTip.classList.add("visible");
+    } else {
+      floatTip.classList.remove("visible");
+      activeOffer = null;
+    }
   });
 }
 
