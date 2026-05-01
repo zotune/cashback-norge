@@ -8,6 +8,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   tfbank: "TF Bank",
   dnb: "DNB",
   curve: "Curve Pro",
+  rabattkode: "Rabattkode",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -17,6 +18,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   sas: "SAS EuroBonus-poeng.\nAktiver tilbud på SAS sine sider.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
   tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
   dnb: "DNB Spare. Aktiver i DNB-appen.",
+  rabattkode: "Rabattkode fra rabattkode.no.\nLim inn koden i handlekurven.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -27,6 +29,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   tfbank: { bg: "#e30613", fg: "#ffffff" },
   dnb: { bg: "#14555a", fg: "#ffffff" },
   curve: { bg: "#000000", fg: "#ffffff" },
+  rabattkode: { bg: "#e74c3c", fg: "#ffffff" },
 };
 
 export type BonusCard = {

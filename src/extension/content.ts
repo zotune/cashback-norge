@@ -39,6 +39,7 @@ type OffersForUrlResponse =
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
+const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
 
 chrome.runtime.onMessage.addListener((message) => {
   if (isCashbackFoundMessage(message)) {
@@ -54,10 +55,11 @@ chrome.runtime.onMessage.addListener((message) => {
 requestCurrentOffers();
 
 function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
-  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY], (result: Record<string, unknown>) => {
+  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY], (result: Record<string, unknown>) => {
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
     const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
-    renderNotice(offers, collapsed, chipsCollapsed);
+    const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
+    renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed);
   });
 }
 
@@ -81,7 +83,7 @@ function requestCurrentOffers(): void {
   });
 }
 
-function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initialChipsCollapsed: boolean): void {
+function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initialChipsCollapsed: boolean, initialCodesCollapsed: boolean): void {
   clearNotice();
 
   const host = document.createElement("div");
@@ -482,6 +484,78 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       transform: rotate(-90deg);
     }
 
+    .codes-section {
+      border-top: 1px solid #edf2ef;
+      margin-top: -4px;
+      padding: 6px 0 4px;
+    }
+
+    .codes-toggle {
+      align-items: center;
+      appearance: none;
+      background: none;
+      border: none;
+      color: #8a9a92;
+      cursor: pointer;
+      display: flex;
+      font: inherit;
+      font-size: 11px;
+      gap: 4px;
+      line-height: 1;
+      margin-bottom: 5px;
+      padding: 0;
+    }
+
+    .codes-toggle:hover {
+      color: #4f5f66;
+    }
+
+    .codes-toggle-arrow {
+      display: inline-block;
+      font-size: 10px;
+      transition: transform 0.15s;
+    }
+
+    .codes-section.collapsed .codes-list {
+      display: none;
+    }
+
+    .codes-section.collapsed .codes-toggle-arrow {
+      transform: rotate(-90deg);
+    }
+
+    .codes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .code-item {
+      align-items: center;
+      background: #f7faf8;
+      border: 1px solid #d8e3de;
+      border-radius: 6px;
+      display: flex;
+      font-size: 12px;
+      gap: 6px;
+      padding: 5px 8px;
+    }
+
+    .code-reward {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .code-value {
+      color: #5d6b71;
+      flex: 1;
+      font-family: monospace;
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .bonus-chip {
       align-items: center;
       background: #f0f4f2;
@@ -576,8 +650,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
   `;
 
-  const mainOffers = offers.filter((o) => o.provider !== "curve");
+  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode");
   const curveOffer = offers.find((o) => o.provider === "curve");
+  const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
 
   const offer = mainOffers[0];
 
@@ -862,7 +937,92 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   });
 
   chipsSection.append(chipsToggle, bonusChips);
+
+  // --- Rabattkoder section ---
+  const codesSection = document.createElement("div");
+  codesSection.className = "codes-section";
+  if (initialCodesCollapsed) {
+    codesSection.classList.add("collapsed");
+  }
+
+  if (codeOffers.length > 0) {
+    const codesToggle = document.createElement("button");
+    codesToggle.className = "codes-toggle";
+    codesToggle.type = "button";
+
+    const codesToggleArrow = document.createElement("span");
+    codesToggleArrow.className = "codes-toggle-arrow";
+    codesToggleArrow.textContent = "\u25BC";
+
+    const codesToggleText = document.createElement("span");
+    codesToggleText.textContent = `Rabattkoder (${codeOffers.length})`;
+
+    codesToggle.append(codesToggleArrow, codesToggleText);
+    codesToggle.addEventListener("click", () => {
+      const isCollapsed = codesSection.classList.toggle("collapsed");
+      chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
+    });
+
+    const codesList = document.createElement("div");
+    codesList.className = "codes-list";
+
+    for (const codeOffer of codeOffers) {
+      const code = codeOffer.discountCode ?? "";
+      const item = document.createElement("div");
+      item.className = "code-item";
+
+      const reward = document.createElement("span");
+      reward.className = "code-reward";
+      reward.textContent = codeOffer.reward;
+
+      const codeSpan = document.createElement("span");
+      codeSpan.className = "code-value";
+      codeSpan.textContent = code;
+
+      const copyBtn = document.createElement("span");
+      copyBtn.className = "copy-code-btn";
+      copyBtn.innerHTML = COPY_ICON_SVG;
+
+      const copyTooltip = document.createElement("div");
+      copyTooltip.className = "copy-code-tooltip";
+      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+      shadowRoot.append(copyTooltip);
+
+      copyBtn.addEventListener("mouseenter", () => {
+        const rect = copyBtn.getBoundingClientRect();
+        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        copyTooltip.style.top = `${rect.top - 30}px`;
+        copyTooltip.style.transform = "translateX(-50%)";
+        copyTooltip.classList.add("visible");
+      });
+      copyBtn.addEventListener("mouseleave", () => {
+        copyTooltip.classList.remove("visible");
+      });
+
+      copyBtn.addEventListener("click", () => {
+        void navigator.clipboard.writeText(code).then(() => {
+          copyBtn.innerHTML = CHECK_ICON_SVG;
+          copyTooltip.textContent = "Kopiert!";
+          copyTooltip.classList.add("visible");
+          setTimeout(() => {
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+            copyTooltip.classList.remove("visible");
+          }, 1500);
+        });
+      });
+
+      item.append(reward, codeSpan, copyBtn);
+      codesList.append(item);
+    }
+
+    codesSection.append(codesToggle, codesList);
+  }
+
   body.append(header, offerList, chipsSection);
+  if (codeOffers.length > 0) {
+    body.append(codesSection);
+  }
 
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
 

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cashback Norge</title>
+<link rel="icon" type="image/png" href="favicon.png">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -191,7 +192,46 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 }
 .tip-line a:hover { text-decoration: underline; }
 .bonus-section {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+}
+.code-item {
+  align-items: center;
+  background: #f7faf8;
+  border: 1px solid #d8e3de;
+  border-radius: 6px;
+  display: flex;
+  font-size: 13px;
+  gap: 8px;
+  padding: 7px 10px;
+}
+.code-reward {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.code-value {
+  color: #5d6b71;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.code-copy-btn {
+  align-items: center;
+  background: none;
+  border: none;
+  color: #1f8f5f;
+  cursor: pointer;
+  display: inline-flex;
+  margin-left: auto;
+  padding: 4px;
+  border-radius: 4px;
+}
+.code-copy-btn:hover { color: #166b47; }
+.code-copy-btn svg { width: 14px; height: 14px; }
+.codes-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 14px 12px;
 }
 .bonus-toggle {
   align-items: center;
@@ -442,7 +482,9 @@ function render(query) {
     const iconHtml = hasIcon
       ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64'">`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
-    const offerHtml = m.offers.map(o => {
+    const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode");
+    const codeOffers = m.offers.filter(o => o.provider === "rabattkode" && o.discountCode);
+    const offerHtml = cashbackOffers.map(o => {
       const url = o.provider === "trumf" ? o.sourceUrl : o.activationUrl;
       const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatReward(o);
       const terms = o.terms || "";
@@ -456,14 +498,35 @@ function render(query) {
         <span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a></span>`;
     }).join("");
+    const codesHtml = codeOffers.map(o => {
+      const code = o.discountCode || "";
+      return `<div class="code-item">
+        <span class="code-reward">${esc(o.reward)}</span>
+        <span class="code-value">${esc(code)}</span>
+        <button class="code-copy-btn" type="button" data-code="${esc(code)}" title="Kopier rabattkode: ${esc(code)}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      </div>`;
+    }).join("");
     return `<div class="merchant">
       <div class="merchant-header">
         ${iconHtml}
         <span class="merchant-name">${esc(m.name)}</span>
       </div>
       <div class="offers">${offerHtml}</div>
+      ${codesHtml ? `<div class="codes-inline">${codesHtml}</div>` : ""}
     </div>`;
   }).join("");
+
+  // Attach copy handlers
+  container.querySelectorAll(".code-copy-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const origHtml = btn.innerHTML;
+      navigator.clipboard.writeText(btn.dataset.code).then(() => {
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        btn.title = "Kopiert!";
+        setTimeout(() => { btn.innerHTML = origHtml; btn.title = `Kopier rabattkode: ${btn.dataset.code}`; }, 1500);
+      });
+    });
+  });
 }
 
 function formatReward(o) {
@@ -600,10 +663,16 @@ function setupBonusToggle() {
   const btn = document.querySelector(".bonus-toggle");
   const chips = document.querySelector(".bonus-chips");
   renderBonusChips();
+  const savedOpen = localStorage.getItem("cashback-bonus-open") === "1";
+  if (savedOpen) {
+    chips.style.display = "flex";
+    btn.classList.add("open");
+  }
   btn.addEventListener("click", () => {
     const open = chips.style.display !== "none";
     chips.style.display = open ? "none" : "flex";
     btn.classList.toggle("open", !open);
+    localStorage.setItem("cashback-bonus-open", open ? "0" : "1");
   });
 
   // Tap-to-show tooltips on mobile (bonus chips only)

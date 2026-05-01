@@ -1,10 +1,11 @@
-(function(){"use strict";Object.assign(window,{SHARED:{EB_PER_TRUMF_KR:13.5,PROVIDER_NAMES:{trumf:"Trumf",klarna:"Klarna",remember:"re:member",sas:"SAS EB",tfbank:"TF Bank",dnb:"DNB",curve:"Curve Pro"},PROVIDER_TIPS:{trumf:`Trumf-bonus. Aktiver i Trumf-appen.
+(function(){"use strict";Object.assign(window,{SHARED:{EB_PER_TRUMF_KR:13.5,PROVIDER_NAMES:{trumf:"Trumf",klarna:"Klarna",remember:"re:member",sas:"SAS EB",tfbank:"TF Bank",dnb:"DNB",curve:"Curve Pro",rabattkode:"Rabattkode"},PROVIDER_TIPS:{trumf:`Trumf-bonus. Aktiver i Trumf-appen.
 1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.`,klarna:`Klarna+ medlemskap.
 Plus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).`,remember:`re:member kredittkort.
 Aktiver tilbud i re:member-appen før kjøp.`,sas:`SAS EuroBonus-poeng.
 Aktiver tilbud på SAS sine sider.
 Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`,tfbank:`TF Bank Mastercard.
-Aktiver tilbud i TF Bank-appen.`,dnb:"DNB Spare. Aktiver i DNB-appen."},FREE_CARDS:[{pct:.0074,ebPer100kr:10,label:"SAS Amex",badge:"sas-amex",approx:!0,url:"https://www.americanexpress.com/nb-no/kredittkort/sas-classic/",tip:`10 EB/100 kr. Gratis kort.
+Aktiver tilbud i TF Bank-appen.`,dnb:"DNB Spare. Aktiver i DNB-appen.",rabattkode:`Rabattkode fra rabattkode.no.
+Lim inn koden i handlekurven.`},FREE_CARDS:[{pct:.0074,ebPer100kr:10,label:"SAS Amex",badge:"sas-amex",approx:!0,url:"https://www.americanexpress.com/nb-no/kredittkort/sas-classic/",tip:`10 EB/100 kr. Gratis kort.
 2-for-1 på SAS-flyvninger i Europa.
 Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`},{pct:.0074,ebPer100kr:10,label:"SAS MC",badge:"sas-amex",approx:!0,url:"https://saseurobonusmastercard.no/kortene/mastercard/",tip:`10 EB/100 kr. Gratis kort (Mastercard).
 Aksepteres flere steder enn Amex.
