@@ -97,16 +97,33 @@ function formatRewardLabel(reward: string, provider: string): string {
 
   if (trimmedReward.toLowerCase().startsWith(maxPrefix.toLowerCase())) {
     const inner = trimmedReward.slice(maxPrefix.length);
+    const short = shortenReward(inner, provider);
     const converted = convertReward(inner, provider);
-    return converted !== "" ? `${inner} (opptil, ${converted})` : `${inner} (opptil)`;
+    return converted !== "" ? `${short} (opptil, ${converted})` : `${short} (opptil)`;
   }
 
   if (trimmedReward.length === 0) {
     return "Cashback";
   }
 
+  const short = shortenReward(trimmedReward, provider);
   const converted = convertReward(trimmedReward, provider);
-  return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
+  return converted !== "" ? `${short} (${converted})` : short;
+}
+
+function shortenReward(reward: string, provider: string): string {
+  if (provider !== "sas") {
+    return reward;
+  }
+  const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
+  if (fixedMatch !== null) {
+    return `${fixedMatch[1].replace(/\s/g, "")}p`;
+  }
+  const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (rateMatch !== null) {
+    return `${rateMatch[1].replace(/\s/g, "")}p/100kr`;
+  }
+  return reward;
 }
 
 function convertReward(reward: string, provider: string): string {

@@ -1,5 +1,5 @@
 import { resolve as dnsResolve } from "node:dns/promises";
-import { CheerioCrawler, type CheerioCrawlingContext } from "crawlee";
+import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
   normalizeDomainInput,
@@ -24,6 +24,10 @@ export async function crawlKlarna(
 ): Promise<CashbackOffer[]> {
   const rawOffers: CashbackOffer[] = [];
 
+  const storage = new MemoryStorage({ persistStorage: false });
+  const config = new Configuration();
+  config.useStorageClient(storage);
+
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.maxPages,
     requestHandler: async ({ $, request }) => {
@@ -34,7 +38,7 @@ export async function crawlKlarna(
       );
       rawOffers.push(...pageOffers);
     },
-  });
+  }, config);
 
   const pageUrls = buildPageUrls(input.startUrl, input.maxPages);
   await crawler.run(pageUrls);

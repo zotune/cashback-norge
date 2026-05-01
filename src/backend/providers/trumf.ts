@@ -1,4 +1,4 @@
-import { CheerioCrawler, type CheerioCrawlingContext } from "crawlee";
+import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
   normalizeDomainInput,
@@ -23,6 +23,10 @@ export async function crawlTrumf(
   input: CrawlTrumfInput,
 ): Promise<CashbackOffer[]> {
   const offers: CashbackOffer[] = [];
+  const storage = new MemoryStorage({ persistStorage: false });
+  const config = new Configuration();
+  config.useStorageClient(storage);
+
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.maxRequestsPerCrawl,
     requestHandler: async ({ $, enqueueLinks, request }) => {
@@ -56,8 +60,13 @@ export async function crawlTrumf(
         label: "detail",
         selector: 'a[href*="/cashback/"]',
       });
+
+      await enqueueLinks({
+        label: "category",
+        selector: 'a[href*="/kategori/"]',
+      });
     },
-  });
+  }, config);
 
   await crawler.run([input.startUrl]);
   return uniqueOffers(offers);
