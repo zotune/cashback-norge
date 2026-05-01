@@ -33,11 +33,12 @@ type OffersForUrlResponse =
       reason: string;
     };
 
-const HOST_ID = "mimir-cashback-notice";
+const HOST_ID = "cashback-varsler-notice";
+const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 
 chrome.runtime.onMessage.addListener((message) => {
   if (isCashbackFoundMessage(message)) {
-    renderNotice(message.offers);
+    renderNoticeWithStoredState(message.offers);
     return;
   }
 
@@ -47,6 +48,13 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 requestCurrentOffers();
+
+function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
+  chrome.storage.local.get(COLLAPSED_STORAGE_KEY, (result: Record<string, unknown>) => {
+    const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
+    renderNotice(offers, collapsed);
+  });
+}
 
 function requestCurrentOffers(): void {
   const message: GetOffersForUrlMessage = {
@@ -60,7 +68,7 @@ function requestCurrentOffers(): void {
     }
 
     if (response.offers.length > 0) {
-      renderNotice(response.offers);
+      renderNoticeWithStoredState(response.offers);
       return;
     }
 
@@ -68,7 +76,7 @@ function requestCurrentOffers(): void {
   });
 }
 
-function renderNotice(offers: CashbackOffer[]): void {
+function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void {
   clearNotice();
 
   const host = document.createElement("div");
@@ -79,73 +87,128 @@ function renderNotice(offers: CashbackOffer[]): void {
     :host {
       all: initial;
       bottom: 16px;
-      left: 16px;
+      left: 0;
       position: fixed;
       z-index: 2147483647;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    *, *::before, *::after {
+      font-family: inherit;
     }
 
     .notice {
-      width: min(340px, calc(100vw - 32px));
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .side-tab {
+      appearance: none;
+      background: #ffffff;
+      border: 1px solid #c9d7cf;
+      border-left: none;
+      border-radius: 0 8px 8px 0;
+      box-shadow: 2px 4px 12px rgba(11, 25, 34, 0.12);
+      color: #172026;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font: inherit;
+      min-height: 40px;
+      padding: 8px 5px;
+      width: 26px;
+      flex-shrink: 0;
+      transition: min-height 0.25s ease, padding 0.25s ease;
+    }
+
+    .side-tab:hover {
+      background: #f7faf8;
+    }
+
+    .notice.collapsed .side-tab.side-tab-remember .side-tab-text {
+      background: #111111;
+      color: #ff9900;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+
+    .notice.collapsed .side-tab.side-tab-klarna .side-tab-text {
+      background: #ffa8cd;
+      color: #0b051d;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+
+    .notice.collapsed .side-tab.side-tab-trumf .side-tab-text {
+      background: #07006b;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+
+    .side-tab-arrow {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      display: block;
+    }
+
+    .side-tab-text {
+      display: none;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      color: #1f8f5f;
+      letter-spacing: 0.02em;
+      margin-top: 6px;
+    }
+
+    .notice.collapsed .side-tab {
+      min-height: 80px;
+      padding: 10px 5px;
+    }
+
+    .notice.collapsed .side-tab-arrow {
+      display: none;
+    }
+
+    .notice.collapsed .side-tab-text {
+      display: block;
+    }
+
+    .panel {
+      width: min(340px, calc(100vw - 42px));
       color: #172026;
       background: #ffffff;
       border: 1px solid #c9d7cf;
       border-radius: 8px;
       box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
       overflow: hidden;
+      margin-left: 4px;
+      transition: width 0.25s ease, opacity 0.25s ease, margin-left 0.25s ease, border-width 0.25s ease;
     }
 
-    .notice.collapsed {
-      width: min(280px, calc(100vw - 32px));
+    .notice.collapsed .panel {
+      width: 0;
+      opacity: 0;
+      margin-left: 0;
+      border-width: 0;
+      pointer-events: none;
+    }
+
+    .notice.no-transition .panel,
+    .notice.no-transition .side-tab {
+      transition: none;
     }
 
     .topline {
       height: 4px;
       background: linear-gradient(90deg, #1f8f5f, #f4b942);
-    }
-
-    .collapsed-bar {
-      align-items: center;
-      appearance: none;
-      background: #ffffff;
-      border: 0;
-      color: #172026;
-      cursor: pointer;
-      display: none;
-      font: inherit;
-      gap: 10px;
-      min-height: 46px;
-      padding: 10px 12px;
-      text-align: left;
-      width: 100%;
-    }
-
-    .notice.collapsed .collapsed-bar {
-      display: flex;
-    }
-
-    .notice.collapsed .body {
-      display: none;
-    }
-
-    .collapsed-text {
-      display: grid;
-      gap: 2px;
-      min-width: 0;
-    }
-
-    .collapsed-title {
-      font-size: 13px;
-      font-weight: 800;
-      line-height: 1.15;
-      overflow-wrap: anywhere;
-    }
-
-    .collapsed-meta {
-      color: #4f5f66;
-      font-size: 12px;
-      line-height: 1.2;
-      overflow-wrap: anywhere;
     }
 
     .body {
@@ -155,13 +218,6 @@ function renderNotice(offers: CashbackOffer[]): void {
     }
 
     .header {
-      align-items: start;
-      display: grid;
-      gap: 10px;
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .brand {
       align-items: center;
       display: grid;
       gap: 12px;
@@ -185,21 +241,6 @@ function renderNotice(offers: CashbackOffer[]): void {
       line-height: 1.25;
       margin: 0;
       overflow-wrap: anywhere;
-    }
-
-    .meta {
-      color: #4f5f66;
-      font-size: 12px;
-      line-height: 1.35;
-      margin: 0;
-      overflow-wrap: anywhere;
-    }
-
-    .actions {
-      align-items: center;
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
     }
 
     .offer-list {
@@ -266,29 +307,21 @@ function renderNotice(offers: CashbackOffer[]): void {
       white-space: nowrap;
     }
 
-    button {
-      appearance: none;
-      border: 0;
-      border-radius: 6px;
-      cursor: pointer;
-      font: inherit;
-      min-height: 32px;
-      padding: 0 11px;
+    .support {
+      border-top: 1px solid #edf2ef;
+      padding: 8px 14px;
     }
 
-    .collapse-toggle {
-      background: #edf2ef;
-      color: #203027;
-      min-height: 30px;
-      padding: 0;
-      width: 30px;
+    .support a {
+      color: #8a9a92;
+      font-size: 11px;
+      line-height: 1.35;
+      text-decoration: none;
     }
 
-    .open {
-      background: #1f8f5f;
-      color: #ffffff;
-      font-size: 13px;
-      font-weight: 700;
+    .support a:hover {
+      color: #4f5f66;
+      text-decoration: underline;
     }
   `;
 
@@ -301,29 +334,33 @@ function renderNotice(offers: CashbackOffer[]): void {
   const notice = document.createElement("section");
   notice.className = "notice";
 
+  // Side tab (collapse/expand control on the left edge)
+  const sideTab = document.createElement("button");
+  sideTab.className = `side-tab side-tab-${offer.provider}`;
+  sideTab.type = "button";
+  sideTab.setAttribute("aria-label", "Collapse cashback offers");
+
+  const sideTabArrow = document.createElement("span");
+  sideTabArrow.className = "side-tab-arrow";
+  sideTabArrow.textContent = "\u2039"; // ‹
+
+  const sideTabText = document.createElement("span");
+  sideTabText.className = "side-tab-text";
+  sideTabText.textContent = formatRewardLabel(offer.reward);
+
+  sideTab.append(sideTabArrow, sideTabText);
+
+  sideTab.addEventListener("click", () => {
+    const isCollapsed = notice.classList.contains("collapsed");
+    setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
+  });
+
+  // Main panel
+  const panel = document.createElement("div");
+  panel.className = "panel";
+
   const topLine = document.createElement("div");
   topLine.className = "topline";
-
-  const collapsedBar = document.createElement("button");
-  collapsedBar.className = "collapsed-bar";
-  collapsedBar.type = "button";
-  collapsedBar.setAttribute("aria-label", "Expand cashback offers");
-
-  const collapsedIcon = createSiteIcon();
-
-  const collapsedText = document.createElement("span");
-  collapsedText.className = "collapsed-text";
-
-  const collapsedTitle = document.createElement("span");
-  collapsedTitle.className = "collapsed-title";
-  collapsedTitle.textContent = `Cashback hos ${offer.merchantName}`;
-
-  const collapsedMeta = document.createElement("span");
-  collapsedMeta.className = "collapsed-meta";
-  collapsedMeta.textContent = `${offers.length} offer${offers.length === 1 ? "" : "s"}`;
-
-  collapsedText.append(collapsedTitle, collapsedMeta);
-  collapsedBar.append(collapsedIcon, collapsedText);
 
   const body = document.createElement("div");
   body.className = "body";
@@ -331,34 +368,13 @@ function renderNotice(offers: CashbackOffer[]): void {
   const header = document.createElement("div");
   header.className = "header";
 
-  const brand = document.createElement("div");
-  brand.className = "brand";
-
   const siteIcon = createSiteIcon();
 
   const title = document.createElement("p");
   title.className = "title";
   title.textContent = `Cashback hos ${offer.merchantName}`;
 
-  const collapseButton = document.createElement("button");
-  collapseButton.className = "collapse-toggle";
-  collapseButton.type = "button";
-  collapseButton.textContent = "-";
-  collapseButton.setAttribute("aria-label", "Collapse cashback offers");
-  collapseButton.addEventListener("click", () => {
-    setCollapsed(notice, collapseButton, true);
-  });
-
-  collapsedBar.addEventListener("click", () => {
-    setCollapsed(notice, collapseButton, false);
-  });
-
-  brand.append(siteIcon, title);
-  header.append(brand, collapseButton);
-
-  const meta = document.createElement("p");
-  meta.className = "meta";
-  meta.textContent = "All offers, best first";
+  header.append(siteIcon, title);
 
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
@@ -389,22 +405,43 @@ function renderNotice(offers: CashbackOffer[]): void {
     offerList.append(offerLink);
   }
 
-  const actions = document.createElement("div");
-  actions.className = "actions";
+  body.append(header, offerList);
 
-  const openButton = document.createElement("button");
-  openButton.className = "open";
-  openButton.type = "button";
-  openButton.textContent = "Top offer";
-  openButton.addEventListener("click", () => {
-    window.open(offer.activationUrl, "_blank", "noopener,noreferrer");
-  });
+  const supportLinks = [
+    { text: "200 kr gratis i fond \u2192", url: "https://kron.no/app/invitert/nvu4d" },
+    { text: "Kj\u00f8p en kaffe til utvikler \u2192", url: "https://buymeacoffee.com/adore" },
+  ];
+  const pick = supportLinks[Math.floor(Math.random() * supportLinks.length)];
 
-  actions.append(openButton);
-  body.append(header, meta, offerList, actions);
-  notice.append(topLine, collapsedBar, body);
+  const support = document.createElement("div");
+  support.className = "support";
+
+  const supportLink = document.createElement("a");
+  supportLink.href = pick.url;
+  supportLink.target = "_blank";
+  supportLink.rel = "noreferrer";
+  supportLink.textContent = `St\u00f8tt oppdateringer: ${pick.text}`;
+  support.append(supportLink);
+
+  panel.append(topLine, body, support);
+  notice.append(sideTab, panel);
+
+  // Apply initial collapsed state before inserting into DOM (no transition flash)
+  if (initialCollapsed) {
+    notice.classList.add("collapsed", "no-transition");
+    sideTabArrow.textContent = "\u203A";
+    sideTab.setAttribute("aria-label", "Expand cashback offers");
+  }
+
   shadowRoot.append(style, notice);
   document.documentElement.append(host);
+
+  // Re-enable transitions after first frame
+  if (initialCollapsed) {
+    requestAnimationFrame(() => {
+      notice.classList.remove("no-transition");
+    });
+  }
 }
 
 function clearNotice(): void {
@@ -424,15 +461,17 @@ function createSiteIcon(): HTMLImageElement {
 
 function setCollapsed(
   notice: HTMLElement,
-  collapseButton: HTMLButtonElement,
+  sideTab: HTMLButtonElement,
+  sideTabArrow: HTMLElement,
   collapsed: boolean,
 ): void {
   notice.classList.toggle("collapsed", collapsed);
-  collapseButton.textContent = collapsed ? "+" : "-";
-  collapseButton.setAttribute(
+  sideTabArrow.textContent = collapsed ? "\u203A" : "\u2039"; // › or ‹
+  sideTab.setAttribute(
     "aria-label",
     collapsed ? "Expand cashback offers" : "Collapse cashback offers",
   );
+  chrome.storage.local.set({ [COLLAPSED_STORAGE_KEY]: collapsed });
 }
 
 function isCashbackFoundMessage(value: unknown): value is CashbackFoundMessage {
