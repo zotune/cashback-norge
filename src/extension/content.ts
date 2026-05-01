@@ -729,10 +729,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         ? formatBreakdownWithAmounts(offer.terms, amount)
         : offer.terms;
     }
-    for (const { element, pct, defaultText } of bonusChipLabels) {
+    for (const { element, pct, approx, defaultText } of bonusChipLabels) {
       if (amount > 0) {
         const kr = amount * pct / 100;
-        element.textContent = `+${formatKr(kr)} kr`;
+        element.textContent = `+${approx ? "~" : ""}${formatKr(kr)} kr`;
       } else {
         element.textContent = defaultText;
       }
@@ -750,7 +750,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
   });
 
-  const bonusChipLabels: { element: HTMLSpanElement; pct: number; defaultText: string }[] = [];
+  const bonusChipLabels: { element: HTMLSpanElement; pct: number; approx: boolean; defaultText: string }[] = [];
 
   const bonusChips = document.createElement("div");
   bonusChips.className = "bonus-chips";
@@ -785,7 +785,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
   for (const card of FREE_CARDS) {
     const { chip, label } = createBonusChip(card);
-    bonusChipLabels.push({ element: label, pct: card.pct * 100, defaultText: label.textContent ?? "" });
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
@@ -828,7 +828,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const shouldShow = card.label !== "Curve" || curveOffer !== undefined;
     if (!shouldShow) continue;
     const { chip, label } = createBonusChip(card, overrideUrl);
-    bonusChipLabels.push({ element: label, pct: card.pct * 100, defaultText: label.textContent ?? "" });
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, approx: card.approx, defaultText: label.textContent ?? "" });
     premiumItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }

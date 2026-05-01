@@ -592,7 +592,7 @@ function renderChipGroup(cards, container) {
     let rewardText;
     if (amt > 0) {
       const kr = Math.round(amt * c.pct);
-      rewardText = `+${kr} kr`;
+      rewardText = c.approx ? `+~${kr} kr` : `+${kr} kr`;
     } else {
       const pctStr = (c.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
       rewardText = c.approx ? `+~${pctStr}%` : `+${pctStr}%`;
