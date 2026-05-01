@@ -358,7 +358,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
   const sideTabText = document.createElement("span");
   sideTabText.className = "side-tab-text";
-  sideTabText.textContent = formatRewardLabel(offer.reward);
+  sideTabText.textContent = formatRewardLabel(offer.reward, offer.provider);
 
   sideTab.append(sideTabArrow, sideTabText);
 
@@ -402,7 +402,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     offerLabel.className = "offer-label";
 
     const offerReward = document.createElement("span");
-    offerReward.textContent = formatRewardLabel(currentOffer.reward);
+    offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
 
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
@@ -595,13 +595,72 @@ function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
   }
 }
 
-function formatRewardLabel(reward: string): string {
+const EB_PER_TRUMF_KR = 13.5;
+
+function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
   const maxPrefix = "Opptil ";
 
   if (trimmedReward.toLowerCase().startsWith(maxPrefix.toLowerCase())) {
-    return `${trimmedReward.slice(maxPrefix.length)} (opptil)`;
+    const inner = trimmedReward.slice(maxPrefix.length);
+    const converted = convertReward(inner, provider);
+    return converted !== "" ? `${inner} (opptil, ${converted})` : `${inner} (opptil)`;
   }
 
-  return trimmedReward.length > 0 ? trimmedReward : "Cashback";
+  if (trimmedReward.length === 0) {
+    return "Cashback";
+  }
+
+  const converted = convertReward(trimmedReward, provider);
+  return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
+}
+
+function convertReward(reward: string, provider: string): string {
+  if (provider === "sas") {
+    return convertSasToKr(reward);
+  }
+  if (provider === "trumf") {
+    return convertTrumfToEb(reward);
+  }
+  return "";
+}
+
+function convertSasToKr(reward: string): string {
+  // "500 poeng" → ~37 kr
+  const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
+  if (fixedMatch !== null) {
+    const points = Number.parseInt(fixedMatch[1].replace(/\s/g, ""), 10);
+    const kr = Math.round(points / EB_PER_TRUMF_KR);
+    return `~${kr} kr`;
+  }
+  // "15 poeng per 100 kr" → ~1,1%
+  const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+  if (rateMatch !== null) {
+    const points = Number.parseInt(rateMatch[1].replace(/\s/g, ""), 10);
+    const pct = points / EB_PER_TRUMF_KR;
+    return `~${formatNo(pct)}%`;
+  }
+  return "";
+}
+
+function convertTrumfToEb(reward: string): string {
+  // "3,1 %" → ~42 EB/100kr
+  const pctMatch = reward.match(/^([\d,]+)\s*%$/);
+  if (pctMatch !== null) {
+    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR);
+    return `~${ebPer100} EB/100kr`;
+  }
+  // "295 kr" → ~3 983 EB
+  const krMatch = reward.match(/^([\d\s]+)\s*kr$/);
+  if (krMatch !== null) {
+    const kr = Number.parseInt(krMatch[1].replace(/\s/g, ""), 10);
+    const eb = Math.round(kr * EB_PER_TRUMF_KR);
+    return `~${eb.toLocaleString("nb-NO")} EB`;
+  }
+  return "";
+}
+
+function formatNo(n: number): string {
+  return n % 1 === 0 ? n.toString() : n.toFixed(1).replace(".", ",");
 }
