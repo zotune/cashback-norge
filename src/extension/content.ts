@@ -656,7 +656,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
   const offer = mainOffers[0];
 
-  if (offer === undefined) {
+  if (offer === undefined && codeOffers.length === 0) {
+    return;
+  }
+
+  const primaryOffer = offer ?? codeOffers[0];
+  if (primaryOffer === undefined) {
     return;
   }
 
@@ -665,7 +670,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
-  sideTab.className = `side-tab side-tab-${offer.provider}`;
+  sideTab.className = `side-tab side-tab-${offer?.provider ?? "rabattkode"}`;
   sideTab.type = "button";
   sideTab.setAttribute("aria-label", "Collapse cashback offers");
 
@@ -675,7 +680,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
   const sideTabText = document.createElement("span");
   sideTabText.className = "side-tab-text";
-  sideTabText.textContent = formatRewardLabel(offer.reward, offer.provider);
+  sideTabText.textContent = offer !== undefined ? formatRewardLabel(offer.reward, offer.provider) : "Rabattkode";
 
   sideTab.append(sideTabArrow, sideTabText);
 
@@ -701,7 +706,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
   const title = document.createElement("p");
   title.className = "title";
-  title.textContent = `Cashback hos ${offer.merchantName}`;
+  title.textContent = offer !== undefined
+    ? `Cashback hos ${offer.merchantName}`
+    : `Rabattkode hos ${primaryOffer.merchantName}`;
 
   header.append(siteIcon, title);
 
@@ -1166,8 +1173,8 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
 
 function isCashbackProvider(
   value: unknown,
-): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve";
+): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" {
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

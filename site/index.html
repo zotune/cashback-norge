@@ -228,10 +228,39 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .code-copy-btn:hover { color: #166b47; }
 .code-copy-btn svg { width: 14px; height: 14px; }
 .codes-inline {
+  padding: 0 14px 12px;
+}
+.codes-toggle {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: none;
+  color: #5d6b71;
+  cursor: pointer;
   display: flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 5px;
+  padding: 0;
+  margin-bottom: 6px;
+}
+.codes-toggle:hover { color: #172026; }
+.codes-toggle-arrow {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.15s;
+}
+.codes-toggle.open .codes-toggle-arrow {
+  transform: rotate(90deg);
+}
+.codes-items {
+  display: none;
   flex-direction: column;
   gap: 4px;
-  padding: 0 14px 12px;
+}
+.codes-inline.open .codes-items {
+  display: flex;
 }
 .bonus-toggle {
   align-items: center;
@@ -512,9 +541,18 @@ function render(query) {
         <span class="merchant-name">${esc(m.name)}</span>
       </div>
       <div class="offers">${offerHtml}</div>
-      ${codesHtml ? `<div class="codes-inline">${codesHtml}</div>` : ""}
+      ${codesHtml ? `<div class="codes-inline"><button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder (${codeOffers.length})</button><div class="codes-items">${codesHtml}</div></div>` : ""}
     </div>`;
   }).join("");
+
+  // Attach codes toggle handlers
+  container.querySelectorAll(".codes-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const section = btn.closest(".codes-inline");
+      section.classList.toggle("open");
+      btn.classList.toggle("open");
+    });
+  });
 
   // Attach copy handlers
   container.querySelectorAll(".code-copy-btn").forEach(btn => {
