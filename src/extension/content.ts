@@ -450,6 +450,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   header.append(sumInput);
 
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
+  const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
 
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
@@ -496,6 +497,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       } else {
         element.textContent = formatRewardLabel(offer.reward, offer.provider);
       }
+    }
+    for (const { element, offer } of tooltipElements) {
+      element.textContent = amount > 0
+        ? formatBreakdownWithAmounts(offer.terms, amount)
+        : offer.terms;
     }
   });
 
@@ -549,6 +555,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     tooltip.className = "offer-tooltip";
     tooltip.textContent = currentOffer.terms;
     shadowRoot.append(tooltip);
+    tooltipElements.push({ element: tooltip, offer: currentOffer });
 
     wrapper.addEventListener("mouseenter", () => {
       const panelEl = shadowRoot.querySelector(".panel");
@@ -738,6 +745,21 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
     return `${label} (${ebStr})`;
   }
   return label;
+}
+
+function formatBreakdownWithAmounts(terms: string, amount: number): string {
+  return terms
+    .split("\n")
+    .map((line) => {
+      const match = line.match(/^([\d,]+)\s*%/);
+      if (match !== null) {
+        const pct = Number.parseFloat(match[1].replace(",", "."));
+        const kr = Math.round(amount * pct / 100);
+        return `${line} (${kr} kr)`;
+      }
+      return line;
+    })
+    .join("\n");
 }
 
 function findSiteIconUrl(): string {

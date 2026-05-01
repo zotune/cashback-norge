@@ -103,12 +103,14 @@ function parseKlarnaStoreListing(
     const uuid = uuidMatch?.[1] ?? store.storeDirectUrl;
     const activationUrl = buildActivationUrl(store.storeDirectUrl, pageUrl);
 
+    const searchQuery = encodeURIComponent(store.displayName);
+
     offers.push({
       provider: "klarna",
       merchantName: store.displayName,
       domains: [],
       reward,
-      sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK#${uuid}`,
+      sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
       activationUrl,
       terms: "Cashback i appen Klarna i kassen",
       updatedAt: generatedAt,
@@ -183,12 +185,14 @@ function parseKlarnaStoreListingFromHtml(
       return;
     }
 
+    const searchQuery = encodeURIComponent(merchantName);
+
     offers.push({
       provider: "klarna",
       merchantName,
       domains: [],
       reward,
-      sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK#${uuid}`,
+      sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
       activationUrl,
       terms: "Cashback i appen Klarna i kassen",
       updatedAt: generatedAt,

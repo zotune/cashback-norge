@@ -69,7 +69,15 @@ export async function fetchTfBank(
 
     const domain = extractDomain(voucherUrl);
 
-    if (domain === undefined || isRedirectDomain(domain)) {
+    if (domain === undefined) {
+      continue;
+    }
+
+    const finalDomains = isRedirectDomain(domain)
+      ? inferDomainsFromName(deal.name)
+      : [domain];
+
+    if (finalDomains.length === 0) {
       continue;
     }
 
@@ -80,14 +88,17 @@ export async function fetchTfBank(
     }
 
     const merchantName = cleanMerchantName(deal.name);
+    const firstDomain = finalDomains[0] ?? deal.name.toLowerCase();
+    const searchParam = encodeURIComponent(firstDomain.replace(/\.(no|com|se)$/, ""));
+    const dealUrl = `https://tfbank.dealpass.no/deal/${deal.id}?search=${searchParam}`;
 
     offers.push({
       provider: "tfbank",
       merchantName,
-      domains: [domain],
+      domains: finalDomains,
       reward: `${discount}%`,
-      sourceUrl: `https://tfbank.dealpass.no/deal/${deal.id}`,
-      activationUrl: `https://portal.dealpass.no/api/deals/${deal.id}/activate`,
+      sourceUrl: dealUrl,
+      activationUrl: dealUrl,
       terms: deal.disclaimer ?? "",
       updatedAt: input.generatedAt,
     });
@@ -117,6 +128,32 @@ const REDIRECT_DOMAINS = new Set([
 
 function isRedirectDomain(domain: string): boolean {
   return REDIRECT_DOMAINS.has(domain);
+}
+
+function inferDomainsFromName(name: string): string[] {
+  const cleaned = name.toLowerCase().trim();
+
+  if (/^[\w.-]+\.[a-z]{2,}$/.test(cleaned)) {
+    return [cleaned];
+  }
+
+  const slug = cleaned
+    .replace(/['']/g, "")
+    .replace(/&/g, "and")
+    .replace(/ø/g, "o")
+    .replace(/æ/g, "ae")
+    .replace(/å/g, "a")
+    .replace(/ö/g, "o")
+    .replace(/ä/g, "a")
+    .replace(/ü/g, "u")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+
+  if (slug.length === 0) {
+    return [];
+  }
+
+  return [`${slug}.no`, `${slug}.com`];
 }
 
 function cleanMerchantName(name: string): string {

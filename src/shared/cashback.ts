@@ -170,7 +170,12 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
   const byKey = new Map<string, CashbackOffer>();
 
   for (const offer of offers) {
-    byKey.set(`${offer.provider}:${offer.sourceUrl}`, offer);
+    const key = `${offer.provider}:${offer.merchantName.toLowerCase()}`;
+    const existing = byKey.get(key);
+    // Keep the offer with more domain info, or the later one
+    if (existing === undefined || offer.domains.length >= existing.domains.length) {
+      byKey.set(key, offer);
+    }
   }
 
   return sortOffers([...byKey.values()]);
