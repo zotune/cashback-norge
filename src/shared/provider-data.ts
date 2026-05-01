@@ -95,7 +95,7 @@ export const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
 };
 
 export const SUPPORT_LINKS = [
-  { text: "200 kr gratis i fond →", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d" },
+  { text: "Kron: 200 kr gratis i fond →", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d" },
   { text: "Horde: Oversikt over alle kort + nedbetaling →", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube" },
   { text: "Kjøp en kaffe til utvikler →", emoji: "☕", url: "https://buymeacoffee.com/adore" },
   { text: "Revolut: Gratis valutaveksling + bonus →", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK" },
