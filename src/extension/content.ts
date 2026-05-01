@@ -476,7 +476,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   const sumInput = document.createElement("input");
   sumInput.className = "sum-input";
   sumInput.type = "text";
-  sumInput.inputMode = "numeric";
+  sumInput.inputMode = "decimal";
   sumInput.placeholder = "Kjøpesum";
 
   header.append(sumInput);
@@ -557,8 +557,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   }
 
   sumInput.addEventListener("input", () => {
-    const raw = sumInput.value.replace(/[^0-9]/g, "");
-    const amount = raw.length > 0 ? Number.parseInt(raw, 10) : 0;
+    const raw = sumInput.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+    const amount = raw.length > 0 ? Number.parseFloat(raw) : 0;
     for (const { element, offer } of rewardLabels) {
       if (amount > 0) {
         const result = calculateCashback(offer, amount);
@@ -769,9 +769,9 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   if (rangeMatch !== null) {
     const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
     const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
-    const minKr = Math.round(amount * minPct / 100);
-    const maxKr = Math.round(amount * maxPct / 100);
-    const label = minKr === maxKr ? `${minKr} kr` : `${minKr}-${maxKr} kr`;
+    const minKr = amount * minPct / 100;
+    const maxKr = amount * maxPct / 100;
+    const label = minKr === maxKr ? `${formatKr(minKr)} kr` : `${formatKr(minKr)}-${formatKr(maxKr)} kr`;
     return addEbSuffix(label, minPct, maxPct, amount, offer.provider);
   }
 
@@ -779,8 +779,8 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
     const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
-    const kr = Math.round(amount * pct / 100);
-    return addEbSuffix(`${kr} kr`, pct, pct, amount, offer.provider);
+    const kr = amount * pct / 100;
+    return addEbSuffix(`${formatKr(kr)} kr`, pct, pct, amount, offer.provider);
   }
 
   // SAS rate: "15 poeng per 100 kr"
@@ -788,24 +788,24 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   if (sasRateMatch !== null) {
     const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
     const eb = Math.round(amount * points / 100);
-    const kr = Math.round(eb / EB_PER_TRUMF_KR);
-    return `~${kr} kr (~${eb} EB)`;
+    const kr = amount * points / 100 / EB_PER_TRUMF_KR;
+    return `~${formatKr(kr)} kr (~${eb} EB)`;
   }
 
   // SAS fixed: "500 poeng"
   const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (sasFixedMatch !== null) {
     const points = Number.parseInt(sasFixedMatch[1].replace(/\s/g, ""), 10);
-    const kr = Math.round(points / EB_PER_TRUMF_KR);
-    return `~${kr} kr (~${points} EB)`;
+    const kr = points / EB_PER_TRUMF_KR;
+    return `~${formatKr(kr)} kr (~${points} EB)`;
   }
 
   // Klarna "5.5%"
   const klarnaMatch = reward.match(/^([\d.]+)%$/);
   if (klarnaMatch !== null) {
     const pct = Number.parseFloat(klarnaMatch[1]);
-    const kr = Math.round(amount * pct / 100);
-    return `${kr} kr`;
+    const kr = amount * pct / 100;
+    return `${formatKr(kr)} kr`;
   }
 
   return "";
@@ -828,8 +828,8 @@ function formatBreakdownWithAmounts(terms: string, amount: number): string {
       const match = line.match(/^([\d,]+)\s*%/);
       if (match !== null) {
         const pct = Number.parseFloat(match[1].replace(",", "."));
-        const kr = Math.round(amount * pct / 100);
-        return `${line} (${kr} kr)`;
+        const kr = amount * pct / 100;
+        return `${line} (${formatKr(kr)} kr)`;
       }
       return line;
     })
@@ -869,6 +869,13 @@ function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
 }
 
 const EB_PER_TRUMF_KR = 13.5;
+
+function formatKr(value: number): string {
+  if (Number.isInteger(value)) {
+    return value.toString();
+  }
+  return value.toFixed(2).replace(".", ",");
+}
 
 const COPY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 

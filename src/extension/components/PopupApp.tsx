@@ -27,7 +27,7 @@ export function PopupApp(): ReactElement {
     loadCurrentTabOffers(setState);
   }, []);
 
-  const amount = sumInput.length > 0 ? Number.parseInt(sumInput.replace(/[^0-9]/g, ""), 10) || 0 : 0;
+  const amount = sumInput.length > 0 ? Number.parseFloat(sumInput.replace(/[^0-9.,]/g, "").replace(",", ".")) || 0 : 0;
 
   if (state.status === "loading") {
     return (
@@ -58,10 +58,10 @@ export function PopupApp(): ReactElement {
         <input
           className="sum-input"
           type="text"
-          inputMode="numeric"
+          inputMode="decimal"
           placeholder="Kjøpesum"
           value={sumInput}
-          onChange={(e) => setSumInput(e.target.value.replace(/[^0-9]/g, ""))}
+          onChange={(e) => setSumInput(e.target.value.replace(/[^0-9.,]/g, ""))}
         />
       </div>
       <div className="offers">
@@ -236,6 +236,13 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   return "Klarna";
 }
 
+function formatKr(value: number): string {
+  if (Number.isInteger(value)) {
+    return value.toString();
+  }
+  return value.toFixed(2).replace(".", ",");
+}
+
 function calculateCashback(offer: CashbackOffer, amount: number): string {
   const reward = offer.reward.trim();
 
@@ -243,39 +250,39 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   if (rangeMatch !== null) {
     const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
     const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
-    const minKr = Math.round(amount * minPct / 100);
-    const maxKr = Math.round(amount * maxPct / 100);
-    const label = minKr === maxKr ? `${minKr} kr` : `${minKr}-${maxKr} kr`;
+    const minKr = amount * minPct / 100;
+    const maxKr = amount * maxPct / 100;
+    const label = minKr === maxKr ? `${formatKr(minKr)} kr` : `${formatKr(minKr)}-${formatKr(maxKr)} kr`;
     return addEbSuffix(label, minPct, maxPct, amount, offer.provider);
   }
 
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
     const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
-    const kr = Math.round(amount * pct / 100);
-    return addEbSuffix(`${kr} kr`, pct, pct, amount, offer.provider);
+    const kr = amount * pct / 100;
+    return addEbSuffix(`${formatKr(kr)} kr`, pct, pct, amount, offer.provider);
   }
 
   const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sasRateMatch !== null) {
     const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
     const eb = Math.round(amount * points / 100);
-    const kr = Math.round(eb / EB_PER_TRUMF_KR);
-    return `~${kr} kr (~${eb} EB)`;
+    const kr = amount * points / 100 / EB_PER_TRUMF_KR;
+    return `~${formatKr(kr)} kr (~${eb} EB)`;
   }
 
   const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (sasFixedMatch !== null) {
     const points = Number.parseInt(sasFixedMatch[1].replace(/\s/g, ""), 10);
-    const kr = Math.round(points / EB_PER_TRUMF_KR);
-    return `~${kr} kr (~${points} EB)`;
+    const kr = points / EB_PER_TRUMF_KR;
+    return `~${formatKr(kr)} kr (~${points} EB)`;
   }
 
   const klarnaMatch = reward.match(/^([\d.]+)%$/);
   if (klarnaMatch !== null) {
     const pct = Number.parseFloat(klarnaMatch[1]);
-    const kr = Math.round(amount * pct / 100);
-    return `${kr} kr`;
+    const kr = amount * pct / 100;
+    return `${formatKr(kr)} kr`;
   }
 
   return "";
