@@ -165,6 +165,26 @@ h1 {
   color: #ffffff;
 }
 
+.provider-revolut {
+  background: #0666eb;
+  color: #ffffff;
+}
+
+.provider-norwegian {
+  background: #d81939;
+  color: #ffffff;
+}
+
+.provider-sas-amex {
+  background: #00005c;
+  color: #ffffff;
+}
+
+.provider-lunar {
+  background: #2bb24c;
+  color: #ffffff;
+}
+
 .copy-code-btn {
   align-items: center;
   color: #1f8f5f;
@@ -178,11 +198,66 @@ h1 {
   color: #166b47;
 }
 
+.bonus-chips-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bonus-chips-toggle {
+  align-items: center;
+  background: none;
+  border: none;
+  color: #5d6b71;
+  cursor: pointer;
+  display: flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+  padding: 0 14px;
+}
+
+.bonus-chips-toggle:hover {
+  color: #172026;
+}
+
+.bonus-chips-toggle-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
+  transform: rotate(-90deg);
+}
+
+.bonus-chips-section.collapsed .bonus-chips {
+  display: none;
+}
+
 .bonus-chips {
+  display: flex;
+  gap: 12px;
+  padding: 0 14px 10px;
+}
+
+.chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chip-group-label {
+  color: #8a9a92;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.chip-group-items {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 0 14px 10px;
 }
 
 .bonus-chip {

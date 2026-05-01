@@ -34,8 +34,28 @@ type OffersForUrlResponse =
       reason: string;
     };
 
+const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
+  "nordvpn.com": "NordVPN Complete",
+  "tinder.com": "Tinder Gold",
+  "ft.com": "Financial Times Premium Digital",
+  "wework.com": "WeWork (3 pass/mnd)",
+  "masterclass.com": "MasterClass Unlimited",
+  "chess.com": "Chess.com Diamond",
+  "classpass.com": "ClassPass (20 credits/mnd)",
+  "makeheadway.com": "Headway",
+  "wolt.com": "Wolt+",
+  "headspace.com": "Headspace",
+  "freeletics.com": "Freeletics",
+  "sleepcycle.com": "Sleep Cycle",
+  "picsart.com": "Picsart",
+  "perplexity.ai": "Perplexity",
+  "theathletic.com": "The Athletic",
+  "laundryheap.com": "Laundryheap+",
+};
+
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
+const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
 
 chrome.runtime.onMessage.addListener((message) => {
   if (isCashbackFoundMessage(message)) {
@@ -51,9 +71,10 @@ chrome.runtime.onMessage.addListener((message) => {
 requestCurrentOffers();
 
 function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
-  chrome.storage.local.get(COLLAPSED_STORAGE_KEY, (result: Record<string, unknown>) => {
+  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY], (result: Record<string, unknown>) => {
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
-    renderNotice(offers, collapsed);
+    const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
+    renderNotice(offers, collapsed, chipsCollapsed);
   });
 }
 
@@ -77,7 +98,7 @@ function requestCurrentOffers(): void {
   });
 }
 
-function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void {
+function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initialChipsCollapsed: boolean): void {
   clearNotice();
 
   const host = document.createElement("div");
@@ -92,6 +113,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       position: fixed;
       z-index: 2147483647;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     *, *::before, *::after {
@@ -197,7 +220,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     }
 
     .panel {
-      width: min(340px, calc(100vw - 42px));
+      width: min(380px, calc(100vw - 42px));
       color: #172026;
       background: #ffffff;
       border: 1px solid #c9d7cf;
@@ -229,7 +252,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     .body {
       display: grid;
       gap: 10px;
-      padding: 14px;
+      padding: 14px 14px 0 14px;
     }
 
     .header {
@@ -358,6 +381,26 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       color: #ffffff;
     }
 
+    .provider-revolut {
+      background: #0666eb;
+      color: #ffffff;
+    }
+
+    .provider-norwegian {
+      background: #d81939;
+      color: #ffffff;
+    }
+
+    .provider-sas-amex {
+      background: #00005c;
+      color: #ffffff;
+    }
+
+    .provider-lunar {
+      background: #2bb24c;
+      color: #ffffff;
+    }
+
     .copy-code-btn {
       align-items: center;
       color: #1f8f5f;
@@ -393,8 +436,67 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
     .bonus-chips {
       display: flex;
+      gap: 12px;
+    }
+
+    .chip-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .chip-group-label {
+      color: #8a9a92;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .chip-group-items {
+      display: flex;
       flex-wrap: wrap;
       gap: 5px;
+    }
+
+    .bonus-chips-section {
+      border-top: 1px solid #edf2ef;
+      margin-top: -4px;
+      padding: 6px 0 4px;
+    }
+
+    .bonus-chips-toggle {
+      align-items: center;
+      appearance: none;
+      background: none;
+      border: none;
+      color: #8a9a92;
+      cursor: pointer;
+      display: flex;
+      font: inherit;
+      font-size: 11px;
+      gap: 4px;
+      line-height: 1;
+      margin-bottom: 5px;
+      padding: 0;
+    }
+
+    .bonus-chips-toggle:hover {
+      color: #4f5f66;
+    }
+
+    .bonus-chips-toggle-arrow {
+      display: inline-block;
+      font-size: 10px;
+      transition: transform 0.15s;
+    }
+
+    .bonus-chips-section.collapsed .bonus-chips {
+      display: none;
+    }
+
+    .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
+      transform: rotate(-90deg);
     }
 
     .bonus-chip {
@@ -427,6 +529,27 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       padding: 0 5px;
     }
 
+    .bonus-chip-tooltip {
+      background: #1a1a2e;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      max-width: 320px;
+      padding: 8px 10px;
+      pointer-events: none;
+      position: fixed;
+      white-space: pre-line;
+      width: max-content;
+      z-index: 2147483647;
+      display: none;
+    }
+
+    .bonus-chip-tooltip.visible {
+      display: block;
+    }
+
     .offer-link-wrapper {
       position: relative;
     }
@@ -454,7 +577,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
     .support {
       border-top: 1px solid #edf2ef;
-      padding: 8px 14px;
+      padding: 6px 14px;
     }
 
     .support a {
@@ -638,12 +761,114 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     } else {
       klarnaLabel.textContent = "+0,5-1 %";
     }
+    if (amount > 0) {
+      const eb = Math.round(amount * 10 / 100);
+      const kr = eb / EB_PER_TRUMF_KR;
+      sasAmexLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
+    } else {
+      sasAmexLabel.textContent = "+10 EB/100kr";
+    }
+    if (amount > 0) {
+      const eb = Math.round(amount * 8 / 100);
+      const kr = eb / EB_PER_TRUMF_KR;
+      lunarEbLabel.textContent = `+${eb} EB (~${formatKr(kr)} kr)`;
+    } else {
+      lunarEbLabel.textContent = "+8 EB/100kr";
+    }
   });
 
   const bonusChipLabels: { element: HTMLSpanElement; pct: number }[] = [];
 
   const bonusChips = document.createElement("div");
   bonusChips.className = "bonus-chips";
+
+  // --- Free chips group (left) ---
+  const freeGroup = document.createElement("div");
+  freeGroup.className = "chip-group";
+  const freeLabel = document.createElement("span");
+  freeLabel.className = "chip-group-label";
+  freeLabel.textContent = "Gratis";
+  const freeItems = document.createElement("div");
+  freeItems.className = "chip-group-items";
+  freeGroup.append(freeLabel, freeItems);
+
+  const norwegianChip = document.createElement("a");
+  norwegianChip.className = "bonus-chip";
+  norwegianChip.href = "https://www.banknorwegian.no/kredittkort/cashback/";
+  norwegianChip.target = "_blank";
+  norwegianChip.rel = "noreferrer";
+  const norwegianLabel = document.createElement("span");
+  norwegianLabel.className = "bonus-chip-label";
+  norwegianLabel.textContent = "+0,5 %";
+  bonusChipLabels.push({ element: norwegianLabel, pct: 0.5 });
+  const norwegianBadge = document.createElement("span");
+  norwegianBadge.className = "provider-badge provider-norwegian";
+  norwegianBadge.textContent = "Norwegian";
+  norwegianChip.append(norwegianLabel, norwegianBadge);
+  freeItems.append(norwegianChip);
+  addChipTooltip(norwegianChip, "0,5 % cashback (1:1 kr mot faktura) eller CashPoints (flyreiser). Gratis kort, ingen årsavgift.", shadowRoot);
+
+  const sasAmexChip = document.createElement("a");
+  sasAmexChip.className = "bonus-chip";
+  sasAmexChip.href = "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/";
+  sasAmexChip.target = "_blank";
+  sasAmexChip.rel = "noreferrer";
+  const sasAmexLabel = document.createElement("span");
+  sasAmexLabel.className = "bonus-chip-label";
+  sasAmexLabel.textContent = "+10 EB/100kr";
+  const sasAmexBadge = document.createElement("span");
+  sasAmexBadge.className = "provider-badge provider-sas-amex";
+  sasAmexBadge.textContent = "SAS Amex";
+  sasAmexChip.append(sasAmexLabel, sasAmexBadge);
+  freeItems.append(sasAmexChip);
+  addChipTooltip(sasAmexChip, "Classic: 10 EB/100 kr (gratis)\nPremium: 15 EB/100 kr (150 kr/mnd)\nElite: 20 EB/100 kr (575 kr/mnd)\n1 EB \u2248 0,07 kr.", shadowRoot);
+
+  const lunarEbChip = document.createElement("a");
+  lunarEbChip.className = "bonus-chip";
+  lunarEbChip.href = "https://www.lunar.app/no/privat/sas-eurobonus";
+  lunarEbChip.target = "_blank";
+  lunarEbChip.rel = "noreferrer";
+  const lunarEbLabel = document.createElement("span");
+  lunarEbLabel.className = "bonus-chip-label";
+  lunarEbLabel.textContent = "+8 EB/100kr";
+  const lunarEbBadge = document.createElement("span");
+  lunarEbBadge.className = "provider-badge provider-lunar";
+  lunarEbBadge.textContent = "Lunar EB";
+  lunarEbChip.append(lunarEbLabel, lunarEbBadge);
+  freeItems.append(lunarEbChip);
+  addChipTooltip(lunarEbChip, "8 EB/100 kr (netthandel)\n20 EB/100 kr på SAS.no\nGratis kort.", shadowRoot);
+
+  bonusChips.append(freeGroup);
+
+  // --- Premium chips group (right) ---
+  const premiumGroup = document.createElement("div");
+  premiumGroup.className = "chip-group";
+  const premiumLabel = document.createElement("span");
+  premiumLabel.className = "chip-group-label";
+  premiumLabel.textContent = "Premium";
+  const premiumItems = document.createElement("div");
+  premiumItems.className = "chip-group-items";
+  premiumGroup.append(premiumLabel, premiumItems);
+
+  const currentHostname = window.location.hostname.replace(/^www\./, "").toLowerCase();
+  const revolutSub = REVOLUT_SUBSCRIPTIONS[currentHostname];
+
+  if (revolutSub !== undefined) {
+    const revolutChip = document.createElement("a");
+    revolutChip.className = "bonus-chip";
+    revolutChip.href = "https://revolut.com/referrals?r=FELPJK";
+    revolutChip.target = "_blank";
+    revolutChip.rel = "noreferrer";
+    const revolutLabel = document.createElement("span");
+    revolutLabel.className = "bonus-chip-label";
+    revolutLabel.textContent = "Inkludert";
+    const revolutBadge = document.createElement("span");
+    revolutBadge.className = "provider-badge provider-revolut";
+    revolutBadge.textContent = "Revolut";
+    revolutChip.append(revolutLabel, revolutBadge);
+    premiumItems.append(revolutChip);
+    addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
+  }
 
   if (curveOffer !== undefined) {
     const curveChip = document.createElement("a");
@@ -659,7 +884,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
     curveBadge.className = "provider-badge provider-curve";
     curveBadge.textContent = "Curve Pro";
     curveChip.append(curveLabel, curveBadge);
-    bonusChips.append(curveChip);
+    premiumItems.append(curveChip);
+    addChipTooltip(curveChip, "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.", shadowRoot);
   }
 
   const klarnaChip = document.createElement("a");
@@ -674,9 +900,37 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   klarnaBadge.className = "provider-badge provider-klarna";
   klarnaBadge.textContent = "Klarna+";
   klarnaChip.append(klarnaLabel, klarnaBadge);
-  bonusChips.append(klarnaChip);
+  premiumItems.append(klarnaChip);
+  addChipTooltip(klarnaChip, "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback.", shadowRoot);
 
-  body.append(header, offerList, bonusChips);
+  bonusChips.append(premiumGroup);
+
+  // Collapsible chips section
+  const chipsSection = document.createElement("div");
+  chipsSection.className = "bonus-chips-section";
+  if (initialChipsCollapsed) {
+    chipsSection.classList.add("collapsed");
+  }
+
+  const chipsToggle = document.createElement("button");
+  chipsToggle.className = "bonus-chips-toggle";
+  chipsToggle.type = "button";
+
+  const chipsToggleArrow = document.createElement("span");
+  chipsToggleArrow.className = "bonus-chips-toggle-arrow";
+  chipsToggleArrow.textContent = "\u25BC";
+
+  const chipsToggleText = document.createElement("span");
+  chipsToggleText.textContent = "Kort og medlemskap";
+
+  chipsToggle.append(chipsToggleArrow, chipsToggleText);
+  chipsToggle.addEventListener("click", () => {
+    const isCollapsed = chipsSection.classList.toggle("collapsed");
+    chrome.storage.local.set({ [CHIPS_COLLAPSED_KEY]: isCollapsed });
+  });
+
+  chipsSection.append(chipsToggle, bonusChips);
+  body.append(header, offerList, chipsSection);
 
   const supportLinks = [
     { text: "200 kr gratis i fond \u2192", url: "https://kron.no/app/invitert/nvu4d" },
@@ -1057,4 +1311,28 @@ function convertTrumfToEb(reward: string): string {
 
 function formatNo(n: number): string {
   return n % 1 === 0 ? n.toString() : n.toFixed(1).replace(".", ",");
+}
+
+function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot): void {
+  const tooltip = document.createElement("div");
+  tooltip.className = "bonus-chip-tooltip";
+  tooltip.textContent = text;
+  shadowRoot.append(tooltip);
+
+  chip.addEventListener("mouseenter", () => {
+    const panelEl = shadowRoot.querySelector(".panel");
+    const panelRect = panelEl?.getBoundingClientRect();
+    const rect = chip.getBoundingClientRect();
+    tooltip.style.left = "-9999px";
+    tooltip.style.top = "-9999px";
+    tooltip.classList.add("visible");
+    const tooltipHeight = tooltip.offsetHeight;
+    const rightEdge = panelRect ? panelRect.right + 6 : rect.right + 6;
+    tooltip.style.left = `${rightEdge}px`;
+    tooltip.style.top = `${rect.top + rect.height / 2 - tooltipHeight / 2}px`;
+    tooltip.style.transform = "none";
+  });
+  chip.addEventListener("mouseleave", () => {
+    tooltip.classList.remove("visible");
+  });
 }

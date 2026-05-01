@@ -5,6 +5,25 @@ import {
   isOffersForUrlResponse,
 } from "../../shared/extension-messages.js";
 
+const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
+  "nordvpn.com": "NordVPN Complete",
+  "tinder.com": "Tinder Gold",
+  "ft.com": "Financial Times Premium Digital",
+  "wework.com": "WeWork (3 pass/mnd)",
+  "masterclass.com": "MasterClass Unlimited",
+  "chess.com": "Chess.com Diamond",
+  "classpass.com": "ClassPass (20 credits/mnd)",
+  "makeheadway.com": "Headway",
+  "wolt.com": "Wolt+",
+  "headspace.com": "Headspace",
+  "freeletics.com": "Freeletics",
+  "sleepcycle.com": "Sleep Cycle",
+  "picsart.com": "Picsart",
+  "perplexity.ai": "Perplexity",
+  "theathletic.com": "The Athletic",
+  "laundryheap.com": "Laundryheap+",
+};
+
 type PopupState =
   | {
       status: "loading";
@@ -22,9 +41,15 @@ type PopupState =
 export function PopupApp(): ReactElement {
   const [state, setState] = useState<PopupState>({ status: "loading" });
   const [sumInput, setSumInput] = useState("");
+  const [chipsCollapsed, setChipsCollapsed] = useState(false);
 
   useEffect(() => {
     loadCurrentTabOffers(setState);
+    chrome.storage.local.get("cashback-varsler-chips-collapsed", (result: Record<string, unknown>) => {
+      if (result["cashback-varsler-chips-collapsed"] === true) {
+        setChipsCollapsed(true);
+      }
+    });
   }, []);
 
   const amount = sumInput.length > 0 ? Number.parseFloat(sumInput.replace(/[^0-9.,]/g, "").replace(",", ".")) || 0 : 0;
@@ -50,6 +75,9 @@ export function PopupApp(): ReactElement {
 
   const mainOffers = state.offers.filter((o) => o.provider !== "curve");
   const curveOffer = state.offers.find((o) => o.provider === "curve");
+
+  const normalizedHostname = state.hostname.replace(/^www\./, "").toLowerCase();
+  const revolutSub = REVOLUT_SUBSCRIPTIONS[normalizedHostname];
 
   const klarnaMinKr = amount > 0 ? formatKr(amount * 0.5 / 100) : null;
   const klarnaMaxKr = amount > 0 ? formatKr(amount * 1 / 100) : null;
@@ -82,33 +110,111 @@ export function PopupApp(): ReactElement {
           );
         })}
       </div>
-      <div className="bonus-chips">
-        {curveOffer !== undefined && (
-          <a
-            className="bonus-chip"
-            href={curveOffer.activationUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span className="bonus-chip-label">
-              {curveKr !== null ? `+${curveKr} kr` : "+1 %"}
-            </span>
-            <span className="provider-badge provider-curve">Curve Pro</span>
-          </a>
-        )}
-        <a
-          className="bonus-chip"
-          href="https://www.klarna.com/no/medlemskap/"
-          target="_blank"
-          rel="noreferrer"
+      <div className={`bonus-chips-section${chipsCollapsed ? " collapsed" : ""}`}>
+        <button
+          className="bonus-chips-toggle"
+          type="button"
+          onClick={() => {
+            const next = !chipsCollapsed;
+            setChipsCollapsed(next);
+            chrome.storage.local.set({ "cashback-varsler-chips-collapsed": next });
+          }}
         >
-          <span className="bonus-chip-label">
-            {klarnaMinKr !== null && klarnaMaxKr !== null
-              ? `+${klarnaMinKr}-${klarnaMaxKr} kr`
-              : "+0,5-1 %"}
-          </span>
-          <span className="provider-badge provider-klarna">Klarna+</span>
-        </a>
+          <span className="bonus-chips-toggle-arrow">{"\u25BE"}</span>
+          <span>Kort og medlemskap</span>
+        </button>
+        <div className="bonus-chips">
+          <div className="chip-group">
+            <span className="chip-group-label">Gratis</span>
+            <div className="chip-group-items">
+              <a
+                className="bonus-chip"
+                href="https://www.banknorwegian.no/kredittkort/cashback/"
+                target="_blank"
+                rel="noreferrer"
+                title={"0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr på Norwegian.no).\nGratis kort, ingen årsavgift."}
+              >
+                <span className="bonus-chip-label">
+                  {amount > 0 ? `+${formatKr(amount * 0.5 / 100)} kr` : "+0,5 %"}
+                </span>
+                <span className="provider-badge provider-norwegian">Norwegian</span>
+              </a>
+              <a
+                className="bonus-chip"
+                href="https://www.americanexpress.com/nb-no/kredittkort/sas-classic/"
+                target="_blank"
+                rel="noreferrer"
+                title={"Classic: 10 EB/100 kr (gratis)\nPremium: 15 EB/100 kr (150 kr/mnd)\nElite: 20 EB/100 kr (575 kr/mnd)\n1 EB ≈ 0,07 kr."}
+              >
+                <span className="bonus-chip-label">
+                  {amount > 0
+                    ? `+${Math.round(amount * 10 / 100)} EB (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
+                    : "+10 EB/100kr"}
+                </span>
+                <span className="provider-badge provider-sas-amex">SAS Amex</span>
+              </a>
+              <a
+                className="bonus-chip"
+                href="https://www.lunar.app/no/privat/sas-eurobonus"
+                target="_blank"
+                rel="noreferrer"
+                title={"8 EB/100 kr (netthandel)\n20 EB/100 kr på SAS.no\nGratis kort."}
+              >
+                <span className="bonus-chip-label">
+                  {amount > 0
+                    ? `+${Math.round(amount * 8 / 100)} EB (~${formatKr(Math.round(amount * 8 / 100) / 13.5)} kr)`
+                    : "+8 EB/100kr"}
+                </span>
+                <span className="provider-badge provider-lunar">Lunar EB</span>
+              </a>
+            </div>
+          </div>
+          <div className="chip-group">
+            <span className="chip-group-label">Premium</span>
+            <div className="chip-group-items">
+              {revolutSub !== undefined && (
+                <a
+                  className="bonus-chip"
+                  href="https://revolut.com/referrals?r=FELPJK"
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`}
+                >
+                  <span className="bonus-chip-label">Inkludert</span>
+                  <span className="provider-badge provider-revolut">Revolut</span>
+                </a>
+              )}
+              {curveOffer !== undefined && (
+                <a
+                  className="bonus-chip"
+                  href={curveOffer.activationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={"Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback."}
+                >
+                  <span className="bonus-chip-label">
+                    {curveKr !== null ? `+${curveKr} kr` : "+1 %"}
+                  </span>
+                  <span className="provider-badge provider-curve">Curve Pro</span>
+                </a>
+              )}
+              <a
+                className="bonus-chip"
+                href="https://www.klarna.com/no/medlemskap/"
+                target="_blank"
+                rel="noreferrer"
+                title={"Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback."}
+              >
+                <span className="bonus-chip-label">
+                  {klarnaMinKr !== null && klarnaMaxKr !== null
+                    ? `+${klarnaMinKr}-${klarnaMaxKr} kr`
+                    : "+0,5-1 %"}
+                </span>
+                <span className="provider-badge provider-klarna">Klarna+</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   );
