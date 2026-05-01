@@ -19,6 +19,7 @@ type CachedIndex = {
 
 const STORAGE_KEY = "cashback-index";
 const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshIndex();
@@ -96,6 +97,22 @@ async function ensureIndex(): Promise<CashbackIndex> {
 }
 
 async function refreshIndex(): Promise<CashbackIndex> {
+  try {
+    const response = await fetch(REMOTE_INDEX_URL);
+    const value: unknown = await response.json();
+
+    if (isCashbackIndex(value)) {
+      const cachedIndex: CachedIndex = {
+        downloadedAt: new Date().toISOString(),
+        index: value,
+      };
+      await setStorageValue(STORAGE_KEY, cachedIndex);
+      return value;
+    }
+  } catch {
+    // Fall through to bundled index
+  }
+
   const bundledIndex = await readBundledIndex();
   const cachedIndex: CachedIndex = {
     downloadedAt: new Date().toISOString(),
