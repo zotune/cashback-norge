@@ -1,8 +1,14 @@
 {
   "trumf": {
+    "auto-europe-notrumf": ["autoeurope.no"],
     "disney-trumfa": ["disneyplus.com"],
+    "ellos": ["ellos.no"],
+    "foss-sport-trumf": ["fosssport.no"],
+    "jlindeberg-trumf": ["jlindeberg.com"],
     "lyko-trumf": ["lyko.com"],
-    "trumfhotels-no": ["hotels.com", "no.hotels.com"]
+    "pyret-and-snackan-trumf": ["pyretochsnackan.se"],
+    "trumfhotels-no": ["hotels.com", "no.hotels.com"],
+    "urban-pioneers-concept-store-trumf": ["urbanpioneers.no"]
   },
   "klarna": {
     "autodude.no--valostore.no": ["autodude.no", "valostore.no"],

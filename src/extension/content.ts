@@ -394,7 +394,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   for (const currentOffer of offers) {
     const offerLink = document.createElement("a");
     offerLink.className = "offer-link";
-    offerLink.href = currentOffer.activationUrl;
+    offerLink.href = currentOffer.provider === "trumf" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
     offerLink.rel = "noreferrer";
 

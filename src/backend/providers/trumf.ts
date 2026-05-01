@@ -1,3 +1,4 @@
+import { resolve as dnsResolve } from "node:dns/promises";
 import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
@@ -69,7 +70,13 @@ export async function crawlTrumf(
   }, config);
 
   await crawler.run([input.startUrl]);
-  return uniqueOffers(offers);
+
+  const resolved = await resolveDomainsForOffers(
+    uniqueOffers(offers),
+    input.overrides,
+    input.logger,
+  );
+  return resolved;
 }
 
 function parseTrumfOffer(
@@ -204,4 +211,116 @@ function extractSlug(sourceUrl: string): string {
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+async function resolveDomainsForOffers(
+  offers: CashbackOffer[],
+  overrides: ProviderOverrides,
+  logger: Logger,
+): Promise<CashbackOffer[]> {
+  const resolved: CashbackOffer[] = [];
+  const batchSize = 20;
+
+  for (let i = 0; i < offers.length; i += batchSize) {
+    const batch = offers.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async (offer) => {
+        if (offer.domains.length > 0) {
+          return offer;
+        }
+
+        const slug = extractSlug(offer.sourceUrl);
+        const overrideDomains = overrides.trumf[slug] ?? [];
+
+        if (overrideDomains.length > 0) {
+          return {
+            ...offer,
+            domains: uniqueStrings(overrideDomains.map(normalizeDomainInput)),
+          };
+        }
+
+        const discovered = await discoverDomains(offer.merchantName, logger);
+        if (discovered.length === 0) {
+          logger.warn(
+            `Trumf offer has no domains: ${offer.merchantName} (${slug})`,
+          );
+        }
+
+        return {
+          ...offer,
+          domains: uniqueStrings(discovered.map(normalizeDomainInput)),
+        };
+      }),
+    );
+    resolved.push(...results);
+  }
+
+  return resolved;
+}
+
+async function discoverDomains(
+  merchantName: string,
+  logger: Logger,
+): Promise<string[]> {
+  const candidates = buildDomainCandidates(merchantName);
+
+  for (const domain of candidates) {
+    if (await canResolve(domain)) {
+      return [domain];
+    }
+  }
+
+  return [];
+}
+
+function buildDomainCandidates(merchantName: string): string[] {
+  const name = merchantName.toLowerCase().trim();
+  const candidates: string[] = [];
+
+  // If name already looks like a domain, use directly
+  if (/\.[a-z]{2,}$/i.test(name)) {
+    candidates.push(name);
+    return candidates;
+  }
+
+  // Slugify: remove special chars, collapse spaces to nothing
+  const slug = name
+    .replace(/['']/g, "")
+    .replace(/&/g, "and")
+    .replace(/ø/g, "o")
+    .replace(/æ/g, "ae")
+    .replace(/å/g, "a")
+    .replace(/ö/g, "o")
+    .replace(/ä/g, "a")
+    .replace(/ü/g, "u")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  if (slug.length === 0) {
+    return candidates;
+  }
+
+  candidates.push(
+    `${slug}.no`,
+    `${slug}.com`,
+    `${slug}.se`,
+  );
+
+  // Try without hyphens
+  if (slug.includes("-")) {
+    const noHyphens = slug.replace(/-/g, "");
+    candidates.push(`${noHyphens}.no`, `${noHyphens}.com`);
+  }
+
+  return candidates;
+}
+
+async function canResolve(domain: string): Promise<boolean> {
+  try {
+    await dnsResolve(domain);
+    return true;
+  } catch {
+    return false;
+  }
 }

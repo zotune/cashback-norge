@@ -67,7 +67,7 @@ function OfferRow(props: { offer: CashbackOffer }): ReactElement {
   return (
     <a
       className="offer"
-      href={props.offer.activationUrl}
+      href={props.offer.provider === "trumf" ? props.offer.sourceUrl : props.offer.activationUrl}
       target="_blank"
       rel="noreferrer"
     >
