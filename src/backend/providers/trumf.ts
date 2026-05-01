@@ -118,6 +118,20 @@ function extractMerchantName($: TrumfCheerio): string {
 }
 
 function extractReward($: TrumfCheerio): string {
+  const categories = extractCategoryRates($);
+
+  if (categories.length > 0) {
+    const rates = categories.map((c) => c.rate);
+    const min = Math.min(...rates);
+    const max = Math.max(...rates);
+
+    if (min === max) {
+      return `${formatRate(min)} %`;
+    }
+
+    return `${formatRate(min)}-${formatRate(max)} %`;
+  }
+
   const text = normalizeWhitespace($("body").text());
   const percentMatch = text.match(/(?:Opptil\s+)?\d+(?:[,.]\d+)?\s*%/i);
   const krMatch = text.match(/(?:Opptil\s+)?\d+(?:[,.]\d+)?\s*kr/i);
@@ -126,6 +140,14 @@ function extractReward($: TrumfCheerio): string {
 }
 
 function extractTerms($: TrumfCheerio): string {
+  const categories = extractCategoryRates($);
+
+  if (categories.length > 1) {
+    return categories
+      .map((c) => `${formatRate(c.rate)} % – ${c.category}`)
+      .join("\n");
+  }
+
   const paragraphs = $("p")
     .toArray()
     .map((element) => normalizeWhitespace($(element).text()))
@@ -133,6 +155,32 @@ function extractTerms($: TrumfCheerio): string {
   const firstParagraph = paragraphs[0] ?? "";
 
   return firstParagraph;
+}
+
+type CategoryRate = { category: string; rate: number };
+
+function extractCategoryRates($: TrumfCheerio): CategoryRate[] {
+  const titles = $(".merchant-list-offer-title").toArray();
+  const values = $(".merchant-list-offer-value").toArray();
+  const categories: CategoryRate[] = [];
+
+  for (let i = 0; i < Math.min(titles.length, values.length); i++) {
+    const category = normalizeWhitespace($(titles[i]).text());
+    const valueText = normalizeWhitespace($(values[i]).text());
+    const rateMatch = valueText.match(/(\d+(?:[,.]\d+)?)\s*%/);
+
+    if (rateMatch !== null && rateMatch[1] !== undefined) {
+      const rate = Number.parseFloat(rateMatch[1].replace(",", "."));
+      categories.push({ category, rate });
+    }
+  }
+
+  return categories;
+}
+
+function formatRate(value: number): string {
+  const formatted = value.toFixed(1).replace(".", ",");
+  return formatted.endsWith(",0") ? formatted.slice(0, -2) : formatted;
 }
 
 function findActivationUrl(

@@ -64,28 +64,35 @@ export function PopupApp(): ReactElement {
 }
 
 function OfferRow(props: { offer: CashbackOffer }): ReactElement {
+  const hasBreakdown = props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms);
+
   return (
-    <a
-      className="offer"
-      href={props.offer.provider === "trumf" ? props.offer.sourceUrl : props.offer.activationUrl}
-      target="_blank"
-      rel="noreferrer"
-    >
-      <div>
-        <p className="merchant">
-          <span>{formatRewardLabel(props.offer.reward, props.offer.provider)}</span>
-          <span
-            className={`provider-badge provider-${props.offer.provider}`}
-          >
-            {formatProviderName(props.offer.provider)}
-          </span>
-        </p>
-        <p className="muted">{props.offer.merchantName}</p>
-      </div>
-      <span className="reward" aria-hidden="true">
-        Open
-      </span>
-    </a>
+    <div className="offer-wrapper" style={{ position: "relative" }}>
+      {hasBreakdown && (
+        <div className="offer-tooltip">{props.offer.terms}</div>
+      )}
+      <a
+        className="offer"
+        href={props.offer.provider === "trumf" ? props.offer.sourceUrl : props.offer.activationUrl}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <div>
+          <p className="merchant">
+            <span>{formatRewardLabel(props.offer.reward, props.offer.provider)}</span>
+            <span
+              className={`provider-badge provider-${props.offer.provider}`}
+            >
+              {formatProviderName(props.offer.provider)}
+            </span>
+          </p>
+          <p className="muted">{props.offer.merchantName}</p>
+        </div>
+        <span className="reward" aria-hidden="true">
+          Open
+        </span>
+      </a>
+    </div>
   );
 }
 
@@ -153,6 +160,14 @@ function convertSasToKr(reward: string): string {
 }
 
 function convertTrumfToEb(reward: string): string {
+  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (rangeMatch !== null) {
+    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minEb = Math.round(minPct * EB_PER_TRUMF_KR);
+    const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR);
+    return `~${minEb}-${maxEb} EB/100kr`;
+  }
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
     const pct = Number.parseFloat(pctMatch[1].replace(",", "."));

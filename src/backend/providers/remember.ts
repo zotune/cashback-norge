@@ -382,6 +382,20 @@ function cleanRedirectUrl(value: string, baseUrl: string): string | undefined {
 }
 
 function extractReward(store: RememberStore): string {
+  const percentageCommissions = store.commission.filter(
+    (c) => c.type === "PERCENTAGE" && c.value > 0,
+  );
+
+  if (percentageCommissions.length > 1) {
+    const values = percentageCommissions.map((c) => c.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    if (min !== max) {
+      return `${formatRewardNumber(min)}-${formatRewardNumber(max)} %`;
+    }
+  }
+
   if (store.maxPercentageValue > 0) {
     return `Opptil ${formatRewardNumber(store.maxPercentageValue)} %`;
   }
@@ -409,6 +423,16 @@ function extractReward(store: RememberStore): string {
 }
 
 function extractTerms(store: RememberStore): string {
+  const percentageCommissions = store.commission.filter(
+    (c) => c.type === "PERCENTAGE" && c.value > 0 && c.description.length > 0,
+  );
+
+  if (percentageCommissions.length > 1) {
+    return percentageCommissions
+      .map((c) => `${formatRewardNumber(c.value)} % – ${c.description}`)
+      .join("\n");
+  }
+
   return (
     store.terms ||
     "Requires re:member reward login and payment with a re:member card."

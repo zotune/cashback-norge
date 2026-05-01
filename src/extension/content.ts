@@ -324,6 +324,31 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       white-space: nowrap;
     }
 
+    .offer-link-wrapper {
+      position: relative;
+    }
+
+    .offer-tooltip {
+      background: #1a1a2e;
+      border-radius: 8px;
+      color: #e0e0e0;
+      display: none;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      max-width: 320px;
+      padding: 8px 10px;
+      pointer-events: none;
+      position: fixed;
+      white-space: pre-line;
+      width: max-content;
+      z-index: 2147483647;
+    }
+
+    .offer-tooltip.visible {
+      display: block;
+    }
+
     .support {
       border-top: 1px solid #edf2ef;
       padding: 8px 14px;
@@ -397,6 +422,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
   offerList.className = "offer-list";
 
   for (const currentOffer of offers) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "offer-link-wrapper";
+
     const offerLink = document.createElement("a");
     offerLink.className = "offer-link";
     offerLink.href = currentOffer.provider === "trumf" ? currentOffer.sourceUrl : currentOffer.activationUrl;
@@ -419,7 +447,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
     offerLabel.append(offerReward, providerBadge);
     offerLink.append(offerLabel, offerOpen);
-    offerList.append(offerLink);
+
+    wrapper.append(offerLink);
+    offerList.append(wrapper);
   }
 
   body.append(header, offerList);
@@ -459,6 +489,34 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
 
   shadowRoot.append(style, notice);
   document.documentElement.append(host);
+
+  // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
+  const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
+  for (let idx = 0; idx < offers.length; idx++) {
+    const currentOffer = offers[idx];
+    if (currentOffer === undefined || !hasRateBreakdown(currentOffer.terms)) continue;
+    const wrapper = wrappers[idx];
+    if (wrapper === undefined) continue;
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "offer-tooltip";
+    tooltip.textContent = currentOffer.terms;
+    shadowRoot.append(tooltip);
+
+    wrapper.addEventListener("mouseenter", () => {
+      const rect = wrapper.getBoundingClientRect();
+      // Show off-screen to measure, then position
+      tooltip.style.left = "-9999px";
+      tooltip.style.top = "-9999px";
+      tooltip.classList.add("visible");
+      const tooltipHeight = tooltip.offsetHeight;
+      tooltip.style.left = `${rect.left}px`;
+      tooltip.style.top = `${rect.top - tooltipHeight - 6}px`;
+    });
+    wrapper.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("visible");
+    });
+  }
 
   // Re-enable transitions after first frame
   if (initialCollapsed) {
@@ -606,6 +664,10 @@ function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
 
 const EB_PER_TRUMF_KR = 13.5;
 
+function hasRateBreakdown(terms: string): boolean {
+  return terms.includes("\n") && /\d+.*%/.test(terms);
+}
+
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
   const maxPrefix = "Opptil ";
@@ -672,6 +734,15 @@ function convertSasToKr(reward: string): string {
 }
 
 function convertTrumfToEb(reward: string): string {
+  // "1,1-1,5 %" → ~15-20 EB/100kr
+  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  if (rangeMatch !== null) {
+    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minEb = Math.round(minPct * EB_PER_TRUMF_KR);
+    const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR);
+    return `~${minEb}-${maxEb} EB/100kr`;
+  }
   // "3,1 %" → ~42 EB/100kr
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
