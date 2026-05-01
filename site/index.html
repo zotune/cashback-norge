@@ -179,30 +179,17 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   font-size: 12px;
   margin-bottom: 12px;
 }
-.tips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+.tip-line {
+  color: #5d6b71;
+  font-size: 13px;
+  margin-bottom: 12px;
+  text-align: center;
 }
-.tip {
-  align-items: center;
-  background: #fff;
-  border: 1px solid #d6e1dc;
-  border-radius: 8px;
-  color: #172026;
-  display: flex;
-  font-size: 12px;
-  font-weight: 600;
-  gap: 6px;
-  padding: 8px 12px;
+.tip-line a {
+  color: #5d6b71;
   text-decoration: none;
-  flex: 1;
-  min-width: 0;
 }
-.tip:active { background: #f0f4f2; }
-.tip-emoji { font-size: 16px; flex-shrink: 0; }
-.tip-text { overflow-wrap: anywhere; }
+.tip-line a:hover { text-decoration: underline; }
 .bonus-section {
   margin-bottom: 16px;
 }
@@ -328,7 +315,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
     <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
     <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
   </div>
-  <div class="tips"></div>
+  <div class="tip-line"></div>
   <div class="bonus-section">
     <button class="bonus-toggle" type="button">
       <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
@@ -577,13 +564,11 @@ function esc(s) {
 }
 
 function renderTips() {
-  const container = document.querySelector(".tips");
-  container.innerHTML = SUPPORT_LINKS.slice(0, 3).map(t =>
-    `<a class="tip" href="${esc(t.url)}" target="_blank" rel="noreferrer">
-      <span class="tip-emoji">${t.emoji}</span>
-      <span class="tip-text">${esc(t.text.replace(/ →$/, ''))}</span>
-    </a>`
-  ).join("");
+  const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
+  const container = document.querySelector(".tip-line");
+  if (pick) {
+    container.innerHTML = `<a href="${esc(pick.url)}" target="_blank" rel="noreferrer">${esc(pick.text)}</a>`;
+  }
 }
 
 function renderChipGroup(cards, container) {
