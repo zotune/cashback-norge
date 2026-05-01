@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm run build:backend && pnpm run build:extension",
+    "build": "pnpm run build:backend && pnpm run build:extension && pnpm run build:site",
     "build:backend": "tsc --project tsconfig.backend.json",
     "build:extension": "vite build --config vite.extension.config.ts",
+    "build:site": "vite build --config vite.site.config.ts",
     "check": "tsc --project tsconfig.json --noEmit",
     "crawl": "tsx src/backend/index.ts"
   },

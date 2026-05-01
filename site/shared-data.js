@@ -1,0 +1,20 @@
+(function(){"use strict";Object.assign(window,{SHARED:{EB_PER_TRUMF_KR:13.5,PROVIDER_NAMES:{trumf:"Trumf",klarna:"Klarna",remember:"re:member",sas:"SAS EB",tfbank:"TF Bank",dnb:"DNB",curve:"Curve Pro"},PROVIDER_TIPS:{trumf:`Trumf-bonus. Aktiver i Trumf-appen.
+1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.`,klarna:`Klarna+ medlemskap.
+Plus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).`,remember:`re:member kredittkort.
+Aktiver tilbud i re:member-appen før kjøp.`,sas:`SAS EuroBonus-poeng.
+Aktiver tilbud på SAS sine sider.
+Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`,tfbank:`TF Bank Mastercard.
+Aktiver tilbud i TF Bank-appen.`,dnb:"DNB Spare. Aktiver i DNB-appen."},FREE_CARDS:[{pct:.0074,ebPer100kr:10,label:"SAS Amex",badge:"sas-amex",approx:!0,url:"https://www.americanexpress.com/nb-no/kredittkort/sas-classic/",tip:`10 EB/100 kr. Gratis kort.
+2-for-1 på SAS-flyvninger i Europa.
+Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`},{pct:.0074,ebPer100kr:10,label:"SAS MC",badge:"sas-amex",approx:!0,url:"https://saseurobonusmastercard.no/kortene/mastercard/",tip:`10 EB/100 kr. Gratis kort (Mastercard).
+Aksepteres flere steder enn Amex.
+Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`},{pct:.0059,ebPer100kr:8,label:"Lunar EB",badge:"lunar",approx:!0,url:"https://www.lunar.app/no/privat/sas-eurobonus",tip:`8 EB/100 kr (netthandel)
+20 EB/100 kr på SAS.no
+Gratis kort.`},{pct:.005,label:"Norwegian",badge:"norwegian",approx:!1,url:"https://www.banknorwegian.no/kredittkort/cashback/",tip:`0,5 % cashback (1:1 kr mot faktura)
+eller CashPoints (1:1 kr på Norwegian.no).
+Gratis kort, ingen årsavgift.`}],PREMIUM_CARDS:[{pct:.01,label:"Curve",badge:"curve",approx:!1,url:"https://www.curve.com/",tip:`Velg butikken i Curve-appen.
+Maks 6 butikker (Pro, €9,99/mnd)
+eller 12 (Pro+, €17,99/mnd).
+Kombineres med annen cashback.`},{pct:.0075,label:"Klarna+",badge:"klarna",approx:!1,url:"https://www.klarna.com/no/medlemskap/",tip:`Plus: +0,5 % (49 kr/mnd)
+Max: +1 % (99 kr/mnd)
+Kombineres med annen cashback.`}],SUPPORT_LINKS:[{text:"200 kr gratis i fond →",emoji:"💰",url:"https://kron.no/app/invitert/nvu4d"},{text:"Horde: 500p bonus + oversikt →",emoji:"📊",url:"https://app.horde.no/66CS/verve?code=kloube"},{text:"Kjøp en kaffe til utvikler →",emoji:"☕",url:"https://buymeacoffee.com/adore"},{text:"Opptil 2 500 kr med Revolut →",emoji:"💳",url:"https://revolut.com/referrals?r=FELPJK"}],MERCHANT_ALIASES:{"auto europe no":"auto europe","christiania glassmagasin":"christiania glasmagasin",hunkemöller:"hunkemøller","jakt og friluft":"jakt & friluft",kinoklubben:"kinoklubb",kitchn:"kitch'n","l´occitane":"l'occitane","nordic print":"nordicprint",nordicprint:"nordicprint","pyret og snäckan":"pyret & snäckan",racketspesialisten:"racketspecialisten","sky showtime":"skyshowtime","scandic hotels":"scandic","ellos no":"ellos","elite hotels of sweden":"elite hotels","db journey":"db","budget leiebiler":"budget","amisol travel":"amisol","radisson hotels":"radisson hotel group","norton by symantec":"norton","marshall-hodetelefoner":"marshall"}}})})();

@@ -1,3 +1,5 @@
+import { EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, PROVIDER_NAMES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
+
 type CashbackOffer = {
   provider: "trumf" | "klarna" | "remember" | "sas";
   merchantName: string;
@@ -33,25 +35,6 @@ type OffersForUrlResponse =
       ok: false;
       reason: string;
     };
-
-const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
-  "nordvpn.com": "NordVPN Complete",
-  "tinder.com": "Tinder Gold",
-  "ft.com": "Financial Times Premium Digital",
-  "wework.com": "WeWork (3 pass/mnd)",
-  "masterclass.com": "MasterClass Unlimited",
-  "chess.com": "Chess.com Diamond",
-  "classpass.com": "ClassPass (20 credits/mnd)",
-  "makeheadway.com": "Headway",
-  "wolt.com": "Wolt+",
-  "headspace.com": "Headspace",
-  "freeletics.com": "Freeletics",
-  "sleepcycle.com": "Sleep Cycle",
-  "picsart.com": "Picsart",
-  "perplexity.ai": "Perplexity",
-  "theathletic.com": "The Athletic",
-  "laundryheap.com": "Laundryheap+",
-};
 
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
@@ -746,36 +729,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         ? formatBreakdownWithAmounts(offer.terms, amount)
         : offer.terms;
     }
-    for (const { element, pct } of bonusChipLabels) {
+    for (const { element, pct, defaultText } of bonusChipLabels) {
       if (amount > 0) {
         const kr = amount * pct / 100;
         element.textContent = `+${formatKr(kr)} kr`;
       } else {
-        element.textContent = `+${pct} %`;
+        element.textContent = defaultText;
       }
-    }
-    if (amount > 0) {
-      const minKr = amount * 0.5 / 100;
-      const maxKr = amount * 1 / 100;
-      klarnaLabel.textContent = `+${formatKr(minKr)}-${formatKr(maxKr)} kr`;
-    } else {
-      klarnaLabel.textContent = "+0,5-1 %";
-    }
-    if (amount > 0) {
-      const eb = Math.round(amount * 10 / 100);
-      const kr = eb / EB_PER_TRUMF_KR;
-      sasAmexLabel.textContent = `+~0,74% (~${formatKr(kr)} kr)`;
-      sasMcLabel.textContent = `+~0,74% (~${formatKr(kr)} kr)`;
-    } else {
-      sasAmexLabel.textContent = "+~0,74% (~10 EB/100kr)";
-      sasMcLabel.textContent = "+~0,74% (~10 EB/100kr)";
-    }
-    if (amount > 0) {
-      const eb = Math.round(amount * 8 / 100);
-      const kr = eb / EB_PER_TRUMF_KR;
-      lunarEbLabel.textContent = `+~0,59% (~${formatKr(kr)} kr)`;
-    } else {
-      lunarEbLabel.textContent = "+~0,59% (~8 EB/100kr)";
     }
     if (amount > 0) {
       const bestBonusEb = Math.round(amount * 10 / 100);
@@ -790,7 +750,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
   });
 
-  const bonusChipLabels: { element: HTMLSpanElement; pct: number }[] = [];
+  const bonusChipLabels: { element: HTMLSpanElement; pct: number; defaultText: string }[] = [];
 
   const bonusChips = document.createElement("div");
   bonusChips.className = "bonus-chips";
@@ -805,66 +765,30 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   freeItems.className = "chip-group-items";
   freeGroup.append(freeLabel, freeItems);
 
-  const norwegianChip = document.createElement("a");
-  const sasAmexChip = document.createElement("a");
-  sasAmexChip.className = "bonus-chip";
-  sasAmexChip.href = "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/";
-  sasAmexChip.target = "_blank";
-  sasAmexChip.rel = "noreferrer";
-  const sasAmexLabel = document.createElement("span");
-  sasAmexLabel.className = "bonus-chip-label";
-  sasAmexLabel.textContent = "+~0,74% (~10 EB/100kr)";
-  const sasAmexBadge = document.createElement("span");
-  sasAmexBadge.className = "provider-badge provider-sas-amex";
-  sasAmexBadge.textContent = "SAS Amex";
-  sasAmexChip.append(sasAmexLabel, sasAmexBadge);
-  freeItems.append(sasAmexChip);
-  addChipTooltip(sasAmexChip, "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).", shadowRoot);
+  function createBonusChip(card: typeof FREE_CARDS[number], overrideUrl?: string): { chip: HTMLAnchorElement; label: HTMLSpanElement } {
+    const chip = document.createElement("a");
+    chip.className = "bonus-chip";
+    chip.href = overrideUrl ?? card.url;
+    chip.target = "_blank";
+    chip.rel = "noreferrer";
+    const label = document.createElement("span");
+    label.className = "bonus-chip-label";
+    const ebInfo = card.ebPer100kr ? ` (~${card.ebPer100kr} EB/100kr)` : "";
+    const pctStr = (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+    label.textContent = `+${card.approx ? "~" : ""}${pctStr}%${ebInfo}`;
+    const badge = document.createElement("span");
+    badge.className = `provider-badge provider-${card.badge}`;
+    badge.textContent = card.label;
+    chip.append(label, badge);
+    return { chip, label };
+  }
 
-  const sasMcChip = document.createElement("a");
-  sasMcChip.className = "bonus-chip";
-  sasMcChip.href = "https://saseurobonusmastercard.no/kortene/mastercard/";
-  sasMcChip.target = "_blank";
-  sasMcChip.rel = "noreferrer";
-  const sasMcLabel = document.createElement("span");
-  sasMcLabel.className = "bonus-chip-label";
-  sasMcLabel.textContent = "+~0,74% (~10 EB/100kr)";
-  const sasMcBadge = document.createElement("span");
-  sasMcBadge.className = "provider-badge provider-sas-amex";
-  sasMcBadge.textContent = "SAS MC";
-  sasMcChip.append(sasMcLabel, sasMcBadge);
-  freeItems.append(sasMcChip);
-  addChipTooltip(sasMcChip, "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).", shadowRoot);
-
-  const lunarEbChip = document.createElement("a");
-  lunarEbChip.className = "bonus-chip";
-  lunarEbChip.href = "https://www.lunar.app/no/privat/sas-eurobonus";
-  lunarEbChip.target = "_blank";
-  lunarEbChip.rel = "noreferrer";
-  const lunarEbLabel = document.createElement("span");
-  lunarEbLabel.className = "bonus-chip-label";
-  lunarEbLabel.textContent = "+~0,59% (~8 EB/100kr)";
-  const lunarEbBadge = document.createElement("span");
-  lunarEbBadge.className = "provider-badge provider-lunar";
-  lunarEbBadge.textContent = "Lunar EB";
-  lunarEbChip.append(lunarEbLabel, lunarEbBadge);
-  freeItems.append(lunarEbChip);
-  addChipTooltip(lunarEbChip, "8 EB/100 kr (netthandel)\n20 EB/100 kr p\u00e5 SAS.no\nGratis kort.", shadowRoot);
-
-  norwegianChip.className = "bonus-chip";
-  norwegianChip.href = "https://www.banknorwegian.no/kredittkort/cashback/";
-  norwegianChip.target = "_blank";
-  norwegianChip.rel = "noreferrer";
-  const norwegianLabel = document.createElement("span");
-  norwegianLabel.className = "bonus-chip-label";
-  norwegianLabel.textContent = "+0,5 %";
-  bonusChipLabels.push({ element: norwegianLabel, pct: 0.5 });
-  const norwegianBadge = document.createElement("span");
-  norwegianBadge.className = "provider-badge provider-norwegian";
-  norwegianBadge.textContent = "Norwegian";
-  norwegianChip.append(norwegianLabel, norwegianBadge);
-  freeItems.append(norwegianChip);
-  addChipTooltip(norwegianChip, "0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr p\u00e5 Norwegian.no).\nGratis kort, ingen \u00e5rsavgift.", shadowRoot);
+  for (const card of FREE_CARDS) {
+    const { chip, label } = createBonusChip(card);
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, defaultText: label.textContent ?? "" });
+    freeItems.append(chip);
+    addChipTooltip(chip, card.tip, shadowRoot);
+  }
 
   bonusChips.append(freeGroup);
 
@@ -898,38 +822,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
   }
 
-  if (curveOffer !== undefined) {
-    const curveChip = document.createElement("a");
-    curveChip.className = "bonus-chip";
-    curveChip.href = curveOffer.activationUrl;
-    curveChip.target = "_blank";
-    curveChip.rel = "noreferrer";
-    const curveLabel = document.createElement("span");
-    curveLabel.className = "bonus-chip-label";
-    curveLabel.textContent = "+1 %";
-    bonusChipLabels.push({ element: curveLabel, pct: 1 });
-    const curveBadge = document.createElement("span");
-    curveBadge.className = "provider-badge provider-curve";
-    curveBadge.textContent = "Curve Pro";
-    curveChip.append(curveLabel, curveBadge);
-    premiumItems.append(curveChip);
-    addChipTooltip(curveChip, "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.", shadowRoot);
+  for (const card of PREMIUM_CARDS) {
+    // For Curve, use the actual offer URL if available
+    const overrideUrl = card.label === "Curve" && curveOffer !== undefined ? curveOffer.activationUrl : undefined;
+    const shouldShow = card.label !== "Curve" || curveOffer !== undefined;
+    if (!shouldShow) continue;
+    const { chip, label } = createBonusChip(card, overrideUrl);
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, defaultText: label.textContent ?? "" });
+    premiumItems.append(chip);
+    addChipTooltip(chip, card.tip, shadowRoot);
   }
-
-  const klarnaChip = document.createElement("a");
-  klarnaChip.className = "bonus-chip";
-  klarnaChip.href = "https://www.klarna.com/no/medlemskap/";
-  klarnaChip.target = "_blank";
-  klarnaChip.rel = "noreferrer";
-  const klarnaLabel = document.createElement("span");
-  klarnaLabel.className = "bonus-chip-label";
-  klarnaLabel.textContent = "+0,5-1 %";
-  const klarnaBadge = document.createElement("span");
-  klarnaBadge.className = "provider-badge provider-klarna";
-  klarnaBadge.textContent = "Klarna+";
-  klarnaChip.append(klarnaLabel, klarnaBadge);
-  premiumItems.append(klarnaChip);
-  addChipTooltip(klarnaChip, "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback.", shadowRoot);
 
   bonusChips.append(premiumGroup);
 
@@ -962,13 +864,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   chipsSection.append(chipsToggle, bonusChips);
   body.append(header, offerList, chipsSection);
 
-  const supportLinks = [
-    { text: "200 kr gratis i fond \u2192", url: "https://kron.no/app/invitert/nvu4d" },
-    { text: "Kj\u00f8p en kaffe til utvikler \u2192", url: "https://buymeacoffee.com/adore" },
-    { text: "Opptil 2 500 kr med Revolut \u2192", url: "https://revolut.com/referrals?r=FELPJK" },
-    { text: "Horde: 500p bonus, oversikt og nedbetaling kredittkort \u2192", url: "https://app.horde.no/66CS/verve?code=kloube" },
-  ];
-  const pick = supportLinks[Math.floor(Math.random() * supportLinks.length)];
+  const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
 
   if (pick !== undefined) {
     const support = document.createElement("div");
@@ -1123,31 +1019,7 @@ function isString(value: unknown): value is string {
 }
 
 function formatProviderName(provider: CashbackOffer["provider"]): string {
-  if (provider === "remember") {
-    return "re:member";
-  }
-
-  if (provider === "trumf") {
-    return "Trumf";
-  }
-
-  if (provider === "sas") {
-    return "SAS EB";
-  }
-
-  if (provider === "tfbank") {
-    return "TF Bank";
-  }
-
-  if (provider === "dnb") {
-    return "DNB";
-  }
-
-  if (provider === "curve") {
-    return "Curve Pro";
-  }
-
-  return "Klarna";
+  return PROVIDER_NAMES[provider] ?? provider;
 }
 
 function calculateCashback(offer: CashbackOffer, amount: number): string {
@@ -1297,8 +1169,6 @@ function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
     return undefined;
   }
 }
-
-const EB_PER_TRUMF_KR = 13.5;
 
 function formatKr(value: number): string {
   if (Number.isInteger(value)) {
