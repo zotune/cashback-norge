@@ -340,6 +340,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean): void 
       color: #ffffff;
     }
 
+    .provider-dnb {
+      background: #007272;
+      color: #ffffff;
+    }
+
     .offer-open {
       color: #1f8f5f;
       font-size: 12px;
@@ -682,6 +687,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "tfbank") {
     return "TF Bank";
+  }
+
+  if (provider === "dnb") {
+    return "DNB";
   }
 
   return "Klarna";

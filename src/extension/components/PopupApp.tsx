@@ -205,6 +205,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "TF Bank";
   }
 
+  if (provider === "dnb") {
+    return "DNB";
+  }
+
   return "Klarna";
 }
 

@@ -9,6 +9,7 @@ import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
 import { fetchTfBank } from "./providers/tfbank.js";
 import { crawlTrumf } from "./providers/trumf.js";
+import { fetchDnb } from "./providers/dnb.js";
 
 type CliConfig = {
   outputPath: string;
@@ -26,6 +27,8 @@ type CliConfig = {
   skipTrumf: boolean;
   skipSas: boolean;
   skipTfBank: boolean;
+  skipDnb: boolean;
+  dnbPageDataUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -78,7 +81,14 @@ async function main(): Promise<void> {
         logger,
         apiUrl: config.tfBankApiUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers]);
+  const dnbOffers = config.skipDnb
+    ? []
+    : await fetchDnb({
+        generatedAt,
+        logger,
+        pageDataUrl: config.dnbPageDataUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -127,6 +137,10 @@ function readCliConfig(args: string[]): CliConfig {
     skipTrumf: args.includes("--skip-trumf"),
     skipSas: args.includes("--skip-sas"),
     skipTfBank: args.includes("--skip-tfbank"),
+    skipDnb: args.includes("--skip-dnb"),
+    dnbPageDataUrl:
+      readArgumentValue(args, "--dnb-page-data-url") ??
+      "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
   };
 }
 
