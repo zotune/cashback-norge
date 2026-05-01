@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cashback Norge</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f7faf8;
+  color: #172026;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 480px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
+.subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 20px; }
+.search-wrap {
+  position: relative;
+  margin-bottom: 20px;
+}
+.search {
+  background: #fff;
+  border: 1px solid #d6e1dc;
+  border-radius: 10px;
+  color: #172026;
+  font: inherit;
+  font-size: 16px;
+  height: 48px;
+  outline: none;
+  padding: 0 14px;
+  width: 100%;
+}
+.search:focus { border-color: #1f8f5f; }
+.search::placeholder { color: #8a9a92; }
+.results { display: grid; gap: 12px; }
+.merchant {
+  background: #fff;
+  border: 1px solid #d6e1dc;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.merchant-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.merchant-icon {
+  background: #f7faf8;
+  border: 1px solid #d8e3de;
+  border-radius: 6px;
+  height: 28px;
+  object-fit: contain;
+  padding: 3px;
+  width: 28px;
+}
+.merchant-name {
+  font-size: 15px;
+  font-weight: 700;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.offers { display: grid; gap: 6px; padding: 0 14px 12px; }
+.offer {
+  align-items: center;
+  background: #f7faf8;
+  border: 1px solid #d8e3de;
+  border-radius: 6px;
+  color: #172026;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 10px;
+  text-decoration: none;
+}
+.offer:active { background: #edf2ef; }
+.offer-reward {
+  font-size: 14px;
+  font-weight: 700;
+  flex: 1;
+}
+.badge {
+  align-items: center;
+  border-radius: 5px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  min-height: 22px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+.badge-trumf { background: #07006b; color: #fff; }
+.badge-klarna { background: #ffa8cd; color: #0b051d; }
+.badge-remember { background: #111; color: #ff9900; }
+.badge-sas { background: #00005c; color: #fff; }
+.badge-tfbank { background: #e30613; color: #fff; }
+.badge-dnb { background: #14555a; color: #fff; }
+.badge-curve { background: #000; color: #fff; }
+.empty {
+  color: #8a9a92;
+  font-size: 14px;
+  padding: 40px 0;
+  text-align: center;
+}
+.footer {
+  border-top: 1px solid #edf2ef;
+  color: #8a9a92;
+  font-size: 11px;
+  margin-top: 32px;
+  padding-top: 12px;
+  text-align: center;
+}
+.footer a { color: #5d6b71; }
+.count {
+  color: #8a9a92;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Cashback Norge</h1>
+  <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
+  <div class="search-wrap">
+    <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
+  </div>
+  <div class="count"></div>
+  <div class="results"></div>
+  <div class="footer">
+    <p>Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
+  </div>
+</div>
+<script>
+const PROVIDER_NAMES = {
+  trumf: "Trumf", klarna: "Klarna", remember: "re:member",
+  sas: "SAS EB", tfbank: "TF Bank", dnb: "DNB", curve: "Curve"
+};
+const EB_PER_TRUMF_KR = 13.5;
+
+let allMerchants = [];
+
+async function init() {
+  const res = await fetch("cashback-index.json");
+  const data = await res.json();
+  allMerchants = groupByMerchant(data.offers);
+  render("");
+  document.querySelector(".search").addEventListener("input", (e) => {
+    render(e.target.value);
+  });
+}
+
+function groupByMerchant(offers) {
+  const map = new Map();
+  for (const o of offers) {
+    const key = o.merchantName.toLowerCase();
+    if (!map.has(key)) map.set(key, { name: o.merchantName, domains: o.domains, offers: [] });
+    map.get(key).offers.push(o);
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "nb"));
+}
+
+function render(query) {
+  const q = query.trim().toLowerCase();
+  const filtered = q.length === 0
+    ? allMerchants
+    : allMerchants.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        m.domains.some(d => d.includes(q))
+      );
+
+  const countEl = document.querySelector(".count");
+  countEl.textContent = q.length > 0
+    ? `${filtered.length} av ${allMerchants.length} butikker`
+    : `${allMerchants.length} butikker`;
+
+  const container = document.querySelector(".results");
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty">Ingen treff</div>';
+    return;
+  }
+
+  const show = q.length > 0 ? filtered : filtered.slice(0, 50);
+  container.innerHTML = show.map(m => {
+    const domain = m.domains[0] || "";
+    const icon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+    const offerHtml = m.offers.map(o => {
+      const url = o.provider === "trumf" ? o.sourceUrl : o.activationUrl;
+      return `<a class="offer" href="${esc(url)}" target="_blank" rel="noreferrer">
+        <span class="offer-reward">${esc(formatReward(o))}</span>
+        <span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
+      </a>`;
+    }).join("");
+    return `<div class="merchant">
+      <div class="merchant-header">
+        <img class="merchant-icon" src="${esc(icon)}" alt="" loading="lazy">
+        <span class="merchant-name">${esc(m.name)}</span>
+      </div>
+      <div class="offers">${offerHtml}</div>
+    </div>`;
+  }).join("") + (q.length === 0 && filtered.length > 50 ? '<div class="empty">Søk for å se flere...</div>' : "");
+}
+
+function formatReward(o) {
+  const r = o.reward.trim();
+  if (o.provider === "sas") {
+    const rate = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+    if (rate) {
+      const p = parseInt(rate[1].replace(/\s/g, ""), 10);
+      return `~${(p / EB_PER_TRUMF_KR).toFixed(1).replace(".", ",")} % (~${p} EB/100kr)`;
+    }
+    const fixed = r.match(/^([\d\s]+)\s*poeng$/i);
+    if (fixed) {
+      const p = parseInt(fixed[1].replace(/\s/g, ""), 10);
+      return `~${Math.round(p / EB_PER_TRUMF_KR)} kr (~${p.toLocaleString("nb-NO")} EB)`;
+    }
+  }
+  if (o.provider === "trumf") {
+    const range = r.match(/^([\d,]+)-([\d,]+)\s*%$/);
+    if (range) {
+      const min = parseFloat(range[1].replace(",", "."));
+      const max = parseFloat(range[2].replace(",", "."));
+      return `${r} (~${Math.round(min * EB_PER_TRUMF_KR)}-${Math.round(max * EB_PER_TRUMF_KR)} EB/100kr)`;
+    }
+    const pct = r.match(/^([\d,]+)\s*%$/);
+    if (pct) {
+      const p = parseFloat(pct[1].replace(",", "."));
+      return `${r} (~${Math.round(p * EB_PER_TRUMF_KR)} EB/100kr)`;
+    }
+  }
+  return r;
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>

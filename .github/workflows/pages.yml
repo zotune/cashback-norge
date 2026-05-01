@@ -3,7 +3,9 @@ name: Publish index to Pages
 on:
   push:
     branches: [main]
-    paths: [data/cashback-index.json]
+    paths:
+      - data/cashback-index.json
+      - site/**
   workflow_dispatch:
 
 permissions:
@@ -27,6 +29,7 @@ jobs:
         run: |
           mkdir _site
           cp data/cashback-index.json _site/cashback-index.json
+          cp site/* _site/
 
       - uses: actions/upload-pages-artifact@v3
         with:
