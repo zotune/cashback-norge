@@ -1168,7 +1168,7 @@ function isOffersForUrlResponse(value: unknown): value is OffersForUrlResponse {
 function isCashbackOffer(value: unknown): value is CashbackOffer {
   return (
     isRecord(value) &&
-    isCashbackProvider(value.provider) &&
+    typeof value.provider === "string" &&
     typeof value.merchantName === "string" &&
     Array.isArray(value.domains) &&
     value.domains.every(isString) &&
@@ -1179,12 +1179,6 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
     (value.discountCode === undefined || typeof value.discountCode === "string") &&
     typeof value.updatedAt === "string"
   );
-}
-
-function isCashbackProvider(
-  value: unknown,
-): value is "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
