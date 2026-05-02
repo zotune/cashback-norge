@@ -327,7 +327,7 @@ function formatRewardLabel(reward: string, provider: string): string {
   // For SAS, convert to percentage-first display with ~ prefix
   if (provider === "sas") {
     const converted = convertSasToPercent(trimmedReward);
-    return converted !== "" ? `~${converted}` : trimmedReward;
+    return converted !== "" ? converted : trimmedReward;
   }
 
   // For Trumf, show original reward + EB conversion

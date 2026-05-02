@@ -727,6 +727,7 @@ function render(query) {
 
 function formatCompactReward(o) {
   const full = formatReward(o);
+  if (o.provider === "trumf" || o.provider === "sas") return full;
   const pct = full.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (pct) return ((pct[1] || "") + pct[2]).replace(/\s+/g, " ");
   const kr = full.match(/\d+(?:[,.]\d+)?\s*kr/i);
