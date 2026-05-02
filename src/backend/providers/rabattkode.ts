@@ -50,8 +50,10 @@ export async function crawlRabattkode(): Promise<CashbackOffer[]> {
       continue;
     }
 
-    const firstPart = domain.split(".")[0] ?? domain;
-    const merchantName = firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+    const parts = domain.split(".");
+    const CC_SUBDOMAINS = new Set(["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"]);
+    const namePart = parts.length >= 3 && CC_SUBDOMAINS.has(parts[0]) ? parts[1] : parts[0];
+    const merchantName = (namePart ?? domain).charAt(0).toUpperCase() + (namePart ?? domain).slice(1);
     const reward = amount ? `${amount}%` : title;
     const terms = [title, subtitle].filter(Boolean).join(". ");
 

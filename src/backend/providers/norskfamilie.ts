@@ -40,7 +40,7 @@ const SLUG_TO_DOMAIN: Record<string, string> = {
   "skogstad-sport": "skogstadsport.no",
   slikkepott: "slikkepott.no",
   smartphoto: "smartphoto.no",
-  stormberg: "stormberg.no",
+  stormberg: "stormberg.com",
   timarco: "timarco.no",
   tirendo: "tirendo.no",
   "urban-pioneers": "urbanpioneers.com",

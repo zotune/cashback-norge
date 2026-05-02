@@ -192,6 +192,38 @@ export function buildCashbackIndex(
     }
   }
 
+  // Also index punycode IDN variants (e.g. smaaungene.no → xn--smungene-b0a.no)
+  const NOR_SUBS: [string, string][] = [["aa", "å"], ["oe", "ø"], ["ae", "æ"]];
+  for (const domain of Object.keys(domainIndex)) {
+    let unicode = domain;
+    let changed = false;
+    for (const [ascii, nor] of NOR_SUBS) {
+      if (unicode.includes(ascii)) {
+        unicode = unicode.replaceAll(ascii, nor);
+        changed = true;
+      }
+    }
+    if (!changed) continue;
+    try {
+      const punycode = new URL(`https://${unicode}`).hostname;
+      if (punycode !== domain && domainIndex[punycode] === undefined) {
+        domainIndex[punycode] = domainIndex[domain];
+      }
+    } catch { /* ignore invalid domains */ }
+  }
+
+  // Deduplicate within each domain: keep one offer per provider+reward+code
+  for (const domain of Object.keys(domainIndex)) {
+    const seen = new Set<string>();
+    domainIndex[domain] = domainIndex[domain].filter((offer) => {
+      const codePart = offer.discountCode ?? "";
+      const key = `${offer.provider}:${offer.reward}:${codePart}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   return {
     version: 1,
     generatedAt,

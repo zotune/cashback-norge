@@ -1,6 +1,9 @@
 {
   "trumf": {
     "acer-trumf": ["acer.com"],
+    "berg-watches-trumf": ["bergwatches.no"],
+    "storytel-trumf": ["storytel.com"],
+    "vrbo-trumf": ["vrbo.com"],
     "adidas-trumfs": ["adidas.no"],
     "adlibris": ["adlibris.com"],
     "autodeler-trumf": ["autodeler.no"],
@@ -97,7 +100,7 @@
     "qatar-airways-notrumf": ["qatarairways.com"],
     "sackit-trumf": ["sackit.com"],
     "safira-trumf": ["safira.com"],
-    "scandic-hotels-trumf": ["scandichotels.no"],
+    "scandic-hotels-trumf": ["scandichotels.com"],
     "sembo-trumf": ["sembo.no"],
     "skeidar-trumf": ["skeidar.no"],
     "sportmann-trumf": ["sportmann.no"],
@@ -116,7 +119,7 @@
     "trumfsmiinto": ["miinto.no"],
     "trumftreningspartner": ["treningspartner.no"],
     "trumfvita": ["vita.no"],
-    "tonnesen-trumf": ["tonnesen.no"],
+    "tonnesen-trumf": ["tonnesen1937.no"],
     "tudos-trumf": ["tudos.no"],
     "uppababy-trumf": ["uppababy.com"],
     "urban-pioneers-concept-store-trumf": ["urbanpioneers.no"],
@@ -159,11 +162,18 @@
     "vila": ["vila.com"],
     "wakakuu-ab": ["wakakuu.com"],
     "wild": ["wildnutrition.com"],
-    "yas": ["yas.com"]
+    "yas": ["y-a-s.com"]
   },
   "remember": {
+    "aarke-direct-deals": ["aarke.com"],
+    "hellofresh": ["hellofresh.no"],
     "munk-store": ["munkstore.com"],
-    "philips-direct-deals": ["philips-hue.com"]
+    "philips-direct-deals": ["philips-hue.com"],
+    "royal-design": ["royaldesign.no"],
+    "rum21": ["rum21.no"],
+    "sobling": ["sobling.jewelry"],
+    "storytel": ["storytel.com"],
+    "vrbo": ["vrbo.com"]
   },
   "sas": {
     "a-retro-tale": ["aretrotale.com"],
@@ -171,7 +181,9 @@
     "albert": ["heialbert.no"],
     "babyland": ["babyland.no"],
     "baerum-energi": ["baerumenergi.no"],
-    "bad-stil": ["badogstil.no"],
+    "bad-stil": ["badstil.no"],
+    "hellofresh": ["hellofresh.no"],
+    "berg-watches": ["bergwatches.no"],
     "batteriexperten": ["batteriexperten.no"],
     "bilxtra": ["bilxtra.no"],
     "bladkongen.no": ["bladkongen.no"],
@@ -251,12 +263,14 @@
     "pink-or-blue": ["pinkorblue.no"],
     "plussmobil": ["plussmobil.no"],
     "proshop": ["proshop.no"],
-    "racketspecialisten": ["racketspecialisten.no"],
+    "racketspecialisten": ["racketspesialisten.no"],
     "rains": ["rains.com"],
     "ray-ban": ["ray-ban.com"],
     "razer": ["razer.com"],
     "readly": ["readly.com"],
     "rito": ["ritohobby.no"],
+    "room21": ["rum21.no"],
+    "royal-design": ["royaldesign.no"],
     "safira": ["safira.com"],
     "sail-racing": ["sailracing.com"],
     "senze-of-joy": ["senseofjoy.no"],
@@ -275,6 +289,7 @@
     "stay-in-place": ["stayinplace.se"],
     "staypro": ["staypro.no"],
     "stella-mccartney": ["stellamccartney.com"],
+    "storytel-no": ["storytel.com"],
     "strim": ["strim.no"],
     "telia-bredband-og-tv": ["telia.no"],
     "the-chef": ["thechef.no"],
@@ -294,12 +309,14 @@
     "watery": ["watery.no"],
     "widforss": ["widforss.se"],
     "won-hundred": ["wonhundred.com"],
-    "x-life": ["x-life.no"],
+    "x-life": ["treningspartner.no"],
     "xplora": ["xplora.com"],
     "youwish": ["youwish.no"],
     "zoo.se-1": ["zoo.no"]
   },
   "tfbank": {
+    "berg-watches": ["bergwatches.no"],
+    "kos-kos-restaurant": ["koskos.no", "monalisahuset.no"],
     "lensway": ["lensway.no"],
     "zalando": ["zalando.no"]
   }

@@ -96,8 +96,14 @@ function extractDomainFromUrl(url: string): string | undefined {
     const cleaned = url.trim().replace(/\/+$/, "");
     const withScheme = cleaned.startsWith("http") ? cleaned : `https://${cleaned}`;
     const parsed = new URL(withScheme);
-    const hostname = parsed.hostname.toLowerCase();
-    return hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+    let hostname = parsed.hostname.toLowerCase();
+    if (hostname.startsWith("www.")) hostname = hostname.slice(4);
+    const CC_SUBDOMAINS = new Set(["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"]);
+    const parts = hostname.split(".");
+    if (parts.length >= 3 && CC_SUBDOMAINS.has(parts[0])) {
+      hostname = parts.slice(1).join(".");
+    }
+    return hostname;
   } catch {
     return undefined;
   }

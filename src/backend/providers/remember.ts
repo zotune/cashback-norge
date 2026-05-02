@@ -105,13 +105,18 @@ async function parseRememberOffer(
 
   const sourceUrl = parseUrlWithBase(store.shopUrl, loadedUrl)?.toString() ?? loadedUrl;
   const overrideDomains = overrides.remember[store.slug] ?? [];
-  const inferredDomains = inferStoreDomains(store);
-  const affiliateDomain = await resolveAffiliateDomain(store.affiliateUrl, logger);
-  const domains = uniqueStrings([
-    ...overrideDomains,
-    ...inferredDomains,
-    ...(affiliateDomain === undefined ? [] : [affiliateDomain]),
-  ]);
+  let domains: string[];
+
+  if (overrideDomains.length > 0) {
+    domains = overrideDomains;
+  } else {
+    const inferredDomains = inferStoreDomains(store);
+    const affiliateDomain = await resolveAffiliateDomain(store.affiliateUrl, logger);
+    domains = uniqueStrings([
+      ...inferredDomains,
+      ...(affiliateDomain === undefined ? [] : [affiliateDomain]),
+    ]);
+  }
 
   return {
     provider: "remember",

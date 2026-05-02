@@ -1120,7 +1120,7 @@ function createSiteIcon(): HTMLImageElement {
   siteIcon.alt = "";
   siteIcon.src = findSiteIconUrl();
   siteIcon.addEventListener("error", () => {
-    siteIcon.remove();
+    siteIcon.style.visibility = "hidden";
   });
   return siteIcon;
 }

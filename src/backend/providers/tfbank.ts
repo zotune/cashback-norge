@@ -78,7 +78,12 @@ export async function fetchTfBank(
 
     let finalDomains: string[];
 
-    if (isRedirectDomain(domain)) {
+    const slug = deal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const overrideDomains = input.overrides.tfbank[slug];
+
+    if (overrideDomains !== undefined && overrideDomains.length > 0) {
+      finalDomains = overrideDomains;
+    } else if (isRedirectDomain(domain)) {
       const resolved = await resolveRedirectDomain(voucherUrl, input.logger);
       finalDomains = resolved !== undefined ? [resolved] : [];
     } else {
@@ -86,15 +91,8 @@ export async function fetchTfBank(
     }
 
     if (finalDomains.length === 0) {
-      const slug = deal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      const overrideDomains = input.overrides.tfbank[slug];
-
-      if (overrideDomains !== undefined && overrideDomains.length > 0) {
-        finalDomains = overrideDomains;
-      } else {
-        input.logger.warn(`TF Bank deal has no resolvable domain: ${deal.name} (${voucherUrl})`);
-        continue;
-      }
+      input.logger.warn(`TF Bank deal has no resolvable domain: ${deal.name} (${voucherUrl})`);
+      continue;
     }
 
     const discount = deal.discount.premium;
