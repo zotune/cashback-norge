@@ -553,12 +553,17 @@ function groupByMerchant(offers) {
   return groups.sort((a, b) => a.name.localeCompare(b.name, "nb"));
 }
 
-const TRACKING_DOMAINS = ["sjv.io", "emjcd.com", "jdoqocy.com", "dpbolvw.net", "anrdoezrs.net", "tkqlhce.com", "kqzyfj.com", "awstrack.me"];
+const TRACKING_DOMAINS = ["sjv.io", "pxf.io", "emjcd.com", "jdoqocy.com", "dpbolvw.net", "anrdoezrs.net", "tkqlhce.com", "kqzyfj.com", "awstrack.me", "madmetrics.com", "synxis.com", "vpweb.no"];
 
 function pickBestDomain(domains) {
   if (!domains || domains.length === 0) return "";
-  const clean = domains.filter(d => !TRACKING_DOMAINS.some(t => d.includes(t)));
-  if (clean.length === 0) return domains[0];
+  const clean = domains.filter(d => {
+    if (TRACKING_DOMAINS.some(t => d.includes(t))) return false;
+    // Filter out obviously broken domains
+    if (d.includes(".com.com") || d.includes(".no.se") || d.includes(".no.no")) return false;
+    return true;
+  });
+  if (clean.length === 0) return "";
   // Prefer .no, then .com, then shortest domain
   const no = clean.find(d => d.endsWith(".no") || d.includes(".no/"));
   if (no) return no;
@@ -593,7 +598,7 @@ function render(query) {
     const hasIcon = domain.length > 0;
     const letter = esc(m.name.charAt(0).toUpperCase());
     const iconHtml = hasIcon
-      ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64'">`
+      ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.onerror=null;this.outerHTML='<span class=\\"merchant-icon merchant-icon-fallback\\">${letter}</span>'">`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
     const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode");
     const codeOffers = m.offers.filter(o => o.provider === "rabattkode" && o.discountCode);
