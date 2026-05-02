@@ -1,4 +1,4 @@
-(function(){"use strict";Object.assign(window,{SHARED:{EB_PER_TRUMF_KR:13.5,PROVIDER_NAMES:{trumf:"Trumf",klarna:"Klarna",remember:"re:member",sas:"SAS EB",tfbank:"TF Bank",dnb:"DNB",curve:"Curve Pro",rabattkode:"Rabattkode",norskfamilie:"NF",logbuy:"LogBuy",obos:"OBOS"},PROVIDER_TIPS:{trumf:`Trumf-bonus. Aktiver i Trumf-appen.
+(function(){"use strict";Object.assign(window,{SHARED:{EB_PER_TRUMF_KR:13.5,PROVIDER_NAMES:{trumf:"Trumf",klarna:"Klarna",remember:"re:member",sas:"SAS EB",tfbank:"TF Bank",dnb:"DNB",curve:"Curve Pro",rabattkode:"Rabattkode",norskfamilie:"NF",logbuy:"LogBuy",obos:"OBOS",naf:"NAF"},PROVIDER_TIPS:{trumf:`Trumf-bonus. Aktiver i Trumf-appen.
 1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.`,klarna:`Klarna+ medlemskap.
 Plus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).`,remember:`re:member kredittkort.
 Aktiver tilbud i re:member-appen før kjøp.`,sas:`SAS EuroBonus-poeng.
