@@ -738,7 +738,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const offerLabel = document.createElement("span");
     offerLabel.className = "offer-label";
     const offerReward = document.createElement("span");
-    offerReward.textContent = formatCompactRewardLabel(currentOffer) ?? formatRewardLabel(currentOffer.reward, currentOffer.provider);
+    offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
@@ -790,9 +790,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     for (const { element, offer } of rewardLabels) {
       if (amount > 0) {
         const result = calculateCashback(offer, amount);
-        element.textContent = result !== "" ? result : (formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider));
+        element.textContent = result !== "" ? result : formatRewardLabel(offer.reward, offer.provider);
       } else {
-        element.textContent = formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
+        element.textContent = formatRewardLabel(offer.reward, offer.provider);
       }
     }
     for (const { element, offer } of tooltipElements) {
@@ -805,11 +805,17 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       if (breakdown) parts.push(breakdown);
       element.textContent = parts.join("\n\n");
     }
-    for (const { element, pct, minPct, maxPct, approx, defaultText } of bonusChipLabels) {
+    for (const { element, pct, minPct, maxPct, ebPer100kr, approx, defaultText } of bonusChipLabels) {
       if (amount > 0 && minPct != null && maxPct != null) {
         element.textContent = `+${formatKr(amount * minPct / 100)}-${formatKr(amount * maxPct / 100)} kr`;
       } else if (amount > 0) {
-        element.textContent = `+${approx ? "~" : ""}${formatKr(amount * pct / 100)} kr`;
+        const kr = formatKr(amount * pct / 100);
+        if (ebPer100kr != null) {
+          const eb = Math.round(amount * ebPer100kr / 100);
+          element.textContent = `+~${kr} kr (~${eb} EB)`;
+        } else {
+          element.textContent = `+${approx ? "~" : ""}${kr} kr`;
+        }
       } else {
         element.textContent = defaultText;
       }
@@ -826,7 +832,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(totalPct)}%)`;
     }
   });
-  const bonusChipLabels: { element: HTMLSpanElement; pct: number; minPct?: number; maxPct?: number; approx: boolean; defaultText: string }[] = [];
+  const bonusChipLabels: { element: HTMLSpanElement; pct: number; minPct?: number; maxPct?: number; ebPer100kr?: number; approx: boolean; defaultText: string }[] = [];
   const bonusChips = document.createElement("div");
   bonusChips.className = "bonus-chips";
   // --- Free chips group (left) ---
@@ -859,7 +865,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   }
   for (const card of FREE_CARDS) {
     const { chip, label } = createBonusChip(card);
-    bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, approx: card.approx, defaultText: label.textContent ?? "" });
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, ebPer100kr: card.ebPer100kr, approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
@@ -1336,6 +1342,12 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
     const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
     const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
     return `${label} (${ebStr})`;
+  }
+  if (provider === "sas") {
+    const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+    const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+    const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
+    return `~${label} (${ebStr})`;
   }
   return label;
 }

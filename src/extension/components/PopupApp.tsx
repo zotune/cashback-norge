@@ -138,7 +138,7 @@ export function PopupApp(): ReactElement {
               >
                 <span className="bonus-chip-label">
                   {amount > 0
-                    ? `+~0,74% (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
+                    ? `+~${formatKr(amount * 10 / 100 / EB_PER_TRUMF_KR)} kr (~${Math.round(amount * 10 / 100)} EB)`
                     : "+~0,74% (~10 EB/100kr)"}
                 </span>
                 <span className="provider-badge provider-sas-amex">SAS Amex</span>
@@ -152,7 +152,7 @@ export function PopupApp(): ReactElement {
               >
                 <span className="bonus-chip-label">
                   {amount > 0
-                    ? `+~0,74% (~${formatKr(Math.round(amount * 10 / 100) / 13.5)} kr)`
+                    ? `+~${formatKr(amount * 10 / 100 / EB_PER_TRUMF_KR)} kr (~${Math.round(amount * 10 / 100)} EB)`
                     : "+~0,74% (~10 EB/100kr)"}
                 </span>
                 <span className="provider-badge provider-sas-amex">SAS MC</span>
@@ -166,7 +166,7 @@ export function PopupApp(): ReactElement {
               >
                 <span className="bonus-chip-label">
                   {amount > 0
-                    ? `+~0,59% (~${formatKr(Math.round(amount * 8 / 100) / 13.5)} kr)`
+                    ? `+~${formatKr(amount * 8 / 100 / EB_PER_TRUMF_KR)} kr (~${Math.round(amount * 8 / 100)} EB)`
                     : "+~0,59% (~8 EB/100kr)"}
                 </span>
                 <span className="provider-badge provider-lunar">Lunar EB</span>
@@ -469,6 +469,12 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
     const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
     const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
     return `${label} (${ebStr})`;
+  }
+  if (provider === "sas") {
+    const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+    const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+    const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
+    return `~${label} (${ebStr})`;
   }
   return label;
 }

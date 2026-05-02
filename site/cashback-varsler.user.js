@@ -1388,6 +1388,12 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
       return `${label} (${ebStr})`;
     }
+    if (provider === "sas") {
+      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+      const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
+      return `~${label} (${ebStr})`;
+    }
     return label;
   }
   function getMaxRewardPercent(offer) {

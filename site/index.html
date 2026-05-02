@@ -850,7 +850,12 @@ function renderChipGroup(cards, container) {
       rewardText = `+${minKr}-${maxKr} kr`;
     } else if (amt > 0) {
       const kr = Math.round(amt * c.pct);
-      rewardText = c.approx ? `+~${kr} kr` : `+${kr} kr`;
+      if (c.ebPer100kr) {
+        const eb = Math.round(amt * c.ebPer100kr / 100);
+        rewardText = `+~${kr} kr (~${eb} EB)`;
+      } else {
+        rewardText = c.approx ? `+~${kr} kr` : `+${kr} kr`;
+      }
     } else if (c.minPct != null && c.maxPct != null) {
       const minStr = (c.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
       const maxStr = (c.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
