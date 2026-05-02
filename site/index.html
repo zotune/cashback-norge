@@ -88,7 +88,10 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   font-weight: 700;
   flex: 1;
   overflow-wrap: anywhere;
+  color: inherit;
+  text-decoration: none;
 }
+a.merchant-name:hover { text-decoration: underline; }
 .offers { display: grid; gap: 6px; padding: 0 14px 12px; }
 .offer {
   align-items: center;
@@ -227,6 +230,24 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 }
 .code-copy-btn:hover { color: #166b47; }
 .code-copy-btn svg { width: 14px; height: 14px; }
+.code-copy-btn { position: relative; }
+.code-copy-btn .copy-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.code-copy-btn:hover .copy-tooltip,
+.code-copy-btn .copy-tooltip.visible { opacity: 1; }
 .codes-inline {
   padding: 0 14px 12px;
 }
@@ -456,31 +477,93 @@ function normalizeName(name) {
 }
 
 function groupByMerchant(offers) {
-  const map = new Map();
+  // Tracking domains that should be excluded from grouping (shared by many unrelated merchants)
+  const domainCount = {};
+  for (const o of offers) {
+    for (const d of (o.domains || [])) {
+      domainCount[d] = (domainCount[d] || 0) + 1;
+    }
+  }
+  const sharedDomains = new Set(Object.keys(domainCount).filter(d =>
+    domainCount[d] > 8 || d.includes("sjv.io") || d.includes("emjcd.com") || d.includes("jdoqocy.com") || d.includes("dpbolvw.net")
+  ));
+
+  // Union-find: group offers that share a domain
+  const domainToGroup = new Map();
+  const groups = [];
+
   for (const o of offers) {
     if (!o.reward || !o.reward.trim()) continue;
     if (o.provider === "curve") continue;
-    const name = normalizeName(o.merchantName);
-    const key = name.toLowerCase();
-    if (!map.has(key)) map.set(key, { name, domains: [], offers: [] });
-    const m = map.get(key);
-    // Prefer a nicely capitalized name (not all-caps, not all-lower)
-    const current = m.name;
-    if (current === current.toLowerCase() || current === current.toUpperCase()) {
-      if (name !== name.toLowerCase() && name !== name.toUpperCase()) {
-        m.name = name;
+
+    const usableDomains = (o.domains || []).filter(d => !sharedDomains.has(d));
+    let group = null;
+
+    // Find existing group via domain overlap
+    for (const d of usableDomains) {
+      if (domainToGroup.has(d)) {
+        group = domainToGroup.get(d);
+        break;
       }
     }
-    for (const d of (o.domains || [])) {
-      if (!m.domains.includes(d)) m.domains.push(d);
+    // Also try by normalized name
+    const name = normalizeName(o.merchantName);
+    const nameKey = name.toLowerCase();
+    if (!group && domainToGroup.has("name:" + nameKey)) {
+      group = domainToGroup.get("name:" + nameKey);
     }
-    m.offers.push(o);
+
+    if (!group) {
+      group = { name, domains: [], offers: [] };
+      groups.push(group);
+    }
+
+    // Prefer a nicely capitalized name (not all-caps, not all-lower)
+    const current = group.name;
+    if (current === current.toLowerCase() || current === current.toUpperCase()) {
+      if (name !== name.toLowerCase() && name !== name.toUpperCase()) {
+        group.name = name;
+      }
+    }
+
+    for (const d of (o.domains || [])) {
+      if (!group.domains.includes(d)) group.domains.push(d);
+    }
+    group.offers.push(o);
+
+    // Register all usable domains and name to point to this group
+    for (const d of usableDomains) {
+      domainToGroup.set(d, group);
+    }
+    domainToGroup.set("name:" + nameKey, group);
   }
-  const merchants = [...map.values()];
-  for (const m of merchants) {
+
+  for (const m of groups) {
+    // Deduplicate offers: same provider + same reward = keep first (unless different discount codes)
+    const seen = new Set();
+    m.offers = m.offers.filter(o => {
+      const key = o.provider + ":" + o.reward + ":" + (o.discountCode || "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     m.offers.sort((a, b) => getMaxPct(b) - getMaxPct(a));
   }
-  return merchants.sort((a, b) => a.name.localeCompare(b.name, "nb"));
+  return groups.sort((a, b) => a.name.localeCompare(b.name, "nb"));
+}
+
+const TRACKING_DOMAINS = ["sjv.io", "emjcd.com", "jdoqocy.com", "dpbolvw.net", "anrdoezrs.net", "tkqlhce.com", "kqzyfj.com", "awstrack.me"];
+
+function pickBestDomain(domains) {
+  if (!domains || domains.length === 0) return "";
+  const clean = domains.filter(d => !TRACKING_DOMAINS.some(t => d.includes(t)));
+  if (clean.length === 0) return domains[0];
+  // Prefer .no, then .com, then shortest domain
+  const no = clean.find(d => d.endsWith(".no") || d.includes(".no/"));
+  if (no) return no;
+  const com = clean.find(d => d.endsWith(".com") || d.includes(".com/"));
+  if (com) return com;
+  return clean.sort((a, b) => a.length - b.length)[0];
 }
 
 function render(query) {
@@ -505,7 +588,7 @@ function render(query) {
 
   container.innerHTML = filtered.map(m => {
     const key = m.name.toLowerCase();
-    const domain = m.domains.find(d => !d.includes("sjv.io") && !d.includes("emjcd.com")) || m.domains[0] || "";
+    const domain = pickBestDomain(m.domains);
     const hasIcon = domain.length > 0;
     const letter = esc(m.name.charAt(0).toUpperCase());
     const iconHtml = hasIcon
@@ -532,13 +615,17 @@ function render(query) {
       return `<div class="code-item">
         <span class="code-reward">${esc(o.reward)}</span>
         <span class="code-value">${esc(code)}</span>
-        <button class="code-copy-btn" type="button" data-code="${esc(code)}" title="Kopier rabattkode: ${esc(code)}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
       </div>`;
     }).join("");
+    const storeUrl = domain ? `https://${domain}` : "";
+    const nameHtml = storeUrl
+      ? `<a class="merchant-name" href="${esc(storeUrl)}" target="_blank" rel="noreferrer">${esc(m.name)}</a>`
+      : `<span class="merchant-name">${esc(m.name)}</span>`;
     return `<div class="merchant">
       <div class="merchant-header">
         ${iconHtml}
-        <span class="merchant-name">${esc(m.name)}</span>
+        ${nameHtml}
       </div>
       <div class="offers">${offerHtml}</div>
       ${codesHtml ? `<div class="codes-inline"><button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder (${codeOffers.length})</button><div class="codes-items">${codesHtml}</div></div>` : ""}
@@ -557,11 +644,15 @@ function render(query) {
   // Attach copy handlers
   container.querySelectorAll(".code-copy-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const origHtml = btn.innerHTML;
+      const origSvg = btn.querySelector('svg').outerHTML;
+      const tooltip = btn.querySelector('.copy-tooltip');
       navigator.clipboard.writeText(btn.dataset.code).then(() => {
-        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-        btn.title = "Kopiert!";
-        setTimeout(() => { btn.innerHTML = origHtml; btn.title = `Kopier rabattkode: ${btn.dataset.code}`; }, 1500);
+        btn.querySelector('svg').outerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        if (tooltip) { tooltip.textContent = "Kopiert!"; tooltip.classList.add("visible"); }
+        setTimeout(() => {
+          btn.querySelector('svg').outerHTML = origSvg;
+          if (tooltip) { tooltip.textContent = `Kopier: ${btn.dataset.code}`; tooltip.classList.remove("visible"); }
+        }, 1500);
       });
     });
   });
