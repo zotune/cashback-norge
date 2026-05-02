@@ -473,10 +473,12 @@ function getMaxPct(o) {
   const r = o.reward.trim();
   const range = r.match(/^([\d.,]+)-([\d.,]+)\s*%$/);
   if (range) return parseFloat(range[2].replace(",", "."));
-  const pct = r.match(/^([\d.,]+)\s*%$/);
+  const pct = r.match(/([\d.,]+)\s*%/);
   if (pct) return parseFloat(pct[1].replace(",", "."));
   const sas = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sas) return parseInt(sas[1].replace(/\s/g, ""), 10) / EB_PER_TRUMF_KR;
+  const kr = r.match(/([\d.,]+)\s*kr/i);
+  if (kr) return parseFloat(kr[1].replace(",", ".")) / 1000;
   return 0;
 }
 
