@@ -1,4 +1,3 @@
-import { resolve as dnsResolve } from "node:dns/promises";
 import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
@@ -7,6 +6,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -18,6 +18,7 @@ export type CrawlTrumfInput = {
   overrides: ProviderOverrides;
   generatedAt: string;
   logger: Logger;
+  domainLookup: DomainLookup;
 };
 
 export async function crawlTrumf(
@@ -71,9 +72,10 @@ export async function crawlTrumf(
 
   await crawler.run([input.startUrl]);
 
-  const resolved = await resolveDomainsForOffers(
+  const resolved = resolveDomainsForOffers(
     uniqueOffers(offers),
     input.overrides,
+    input.domainLookup,
     input.logger,
   );
   return resolved;
@@ -261,113 +263,40 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-async function resolveDomainsForOffers(
+function resolveDomainsForOffers(
   offers: CashbackOffer[],
   overrides: ProviderOverrides,
+  domainLookup: DomainLookup,
   logger: Logger,
-): Promise<CashbackOffer[]> {
-  const resolved: CashbackOffer[] = [];
-  const batchSize = 20;
+): CashbackOffer[] {
+  return offers.map((offer) => {
+    if (offer.domains.length > 0) {
+      return offer;
+    }
 
-  for (let i = 0; i < offers.length; i += batchSize) {
-    const batch = offers.slice(i, i + batchSize);
-    const results = await Promise.all(
-      batch.map(async (offer) => {
-        if (offer.domains.length > 0) {
-          return offer;
-        }
+    const slug = extractSlug(offer.sourceUrl);
+    const overrideDomains = overrides.trumf[slug] ?? [];
 
-        const slug = extractSlug(offer.sourceUrl);
-        const overrideDomains = overrides.trumf[slug] ?? [];
+    if (overrideDomains.length > 0) {
+      return {
+        ...offer,
+        domains: uniqueStrings(overrideDomains.map(normalizeDomainInput)),
+      };
+    }
 
-        if (overrideDomains.length > 0) {
-          return {
-            ...offer,
-            domains: uniqueStrings(overrideDomains.map(normalizeDomainInput)),
-          };
-        }
+    const lookedUp = lookupDomains(domainLookup, offer.merchantName);
 
-        const discovered = await discoverDomains(offer.merchantName, logger);
-        if (discovered.length === 0) {
-          logger.warn(
-            `Trumf offer has no domains: ${offer.merchantName} (${slug})`,
-          );
-        }
+    if (lookedUp.length > 0) {
+      return {
+        ...offer,
+        domains: uniqueStrings(lookedUp),
+      };
+    }
 
-        return {
-          ...offer,
-          domains: uniqueStrings(discovered.map(normalizeDomainInput)),
-        };
-      }),
+    logger.warn(
+      `Trumf offer has no domains: ${offer.merchantName} (${slug})`,
     );
-    resolved.push(...results);
-  }
 
-  return resolved;
-}
-
-async function discoverDomains(
-  merchantName: string,
-  logger: Logger,
-): Promise<string[]> {
-  const candidates = buildDomainCandidates(merchantName);
-  const results = await Promise.all(
-    candidates.map(async (domain) => {
-      const resolved = await canResolve(domain);
-      return resolved ? domain : undefined;
-    }),
-  );
-  return results.filter((d): d is string => d !== undefined);
-}
-
-function buildDomainCandidates(merchantName: string): string[] {
-  const name = merchantName.toLowerCase().trim();
-  const candidates: string[] = [];
-
-  // If name already looks like a domain, use directly
-  if (/\.[a-z]{2,}$/i.test(name)) {
-    candidates.push(name);
-    return candidates;
-  }
-
-  // Slugify: remove special chars, collapse spaces to nothing
-  const slug = name
-    .replace(/['']/g, "")
-    .replace(/&/g, "and")
-    .replace(/ø/g, "o")
-    .replace(/æ/g, "ae")
-    .replace(/å/g, "a")
-    .replace(/ö/g, "o")
-    .replace(/ä/g, "a")
-    .replace(/ü/g, "u")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  if (slug.length === 0) {
-    return candidates;
-  }
-
-  candidates.push(
-    `${slug}.no`,
-    `${slug}.com`,
-    `${slug}.se`,
-  );
-
-  // Try without hyphens
-  if (slug.includes("-")) {
-    const noHyphens = slug.replace(/-/g, "");
-    candidates.push(`${noHyphens}.no`, `${noHyphens}.com`);
-  }
-
-  return candidates;
-}
-
-async function canResolve(domain: string): Promise<boolean> {
-  try {
-    await dnsResolve(domain);
-    return true;
-  } catch {
-    return false;
-  }
+    return offer;
+  });
 }

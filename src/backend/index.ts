@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { buildCashbackIndex, uniqueOffers } from "../shared/cashback.js";
+import { buildDomainLookup } from "./domain-lookup.js";
 import { writeJsonFile } from "./json-file.js";
 import { createConsoleLogger } from "./logger.js";
 import { readManualOffers } from "./manual-offers.js";
@@ -45,6 +46,7 @@ async function main(): Promise<void> {
   const providerOverrides = await readProviderOverrides(
     config.providerOverridesPath,
   );
+  // Phase 1: Crawl providers that have real merchant URLs
   const klarnaOffers = config.skipKlarna
     ? []
     : await crawlKlarna({
@@ -63,23 +65,6 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
         startUrl: config.rememberStartUrl,
       });
-  const trumfOffers = config.skipTrumf
-    ? []
-    : await crawlTrumf({
-        generatedAt,
-        logger,
-        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        overrides: providerOverrides,
-        startUrl: config.trumfStartUrl,
-      });
-  const sasOffers = config.skipSas
-    ? []
-    : await fetchSas({
-        generatedAt,
-        logger,
-        overrides: providerOverrides,
-        apiUrl: config.sasApiUrl,
-      });
   const tfBankOffers = config.skipTfBank
     ? []
     : await fetchTfBank({
@@ -94,6 +79,42 @@ async function main(): Promise<void> {
         logger,
         pageDataUrl: config.dnbPageDataUrl,
       });
+  const norskfamilieOffers = config.skipNorskfamilie
+    ? []
+    : await crawlNorskfamilie();
+  logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
+
+  // Phase 2: Build domain lookup from providers with known-good URLs
+  const domainLookup = buildDomainLookup([
+    ...klarnaOffers,
+    ...rememberOffers,
+    ...tfBankOffers,
+    ...dnbOffers,
+    ...norskfamilieOffers,
+    ...manualOffers,
+  ]);
+  logger.info(`Domain lookup: ${domainLookup.size} merchant names with known domains`);
+
+  // Phase 3: Crawl providers that need cross-referencing for domains
+  const trumfOffers = config.skipTrumf
+    ? []
+    : await crawlTrumf({
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides,
+        startUrl: config.trumfStartUrl,
+        domainLookup,
+      });
+  const sasOffers = config.skipSas
+    ? []
+    : await fetchSas({
+        generatedAt,
+        logger,
+        overrides: providerOverrides,
+        apiUrl: config.sasApiUrl,
+        domainLookup,
+      });
   const curveOffers = config.skipCurve
     ? []
     : fetchCurve({
@@ -104,10 +125,6 @@ async function main(): Promise<void> {
     ? []
     : await crawlRabattkode();
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const norskfamilieOffers = config.skipNorskfamilie
-    ? []
-    : await crawlNorskfamilie();
-  logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
   const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...norskfamilieOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
