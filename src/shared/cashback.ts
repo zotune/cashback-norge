@@ -267,8 +267,11 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
     const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
-    // Keep the offer with the best reward value
-    if (existing === undefined || parseRewardValue(offer.reward) > parseRewardValue(existing.reward)) {
+    // Keep the offer with the best reward value; prefer range over single when equal
+    const newVal = parseRewardValue(offer.reward);
+    const existingVal = existing !== undefined ? parseRewardValue(existing.reward) : null;
+    const isRange = offer.reward.includes("-");
+    if (existing === undefined || newVal > existingVal! || (newVal === existingVal! && isRange && !existing.reward.includes("-"))) {
       byKey.set(key, offer);
     }
   }

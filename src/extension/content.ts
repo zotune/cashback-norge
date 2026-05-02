@@ -1177,7 +1177,10 @@ function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
     const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
-    if (existing === undefined || offer.domains.length >= existing.domains.length) {
+    const newVal = parseRewardValue(offer.reward);
+    const existingVal = existing !== undefined ? parseRewardValue(existing.reward) : null;
+    const isRange = offer.reward.includes("-");
+    if (existing === undefined || newVal.amount > existingVal!.amount || (newVal.amount === existingVal!.amount && isRange && !existing.reward.includes("-"))) {
       byKey.set(key, offer);
     }
   }
@@ -1202,7 +1205,10 @@ type RewardValue = {
   amount: number;
 };
 function parseRewardValue(reward: string): RewardValue {
-  const percentageMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
+  const percentageMatch = rangeMatch
+    ? [null, rangeMatch[1]]
+    : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
   if (percentageMatch !== null) {
     return {
       kind: "percentage",
@@ -1482,7 +1488,7 @@ function formatSideTabText(
 }
 function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
-  const percentMatch = label.match(/(?:~)?(?:opptil\s*)?(\d+(?:[,.]\d+)?\s*%(?:\s*[-–]\s*\d+(?:[,.]\d+)?\s*%)?)/i);
+  const percentMatch = label.match(/(?:~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (percentMatch !== null) {
     return percentMatch[1]!.replace(/\s+/g, " ");
   }

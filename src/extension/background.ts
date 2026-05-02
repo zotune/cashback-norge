@@ -87,21 +87,17 @@ async function notifyTab(tabId: number, url: string): Promise<void> {
 }
 
 async function ensureIndex(): Promise<CashbackIndex> {
+  const bundledIndex = await readBundledIndex();
   const cachedIndex = await readCachedIndex();
 
-  if (cachedIndex !== undefined && isFresh(cachedIndex.downloadedAt)) {
-    const bundledIndex = await readBundledIndex();
-
-    if (cachedIndex.index.generatedAt >= bundledIndex.generatedAt) {
-      return cachedIndex.index;
-    }
-
-    await cacheIndex(bundledIndex);
-    void fetchRemoteIndex();
-    return bundledIndex;
+  // Bundled always wins over cached — remote is only a fallback for when bundled is stale
+  if (cachedIndex !== undefined && isFresh(cachedIndex.downloadedAt) && cachedIndex.index.generatedAt > bundledIndex.generatedAt) {
+    return cachedIndex.index;
   }
 
-  return refreshIndex();
+  await cacheIndex(bundledIndex);
+  void fetchRemoteIndex();
+  return bundledIndex;
 }
 
 async function cacheIndex(index: CashbackIndex): Promise<void> {
