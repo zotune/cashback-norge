@@ -175,7 +175,9 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
           waitUntil: "domcontentloaded",
           timeout: 15000,
         });
-        await page.waitForTimeout(1000);
+
+        // Wait for the benefit card to appear (it's React-rendered)
+        await page.waitForSelector('[class*="BenefitBulletsCard"]', { timeout: 5000 }).catch(() => {});
 
         const detail = await page.evaluate((internalDomains: string[]) => {
           let storeUrl: string | undefined;
@@ -196,25 +198,36 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
             if (!storeUrl) storeUrl = href;
           }
 
-          const bodyText = document.body.innerText ?? "";
-          const pctMatches = [...bodyText.matchAll(/(\d{1,3}(?:[,.]\d+)?)\s*%/g)];
+          // Extract discount % from "Hva får du?" bullet card, fall back to main
+          const bulletCard = document.querySelector('[class*="BenefitBulletsCard"]');
+          const searchText = bulletCard
+            ? (bulletCard.innerText ?? "")
+            : (document.querySelector("main")?.innerText ?? "");
+
+          const pctMatches = searchText ? [...searchText.matchAll(/(\d{1,2}(?:[,.]\d+)?)\s*%/g)] : [];
           let reward = "";
           if (pctMatches.length > 0) {
-            const vals = pctMatches.map(m => parseFloat((m[1] ?? "0").replace(",", ".")));
-            const min = Math.min(...vals);
-            const max = Math.max(...vals);
-            const fmt = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
-            reward = min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
-          } else {
-            const kr = bodyText.match(/(\d+)\s*kr\s*(?:i\s*)?rabatt/i);
+            const vals = pctMatches
+              .map(m => parseFloat((m[1] ?? "0").replace(",", ".")))
+              .filter(v => v >= 1 && v <= 99);
+            if (vals.length > 0) {
+              const min = Math.min(...vals);
+              const max = Math.max(...vals);
+              const fmt = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
+              reward = min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
+            }
+          }
+          if (!reward) {
+            const kr = searchText.match(/(\d+)\s*kr\s*(?:i\s*)?rabatt/i);
             if (kr) reward = (kr[1] ?? "") + " kr rabatt";
           }
 
-          return { storeUrl, reward };
+          return { storeUrl, reward, hasBulletCard: !!bulletCard };
         }, [...INTERNAL_DOMAINS]);
 
         if (detail.storeUrl) b.storeUrl = detail.storeUrl;
-        if (!b.reward && detail.reward) b.reward = detail.reward;
+        if (detail.reward) b.reward = detail.reward;
+        if (!detail.hasBulletCard) input.logger.warn(`NAF: no BulletCard on ${b.slug} (reward: "${detail.reward}")`);
       } catch {
         // detail page failed — keep what we have
       }
