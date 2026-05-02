@@ -1,5 +1,7 @@
 import type { CashbackOffer } from "../../shared/cashback.js";
+import { normalizeDomainInput, parseUrl } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
+import type { ProviderOverrides } from "../provider-overrides.js";
 
 type DealpassDeal = {
   id: number;
@@ -20,6 +22,7 @@ export type FetchTfBankInput = {
   apiUrl: string;
   generatedAt: string;
   logger: Logger;
+  overrides: ProviderOverrides;
 };
 
 export async function fetchTfBank(
@@ -73,12 +76,25 @@ export async function fetchTfBank(
       continue;
     }
 
-    const finalDomains = isRedirectDomain(domain)
-      ? inferDomainsFromName(deal.name)
-      : [domain];
+    let finalDomains: string[];
+
+    if (isRedirectDomain(domain)) {
+      const resolved = await resolveRedirectDomain(voucherUrl, input.logger);
+      finalDomains = resolved !== undefined ? [resolved] : [];
+    } else {
+      finalDomains = [domain];
+    }
 
     if (finalDomains.length === 0) {
-      continue;
+      const slug = deal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const overrideDomains = input.overrides.tfbank[slug];
+
+      if (overrideDomains !== undefined && overrideDomains.length > 0) {
+        finalDomains = overrideDomains;
+      } else {
+        input.logger.warn(`TF Bank deal has no resolvable domain: ${deal.name} (${voucherUrl})`);
+        continue;
+      }
     }
 
     const discount = deal.discount.premium;
@@ -130,36 +146,92 @@ const REDIRECT_DOMAINS = new Set([
   "getgifted.com",
   "click.linksynergy.com",
   "track.adtraction.com",
+  "dpbolvw.net",
+  "anrdoezrs.net",
+  "kqzyfj.com",
+  "tkqlhce.com",
+  "awin1.com",
+  "prf.hn",
 ]);
 
 function isRedirectDomain(domain: string): boolean {
-  return REDIRECT_DOMAINS.has(domain);
+  return REDIRECT_DOMAINS.has(domain) || domain.endsWith(".tradedoubler.com") || domain.endsWith(".adtraction.com");
 }
 
-function inferDomainsFromName(name: string): string[] {
-  const cleaned = name.toLowerCase().trim();
+async function resolveRedirectDomain(
+  url: string,
+  logger: Logger,
+  maxRedirects = 8,
+): Promise<string | undefined> {
+  const embedded = extractEmbeddedUrl(url);
 
-  if (/^[\w.-]+\.[a-z]{2,}$/.test(cleaned)) {
-    return [cleaned];
+  if (embedded !== undefined) {
+    return embedded;
   }
 
-  const slug = cleaned
-    .replace(/['']/g, "")
-    .replace(/&/g, "and")
-    .replace(/ø/g, "o")
-    .replace(/æ/g, "ae")
-    .replace(/å/g, "a")
-    .replace(/ö/g, "o")
-    .replace(/ä/g, "a")
-    .replace(/ü/g, "u")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
+  let currentUrl = url;
 
-  if (slug.length === 0) {
-    return [];
+  for (let i = 0; i < maxRedirects; i++) {
+    try {
+      const response = await fetch(currentUrl, {
+        method: "HEAD",
+        redirect: "manual",
+        signal: AbortSignal.timeout(5_000),
+      });
+
+      const location = response.headers.get("location");
+
+      if (location === null) {
+        break;
+      }
+
+      const resolved = parseUrl(location) ?? parseUrl(new URL(location, currentUrl).toString());
+
+      if (resolved === undefined) {
+        break;
+      }
+
+      const hostname = normalizeDomainInput(resolved.hostname);
+
+      if (!isRedirectDomain(hostname)) {
+        return hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+      }
+
+      currentUrl = resolved.toString();
+    } catch {
+      logger.warn(`TF Bank: failed to follow redirect for ${currentUrl}`);
+      break;
+    }
   }
 
-  return [`${slug}.no`, `${slug}.com`];
+  return undefined;
+}
+
+function extractEmbeddedUrl(url: string): string | undefined {
+  const parsed = parseUrl(url);
+
+  if (parsed === undefined) {
+    return undefined;
+  }
+
+  const paramNames = ["url", "dest", "destination", "redirect", "redirect_url", "target", "u"];
+
+  for (const param of paramNames) {
+    const value = parsed.searchParams.get(param);
+
+    if (value === null) {
+      continue;
+    }
+
+    const embedded = parseUrl(value);
+
+    if (embedded !== undefined && !isRedirectDomain(normalizeDomainInput(embedded.hostname))) {
+      const hostname = normalizeDomainInput(embedded.hostname);
+      return hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+    }
+  }
+
+  return undefined;
 }
 
 function cleanMerchantName(name: string): string {

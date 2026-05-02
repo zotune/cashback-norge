@@ -71,6 +71,7 @@ async function main(): Promise<void> {
         generatedAt,
         logger,
         apiUrl: config.tfBankApiUrl,
+        overrides: providerOverrides,
       });
   const dnbOffers = config.skipDnb
     ? []

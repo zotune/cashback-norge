@@ -499,6 +499,8 @@ function isTrackingHostname(hostname: string): boolean {
     "anrdoezrs.net",
     "awardit.com",
     "awin1.com",
+    "dpbolvw.net",
+    "emjcd.com",
     "kqzyfj.com",
     "mplxtms.com",
     "prf.hn",
