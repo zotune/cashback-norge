@@ -65,7 +65,7 @@ function extractCtaUrl($: ObosCheerio): string | undefined {
   let ctaUrl: string | undefined;
   let firstUrl: string | undefined;
 
-  $('a[href^="http"]').each((_, el) => {
+  $('a[href^="http"]').each((_, el): false | void => {
     const href = $(el).attr("href") ?? "";
     try {
       const { hostname } = new URL(href);

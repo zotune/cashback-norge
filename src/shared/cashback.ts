@@ -169,7 +169,7 @@ export function findOffersForHostname(
     }
   }
   return [...bestByProvider.values()].sort(
-    (a, b) => parseRewardValue(b.reward) - parseRewardValue(a.reward),
+    (a, b) => parseRewardValue(b.reward).amount - parseRewardValue(a.reward).amount,
   );
 }
 

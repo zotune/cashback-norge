@@ -201,7 +201,7 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
 
           const bulletCard = document.querySelector('[class*="BenefitBulletsCard"]');
           const searchText = bulletCard
-            ? (bulletCard.innerText ?? "")
+            ? ((bulletCard as HTMLElement).innerText ?? "")
             : (document.querySelector("main")?.innerText ?? "");
 
           const pctMatches = searchText ? [...searchText.matchAll(/(\d{1,2}(?:[,.]\d+)?)\s*%/g)] : [];
@@ -213,7 +213,7 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
             if (vals.length > 0) {
               const min = Math.min(...vals);
               const max = Math.max(...vals);
-              const fmt = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
+              const fmt = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
               reward = min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
             }
           }
