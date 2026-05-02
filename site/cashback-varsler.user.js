@@ -643,6 +643,7 @@
       border-radius: 20px;
       color: #172026;
       display: flex;
+      justify-content: space-between;
       font-size: 11px;
       font-weight: 600;
       gap: 4px;
