@@ -33,6 +33,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build:site
+      - run: pnpm run build:userscript
 
       - name: Prepare pages content
         run: |

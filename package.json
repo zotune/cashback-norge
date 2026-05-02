@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm run build:backend && pnpm run build:extension && pnpm run build:site",
+    "build": "pnpm run build:backend && pnpm run build:extension && pnpm run build:site && pnpm run build:userscript",
+    "build:userscript": "vite build --config vite.userscript.config.ts",
     "build:backend": "tsc --project tsconfig.backend.json",
     "build:extension": "vite build --config vite.extension.config.ts",
     "build:site": "vite build --config vite.site.config.ts",
