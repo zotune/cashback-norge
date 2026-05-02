@@ -22,7 +22,7 @@ const SLUG_NAME_OVERRIDES: Record<string, string> = {
   "dekk": "Bestdrive",
   "dekkhotell": "Bestdrive",
   "dekkmann-mc-dekk": "Bestdrive",
-  "noddi-hjulskift": "Bestdrive",
+  "noddi-hjulskift": "Noddi",
   "leiebil-avis": "Avis",
   "homely": "Homely",
   "bilpleiekongen": "Bilpleiekongen",
@@ -40,7 +40,6 @@ const SLUG_NAME_OVERRIDES: Record<string, string> = {
   "bullfighter": "Bullfighter",
   "kjells-markiser-garasjeport": "Kjells Markiser",
   "kjells-markiser-solskjerming": "Kjells Markiser",
-  "noddi-hjulskift": "Noddi",
   "hallmark": "Hallmark",
   "sikker-pa-mc-kurs": "Førerutvikling.no",
 };
