@@ -799,9 +799,10 @@
       const dx = (e.touches[0]?.clientX ?? 0) - dragStartX;
       if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) isDragging = true;
       if (!isDragging) return;
+      e.preventDefault();
       const newBottom = Math.max(0, Math.min(window.innerHeight - host.offsetHeight, dragStartBottom + dy));
       host.style.bottom = `${newBottom}px`;
-    }, { passive: true });
+    }, { passive: false });
     sideTab.addEventListener("touchend", (e) => {
       if (isDragging) {
         localStorage.setItem(POSITION_KEY, host.style.bottom);
