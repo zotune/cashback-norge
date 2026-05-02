@@ -395,7 +395,7 @@
       color: #172026;
       display: grid;
       gap: 8px;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       min-height: 32px;
       padding: 5px 9px;
       text-decoration: none;
@@ -824,7 +824,7 @@
       const providerBadge = document.createElement("span");
       providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
       providerBadge.textContent = formatProviderName(currentOffer.provider);
-      offerLabel.append(offerReward, providerBadge);
+      offerLabel.append(offerReward);
       if (currentOffer.discountCode !== void 0) {
         const code = currentOffer.discountCode;
         const copyBtn = document.createElement("span");
@@ -858,9 +858,9 @@
             }, 1500);
           });
         });
-        offerLink.append(offerLabel, copyBtn);
+        offerLink.append(offerLabel, copyBtn, providerBadge);
       } else {
-        offerLink.append(offerLabel);
+        offerLink.append(offerLabel, providerBadge);
       }
       wrapper.append(offerLink);
       offerList.append(wrapper);
