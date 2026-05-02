@@ -182,6 +182,36 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       padding: 4px 2px;
       border-radius: 4px;
     }
+    .notice.collapsed .side-tab.side-tab-tfbank .side-tab-text {
+      background: #e30613;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+    .notice.collapsed .side-tab.side-tab-obos .side-tab-text {
+      background: #003087;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+    .notice.collapsed .side-tab.side-tab-naf .side-tab-text {
+      background: #FFD100;
+      color: #000000;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+    .notice.collapsed .side-tab.side-tab-logbuy .side-tab-text {
+      background: #d81939;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
+    .notice.collapsed .side-tab.side-tab-norskfamilie .side-tab-text {
+      background: #ff6600;
+      color: #ffffff;
+      padding: 4px 2px;
+      border-radius: 4px;
+    }
     .side-tab-arrow {
       font-size: 16px;
       font-weight: 700;
