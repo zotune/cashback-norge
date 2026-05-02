@@ -894,8 +894,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   for (const card of PREMIUM_CARDS) {
     // For Curve, use the actual offer URL if available
     const overrideUrl = card.label === "Curve" && curveOffer !== undefined ? curveOffer.activationUrl : undefined;
-    const shouldShow = card.label !== "Curve" || curveOffer !== undefined;
-    if (!shouldShow) continue;
     const { chip, label } = createBonusChip(card, overrideUrl);
     bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, approx: card.approx, defaultText: label.textContent ?? "" });
     premiumItems.append(chip);

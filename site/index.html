@@ -857,7 +857,8 @@ function renderChipGroup(cards, container) {
       rewardText = `+${minStr}-${maxStr} %`;
     } else {
       const pctStr = (c.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
-      rewardText = c.approx ? `+~${pctStr}%` : `+${pctStr}%`;
+      const ebInfo = c.ebPer100kr ? ` (~${c.ebPer100kr} EB/100kr)` : "";
+      rewardText = (c.approx ? `+~${pctStr}%` : `+${pctStr}%`) + ebInfo;
     }
     return `<span class="tooltip-wrap">
       <span class="tooltip">${esc(c.tip)}</span>

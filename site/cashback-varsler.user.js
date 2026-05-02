@@ -1009,8 +1009,6 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     }
     for (const card of PREMIUM_CARDS) {
       const overrideUrl = card.label === "Curve" && curveOffer !== void 0 ? curveOffer.activationUrl : void 0;
-      const shouldShow = card.label !== "Curve" || curveOffer !== void 0;
-      if (!shouldShow) continue;
       const { chip, label } = createBonusChip(card, overrideUrl);
       bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, approx: card.approx, defaultText: label.textContent ?? "" });
       premiumItems.append(chip);
