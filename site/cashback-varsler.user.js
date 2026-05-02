@@ -310,7 +310,7 @@
       display: flex;
     }
     .panel {
-      width: min(400px, calc(100vw - 42px));
+      width: min(400px, calc(100vw - 70px));
       color: #172026;
       background: #ffffff;
       border: 1px solid #c9d7cf;
