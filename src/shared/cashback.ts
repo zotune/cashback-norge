@@ -268,7 +268,7 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
     // Keep the offer with the best reward value
-    if (existing === undefined || parseRewardValue(offer.reward) >= parseRewardValue(existing.reward)) {
+    if (existing === undefined || parseRewardValue(offer.reward) > parseRewardValue(existing.reward)) {
       byKey.set(key, offer);
     }
   }
