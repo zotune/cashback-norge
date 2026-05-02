@@ -11,6 +11,37 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 
 const LIST_URL = "https://www.naf.no/medlemskap/medlemsfordeler";
 
+// Slug → correct brand name, for cards where NAF uses a generic category title
+const SLUG_NAME_OVERRIDES: Record<string, string> = {
+  "talkmore": "Talkmore",
+  "bildeler": "Bildeler.no",
+  "byggmakker": "Byggmakker",
+  "maskinvask": "Circle K Bilvask",
+  "drivstoff": "Circle K",
+  "hurtiglading-circle-k": "Circle K",
+  "dekk": "Dekk1",
+  "leiebil-avis": "Avis",
+  "homely": "Homely",
+  "bilpleiekongen": "Bilpleiekongen",
+  "naf-senter": "NAF Senter",
+  "riis-bilglass": "Riis Bilglass",
+  "elton": "Elton",
+  "markabutikken": "Markabutikken",
+  "flight-park": "Flight Park",
+  "camping-norge": "Camping.no",
+  "go-nordic-cruiseline": "Go Nordic Cruiseline",
+  "nordkapplinjen": "Nordkapplinjen",
+  "bo-sommarland": "Bø Sommarland",
+  "zaptec-hjemmelader": "Zaptec",
+  "garmin-mc": "Garmin",
+  "bullfighter": "Bullfighter",
+  "kjells-markiser-garasjeport": "Kjells Markiser",
+  "kjells-markiser-solskjerming": "Kjells Markiser",
+  "noddi-hjulskift": "Noddi",
+  "hallmark": "Hallmark",
+  "sikker-pa-mc-kurs": "Førerutvikling.no",
+};
+
 const INTERNAL_DOMAINS = new Set([
   "naf.no",
   "sos.eu",
@@ -218,9 +249,10 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
     }
 
     const sourceUrl = `${LIST_URL}/${b.slug}`;
+    const merchantName = SLUG_NAME_OVERRIDES[b.slug] ?? b.name;
     offers.push({
       provider: "naf",
-      merchantName: b.name,
+      merchantName,
       domains: uniqueStrings(domains),
       reward: b.reward,
       sourceUrl,
