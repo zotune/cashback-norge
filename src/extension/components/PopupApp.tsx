@@ -240,7 +240,7 @@ export function PopupApp(): ReactElement {
                     ? `+${klarnaMinKr}-${klarnaMaxKr} kr`
                     : "+0,5-1 %"}
                 </span>
-                <span className="provider-badge provider-klarna">Klarna+</span>
+                <span className="provider-badge provider-klarna">Klarna</span>
               </a>
             </div>
           </div>

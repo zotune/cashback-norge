@@ -125,7 +125,7 @@
       pct: 75e-4,
       minPct: 5e-3,
       maxPct: 0.01,
-      label: "Klarna+",
+      label: "Klarna",
       badge: "klarna",
       approx: false,
       url: "https://www.klarna.com/no/medlemskap/",

@@ -89,7 +89,7 @@ export const PREMIUM_CARDS: BonusCard[] = [
     tip: "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.",
   },
   {
-    pct: 0.0075, minPct: 0.005, maxPct: 0.01, label: "Klarna+", badge: "klarna", approx: false,
+    pct: 0.0075, minPct: 0.005, maxPct: 0.01, label: "Klarna", badge: "klarna", approx: false,
     url: "https://www.klarna.com/no/medlemskap/",
     tip: "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback.",
   },
