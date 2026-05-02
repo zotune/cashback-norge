@@ -331,6 +331,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       background: #000000;
       color: #ffffff;
     }
+    .provider-crypto {
+      background: #002d74;
+      color: #ffffff;
+    }
     .provider-rabattkode {
       background: #e74c3c;
       color: #ffffff;
