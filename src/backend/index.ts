@@ -15,8 +15,10 @@ import { crawlCuponation } from "./providers/cuponation.js";
 import { fetchDnb } from "./providers/dnb.js";
 import { fetchCurve } from "./providers/curve.js";
 import { crawlFinnkupongkoder } from "./providers/finnkupongkoder.js";
+import { crawlKickback } from "./providers/kickback.js";
 import { crawlRabattkode } from "./providers/rabattkode.js";
 import { crawlNorskfamilie } from "./providers/norskfamilie.js";
+import { crawlTrustdeals } from "./providers/trustdeals.js";
 
 type CliConfig = {
   outputPath: string;
@@ -38,11 +40,15 @@ type CliConfig = {
   skipDnb: boolean;
   skipCurve: boolean;
   skipFinnkupongkoder: boolean;
+  skipKickback: boolean;
   skipRabattkode: boolean;
   skipNorskfamilie: boolean;
+  skipTrustdeals: boolean;
   dnbPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
+  kickbackStartUrl: string;
+  trustdealsStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -140,6 +146,22 @@ async function main(): Promise<void> {
         logger,
         startUrl: config.cuponationStartUrl,
       });
+  const trustdealsOffers = config.skipTrustdeals
+    ? []
+    : await crawlTrustdeals({
+        generatedAt,
+        logger,
+        startUrl: config.trustdealsStartUrl,
+      });
+  const kickbackOffers = config.skipKickback
+    ? []
+    : await crawlKickback({
+        domainLookup,
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        startUrl: config.kickbackStartUrl,
+      });
   const finnkupongkoderOffers = config.skipFinnkupongkoder
     ? []
     : await crawlFinnkupongkoder({
@@ -148,7 +170,7 @@ async function main(): Promise<void> {
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         startUrl: config.finnkupongkoderStartUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...finnkupongkoderOffers, ...norskfamilieOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -205,8 +227,10 @@ function readCliConfig(args: string[]): CliConfig {
     skipDnb: args.includes("--skip-dnb"),
     skipCurve: args.includes("--skip-curve"),
     skipFinnkupongkoder: args.includes("--skip-finnkupongkoder"),
+    skipKickback: args.includes("--skip-kickback"),
     skipRabattkode: args.includes("--skip-rabattkode"),
     skipNorskfamilie: args.includes("--skip-norskfamilie"),
+    skipTrustdeals: args.includes("--skip-trustdeals"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
@@ -216,6 +240,12 @@ function readCliConfig(args: string[]): CliConfig {
     finnkupongkoderStartUrl:
       readArgumentValue(args, "--finnkupongkoder-start-url") ??
       "https://www.finnkupongkoder.no/top",
+    kickbackStartUrl:
+      readArgumentValue(args, "--kickback-start-url") ??
+      "https://kickback.no/",
+    trustdealsStartUrl:
+      readArgumentValue(args, "--trustdeals-start-url") ??
+      "https://www.trustdeals.no/",
   };
 }
 

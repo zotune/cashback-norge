@@ -7,8 +7,8 @@ import {
 import {
   type CashbackOffer,
   isRecord,
-  normalizeDomainInput,
 } from "../../shared/cashback.js";
+import { merchantDomainsFromUrl } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 
 type CuponationCheerio = CheerioCrawlingContext["$"];
@@ -174,16 +174,16 @@ function parseCuponationVoucher(
     return undefined;
   }
 
-  const domain = extractMerchantDomain(voucher.retailer.merchantUrl);
+  const domains = merchantDomainsFromUrl(voucher.retailer.merchantUrl);
 
-  if (domain === undefined) {
+  if (domains.length === 0) {
     return undefined;
   }
 
   return {
     provider: "rabattkode",
     merchantName: voucher.retailer.name,
-    domains: [domain],
+    domains,
     reward: extractReward(voucher),
     sourceUrl: pageUrl,
     activationUrl: voucher.retailer.merchantUrl,
@@ -199,14 +199,6 @@ function isReusableDiscountCode(code: string): boolean {
   }
 
   return code.toLowerCase() !== "uniquecodes";
-}
-
-function extractMerchantDomain(merchantUrl: string): string | undefined {
-  try {
-    return normalizeDomainInput(new URL(merchantUrl).hostname);
-  } catch {
-    return undefined;
-  }
 }
 
 function extractReward(voucher: CuponationVoucher): string {
