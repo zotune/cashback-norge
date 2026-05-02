@@ -286,7 +286,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
     .offer-list {
       display: grid;
-      gap: 6px;
+      gap: 4px;
     }
     .offer-link {
       align-items: center;
@@ -297,8 +297,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       display: grid;
       gap: 8px;
       grid-template-columns: minmax(0, 1fr) auto;
-      min-height: 38px;
-      padding: 7px 9px;
+      min-height: 32px;
+      padding: 5px 9px;
       text-decoration: none;
     }
     .offer-label {
@@ -364,6 +364,14 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
     .provider-norwegian {
       background: #d81939;
+      color: #ffffff;
+    }
+    .provider-logbuy {
+      background: #d81939;
+      color: #ffffff;
+    }
+    .provider-obos {
+      background: #003087;
       color: #ffffff;
     }
     .provider-sas-amex {
@@ -696,7 +704,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const offerLabel = document.createElement("span");
     offerLabel.className = "offer-label";
     const offerReward = document.createElement("span");
-    offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
+    offerReward.textContent = formatCompactRewardLabel(currentOffer) ?? formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
@@ -748,15 +756,20 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     for (const { element, offer } of rewardLabels) {
       if (amount > 0) {
         const result = calculateCashback(offer, amount);
-        element.textContent = result !== "" ? result : formatRewardLabel(offer.reward, offer.provider);
+        element.textContent = result !== "" ? result : (formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider));
       } else {
-        element.textContent = formatRewardLabel(offer.reward, offer.provider);
+        element.textContent = formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
       }
     }
     for (const { element, offer } of tooltipElements) {
-      element.textContent = amount > 0
-        ? formatBreakdownWithAmounts(offer.terms, amount)
-        : offer.terms;
+      const fullReward = formatRewardLabel(offer.reward, offer.provider);
+      const compact = formatCompactRewardLabel(offer);
+      const showRewardInTooltip = compact !== undefined && fullReward !== compact;
+      const breakdown = amount > 0 ? formatBreakdownWithAmounts(offer.terms, amount) : offer.terms;
+      const parts: string[] = [];
+      if (showRewardInTooltip) parts.push(fullReward);
+      if (breakdown) parts.push(breakdown);
+      element.textContent = parts.join("\n\n");
     }
     for (const { element, pct, approx, defaultText } of bonusChipLabels) {
       if (amount > 0) {
@@ -973,12 +986,19 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
   for (let idx = 0; idx < mainOffers.length; idx++) {
     const currentOffer = mainOffers[idx];
-    if (currentOffer === undefined || !hasRateBreakdown(currentOffer.terms)) continue;
+    if (currentOffer === undefined) continue;
+    const compact = formatCompactRewardLabel(currentOffer);
+    const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
+    const showRewardInTooltip = compact !== undefined && fullReward !== compact;
+    if (!showRewardInTooltip && !hasRateBreakdown(currentOffer.terms)) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
     const tooltip = document.createElement("div");
     tooltip.className = "offer-tooltip";
-    tooltip.textContent = currentOffer.terms;
+    const tooltipParts: string[] = [];
+    if (showRewardInTooltip) tooltipParts.push(fullReward);
+    if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
+    tooltip.textContent = tooltipParts.join("\n\n");
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });
     wrapper.addEventListener("mouseenter", () => {
@@ -1466,9 +1486,9 @@ function formatSideTabText(
 }
 function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
-  const percentMatch = label.match(/(?:opptil\s*)?\d+(?:[,.]\d+)?\s*%/i);
+  const percentMatch = label.match(/(?:opptil\s*)?(\d+(?:[,.]\d+)?\s*%(?:\s*[-–]\s*\d+(?:[,.]\d+)?\s*%)?)/i);
   if (percentMatch !== null) {
-    return percentMatch[0].replace(/\s+/g, " ");
+    return percentMatch[1]!.replace(/\s+/g, " ");
   }
   const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
   if (krMatch !== null) {

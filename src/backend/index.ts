@@ -19,6 +19,8 @@ import { crawlKickback } from "./providers/kickback.js";
 import { crawlRabattkode } from "./providers/rabattkode.js";
 import { crawlNorskfamilie } from "./providers/norskfamilie.js";
 import { crawlTrustdeals } from "./providers/trustdeals.js";
+import { crawlLogbuy } from "./providers/logbuy.js";
+import { crawlObos } from "./providers/obos.js";
 
 type CliConfig = {
   outputPath: string;
@@ -44,11 +46,15 @@ type CliConfig = {
   skipRabattkode: boolean;
   skipNorskfamilie: boolean;
   skipTrustdeals: boolean;
+  skipLogbuy: boolean;
+  skipObos: boolean;
   dnbPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
   kickbackStartUrl: string;
   trustdealsStartUrl: string;
+  logbuyStartUrl: string;
+  obosStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -97,6 +103,15 @@ async function main(): Promise<void> {
     ? []
     : await crawlNorskfamilie();
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
+  const obosOffers = config.skipObos
+    ? []
+    : await crawlObos({
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides,
+        startUrl: config.obosStartUrl,
+      });
 
   // Phase 2: Build domain lookup from providers with known-good URLs
   const domainLookup = buildDomainLookup([
@@ -105,6 +120,7 @@ async function main(): Promise<void> {
     ...tfBankOffers,
     ...dnbOffers,
     ...norskfamilieOffers,
+    ...obosOffers,
     ...manualOffers,
   ]);
   logger.info(`Domain lookup: ${domainLookup.size} merchant names with known domains`);
@@ -170,7 +186,17 @@ async function main(): Promise<void> {
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         startUrl: config.finnkupongkoderStartUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers]);
+  const logbuyOffers = config.skipLogbuy
+    ? []
+    : await crawlLogbuy({
+        domainLookup,
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides,
+        startUrl: config.logbuyStartUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -231,6 +257,8 @@ function readCliConfig(args: string[]): CliConfig {
     skipRabattkode: args.includes("--skip-rabattkode"),
     skipNorskfamilie: args.includes("--skip-norskfamilie"),
     skipTrustdeals: args.includes("--skip-trustdeals"),
+    skipLogbuy: args.includes("--skip-logbuy"),
+    skipObos: args.includes("--skip-obos"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
@@ -246,6 +274,12 @@ function readCliConfig(args: string[]): CliConfig {
     trustdealsStartUrl:
       readArgumentValue(args, "--trustdeals-start-url") ??
       "https://www.trustdeals.no/",
+    logbuyStartUrl:
+      readArgumentValue(args, "--logbuy-start-url") ??
+      "https://logbuy.no/rabatter",
+    obosStartUrl:
+      readArgumentValue(args, "--obos-start-url") ??
+      "https://www.obos.no/medlem/medlemsfordeler",
   };
 }
 

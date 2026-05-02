@@ -10,6 +10,8 @@ export const PROVIDER_NAMES: Record<string, string> = {
   curve: "Curve Pro",
   rabattkode: "Rabattkode",
   norskfamilie: "NF",
+  logbuy: "LogBuy",
+  obos: "OBOS",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -33,6 +35,8 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   curve: { bg: "#000000", fg: "#ffffff" },
   rabattkode: { bg: "#e74c3c", fg: "#ffffff" },
   norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
+  logbuy: { bg: "#d81939", fg: "#ffffff" },
+  obos: { bg: "#003087", fg: "#ffffff" },
 };
 
 export type BonusCard = {

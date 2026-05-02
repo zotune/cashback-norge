@@ -165,6 +165,8 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-dnb { background: #14555a; color: #fff; }
 .badge-curve { background: #000; color: #fff; }
 .badge-norskfamilie { background: #ff6600; color: #fff; }
+.badge-logbuy { background: #d81939; color: #fff; }
+.badge-obos { background: #003087; color: #fff; }
 .empty {
   color: #8a9a92;
   font-size: 14px;
@@ -630,12 +632,16 @@ function render(query) {
     const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb") && o.discountCode);
     const offerHtml = cashbackOffers.map(o => {
       const url = o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
-      const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatReward(o);
+      const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatCompactReward(o);
+      const fullReward = formatReward(o);
+      const compact = formatCompactReward(o);
       const terms = o.terms || "";
       const hasBreakdown = terms.includes("\n") && /\d+.*%/.test(terms);
-      const tipText = hasBreakdown
+      const rewardDetail = (compact !== fullReward) ? fullReward : "";
+      const tipBase = hasBreakdown
         ? (currentAmount > 0 ? formatBreakdownWithAmounts(terms, currentAmount) : terms)
         : (PROVIDER_TIPS[o.provider] || "");
+      const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
       const tooltipHtml = tipText ? `<span class="offer-tooltip">${esc(tipText)}</span>` : "";
       return `<span class="offer-wrap">${tooltipHtml}<a class="offer" href="${esc(url)}" target="_blank" rel="noreferrer">
         <span class="offer-reward">${esc(label)}</span>
@@ -690,6 +696,16 @@ function render(query) {
   });
 }
 
+function formatCompactReward(o) {
+  const full = formatReward(o);
+  const pct = full.match(/(?:opptil\s*)?(\d+(?:[,.]\d+)?\s*%(?:\s*[-–]\s*\d+(?:[,.]\d+)?\s*%)?)/i);
+  if (pct) return pct[1].replace(/\s+/g, " ");
+  const kr = full.match(/\d+(?:[,.]\d+)?\s*kr/i);
+  if (kr) return kr[0].replace(/\s+/g, " ");
+  if (/gratis\s+frakt/i.test(full)) return "Gratis frakt";
+  if (/gratis/i.test(full)) return "Gratis";
+  return full.length <= 20 ? full : full;
+}
 function formatReward(o) {
   const r = o.reward.trim();
   if (o.provider === "sas") {

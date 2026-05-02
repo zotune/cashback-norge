@@ -29,7 +29,9 @@ export function isProviderOverrides(value: unknown): value is ProviderOverrides 
     !isProviderRecord(value.klarna) ||
     !isProviderRecord(value.remember) ||
     !isProviderRecord(value.sas) ||
-    !isProviderRecord(value.tfbank)
+    !isProviderRecord(value.tfbank) ||
+    !isProviderRecord(value.obos) ||
+    !isProviderRecord(value.logbuy)
   ) {
     return false;
   }
