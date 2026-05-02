@@ -12,6 +12,7 @@ import { crawlTrumf } from "./providers/trumf.js";
 import { fetchDnb } from "./providers/dnb.js";
 import { fetchCurve } from "./providers/curve.js";
 import { crawlRabattkode } from "./providers/rabattkode.js";
+import { crawlNorskfamilie } from "./providers/norskfamilie.js";
 
 type CliConfig = {
   outputPath: string;
@@ -32,6 +33,7 @@ type CliConfig = {
   skipDnb: boolean;
   skipCurve: boolean;
   skipRabattkode: boolean;
+  skipNorskfamilie: boolean;
   dnbPageDataUrl: string;
 };
 
@@ -102,7 +104,11 @@ async function main(): Promise<void> {
     ? []
     : await crawlRabattkode();
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers]);
+  const norskfamilieOffers = config.skipNorskfamilie
+    ? []
+    : await crawlNorskfamilie();
+  logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...norskfamilieOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -154,6 +160,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipDnb: args.includes("--skip-dnb"),
     skipCurve: args.includes("--skip-curve"),
     skipRabattkode: args.includes("--skip-rabattkode"),
+    skipNorskfamilie: args.includes("--skip-norskfamilie"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",

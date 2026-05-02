@@ -9,6 +9,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   dnb: "DNB",
   curve: "Curve Pro",
   rabattkode: "Rabattkode",
+  norskfamilie: "Norsk Familieøkonomi",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -19,6 +20,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
   dnb: "DNB Spare. Aktiver i DNB-appen.",
   rabattkode: "Rabattkode fra rabattkode.no.\nLim inn koden i handlekurven.",
+  norskfamilie: "Norsk Familieøkonomi.\nKrever medlemskap. Aktiver kjøp via norskfamilie.no.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -30,6 +32,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   dnb: { bg: "#14555a", fg: "#ffffff" },
   curve: { bg: "#000000", fg: "#ffffff" },
   rabattkode: { bg: "#e74c3c", fg: "#ffffff" },
+  norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
 };
 
 export type BonusCard = {
