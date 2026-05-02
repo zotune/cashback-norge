@@ -537,7 +537,7 @@
     }
     .chip-group-items {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 5px;
     }
     .bonus-chips-section {
@@ -642,7 +642,7 @@
       border: 1px solid #d8e3de;
       border-radius: 20px;
       color: #172026;
-      display: inline-flex;
+      display: flex;
       font-size: 11px;
       font-weight: 600;
       gap: 4px;
