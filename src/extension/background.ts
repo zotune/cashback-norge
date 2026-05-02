@@ -90,21 +90,33 @@ async function ensureIndex(): Promise<CashbackIndex> {
   const cachedIndex = await readCachedIndex();
 
   if (cachedIndex !== undefined && isFresh(cachedIndex.downloadedAt)) {
-    return cachedIndex.index;
+    const bundledIndex = await readBundledIndex();
+
+    if (cachedIndex.index.generatedAt >= bundledIndex.generatedAt) {
+      return cachedIndex.index;
+    }
+
+    await cacheIndex(bundledIndex);
+    void fetchRemoteIndex();
+    return bundledIndex;
   }
 
   return refreshIndex();
+}
+
+async function cacheIndex(index: CashbackIndex): Promise<void> {
+  const cachedIndex: CachedIndex = {
+    downloadedAt: new Date().toISOString(),
+    index,
+  };
+  await setStorageValue(STORAGE_KEY, cachedIndex);
 }
 
 async function refreshIndex(): Promise<CashbackIndex> {
   // Always use the bundled index first — it's the most up-to-date at build time.
   // Then try to fetch a newer remote version in the background.
   const bundledIndex = await readBundledIndex();
-  const cachedIndex: CachedIndex = {
-    downloadedAt: new Date().toISOString(),
-    index: bundledIndex,
-  };
-  await setStorageValue(STORAGE_KEY, cachedIndex);
+  await cacheIndex(bundledIndex);
 
   // Fetch remote in background to update for next load
   void fetchRemoteIndex();
@@ -121,11 +133,7 @@ async function fetchRemoteIndex(): Promise<void> {
       const bundledIndex = await readBundledIndex();
       // Only use remote if it's newer than bundled
       if (value.generatedAt > bundledIndex.generatedAt) {
-        const cachedIndex: CachedIndex = {
-          downloadedAt: new Date().toISOString(),
-          index: value,
-        };
-        await setStorageValue(STORAGE_KEY, cachedIndex);
+        await cacheIndex(value);
       }
     }
   } catch {

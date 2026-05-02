@@ -690,7 +690,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
   const sideTabText = document.createElement("span");
   sideTabText.className = "side-tab-text";
-  sideTabText.textContent = offer !== undefined ? formatRewardLabel(offer.reward, offer.provider) : "Rabattkode";
+  sideTabText.textContent = formatSideTabText(offer, primaryOffer);
 
   sideTab.append(sideTabArrow, sideTabText);
 
@@ -1376,6 +1376,42 @@ function formatRewardLabel(reward: string, provider: string): string {
   }
 
   return trimmedReward;
+}
+
+function formatSideTabText(
+  cashbackOffer: CashbackOffer | undefined,
+  primaryOffer: CashbackOffer,
+): string {
+  if (cashbackOffer !== undefined) {
+    return formatRewardLabel(cashbackOffer.reward, cashbackOffer.provider);
+  }
+
+  return formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
+}
+
+function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
+  const label = formatRewardLabel(offer.reward, offer.provider);
+  const percentMatch = label.match(/(?:opptil\s*)?\d+(?:[,.]\d+)?\s*%/i);
+
+  if (percentMatch !== null) {
+    return percentMatch[0].replace(/\s+/g, " ");
+  }
+
+  const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
+
+  if (krMatch !== null) {
+    return krMatch[0].replace(/\s+/g, " ");
+  }
+
+  if (/gratis\s+frakt/i.test(label)) {
+    return "Gratis frakt";
+  }
+
+  if (/gratis/i.test(label)) {
+    return "Gratis";
+  }
+
+  return label.length <= 14 ? label : undefined;
 }
 
 function convertSasToPercent(reward: string): string {

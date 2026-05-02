@@ -14,7 +14,7 @@ Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`},{pct:.0059,ebPer100kr:8,label
 20 EB/100 kr på SAS.no
 Gratis kort.`},{pct:.005,label:"Norwegian",badge:"norwegian",approx:!1,url:"https://www.banknorwegian.no/kredittkort/cashback/",tip:`0,5 % cashback (1:1 kr mot faktura)
 eller CashPoints (1:1 kr på Norwegian.no).
-Gratis kort, ingen årsavgift.`}],PREMIUM_CARDS:[{pct:.01,label:"Curve",badge:"curve",approx:!1,url:"https://www.curve.com/",tip:`Velg butikken i Curve-appen.
+Gratis kort, ingen årsavgift.`}],PREMIUM_CARDS:[{pct:.01,label:"Curve",badge:"curve",approx:!1,url:"https://www.curve.com/join#D5GXXJJD",tip:`Velg butikken i Curve-appen.
 Maks 6 butikker (Pro, €9,99/mnd)
 eller 12 (Pro+, €17,99/mnd).
 Kombineres med annen cashback.`},{pct:.0075,label:"Klarna+",badge:"klarna",approx:!1,url:"https://www.klarna.com/no/medlemskap/",tip:`Plus: +0,5 % (49 kr/mnd)

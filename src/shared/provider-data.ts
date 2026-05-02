@@ -71,7 +71,7 @@ export const FREE_CARDS: BonusCard[] = [
 export const PREMIUM_CARDS: BonusCard[] = [
   {
     pct: 0.01, label: "Curve", badge: "curve", approx: false,
-    url: "https://www.curve.com/",
+    url: "https://www.curve.com/join#D5GXXJJD",
     tip: "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.",
   },
   {
