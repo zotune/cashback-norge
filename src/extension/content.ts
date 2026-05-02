@@ -660,7 +660,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
   `;
 
-  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode");
+  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
   const curveOffer = offers.find((o) => o.provider === "curve");
   const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
 

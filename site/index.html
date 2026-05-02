@@ -600,8 +600,8 @@ function render(query) {
     const iconHtml = hasIcon
       ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
-    const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode");
-    const codeOffers = m.offers.filter(o => o.provider === "rabattkode" && o.discountCode);
+    const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode" && o.provider !== "dnb");
+    const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb") && o.discountCode);
     const offerHtml = cashbackOffers.map(o => {
       const url = o.provider === "trumf" ? o.sourceUrl : o.activationUrl;
       const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatReward(o);
