@@ -1,5 +1,4 @@
 import { EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, PROVIDER_NAMES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
-
 type CashbackOffer = {
   provider: string;
   merchantName: string;
@@ -11,21 +10,23 @@ type CashbackOffer = {
   discountCode?: string;
   updatedAt: string;
 };
-
+type CashbackIndex = {
+  version: number;
+  generatedAt: string;
+  offers: CashbackOffer[];
+  domainIndex: Record<string, CashbackOffer[]>;
+};
 type CashbackFoundMessage = {
   type: "cashback-found";
   offers: CashbackOffer[];
 };
-
 type CashbackNoneMessage = {
   type: "cashback-none";
 };
-
 type GetOffersForUrlMessage = {
   type: "get-offers-for-url";
   url: string;
 };
-
 type OffersForUrlResponse =
   | {
       ok: true;
@@ -35,25 +36,20 @@ type OffersForUrlResponse =
       ok: false;
       reason: string;
     };
-
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
 const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
-
 chrome.runtime.onMessage.addListener((message) => {
   if (isCashbackFoundMessage(message)) {
     renderNoticeWithStoredState(message.offers);
     return;
   }
-
   if (isCashbackNoneMessage(message)) {
     clearNotice();
   }
 });
-
 requestCurrentOffers();
-
 function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
   chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY], (result: Record<string, unknown>) => {
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
@@ -62,30 +58,55 @@ function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
     renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed);
   });
 }
-
 function requestCurrentOffers(): void {
   const message: GetOffersForUrlMessage = {
     type: "get-offers-for-url",
     url: window.location.href,
   };
-
   chrome.runtime.sendMessage(message, (response: unknown) => {
-    if (!isOffersForUrlResponse(response) || !response.ok) {
+    if (chrome.runtime.lastError !== undefined) {
+      void renderBundledOffersForCurrentUrl();
       return;
     }
-
+    if (!isOffersForUrlResponse(response) || !response.ok) {
+      void renderBundledOffersForCurrentUrl();
+      return;
+    }
     if (response.offers.length > 0) {
       renderNoticeWithStoredState(response.offers);
       return;
     }
-
-    clearNotice();
+    void renderBundledOffersForCurrentUrl();
   });
 }
-
+async function renderBundledOffersForCurrentUrl(): Promise<void> {
+  const parsedUrl = parseUrl(window.location.href);
+  if (
+    parsedUrl === undefined ||
+    (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:")
+  ) {
+    clearNotice();
+    return;
+  }
+  try {
+    const response = await fetch(chrome.runtime.getURL("cashback-index.json"));
+    const value: unknown = await response.json();
+    if (!isCashbackIndex(value)) {
+      clearNotice();
+      return;
+    }
+    const offers = findOffersForHostname(value, parsedUrl.hostname);
+    if (offers.length > 0) {
+      renderNoticeWithStoredState(offers);
+      return;
+    }
+  } catch {
+    // Fall through to clearing the notice.
+  }
+  clearNotice();
+}
 function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initialChipsCollapsed: boolean, initialCodesCollapsed: boolean): void {
   clearNotice();
-
   const host = document.createElement("div");
   host.id = HOST_ID;
   const shadowRoot = host.attachShadow({ mode: "open" });
@@ -101,16 +122,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
-
     *, *::before, *::after {
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
     .notice {
       display: flex;
       align-items: flex-end;
     }
-
     .side-tab {
       appearance: none;
       background: #ffffff;
@@ -131,53 +149,45 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       flex-shrink: 0;
       transition: min-height 0.25s ease, padding 0.25s ease;
     }
-
     .side-tab:hover {
       background: #f7faf8;
     }
-
     .notice.collapsed .side-tab.side-tab-remember .side-tab-text {
       background: #111111;
       color: #ff9900;
       padding: 4px 2px;
       border-radius: 4px;
     }
-
     .notice.collapsed .side-tab.side-tab-klarna .side-tab-text {
       background: #ffa8cd;
       color: #0b051d;
       padding: 4px 2px;
       border-radius: 4px;
     }
-
     .notice.collapsed .side-tab.side-tab-trumf .side-tab-text {
       background: #07006b;
       color: #ffffff;
       padding: 4px 2px;
       border-radius: 4px;
     }
-
     .notice.collapsed .side-tab.side-tab-sas .side-tab-text {
       background: #00005c;
       color: #ffffff;
       padding: 4px 2px;
       border-radius: 4px;
     }
-
     .notice.collapsed .side-tab.side-tab-curve .side-tab-text {
       background: #000000;
       color: #ffffff;
       padding: 4px 2px;
       border-radius: 4px;
     }
-
     .side-tab-arrow {
       font-size: 16px;
       font-weight: 700;
       line-height: 1;
       display: block;
     }
-
     .side-tab-text {
       display: none;
       writing-mode: vertical-rl;
@@ -190,20 +200,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       letter-spacing: 0.02em;
       margin-top: 6px;
     }
-
     .notice.collapsed .side-tab {
       min-height: 80px;
       padding: 10px 5px;
     }
-
     .notice.collapsed .side-tab-arrow {
       display: none;
     }
-
     .notice.collapsed .side-tab-text {
       display: block;
     }
-
     .panel {
       width: min(400px, calc(100vw - 42px));
       color: #172026;
@@ -215,7 +221,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       margin-left: 4px;
       transition: width 0.25s ease, opacity 0.25s ease, margin-left 0.25s ease, border-width 0.25s ease;
     }
-
     .notice.collapsed .panel {
       width: 0;
       opacity: 0;
@@ -223,23 +228,19 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       border-width: 0;
       pointer-events: none;
     }
-
     .notice.no-transition .panel,
     .notice.no-transition .side-tab {
       transition: none;
     }
-
     .topline {
       height: 4px;
       background: linear-gradient(90deg, #1f8f5f, #f4b942);
     }
-
     .body {
       display: grid;
       gap: 10px;
       padding: 14px 14px 0 14px;
     }
-
     .header {
       align-items: center;
       display: grid;
@@ -247,7 +248,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       grid-template-columns: 24px minmax(0, 1fr) auto;
       min-height: 32px;
     }
-
     .sum-input {
       background: #f7faf8;
       border: 1px solid #d8e3de;
@@ -261,16 +261,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       text-align: right;
       width: 68px;
     }
-
     .sum-input:focus {
       border-color: #1f8f5f;
     }
-
     .sum-input::placeholder {
       color: #8a9a92;
       font-size: 11px;
     }
-
     .site-icon {
       background: #f7faf8;
       border: 1px solid #d8e3de;
@@ -280,7 +277,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       padding: 3px;
       width: 24px;
     }
-
     .title {
       font-size: 14px;
       font-weight: 700;
@@ -288,12 +284,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       margin: 0;
       overflow-wrap: anywhere;
     }
-
     .offer-list {
       display: grid;
       gap: 6px;
     }
-
     .offer-link {
       align-items: center;
       background: #f7faf8;
@@ -307,7 +301,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       padding: 7px 9px;
       text-decoration: none;
     }
-
     .offer-label {
       align-items: center;
       display: flex;
@@ -318,7 +311,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       line-height: 1.2;
       overflow-wrap: anywhere;
     }
-
     .provider-badge {
       align-items: center;
       border-radius: 5px;
@@ -330,72 +322,58 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       padding: 0 7px;
       white-space: nowrap;
     }
-
     .provider-remember {
       background: #111111;
       color: #ff9900;
     }
-
     .provider-klarna {
       background: #ffa8cd;
       color: #0b051d;
     }
-
     .provider-trumf {
       background: #07006b;
       color: #ffffff;
     }
-
     .provider-sas {
       background: #00005c;
       color: #ffffff;
     }
-
     .provider-tfbank {
       background: #e30613;
       color: #ffffff;
     }
-
     .provider-dnb {
       background: #14555a;
       color: #ffffff;
     }
-
     .provider-curve {
       background: #000000;
       color: #ffffff;
     }
-
     .provider-rabattkode {
       background: #e74c3c;
       color: #ffffff;
     }
-
     .provider-norskfamilie {
       background: #ff6600;
       color: #ffffff;
     }
-
     .provider-revolut {
       background: #0666eb;
       color: #ffffff;
     }
-
     .provider-norwegian {
       background: #d81939;
       color: #ffffff;
     }
-
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;
     }
-
     .provider-lunar {
       background: #2bb24c;
       color: #ffffff;
     }
-
     .copy-code-btn {
       align-items: center;
       color: #1f8f5f;
@@ -405,11 +383,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       border-radius: 4px;
       position: relative;
     }
-
     .copy-code-btn:hover {
       color: #166b47;
     }
-
     .copy-code-tooltip {
       background: #1a1a2e;
       border-radius: 6px;
@@ -424,22 +400,18 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       z-index: 2147483647;
       display: none;
     }
-
     .copy-code-tooltip.visible {
       display: block;
     }
-
     .bonus-chips {
       display: flex;
       gap: 12px;
     }
-
     .chip-group {
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
-
     .chip-group-label {
       color: #8a9a92;
       font-size: 9px;
@@ -447,19 +419,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       letter-spacing: 0.03em;
       text-transform: uppercase;
     }
-
     .chip-group-items {
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
     }
-
     .bonus-chips-section {
       border-top: 1px solid #edf2ef;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
-
     .bonus-chips-toggle {
       align-items: center;
       appearance: none;
@@ -475,31 +444,25 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       margin-bottom: 5px;
       padding: 0;
     }
-
     .bonus-chips-toggle:hover {
       color: #4f5f66;
     }
-
     .bonus-chips-toggle-arrow {
       display: inline-block;
       font-size: 10px;
       transition: transform 0.15s;
     }
-
     .bonus-chips-section.collapsed .bonus-chips {
       display: none;
     }
-
     .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
       transform: rotate(-90deg);
     }
-
     .codes-section {
       border-top: 1px solid #edf2ef;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
-
     .codes-toggle {
       align-items: center;
       appearance: none;
@@ -515,31 +478,25 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       margin-bottom: 5px;
       padding: 0;
     }
-
     .codes-toggle:hover {
       color: #4f5f66;
     }
-
     .codes-toggle-arrow {
       display: inline-block;
       font-size: 10px;
       transition: transform 0.15s;
     }
-
     .codes-section.collapsed .codes-list {
       display: none;
     }
-
     .codes-section.collapsed .codes-toggle-arrow {
       transform: rotate(-90deg);
     }
-
     .codes-list {
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
-
     .code-item {
       align-items: center;
       background: #f7faf8;
@@ -550,12 +507,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       gap: 6px;
       padding: 5px 8px;
     }
-
     .code-reward {
       font-weight: 700;
       white-space: nowrap;
     }
-
     .code-value {
       color: #5d6b71;
       flex: 1;
@@ -565,7 +520,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-
     .bonus-chip {
       align-items: center;
       background: #f0f4f2;
@@ -581,21 +535,17 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       text-decoration: none;
       white-space: nowrap;
     }
-
     .bonus-chip:hover {
       background: #e4ebe7;
     }
-
     .bonus-chip-label {
       font-weight: 800;
     }
-
     .bonus-chip .provider-badge {
       font-size: 9px;
       min-height: 16px;
       padding: 0 5px;
     }
-
     .bonus-chip-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
@@ -612,15 +562,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       z-index: 2147483647;
       display: none;
     }
-
     .bonus-chip-tooltip.visible {
       display: block;
     }
-
     .offer-link-wrapper {
       position: relative;
     }
-
     .offer-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
@@ -637,139 +584,133 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       width: max-content;
       z-index: 2147483647;
     }
-
     .offer-tooltip.visible {
       display: block;
     }
-
     .support {
       border-top: 1px solid #edf2ef;
       padding: 6px 14px;
     }
-
     .support a {
       color: #8a9a92;
       font-size: 11px;
       line-height: 1.35;
       text-decoration: none;
     }
-
     .support a:hover {
       color: #4f5f66;
       text-decoration: underline;
     }
+    .conflict-warning {
+      color: #d4830a;
+      cursor: help;
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .conflict-tooltip {
+      background: #1a1a2e;
+      border-radius: 8px;
+      color: #e0e0e0;
+      display: none;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      max-width: 280px;
+      padding: 8px 10px;
+      pointer-events: none;
+      position: fixed;
+      white-space: pre-line;
+      width: max-content;
+      z-index: 2147483647;
+    }
+    .conflict-tooltip.visible {
+      display: block;
+    }
   `;
-
   const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
   const curveOffer = offers.find((o) => o.provider === "curve");
   const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
-
   const offer = mainOffers[0];
-
   if (offer === undefined && codeOffers.length === 0) {
     return;
   }
-
   const primaryOffer = offer ?? codeOffers[0];
   if (primaryOffer === undefined) {
     return;
   }
-
   const notice = document.createElement("section");
   notice.className = "notice";
-
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
   sideTab.className = `side-tab side-tab-${offer?.provider ?? "rabattkode"}`;
   sideTab.type = "button";
   sideTab.setAttribute("aria-label", "Collapse cashback offers");
-
   const sideTabArrow = document.createElement("span");
   sideTabArrow.className = "side-tab-arrow";
   sideTabArrow.textContent = "\u2039"; // ‹
-
   const sideTabText = document.createElement("span");
   sideTabText.className = "side-tab-text";
   sideTabText.textContent = formatSideTabText(offer, primaryOffer);
-
   sideTab.append(sideTabArrow, sideTabText);
-
   sideTab.addEventListener("click", () => {
     const isCollapsed = notice.classList.contains("collapsed");
     setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
   });
-
   // Main panel
   const panel = document.createElement("div");
   panel.className = "panel";
-
   const topLine = document.createElement("div");
   topLine.className = "topline";
-
   const body = document.createElement("div");
   body.className = "body";
-
   const header = document.createElement("div");
   header.className = "header";
-
   const siteIcon = createSiteIcon();
-
   const title = document.createElement("p");
   title.className = "title";
   title.textContent = offer !== undefined
     ? `Cashback hos ${offer.merchantName}`
     : `Rabattkode hos ${primaryOffer.merchantName}`;
-
   header.append(siteIcon, title);
-
   const sumInput = document.createElement("input");
   sumInput.className = "sum-input";
   sumInput.type = "text";
   sumInput.inputMode = "decimal";
   sumInput.placeholder = "Kjøpesum";
-
   header.append(sumInput);
-
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
-
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
-
   for (const currentOffer of mainOffers) {
     const wrapper = document.createElement("div");
     wrapper.className = "offer-link-wrapper";
-
     const offerLink = document.createElement("a");
     offerLink.className = "offer-link";
     offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
     offerLink.rel = "noreferrer";
-
     const offerLabel = document.createElement("span");
     offerLabel.className = "offer-label";
-
     const offerReward = document.createElement("span");
     offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
-
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
     providerBadge.textContent = formatProviderName(currentOffer.provider);
-
     offerLabel.append(offerReward, providerBadge);
-
     if (currentOffer.discountCode !== undefined) {
       const code = currentOffer.discountCode;
       const copyBtn = document.createElement("span");
       copyBtn.className = "copy-code-btn";
       copyBtn.innerHTML = COPY_ICON_SVG;
-
       const copyTooltip = document.createElement("div");
       copyTooltip.className = "copy-code-tooltip";
       copyTooltip.textContent = `Kopier rabattkode: ${code}`;
       shadowRoot.append(copyTooltip);
-
       copyBtn.addEventListener("mouseenter", () => {
         const rect = copyBtn.getBoundingClientRect();
         copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
@@ -780,7 +721,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       copyBtn.addEventListener("mouseleave", () => {
         copyTooltip.classList.remove("visible");
       });
-
       copyBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -795,16 +735,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
           }, 1500);
         });
       });
-
       offerLink.append(offerLabel, copyBtn);
     } else {
       offerLink.append(offerLabel);
     }
-
     wrapper.append(offerLink);
     offerList.append(wrapper);
   }
-
   sumInput.addEventListener("input", () => {
     const raw = sumInput.value.replace(/[^0-9.,]/g, "").replace(",", ".");
     const amount = raw.length > 0 ? Number.parseFloat(raw) : 0;
@@ -841,12 +778,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(totalPct)}%)`;
     }
   });
-
   const bonusChipLabels: { element: HTMLSpanElement; pct: number; approx: boolean; defaultText: string }[] = [];
-
   const bonusChips = document.createElement("div");
   bonusChips.className = "bonus-chips";
-
   // --- Free chips group (left) ---
   const freeGroup = document.createElement("div");
   freeGroup.className = "chip-group";
@@ -856,7 +790,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const freeItems = document.createElement("div");
   freeItems.className = "chip-group-items";
   freeGroup.append(freeLabel, freeItems);
-
   function createBonusChip(card: typeof FREE_CARDS[number], overrideUrl?: string): { chip: HTMLAnchorElement; label: HTMLSpanElement } {
     const chip = document.createElement("a");
     chip.className = "bonus-chip";
@@ -874,16 +807,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     chip.append(label, badge);
     return { chip, label };
   }
-
   for (const card of FREE_CARDS) {
     const { chip, label } = createBonusChip(card);
     bonusChipLabels.push({ element: label, pct: card.pct * 100, approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
-
   bonusChips.append(freeGroup);
-
   // --- Premium chips group (right) ---
   const premiumGroup = document.createElement("div");
   premiumGroup.className = "chip-group";
@@ -893,10 +823,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const premiumItems = document.createElement("div");
   premiumItems.className = "chip-group-items";
   premiumGroup.append(premiumLabel, premiumItems);
-
   const currentHostname = window.location.hostname.replace(/^www\./, "").toLowerCase();
   const revolutSub = REVOLUT_SUBSCRIPTIONS[currentHostname];
-
   if (revolutSub !== undefined) {
     const revolutChip = document.createElement("a");
     revolutChip.className = "bonus-chip";
@@ -913,7 +841,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     premiumItems.append(revolutChip);
     addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
   }
-
   for (const card of PREMIUM_CARDS) {
     // For Curve, use the actual offer URL if available
     const overrideUrl = card.label === "Curve" && curveOffer !== undefined ? curveOffer.activationUrl : undefined;
@@ -924,87 +851,68 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     premiumItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
-
   bonusChips.append(premiumGroup);
-
   // Collapsible chips section
   const chipsSection = document.createElement("div");
   chipsSection.className = "bonus-chips-section";
   if (initialChipsCollapsed) {
     chipsSection.classList.add("collapsed");
   }
-
   const chipsToggle = document.createElement("button");
   chipsToggle.className = "bonus-chips-toggle";
   chipsToggle.type = "button";
-
   const chipsToggleArrow = document.createElement("span");
   chipsToggleArrow.className = "bonus-chips-toggle-arrow";
   chipsToggleArrow.textContent = "\u25BC";
-
   const chipsToggleText = document.createElement("span");
   const defaultMainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
   const defaultTotalPct = defaultMainMaxPct + 0.74;
   chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(defaultTotalPct)}%)`;
-
   chipsToggle.append(chipsToggleArrow, chipsToggleText);
   chipsToggle.addEventListener("click", () => {
     const isCollapsed = chipsSection.classList.toggle("collapsed");
     chrome.storage.local.set({ [CHIPS_COLLAPSED_KEY]: isCollapsed });
   });
-
   chipsSection.append(chipsToggle, bonusChips);
-
   // --- Rabattkoder section ---
   const codesSection = document.createElement("div");
   codesSection.className = "codes-section";
   if (initialCodesCollapsed) {
     codesSection.classList.add("collapsed");
   }
-
   if (codeOffers.length > 0) {
     const codesToggle = document.createElement("button");
     codesToggle.className = "codes-toggle";
     codesToggle.type = "button";
-
     const codesToggleArrow = document.createElement("span");
     codesToggleArrow.className = "codes-toggle-arrow";
     codesToggleArrow.textContent = "\u25BC";
-
     const codesToggleText = document.createElement("span");
     codesToggleText.textContent = `Rabattkoder (${codeOffers.length})`;
-
     codesToggle.append(codesToggleArrow, codesToggleText);
     codesToggle.addEventListener("click", () => {
       const isCollapsed = codesSection.classList.toggle("collapsed");
       chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
     });
-
     const codesList = document.createElement("div");
     codesList.className = "codes-list";
-
     for (const codeOffer of codeOffers) {
       const code = codeOffer.discountCode ?? "";
       const item = document.createElement("div");
       item.className = "code-item";
-
       const reward = document.createElement("span");
       reward.className = "code-reward";
       reward.textContent = codeOffer.reward;
-
       const codeSpan = document.createElement("span");
       codeSpan.className = "code-value";
       codeSpan.textContent = code;
-
       const copyBtn = document.createElement("span");
       copyBtn.className = "copy-code-btn";
       copyBtn.innerHTML = COPY_ICON_SVG;
-
       const copyTooltip = document.createElement("div");
       copyTooltip.className = "copy-code-tooltip";
       copyTooltip.textContent = `Kopier rabattkode: ${code}`;
       shadowRoot.append(copyTooltip);
-
       copyBtn.addEventListener("mouseenter", () => {
         const rect = copyBtn.getBoundingClientRect();
         copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
@@ -1015,7 +923,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       copyBtn.addEventListener("mouseleave", () => {
         copyTooltip.classList.remove("visible");
       });
-
       copyBtn.addEventListener("click", () => {
         void navigator.clipboard.writeText(code).then(() => {
           copyBtn.innerHTML = CHECK_ICON_SVG;
@@ -1028,48 +935,40 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
           }, 1500);
         });
       });
-
       item.append(reward, codeSpan, copyBtn);
       codesList.append(item);
     }
-
     codesSection.append(codesToggle, codesList);
   }
-
   body.append(header, offerList, chipsSection);
   if (codeOffers.length > 0) {
     body.append(codesSection);
   }
-
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
-
   if (pick !== undefined) {
     const support = document.createElement("div");
     support.className = "support";
-
     const supportLink = document.createElement("a");
     supportLink.href = pick.url;
     supportLink.target = "_blank";
     supportLink.rel = "noreferrer";
     supportLink.textContent = pick.text;
     support.append(supportLink);
-
     panel.append(topLine, body, support);
   } else {
     panel.append(topLine, body);
   }
   notice.append(sideTab, panel);
-
   // Apply initial collapsed state before inserting into DOM (no transition flash)
   if (initialCollapsed) {
     notice.classList.add("collapsed", "no-transition");
     sideTabArrow.textContent = "\u203A";
     sideTab.setAttribute("aria-label", "Expand cashback offers");
   }
-
   shadowRoot.append(style, notice);
-  document.documentElement.append(host);
-
+  const mountTarget = document.body ?? document.documentElement;
+  mountTarget.append(host);
+  void detectConflicts(shadowRoot, title);
   // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
   const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
   for (let idx = 0; idx < mainOffers.length; idx++) {
@@ -1077,13 +976,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (currentOffer === undefined || !hasRateBreakdown(currentOffer.terms)) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
-
     const tooltip = document.createElement("div");
     tooltip.className = "offer-tooltip";
     tooltip.textContent = currentOffer.terms;
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });
-
     wrapper.addEventListener("mouseenter", () => {
       const panelEl = shadowRoot.querySelector(".panel");
       const panelRect = panelEl?.getBoundingClientRect();
@@ -1101,7 +998,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       tooltip.classList.remove("visible");
     });
   }
-
   // Re-enable transitions after first frame
   if (initialCollapsed) {
     requestAnimationFrame(() => {
@@ -1109,11 +1005,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     });
   }
 }
-
 function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
 }
-
 function createSiteIcon(): HTMLImageElement {
   const siteIcon = document.createElement("img");
   siteIcon.className = "site-icon";
@@ -1124,7 +1018,6 @@ function createSiteIcon(): HTMLImageElement {
   });
   return siteIcon;
 }
-
 function setCollapsed(
   notice: HTMLElement,
   sideTab: HTMLButtonElement,
@@ -1139,7 +1032,6 @@ function setCollapsed(
   );
   chrome.storage.local.set({ [COLLAPSED_STORAGE_KEY]: collapsed });
 }
-
 function isCashbackFoundMessage(value: unknown): value is CashbackFoundMessage {
   return (
     isRecord(value) &&
@@ -1148,23 +1040,35 @@ function isCashbackFoundMessage(value: unknown): value is CashbackFoundMessage {
     value.offers.every(isCashbackOffer)
   );
 }
-
 function isCashbackNoneMessage(value: unknown): value is CashbackNoneMessage {
   return isRecord(value) && value.type === "cashback-none";
 }
-
 function isOffersForUrlResponse(value: unknown): value is OffersForUrlResponse {
   if (!isRecord(value) || typeof value.ok !== "boolean") {
     return false;
   }
-
   if (value.ok) {
     return Array.isArray(value.offers) && value.offers.every(isCashbackOffer);
   }
-
   return typeof value.reason === "string";
 }
-
+function isCashbackIndex(value: unknown): value is CashbackIndex {
+  if (
+    !isRecord(value) ||
+    typeof value.version !== "number" ||
+    typeof value.generatedAt !== "string" ||
+    !Array.isArray(value.offers) ||
+    !isRecord(value.domainIndex)
+  ) {
+    return false;
+  }
+  return (
+    value.offers.every(isCashbackOffer) &&
+    Object.values(value.domainIndex).every((offers) => {
+      return Array.isArray(offers) && offers.every(isCashbackOffer);
+    })
+  );
+}
 function isCashbackOffer(value: unknown): value is CashbackOffer {
   return (
     isRecord(value) &&
@@ -1180,22 +1084,150 @@ function isCashbackOffer(value: unknown): value is CashbackOffer {
     typeof value.updatedAt === "string"
   );
 }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
 function isString(value: unknown): value is string {
   return typeof value === "string";
 }
-
+function findOffersForHostname(
+  cashbackIndex: CashbackIndex,
+  hostname: string,
+): CashbackOffer[] {
+  const normalizedHostname = normalizeHostname(hostname);
+  const lookupDomains = [
+    normalizedHostname,
+    ...getAlternateTldDomains(normalizedHostname),
+    ...CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`),
+  ];
+  const indexMatches = lookupDomains.flatMap((domain) => {
+    return cashbackIndex.domainIndex[domain] ?? [];
+  });
+  const suffixMatches = cashbackIndex.offers.filter((offer) => {
+    return offer.domains.some((domain) => {
+      const normalizedDomain = normalizeDomainInput(domain);
+      return (
+        normalizedDomain !== normalizedHostname &&
+        normalizedHostname.endsWith(`.${normalizedDomain}`)
+      );
+    });
+  });
+  return sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
+}
+function normalizeHostname(hostname: string): string {
+  const lowerCaseHostname = hostname.trim().toLowerCase();
+  const withoutTrailingDot = lowerCaseHostname.endsWith(".")
+    ? lowerCaseHostname.slice(0, -1)
+    : lowerCaseHostname;
+  return withoutTrailingDot.startsWith("www.")
+    ? withoutTrailingDot.slice(4)
+    : withoutTrailingDot;
+}
+function normalizeDomainInput(input: string): string {
+  const trimmedInput = input.trim();
+  const urlLikeInput = trimmedInput.includes("://")
+    ? trimmedInput
+    : `https://${trimmedInput}`;
+  const parsedUrl = parseUrl(urlLikeInput);
+  if (parsedUrl !== undefined) {
+    return normalizeHostname(parsedUrl.hostname);
+  }
+  const firstSlashIndex = trimmedInput.indexOf("/");
+  const hostPart =
+    firstSlashIndex === -1 ? trimmedInput : trimmedInput.slice(0, firstSlashIndex);
+  return normalizeHostname(hostPart);
+}
+const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
+const CC_SUBDOMAINS = ["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"];
+function getAlternateTldDomains(domain: string): string[] {
+  const parts = domain.split(".");
+  if (parts.length !== 2) return [];
+  const tld = `.${parts[1]}`;
+  if (!COMMON_TLDS.includes(tld)) return [];
+  const baseName = parts[0];
+  return COMMON_TLDS
+    .filter((commonTld) => commonTld !== tld)
+    .map((commonTld) => `${baseName}${commonTld}`);
+}
+function parseUrl(input: string): URL | undefined {
+  try {
+    return new URL(input);
+  } catch {
+    return undefined;
+  }
+}
+function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
+  const byKey = new Map<string, CashbackOffer>();
+  for (const offer of offers) {
+    const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
+    const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
+    const existing = byKey.get(key);
+    if (existing === undefined || offer.domains.length >= existing.domains.length) {
+      byKey.set(key, offer);
+    }
+  }
+  return [...byKey.values()];
+}
+function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
+  return [...offers].sort((firstOffer, secondOffer) => {
+    const firstReward = parseRewardValue(firstOffer.reward);
+    const secondReward = parseRewardValue(secondOffer.reward);
+    const rewardKindSort =
+      rewardKindRank(secondReward.kind) - rewardKindRank(firstReward.kind);
+    if (rewardKindSort !== 0) return rewardKindSort;
+    const rewardAmountSort = secondReward.amount - firstReward.amount;
+    if (rewardAmountSort !== 0) return rewardAmountSort;
+    const merchantSort = firstOffer.merchantName.localeCompare(secondOffer.merchantName);
+    if (merchantSort !== 0) return merchantSort;
+    return firstOffer.provider.localeCompare(secondOffer.provider);
+  });
+}
+type RewardValue = {
+  kind: "percentage" | "fixed" | "points" | "unknown";
+  amount: number;
+};
+function parseRewardValue(reward: string): RewardValue {
+  const percentageMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+  if (percentageMatch !== null) {
+    return {
+      kind: "percentage",
+      amount: parseLocalizedNumber(percentageMatch[1] ?? "0"),
+    };
+  }
+  const fixedMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+  if (fixedMatch !== null) {
+    return {
+      kind: "fixed",
+      amount: parseLocalizedNumber(fixedMatch[1] ?? "0"),
+    };
+  }
+  const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
+  if (pointsMatch !== null) {
+    return {
+      kind: "points",
+      amount: parseLocalizedNumber((pointsMatch[1] ?? "0").replace(/\s/g, "")),
+    };
+  }
+  return {
+    kind: "unknown",
+    amount: 0,
+  };
+}
+function parseLocalizedNumber(value: string): number {
+  const parsedValue = Number.parseFloat(value.replace(",", "."));
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+function rewardKindRank(kind: RewardValue["kind"]): number {
+  if (kind === "percentage") return 4;
+  if (kind === "fixed") return 3;
+  if (kind === "points") return 2;
+  return 1;
+}
 function formatProviderName(provider: CashbackOffer["provider"]): string {
   return PROVIDER_NAMES[provider] ?? provider;
 }
-
 function calculateCashback(offer: CashbackOffer, amount: number): string {
   const reward = offer.reward.trim();
-
   // Percentage range: "2-3,5 %"
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
@@ -1206,7 +1238,6 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
     const label = minKr === maxKr ? `${formatKr(minKr)} kr` : `${formatKr(minKr)}-${formatKr(maxKr)} kr`;
     return addEbSuffix(label, minPct, maxPct, amount, offer.provider);
   }
-
   // Single percentage: "6,2 %"
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
@@ -1214,7 +1245,6 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
     const kr = amount * pct / 100;
     return addEbSuffix(`${formatKr(kr)} kr`, pct, pct, amount, offer.provider);
   }
-
   // SAS rate: "15 poeng per 100 kr"
   const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sasRateMatch !== null) {
@@ -1223,7 +1253,6 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
     const kr = amount * points / 100 / EB_PER_TRUMF_KR;
     return `~${formatKr(kr)} kr (~${eb} EB)`;
   }
-
   // SAS fixed: "500 poeng"
   const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (sasFixedMatch !== null) {
@@ -1231,7 +1260,6 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
     const kr = points / EB_PER_TRUMF_KR;
     return `~${formatKr(kr)} kr (~${points} EB)`;
   }
-
   // Klarna "5.5%"
   const klarnaMatch = reward.match(/^([\d.]+)%$/);
   if (klarnaMatch !== null) {
@@ -1239,10 +1267,8 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
     const kr = amount * pct / 100;
     return `${formatKr(kr)} kr`;
   }
-
   return "";
 }
-
 function addEbSuffix(label: string, minPct: number, maxPct: number, amount: number, provider: string): string {
   if (provider === "trumf") {
     const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
@@ -1252,7 +1278,6 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
   }
   return label;
 }
-
 function getMaxRewardPercent(offer: CashbackOffer): number {
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
@@ -1270,7 +1295,6 @@ function getMaxRewardPercent(offer: CashbackOffer): number {
   }
   return 0;
 }
-
 function calculateCashbackMaxKr(offer: CashbackOffer, amount: number): number {
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
@@ -1293,7 +1317,6 @@ function calculateCashbackMaxKr(offer: CashbackOffer, amount: number): number {
   }
   return 0;
 }
-
 function formatBreakdownWithAmounts(terms: string, amount: number): string {
   return terms
     .split("\n")
@@ -1308,31 +1331,24 @@ function formatBreakdownWithAmounts(terms: string, amount: number): string {
     })
     .join("\n");
 }
-
 function findSiteIconUrl(): string {
   const iconSelectors = [
     'link[rel~="icon"][href]',
     'link[rel="shortcut icon"][href]',
     'link[rel="apple-touch-icon"][href]',
   ];
-
   for (const selector of iconSelectors) {
     const iconElement = document.querySelector(selector);
-
     if (!(iconElement instanceof HTMLLinkElement)) {
       continue;
     }
-
     const parsedUrl = parseUrlWithBase(iconElement.href, window.location.href);
-
     if (parsedUrl !== undefined) {
       return parsedUrl.toString();
     }
   }
-
   return new URL("/favicon.ico", window.location.origin).toString();
 }
-
 function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
   try {
     return new URL(href, baseUrl);
@@ -1340,44 +1356,105 @@ function parseUrlWithBase(href: string, baseUrl: string): URL | undefined {
     return undefined;
   }
 }
-
 function formatKr(value: number): string {
   if (Number.isInteger(value)) {
     return value.toString();
   }
   return value.toFixed(2).replace(".", ",");
 }
-
+const WARNING_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 const COPY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-
 const CHECK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-
 function hasRateBreakdown(terms: string): boolean {
   return terms.includes("\n") && /\d+.*%/.test(terms);
 }
+async function detectAdblock(): Promise<boolean> {
+  const [urlBlocked, domBlocked] = await Promise.all([
+    detectAdblockByUrl(),
+    detectAdblockByDom(),
+  ]);
+  return urlBlocked || domBlocked;
+}
 
+async function detectAdblockByUrl(): Promise<boolean> {
+  if (document.querySelector('meta[http-equiv="Content-Security-Policy"]') !== null) {
+    return false;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    await fetch("https://widgets.outbrain.com/outbrain.js", { mode: "no-cors", signal: controller.signal });
+    clearTimeout(timeoutId);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+async function detectAdblockByDom(): Promise<boolean> {
+  try {
+    const container = document.createElement("div");
+    container.style.cssText = "position:absolute;left:-9999px;top:-9999px;";
+    for (const id of ["AdHeader", "AdContainer", "AD_Top", "homead", "ad-lead"]) {
+      const el = document.createElement("div");
+      el.id = id;
+      el.style.cssText = "display:block;width:1px;height:1px;";
+      container.appendChild(el);
+    }
+    (document.body ?? document.documentElement).appendChild(container);
+    await new Promise<void>((r) => setTimeout(r, 100));
+    let blockedCount = 0;
+    for (const id of ["AdHeader", "AdContainer", "AD_Top", "homead", "ad-lead"]) {
+      const el = container.querySelector(`#${id}`) as HTMLElement | null;
+      if (!el || el.offsetHeight === 0) blockedCount++;
+    }
+    container.remove();
+    return blockedCount >= 1;
+  } catch {
+    return false;
+  }
+}
+async function detectConflicts(shadowRoot: ShadowRoot, titleEl: HTMLElement): Promise<void> {
+  if (!await detectAdblock()) return;
+  const warningIcon = document.createElement("span");
+  warningIcon.className = "conflict-warning";
+  warningIcon.innerHTML = WARNING_ICON_SVG;
+  const conflictTooltip = document.createElement("div");
+  conflictTooltip.className = "conflict-tooltip";
+  conflictTooltip.textContent = "Adblock er aktivert – kan blokkere cashback-sporing";
+  shadowRoot.append(conflictTooltip);
+  warningIcon.addEventListener("mouseenter", () => {
+    conflictTooltip.style.left = "-9999px";
+    conflictTooltip.style.top = "-9999px";
+    conflictTooltip.classList.add("visible");
+    const tooltipHeight = conflictTooltip.offsetHeight;
+    const rect = warningIcon.getBoundingClientRect();
+    conflictTooltip.style.left = `${rect.left + rect.width / 2}px`;
+    conflictTooltip.style.top = `${rect.top - tooltipHeight - 6}px`;
+    conflictTooltip.style.transform = "translateX(-50%)";
+  });
+  warningIcon.addEventListener("mouseleave", () => {
+    conflictTooltip.classList.remove("visible");
+  });
+  titleEl.appendChild(warningIcon);
+}
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
-
   if (trimmedReward.length === 0) {
     return "Cashback";
   }
-
   // For SAS, convert to percentage-first display
   if (provider === "sas") {
     const converted = convertSasToPercent(trimmedReward);
     return converted !== "" ? converted : trimmedReward;
   }
-
   // For Trumf, show original reward + EB conversion
   if (provider === "trumf") {
     const converted = convertTrumfToEb(trimmedReward);
     return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
   }
-
   return trimmedReward;
 }
-
 function formatSideTabText(
   cashbackOffer: CashbackOffer | undefined,
   primaryOffer: CashbackOffer,
@@ -1385,35 +1462,26 @@ function formatSideTabText(
   if (cashbackOffer !== undefined) {
     return formatRewardLabel(cashbackOffer.reward, cashbackOffer.provider);
   }
-
   return formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
 }
-
 function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
   const percentMatch = label.match(/(?:opptil\s*)?\d+(?:[,.]\d+)?\s*%/i);
-
   if (percentMatch !== null) {
     return percentMatch[0].replace(/\s+/g, " ");
   }
-
   const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
-
   if (krMatch !== null) {
     return krMatch[0].replace(/\s+/g, " ");
   }
-
   if (/gratis\s+frakt/i.test(label)) {
     return "Gratis frakt";
   }
-
   if (/gratis/i.test(label)) {
     return "Gratis";
   }
-
   return label.length <= 14 ? label : undefined;
 }
-
 function convertSasToPercent(reward: string): string {
   const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (fixedMatch !== null) {
@@ -1429,7 +1497,6 @@ function convertSasToPercent(reward: string): string {
   }
   return "";
 }
-
 function convertTrumfToEb(reward: string): string {
   // "1,1-1,5 %" → ~15-20 EB/100kr
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
@@ -1456,17 +1523,14 @@ function convertTrumfToEb(reward: string): string {
   }
   return "";
 }
-
 function formatNo(n: number): string {
   return n % 1 === 0 ? n.toString() : n.toFixed(1).replace(".", ",");
 }
-
 function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot): void {
   const tooltip = document.createElement("div");
   tooltip.className = "bonus-chip-tooltip";
   tooltip.textContent = text;
   shadowRoot.append(tooltip);
-
   chip.addEventListener("mouseenter", () => {
     const panelEl = shadowRoot.querySelector(".panel");
     const panelRect = panelEl?.getBoundingClientRect();

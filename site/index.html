@@ -196,6 +196,19 @@ a.merchant-name:hover { text-decoration: underline; }
   text-decoration: none;
 }
 .tip-line a:hover { text-decoration: underline; }
+.adblock-warning {
+  align-items: center;
+  background: #fff8e1;
+  border: 1px solid #f4b942;
+  border-radius: 8px;
+  color: #7a5200;
+  display: none;
+  font-size: 13px;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+}
+.adblock-warning.visible { display: flex; }
 .bonus-section {
   margin-bottom: 8px;
 }
@@ -403,6 +416,7 @@ a.merchant-name:hover { text-decoration: underline; }
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
   <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
+  <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="search-wrap">
     <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
     <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
@@ -835,6 +849,51 @@ function setupBonusToggle() {
 }
 
 init();
+
+async function checkAdblock() {
+  const [urlBlocked, domBlocked] = await Promise.all([
+    checkAdblockByUrl(),
+    checkAdblockByDom(),
+  ]);
+  if (urlBlocked || domBlocked) {
+    document.querySelector(".adblock-warning").classList.add("visible");
+  }
+}
+
+async function checkAdblockByUrl() {
+  if (document.querySelector('meta[http-equiv="Content-Security-Policy"]') !== null) return false;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    await fetch("https://widgets.outbrain.com/outbrain.js", { mode: "no-cors", signal: controller.signal });
+    clearTimeout(timeoutId);
+    return false;
+  } catch { return true; }
+}
+
+async function checkAdblockByDom() {
+  try {
+    const container = document.createElement("div");
+    container.style.cssText = "position:absolute;left:-9999px;top:-9999px;";
+    for (const id of ["AdHeader", "AdContainer", "AD_Top", "homead", "ad-lead"]) {
+      const el = document.createElement("div");
+      el.id = id;
+      el.style.cssText = "display:block;width:1px;height:1px;";
+      container.appendChild(el);
+    }
+    document.body.appendChild(container);
+    await new Promise(r => setTimeout(r, 100));
+    let blockedCount = 0;
+    for (const id of ["AdHeader", "AdContainer", "AD_Top", "homead", "ad-lead"]) {
+      const el = container.querySelector("#" + id);
+      if (!el || el.offsetHeight === 0) blockedCount++;
+    }
+    container.remove();
+    return blockedCount >= 1;
+  } catch { return false; }
+}
+
+checkAdblock();
 </script>
 </body>
 </html>
