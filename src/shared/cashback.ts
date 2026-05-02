@@ -170,9 +170,7 @@ export function findOffersForHostname(
       bestByProvider.set(offer.provider, offer);
     }
   }
-  return [...bestByProvider.values()].sort(
-    (a, b) => parseRewardValue(b.reward).amount - parseRewardValue(a.reward).amount,
-  );
+  return sortOffersByReward([...bestByProvider.values()]);
 }
 
 const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
