@@ -4,7 +4,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   trumf: "Trumf",
   klarna: "Klarna",
   remember: "re:member",
-  sas: "SAS EB",
+  sas: "SAS",
   tfbank: "TF Bank",
   dnb: "DNB",
   curve: "Curve Pro",

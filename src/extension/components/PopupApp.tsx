@@ -377,7 +377,7 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   }
 
   if (provider === "sas") {
-    return "SAS EB";
+    return "SAS";
   }
 
   if (provider === "tfbank") {
