@@ -8,7 +8,7 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
 2. Trykk **aA** i adressefeltet i Safari → **Manage Extensions** → skru på **Userscripts**
 3. Trykk **aA** → **Userscripts** → velg **Tillat alltid på alle nettsider**
 4. **[Klikk her for å åpne scriptet i Safari](https://zotune.github.io/cashback-norge/cashback-varsler.user.js)**
-5. Trykk **aA** → **Userscripts** → **Tap to Install** → huk av → **Done**
+5. Trykk **aA** → **Userscripts** → **Tap to Install** → **Install** → "Userscript installed"
 
 Scriptet oppdaterer seg selv automatisk.
 
