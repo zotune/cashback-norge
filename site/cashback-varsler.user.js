@@ -520,6 +520,7 @@
     }
     .bonus-chips {
       display: flex;
+      flex-direction: column;
       gap: 12px;
     }
     .chip-group {
