@@ -1514,7 +1514,8 @@ function formatSideTabText(
   primaryOffer: CashbackOffer,
 ): string {
   if (cashbackOffer !== undefined) {
-    return formatRewardLabel(cashbackOffer.reward, cashbackOffer.provider);
+    const reward = formatCompactRewardLabel(cashbackOffer) ?? formatRewardLabel(cashbackOffer.reward, cashbackOffer.provider);
+    return `${reward} ${formatProviderName(cashbackOffer.provider)}`;
   }
   return formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
 }
