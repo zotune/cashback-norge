@@ -1166,6 +1166,9 @@
     "strawberry": [
       "strawberry.com"
     ],
+    "citybox-hotels": [
+      "cityboxhotels.com"
+    ],
     "forerutvikling": [
       "forerutvikling.no"
     ],
@@ -1174,6 +1177,27 @@
     ],
     "hx-hurtigruten-expeditions": [
       "hurtigruten.com"
+    ],
+    "riis-bilglass": [
+      "booking.bilglass.no"
+    ],
+    "hurtiglading-circle-k": [
+      "circlek.no"
+    ],
+    "drivstoff": [
+      "circlek.no"
+    ],
+    "maskinvask": [
+      "circlek.no"
+    ],
+    "markabutikken": [
+      "markabutikken.no"
+    ],
+    "garmin-mc": [
+      "garmin.com"
+    ],
+    "Garmin": [
+      "garmin.com"
     ]
   }
 }

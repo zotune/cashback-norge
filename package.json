@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "crawlee": "^3.16.0",
-    "playwright": "^1.59.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

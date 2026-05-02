@@ -1,15 +1,20 @@
-import { chromium } from "playwright";
+import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
+  isRecord,
   normalizeDomainInput,
+  parseUrl,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
 const LIST_URL = "https://www.naf.no/medlemskap/medlemsfordeler";
+const BENEFITS_PAGE_SIZE = 200;
+const DETAIL_CONCURRENCY = 3;
 
 // Slug → correct brand name, for cards where NAF uses a generic category title
 const SLUG_NAME_OVERRIDES: Record<string, string> = {
@@ -54,21 +59,28 @@ const SKIP_HOSTNAMES = new Set([
   "google.com", "youtube.com", "facebook.com", "instagram.com",
   "twitter.com", "x.com", "linkedin.com", "apps.apple.com",
   "play.google.com", "clarity.microsoft.com", "cloudinary.com",
-  "varify.io",
+  "safelinks.protection.outlook.com", "varify.io",
 ]);
 
 const EXCLUDED_NAMES = new Set([
   "naf veihjelp", "naf forsikring", "naf billån", "naf billan",
   "naf grønt billån", "naf lease", "naf re-lease", "naf mc-lån",
   "naf caravanlån", "naf sykkel", "naf xtra", "naf veibok",
-  "naf øvingsbane", "naf-kontroll", "naf magasinet", "motor magasin",
+  "naf øvingsbane", "naf-kontroll", "naf magasinet", "naf mekling",
+  "naf senter", "magasinet motor", "motor magasin",
   "juridisk rådgivning", "juridisk og bilteknisk", "internasjonalt førerkort",
   "kjøpekontrakt", "nøkkelforsikring", "egenandelsforsikring", "veihjelp",
+  "advokathjelp", "bilverksted og tester", "personskadeerstatning",
+  "reisebøker fra naf", "ta med veiboka på reisen",
 ]);
 
 function isInternal(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^www\./, "");
-  return INTERNAL_DOMAINS.has(h) || h.endsWith(".naf.no") || SKIP_HOSTNAMES.has(h);
+  return (
+    INTERNAL_DOMAINS.has(h) ||
+    h.endsWith(".naf.no") ||
+    [...SKIP_HOSTNAMES].some((skipped) => h === skipped || h.endsWith(`.${skipped}`))
+  );
 }
 
 function isExcluded(name: string): boolean {
@@ -90,159 +102,34 @@ export type CrawlNafInput = {
   logger: Logger;
 };
 
+type BenefitEntry = {
+  lookupNames: string[];
+  name: string;
+  reward: string;
+  slug: string;
+  storeUrl?: string;
+};
+
+type NafApiConfig = {
+  apimBaseUrl: string;
+  apimContentHub: string;
+  apimNafNoApi: string;
+};
+
+type NafBenefitsResponse = {
+  items: unknown[];
+  total: number;
+};
+
 export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  input.logger.info("NAF: loading API config...");
+  const apiConfig = await fetchApiConfig(input.startUrl);
+  input.logger.info("NAF: fetching benefits API...");
 
-  type BenefitEntry = {
-    name: string;
-    slug: string;
-    reward: string;
-    storeUrl?: string;
-  };
+  const benefits = await fetchBenefits(apiConfig);
+  input.logger.info(`NAF: found ${benefits.length} benefits in API`);
 
-  const benefits: BenefitEntry[] = [];
-
-  try {
-    input.logger.info("NAF: loading benefits page...");
-    await page.goto(`${input.startUrl}?tabView=rabatter&query=`, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
-    });
-    await page.waitForTimeout(3000);
-
-    // Click "Rabatter" tab if needed
-    try {
-      const tab = page.locator('button:has-text("Rabatter"), [role="tab"]:has-text("Rabatter")').first();
-      if (await tab.isVisible({ timeout: 3000 })) {
-        await tab.click();
-        await page.waitForTimeout(2000);
-      }
-    } catch { /* already on tab */ }
-
-    // Click "Vis flere" until gone
-    let moreClicks = 0;
-    while (moreClicks < 20) {
-      const btn = page.locator('button:has-text("Vis flere"), button:has-text("Last inn flere"), button:has-text("Se flere")').first();
-      if (!await btn.isVisible({ timeout: 2000 }).catch(() => false)) break;
-      await btn.click();
-      await page.waitForTimeout(1000);
-      moreClicks++;
-    }
-    input.logger.info(`NAF: clicked "vis flere" ${moreClicks} times`);
-
-    // Extract benefit cards
-    const extracted = await page.evaluate((excludedNamesArr: string[]) => {
-      const results: BenefitEntry[] = [];
-      const seen = new Set<string>();
-
-      type BenefitEntry = { name: string; slug: string; reward: string; storeUrl?: string };
-
-      document.querySelectorAll('a[href*="/medlemskap/medlemsfordeler/"]').forEach((link) => {
-        const href = link.getAttribute("href") ?? "";
-        const slugMatch = href.match(/\/medlemskap\/medlemsfordeler\/([^/?#]+)/);
-        if (!slugMatch) return;
-        const slug = decodeURIComponent(slugMatch[1]!);
-        if (!slug || seen.has(slug)) return;
-        seen.add(slug);
-
-        const name =
-          link.querySelector("h2,h3,h4,h5")?.textContent?.trim() ||
-          (link as HTMLElement).innerText?.split("\n")[0]?.trim() ||
-          "";
-        if (!name) return;
-        if (excludedNamesArr.some((e) => name.toLowerCase().includes(e))) return;
-
-        const allText = (link as HTMLElement).innerText || link.textContent || "";
-        const discountMatch = allText.match(/(\d{1,3}(?:[,.]\d+)?\s*%|\d+\s*kr\s+(?:i\s+)?rabatt)/i);
-        const reward = discountMatch ? (discountMatch[1] ?? "").trim() : "";
-
-        results.push({ name, slug, reward });
-      });
-
-      return results;
-    }, [...EXCLUDED_NAMES]);
-
-    benefits.push(...extracted.filter((b) => !isExcluded(b.name)));
-    input.logger.info(`NAF: found ${benefits.length} benefits on list page`);
-
-    // Visit detail pages in parallel (concurrency = 5)
-    const CONCURRENCY = 5;
-    let completed = 0;
-    const internalDomainsArr = [...INTERNAL_DOMAINS];
-
-    async function scrapeDetail(b: typeof benefits[number]): Promise<void> {
-      const detailPage = await browser.newPage();
-      try {
-        await detailPage.goto(`${LIST_URL}/${b.slug}`, {
-          waitUntil: "domcontentloaded",
-          timeout: 15000,
-        });
-        await detailPage.waitForSelector('[class*="BenefitBulletsCard"]', { timeout: 5000 }).catch(() => {});
-
-        const detail = await detailPage.evaluate((internalDomains: string[]) => {
-          let storeUrl: string | undefined;
-          const CTA_TEXTS = ["gå til", "bestill", "kjøp", "handle", "book", "se tilbud", "les mer", "se betingelser"];
-
-          for (const link of document.querySelectorAll<HTMLAnchorElement>('a[href^="http"]')) {
-            const href = link.href;
-            let hostname: string;
-            try { hostname = new URL(href).hostname; } catch { continue; }
-            const h = hostname.replace(/^www\./, "");
-            if (internalDomains.some((d) => h === d || h.endsWith(`.${d}`))) continue;
-            if (["google.com","youtube.com","facebook.com","instagram.com","twitter.com","x.com","linkedin.com"].some((s) => hostname.includes(s))) continue;
-            const text = link.innerText?.trim().toLowerCase() ?? "";
-            if (CTA_TEXTS.some((c) => text.includes(c)) || link.closest('[class*="cta"],[class*="button"],[class*="action"]')) {
-              storeUrl = href;
-              break;
-            }
-            if (!storeUrl) storeUrl = href;
-          }
-
-          const bulletCard = document.querySelector('[class*="BenefitBulletsCard"]');
-          const searchText = bulletCard
-            ? ((bulletCard as HTMLElement).innerText ?? "")
-            : (document.querySelector("main")?.innerText ?? "");
-
-          const pctMatches = searchText ? [...searchText.matchAll(/(\d{1,2}(?:[,.]\d+)?)\s*%/g)] : [];
-          let reward = "";
-          if (pctMatches.length > 0) {
-            const vals = pctMatches
-              .map(m => parseFloat((m[1] ?? "0").replace(",", ".")))
-              .filter(v => v >= 1 && v <= 99);
-            if (vals.length > 0) {
-              const min = Math.min(...vals);
-              const max = Math.max(...vals);
-              const fmt = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
-              reward = min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
-            }
-          }
-          if (!reward) {
-            const kr = searchText.match(/(\d+)\s*kr\s*(?:i\s*)?rabatt/i);
-            if (kr) reward = (kr[1] ?? "") + " kr rabatt";
-          }
-
-          return { storeUrl, reward };
-        }, internalDomainsArr);
-
-        if (detail.storeUrl) b.storeUrl = detail.storeUrl;
-        if (detail.reward) b.reward = detail.reward;
-      } catch {
-        // detail page failed — keep what we have
-      } finally {
-        await detailPage.close();
-        completed++;
-        process.stdout.write(`\r  NAF detail ${completed}/${benefits.length}: ${b.name.slice(0, 40)}  `);
-      }
-    }
-
-    // Run with limited concurrency
-    for (let i = 0; i < benefits.length; i += CONCURRENCY) {
-      await Promise.all(benefits.slice(i, i + CONCURRENCY).map(scrapeDetail));
-    }
-  } finally {
-    await browser.close();
-  }
+  await enrichBenefitDetails(benefits, apiConfig, input.logger);
 
   input.logger.info(`NAF: extracted ${benefits.length} benefits, building offers...`);
 
@@ -254,25 +141,25 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
   for (const b of benefits) {
     let domains: string[] = [];
 
-    // 1. Domain from scraped storeUrl
-    if (b.storeUrl) {
+    const overrideDomains = input.overrides.naf?.[b.slug] ?? [];
+    const firstOverride = overrideDomains[0];
+    if (firstOverride) { domains = [normalizeDomainInput(firstOverride)]; overrideCount++; }
+
+    if (domains.length === 0 && b.storeUrl) {
       try {
         const hostname = normalizeDomainInput(new URL(b.storeUrl).hostname);
-        if (hostname) { domains = [hostname]; fromUrl++; }
+        if (hostname && !isInternal(hostname)) { domains = [hostname]; fromUrl++; }
       } catch { /* skip */ }
     }
 
-    // 2. Domain lookup by merchant name
     if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, b.name);
-      if (domains.length > 0) lookedUp++;
-    }
-
-    // 3. Provider overrides by slug
-    if (domains.length === 0) {
-      const overrideDomains = input.overrides.naf?.[b.slug] ?? [];
-      const first = overrideDomains[0];
-      if (first) { domains = [normalizeDomainInput(first)]; overrideCount++; }
+      for (const lookupName of b.lookupNames) {
+        domains = lookupDomains(input.domainLookup, lookupName);
+        if (domains.length > 0) {
+          lookedUp++;
+          break;
+        }
+      }
     }
 
     if (domains.length === 0) {
@@ -280,7 +167,7 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
       continue;
     }
 
-    const sourceUrl = `${LIST_URL}/${b.slug}`;
+    const sourceUrl = buildSourceUrl(input.startUrl, b.slug);
     const merchantName = SLUG_NAME_OVERRIDES[b.slug] ?? b.name;
     offers.push({
       provider: "naf",
@@ -297,4 +184,348 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
   input.logger.info(`NAF: resolved ${fromUrl} via URL, ${lookedUp} via lookup, ${overrideCount} via override`);
   input.logger.info(`NAF: produced ${offers.length} offers`);
   return uniqueOffers(offers);
+}
+
+async function fetchApiConfig(startUrl: string): Promise<NafApiConfig> {
+  const url = new URL(startUrl);
+  url.searchParams.set("tabView", "rabatter");
+  url.searchParams.set("query", "");
+
+  const response = await gotScraping(url.toString(), {
+    responseType: "text",
+    http2: false,
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`NAF benefits page returned ${response.statusCode}: ${response.statusMessage}`);
+  }
+
+  const state = extractPreloadedState(response.body);
+  const application = isRecord(state) && isRecord(state.application)
+    ? state.application
+    : undefined;
+
+  if (!application) {
+    throw new Error("NAF benefits page did not include API config");
+  }
+
+  const config = {
+    apimBaseUrl: readString(application.apimBaseUrl),
+    apimContentHub: readString(application.apimContentHub),
+    apimNafNoApi: readString(application.apimNafNoApi),
+  };
+
+  if (!config.apimBaseUrl || !config.apimContentHub || !config.apimNafNoApi) {
+    throw new Error("NAF benefits page had incomplete API config");
+  }
+
+  return config;
+}
+
+function extractPreloadedState(html: string): unknown {
+  const markerIndex = html.indexOf("window.__PRELOADED_STATE__");
+  if (markerIndex === -1) return undefined;
+
+  const assignmentIndex = html.indexOf("=", markerIndex);
+  const scriptEndIndex = html.indexOf("</script>", assignmentIndex);
+  if (assignmentIndex === -1 || scriptEndIndex === -1) return undefined;
+
+  const rawJson = html
+    .slice(assignmentIndex + 1, scriptEndIndex)
+    .trim()
+    .replace(/;$/, "");
+
+  try {
+    return JSON.parse(rawJson);
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchBenefits(apiConfig: NafApiConfig): Promise<BenefitEntry[]> {
+  const benefits: BenefitEntry[] = [];
+  const seen = new Set<string>();
+  let skip = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (skip < total) {
+    const response = await fetchNafJson(
+      apiConfig,
+      "benefits",
+      { skip, take: BENEFITS_PAGE_SIZE },
+    );
+
+    if (!isBenefitsResponse(response)) {
+      throw new Error("NAF benefits API returned unexpected format");
+    }
+
+    total = response.total;
+    for (const item of response.items) {
+      const benefit = parseBenefitSummary(item);
+      if (benefit === undefined || seen.has(benefit.slug)) continue;
+      seen.add(benefit.slug);
+      benefits.push(benefit);
+    }
+
+    if (response.items.length === 0) break;
+    skip += response.items.length;
+  }
+
+  return benefits;
+}
+
+async function enrichBenefitDetails(
+  benefits: BenefitEntry[],
+  apiConfig: NafApiConfig,
+  logger: Logger,
+): Promise<void> {
+  let completed = 0;
+
+  async function enrich(benefit: BenefitEntry): Promise<void> {
+    try {
+      const detail = await fetchNafJson(apiConfig, `commonarticles/${benefit.slug}`);
+      const storeUrl = extractStoreUrl(detail);
+      const reward = extractDetailReward(detail);
+      const detailLookupNames = extractDetailLookupNames(detail);
+
+      if (storeUrl !== undefined) benefit.storeUrl = storeUrl;
+      if (reward && !benefit.reward) benefit.reward = reward;
+      benefit.lookupNames = uniqueStringsPreserveOrder([
+        ...benefit.lookupNames,
+        ...detailLookupNames,
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logger.warn(`NAF detail failed for ${benefit.slug}: ${message}`);
+    } finally {
+      completed++;
+      process.stdout.write(`\r  NAF detail ${completed}/${benefits.length}: ${benefit.name.slice(0, 40)}  `);
+    }
+  }
+
+  for (let i = 0; i < benefits.length; i += DETAIL_CONCURRENCY) {
+    await Promise.all(benefits.slice(i, i + DETAIL_CONCURRENCY).map(enrich));
+  }
+
+  if (benefits.length > 0) process.stdout.write("\n");
+}
+
+async function fetchNafJson(
+  apiConfig: NafApiConfig,
+  path: string,
+  params: Record<string, number | string> = {},
+): Promise<unknown> {
+  const url = buildApiUrl(apiConfig, path, params);
+  const response = await gotScraping(url, {
+    responseType: "json",
+    http2: false,
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+    headers: {
+      "Accept": "application/json",
+      "Ocp-Apim-Subscription-Key": apiConfig.apimContentHub,
+    },
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`NAF API ${path} returned ${response.statusCode}: ${response.statusMessage}`);
+  }
+
+  return response.body;
+}
+
+function buildApiUrl(
+  apiConfig: NafApiConfig,
+  path: string,
+  params: Record<string, number | string>,
+): string {
+  const baseUrl = apiConfig.apimBaseUrl.replace(/\/+$/, "");
+  const apiName = apiConfig.apimNafNoApi.replace(/^\/+|\/+$/g, "");
+  const normalizedPath = path.replace(/^\/+/, "");
+  const url = new URL(`${baseUrl}/${apiName}/${normalizedPath}`);
+
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
+
+  return url.toString();
+}
+
+function parseBenefitSummary(value: unknown): BenefitEntry | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const slug = readString(value.slug);
+  const title = readString(value.title ?? value.name);
+  const partnerName = extractPartnerName(value.partner);
+  const name = SLUG_NAME_OVERRIDES[slug] ?? (title || partnerName);
+
+  if (!slug || !name || isExcluded(name) || isExcluded(title)) {
+    return undefined;
+  }
+
+  return {
+    lookupNames: uniqueStringsPreserveOrder([name, partnerName, title]),
+    name,
+    reward: normalizeReward(readString(value.discountBadge)),
+    slug,
+  };
+}
+
+function extractStoreUrl(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const preferredUrls = [
+    ...collectUrls(value.callToAction),
+    ...collectUrls(value.body),
+    ...collectUrls(value.stepByStepSection),
+    ...collectUrls(value.keyInformation),
+  ];
+
+  return preferredUrls.find((url) => {
+    const parsedUrl = parseUrl(url);
+    return parsedUrl !== undefined && !isInternal(parsedUrl.hostname);
+  });
+}
+
+function extractDetailReward(value: unknown): string {
+  if (!isRecord(value)) return "";
+
+  const keyInformationItems = isRecord(value.keyInformation) &&
+    Array.isArray(value.keyInformation.items)
+    ? value.keyInformation.items.map(readString).filter(Boolean)
+    : [];
+
+  return (
+    normalizeReward(readString(value.discountBadge)) ||
+    extractRewardFromText(keyInformationItems.join(" ")) ||
+    extractRewardFromText(collectText(value.body).join(" "))
+  );
+}
+
+function extractDetailLookupNames(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  return uniqueStringsPreserveOrder([
+    readString(value.title),
+    extractPartnerName(value.partner),
+  ]);
+}
+
+function collectUrls(value: unknown): string[] {
+  const urls: string[] = [];
+  collectValues(value, (candidate) => {
+    if (typeof candidate !== "string") return;
+    const matches = candidate.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
+    urls.push(...matches.map(normalizeUrlCandidate).filter((url) => url !== undefined));
+  });
+  return uniqueStringsPreserveOrder(urls);
+}
+
+function normalizeUrlCandidate(candidate: string): string | undefined {
+  const url = candidate.replace(/[),.;]+$/, "");
+  const parsedUrl = parseUrl(url);
+
+  if (parsedUrl === undefined) {
+    return undefined;
+  }
+
+  const unwrappedUrl = parsedUrl.searchParams.get("url") ??
+    parsedUrl.searchParams.get("u");
+
+  if (
+    unwrappedUrl &&
+    parsedUrl.hostname.toLowerCase().endsWith("safelinks.protection.outlook.com")
+  ) {
+    return parseUrl(unwrappedUrl)?.toString();
+  }
+
+  return parsedUrl.toString();
+}
+
+function collectText(value: unknown): string[] {
+  const text: string[] = [];
+  collectValues(value, (candidate) => {
+    if (typeof candidate === "string") text.push(candidate);
+  });
+  return text;
+}
+
+function collectValues(value: unknown, visit: (value: unknown) => void): void {
+  visit(value);
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectValues(item, visit);
+    return;
+  }
+
+  if (!isRecord(value)) return;
+  for (const item of Object.values(value)) collectValues(item, visit);
+}
+
+function normalizeReward(value: string): string {
+  const normalized = value
+    .replace(/\s+/g, " ")
+    .replace(/(\d)\s*–\s*(\d)/g, "$1-$2")
+    .replace(/(\d[\d\s]*),\s*[–-]/g, "$1 kr")
+    .replace(/(\d[\d\s]*),-/g, "$1 kr")
+    .replace(/\b[Ss]par opptil kr\s+/g, "Spar opptil ")
+    .replace(/\b[Ss]par kr\s+/g, "Spar ")
+    .replace(/\bkr\s+i rabatt\b/g, "kr rabatt")
+    .replace(/\bkr\s+(\d[\d\s]*)\s+kr\b/g, "$1 kr")
+    .trim();
+
+  if (!normalized || /^les mer$/i.test(normalized)) return "";
+
+  const negativeKrMatch = normalized.match(/^-\s*kr\s*(\d[\d\s]*)$/i);
+  if (negativeKrMatch) return `${negativeKrMatch[1]?.replace(/\s+/g, " ")} kr rabatt`;
+
+  return normalized;
+}
+
+function extractRewardFromText(text: string): string {
+  const percentageReward = extractPercentageReward(
+    text,
+    /\bbonus\b/i.test(text) ? " bonus" : "",
+  );
+
+  if (percentageReward !== "") return percentageReward;
+
+  const krMatch = text.match(/(\d[\d\s]*)\s*kr\s*(?:i\s*)?(?:rabatt|avslag)?/i) ??
+    text.match(/spar\s+(?:opptil\s+)?(?:kr\s*)?(\d[\d\s]*)/i);
+  const krValue = krMatch?.[1]?.replace(/\s+/g, " ").trim();
+  return krValue ? `${krValue} kr rabatt` : "";
+}
+
+function extractPartnerName(value: unknown): string {
+  return isRecord(value) ? readString(value.partnerName) : "";
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isBenefitsResponse(value: unknown): value is NafBenefitsResponse {
+  return isRecord(value) &&
+    Array.isArray(value.items) &&
+    typeof value.total === "number";
+}
+
+function buildSourceUrl(startUrl: string, slug: string): string {
+  const baseUrl = startUrl.endsWith("/") ? startUrl : `${startUrl}/`;
+  return new URL(slug, baseUrl).toString();
+}
+
+function uniqueStringsPreserveOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+
+  return result;
 }

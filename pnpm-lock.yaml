@@ -11,9 +11,6 @@ importers:
       crawlee:
         specifier: ^3.16.0
         version: 3.16.0(@types/node@22.19.17)(playwright@1.59.1)
-      playwright:
-        specifier: ^1.59.1
-        version: 1.59.1
       react:
         specifier: ^19.0.0
         version: 19.2.5
@@ -3166,13 +3163,15 @@ snapshots:
     dependencies:
       find-up: 4.1.0
 
-  playwright-core@1.59.1: {}
+  playwright-core@1.59.1:
+    optional: true
 
   playwright@1.59.1:
     dependencies:
       playwright-core: 1.59.1
     optionalDependencies:
       fsevents: 2.3.2
+    optional: true
 
   postcss@8.5.13:
     dependencies:

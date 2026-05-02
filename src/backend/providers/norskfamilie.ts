@@ -1,7 +1,10 @@
 import { CheerioCrawler, Configuration, MemoryStorage } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
+import { extractPercentageReward, normalizeRewardLabel } from "../../shared/reward.js";
 
 const BUTIKKER_URL = "https://www.norskfamilie.no/netthandel/butikker/";
+const LABEL_LIST = "list";
+const LABEL_DETAIL = "detail";
 
 const SLUG_TO_DOMAIN: Record<string, string> = {
   adlibris: "adlibris.com",
@@ -50,22 +53,42 @@ const SLUG_TO_DOMAIN: Record<string, string> = {
 
 export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
   const generatedAt = new Date().toISOString();
-  const offers: CashbackOffer[] = [];
+  const offersBySlug = new Map<string, CashbackOffer>();
 
   const storage = new MemoryStorage({ persistStorage: false });
   const config = new Configuration();
   config.useStorageClient(storage);
 
   const crawler = new CheerioCrawler({
-    maxRequestsPerCrawl: 1,
-    requestHandler: async ({ $ }) => {
+    maxConcurrency: 4,
+    maxRequestsPerCrawl: 100,
+    requestHandler: async ({ $, request }) => {
+      const label = request.label ?? LABEL_LIST;
+
+      if (label === LABEL_DETAIL) {
+        const slug = readSlug(request.url);
+        const offer = offersBySlug.get(slug);
+        if (offer === undefined) return;
+
+        const detailText = $(".shopping-content").first().text().replace(/\s+/g, " ").trim();
+        const detailReward = extractPercentageReward(detailText);
+        if (detailReward !== "") {
+          offer.reward = detailReward;
+        }
+        return;
+      }
+
+      const detailRequests: Array<{ url: string; label: string }> = [];
+
       $(".list-shop").each((_i, el) => {
         const card = $(el);
         const name = card.find("img.img-fluid").attr("alt")?.trim();
         if (!name) return;
 
         const rateText = card.find(".shop-comission").text().trim();
-        const reward = rateText.replace(/\s+/g, " ").trim();
+        const normalizedRateText = rateText.replace(/\s+/g, " ").trim();
+        const reward = extractPercentageReward(normalizedRateText) ||
+          normalizeRewardLabel(normalizedRateText);
         if (!reward || reward === "\u00a0") return;
 
         const partnerLink = card.find('a[href*="/partner/"]').attr("href") ?? "";
@@ -73,9 +96,9 @@ export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
         const slug = slugMatch?.[1] ?? "";
 
         const domain = SLUG_TO_DOMAIN[slug];
-        const sourceUrl = `https://www.norskfamilie.no${partnerLink}`;
+        const sourceUrl = new URL(partnerLink, BUTIKKER_URL).toString();
 
-        offers.push({
+        offersBySlug.set(slug, {
           provider: "norskfamilie",
           merchantName: name,
           domains: domain ? [domain] : [],
@@ -85,10 +108,19 @@ export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
           terms: "",
           updatedAt: generatedAt,
         });
+
+        detailRequests.push({ url: sourceUrl, label: LABEL_DETAIL });
       });
+
+      await crawler.addRequests(detailRequests);
     },
   }, config);
 
-  await crawler.run([BUTIKKER_URL]);
-  return offers;
+  await crawler.run([{ url: BUTIKKER_URL, label: LABEL_LIST }]);
+  return [...offersBySlug.values()];
+}
+
+function readSlug(url: string): string {
+  const match = url.match(/\/partner\/([^/]+)\//);
+  return match?.[1] ?? "";
 }

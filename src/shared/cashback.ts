@@ -1,3 +1,5 @@
+import { normalizeRewardLabel } from "./reward.js";
+
 export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "logbuy" | "naf";
 
 export type CashbackOffer = {
@@ -195,6 +197,7 @@ export function buildCashbackIndex(
     return {
       ...offer,
       domains: uniqueStrings(offer.domains.map(normalizeDomainInput)),
+      reward: normalizeRewardLabel(offer.reward),
     };
   });
   const domainIndex: Record<string, CashbackOffer[]> = {};
@@ -314,7 +317,7 @@ type RewardValue = {
 };
 
 function parseRewardValue(reward: string): RewardValue {
-  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
+  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d+(?:[,.]\d+)?)\s*%/);
   const percentageMatch = rangeMatch
     ? [null, rangeMatch[1]]
     : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);

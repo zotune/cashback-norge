@@ -1,3 +1,4 @@
+import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
   isRecord,
@@ -34,15 +35,19 @@ export type FetchSasInput = {
 export async function fetchSas(input: FetchSasInput): Promise<CashbackOffer[]> {
   input.logger.info(`Fetching SAS EuroBonus shops from ${input.apiUrl}`);
 
-  const response = await fetch(input.apiUrl);
+  const response = await gotScraping(input.apiUrl, {
+    responseType: "json",
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+  });
 
-  if (!response.ok) {
+  if (response.statusCode < 200 || response.statusCode >= 300) {
     throw new Error(
-      `SAS API returned ${response.status}: ${response.statusText}`,
+      `SAS API returned ${response.statusCode}: ${response.statusMessage}`,
     );
   }
 
-  const body: unknown = await response.json();
+  const body: unknown = response.body;
 
   if (!isSasShopsResponse(body)) {
     throw new Error("SAS API returned unexpected data format");

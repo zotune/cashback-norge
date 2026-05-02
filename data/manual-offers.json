@@ -1,25 +1,5 @@
 [
   {
-    "provider": "trumf",
-    "merchantName": "LYKO",
-    "domains": ["lyko.com"],
-    "reward": "6,2 %",
-    "sourceUrl": "https://trumfnetthandel.no/cashback/lyko-trumf",
-    "activationUrl": "https://trumfnetthandel.no/cashback/lyko-trumf",
-    "terms": "Manual seed until the crawler has a stable merchant-domain mapping.",
-    "updatedAt": "2026-05-01T00:00:00.000Z"
-  },
-  {
-    "provider": "trumf",
-    "merchantName": "Hotels.com",
-    "domains": ["hotels.com", "no.hotels.com"],
-    "reward": "7,8 %",
-    "sourceUrl": "https://trumfnetthandel.no/cashback/trumfhotels-no",
-    "activationUrl": "https://trumfnetthandel.no/cashback/trumfhotels-no",
-    "terms": "Manual seed until the crawler has a stable merchant-domain mapping.",
-    "updatedAt": "2026-05-01T00:00:00.000Z"
-  },
-  {
     "provider": "klarna",
     "merchantName": "Farmasiet",
     "domains": ["farmasiet.no"],

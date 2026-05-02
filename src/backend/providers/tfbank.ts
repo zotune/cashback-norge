@@ -1,3 +1,4 @@
+import { gotScraping } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
 import { normalizeDomainInput, parseUrl } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
@@ -36,15 +37,19 @@ export async function fetchTfBank(
 
   while (true) {
     const url = `${input.apiUrl}?offset=${offset}&limit=${limit}`;
-    const response = await fetch(url);
+    const response = await gotScraping(url, {
+      responseType: "json",
+      throwHttpErrors: false,
+      timeout: { request: 30_000 },
+    });
 
-    if (!response.ok) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw new Error(
-        `TF Bank API returned ${response.status}: ${response.statusText}`,
+        `TF Bank API returned ${response.statusCode}: ${response.statusMessage}`,
       );
     }
 
-    const body: unknown = await response.json();
+    const body: unknown = response.body;
 
     if (!isDealpassResponse(body)) {
       throw new Error("TF Bank API returned unexpected data format");
@@ -171,15 +176,17 @@ async function resolveRedirectDomain(
 
   for (let i = 0; i < maxRedirects; i++) {
     try {
-      const response = await fetch(currentUrl, {
+      const response = await gotScraping(currentUrl, {
         method: "HEAD",
-        redirect: "manual",
-        signal: AbortSignal.timeout(5_000),
+        followRedirect: false,
+        responseType: "text",
+        throwHttpErrors: false,
+        timeout: { request: 5_000 },
       });
 
-      const location = response.headers.get("location");
+      const location = readHeader(response.headers.location);
 
-      if (location === null) {
+      if (location === undefined) {
         break;
       }
 
@@ -203,6 +210,10 @@ async function resolveRedirectDomain(
   }
 
   return undefined;
+}
+
+function readHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function extractEmbeddedUrl(url: string): string | undefined {

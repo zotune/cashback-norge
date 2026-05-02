@@ -1,3 +1,4 @@
+import { gotScraping } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
 
@@ -32,15 +33,19 @@ export async function fetchDnb(
 ): Promise<CashbackOffer[]> {
   input.logger.info(`Fetching DNB faste rabatter from ${input.pageDataUrl}`);
 
-  const response = await fetch(input.pageDataUrl);
+  const response = await gotScraping(input.pageDataUrl, {
+    responseType: "json",
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+  });
 
-  if (!response.ok) {
+  if (response.statusCode < 200 || response.statusCode >= 300) {
     throw new Error(
-      `DNB page-data returned ${response.status}: ${response.statusText}`,
+      `DNB page-data returned ${response.statusCode}: ${response.statusMessage}`,
     );
   }
 
-  const body: unknown = await response.json();
+  const body: unknown = response.body;
 
   if (!isDnbPageData(body)) {
     throw new Error("DNB page-data returned unexpected format");

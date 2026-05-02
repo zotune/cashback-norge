@@ -7,6 +7,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { extractPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -28,6 +29,7 @@ const SKIP_HOSTNAMES = new Set([
   "play.google.com",
   "clarity.microsoft.com",
   "microsoft.com",
+  "safelinks.protection.outlook.com",
 ]);
 
 const EXCLUDED_NAME_FRAGMENTS = [
@@ -58,7 +60,11 @@ function isExcluded(slug: string, name: string): boolean {
 
 function isSkippedHostname(hostname: string): boolean {
   const lower = hostname.toLowerCase().replace(/^www\./, "");
-  return SKIP_HOSTNAMES.has(lower) || lower.endsWith(".obos.no");
+  return (
+    SKIP_HOSTNAMES.has(lower) ||
+    [...SKIP_HOSTNAMES].some((skipped) => lower.endsWith(`.${skipped}`)) ||
+    lower.endsWith(".obos.no")
+  );
 }
 
 function extractCtaUrl($: ObosCheerio): string | undefined {
@@ -67,41 +73,60 @@ function extractCtaUrl($: ObosCheerio): string | undefined {
 
   $('a[href^="http"]').each((_, el): false | void => {
     const href = $(el).attr("href") ?? "";
-    try {
-      const { hostname } = new URL(href);
-      if (isSkippedHostname(hostname)) return;
-      if (!firstUrl) firstUrl = href;
-      const text = $(el).text().trim().toLowerCase();
-      if (!ctaUrl && (text.includes("gå til") || text.includes("bestill") ||
-          text.includes("kjøp") || text.includes("handle") || text.includes("book"))) {
-        ctaUrl = href;
-        return false;
-      }
-    } catch { /* skip */ }
+    const externalUrl = normalizeExternalUrl(href);
+    if (externalUrl === undefined) return;
+
+    if (!firstUrl) firstUrl = externalUrl;
+    const text = $(el).text().trim().toLowerCase();
+    if (!ctaUrl && (text.includes("gå til") || text.includes("bestill") ||
+        text.includes("kjøp") || text.includes("handle") || text.includes("book"))) {
+      ctaUrl = externalUrl;
+      return false;
+    }
   });
 
   return ctaUrl ?? firstUrl;
 }
 
-function extractDiscount($: ObosCheerio): string {
-  // Prefer main content over full body to avoid picking up nav/footer noise
-  const contentEl = $("main, article, [class*='content'], [class*='benefit'], [class*='detail']").first();
-  const text = contentEl.length ? contentEl.text() : $("body").text();
+function normalizeExternalUrl(value: string): string | undefined {
+  const parsed = parseUrl(value) ?? parseUrl(`https://${value}`);
+  if (parsed === undefined) return undefined;
 
-  const pctMatches = [...text.matchAll(/(\d{1,3}(?:[,.]\d+)?)\s*%/gi)];
-  const krMatches = [...text.matchAll(/(\d+)\s*kr\s+(?:i\s+)?rabatt/gi)];
-
-  if (pctMatches.length === 0 && krMatches.length === 0) return "";
-
-  if (pctMatches.length > 0) {
-    const vals = pctMatches.map(m => parseFloat((m[1] ?? "0").replace(",", ".")));
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
-    const fmt = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
-    return min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
+  const unwrapped = parsed.searchParams.get("url") ?? parsed.searchParams.get("u");
+  if (
+    unwrapped &&
+    normalizeDomainInput(parsed.hostname).endsWith("safelinks.protection.outlook.com")
+  ) {
+    return normalizeExternalUrl(unwrapped);
   }
 
+  return isSkippedHostname(parsed.hostname) ? undefined : parsed.toString();
+}
+
+function extractDiscount($: ObosCheerio): string {
+  // Prefer the actual detail content; related benefit cards can contain other percentages.
+  const contentEl = $("main, article").first();
+  const fullText = contentEl.length ? contentEl.text() : $("body").text();
+  return extractDiscountFromText(trimRelatedBenefits(fullText));
+}
+
+function extractDiscountFromText(text: string): string {
+  const percentageReward = extractPercentageReward(text);
+  const krMatches = [...text.matchAll(/(\d+)\s*kr\s+(?:i\s+)?rabatt/gi)];
+
+  if (percentageReward === "" && krMatches.length === 0) return "";
+
+  if (percentageReward !== "") return percentageReward;
+
   return (krMatches[0]?.[0] ?? "").trim();
+}
+
+function trimRelatedBenefits(text: string): string {
+  const relatedSectionMatch = text.search(
+    /(?:relevante|relaterte|flere aktuelle)\s+medlemsfordeler/i,
+  );
+
+  return relatedSectionMatch === -1 ? text : text.slice(0, relatedSectionMatch);
 }
 
 function extractNextData($: ObosCheerio): unknown {
@@ -153,7 +178,8 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
             const name = readString(benefit.title ?? benefit.name ?? benefit.navn);
             if (!slug || !name || isExcluded(slug, name)) continue;
             slugToName.set(slug, name);
-            const discount = readString(benefit.discount ?? benefit.rabatt ?? benefit.description);
+            const rawDiscount = readString(benefit.discount ?? benefit.rabatt ?? benefit.description);
+            const discount = extractDiscountFromText(rawDiscount) || rawDiscount;
             if (discount) slugToDiscount.set(slug, discount);
           }
         }
@@ -171,8 +197,8 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
           if (!name || isExcluded(slug, name)) return;
           slugToName.set(slug, name);
           const allText = $(el).text();
-          const dMatch = allText.match(/(?:^|\s)(\d{1,3}(?:[,.]\d+)?\s*%|Opptil\s+\d{1,3}(?:[,.]\d+)?\s*%|\d+\s*kr\s+rabatt)/i);
-          if (dMatch && dMatch[1]) slugToDiscount.set(slug, dMatch[1].trim());
+          const discount = extractDiscountFromText(allText);
+          if (discount) slugToDiscount.set(slug, discount);
         });
 
         // Also enqueue from next page if paginated
@@ -204,18 +230,18 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
             isRecord(pageProps?.fordel) ? pageProps.fordel : undefined;
           if (benefit) {
             const urlVal = readString(benefit.ctaUrl ?? benefit.externalUrl ?? benefit.url ?? benefit.shopUrl);
-            if (urlVal && !isSkippedHostname(new URL(urlVal.startsWith("http") ? urlVal : `https://${urlVal}`).hostname)) {
-              ctaUrl = urlVal;
+            const externalUrl = normalizeExternalUrl(urlVal);
+            if (externalUrl !== undefined) {
+              ctaUrl = externalUrl;
             }
             // Read description from Next.js data — often contains the full multi-line discount text
-            if (!slugToDiscount.has(slug)) {
-              const desc = readString(
-                benefit.description ?? benefit.ingress ?? benefit.tekst ??
-                benefit.shortDescription ?? benefit.excerpt ?? benefit.summary
-              );
-              if (desc && /\d+\s*%|\d+\s*kr/i.test(desc)) {
-                slugToDiscount.set(slug, desc);
-              }
+            const desc = readString(
+              benefit.description ?? benefit.ingress ?? benefit.tekst ??
+              benefit.shortDescription ?? benefit.excerpt ?? benefit.summary
+            );
+            const discount = extractDiscountFromText(desc);
+            if (discount) {
+              slugToDiscount.set(slug, discount);
             }
           }
         }
@@ -236,10 +262,8 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
           if (name && !isExcluded(slug, name)) slugToName.set(slug, name);
         }
 
-        if (!slugToDiscount.has(slug)) {
-          const discount = extractDiscount($);
-          if (discount) slugToDiscount.set(slug, discount);
-        }
+        const discount = extractDiscount($);
+        if (discount) slugToDiscount.set(slug, discount);
 
         if (ctaUrl) {
           try {

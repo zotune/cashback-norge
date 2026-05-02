@@ -9,6 +9,7 @@ import {
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
+import { extractPercentageReward } from "../../shared/reward.js";
 import {
   merchantDomainsFromHostname,
 } from "../merchant-domains.js";
@@ -193,10 +194,10 @@ function stripMerchantSuffix(value: string): string {
 }
 
 function extractReward(title: string): string {
-  const percentMatch = title.match(/\d+(?:[,.]\d+)?\s*%/);
+  const percentageReward = extractPercentageReward(title);
 
-  if (percentMatch !== null) {
-    return percentMatch[0].replace(/\s+/g, " ");
+  if (percentageReward !== "") {
+    return percentageReward;
   }
 
   const fixedMatch = title.match(/\d+(?:[,.]\d+)?\s*kr/i);

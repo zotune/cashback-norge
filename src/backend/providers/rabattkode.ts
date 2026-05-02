@@ -1,3 +1,4 @@
+import { gotScraping } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
 
 const FIRESTORE_URL =
@@ -18,11 +19,16 @@ interface FirestoreDoc {
 
 export async function crawlRabattkode(): Promise<CashbackOffer[]> {
   const generatedAt = new Date().toISOString();
-  const res = await fetch(FIRESTORE_URL);
-  if (!res.ok) {
-    throw new Error(`Rabattkode Firestore responded ${res.status}`);
+  const response = await gotScraping(FIRESTORE_URL, {
+    responseType: "json",
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`Rabattkode Firestore responded ${response.statusCode}`);
   }
-  const data = (await res.json()) as { documents?: FirestoreDoc[] };
+  const data = response.body as { documents?: FirestoreDoc[] };
   const docs = data.documents ?? [];
 
   const offers: CashbackOffer[] = [];
