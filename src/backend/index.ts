@@ -1,3 +1,4 @@
+import { copyFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buildCashbackIndex, uniqueOffers } from "../shared/cashback.js";
 import { buildDomainLookup } from "./domain-lookup.js";
@@ -133,6 +134,10 @@ async function main(): Promise<void> {
   logger.info(
     `Wrote ${cashbackIndex.offers.length} offers to ${config.outputPath}`,
   );
+
+  const siteIndexPath = resolve("site/cashback-index.json");
+  await copyFile(config.outputPath, siteIndexPath);
+  logger.info(`Copied index to ${siteIndexPath}`);
 }
 
 function readCliConfig(args: string[]): CliConfig {
