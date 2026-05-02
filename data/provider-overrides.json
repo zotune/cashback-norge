@@ -85,7 +85,7 @@
     "brilleland-trumf": [
       "brilleland.no"
     ],
-    "trumfbjörn-borg": [
+    "trumfbj\u00f6rn-borg": [
       "bjornborg.no"
     ],
     "budget-trumf": [
@@ -686,7 +686,7 @@
       "dfrequency.com",
       "dressmann.com"
     ],
-    "drømmerom": [
+    "dr\u00f8mmerom": [
       "drommerom.no"
     ],
     "dustin-1": [
@@ -701,7 +701,7 @@
     "electrolux-spares-accessories": [
       "electrolux.no"
     ],
-    "elektroimportøren.no": [
+    "elektroimport\u00f8ren.no": [
       "elektroimportoren.no"
     ],
     "elskling": [
@@ -757,7 +757,7 @@
     "iphonehuset": [
       "iphonehuset.no"
     ],
-    "ishavskraft-strøm": [
+    "ishavskraft-str\u00f8m": [
       "ishavskraft.no"
     ],
     "kajakk-og-fritid": [
@@ -1068,26 +1068,103 @@
   },
   "obos": {},
   "logbuy": {
-    "adlibris": ["adlibris.com"],
-    "anton-sport": ["antonsport.no"],
-    "apollo": ["apollo.no"],
-    "apple": ["apple.com"],
-    "blivakker": ["blivakker.no"],
-    "braasport": ["braasport.no"],
-    "cewe": ["cewe.no"],
-    "circle-k": ["circlek.no"],
-    "cutters": ["cutters.no"],
-    "dominos": ["dominos.no"],
-    "fjellsport": ["fjellsport.no"],
-    "gymgrossisten": ["gymgrossisten.no"],
-    "hm": ["hm.com"],
-    "hoka": ["hoka.com"],
-    "interflora": ["interflora.no"],
-    "nelly": ["nelly.com"],
-    "radisson": ["radissonhotels.com"],
-    "samsung": ["samsung.com"],
-    "strawberry": ["strawberry.com"],
-    "talkmore": ["talkmore.no"],
-    "zalando": ["zalando.no"]
+    "adlibris": [
+      "adlibris.com"
+    ],
+    "anton-sport": [
+      "antonsport.no"
+    ],
+    "apollo": [
+      "apollo.no"
+    ],
+    "apple": [
+      "apple.com"
+    ],
+    "blivakker": [
+      "blivakker.no"
+    ],
+    "braasport": [
+      "braasport.no"
+    ],
+    "cewe": [
+      "cewe.no"
+    ],
+    "circle-k": [
+      "circlek.no"
+    ],
+    "cutters": [
+      "cutters.no"
+    ],
+    "dominos": [
+      "dominos.no"
+    ],
+    "fjellsport": [
+      "fjellsport.no"
+    ],
+    "gymgrossisten": [
+      "gymgrossisten.no"
+    ],
+    "hm": [
+      "hm.com"
+    ],
+    "hoka": [
+      "hoka.com"
+    ],
+    "interflora": [
+      "interflora.no"
+    ],
+    "nelly": [
+      "nelly.com"
+    ],
+    "radisson": [
+      "radissonhotels.com"
+    ],
+    "samsung": [
+      "samsung.com"
+    ],
+    "strawberry": [
+      "strawberry.com"
+    ],
+    "talkmore": [
+      "talkmore.no"
+    ],
+    "zalando": [
+      "zalando.no"
+    ]
+  },
+  "naf": {
+    "tui": [
+      "tui.no"
+    ],
+    "byggmakker": [
+      "byggmakker.no"
+    ],
+    "bildeler": [
+      "bildeler.no"
+    ],
+    "anton-sport": [
+      "antonsport.no"
+    ],
+    "dekkhotell": [
+      "dekkhotell.no"
+    ],
+    "fabel": [
+      "fabel.no"
+    ],
+    "de-historiske-hotel": [
+      "dehistoriske.no"
+    ],
+    "strawberry": [
+      "strawberry.com"
+    ],
+    "forerutvikling": [
+      "forerutvikling.no"
+    ],
+    "tourstart": [
+      "tourstart.no"
+    ],
+    "hx-hurtigruten-expeditions": [
+      "hurtigruten.com"
+    ]
   }
 }

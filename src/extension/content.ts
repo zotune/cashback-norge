@@ -374,6 +374,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       background: #003087;
       color: #ffffff;
     }
+    .provider-naf {
+      background: #003c96;
+      color: #ffffff;
+    }
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;

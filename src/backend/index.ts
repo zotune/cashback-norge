@@ -21,6 +21,7 @@ import { crawlNorskfamilie } from "./providers/norskfamilie.js";
 import { crawlTrustdeals } from "./providers/trustdeals.js";
 import { crawlLogbuy } from "./providers/logbuy.js";
 import { crawlObos } from "./providers/obos.js";
+import { crawlNaf } from "./providers/naf.js";
 
 type CliConfig = {
   outputPath: string;
@@ -48,6 +49,7 @@ type CliConfig = {
   skipTrustdeals: boolean;
   skipLogbuy: boolean;
   skipObos: boolean;
+  skipNaf: boolean;
   dnbPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
@@ -55,6 +57,7 @@ type CliConfig = {
   trustdealsStartUrl: string;
   logbuyStartUrl: string;
   obosStartUrl: string;
+  nafStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -196,7 +199,16 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
         startUrl: config.logbuyStartUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers]);
+  const nafOffers = config.skipNaf
+    ? []
+    : await crawlNaf({
+        domainLookup,
+        generatedAt,
+        logger,
+        overrides: providerOverrides,
+        startUrl: config.nafStartUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -259,6 +271,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipTrustdeals: args.includes("--skip-trustdeals"),
     skipLogbuy: args.includes("--skip-logbuy"),
     skipObos: args.includes("--skip-obos"),
+    skipNaf: args.includes("--skip-naf"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
@@ -280,6 +293,9 @@ function readCliConfig(args: string[]): CliConfig {
     obosStartUrl:
       readArgumentValue(args, "--obos-start-url") ??
       "https://www.obos.no/medlem/medlemsfordeler",
+    nafStartUrl:
+      readArgumentValue(args, "--naf-start-url") ??
+      "https://www.naf.no/medlemskap/medlemsfordeler",
   };
 }
 

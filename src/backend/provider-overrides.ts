@@ -31,7 +31,8 @@ export function isProviderOverrides(value: unknown): value is ProviderOverrides 
     !isProviderRecord(value.sas) ||
     !isProviderRecord(value.tfbank) ||
     !isProviderRecord(value.obos) ||
-    !isProviderRecord(value.logbuy)
+    !isProviderRecord(value.logbuy) ||
+    !isProviderRecord(value.naf)
   ) {
     return false;
   }
