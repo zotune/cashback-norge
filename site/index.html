@@ -569,6 +569,17 @@ function groupByMerchant(offers) {
       bestPerProvider.set(key, true);
       return true;
     });
+    // Override group name based on primary domain when merchant names are generic
+    const DOMAIN_DISPLAY_NAMES = {
+      "gjensidige.no": "Gjensidige",
+      "if.no": "If Forsikring",
+      "tryg.no": "Tryg",
+      "fremtind.no": "Fremtind",
+    };
+    const primaryDomain = m.domains[0];
+    if (primaryDomain && DOMAIN_DISPLAY_NAMES[primaryDomain]) {
+      m.name = DOMAIN_DISPLAY_NAMES[primaryDomain];
+    }
   }
   return groups.sort((a, b) => a.name.localeCompare(b.name, "nb"));
 }
