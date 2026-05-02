@@ -5,6 +5,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -79,8 +80,9 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
         const entry = deals.get(slug);
         if (!entry) return;
 
-        // p.text-medium holds the precise discount description
-        const reward = $("p.text-medium").first().text().trim().replace(/\s+/g, " ");
+        // p.text-medium holds the precise discount description, e.g. "10 % rabatt på bøker fra Adlibris."
+        const raw = $("p.text-medium").first().text().trim().replace(/\s+/g, " ");
+        const reward = extractPercentageReward(raw);
         if (reward) entry.reward = reward;
       }
     },

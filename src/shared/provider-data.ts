@@ -27,6 +27,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
+  crypto: { bg: "#002d74", fg: "#ffffff" },
   remember: { bg: "#111111", fg: "#ff9900" },
   klarna: { bg: "#ffa8cd", fg: "#0b051d" },
   trumf: { bg: "#07006b", fg: "#ffffff" },
@@ -43,6 +44,8 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
 
 export type BonusCard = {
   pct: number;
+  minPct?: number;
+  maxPct?: number;
   ebPer100kr?: number;
   label: string;
   badge: string;
@@ -76,12 +79,17 @@ export const FREE_CARDS: BonusCard[] = [
 
 export const PREMIUM_CARDS: BonusCard[] = [
   {
+    pct: 0.035, minPct: 0.02, maxPct: 0.05, label: "Crypto", badge: "crypto", approx: false,
+    url: "https://crypto.com/app/ns3fma5hou",
+    tip: "Crypto.com Visa-kort.\nPlatin: +2 % (400 kr/mnd), Jade/Obsidian: +5 %.\nKombineres med annen cashback.",
+  },
+  {
     pct: 0.01, label: "Curve", badge: "curve", approx: false,
     url: "https://www.curve.com/join#D5GXXJJD",
     tip: "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.",
   },
   {
-    pct: 0.0075, label: "Klarna+", badge: "klarna", approx: false,
+    pct: 0.0075, minPct: 0.005, maxPct: 0.01, label: "Klarna+", badge: "klarna", approx: false,
     url: "https://www.klarna.com/no/medlemskap/",
     tip: "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback.",
   },

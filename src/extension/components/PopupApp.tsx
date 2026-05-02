@@ -82,6 +82,8 @@ export function PopupApp(): ReactElement {
   const klarnaMinKr = amount > 0 ? formatKr(amount * 0.5 / 100) : null;
   const klarnaMaxKr = amount > 0 ? formatKr(amount * 1 / 100) : null;
   const curveKr = amount > 0 ? formatKr(amount * 1 / 100) : null;
+  const cryptoMinKr = amount > 0 ? formatKr(amount * 2 / 100) : null;
+  const cryptoMaxKr = amount > 0 ? formatKr(amount * 5 / 100) : null;
 
   return (
     <main className="popup">
@@ -212,6 +214,20 @@ export function PopupApp(): ReactElement {
                   <span className="provider-badge provider-curve">Curve Pro</span>
                 </a>
               )}
+              <a
+                className="bonus-chip"
+                href="https://crypto.com/app/ns3fma5hou"
+                target="_blank"
+                rel="noreferrer"
+                title={"Crypto.com Visa-kort.\nPlatin: +2 % (400 kr/mnd), Jade/Obsidian: +5 %.\nKombineres med annen cashback."}
+              >
+                <span className="bonus-chip-label">
+                  {cryptoMinKr !== null && cryptoMaxKr !== null
+                    ? `+${cryptoMinKr}-${cryptoMaxKr} kr`
+                    : "+2-5 %"}
+                </span>
+                <span className="provider-badge provider-crypto">Crypto</span>
+              </a>
               <a
                 className="bonus-chip"
                 href="https://www.klarna.com/no/medlemskap/"

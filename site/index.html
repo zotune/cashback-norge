@@ -164,6 +164,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-tfbank { background: #e30613; color: #fff; }
 .badge-dnb { background: #14555a; color: #fff; }
 .badge-curve { background: #000; color: #fff; }
+.badge-crypto { background: #002d74; color: #fff; }
 .badge-norskfamilie { background: #ff6600; color: #fff; }
 .badge-logbuy { background: #d81939; color: #fff; }
 .badge-obos { background: #003087; color: #fff; }
@@ -842,9 +843,17 @@ function renderChipGroup(cards, container) {
   container.innerHTML = cards.map(c => {
     const amt = currentAmount > 0 ? currentAmount : 0;
     let rewardText;
-    if (amt > 0) {
+    if (amt > 0 && c.minPct != null && c.maxPct != null) {
+      const minKr = Math.round(amt * c.minPct);
+      const maxKr = Math.round(amt * c.maxPct);
+      rewardText = `+${minKr}-${maxKr} kr`;
+    } else if (amt > 0) {
       const kr = Math.round(amt * c.pct);
       rewardText = c.approx ? `+~${kr} kr` : `+${kr} kr`;
+    } else if (c.minPct != null && c.maxPct != null) {
+      const minStr = (c.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+      const maxStr = (c.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+      rewardText = `+${minStr}-${maxStr} %`;
     } else {
       const pctStr = (c.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
       rewardText = c.approx ? `+~${pctStr}%` : `+${pctStr}%`;
