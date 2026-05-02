@@ -11,6 +11,7 @@ import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
 import { fetchTfBank } from "./providers/tfbank.js";
 import { crawlTrumf } from "./providers/trumf.js";
+import { crawlCuponation } from "./providers/cuponation.js";
 import { fetchDnb } from "./providers/dnb.js";
 import { fetchCurve } from "./providers/curve.js";
 import { crawlFinnkupongkoder } from "./providers/finnkupongkoder.js";
@@ -33,12 +34,14 @@ type CliConfig = {
   skipTrumf: boolean;
   skipSas: boolean;
   skipTfBank: boolean;
+  skipCuponation: boolean;
   skipDnb: boolean;
   skipCurve: boolean;
   skipFinnkupongkoder: boolean;
   skipRabattkode: boolean;
   skipNorskfamilie: boolean;
   dnbPageDataUrl: string;
+  cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
 };
 
@@ -130,6 +133,13 @@ async function main(): Promise<void> {
     ? []
     : await crawlRabattkode();
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
+  const cuponationOffers = config.skipCuponation
+    ? []
+    : await crawlCuponation({
+        generatedAt,
+        logger,
+        startUrl: config.cuponationStartUrl,
+      });
   const finnkupongkoderOffers = config.skipFinnkupongkoder
     ? []
     : await crawlFinnkupongkoder({
@@ -138,7 +148,7 @@ async function main(): Promise<void> {
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         startUrl: config.finnkupongkoderStartUrl,
       });
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...finnkupongkoderOffers, ...norskfamilieOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...finnkupongkoderOffers, ...norskfamilieOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -191,6 +201,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipTrumf: args.includes("--skip-trumf"),
     skipSas: args.includes("--skip-sas"),
     skipTfBank: args.includes("--skip-tfbank"),
+    skipCuponation: args.includes("--skip-cuponation"),
     skipDnb: args.includes("--skip-dnb"),
     skipCurve: args.includes("--skip-curve"),
     skipFinnkupongkoder: args.includes("--skip-finnkupongkoder"),
@@ -199,6 +210,9 @@ function readCliConfig(args: string[]): CliConfig {
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
+    cuponationStartUrl:
+      readArgumentValue(args, "--cuponation-start-url") ??
+      "https://www.cuponation.no/topp-20",
     finnkupongkoderStartUrl:
       readArgumentValue(args, "--finnkupongkoder-start-url") ??
       "https://www.finnkupongkoder.no/top",
