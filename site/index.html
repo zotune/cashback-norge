@@ -560,15 +560,15 @@ function groupByMerchant(offers) {
   }
 
   for (const m of groups) {
-    // Deduplicate offers: same provider + same reward = keep first (unless different discount codes)
-    const seen = new Set();
+    // Deduplicate: keep only the best offer per provider (highest reward wins)
+    m.offers.sort((a, b) => getMaxPct(b) - getMaxPct(a));
+    const bestPerProvider = new Map();
     m.offers = m.offers.filter(o => {
-      const key = o.provider + ":" + o.reward + ":" + (o.discountCode || "");
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const key = o.provider + ":" + (o.discountCode || "");
+      if (bestPerProvider.has(key)) return false;
+      bestPerProvider.set(key, true);
       return true;
     });
-    m.offers.sort((a, b) => getMaxPct(b) - getMaxPct(a));
   }
   return groups.sort((a, b) => a.name.localeCompare(b.name, "nb"));
 }
