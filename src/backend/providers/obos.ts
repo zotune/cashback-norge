@@ -84,9 +84,29 @@ function extractCtaUrl($: ObosCheerio): string | undefined {
 }
 
 function extractDiscount($: ObosCheerio): string {
-  const text = $("body").text();
-  const match = text.match(/(?:^|\s)(\d{1,3}(?:[,.]\d+)?\s*%|Opptil\s+\d{1,3}(?:[,.]\d+)?\s*%|\d+\s*kr\s+rabatt)/i);
-  return match ? match[1].trim() : "";
+  // Prefer main content over full body to avoid picking up nav/footer noise
+  const contentEl = $("main, article, [class*='content'], [class*='benefit'], [class*='detail']").first();
+  const text = contentEl.length ? contentEl.text() : $("body").text();
+
+  // Collect all percentage/kr-rabatt hits
+  const pctMatches = [...text.matchAll(/(opptil\s+)?(\d{1,3}(?:[,.]\d+)?)\s*%(?:\s*(?:cashback|rabatt))?/gi)];
+  const krMatches = [...text.matchAll(/(\d+)\s*kr\s+(?:i\s+)?rabatt/gi)];
+
+  if (pctMatches.length === 0 && krMatches.length === 0) return "";
+
+  if (pctMatches.length > 0) {
+    // Return the highest single percentage
+    let best = pctMatches[0]!;
+    let bestVal = parseFloat((best[2] ?? "0").replace(",", "."));
+    for (const m of pctMatches) {
+      const v = parseFloat((m[2] ?? "0").replace(",", "."));
+      if (v > bestVal) { bestVal = v; best = m; }
+    }
+    const prefix = best[1] ? "Opptil " : "";
+    return `${prefix}${bestVal} %`;
+  }
+
+  return (krMatches[0]?.[0] ?? "").trim();
 }
 
 function extractNextData($: ObosCheerio): unknown {
@@ -191,6 +211,16 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
             const urlVal = readString(benefit.ctaUrl ?? benefit.externalUrl ?? benefit.url ?? benefit.shopUrl);
             if (urlVal && !isSkippedHostname(new URL(urlVal.startsWith("http") ? urlVal : `https://${urlVal}`).hostname)) {
               ctaUrl = urlVal;
+            }
+            // Read description from Next.js data — often contains the full multi-line discount text
+            if (!slugToDiscount.has(slug)) {
+              const desc = readString(
+                benefit.description ?? benefit.ingress ?? benefit.tekst ??
+                benefit.shortDescription ?? benefit.excerpt ?? benefit.summary
+              );
+              if (desc && /\d+\s*%|\d+\s*kr/i.test(desc)) {
+                slugToDiscount.set(slug, desc);
+              }
             }
           }
         }
