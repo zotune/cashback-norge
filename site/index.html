@@ -598,7 +598,7 @@ function render(query) {
     const hasIcon = domain.length > 0;
     const letter = esc(m.name.charAt(0).toUpperCase());
     const iconHtml = hasIcon
-      ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.onerror=null;this.outerHTML='<span class=\\"merchant-icon merchant-icon-fallback\\">${letter}</span>'">`
+      ? `<img class="merchant-icon" src="https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
     const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode");
     const codeOffers = m.offers.filter(o => o.provider === "rabattkode" && o.discountCode);
