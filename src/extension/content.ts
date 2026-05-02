@@ -152,36 +152,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .side-tab:hover {
       background: #f7faf8;
     }
-    .notice.collapsed .side-tab.side-tab-remember .side-tab-text {
-      color: #ff9900;
-    }
-    .notice.collapsed .side-tab.side-tab-klarna .side-tab-text {
-      color: #0b051d;
-    }
-    .notice.collapsed .side-tab.side-tab-trumf .side-tab-text {
-      color: #07006b;
-    }
-    .notice.collapsed .side-tab.side-tab-sas .side-tab-text {
-      color: #00005c;
-    }
-    .notice.collapsed .side-tab.side-tab-curve .side-tab-text {
-      color: #000000;
-    }
-    .notice.collapsed .side-tab.side-tab-tfbank .side-tab-text {
-      color: #e30613;
-    }
-    .notice.collapsed .side-tab.side-tab-obos .side-tab-text {
-      color: #003087;
-    }
-    .notice.collapsed .side-tab.side-tab-naf .side-tab-text {
-      color: #b89a00;
-    }
-    .notice.collapsed .side-tab.side-tab-logbuy .side-tab-text {
-      color: #d81939;
-    }
-    .notice.collapsed .side-tab.side-tab-norskfamilie .side-tab-text {
-      color: #ff6600;
-    }
     .side-tab-arrow {
       font-size: 16px;
       font-weight: 700;
@@ -196,9 +166,20 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       font-size: 11px;
       font-weight: 700;
       white-space: nowrap;
-      color: #1f8f5f;
+      color: #172026;
       letter-spacing: 0.02em;
       margin-top: 6px;
+      align-items: center;
+      gap: 4px;
+    }
+    .side-tab-reward {
+      color: #172026;
+    }
+    .side-tab-chip {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 4px;
+      border-radius: 4px;
     }
     .notice.collapsed .side-tab {
       min-height: 80px;
@@ -208,7 +189,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       display: none;
     }
     .notice.collapsed .side-tab-text {
-      display: block;
+      display: flex;
     }
     .panel {
       width: min(400px, calc(100vw - 42px));
@@ -665,7 +646,17 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sideTabArrow.textContent = "\u2039"; // ‹
   const sideTabText = document.createElement("span");
   sideTabText.className = "side-tab-text";
-  sideTabText.textContent = formatSideTabText(offer, primaryOffer);
+  if (offer !== undefined) {
+    const rewardSpan = document.createElement("span");
+    rewardSpan.className = "side-tab-reward";
+    rewardSpan.textContent = formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
+    const chipSpan = document.createElement("span");
+    chipSpan.className = `side-tab-chip provider-${offer.provider}`;
+    chipSpan.textContent = formatProviderName(offer.provider);
+    sideTabText.append(rewardSpan, chipSpan);
+  } else {
+    sideTabText.textContent = formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
+  }
   sideTab.append(sideTabArrow, sideTabText);
   sideTab.addEventListener("click", () => {
     const isCollapsed = notice.classList.contains("collapsed");
