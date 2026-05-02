@@ -664,7 +664,30 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     sideTabText.textContent = formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
   }
   sideTab.append(sideTabArrow, sideTabText);
-  sideTab.addEventListener("click", () => {
+  const POSITION_KEY = "cashback-varsler-bottom";
+  const savedBottom = localStorage.getItem(POSITION_KEY);
+  if (savedBottom !== null) host.style.bottom = savedBottom;
+
+  let dragStartY = 0;
+  let dragStartBottom = 0;
+  let isDragging = false;
+  sideTab.addEventListener("touchstart", (e) => {
+    dragStartY = e.touches[0]?.clientY ?? 0;
+    dragStartBottom = parseInt(host.style.bottom || "16", 10);
+    isDragging = false;
+  }, { passive: true });
+  sideTab.addEventListener("touchmove", (e) => {
+    const dy = dragStartY - (e.touches[0]?.clientY ?? 0);
+    if (Math.abs(dy) > 5) isDragging = true;
+    if (!isDragging) return;
+    const newBottom = Math.max(0, Math.min(window.innerHeight - host.offsetHeight, dragStartBottom + dy));
+    host.style.bottom = `${newBottom}px`;
+  }, { passive: true });
+  sideTab.addEventListener("touchend", () => {
+    if (isDragging) localStorage.setItem(POSITION_KEY, host.style.bottom);
+  }, { passive: true });
+  sideTab.addEventListener("click", (e) => {
+    if (isDragging) { e.preventDefault(); return; }
     const isCollapsed = notice.classList.contains("collapsed");
     setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
   });
