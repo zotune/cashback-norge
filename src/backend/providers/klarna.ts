@@ -1,4 +1,3 @@
-import { resolve as dnsResolve } from "node:dns/promises";
 import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
@@ -79,6 +78,7 @@ type KlarnaStore = {
       suffix: string;
     };
   } | null;
+  otcUrl: string | null;
 };
 
 function parseKlarnaStoreListing(
@@ -103,12 +103,13 @@ function parseKlarnaStoreListing(
     const uuid = uuidMatch?.[1] ?? store.storeDirectUrl;
     const activationUrl = buildActivationUrl(store.storeDirectUrl, pageUrl);
 
+    const merchantDomain = extractMerchantDomain(store);
     const searchQuery = encodeURIComponent(store.displayName);
 
     offers.push({
       provider: "klarna",
       merchantName: store.displayName,
-      domains: [],
+      domains: merchantDomain !== undefined ? [merchantDomain] : [],
       reward,
       sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
       activationUrl,
@@ -222,44 +223,29 @@ async function resolveDomainsForOffers(
   overrides: ProviderOverrides,
   logger: Logger,
 ): Promise<CashbackOffer[]> {
-  const resolved: CashbackOffer[] = [];
+  return offers.map((offer) => {
+    const slug = toSlug(offer.merchantName);
+    const overrideDomains = overrides.klarna[slug] ?? [];
 
-  // Resolve domains in parallel batches
-  const batchSize = 20;
-  for (let i = 0; i < offers.length; i += batchSize) {
-    const batch = offers.slice(i, i + batchSize);
-    const results = await Promise.all(
-      batch.map(async (offer) => {
-        const slug = toSlug(offer.merchantName);
-        const overrideDomains = overrides.klarna[slug] ?? [];
+    // Use override if available, otherwise keep the domain already extracted from otcUrl
+    const domains =
+      overrideDomains.length > 0
+        ? overrideDomains
+        : offer.domains;
 
-        const domains =
-          overrideDomains.length > 0
-            ? overrideDomains
-            : await discoverDomains(offer.merchantName, logger);
+    if (domains.length === 0) {
+      logger.warn(
+        `Klarna offer has no domains: ${offer.merchantName} (slug: ${slug})`,
+      );
+    }
 
-        if (domains.length === 0) {
-          logger.warn(
-            `Klarna offer has no domains and could not resolve: ${offer.merchantName}`,
-          );
-        }
+    const resolvedDomains = uniqueStrings(domains.map(normalizeDomainInput));
 
-        const resolvedDomains = uniqueStrings(domains.map(normalizeDomainInput));
-        const searchQuery = encodeURIComponent(offer.merchantName);
-        const klarnaSearchUrl = `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`;
-
-        return {
-          ...offer,
-          domains: resolvedDomains,
-          sourceUrl: klarnaSearchUrl,
-          activationUrl: klarnaSearchUrl,
-        };
-      }),
-    );
-    resolved.push(...results);
-  }
-
-  return resolved;
+    return {
+      ...offer,
+      domains: resolvedDomains,
+    };
+  });
 }
 
 function toSlug(name: string): string {
@@ -269,74 +255,11 @@ function toSlug(name: string): string {
     .replace(/[^a-z0-9æøå.-]/g, "");
 }
 
-async function discoverDomains(
-  merchantName: string,
-  logger: Logger,
-): Promise<string[]> {
-  const candidates = buildDomainCandidates(merchantName);
-  const resolved: string[] = [];
-
-  for (const domain of candidates) {
-    if (await canResolve(domain)) {
-      resolved.push(domain);
-      break;
-    }
+function extractMerchantDomain(store: KlarnaStore): string | undefined {
+  const otcUrl = store.otcUrl ?? "";
+  const match = otcUrl.match(/merchantUrl=([^&]+)/);
+  if (match?.[1] !== undefined && match[1].length > 0) {
+    return match[1];
   }
-
-  if (resolved.length === 0) {
-    logger.warn(
-      `Could not resolve domain for Klarna merchant: ${merchantName} (tried: ${candidates.join(", ")})`,
-    );
-  }
-
-  return resolved;
-}
-
-function buildDomainCandidates(merchantName: string): string[] {
-  const name = merchantName.toLowerCase().trim();
-  const candidates: string[] = [];
-
-  // If name already looks like a domain (contains a dot and a TLD), use it directly
-  if (/\.[a-z]{2,}$/i.test(name)) {
-    candidates.push(name);
-    if (!name.startsWith("www.")) {
-      candidates.push(`www.${name}`);
-    }
-    return candidates;
-  }
-
-  // Build candidates from the merchant name
-  const slug = name
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9æøå-]/g, "");
-
-  if (slug.length === 0) {
-    return candidates;
-  }
-
-  // Try .no first (Norwegian market), then .com, then .se
-  candidates.push(
-    `${slug}.no`,
-    `www.${slug}.no`,
-    `${slug}.com`,
-    `www.${slug}.com`,
-    `${slug}.se`,
-  );
-
-  // If slug contains hyphens, try without them
-  if (slug.includes("-")) {
-    const noHyphens = slug.replace(/-/g, "");
-    candidates.push(`${noHyphens}.no`, `${noHyphens}.com`);
-  }
-
-  return candidates;
-}
-
-async function canResolve(domain: string): Promise<boolean> {
-  try {
-    await dnsResolve(domain);
-    return true;
-  } catch {
-    return false;
-  }
+  return undefined;
 }

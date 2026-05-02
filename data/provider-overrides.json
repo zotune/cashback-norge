@@ -32,6 +32,7 @@
     "meta": ["meta.com"],
     "new-vetzoo.no-kco-v.3-b2b-recurring": ["vetzoo.no"],
     "omio": ["omio.com"],
+    "puma": ["eu.puma.com"],
     "only--sons": ["onlyandsons.com"],
     "vila": ["vila.com"],
     "wakakuu-ab": ["wakakuu.com"],
@@ -41,7 +42,15 @@
   "remember": {},
   "sas": {
     "albert": ["heialbert.no"],
-    "disney+-1": ["disneyplus.com"]
+    "bodystore.com": ["bodystore.com"],
+    "charlies-hus": ["charlieshus.no"],
+    "disney+-1": ["disneyplus.com"],
+    "elektroimportøren.no": ["elektroimportoren.no"],
+    "kjell-co-no": ["kjell.com"],
+    "lanna-mobler": ["lannamobler.se"],
+    "newchic": ["newchic.com"],
+    "razer": ["razer.com"],
+    "shampoohuset": ["shampoohuset.no"]
   },
   "tfbank": {}
 }
