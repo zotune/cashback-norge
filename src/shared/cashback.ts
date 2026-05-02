@@ -159,7 +159,18 @@ export function findOffersForHostname(
     });
   });
 
-  return sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
+  const all = sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
+
+  // Keep only the best offer per provider (highest reward wins)
+  const bestByProvider = new Map<string, CashbackOffer>();
+  for (const offer of all) {
+    if (!bestByProvider.has(offer.provider)) {
+      bestByProvider.set(offer.provider, offer);
+    }
+  }
+  return [...bestByProvider.values()].sort(
+    (a, b) => parseRewardValue(b.reward) - parseRewardValue(a.reward),
+  );
 }
 
 const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
