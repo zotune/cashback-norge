@@ -811,7 +811,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const label = document.createElement("span");
     label.className = "bonus-chip-label";
     const ebInfo = card.ebPer100kr ? ` (~${card.ebPer100kr} EB/100kr)` : "";
-    const pctStr = (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+    const pctStr = (card.minPct != null && card.maxPct != null)
+      ? `${(card.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}-${(card.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}`
+      : (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
     label.textContent = `+${card.approx ? "~" : ""}${pctStr}%${ebInfo}`;
     const badge = document.createElement("span");
     badge.className = `provider-badge provider-${card.badge}`;
