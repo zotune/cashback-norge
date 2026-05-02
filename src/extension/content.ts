@@ -1458,10 +1458,10 @@ function formatRewardLabel(reward: string, provider: string): string {
   if (trimmedReward.length === 0) {
     return "Cashback";
   }
-  // For SAS, convert to percentage-first display
+  // For SAS, convert to percentage-first display with ~ prefix
   if (provider === "sas") {
     const converted = convertSasToPercent(trimmedReward);
-    return converted !== "" ? converted : trimmedReward;
+    return converted !== "" ? `~${converted}` : trimmedReward;
   }
   // For Trumf, show original reward + EB conversion
   if (provider === "trumf") {
