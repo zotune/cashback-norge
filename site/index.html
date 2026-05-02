@@ -726,8 +726,8 @@ function render(query) {
 
 function formatCompactReward(o) {
   const full = formatReward(o);
-  const pct = full.match(/(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
-  if (pct) return pct[1].replace(/\s+/g, " ");
+  const pct = full.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
+  if (pct) return ((pct[1] || "") + pct[2]).replace(/\s+/g, " ");
   const kr = full.match(/\d+(?:[,.]\d+)?\s*kr/i);
   if (kr) return kr[0].replace(/\s+/g, " ");
   if (/gratis\s+frakt/i.test(full)) return "Gratis frakt";

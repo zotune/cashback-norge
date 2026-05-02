@@ -759,7 +759,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     for (const { element, offer } of tooltipElements) {
       const fullReward = formatRewardLabel(offer.reward, offer.provider);
       const compact = formatCompactRewardLabel(offer);
-      const showRewardInTooltip = compact !== undefined && fullReward !== compact;
+      const showRewardInTooltip = compact !== undefined && fullReward !== compact && !fullReward.startsWith(compact);
       const breakdown = amount > 0 ? formatBreakdownWithAmounts(offer.terms, amount) : offer.terms;
       const parts: string[] = [];
       if (showRewardInTooltip) parts.push(fullReward);
@@ -1488,9 +1488,10 @@ function formatSideTabText(
 }
 function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
-  const percentMatch = label.match(/(?:~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
+  const percentMatch = label.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (percentMatch !== null) {
-    return percentMatch[1]!.replace(/\s+/g, " ");
+    const prefix = percentMatch[1] ?? "";
+    return (prefix + percentMatch[2]!).replace(/\s+/g, " ");
   }
   const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
   if (krMatch !== null) {
