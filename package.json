@@ -9,7 +9,7 @@
     "build:extension": "vite build --config vite.extension.config.ts",
     "build:site": "vite build --config vite.site.config.ts",
     "check": "tsc --project tsconfig.json --noEmit",
-    "crawl": "tsx src/backend/index.ts"
+    "crawl": "tsx src/backend/index.ts && cp data/cashback-index.json site/cashback-index.json"
   },
   "dependencies": {
     "crawlee": "^3.16.0",
