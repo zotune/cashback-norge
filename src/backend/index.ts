@@ -13,6 +13,7 @@ import { fetchTfBank } from "./providers/tfbank.js";
 import { crawlTrumf } from "./providers/trumf.js";
 import { fetchDnb } from "./providers/dnb.js";
 import { fetchCurve } from "./providers/curve.js";
+import { crawlFinnkupongkoder } from "./providers/finnkupongkoder.js";
 import { crawlRabattkode } from "./providers/rabattkode.js";
 import { crawlNorskfamilie } from "./providers/norskfamilie.js";
 
@@ -34,9 +35,11 @@ type CliConfig = {
   skipTfBank: boolean;
   skipDnb: boolean;
   skipCurve: boolean;
+  skipFinnkupongkoder: boolean;
   skipRabattkode: boolean;
   skipNorskfamilie: boolean;
   dnbPageDataUrl: string;
+  finnkupongkoderStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -127,7 +130,15 @@ async function main(): Promise<void> {
     ? []
     : await crawlRabattkode();
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...norskfamilieOffers]);
+  const finnkupongkoderOffers = config.skipFinnkupongkoder
+    ? []
+    : await crawlFinnkupongkoder({
+        generatedAt,
+        logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        startUrl: config.finnkupongkoderStartUrl,
+      });
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...finnkupongkoderOffers, ...norskfamilieOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -182,11 +193,15 @@ function readCliConfig(args: string[]): CliConfig {
     skipTfBank: args.includes("--skip-tfbank"),
     skipDnb: args.includes("--skip-dnb"),
     skipCurve: args.includes("--skip-curve"),
+    skipFinnkupongkoder: args.includes("--skip-finnkupongkoder"),
     skipRabattkode: args.includes("--skip-rabattkode"),
     skipNorskfamilie: args.includes("--skip-norskfamilie"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
+    finnkupongkoderStartUrl:
+      readArgumentValue(args, "--finnkupongkoder-start-url") ??
+      "https://www.finnkupongkoder.no/top",
   };
 }
 

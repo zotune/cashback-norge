@@ -100,7 +100,8 @@ function extractDomainFromUrl(url: string): string | undefined {
     if (hostname.startsWith("www.")) hostname = hostname.slice(4);
     const CC_SUBDOMAINS = new Set(["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"]);
     const parts = hostname.split(".");
-    if (parts.length >= 3 && CC_SUBDOMAINS.has(parts[0])) {
+    const firstPart = parts[0] ?? "";
+    if (parts.length >= 3 && CC_SUBDOMAINS.has(firstPart)) {
       hostname = parts.slice(1).join(".");
     }
     return hostname;

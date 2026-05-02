@@ -209,16 +209,24 @@ export function buildCashbackIndex(
     if (!changed) continue;
     try {
       const punycode = new URL(`https://${unicode}`).hostname;
-      if (punycode !== domain && domainIndex[punycode] === undefined) {
-        domainIndex[punycode] = domainIndex[domain];
+      const offersForDomain = domainIndex[domain];
+      if (
+        punycode !== domain &&
+        domainIndex[punycode] === undefined &&
+        offersForDomain !== undefined
+      ) {
+        domainIndex[punycode] = offersForDomain;
       }
     } catch { /* ignore invalid domains */ }
   }
 
   // Deduplicate within each domain: keep one offer per provider+reward+code
   for (const domain of Object.keys(domainIndex)) {
+    const offersForDomain = domainIndex[domain];
+    if (offersForDomain === undefined) continue;
+
     const seen = new Set<string>();
-    domainIndex[domain] = domainIndex[domain].filter((offer) => {
+    domainIndex[domain] = offersForDomain.filter((offer) => {
       const codePart = offer.discountCode ?? "";
       const key = `${offer.provider}:${offer.reward}:${codePart}`;
       if (seen.has(key)) return false;
