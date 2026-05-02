@@ -139,7 +139,9 @@ export function findOffersForHostname(
 
   // Also check alternate TLDs: visiting cdon.no should find offers for cdon.com
   const altDomains = getAlternateTldDomains(normalizedHostname);
-  const lookupDomains = [normalizedHostname, ...altDomains];
+  // Also check country-code subdomains: visiting lookfantastic.com should find no.lookfantastic.com
+  const ccSubdomains = CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`);
+  const lookupDomains = [normalizedHostname, ...altDomains, ...ccSubdomains];
 
   const indexMatches: CashbackOffer[] = [];
   for (const domain of lookupDomains) {
@@ -160,7 +162,8 @@ export function findOffersForHostname(
   return sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
 }
 
-const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi"];
+const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
+const CC_SUBDOMAINS = ["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"];
 
 function getAlternateTldDomains(domain: string): string[] {
   const parts = domain.split(".");

@@ -510,7 +510,7 @@ function groupByMerchant(offers) {
     }
     // Also try by normalized name
     const name = normalizeName(o.merchantName);
-    const nameKey = name.toLowerCase();
+    const nameKey = name.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!group && domainToGroup.has("name:" + nameKey)) {
       group = domainToGroup.get("name:" + nameKey);
     }
@@ -558,6 +558,7 @@ const TRACKING_DOMAINS = ["sjv.io", "pxf.io", "emjcd.com", "jdoqocy.com", "dpbol
 
 function pickBestDomain(domains) {
   if (!domains || domains.length === 0) return "";
+  const CC_SUBS = new Set(["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu", "nor"]);
   const clean = domains.filter(d => {
     if (TRACKING_DOMAINS.some(t => d.includes(t))) return false;
     // Filter out obviously broken domains
@@ -565,12 +566,22 @@ function pickBestDomain(domains) {
     return true;
   });
   if (clean.length === 0) return "";
-  // Prefer .no, then .com, then shortest domain
-  const no = clean.find(d => d.endsWith(".no") || d.includes(".no/"));
+  // Strip country-code subdomains to get base domain variants
+  const withBase = [...clean];
+  for (const d of clean) {
+    const parts = d.split(".");
+    if (parts.length >= 3 && CC_SUBS.has(parts[0])) {
+      const base = parts.slice(1).join(".");
+      if (!withBase.includes(base)) withBase.push(base);
+    }
+  }
+  // Prefer .no, then .com, then shortest domain (prefer shorter/base domains over CC subdomain variants)
+  const byLen = withBase.slice().sort((a, b) => a.length - b.length);
+  const no = byLen.find(d => d.endsWith(".no") || d.includes(".no/"));
   if (no) return no;
-  const com = clean.find(d => d.endsWith(".com") || d.includes(".com/"));
+  const com = byLen.find(d => d.endsWith(".com") || d.includes(".com/"));
   if (com) return com;
-  return clean.sort((a, b) => a.length - b.length)[0];
+  return byLen[0];
 }
 
 function render(query) {
@@ -625,7 +636,7 @@ function render(query) {
         <button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
       </div>`;
     }).join("");
-    const storeUrl = domain ? (domain.includes(".") && !domain.startsWith("www.") ? `https://www.${domain}` : `https://${domain}`) : "";
+    const storeUrl = domain ? `https://${domain}` : "";
     const nameHtml = storeUrl
       ? `<a class="merchant-name" href="${esc(storeUrl)}" target="_blank" rel="noreferrer">${esc(m.name)}</a>`
       : `<span class="merchant-name">${esc(m.name)}</span>`;
