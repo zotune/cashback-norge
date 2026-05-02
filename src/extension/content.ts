@@ -153,64 +153,34 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       background: #f7faf8;
     }
     .notice.collapsed .side-tab.side-tab-remember .side-tab-text {
-      background: #111111;
       color: #ff9900;
-      padding: 4px 2px;
-      border-radius: 4px;
     }
     .notice.collapsed .side-tab.side-tab-klarna .side-tab-text {
-      background: #ffa8cd;
       color: #0b051d;
-      padding: 4px 2px;
-      border-radius: 4px;
     }
     .notice.collapsed .side-tab.side-tab-trumf .side-tab-text {
-      background: #07006b;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #07006b;
     }
     .notice.collapsed .side-tab.side-tab-sas .side-tab-text {
-      background: #00005c;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #00005c;
     }
     .notice.collapsed .side-tab.side-tab-curve .side-tab-text {
-      background: #000000;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #000000;
     }
     .notice.collapsed .side-tab.side-tab-tfbank .side-tab-text {
-      background: #e30613;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #e30613;
     }
     .notice.collapsed .side-tab.side-tab-obos .side-tab-text {
-      background: #003087;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #003087;
     }
     .notice.collapsed .side-tab.side-tab-naf .side-tab-text {
-      background: #FFD100;
-      color: #000000;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #b89a00;
     }
     .notice.collapsed .side-tab.side-tab-logbuy .side-tab-text {
-      background: #d81939;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #d81939;
     }
     .notice.collapsed .side-tab.side-tab-norskfamilie .side-tab-text {
-      background: #ff6600;
-      color: #ffffff;
-      padding: 4px 2px;
-      border-radius: 4px;
+      color: #ff6600;
     }
     .side-tab-arrow {
       font-size: 16px;
