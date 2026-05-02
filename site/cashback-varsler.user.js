@@ -824,14 +824,6 @@
       setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
     });
     const panel = document.createElement("div");
-    let touchStartX = 0;
-    panel.addEventListener("touchstart", (e) => {
-      touchStartX = e.touches[0]?.clientX ?? 0;
-    }, { passive: true });
-    panel.addEventListener("touchend", (e) => {
-      const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX;
-      if (dx < -50) setCollapsed(notice, sideTab, sideTabArrow, true);
-    }, { passive: true });
     panel.className = "panel";
     const topLine = document.createElement("div");
     topLine.className = "topline";
