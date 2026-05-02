@@ -742,7 +742,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
     const offerLink = document.createElement("a");
     offerLink.className = "offer-link";
-    offerLink.href = currentOffer.provider === "trumf" ? currentOffer.sourceUrl : currentOffer.activationUrl;
+    offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
     offerLink.rel = "noreferrer";
 

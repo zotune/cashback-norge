@@ -604,7 +604,7 @@ function render(query) {
     const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode" && o.provider !== "dnb");
     const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb") && o.discountCode);
     const offerHtml = cashbackOffers.map(o => {
-      const url = o.provider === "trumf" ? o.sourceUrl : o.activationUrl;
+      const url = o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
       const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatReward(o);
       const terms = o.terms || "";
       const hasBreakdown = terms.includes("\n") && /\d+.*%/.test(terms);
