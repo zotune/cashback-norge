@@ -38,7 +38,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
   logbuy: { bg: "#d81939", fg: "#ffffff" },
   obos: { bg: "#003087", fg: "#ffffff" },
-  naf: { bg: "#003c96", fg: "#ffffff" },
+  naf: { bg: "#FFD100", fg: "#000000" },
 };
 
 export type BonusCard = {
