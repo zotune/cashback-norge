@@ -320,11 +320,6 @@ function formatRewardLabel(reward: string, provider: string): string {
     return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
   }
 
-  // Add ≈ prefix for percentage rewards (cashback is always approximate)
-  if (/\d.*%/.test(trimmedReward)) {
-    return `≈\u00a0${trimmedReward}`;
-  }
-
   return trimmedReward;
 }
 

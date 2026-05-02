@@ -68,53 +68,37 @@ async function main(): Promise<void> {
   const providerOverrides = await readProviderOverrides(
     config.providerOverridesPath,
   );
-  // Phase 1: Crawl providers that have real merchant URLs
-  const klarnaOffers = config.skipKlarna
-    ? []
-    : await crawlKlarna({
-        generatedAt,
-        logger,
-        maxPages: config.klarnaMaxPages,
+  // Phase 1: Crawl providers that have real merchant URLs (parallel)
+  const [
+    klarnaOffers,
+    rememberOffers,
+    tfBankOffers,
+    dnbOffers,
+    norskfamilieOffers,
+    obosOffers,
+  ] = await Promise.all([
+    config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
+        generatedAt, logger, maxPages: config.klarnaMaxPages,
+        overrides: providerOverrides, startUrl: config.klarnaStartUrl,
+      }),
+    config.skipRemember ? Promise.resolve([]) : crawlRemember({
+        generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides, startUrl: config.rememberStartUrl,
+      }),
+    config.skipTfBank ? Promise.resolve([]) : fetchTfBank({
+        generatedAt, logger, apiUrl: config.tfBankApiUrl,
         overrides: providerOverrides,
-        startUrl: config.klarnaStartUrl,
-      });
-  const rememberOffers = config.skipRemember
-    ? []
-    : await crawlRemember({
-        generatedAt,
-        logger,
-        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        overrides: providerOverrides,
-        startUrl: config.rememberStartUrl,
-      });
-  const tfBankOffers = config.skipTfBank
-    ? []
-    : await fetchTfBank({
-        generatedAt,
-        logger,
-        apiUrl: config.tfBankApiUrl,
-        overrides: providerOverrides,
-      });
-  const dnbOffers = config.skipDnb
-    ? []
-    : await fetchDnb({
-        generatedAt,
-        logger,
-        pageDataUrl: config.dnbPageDataUrl,
-      });
-  const norskfamilieOffers = config.skipNorskfamilie
-    ? []
-    : await crawlNorskfamilie();
+      }),
+    config.skipDnb ? Promise.resolve([]) : fetchDnb({
+        generatedAt, logger, pageDataUrl: config.dnbPageDataUrl,
+      }),
+    config.skipNorskfamilie ? Promise.resolve([]) : crawlNorskfamilie(),
+    config.skipObos ? Promise.resolve([]) : crawlObos({
+        generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides, startUrl: config.obosStartUrl,
+      }),
+  ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
-  const obosOffers = config.skipObos
-    ? []
-    : await crawlObos({
-        generatedAt,
-        logger,
-        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        overrides: providerOverrides,
-        startUrl: config.obosStartUrl,
-      });
 
   // Phase 2: Build domain lookup from providers with known-good URLs
   const domainLookup = buildDomainLookup([
@@ -128,86 +112,54 @@ async function main(): Promise<void> {
   ]);
   logger.info(`Domain lookup: ${domainLookup.size} merchant names with known domains`);
 
-  // Phase 3: Crawl providers that need cross-referencing for domains
-  const trumfOffers = config.skipTrumf
-    ? []
-    : await crawlTrumf({
-        generatedAt,
-        logger,
+  // Phase 3: Crawl providers that need cross-referencing for domains (parallel)
+  const [
+    trumfOffers,
+    sasOffers,
+    curveOffers,
+    rabattkodeOffers,
+    cuponationOffers,
+    trustdealsOffers,
+    kickbackOffers,
+    finnkupongkoderOffers,
+    logbuyOffers,
+    nafOffers,
+  ] = await Promise.all([
+    config.skipTrumf ? Promise.resolve([]) : crawlTrumf({
+        generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides, startUrl: config.trumfStartUrl, domainLookup,
+      }),
+    config.skipSas ? Promise.resolve([]) : fetchSas({
+        generatedAt, logger, overrides: providerOverrides,
+        apiUrl: config.sasApiUrl, domainLookup,
+      }),
+    Promise.resolve(config.skipCurve ? [] : fetchCurve({ generatedAt, logger })),
+    config.skipRabattkode ? Promise.resolve([]) : crawlRabattkode(),
+    config.skipCuponation ? Promise.resolve([]) : crawlCuponation({
+        generatedAt, logger, startUrl: config.cuponationStartUrl,
+      }),
+    config.skipTrustdeals ? Promise.resolve([]) : crawlTrustdeals({
+        generatedAt, logger, startUrl: config.trustdealsStartUrl,
+      }),
+    config.skipKickback ? Promise.resolve([]) : crawlKickback({
+        domainLookup, generatedAt, logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl, startUrl: config.kickbackStartUrl,
+      }),
+    config.skipFinnkupongkoder ? Promise.resolve([]) : crawlFinnkupongkoder({
+        generatedAt, logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl, startUrl: config.finnkupongkoderStartUrl,
+      }),
+    config.skipLogbuy ? Promise.resolve([]) : crawlLogbuy({
+        domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        overrides: providerOverrides,
-        startUrl: config.trumfStartUrl,
-        domainLookup,
-      });
-  const sasOffers = config.skipSas
-    ? []
-    : await fetchSas({
-        generatedAt,
-        logger,
-        overrides: providerOverrides,
-        apiUrl: config.sasApiUrl,
-        domainLookup,
-      });
-  const curveOffers = config.skipCurve
-    ? []
-    : fetchCurve({
-        generatedAt,
-        logger,
-      });
-  const rabattkodeOffers = config.skipRabattkode
-    ? []
-    : await crawlRabattkode();
+        overrides: providerOverrides, startUrl: config.logbuyStartUrl,
+      }),
+    config.skipNaf ? Promise.resolve([]) : crawlNaf({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides, startUrl: config.nafStartUrl,
+      }),
+  ]);
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const cuponationOffers = config.skipCuponation
-    ? []
-    : await crawlCuponation({
-        generatedAt,
-        logger,
-        startUrl: config.cuponationStartUrl,
-      });
-  const trustdealsOffers = config.skipTrustdeals
-    ? []
-    : await crawlTrustdeals({
-        generatedAt,
-        logger,
-        startUrl: config.trustdealsStartUrl,
-      });
-  const kickbackOffers = config.skipKickback
-    ? []
-    : await crawlKickback({
-        domainLookup,
-        generatedAt,
-        logger,
-        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        startUrl: config.kickbackStartUrl,
-      });
-  const finnkupongkoderOffers = config.skipFinnkupongkoder
-    ? []
-    : await crawlFinnkupongkoder({
-        generatedAt,
-        logger,
-        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        startUrl: config.finnkupongkoderStartUrl,
-      });
-  const logbuyOffers = config.skipLogbuy
-    ? []
-    : await crawlLogbuy({
-        domainLookup,
-        generatedAt,
-        logger,
-        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
-        overrides: providerOverrides,
-        startUrl: config.logbuyStartUrl,
-      });
-  const nafOffers = config.skipNaf
-    ? []
-    : await crawlNaf({
-        domainLookup,
-        generatedAt,
-        logger,
-        overrides: providerOverrides,
-        startUrl: config.nafStartUrl,
-      });
   const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 

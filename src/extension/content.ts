@@ -1468,10 +1468,6 @@ function formatRewardLabel(reward: string, provider: string): string {
     const converted = convertTrumfToEb(trimmedReward);
     return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
   }
-  // Add ≈ prefix for percentage rewards
-  if (/\d.*%/.test(trimmedReward)) {
-    return `≈\u00a0${trimmedReward}`;
-  }
   return trimmedReward;
 }
 function formatSideTabText(
@@ -1486,9 +1482,9 @@ function formatSideTabText(
 }
 function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
-  const percentMatch = label.match(/(?:≈\u00a0)?(?:opptil\s*)?(\d+(?:[,.]\d+)?\s*%(?:\s*[-–]\s*\d+(?:[,.]\d+)?\s*%)?)/i);
+  const percentMatch = label.match(/(?:~)?(?:opptil\s*)?(\d+(?:[,.]\d+)?\s*%(?:\s*[-–]\s*\d+(?:[,.]\d+)?\s*%)?)/i);
   if (percentMatch !== null) {
-    return `≈\u00a0${percentMatch[1]!.replace(/\s+/g, " ")}`;
+    return percentMatch[1]!.replace(/\s+/g, " ");
   }
   const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
   if (krMatch !== null) {

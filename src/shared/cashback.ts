@@ -311,7 +311,10 @@ type RewardValue = {
 };
 
 function parseRewardValue(reward: string): RewardValue {
-  const percentageMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
+  const percentageMatch = rangeMatch
+    ? [null, rangeMatch[1]]
+    : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
 
   if (percentageMatch !== null) {
     return {

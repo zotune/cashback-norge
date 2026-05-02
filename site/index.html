@@ -416,6 +416,7 @@ a.merchant-name:hover { text-decoration: underline; }
 </head>
 <body>
 <div class="container">
+  <img src="icon.png" alt="" style="width:48px;height:48px;border-radius:12px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
   <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
@@ -502,7 +503,6 @@ function groupByMerchant(offers) {
   const DOMAIN_ALIASES = {
     "bestdrive.no": "dekkmann.no",
     "dekkhotell.no": "dekkmann.no",
-    "noddi.no": "dekkmann.no",
   };
 
   // Normalize domains through aliases before grouping

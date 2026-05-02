@@ -166,20 +166,21 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
     benefits.push(...extracted.filter((b) => !isExcluded(b.name)));
     input.logger.info(`NAF: found ${benefits.length} benefits on list page`);
 
-    // Visit detail pages for precise reward + store URL
-    for (let i = 0; i < benefits.length; i++) {
-      const b = benefits[i]!;
-      process.stdout.write(`\r  NAF detail ${i + 1}/${benefits.length}: ${b.name.slice(0, 40)}  `);
+    // Visit detail pages in parallel (concurrency = 5)
+    const CONCURRENCY = 5;
+    let completed = 0;
+    const internalDomainsArr = [...INTERNAL_DOMAINS];
+
+    async function scrapeDetail(b: typeof benefits[number]): Promise<void> {
+      const detailPage = await browser.newPage();
       try {
-        await page.goto(`${LIST_URL}/${b.slug}`, {
+        await detailPage.goto(`${LIST_URL}/${b.slug}`, {
           waitUntil: "domcontentloaded",
           timeout: 15000,
         });
+        await detailPage.waitForSelector('[class*="BenefitBulletsCard"]', { timeout: 5000 }).catch(() => {});
 
-        // Wait for the benefit card to appear (it's React-rendered)
-        await page.waitForSelector('[class*="BenefitBulletsCard"]', { timeout: 5000 }).catch(() => {});
-
-        const detail = await page.evaluate((internalDomains: string[]) => {
+        const detail = await detailPage.evaluate((internalDomains: string[]) => {
           let storeUrl: string | undefined;
           const CTA_TEXTS = ["gå til", "bestill", "kjøp", "handle", "book", "se tilbud", "les mer", "se betingelser"];
 
@@ -198,7 +199,6 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
             if (!storeUrl) storeUrl = href;
           }
 
-          // Extract discount % from "Hva får du?" bullet card, fall back to main
           const bulletCard = document.querySelector('[class*="BenefitBulletsCard"]');
           const searchText = bulletCard
             ? (bulletCard.innerText ?? "")
@@ -222,17 +222,24 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
             if (kr) reward = (kr[1] ?? "") + " kr rabatt";
           }
 
-          return { storeUrl, reward, hasBulletCard: !!bulletCard };
-        }, [...INTERNAL_DOMAINS]);
+          return { storeUrl, reward };
+        }, internalDomainsArr);
 
         if (detail.storeUrl) b.storeUrl = detail.storeUrl;
         if (detail.reward) b.reward = detail.reward;
-        if (!detail.hasBulletCard) input.logger.warn(`NAF: no BulletCard on ${b.slug} (reward: "${detail.reward}")`);
       } catch {
         // detail page failed — keep what we have
+      } finally {
+        await detailPage.close();
+        completed++;
+        process.stdout.write(`\r  NAF detail ${completed}/${benefits.length}: ${b.name.slice(0, 40)}  `);
       }
     }
-    process.stdout.write("\n");
+
+    // Run with limited concurrency
+    for (let i = 0; i < benefits.length; i += CONCURRENCY) {
+      await Promise.all(benefits.slice(i, i + CONCURRENCY).map(scrapeDetail));
+    }
   } finally {
     await browser.close();
   }
