@@ -498,6 +498,18 @@ function normalizeName(name) {
 }
 
 function groupByMerchant(offers) {
+  // Domains that are aliases for another domain (treated as the same merchant)
+  const DOMAIN_ALIASES = {
+    "bestdrive.no": "dekkmann.no",
+    "dekkhotell.no": "dekkmann.no",
+    "noddi.no": "dekkmann.no",
+  };
+
+  // Normalize domains through aliases before grouping
+  function canonicalDomain(d) {
+    return DOMAIN_ALIASES[d] || d;
+  }
+
   // Tracking domains that should be excluded from grouping (shared by many unrelated merchants)
   const domainCount = {};
   for (const o of offers) {
@@ -517,7 +529,7 @@ function groupByMerchant(offers) {
     if (!o.reward || !o.reward.trim()) continue;
     if (o.provider === "curve") continue;
 
-    const usableDomains = (o.domains || []).filter(d => !sharedDomains.has(d));
+    const usableDomains = (o.domains || []).map(canonicalDomain).filter(d => !sharedDomains.has(d));
     let group = null;
 
     // Find existing group via domain overlap
@@ -575,6 +587,7 @@ function groupByMerchant(offers) {
       "if.no": "If Forsikring",
       "tryg.no": "Tryg",
       "fremtind.no": "Fremtind",
+      "dekkmann.no": "Bestdrive",
     };
     const primaryDomain = m.domains[0];
     if (primaryDomain && DOMAIN_DISPLAY_NAMES[primaryDomain]) {

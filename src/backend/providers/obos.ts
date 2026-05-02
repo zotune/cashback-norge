@@ -88,22 +88,17 @@ function extractDiscount($: ObosCheerio): string {
   const contentEl = $("main, article, [class*='content'], [class*='benefit'], [class*='detail']").first();
   const text = contentEl.length ? contentEl.text() : $("body").text();
 
-  // Collect all percentage/kr-rabatt hits
-  const pctMatches = [...text.matchAll(/(opptil\s+)?(\d{1,3}(?:[,.]\d+)?)\s*%(?:\s*(?:cashback|rabatt))?/gi)];
+  const pctMatches = [...text.matchAll(/(\d{1,3}(?:[,.]\d+)?)\s*%/gi)];
   const krMatches = [...text.matchAll(/(\d+)\s*kr\s+(?:i\s+)?rabatt/gi)];
 
   if (pctMatches.length === 0 && krMatches.length === 0) return "";
 
   if (pctMatches.length > 0) {
-    // Return the highest single percentage
-    let best = pctMatches[0]!;
-    let bestVal = parseFloat((best[2] ?? "0").replace(",", "."));
-    for (const m of pctMatches) {
-      const v = parseFloat((m[2] ?? "0").replace(",", "."));
-      if (v > bestVal) { bestVal = v; best = m; }
-    }
-    const prefix = best[1] ? "Opptil " : "";
-    return `${prefix}${bestVal} %`;
+    const vals = pctMatches.map(m => parseFloat((m[1] ?? "0").replace(",", ".")));
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const fmt = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
+    return min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
   }
 
   return (krMatches[0]?.[0] ?? "").trim();

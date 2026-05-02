@@ -19,7 +19,10 @@ const SLUG_NAME_OVERRIDES: Record<string, string> = {
   "maskinvask": "Circle K Bilvask",
   "drivstoff": "Circle K",
   "hurtiglading-circle-k": "Circle K",
-  "dekk": "Dekk1",
+  "dekk": "Bestdrive",
+  "dekkhotell": "Bestdrive",
+  "dekkmann-mc-dekk": "Bestdrive",
+  "noddi-hjulskift": "Bestdrive",
   "leiebil-avis": "Avis",
   "homely": "Homely",
   "bilpleiekongen": "Bilpleiekongen",
@@ -195,8 +198,18 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
           }
 
           const bodyText = document.body.innerText ?? "";
-          const m = bodyText.match(/(\d{1,3}(?:[,.]\d+)?\s*%\s*rabatt|\d+\s*kr\s*(?:i\s*)?rabatt|opptil\s+\d{1,3}(?:[,.]\d+)?\s*%)/i);
-          const reward = m ? (m[1] ?? "").trim() : "";
+          const pctMatches = [...bodyText.matchAll(/(\d{1,3}(?:[,.]\d+)?)\s*%/g)];
+          let reward = "";
+          if (pctMatches.length > 0) {
+            const vals = pctMatches.map(m => parseFloat((m[1] ?? "0").replace(",", ".")));
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            const fmt = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ",");
+            reward = min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
+          } else {
+            const kr = bodyText.match(/(\d+)\s*kr\s*(?:i\s*)?rabatt/i);
+            if (kr) reward = (kr[1] ?? "") + " kr rabatt";
+          }
 
           return { storeUrl, reward };
         }, [...INTERNAL_DOMAINS]);
