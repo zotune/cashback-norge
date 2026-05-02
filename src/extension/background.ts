@@ -97,29 +97,40 @@ async function ensureIndex(): Promise<CashbackIndex> {
 }
 
 async function refreshIndex(): Promise<CashbackIndex> {
-  try {
-    const response = await fetch(REMOTE_INDEX_URL);
-    const value: unknown = await response.json();
-
-    if (isCashbackIndex(value)) {
-      const cachedIndex: CachedIndex = {
-        downloadedAt: new Date().toISOString(),
-        index: value,
-      };
-      await setStorageValue(STORAGE_KEY, cachedIndex);
-      return value;
-    }
-  } catch {
-    // Fall through to bundled index
-  }
-
+  // Always use the bundled index first — it's the most up-to-date at build time.
+  // Then try to fetch a newer remote version in the background.
   const bundledIndex = await readBundledIndex();
   const cachedIndex: CachedIndex = {
     downloadedAt: new Date().toISOString(),
     index: bundledIndex,
   };
   await setStorageValue(STORAGE_KEY, cachedIndex);
+
+  // Fetch remote in background to update for next load
+  void fetchRemoteIndex();
+
   return bundledIndex;
+}
+
+async function fetchRemoteIndex(): Promise<void> {
+  try {
+    const response = await fetch(REMOTE_INDEX_URL);
+    const value: unknown = await response.json();
+
+    if (isCashbackIndex(value)) {
+      const bundledIndex = await readBundledIndex();
+      // Only use remote if it's newer than bundled
+      if (value.generatedAt > bundledIndex.generatedAt) {
+        const cachedIndex: CachedIndex = {
+          downloadedAt: new Date().toISOString(),
+          index: value,
+        };
+        await setStorageValue(STORAGE_KEY, cachedIndex);
+      }
+    }
+  } catch {
+    // Remote fetch failed, bundled index is already in use
+  }
 }
 
 async function readBundledIndex(): Promise<CashbackIndex> {

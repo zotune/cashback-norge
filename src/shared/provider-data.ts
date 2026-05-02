@@ -9,7 +9,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   dnb: "DNB",
   curve: "Curve Pro",
   rabattkode: "Rabattkode",
-  norskfamilie: "Norsk Familieøkonomi",
+  norskfamilie: "NF",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {

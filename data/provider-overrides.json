@@ -1,5 +1,6 @@
 {
   "trumf": {
+    "asics-outlet-trumf": ["outlet.asics.com"],
     "auto-europe-notrumf": ["autoeurope.no"],
     "disney-trumfa": ["disneyplus.com"],
     "ellos": ["ellos.no"],
@@ -28,6 +29,7 @@
   },
   "remember": {},
   "sas": {
+    "albert": ["heialbert.no"],
     "disney+-1": ["disneyplus.com"]
   },
   "tfbank": {}

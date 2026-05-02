@@ -1,7 +1,7 @@
 import { EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, PROVIDER_NAMES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
 
 type CashbackOffer = {
-  provider: "trumf" | "klarna" | "remember" | "sas";
+  provider: string;
   merchantName: string;
   domains: string[];
   reward: string;
@@ -363,6 +363,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 
     .provider-curve {
       background: #000000;
+      color: #ffffff;
+    }
+
+    .provider-rabattkode {
+      background: #e74c3c;
+      color: #ffffff;
+    }
+
+    .provider-norskfamilie {
+      background: #ff6600;
       color: #ffffff;
     }
 

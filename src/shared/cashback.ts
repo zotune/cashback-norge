@@ -98,6 +98,21 @@ export function normalizeDomainInput(input: string): string {
   return normalizeHostname(hostPart);
 }
 
+const COMPOUND_TLDS = ["co.uk", "com.au", "co.jp", "com.br"];
+
+export function toBaseDomain(domain: string): string {
+  for (const tld of COMPOUND_TLDS) {
+    if (domain.endsWith(`.${tld}`)) {
+      const prefix = domain.slice(0, -(tld.length + 1));
+      const lastDot = prefix.lastIndexOf(".");
+      return lastDot === -1 ? domain : domain.slice(lastDot + 1);
+    }
+  }
+  const parts = domain.split(".");
+  if (parts.length <= 2) return domain;
+  return parts.slice(-2).join(".");
+}
+
 export function parseUrl(input: string): URL | undefined {
   try {
     return new URL(input);
@@ -121,7 +136,17 @@ export function findOffersForHostname(
   hostname: string,
 ): CashbackOffer[] {
   const normalizedHostname = normalizeHostname(hostname);
-  const exactMatches = cashbackIndex.domainIndex[normalizedHostname] ?? [];
+
+  // Also check alternate TLDs: visiting cdon.no should find offers for cdon.com
+  const altDomains = getAlternateTldDomains(normalizedHostname);
+  const lookupDomains = [normalizedHostname, ...altDomains];
+
+  const indexMatches: CashbackOffer[] = [];
+  for (const domain of lookupDomains) {
+    const matches = cashbackIndex.domainIndex[domain] ?? [];
+    indexMatches.push(...matches);
+  }
+
   const suffixMatches = cashbackIndex.offers.filter((offer) => {
     return offer.domains.some((domain) => {
       const normalizedDomain = normalizeDomainInput(domain);
@@ -132,7 +157,20 @@ export function findOffersForHostname(
     });
   });
 
-  return sortOffersByReward(uniqueOffers([...exactMatches, ...suffixMatches]));
+  return sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
+}
+
+const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi"];
+
+function getAlternateTldDomains(domain: string): string[] {
+  const parts = domain.split(".");
+  if (parts.length !== 2) return [];
+  const tld = `.${parts[1]}`;
+  if (!COMMON_TLDS.includes(tld)) return [];
+  const baseName = parts[0];
+  return COMMON_TLDS
+    .filter((t) => t !== tld)
+    .map((t) => `${baseName}${t}`);
 }
 
 export function buildCashbackIndex(

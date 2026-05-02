@@ -96,42 +96,42 @@ async function discoverDomains(shop: SasShop, logger: Logger): Promise<string[]>
   const slug = shop.slug;
   const name = shop.name.trim();
 
+  // If the store name itself looks like a domain (e.g. "Barbershop.no", "CDON.COM")
+  if (/^[\w.\-]+\.(no|com|se|eu|net|io|dk|fi)$/i.test(name)) {
+    const domain = name.toLowerCase();
+    if (await canResolve(domain)) {
+      logger.info(`SAS ${slug}: resolved domain from name ${domain}`);
+      return [domain];
+    }
+  }
+
   const cleanSlug = slug.replace(/-\d+$/, "").replace(/-(?:no|se|dk)$/, "");
   const nameClean = name.toLowerCase().replace(/[^a-z0-9\-]/g, "");
 
-  const candidates = new Set<string>();
-
-  // If the store name itself looks like a domain (e.g. "Barbershop.no", "CDON.COM")
-  if (/^[\w.\-]+\.(no|com|se|eu|net|io|dk|fi)$/i.test(name)) {
-    candidates.add(name.toLowerCase());
-  }
+  const candidates: string[] = [];
 
   // Try common TLDs with slug variants
   for (const base of [cleanSlug, slug]) {
     const baseLower = base.replace(/\s/g, "").toLowerCase();
     for (const tld of [".no", ".com", ".se"]) {
-      candidates.add(`${baseLower}${tld}`);
+      candidates.push(`${baseLower}${tld}`);
     }
   }
 
   // Try cleaned store name as domain
   for (const tld of [".no", ".com"]) {
-    candidates.add(`${nameClean}${tld}`);
+    candidates.push(`${nameClean}${tld}`);
   }
 
-  const resolved: string[] = [];
-
-  for (const candidate of [...candidates].sort()) {
+  // Return first candidate that resolves
+  for (const candidate of candidates) {
     if (await canResolve(candidate)) {
-      resolved.push(candidate);
+      logger.info(`SAS ${slug}: resolved domain ${candidate}`);
+      return [candidate];
     }
   }
 
-  if (resolved.length > 0) {
-    logger.info(`SAS ${slug}: resolved domains ${resolved.join(", ")}`);
-  }
-
-  return uniqueStrings(resolved);
+  return [];
 }
 
 async function canResolve(domain: string): Promise<boolean> {
