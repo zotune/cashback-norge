@@ -13,7 +13,7 @@ function userscriptBannerPlugin(banner: string, fileName: string): Plugin {
   };
 }
 
-const PAGES_URL = "https://zotune.github.io/cashback-norge";
+const PAGES_URL = "https://cashbacknorge.no";
 
 const USERSCRIPT_BANNER = `\
 // ==UserScript==

@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Cashback Varsler
-// @namespace    https://zotune.github.io/cashback-norge/
+// @namespace    https://cashbacknorge.no/
 // @version      1.0
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
-// @updateURL    https://zotune.github.io/cashback-norge/cashback-varsler.user.js
-// @downloadURL  https://zotune.github.io/cashback-norge/cashback-varsler.user.js
+// @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
+// @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
 // ==/UserScript==
 (function() {
   "use strict";
@@ -23,7 +23,7 @@
         return void 0;
       },
       getURL() {
-        return "https://zotune.github.io/cashback-norge/cashback-index.json";
+        return "https://cashbacknorge.no/cashback-index.json";
       }
     },
     storage: {
