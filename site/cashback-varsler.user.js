@@ -1269,10 +1269,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       });
     }
     if (initialCollapsed) {
-      requestAnimationFrame(() => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
         notice.classList.remove("no-transition");
-      });
+      }));
     }
+    let panelSwipeStartX = 0;
+    let panelSwipeStartY = 0;
+    panel.addEventListener("touchstart", (e) => {
+      panelSwipeStartX = e.touches[0]?.clientX ?? 0;
+      panelSwipeStartY = e.touches[0]?.clientY ?? 0;
+    }, { passive: true });
+    panel.addEventListener("touchend", (e) => {
+      const dx = (e.changedTouches[0]?.clientX ?? 0) - panelSwipeStartX;
+      const dy = (e.changedTouches[0]?.clientY ?? 0) - panelSwipeStartY;
+      if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        setCollapsed(notice, sideTab, sideTabArrow, true);
+      }
+    }, { passive: true });
   }
   function clearNotice() {
     document.getElementById(HOST_ID)?.remove();

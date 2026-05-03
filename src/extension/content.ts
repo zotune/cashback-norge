@@ -1175,12 +1175,27 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       tooltip.classList.remove("visible");
     });
   }
-  // Re-enable transitions after first frame
+  // Re-enable transitions after layout settles (double rAF ensures reflow is done)
   if (initialCollapsed) {
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       notice.classList.remove("no-transition");
-    });
+    }));
   }
+
+  // Swipe-left on panel to collapse
+  let panelSwipeStartX = 0;
+  let panelSwipeStartY = 0;
+  panel.addEventListener("touchstart", (e) => {
+    panelSwipeStartX = e.touches[0]?.clientX ?? 0;
+    panelSwipeStartY = e.touches[0]?.clientY ?? 0;
+  }, { passive: true });
+  panel.addEventListener("touchend", (e) => {
+    const dx = (e.changedTouches[0]?.clientX ?? 0) - panelSwipeStartX;
+    const dy = (e.changedTouches[0]?.clientY ?? 0) - panelSwipeStartY;
+    if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      setCollapsed(notice, sideTab, sideTabArrow, true);
+    }
+  }, { passive: true });
 }
 function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
