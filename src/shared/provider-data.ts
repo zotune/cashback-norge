@@ -118,6 +118,8 @@ export const SUPPORT_LINKS = [
   { text: "Kron: 200 kr gratis i fond →", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d" },
   { text: "Horde: Oversikt over alle kort + nedbetaling →", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube" },
   { text: "Kjøp en kaffe til utvikler →", emoji: "☕", url: "https://buymeacoffee.com/adore" },
+  { text: "Wise: Gratis internasjonal overføring opptil 5 000 kr →", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41" },
+  { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift →", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene" },
   { text: "Revolut: Gratis valutaveksling + bonus →", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK" },
   { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix →", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou" },
   { text: "Curve: Samle alle kort i ett + gratis valutaveksling →", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD" },

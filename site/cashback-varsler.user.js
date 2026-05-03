@@ -154,6 +154,8 @@
     { text: "Kron: 200 kr gratis i fond →", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d" },
     { text: "Horde: Oversikt over alle kort + nedbetaling →", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube" },
     { text: "Kjøp en kaffe til utvikler →", emoji: "☕", url: "https://buymeacoffee.com/adore" },
+    { text: "Wise: Gratis internasjonal overføring opptil 5 000 kr →", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41" },
+    { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift →", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene" },
     { text: "Revolut: Gratis valutaveksling + bonus →", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK" },
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix →", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou" },
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling →", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD" }
@@ -857,7 +859,7 @@
       const offerLabel = document.createElement("span");
       offerLabel.className = "offer-label";
       const offerReward = document.createElement("span");
-      offerReward.textContent = formatCompactRewardLabel(currentOffer) ?? formatRewardLabel(currentOffer.reward, currentOffer.provider);
+      offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
       const providerBadge = document.createElement("span");
       providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
@@ -909,9 +911,9 @@
       for (const { element, offer: offer2 } of rewardLabels) {
         if (amount > 0) {
           const result = calculateCashback(offer2, amount);
-          element.textContent = result !== "" ? result : formatCompactRewardLabel(offer2) ?? formatRewardLabel(offer2.reward, offer2.provider);
+          element.textContent = result !== "" ? result : formatRewardLabel(offer2.reward, offer2.provider);
         } else {
-          element.textContent = formatCompactRewardLabel(offer2) ?? formatRewardLabel(offer2.reward, offer2.provider);
+          element.textContent = formatRewardLabel(offer2.reward, offer2.provider);
         }
       }
       for (const { element, offer: offer2 } of tooltipElements) {
@@ -924,11 +926,17 @@
         if (breakdown) parts.push(breakdown);
         element.textContent = parts.join("\n\n");
       }
-      for (const { element, pct, minPct, maxPct, approx, defaultText } of bonusChipLabels) {
+      for (const { element, pct, minPct, maxPct, ebPer100kr, approx, defaultText } of bonusChipLabels) {
         if (amount > 0 && minPct != null && maxPct != null) {
           element.textContent = `+${formatKr(amount * minPct / 100)}-${formatKr(amount * maxPct / 100)} kr`;
         } else if (amount > 0) {
-          element.textContent = `+${approx ? "~" : ""}${formatKr(amount * pct / 100)} kr`;
+          const kr = formatKr(amount * pct / 100);
+          if (ebPer100kr != null) {
+            const eb = Math.round(amount * ebPer100kr / 100);
+            element.textContent = `+~${kr} kr (~${eb} EB)`;
+          } else {
+            element.textContent = `+${approx ? "~" : ""}${kr} kr`;
+          }
         } else {
           element.textContent = defaultText;
         }
@@ -975,7 +983,7 @@
     }
     for (const card of FREE_CARDS) {
       const { chip, label } = createBonusChip(card);
-      bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, approx: card.approx, defaultText: label.textContent ?? "" });
+      bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, ebPer100kr: card.ebPer100kr, approx: card.approx, defaultText: label.textContent ?? "" });
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
@@ -1558,7 +1566,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     }
     if (provider === "sas") {
       const converted = convertSasToPercent(trimmedReward);
-      return converted !== "" ? `~${converted}` : trimmedReward;
+      return converted !== "" ? converted : trimmedReward;
     }
     if (provider === "trumf") {
       const converted = convertTrumfToEb(trimmedReward);
