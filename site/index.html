@@ -452,6 +452,12 @@ a.merchant-name:hover { text-decoration: underline; }
 <script>
 const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES } = window.SHARED;
 
+const CRYPTO_SUBSCRIPTIONS = {
+  "spotify.com": "Spotify",
+  "netflix.com": "Netflix",
+  "truthsocial.com": "Truth+",
+};
+
 let allMerchants = [];
 
 let currentAmount = 0;
@@ -462,6 +468,12 @@ async function init() {
   const res = await fetch("cashback-index.json");
   const data = await res.json();
   allMerchants = groupByMerchant(data.offers);
+  for (const [domain, name] of Object.entries(CRYPTO_SUBSCRIPTIONS)) {
+    if (!allMerchants.some(m => m.domains.includes(domain))) {
+      allMerchants.push({ name, domains: [domain], offers: [] });
+    }
+  }
+  allMerchants.sort((a, b) => a.name.localeCompare(b.name, "nb"));
   render("");
   document.querySelector(".search").addEventListener("input", (e) => {
     render(e.target.value);
@@ -689,6 +701,12 @@ function render(query) {
         <span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a></span>`;
     }).join("");
+    const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
+    const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
+    const cryptoChipHtml = cryptoSubName ? (() => {
+      const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}\n+2-5 % cashback på alle kjøp`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="badge badge-crypto">Crypto</span></a></span>`;
+    })() : "";
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       return `<div class="code-item">
@@ -706,7 +724,7 @@ function render(query) {
         ${iconHtml}
         ${nameHtml}
       </div>
-      <div class="offers">${offerHtml}</div>
+      <div class="offers">${offerHtml}${cryptoChipHtml}</div>
       ${codesHtml ? `<div class="codes-inline"><button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder (${codeOffers.length})</button><div class="codes-items">${codesHtml}</div></div>` : ""}
     </div>`;
   }).join("");

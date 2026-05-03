@@ -639,6 +639,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   `;
   const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
   const curveOffer = offers.find((o) => o.provider === "curve");
+  const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
+  const isCardOnly = mainOffers.length > 0 && mainOffers.every((o) => CARD_ONLY_PROVIDERS.has(o.provider));
+  const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
+    "spotify.com": "Spotify",
+    "netflix.com": "Netflix",
+    "truthsocial.com": "Truth+",
+  };
+  const currentHost = window.location.hostname.replace(/^www\./, "").toLowerCase();
+  const cryptoSubEntry = Object.entries(CRYPTO_SUBSCRIPTIONS).find(([d]) => currentHost === d || currentHost.endsWith(`.${d}`));
+  const cryptoSub = cryptoSubEntry?.[1];
   const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
   const offer = mainOffers[0];
   if (offer === undefined && codeOffers.length === 0) {
@@ -906,7 +916,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
   }
   for (const card of PREMIUM_CARDS) {
-    // For Curve, use the actual offer URL if available
     const overrideUrl = card.label === "Curve" && curveOffer !== undefined ? curveOffer.activationUrl : undefined;
     const { chip, label } = createBonusChip(card, overrideUrl);
     bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, approx: card.approx, defaultText: label.textContent ?? "" });
@@ -1002,7 +1011,32 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
     codesSection.append(codesToggle, codesList);
   }
-  body.append(header, offerList, chipsSection);
+  if (isCardOnly && cryptoSub !== undefined) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "offer-link-wrapper";
+    const offerLink = document.createElement("a");
+    offerLink.className = "offer-link";
+    offerLink.href = "https://crypto.com/app/ns3fma5hou";
+    offerLink.target = "_blank";
+    offerLink.rel = "noreferrer";
+    const offerLabel = document.createElement("span");
+    offerLabel.className = "offer-label";
+    const offerReward = document.createElement("span");
+    offerReward.textContent = "3-6 mnd gratis";
+    const providerBadge = document.createElement("span");
+    providerBadge.className = "provider-badge provider-crypto";
+    providerBadge.textContent = "Crypto";
+    offerLabel.append(offerReward);
+    offerLink.append(offerLabel, providerBadge);
+    wrapper.append(offerLink);
+    addChipTooltip(offerLink, `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSub}\nPlatin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
+    offerList.append(wrapper);
+    body.append(header, offerList);
+  } else if (!isCardOnly) {
+    body.append(header, offerList, chipsSection);
+  } else {
+    body.append(header, offerList);
+  }
   if (codeOffers.length > 0) {
     body.append(codesSection);
   }

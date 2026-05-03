@@ -5,6 +5,12 @@ import {
   isOffersForUrlResponse,
 } from "../../shared/extension-messages.js";
 
+const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
+  "spotify.com": "Spotify",
+  "netflix.com": "Netflix",
+  "truthsocial.com": "Truth+",
+};
+
 const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
   "nordvpn.com": "NordVPN Complete",
   "tinder.com": "Tinder Gold",
@@ -76,11 +82,16 @@ export function PopupApp(): ReactElement {
   const mainOffers = state.offers.filter((o) => o.provider !== "curve");
   const curveOffer = state.offers.find((o) => o.provider === "curve");
 
-  const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
-  const showExtraCashback = mainOffers.length === 0 || mainOffers.some((o) => !CARD_ONLY_PROVIDERS.has(o.provider));
-
   const normalizedHostname = state.hostname.replace(/^www\./, "").toLowerCase();
   const revolutSub = REVOLUT_SUBSCRIPTIONS[normalizedHostname];
+  const cryptoSubEntry = Object.entries(CRYPTO_SUBSCRIPTIONS).find(([domain]) =>
+    normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`)
+  );
+  const cryptoSub = cryptoSubEntry?.[1];
+
+  const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
+  const isCardOnly = mainOffers.length > 0 && mainOffers.every((o) => CARD_ONLY_PROVIDERS.has(o.provider));
+  const showExtraCashback = !isCardOnly || cryptoSub !== undefined;
 
   const klarnaMinKr = amount > 0 ? formatKr(amount * 0.5 / 100) : null;
   const klarnaMaxKr = amount > 0 ? formatKr(amount * 1 / 100) : null;
@@ -129,7 +140,7 @@ export function PopupApp(): ReactElement {
           <span>Ekstra cashback</span>
         </button>
         <div className="bonus-chips">
-          <div className="chip-group">
+          {!isCardOnly && <div className="chip-group">
             <span className="chip-group-label">Gratis</span>
             <div className="chip-group-items">
               <a
@@ -187,11 +198,11 @@ export function PopupApp(): ReactElement {
                 <span className="provider-badge provider-norwegian">Norwegian</span>
               </a>
             </div>
-          </div>
+          </div>}
           <div className="chip-group">
             <span className="chip-group-label">Premium</span>
             <div className="chip-group-items">
-              {revolutSub !== undefined && (
+              {!isCardOnly && revolutSub !== undefined && (
                 <a
                   className="bonus-chip"
                   href="https://revolut.com/referrals?r=FELPJK"
@@ -222,10 +233,14 @@ export function PopupApp(): ReactElement {
                 href="https://crypto.com/app/ns3fma5hou"
                 target="_blank"
                 rel="noreferrer"
-                title={"Crypto.com Visa-kort.\nPlatin: +2 % (400 kr/mnd), Jade/Obsidian: +5 %.\nKombineres med annen cashback."}
+                title={cryptoSub !== undefined
+                  ? `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSub}\nPlatin: 3 mnd gratis ${cryptoSub}\n+2-5 % cashback på alle kjøp`
+                  : "Crypto.com Visa-kort.\nPlatin: +2 % (400 kr/mnd), Jade/Obsidian: +5 %.\nKombineres med annen cashback."}
               >
                 <span className="bonus-chip-label">
-                  {cryptoMinKr !== null && cryptoMaxKr !== null
+                  {cryptoSub !== undefined
+                    ? "3-6 mnd gratis"
+                    : cryptoMinKr !== null && cryptoMaxKr !== null
                     ? `+${cryptoMinKr}-${cryptoMaxKr} kr`
                     : "+2-5 %"}
                 </span>
