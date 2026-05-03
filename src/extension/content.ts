@@ -731,40 +731,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     sideTabText.textContent = formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
   }
   sideTab.append(sideTabArrow, sideTabText);
-  const POSITION_KEY = "cashback-varsler-bottom";
-  const savedBottom = localStorage.getItem(POSITION_KEY);
-  if (savedBottom !== null) host.style.bottom = savedBottom;
-
-  let dragStartX = 0;
-  let dragStartY = 0;
-  let dragStartBottom = 0;
-  let isDragging = false;
-  sideTab.addEventListener("touchstart", (e) => {
-    dragStartX = e.touches[0]?.clientX ?? 0;
-    dragStartY = e.touches[0]?.clientY ?? 0;
-    dragStartBottom = parseInt(host.style.bottom || "16", 10);
-    isDragging = false;
-  }, { passive: true });
-  sideTab.addEventListener("touchmove", (e) => {
-    const dy = dragStartY - (e.touches[0]?.clientY ?? 0);
-    const dx = (e.touches[0]?.clientX ?? 0) - dragStartX;
-    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) isDragging = true;
-    if (!isDragging) return;
-    e.preventDefault();
-    const newBottom = Math.max(0, Math.min(window.innerHeight - host.offsetHeight, dragStartBottom + dy));
-    host.style.bottom = `${newBottom}px`;
-  }, { passive: false });
-  sideTab.addEventListener("touchend", (e) => {
-    if (isDragging) { localStorage.setItem(POSITION_KEY, host.style.bottom); return; }
-    const dx = (e.changedTouches[0]?.clientX ?? 0) - dragStartX;
-    const dy = (e.changedTouches[0]?.clientY ?? 0) - dragStartY;
-    if (dx > 50 && Math.abs(dx) > Math.abs(dy)) {
-      setCollapsed(notice, sideTab, sideTabArrow, false);
-      return;
-    }
-  }, { passive: true });
-  sideTab.addEventListener("click", (e) => {
-    if (isDragging) { e.preventDefault(); return; }
+  sideTab.addEventListener("click", () => {
     const isCollapsed = notice.classList.contains("collapsed");
     setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
   });
