@@ -40,6 +40,8 @@ const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
 const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
+const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
 chrome.runtime.onMessage.addListener((message) => {
   if (isCashbackFoundMessage(message)) {
     renderNoticeWithStoredState(message.offers);
@@ -47,11 +49,28 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (isCashbackNoneMessage(message)) {
     clearNotice();
+    return;
+  }
+  if (isRecord(message) && message.type === "toggle-notice") {
+    chrome.storage.local.get(HIDDEN_HOSTS_KEY, (result: Record<string, unknown>) => {
+      const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
+      const isHidden = hidden.includes(CURRENT_HOST);
+      if (isHidden) {
+        const next = hidden.filter((h) => h !== CURRENT_HOST);
+        chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: next });
+        requestCurrentOffers();
+      } else {
+        chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: [...hidden, CURRENT_HOST] });
+        clearNotice();
+      }
+    });
   }
 });
 requestCurrentOffers();
 function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
-  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY], (result: Record<string, unknown>) => {
+  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
+    const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
+    if (hidden.includes(CURRENT_HOST)) return;
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
     const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
     const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;

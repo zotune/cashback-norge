@@ -17,7 +17,6 @@
   ],
   "action": {
     "default_title": "Cashback Varsler",
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",

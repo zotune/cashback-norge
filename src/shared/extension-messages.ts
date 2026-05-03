@@ -18,6 +18,10 @@ export type GetOffersForUrlMessage = {
   url: string;
 };
 
+export type ToggleNoticeMessage = {
+  type: "toggle-notice";
+};
+
 export type OffersForUrlResponse =
   | {
       ok: true;

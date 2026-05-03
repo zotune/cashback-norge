@@ -37,6 +37,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   void notifyTab(tabId, tab.url ?? "");
 });
 
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id !== undefined) {
+    void chrome.tabs.sendMessage(tab.id, { type: "toggle-notice" });
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   void handleRuntimeMessage(message, sendResponse);
   return true;
