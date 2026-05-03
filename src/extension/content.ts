@@ -221,6 +221,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
       overflow: hidden;
       margin-left: 4px;
+      transform: translateZ(0);
       transition: width 0.25s ease, opacity 0.25s ease, margin-left 0.25s ease, border-width 0.25s ease;
     }
     .notice.collapsed .panel {
@@ -1089,6 +1090,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     panel.append(topLine, body);
   }
   notice.append(sideTab, panel);
+  // Force reflow after expand transition to fix Safari whitespace bug
+  panel.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "width" && !notice.classList.contains("collapsed")) {
+      void panel.offsetHeight; // trigger reflow
+    }
+  });
   // Apply initial collapsed state before inserting into DOM (no transition flash)
   if (initialCollapsed) {
     notice.classList.add("collapsed", "no-transition");
