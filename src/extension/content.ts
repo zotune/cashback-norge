@@ -885,17 +885,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         element.textContent = defaultText;
       }
     }
-    if (amount > 0) {
-      const bestBonusEb = Math.round(amount * 10 / 100);
-      const bestBonusKr = bestBonusEb / EB_PER_TRUMF_KR;
-      const mainMaxKr = mainOffers.reduce((max, o) => Math.max(max, calculateCashbackMaxKr(o, amount)), 0);
-      const totalKr = mainMaxKr + bestBonusKr;
-      chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatKr(totalKr)} kr)`;
-    } else {
-      const mainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
-      const totalPct = mainMaxPct + 0.74;
-      chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(totalPct)}%)`;
-    }
+    chipsToggleText.textContent = "Ekstra cashback";
   });
   const bonusChipLabels: { element: HTMLSpanElement; pct: number; minPct?: number; maxPct?: number; ebPer100kr?: number; approx: boolean; defaultText: string }[] = [];
   const bonusChips = document.createElement("div");
@@ -1020,9 +1010,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   chipsToggleArrow.className = "bonus-chips-toggle-arrow";
   chipsToggleArrow.textContent = "\u25BC";
   const chipsToggleText = document.createElement("span");
-  const defaultMainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
-  const defaultTotalPct = defaultMainMaxPct + 0.74;
-  chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(defaultTotalPct)}%)`;
+  chipsToggleText.textContent = "Ekstra cashback";
   chipsToggle.append(chipsToggleArrow, chipsToggleText);
   chipsToggle.addEventListener("click", () => {
     const isCollapsed = chipsSection.classList.toggle("collapsed");
