@@ -301,6 +301,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       padding: 5px 9px;
       text-decoration: none;
     }
+    .offer-link .provider-badge {
+      grid-column: 3;
+    }
     .offer-label {
       align-items: center;
       display: flex;
