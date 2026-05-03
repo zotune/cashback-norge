@@ -8,5 +8,25 @@
     "activationUrl": "https://www.klarna.com/no/store/",
     "terms": "Cashback i Klarna-appen. Krever Klarna-saldo og følger Klarnas cashback-vilkår.",
     "updatedAt": "2026-05-01T00:00:00.000Z"
+  },
+  {
+    "provider": "cbn",
+    "merchantName": "Timarco",
+    "domains": ["timarco.com"],
+    "reward": "1 % til gode formål",
+    "sourceUrl": "https://adoretunes.com/",
+    "activationUrl": "https://adoretunes.com/",
+    "terms": "DEBUG TEST! Ikke bruk denne donasjonslenken ennå. Annonselenke: Det koster deg ingenting ekstra, men innebærer at du gir verdien fra denne lenken videre til andre i stedet for å få cashback selv. Dette støtter videre utvikling av extensionen og hjelper oss å finne bedre tilbud. For mer informasjon om hva vi donerer til for øyeblikket, se adoretunes.com - 10% to charity (fullt transparent med alle transaksjoner).",
+    "updatedAt": "2026-05-03T00:00:00.000Z"
+  },
+  {
+    "provider": "cbn",
+    "merchantName": "ICE",
+    "domains": ["ice.no"],
+    "reward": "38,50 kr til gode formål",
+    "sourceUrl": "https://adoretunes.com/",
+    "activationUrl": "https://adoretunes.com/",
+    "terms": "DEBUG TEST! Ikke bruk denne donasjonslenken ennå. Annonselenke: Det koster deg ingenting ekstra, men innebærer at du gir verdien fra denne lenken videre til andre i stedet for å få cashback selv. Dette støtter videre utvikling av extensionen og hjelper oss å finne bedre tilbud. For mer informasjon om hva vi donerer til for øyeblikket, se adoretunes.com - 10% to charity (fullt transparent med alle transaksjoner).",
+    "updatedAt": "2026-05-03T00:00:00.000Z"
   }
 ]

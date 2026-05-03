@@ -63,7 +63,8 @@
     norskfamilie: "NF",
     logbuy: "LogBuy",
     obos: "OBOS",
-    naf: "NAF"
+    naf: "NAF",
+    cbn: "♥"
   };
   const FREE_CARDS = [
     {
@@ -482,6 +483,10 @@
     .provider-naf {
       background: #FFD100;
       color: #000000;
+    }
+    .provider-cbn {
+      background: #f7d7e6;
+      color: #8f164f;
     }
     .provider-sas-amex {
       background: #00005c;
@@ -1144,7 +1149,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       const compact = formatCompactRewardLabel(currentOffer);
       const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       const showRewardInTooltip = compact !== void 0 && fullReward !== compact;
-      if (!showRewardInTooltip && !hasRateBreakdown(currentOffer.terms)) continue;
+      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasRateBreakdown(currentOffer.terms)) continue;
       const wrapper = wrappers[idx];
       if (wrapper === void 0) continue;
       const tooltip = document.createElement("div");
@@ -1299,6 +1304,11 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
   }
   function sortOffersByReward(offers) {
     return [...offers].sort((firstOffer, secondOffer) => {
+      const firstIsSupport = firstOffer.provider === "cbn";
+      const secondIsSupport = secondOffer.provider === "cbn";
+      if (firstIsSupport !== secondIsSupport) {
+        return firstIsSupport ? 1 : -1;
+      }
       const firstReward = parseRewardValue(firstOffer.reward);
       const secondReward = parseRewardValue(secondOffer.reward);
       const rewardKindSort = rewardKindRank(secondReward.kind) - rewardKindRank(firstReward.kind);
@@ -1352,6 +1362,19 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     return PROVIDER_NAMES[provider] ?? provider;
   }
   function calculateCashback(offer, amount) {
+    if (offer.provider === "cbn") {
+      const pctMatch2 = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+      if (pctMatch2 !== null) {
+        const pct = Number.parseFloat(pctMatch2[1]?.replace(",", ".") ?? "0");
+        return `${formatKr(amount * pct / 100)} kr til gode formål`;
+      }
+      const fixedKrMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+      if (fixedKrMatch !== null) {
+        const fixedKr = Number.parseFloat(fixedKrMatch[1]?.replace(",", ".") ?? "0");
+        return `${formatKr(fixedKr)} kr til gode formål`;
+      }
+      return "";
+    }
     const reward = offer.reward.trim();
     const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
     if (rangeMatch !== null) {
@@ -1405,6 +1428,9 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     return label;
   }
   function getMaxRewardPercent(offer) {
+    if (offer.provider === "cbn") {
+      return 0;
+    }
     const reward = offer.reward.trim();
     const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
     if (rangeMatch !== null) {
@@ -1422,6 +1448,9 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     return 0;
   }
   function calculateCashbackMaxKr(offer, amount) {
+    if (offer.provider === "cbn") {
+      return 0;
+    }
     const reward = offer.reward.trim();
     const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
     if (rangeMatch !== null) {

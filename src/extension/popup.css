@@ -190,6 +190,11 @@ h1 {
   color: #ffffff;
 }
 
+.provider-cbn {
+  background: #f7d7e6;
+  color: #8f164f;
+}
+
 .copy-code-btn {
   align-items: center;
   color: #1f8f5f;

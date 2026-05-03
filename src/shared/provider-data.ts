@@ -13,6 +13,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   logbuy: "LogBuy",
   obos: "OBOS",
   naf: "NAF",
+  cbn: "♥",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -40,6 +41,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   logbuy: { bg: "#d81939", fg: "#ffffff" },
   obos: { bg: "#003087", fg: "#ffffff" },
   naf: { bg: "#FFD100", fg: "#000000" },
+  cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 
 export type BonusCard = {

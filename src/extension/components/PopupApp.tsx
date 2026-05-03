@@ -251,7 +251,7 @@ export function PopupApp(): ReactElement {
 }
 
 function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement {
-  const hasBreakdown = props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms);
+  const hasBreakdown = props.offer.provider === "cbn" || (props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms));
   const [copied, setCopied] = useState(false);
 
   let rewardText: string;
@@ -384,6 +384,10 @@ function formatNo(n: number): string {
 }
 
 function formatProviderName(provider: CashbackOffer["provider"]): string {
+  if (provider === "cbn") {
+    return "♥";
+  }
+
   if (provider === "remember") {
     return "re:member";
   }
@@ -419,6 +423,22 @@ function formatKr(value: number): string {
 }
 
 function calculateCashback(offer: CashbackOffer, amount: number): string {
+  if (offer.provider === "cbn") {
+    const pctMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+    if (pctMatch !== null) {
+      const pct = Number.parseFloat(pctMatch[1]?.replace(",", ".") ?? "0");
+      return `${formatKr(amount * pct / 100)} kr til gode formål`;
+    }
+
+    const fixedKrMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+    if (fixedKrMatch !== null) {
+      const fixedKr = Number.parseFloat(fixedKrMatch[1]?.replace(",", ".") ?? "0");
+      return `${formatKr(fixedKr)} kr til gode formål`;
+    }
+
+    return "";
+  }
+
   const reward = offer.reward.trim();
 
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);

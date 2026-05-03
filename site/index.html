@@ -169,6 +169,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-logbuy { background: #d81939; color: #fff; }
 .badge-obos { background: #003087; color: #fff; }
 .badge-naf { background: #FFD100; color: #000; }
+.badge-cbn { background: #f7d7e6; color: #8f164f; }
 .empty {
   color: #8a9a92;
   font-size: 14px;
@@ -473,6 +474,7 @@ async function init() {
 }
 
 function getMaxPct(o) {
+  if (o.provider === "cbn") return 0;
   const r = o.reward.trim();
   const range = r.match(/^([\d.,]+)-([\d.,]+)\s*%$/);
   if (range) return parseFloat(range[2].replace(",", "."));
@@ -483,6 +485,13 @@ function getMaxPct(o) {
   const kr = r.match(/([\d.,]+)\s*kr/i);
   if (kr) return parseFloat(kr[1].replace(",", ".")) / 1000;
   return 0;
+}
+
+function compareOffers(a, b) {
+  const aSupport = a.provider === "cbn";
+  const bSupport = b.provider === "cbn";
+  if (aSupport !== bSupport) return aSupport ? 1 : -1;
+  return getMaxPct(b) - getMaxPct(a);
 }
 
 function normalizeName(name) {
@@ -575,7 +584,7 @@ function groupByMerchant(offers) {
 
   for (const m of groups) {
     // Deduplicate: keep only the best offer per provider (highest reward wins)
-    m.offers.sort((a, b) => getMaxPct(b) - getMaxPct(a));
+    m.offers.sort(compareOffers);
     const bestPerProvider = new Map();
     m.offers = m.offers.filter(o => {
       const key = o.provider + ":" + (o.discountCode || "");
@@ -666,8 +675,10 @@ function render(query) {
       const compact = formatCompactReward(o);
       const terms = o.terms || "";
       const hasBreakdown = terms.includes("\n") && /\d+.*%/.test(terms);
-      const rewardDetail = (compact !== fullReward) ? fullReward : "";
-      const tipBase = hasBreakdown
+      const rewardDetail = o.provider === "cbn" ? "" : (compact !== fullReward) ? fullReward : "";
+      const tipBase = o.provider === "cbn"
+        ? terms
+        : hasBreakdown
         ? (currentAmount > 0 ? formatBreakdownWithAmounts(terms, currentAmount) : terms)
         : (PROVIDER_TIPS[o.provider] || "");
       const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
@@ -727,6 +738,7 @@ function render(query) {
 
 function formatCompactReward(o) {
   const full = formatReward(o);
+  if (o.provider === "cbn") return full;
   if (o.provider === "trumf" || o.provider === "sas") return full;
   const pct = full.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (pct) return ((pct[1] || "") + pct[2]).replace(/\s+/g, " ");
@@ -785,6 +797,18 @@ function formatBreakdownWithAmounts(terms, amount) {
 function calcReward(o, amount) {
   const r = o.reward.trim();
   const fmt = (n) => n.toFixed(2).replace(".", ",").replace(/,00$/, "");
+  if (o.provider === "cbn") {
+    const pct = r.match(/(\d+(?:[,.]\d+)?)\s*%/);
+    if (pct) {
+      const p = parseFloat(pct[1].replace(",", "."));
+      return `${fmt(amount * p / 100)} kr til gode formål`;
+    }
+    const fixedKr = r.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+    if (fixedKr) {
+      return `${fmt(parseFloat(fixedKr[1].replace(",", ".")))} kr til gode formål`;
+    }
+    return r;
+  }
   // range percent
   const range = r.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (range) {

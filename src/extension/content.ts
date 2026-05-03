@@ -363,6 +363,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       background: #FFD100;
       color: #000000;
     }
+    .provider-cbn {
+      background: #f7d7e6;
+      color: #8f164f;
+    }
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;
@@ -1031,7 +1035,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const compact = formatCompactRewardLabel(currentOffer);
     const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     const showRewardInTooltip = compact !== undefined && fullReward !== compact;
-    if (!showRewardInTooltip && !hasRateBreakdown(currentOffer.terms)) continue;
+    if (
+      currentOffer.provider !== "cbn" &&
+      !showRewardInTooltip &&
+      !hasRateBreakdown(currentOffer.terms)
+    ) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
     const tooltip = document.createElement("div");
@@ -1234,6 +1242,13 @@ function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
 }
 function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
   return [...offers].sort((firstOffer, secondOffer) => {
+    const firstIsSupport = firstOffer.provider === "cbn";
+    const secondIsSupport = secondOffer.provider === "cbn";
+
+    if (firstIsSupport !== secondIsSupport) {
+      return firstIsSupport ? 1 : -1;
+    }
+
     const firstReward = parseRewardValue(firstOffer.reward);
     const secondReward = parseRewardValue(secondOffer.reward);
     const rewardKindSort =
@@ -1294,6 +1309,22 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
   return PROVIDER_NAMES[provider] ?? provider;
 }
 function calculateCashback(offer: CashbackOffer, amount: number): string {
+  if (offer.provider === "cbn") {
+    const pctMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+    if (pctMatch !== null) {
+      const pct = Number.parseFloat(pctMatch[1]?.replace(",", ".") ?? "0");
+      return `${formatKr(amount * pct / 100)} kr til gode formål`;
+    }
+
+    const fixedKrMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+    if (fixedKrMatch !== null) {
+      const fixedKr = Number.parseFloat(fixedKrMatch[1]?.replace(",", ".") ?? "0");
+      return `${formatKr(fixedKr)} kr til gode formål`;
+    }
+
+    return "";
+  }
+
   const reward = offer.reward.trim();
   // Percentage range: "2-3,5 %"
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
@@ -1352,6 +1383,10 @@ function addEbSuffix(label: string, minPct: number, maxPct: number, amount: numb
   return label;
 }
 function getMaxRewardPercent(offer: CashbackOffer): number {
+  if (offer.provider === "cbn") {
+    return 0;
+  }
+
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
@@ -1369,6 +1404,10 @@ function getMaxRewardPercent(offer: CashbackOffer): number {
   return 0;
 }
 function calculateCashbackMaxKr(offer: CashbackOffer, amount: number): number {
+  if (offer.provider === "cbn") {
+    return 0;
+  }
+
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {

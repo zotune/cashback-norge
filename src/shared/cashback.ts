@@ -1,6 +1,6 @@
 import { normalizeRewardLabel } from "./reward.js";
 
-export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "logbuy" | "naf";
+export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "logbuy" | "naf" | "cbn";
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -26,7 +26,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "logbuy" || value === "naf";
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "logbuy" || value === "naf" || value === "cbn";
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {
@@ -282,6 +282,13 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
 
 export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
   return [...offers].sort((firstOffer, secondOffer) => {
+    const firstIsSupport = firstOffer.provider === "cbn";
+    const secondIsSupport = secondOffer.provider === "cbn";
+
+    if (firstIsSupport !== secondIsSupport) {
+      return firstIsSupport ? 1 : -1;
+    }
+
     const firstReward = parseRewardValue(firstOffer.reward);
     const secondReward = parseRewardValue(secondOffer.reward);
     const rewardKindSort =
