@@ -1007,7 +1007,7 @@
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
-    bonusChips.append(freeGroup);
+    if (!isCardOnly) bonusChips.append(freeGroup);
     const premiumGroup = document.createElement("div");
     premiumGroup.className = "chip-group";
     const premiumLabel = document.createElement("span");
@@ -1036,13 +1036,51 @@
 Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
     }
     for (const card of PREMIUM_CARDS) {
-      const overrideUrl = card.label === "Curve" && curveOffer !== void 0 ? curveOffer.activationUrl : void 0;
-      const { chip, label } = createBonusChip(card, overrideUrl);
+      if (card.label === "Curve") continue;
+      if (card.label === "Crypto" && cryptoSub !== void 0) continue;
+      const { chip, label } = createBonusChip(card);
       bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, approx: card.approx, defaultText: label.textContent ?? "" });
       premiumItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
-    bonusChips.append(premiumGroup);
+    if (!isCardOnly) bonusChips.append(premiumGroup);
+    const selectedGroup = document.createElement("div");
+    selectedGroup.className = "chip-group";
+    const selectedLabel = document.createElement("span");
+    selectedLabel.className = "chip-group-label";
+    selectedLabel.textContent = "Premium for enkelte butikker";
+    const selectedItems = document.createElement("div");
+    selectedItems.className = "chip-group-items";
+    selectedGroup.append(selectedLabel, selectedItems);
+    let hasSelectedItems = false;
+    if (curveOffer !== void 0) {
+      const curveCard = PREMIUM_CARDS.find((c) => c.label === "Curve");
+      const { chip, label } = createBonusChip(curveCard, curveOffer.activationUrl);
+      bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, minPct: void 0, maxPct: void 0, approx: curveCard.approx, defaultText: label.textContent ?? "" });
+      addChipTooltip(chip, curveCard.tip, shadowRoot);
+      selectedItems.append(chip);
+      hasSelectedItems = true;
+    }
+    if (cryptoSub !== void 0) {
+      const cryptoChip = document.createElement("a");
+      cryptoChip.className = "bonus-chip";
+      cryptoChip.href = "https://crypto.com/app/ns3fma5hou";
+      cryptoChip.target = "_blank";
+      cryptoChip.rel = "noreferrer";
+      const cryptoChipLabel = document.createElement("span");
+      cryptoChipLabel.className = "bonus-chip-label";
+      cryptoChipLabel.textContent = "3-6 mnd gratis";
+      const cryptoBadge = document.createElement("span");
+      cryptoBadge.className = "provider-badge provider-crypto";
+      cryptoBadge.textContent = "Crypto";
+      cryptoChip.append(cryptoChipLabel, cryptoBadge);
+      addChipTooltip(cryptoChip, `Crypto.com Visa-kort.
+Jade/Obsidian: 6 mnd gratis ${cryptoSub}
+Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
+      selectedItems.append(cryptoChip);
+      hasSelectedItems = true;
+    }
+    if (hasSelectedItems) bonusChips.append(selectedGroup);
     const chipsSection = document.createElement("div");
     chipsSection.className = "bonus-chips-section";
     if (initialChipsCollapsed) {
@@ -1129,30 +1167,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       }
       codesSection.append(codesToggle, codesList);
     }
-    if (isCardOnly && cryptoSub !== void 0) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "offer-link-wrapper";
-      const offerLink = document.createElement("a");
-      offerLink.className = "offer-link";
-      offerLink.href = "https://crypto.com/app/ns3fma5hou";
-      offerLink.target = "_blank";
-      offerLink.rel = "noreferrer";
-      const offerLabel = document.createElement("span");
-      offerLabel.className = "offer-label";
-      const offerReward = document.createElement("span");
-      offerReward.textContent = "3-6 mnd gratis";
-      const providerBadge = document.createElement("span");
-      providerBadge.className = "provider-badge provider-crypto";
-      providerBadge.textContent = "Crypto";
-      offerLabel.append(offerReward);
-      offerLink.append(offerLabel, providerBadge);
-      wrapper.append(offerLink);
-      addChipTooltip(offerLink, `Crypto.com Visa-kort.
-Jade/Obsidian: 6 mnd gratis ${cryptoSub}
-Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
-      offerList.append(wrapper);
-      body.append(header, offerList);
-    } else if (!isCardOnly) {
+    if (!isCardOnly || hasSelectedItems) {
       body.append(header, offerList, chipsSection);
     } else {
       body.append(header, offerList);

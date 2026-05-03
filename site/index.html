@@ -94,6 +94,9 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 }
 a.merchant-name:hover { text-decoration: underline; }
 .offers { display: grid; gap: 6px; padding: 0 14px 12px; }
+.selected-retailers { padding: 0 14px 10px; }
+.selected-label { display: block; font-size: 9px; font-weight: 700; color: #8a9a92; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px; }
+.selected-items { display: flex; flex-wrap: wrap; gap: 6px; }
 .offer {
   align-items: center;
   background: #f7faf8;
@@ -459,6 +462,7 @@ const CRYPTO_SUBSCRIPTIONS = {
 };
 
 let allMerchants = [];
+let curveDomains = new Set();
 
 let currentAmount = 0;
 
@@ -468,6 +472,7 @@ async function init() {
   const res = await fetch("cashback-index.json");
   const data = await res.json();
   allMerchants = groupByMerchant(data.offers);
+  curveDomains = new Set(data.offers.filter(o => o.provider === "curve").flatMap(o => o.domains));
   for (const [domain, name] of Object.entries(CRYPTO_SUBSCRIPTIONS)) {
     if (!allMerchants.some(m => m.domains.includes(domain))) {
       allMerchants.push({ name, domains: [domain], offers: [] });
@@ -703,10 +708,16 @@ function render(query) {
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
     const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
-    const cryptoChipHtml = cryptoSubName ? (() => {
-      const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}\n+2-5 % cashback på alle kjøp`;
+    const cryptoSelectedHtml = cryptoSubName ? (() => {
+      const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
       return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="badge badge-crypto">Crypto</span></a></span>`;
     })() : "";
+    const hasCurve = m.domains.some(d => curveDomains.has(d));
+    const curveSelectedHtml = hasCurve ? (() => {
+      const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward">+1 %</span><span class="badge badge-curve">Curve</span></a></span>`;
+    })() : "";
+    const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       return `<div class="code-item">
@@ -724,7 +735,8 @@ function render(query) {
         ${iconHtml}
         ${nameHtml}
       </div>
-      <div class="offers">${offerHtml}${cryptoChipHtml}</div>
+      <div class="offers">${offerHtml}</div>
+      ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
       ${codesHtml ? `<div class="codes-inline"><button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder (${codeOffers.length})</button><div class="codes-items">${codesHtml}</div></div>` : ""}
     </div>`;
   }).join("");
