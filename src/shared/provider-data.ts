@@ -13,6 +13,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   logbuy: "LogBuy",
   obos: "OBOS",
   naf: "NAF",
+  sparebank1: "SB1 Ung",
   cbn: "♥",
 };
 
@@ -25,6 +26,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   dnb: "DNB Spare. Aktiver i DNB-appen.",
   rabattkode: "Rabattkode fra rabattkode.no.\nLim inn koden i handlekurven.",
   norskfamilie: "Norsk Familieøkonomi.\nKrever medlemskap. Aktiver kjøp via norskfamilie.no.",
+  sparebank1: "SpareBank 1 Mastercard Ung.\n20 % rabatt på utvalgte strømmetjenester.\nSamlet inntil 500 kr per kalenderår.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -41,6 +43,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   logbuy: { bg: "#d81939", fg: "#ffffff" },
   obos: { bg: "#003087", fg: "#ffffff" },
   naf: { bg: "#FFD100", fg: "#000000" },
+  sparebank1: { bg: "#005aa4", fg: "#ffffff" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 

@@ -363,6 +363,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       background: #FFD100;
       color: #000000;
     }
+    .provider-sparebank1 {
+      background: #005aa4;
+      color: #ffffff;
+    }
     .provider-cbn {
       background: #f7d7e6;
       color: #8f164f;

@@ -64,6 +64,7 @@
     logbuy: "LogBuy",
     obos: "OBOS",
     naf: "NAF",
+    sparebank1: "SB1 Ung",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -483,6 +484,10 @@
     .provider-naf {
       background: #FFD100;
       color: #000000;
+    }
+    .provider-sparebank1 {
+      background: #005aa4;
+      color: #ffffff;
     }
     .provider-cbn {
       background: #f7d7e6;

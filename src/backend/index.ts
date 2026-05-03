@@ -22,6 +22,7 @@ import { crawlTrustdeals } from "./providers/trustdeals.js";
 import { crawlLogbuy } from "./providers/logbuy.js";
 import { crawlObos } from "./providers/obos.js";
 import { crawlNaf } from "./providers/naf.js";
+import { crawlSparebank1 } from "./providers/sparebank1.js";
 
 type CliConfig = {
   outputPath: string;
@@ -50,6 +51,7 @@ type CliConfig = {
   skipLogbuy: boolean;
   skipObos: boolean;
   skipNaf: boolean;
+  skipSparebank1: boolean;
   dnbPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
@@ -58,6 +60,7 @@ type CliConfig = {
   logbuyStartUrl: string;
   obosStartUrl: string;
   nafStartUrl: string;
+  sparebank1StartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -76,6 +79,7 @@ async function main(): Promise<void> {
     dnbOffers,
     norskfamilieOffers,
     obosOffers,
+    sparebank1Offers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
@@ -97,6 +101,10 @@ async function main(): Promise<void> {
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.obosStartUrl,
       }),
+    config.skipSparebank1 ? Promise.resolve([]) : crawlSparebank1({
+        generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        startUrl: config.sparebank1StartUrl,
+      }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -108,6 +116,7 @@ async function main(): Promise<void> {
     ...dnbOffers,
     ...norskfamilieOffers,
     ...obosOffers,
+    ...sparebank1Offers,
     ...manualOffers,
   ]);
   logger.info(`Domain lookup: ${domainLookup.size} merchant names with known domains`);
@@ -160,7 +169,7 @@ async function main(): Promise<void> {
       }),
   ]);
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers, ...sparebank1Offers]);
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
@@ -224,6 +233,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipLogbuy: args.includes("--skip-logbuy"),
     skipObos: args.includes("--skip-obos"),
     skipNaf: args.includes("--skip-naf"),
+    skipSparebank1: args.includes("--skip-sparebank1"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
@@ -248,6 +258,9 @@ function readCliConfig(args: string[]): CliConfig {
     nafStartUrl:
       readArgumentValue(args, "--naf-start-url") ??
       "https://www.naf.no/medlemskap/medlemsfordeler",
+    sparebank1StartUrl:
+      readArgumentValue(args, "--sparebank1-start-url") ??
+      "https://www.sparebank1.no/nb/bank/privat/kundeservice/kort/strommetjenester-rabatt.html",
   };
 }
 

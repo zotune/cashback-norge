@@ -76,6 +76,9 @@ export function PopupApp(): ReactElement {
   const mainOffers = state.offers.filter((o) => o.provider !== "curve");
   const curveOffer = state.offers.find((o) => o.provider === "curve");
 
+  const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
+  const showExtraCashback = mainOffers.length === 0 || mainOffers.some((o) => !CARD_ONLY_PROVIDERS.has(o.provider));
+
   const normalizedHostname = state.hostname.replace(/^www\./, "").toLowerCase();
   const revolutSub = REVOLUT_SUBSCRIPTIONS[normalizedHostname];
 
@@ -112,7 +115,7 @@ export function PopupApp(): ReactElement {
           );
         })}
       </div>
-      <div className={`bonus-chips-section${chipsCollapsed ? " collapsed" : ""}`}>
+      {showExtraCashback && <div className={`bonus-chips-section${chipsCollapsed ? " collapsed" : ""}`}>
         <button
           className="bonus-chips-toggle"
           type="button"
@@ -245,7 +248,7 @@ export function PopupApp(): ReactElement {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </main>
   );
 }
@@ -410,6 +413,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "curve") {
     return "Curve Pro";
+  }
+
+  if (provider === "sparebank1") {
+    return "SB1 Ung";
   }
 
   return "Klarna";
