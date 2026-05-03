@@ -220,6 +220,7 @@ function sendTabMessage(
 ): Promise<void> {
   return new Promise((resolveValue) => {
     chrome.tabs.sendMessage(tabId, message, () => {
+      void chrome.runtime.lastError;
       resolveValue();
     });
   });
