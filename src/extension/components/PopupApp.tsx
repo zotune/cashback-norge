@@ -268,8 +268,12 @@ export function PopupApp(): ReactElement {
   );
 }
 
+const CARD_ONLY_PROVIDERS = ["sparebank1", "remember"];
+const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
+
 function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement {
   const hasBreakdown = props.offer.provider === "cbn" || (props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms));
+  const isCardOnly = (CARD_ONLY_PROVIDERS as string[]).includes(props.offer.provider);
   const [copied, setCopied] = useState(false);
 
   let rewardText: string;
@@ -292,10 +296,18 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
     });
   }
 
+  const tooltipContent = hasBreakdown && isCardOnly
+    ? `${props.offer.terms}\n\n⚠ ${CARD_ONLY_TIP}`
+    : hasBreakdown
+    ? props.offer.terms
+    : isCardOnly
+    ? `⚠ ${CARD_ONLY_TIP}`
+    : null;
+
   return (
     <div className="offer-wrapper" style={{ position: "relative" }}>
-      {hasBreakdown && (
-        <div className="offer-tooltip">{props.offer.terms}</div>
+      {tooltipContent !== null && (
+        <div className="offer-tooltip">{tooltipContent}</div>
       )}
       <a
         className="offer"
@@ -311,6 +323,9 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
             >
               {formatProviderName(props.offer.provider)}
             </span>
+            {isCardOnly && (
+              <span className="offer-card-only-warn">⚠</span>
+            )}
           </p>
           <p className="muted">{props.offer.merchantName}</p>
         </div>

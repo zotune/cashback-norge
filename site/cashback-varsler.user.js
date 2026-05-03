@@ -697,6 +697,13 @@
     .offer-link-wrapper {
       position: relative;
     }
+    .card-only-warn {
+      color: #b0bec5;
+      cursor: help;
+      font-size: 11px;
+      line-height: 1;
+      user-select: none;
+    }
     .offer-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
@@ -762,7 +769,6 @@
     const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
-    const isCardOnly = mainOffers.length > 0 && mainOffers.every((o) => CARD_ONLY_PROVIDERS.has(o.provider));
     const CRYPTO_SUBSCRIPTIONS = {
       "spotify.com": "Spotify",
       "netflix.com": "Netflix",
@@ -919,6 +925,12 @@
           });
         });
         offerLink.append(offerLabel, copyBtn, providerBadge);
+      } else if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
+        const warnIcon = document.createElement("span");
+        warnIcon.className = "card-only-warn";
+        warnIcon.textContent = "⚠";
+        addChipTooltip(warnIcon, "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort", shadowRoot);
+        offerLink.append(offerLabel, warnIcon, providerBadge);
       } else {
         offerLink.append(offerLabel, providerBadge);
       }
@@ -1007,7 +1019,7 @@
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
-    if (!isCardOnly) bonusChips.append(freeGroup);
+    bonusChips.append(freeGroup);
     const premiumGroup = document.createElement("div");
     premiumGroup.className = "chip-group";
     const premiumLabel = document.createElement("span");
@@ -1043,7 +1055,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       premiumItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
-    if (!isCardOnly) bonusChips.append(premiumGroup);
+    bonusChips.append(premiumGroup);
     const selectedGroup = document.createElement("div");
     selectedGroup.className = "chip-group";
     const selectedLabel = document.createElement("span");
@@ -1167,11 +1179,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       }
       codesSection.append(codesToggle, codesList);
     }
-    if (!isCardOnly || hasSelectedItems) {
-      body.append(header, offerList, chipsSection);
-    } else {
-      body.append(header, offerList);
-    }
+    body.append(header, offerList, chipsSection);
     if (codeOffers.length > 0) {
       body.append(codesSection);
     }

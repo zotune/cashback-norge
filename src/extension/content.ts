@@ -575,6 +575,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .offer-link-wrapper {
       position: relative;
     }
+    .card-only-warn {
+      color: #b0bec5;
+      cursor: help;
+      font-size: 11px;
+      line-height: 1;
+      user-select: none;
+    }
     .offer-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
@@ -640,7 +647,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
-  const isCardOnly = mainOffers.length > 0 && mainOffers.every((o) => CARD_ONLY_PROVIDERS.has(o.provider));
   const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
     "spotify.com": "Spotify",
     "netflix.com": "Netflix",
@@ -796,6 +802,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         });
       });
       offerLink.append(offerLabel, copyBtn, providerBadge);
+    } else if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
+      const warnIcon = document.createElement("span");
+      warnIcon.className = "card-only-warn";
+      warnIcon.textContent = "⚠";
+      offerLink.append(offerLabel, warnIcon, providerBadge);
     } else {
       offerLink.append(offerLabel, providerBadge);
     }
@@ -887,7 +898,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
-  if (!isCardOnly) bonusChips.append(freeGroup);
+  bonusChips.append(freeGroup);
   // --- Premium chips group (right) ---
   const premiumGroup = document.createElement("div");
   premiumGroup.className = "chip-group";
@@ -923,7 +934,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     premiumItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
-  if (!isCardOnly) bonusChips.append(premiumGroup);
+  bonusChips.append(premiumGroup);
   // --- Selected retailers group ---
   const selectedGroup = document.createElement("div");
   selectedGroup.className = "chip-group";
@@ -1048,11 +1059,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
     codesSection.append(codesToggle, codesList);
   }
-  if (!isCardOnly || hasSelectedItems) {
-    body.append(header, offerList, chipsSection);
-  } else {
-    body.append(header, offerList);
-  }
+  body.append(header, offerList, chipsSection);
   if (codeOffers.length > 0) {
     body.append(codesSection);
   }
@@ -1089,10 +1096,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const compact = formatCompactRewardLabel(currentOffer);
     const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     const showRewardInTooltip = compact !== undefined && fullReward !== compact;
+    const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
     if (
       currentOffer.provider !== "cbn" &&
       !showRewardInTooltip &&
-      !hasRateBreakdown(currentOffer.terms)
+      !hasRateBreakdown(currentOffer.terms) &&
+      !isCardOnlyOffer
     ) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
@@ -1101,6 +1110,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const tooltipParts: string[] = [];
     if (showRewardInTooltip) tooltipParts.push(fullReward);
     if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
+    if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
     tooltip.textContent = tooltipParts.join("\n\n");
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });

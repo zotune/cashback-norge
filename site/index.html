@@ -96,7 +96,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .offers { display: grid; gap: 6px; padding: 0 14px 12px; }
 .selected-retailers { padding: 0 14px 10px; }
 .selected-label { display: block; font-size: 9px; font-weight: 700; color: #8a9a92; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px; }
-.selected-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.selected-items { display: grid; gap: 6px; }
 .offer {
   align-items: center;
   background: #f7faf8;
@@ -110,6 +110,9 @@ a.merchant-name:hover { text-decoration: underline; }
   text-decoration: none;
 }
 .offer:active { background: #edf2ef; }
+.offer-card-only { justify-content: space-between; }
+.offer-card-only .offer-reward { flex: 1; }
+.offer-card-only-warn { color: #b0bec5; font-size: 11px; cursor: help; }
 .offer-wrap {
   position: relative;
   display: block;
@@ -140,7 +143,7 @@ a.merchant-name:hover { text-decoration: underline; }
   border: 5px solid transparent;
   border-top-color: #172026;
 }
-.offer-wrap:hover .offer-tooltip {
+.offer-wrap:hover > .offer-tooltip {
   opacity: 1;
   pointer-events: auto;
 }
@@ -700,10 +703,14 @@ function render(query) {
         ? (currentAmount > 0 ? formatBreakdownWithAmounts(terms, currentAmount) : terms)
         : (PROVIDER_TIPS[o.provider] || "");
       const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
-      const tooltipHtml = tipText ? `<span class="offer-tooltip">${esc(tipText)}</span>` : "";
-      return `<span class="offer-wrap">${tooltipHtml}<a class="offer" href="${esc(url)}" target="_blank" rel="noreferrer">
+      const cardOnly = ["sparebank1", "remember"].includes(o.provider);
+      const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
+      const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : tipText;
+      const tooltipHtml = fullTip ? `<span class="offer-tooltip">${esc(fullTip)}</span>` : "";
+      const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : "";
+      return `<span class="offer-wrap">${tooltipHtml}<a class="offer ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
         <span class="offer-reward">${esc(label)}</span>
-        <span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
+        ${warnIconHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a></span>`;
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
