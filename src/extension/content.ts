@@ -289,6 +289,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       display: grid;
       gap: 4px;
     }
+    .offer-link.offer-link--best {
+      color: #3a7d55;
+    }
     .offer-link {
       align-items: center;
       background: #f7faf8;
@@ -568,6 +571,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .bonus-chip:hover {
       background: #e4ebe7;
     }
+    .bonus-chip--best {
+      color: #3a7d55;
+    }
     .bonus-chip-label {
       font-weight: 800;
     }
@@ -787,11 +793,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
-  for (const currentOffer of mainOffers) {
+  for (const [offerIdx, currentOffer] of mainOffers.entries()) {
     const wrapper = document.createElement("div");
     wrapper.className = "offer-link-wrapper";
     const offerLink = document.createElement("a");
-    offerLink.className = "offer-link";
+    const isBestOffer = offerIdx === 0;
+    offerLink.className = isBestOffer ? "offer-link offer-link--best" : "offer-link";
     offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
     offerLink.rel = "noreferrer";
@@ -918,8 +925,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     chip.append(label, badge);
     return { chip, label };
   }
-  for (const card of FREE_CARDS) {
+  const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0].provider);
+  for (const [cardIdx, card] of FREE_CARDS.entries()) {
     const { chip, label } = createBonusChip(card);
+    if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
     bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, ebPer100kr: card.ebPer100kr, approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
