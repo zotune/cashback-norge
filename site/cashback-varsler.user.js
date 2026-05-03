@@ -78,24 +78,6 @@
       tip: "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)."
     },
     {
-      pct: 74e-4,
-      ebPer100kr: 10,
-      label: "SAS MC",
-      badge: "sas-amex",
-      approx: true,
-      url: "https://saseurobonusmastercard.no/kortene/mastercard/",
-      tip: "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)."
-    },
-    {
-      pct: 59e-4,
-      ebPer100kr: 8,
-      label: "Lunar EB",
-      badge: "lunar",
-      approx: true,
-      url: "https://www.lunar.app/no/privat/sas-eurobonus",
-      tip: "8 EB/100 kr (netthandel)\n20 EB/100 kr på SAS.no\nGratis kort."
-    },
-    {
       pct: 5e-3,
       label: "Norwegian",
       badge: "norwegian",
@@ -162,10 +144,13 @@
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix →", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou" },
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling →", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD" }
   ];
+  const CBN_LOGO_B64 = "data:image/png;base64,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";
   const HOST_ID = "cashback-varsler-notice";
   const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
   const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
   const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
+  const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+  const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
   chrome.runtime.onMessage.addListener((message) => {
     if (isCashbackFoundMessage(message)) {
       renderNoticeWithStoredState(message.offers);
@@ -173,11 +158,28 @@
     }
     if (isCashbackNoneMessage(message)) {
       clearNotice();
+      return;
+    }
+    if (isRecord(message) && message.type === "toggle-notice") {
+      chrome.storage.local.get(HIDDEN_HOSTS_KEY, (result) => {
+        const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
+        const isHidden = hidden.includes(CURRENT_HOST);
+        if (isHidden) {
+          const next = hidden.filter((h) => h !== CURRENT_HOST);
+          chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: next });
+          requestCurrentOffers();
+        } else {
+          chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: [...hidden, CURRENT_HOST] });
+          clearNotice();
+        }
+      });
     }
   });
   requestCurrentOffers();
   function renderNoticeWithStoredState(offers) {
-    chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY], (result) => {
+    chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
+      const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
+      if (hidden.includes(CURRENT_HOST)) return;
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
@@ -391,6 +393,9 @@
       display: grid;
       gap: 4px;
     }
+    .offer-link.offer-link--best {
+      color: #3a7d55;
+    }
     .offer-link {
       align-items: center;
       background: #f7faf8;
@@ -403,6 +408,9 @@
       min-height: 32px;
       padding: 5px 9px;
       text-decoration: none;
+    }
+    .offer-link .provider-badge {
+      grid-column: 3;
     }
     .offer-label {
       align-items: center;
@@ -667,6 +675,9 @@
     .bonus-chip:hover {
       background: #e4ebe7;
     }
+    .bonus-chip--best {
+      color: #3a7d55;
+    }
     .bonus-chip-label {
       font-weight: 800;
     }
@@ -726,6 +737,9 @@
     .support {
       border-top: 1px solid #edf2ef;
       padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
     .support a {
       color: #8a9a92;
@@ -736,6 +750,16 @@
     .support a:hover {
       color: #4f5f66;
       text-decoration: underline;
+    }
+    .support-logo {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+    .support-logo:hover {
+      opacity: 1;
     }
     .conflict-warning {
       color: #d4830a;
@@ -874,11 +898,12 @@
     const tooltipElements = [];
     const offerList = document.createElement("div");
     offerList.className = "offer-list";
-    for (const currentOffer of mainOffers) {
+    for (const [offerIdx, currentOffer] of mainOffers.entries()) {
       const wrapper = document.createElement("div");
       wrapper.className = "offer-link-wrapper";
       const offerLink = document.createElement("a");
-      offerLink.className = "offer-link";
+      const isBestOffer = offerIdx === 0;
+      offerLink.className = isBestOffer ? "offer-link offer-link--best" : "offer-link";
       offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
       offerLink.target = "_blank";
       offerLink.rel = "noreferrer";
@@ -929,7 +954,6 @@
         const warnIcon = document.createElement("span");
         warnIcon.className = "card-only-warn";
         warnIcon.textContent = "⚠";
-        addChipTooltip(warnIcon, "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort", shadowRoot);
         offerLink.append(offerLabel, warnIcon, providerBadge);
       } else {
         offerLink.append(offerLabel, providerBadge);
@@ -973,17 +997,7 @@
           element.textContent = defaultText;
         }
       }
-      if (amount > 0) {
-        const bestBonusEb = Math.round(amount * 10 / 100);
-        const bestBonusKr = bestBonusEb / EB_PER_TRUMF_KR;
-        const mainMaxKr = mainOffers.reduce((max, o) => Math.max(max, calculateCashbackMaxKr(o, amount)), 0);
-        const totalKr = mainMaxKr + bestBonusKr;
-        chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatKr(totalKr)} kr)`;
-      } else {
-        const mainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
-        const totalPct = mainMaxPct + 0.74;
-        chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(totalPct)}%)`;
-      }
+      chipsToggleText.textContent = "Ekstra cashback";
     });
     const bonusChipLabels = [];
     const bonusChips = document.createElement("div");
@@ -1013,8 +1027,10 @@
       chip.append(label, badge);
       return { chip, label };
     }
-    for (const card of FREE_CARDS) {
+    const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0].provider);
+    for (const [cardIdx, card] of FREE_CARDS.entries()) {
       const { chip, label } = createBonusChip(card);
+      if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
       bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, ebPer100kr: card.ebPer100kr, approx: card.approx, defaultText: label.textContent ?? "" });
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
@@ -1105,9 +1121,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     chipsToggleArrow.className = "bonus-chips-toggle-arrow";
     chipsToggleArrow.textContent = "▼";
     const chipsToggleText = document.createElement("span");
-    const defaultMainMaxPct = mainOffers.reduce((max, o) => Math.max(max, getMaxRewardPercent(o)), 0);
-    const defaultTotalPct = defaultMainMaxPct + 0.74;
-    chipsToggleText.textContent = `Ekstra cashback (totalt ~${formatNo(defaultTotalPct)}%)`;
+    chipsToggleText.textContent = "Ekstra cashback";
     chipsToggle.append(chipsToggleArrow, chipsToggleText);
     chipsToggle.addEventListener("click", () => {
       const isCollapsed = chipsSection.classList.toggle("collapsed");
@@ -1192,7 +1206,17 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       supportLink.target = "_blank";
       supportLink.rel = "noreferrer";
       supportLink.textContent = pick.text;
-      support.append(supportLink);
+      const logoLink = document.createElement("a");
+      logoLink.href = "https://cashbacknorge.no";
+      logoLink.target = "_blank";
+      logoLink.rel = "noreferrer";
+      logoLink.title = "cashbacknorge.no";
+      const logoImg = document.createElement("img");
+      logoImg.src = CBN_LOGO_B64;
+      logoImg.className = "support-logo";
+      logoImg.alt = "CBN";
+      logoLink.append(logoImg);
+      support.append(supportLink, logoLink);
       panel.append(topLine, body, support);
     } else {
       panel.append(topLine, body);
@@ -1214,7 +1238,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const compact = formatCompactRewardLabel(currentOffer);
       const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       const showRewardInTooltip = compact !== void 0 && fullReward !== compact;
-      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasRateBreakdown(currentOffer.terms)) continue;
+      const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
+      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasRateBreakdown(currentOffer.terms) && !isCardOnlyOffer) continue;
       const wrapper = wrappers[idx];
       if (wrapper === void 0) continue;
       const tooltip = document.createElement("div");
@@ -1222,6 +1247,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const tooltipParts = [];
       if (showRewardInTooltip) tooltipParts.push(fullReward);
       if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
+      if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
       tooltip.textContent = tooltipParts.join("\n\n");
       shadowRoot.append(tooltip);
       tooltipElements.push({ element: tooltip, offer: currentOffer });
@@ -1491,51 +1517,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return `~${label} (${ebStr})`;
     }
     return label;
-  }
-  function getMaxRewardPercent(offer) {
-    if (offer.provider === "cbn") {
-      return 0;
-    }
-    const reward = offer.reward.trim();
-    const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
-    if (rangeMatch !== null) {
-      return Number.parseFloat(rangeMatch[2].replace(",", "."));
-    }
-    const pctMatch = reward.match(/^([\d,]+)\s*%$/);
-    if (pctMatch !== null) {
-      return Number.parseFloat(pctMatch[1].replace(",", "."));
-    }
-    const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-    if (sasRateMatch !== null) {
-      const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
-      return points / EB_PER_TRUMF_KR;
-    }
-    return 0;
-  }
-  function calculateCashbackMaxKr(offer, amount) {
-    if (offer.provider === "cbn") {
-      return 0;
-    }
-    const reward = offer.reward.trim();
-    const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
-    if (rangeMatch !== null) {
-      const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
-      return amount * maxPct / 100;
-    }
-    const pctMatch = reward.match(/^([\d,]+)\s*%$/);
-    if (pctMatch !== null) {
-      return amount * Number.parseFloat(pctMatch[1].replace(",", ".")) / 100;
-    }
-    const klarnaMatch = reward.match(/^([\d.]+)%$/);
-    if (klarnaMatch !== null) {
-      return amount * Number.parseFloat(klarnaMatch[1]) / 100;
-    }
-    const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-    if (sasRateMatch !== null) {
-      const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
-      return amount * points / 100 / EB_PER_TRUMF_KR;
-    }
-    return 0;
   }
   function formatBreakdownWithAmounts(terms, amount) {
     return terms.split("\n").map((line) => {
