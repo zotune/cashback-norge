@@ -177,9 +177,10 @@
   });
   requestCurrentOffers();
   function renderNoticeWithStoredState(offers) {
+    const isUserscript = chrome.runtime.id === void 0;
     chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
       const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
-      if (hidden.includes(CURRENT_HOST)) return;
+      if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;

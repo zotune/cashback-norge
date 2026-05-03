@@ -69,9 +69,10 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 requestCurrentOffers();
 function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
+  const isUserscript = (chrome.runtime as { id?: string }).id === undefined;
   chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
     const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
-    if (hidden.includes(CURRENT_HOST)) return;
+    if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
     const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
     const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
