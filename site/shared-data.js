@@ -10,8 +10,6 @@ Krever medlemskap. Aktiver kjøp via norskfamilie.no.`,sparebank1:`SpareBank 1 M
 20 % rabatt på utvalgte strømmetjenester.
 Samlet inntil 500 kr per kalenderår.`},FREE_CARDS:[{pct:.0074,ebPer100kr:10,label:"SAS Amex",badge:"sas-amex",approx:!0,url:"https://www.americanexpress.com/nb-no/kredittkort/sas-classic/",tip:`10 EB/100 kr. Gratis kort.
 2-for-1 på SAS-flyvninger i Europa.
-Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`},{pct:.0074,ebPer100kr:10,label:"SAS MC",badge:"sas-amex",approx:!0,url:"https://saseurobonusmastercard.no/kortene/mastercard/",tip:`10 EB/100 kr. Gratis kort (Mastercard).
-Aksepteres flere steder enn Amex.
 Kr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).`},{pct:.0059,ebPer100kr:8,label:"Lunar EB",badge:"lunar",approx:!0,url:"https://www.lunar.app/no/privat/sas-eurobonus",tip:`8 EB/100 kr (netthandel)
 20 EB/100 kr på SAS.no
 Gratis kort.`},{pct:.005,label:"Norwegian",badge:"norwegian",approx:!1,url:"https://www.banknorwegian.no/kredittkort/cashback/",tip:`0,5 % cashback (1:1 kr mot faktura)

@@ -66,11 +66,6 @@ export const FREE_CARDS: BonusCard[] = [
     tip: "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
   },
   {
-    pct: 0.0074, ebPer100kr: 10, label: "SAS MC", badge: "sas-amex", approx: true,
-    url: "https://saseurobonusmastercard.no/kortene/mastercard/",
-    tip: "10 EB/100 kr. Gratis kort (Mastercard).\nAksepteres flere steder enn Amex.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
-  },
-  {
     pct: 0.0059, ebPer100kr: 8, label: "Lunar EB", badge: "lunar", approx: true,
     url: "https://www.lunar.app/no/privat/sas-eurobonus",
     tip: "8 EB/100 kr (netthandel)\n20 EB/100 kr på SAS.no\nGratis kort.",
