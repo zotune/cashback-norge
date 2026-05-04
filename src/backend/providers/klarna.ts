@@ -1,4 +1,4 @@
-import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
+import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage, ProxyConfiguration } from "crawlee";
 import {
   type CashbackOffer,
   normalizeDomainInput,
@@ -16,6 +16,7 @@ export type CrawlKlarnaInput = {
   overrides: ProviderOverrides;
   generatedAt: string;
   logger: Logger;
+  proxyUrl?: string;
 };
 
 export async function crawlKlarna(
@@ -27,8 +28,13 @@ export async function crawlKlarna(
   const config = new Configuration();
   config.useStorageClient(storage);
 
+  const proxyConfiguration = input.proxyUrl
+    ? new ProxyConfiguration({ proxyUrls: [input.proxyUrl] })
+    : undefined;
+
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.maxPages,
+    ...(proxyConfiguration ? { proxyConfiguration } : {}),
     requestHandler: async ({ $, request }) => {
       const pageOffers = parseKlarnaStoreListing(
         $,

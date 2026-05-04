@@ -26,6 +26,8 @@ jobs:
       - run: pnpm run build:backend
 
       - run: pnpm run crawl
+        env:
+          SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
 
       - name: Commit updated index
         run: |

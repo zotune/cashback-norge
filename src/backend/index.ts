@@ -30,6 +30,7 @@ type CliConfig = {
   providerOverridesPath: string;
   klarnaStartUrl: string;
   klarnaMaxPages: number;
+  klarnaProxyUrl: string | undefined;
   rememberStartUrl: string;
   trumfStartUrl: string;
   sasApiUrl: string;
@@ -84,6 +85,7 @@ async function main(): Promise<void> {
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
         overrides: providerOverrides, startUrl: config.klarnaStartUrl,
+        ...(config.klarnaProxyUrl ? { proxyUrl: config.klarnaProxyUrl } : {}),
       }),
     config.skipRemember ? Promise.resolve([]) : crawlRemember({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -200,6 +202,9 @@ function readCliConfig(args: string[]): CliConfig {
       "--klarna-max-pages",
       5,
     ),
+    klarnaProxyUrl: process.env.SCRAPERAPI_KEY
+      ? `http://scraperapi:${process.env.SCRAPERAPI_KEY}@proxy-server.scraperapi.com:8001`
+      : undefined,
     rememberStartUrl:
       readArgumentValue(args, "--remember-start-url") ??
       "https://www.remember.no/reward/rabatt",
