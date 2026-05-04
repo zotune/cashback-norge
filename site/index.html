@@ -234,8 +234,8 @@ a.merchant-name:hover { text-decoration: underline; }
 .sticky-header .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(90deg); }
 .fixed-footer .bonus-chips { left: 50%; right: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: rgba(255, 255, 255, 0.92); border: 1px solid #d8e3de; isolation: isolate; }
 .bonus-chips-portal {
-  padding-top: 6px;
-  margin-top: 2px;
+  padding-top: 4px;
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1648,12 +1648,26 @@ function setupBonusToggle() {
     chips.style.display = "flex";
     btn.classList.add("open");
   }
+  const closeChips = () => {
+    chips.style.display = "none";
+    btn.classList.remove("open");
+    localStorage.setItem("cashback-bonus-open", "0");
+  };
+
   btn.addEventListener("click", () => {
     const open = chips.style.display !== "none";
     chips.style.display = open ? "none" : "flex";
     btn.classList.toggle("open", !open);
     localStorage.setItem("cashback-bonus-open", open ? "0" : "1");
   });
+
+  // Swipe up to close
+  let touchStartY = 0;
+  chips.addEventListener("touchstart", (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  chips.addEventListener("touchend", (e) => {
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    if (dy > 40) closeChips();
+  }, { passive: true });
 
   // Tap-to-show tooltips on mobile (bonus chips only)
   document.addEventListener("click", (e) => {
