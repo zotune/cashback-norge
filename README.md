@@ -4,13 +4,15 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
 
 ## iPhone / iPad
 
-1. Installer **[Userscripts](https://apps.apple.com/no/app/userscripts/id1463298887)** fra App Store (gratis)
-2. Trykk **aA** i adressefeltet i Safari → **Manage Extensions** → skru på **Userscripts**
-3. Trykk **aA** → **Userscripts** → velg **Tillat alltid på alle nettsider**
-4. **[Klikk her for å åpne scriptet i Safari](https://zotune.github.io/cashback-norge/cashback-varsler.user.js)**
-5. Trykk **aA** → **Userscripts** → **Tap to Install** → **Install** → "Userscript installed"
+1. Installer **[Stay for Safari](https://apps.apple.com/no/app/stay-for-safari/id1591620171)** fra App Store
+2. Åpne **Safari** → trykk **aA** i adressefeltet → **Manage Extensions** → skru på **Stay**
+3. Åpne Stay-appen → **Userscript** → lim inn lenken og trykk **Continue**:
+   ```
+   https://cashbacknorge.no/cashback-varsler.user.js
+   ```
+4. Gå tilbake til Safari og besøk en støttet nettbutikk, f.eks. [lyko.no](https://lyko.no) — cashback-varselet dukker opp nede til venstre på skjermen
 
-Scriptet oppdaterer seg selv automatisk.
+Stay oppdaterer scriptet automatisk når nye versjoner slippes.
 
 ## Chrome / Firefox (desktop)
 

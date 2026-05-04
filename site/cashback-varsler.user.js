@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cashback Varsler
 // @namespace    https://cashbacknorge.no/
-// @version      1.0
+// @version      1777937582
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @match        *://*/*
@@ -2394,7 +2394,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         const crawlerByCode = new Map(
           codeOffers.map((o) => [(o.discountCode ?? "").toUpperCase(), o])
         );
-        const parseReward = (r) => parseFloat(r.replace(",", ".")) || 0;
         const entries = [];
         for (const dbCode of dbCodes) {
           const net = dbCode.upvotes - dbCode.downvotes;
@@ -2405,6 +2404,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
             item.dataset.codeId = String(dbCode.id);
             const reward = document.createElement("span");
             reward.className = "code-reward";
+            if (/%/.test(dbCode.reward)) {
+              reward.dataset.pct = String(parseRewardNum(dbCode.reward));
+              reward.dataset.origReward = dbCode.reward;
+            }
             reward.textContent = dbCode.reward;
             const codeSpan = document.createElement("span");
             codeSpan.className = "code-value";
@@ -2462,7 +2465,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         for (const [, codeOffer] of crawlerByCode) {
           entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
         }
-        entries.sort((a, b) => parseReward(b.reward) - parseReward(a.reward));
+        const rewardPct = (r) => /%/.test(r) ? parseFloat(r.replace(",", ".")) || 0 : 0;
+        entries.sort((a, b) => rewardPct(b.reward) - rewardPct(a.reward));
         codesList.removeChild(addCodeForm);
         codesList.innerHTML = "";
         expiredList.innerHTML = "";

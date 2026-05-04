@@ -15,11 +15,13 @@ function userscriptBannerPlugin(banner: string, fileName: string): Plugin {
 
 const PAGES_URL = "https://cashbacknorge.no";
 
+const VERSION = `${Math.floor(Date.now() / 1000)}`;
+
 const USERSCRIPT_BANNER = `\
 // ==UserScript==
 // @name         Cashback Varsler
 // @namespace    ${PAGES_URL}/
-// @version      1.0
+// @version      ${VERSION}
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @match        *://*/*
