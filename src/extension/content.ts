@@ -599,49 +599,64 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .add-code-form {
       align-items: center;
       display: flex;
-      gap: 4px;
+      gap: 6px;
       padding: 2px 0;
     }
-    .add-code-input {
-      background: #fff;
+    .add-code-form-inner {
+      align-items: center;
+      background: #f7faf8;
       border: 1px solid #d0dbd5;
       border-radius: 6px;
+      display: flex;
+      flex: 1;
+      gap: 4px;
+      min-width: 0;
+      padding: 3px 6px;
+    }
+    .add-code-input {
+      background: transparent;
+      border: none;
       color: #172026;
       flex: 1;
       font-size: 12px;
       min-width: 0;
-      padding: 5px 8px;
+      padding: 4px 2px;
       font-family: inherit;
+      outline: none;
     }
     .add-reward-input {
-      flex: 0 0 70px;
-    }
-    .add-code-input:focus {
-      border-color: #1f8f5f;
-      outline: none;
+      flex: 0 0 48px;
+      border-right: 1px solid #d0dbd5;
+      padding-right: 6px;
     }
     .add-code-submit {
       align-items: center;
-      background: #1f8f5f;
+      background: none;
       border: none;
-      border-radius: 6px;
-      color: #fff;
+      border-radius: 4px;
+      color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
-      padding: 5px 8px;
+      padding: 4px;
       flex-shrink: 0;
     }
     .add-code-submit:disabled {
-      background: #b0c8bc;
+      color: #b0c8bc;
       cursor: default;
     }
     .add-code-cancel {
+      align-items: center;
       background: none;
       border: none;
       color: #8a9ba3;
       cursor: pointer;
-      font-size: 13px;
-      padding: 4px;
+      display: inline-flex;
+      flex-shrink: 0;
+      font-size: 14px;
+      height: 22px;
+      justify-content: center;
+      padding: 0;
+      width: 22px;
     }
     .add-code-cancel:hover {
       color: #172026;
@@ -1376,18 +1391,19 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   addCodeCancel.className = "add-code-cancel";
   addCodeCancel.type = "button";
   addCodeCancel.textContent = "\u2715";
-  addCodeForm.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
+  const addCodeFormInner = document.createElement("div");
+  addCodeFormInner.className = "add-code-form-inner";
+  addCodeFormInner.append(addRewardInput, addCodeInput, addCodeSubmit);
+  addCodeForm.append(addCodeFormInner, addCodeCancel);
   const updateSubmitState = (): void => {
     addCodeSubmit.disabled = addCodeInput.value.trim().length === 0 || addRewardInput.value.trim().length === 0;
   };
   addCodeInput.addEventListener("input", updateSubmitState);
   addRewardInput.addEventListener("input", () => {
     // Strip anything that isn't a digit or decimal separator
-    addRewardInput.value = addRewardInput.value.replace(/[^0-9]/g, "");
+    addRewardInput.value = addRewardInput.value.replace(/[^0-9]/g, "").replace(/^0+(\d)/, "$1");
     const v = Number(addRewardInput.value);
-    if (addRewardInput.value !== "" && (v < 0 || v > 100)) {
-      addRewardInput.value = String(Math.min(100, Math.max(0, v)));
-    }
+    if (addRewardInput.value !== "" && v > 100) addRewardInput.value = "100";
     updateSubmitState();
   });
   const closeAddForm = (): void => {

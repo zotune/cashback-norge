@@ -400,50 +400,53 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .codes-add-btn:hover { border-color: #1f8f5f; color: #1f8f5f; }
 .codes-add-form {
-  background: #f7faf8;
-  border: 1px solid #d8e3de;
-  border-radius: 6px;
   display: none;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 2px 0;
 }
 .codes-add-form.open { display: flex; }
-.codes-add-form-row { display: flex; gap: 6px; }
+.codes-add-form-row { display: flex; gap: 6px; align-items: center; }
+.codes-add-form-inner { display: flex; flex: 1; gap: 6px; align-items: center; background: #f7faf8; border: 1px solid #d8e3de; border-radius: 6px; padding: 3px 6px; min-width: 0; }
 .codes-add-input {
-  background: #fff;
-  border: 1px solid #d8e3de;
-  border-radius: 4px;
+  background: transparent;
+  border: none;
   color: #172026;
   flex: 1;
   font: inherit;
   font-size: 12px;
   min-width: 0;
   outline: none;
-  padding: 5px 8px;
+  padding: 4px 2px;
 }
-.codes-reward-input { flex: 0 0 60px; }
-.codes-add-input:focus { border-color: #1f8f5f; }
+.codes-add-input:focus { outline: none; }
+.codes-reward-input { flex: 0 0 48px; border-right: 1px solid #d8e3de; padding-right: 6px; }
 .codes-add-submit {
   align-items: center;
-  background: #1f8f5f;
+  background: none;
   border: none;
   border-radius: 4px;
-  color: #fff;
+  color: #1f8f5f;
   cursor: pointer;
   display: inline-flex;
   flex-shrink: 0;
-  padding: 5px 8px;
+  padding: 4px;
 }
 .codes-add-submit:disabled { opacity: 0.4; cursor: default; }
 .codes-add-cancel {
+  align-items: center;
   background: none;
   border: none;
   color: #8a9a92;
   cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  padding: 5px 8px;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 14px;
+  height: 22px;
+  justify-content: center;
+  padding: 0;
+  width: 22px;
+  border-radius: 4px;
 }
 .delete-code-btn {
   background: none;
@@ -940,9 +943,11 @@ function render(query) {
         <div class="codes-items">
           <div class="codes-add-form">
             <div class="codes-add-form-row">
-              <input class="codes-add-input codes-reward-input" type="number" placeholder="%" min="0" max="100">
-              <input class="codes-add-input codes-code-input" type="text" placeholder="Kode" maxlength="50">
-              <button class="codes-add-submit" type="button" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <div class="codes-add-form-inner">
+                <input class="codes-add-input codes-reward-input" type="number" placeholder="%" min="0" max="100">
+                <input class="codes-add-input codes-code-input" type="text" placeholder="Kode" maxlength="50">
+                <button class="codes-add-submit" type="button" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              </div>
               <button class="codes-add-cancel" type="button">✕</button>
             </div>
           </div>
@@ -1022,7 +1027,7 @@ function render(query) {
     };
     codeInput?.addEventListener("input", updateSubmit);
     rewardInput?.addEventListener("input", () => {
-      rewardInput.value = rewardInput.value.replace(/[^0-9]/g, "");
+      rewardInput.value = rewardInput.value.replace(/[^0-9]/g, "").replace(/^0+(\d)/, "$1");
       const v = Number(rewardInput.value);
       if (rewardInput.value !== "" && v > 100) rewardInput.value = "100";
       updateSubmit();
