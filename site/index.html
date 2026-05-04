@@ -1890,6 +1890,16 @@ function setupBonusToggle() {
       localStorage.setItem("cashback-bonus-open", "0");
     }
   });
+
+  // Swipe up to close
+  let touchStartY = 0;
+  guide.addEventListener("touchstart", (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  guide.addEventListener("touchend", (e) => {
+    if (touchStartY - e.changedTouches[0].clientY > 40) {
+      guide.style.display = "none";
+      arrow.style.transform = "";
+    }
+  }, { passive: true });
   document.getElementById("iphone-guide-copy").addEventListener("click", function() {
     const origSvg = this.querySelector("svg").outerHTML;
     navigator.clipboard.writeText("https://cashbacknorge.no/cashback-varsler.user.js").then(() => {
