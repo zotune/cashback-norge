@@ -26,8 +26,6 @@ body {
   margin: 0 -16px;
   padding: 8px 16px 4px;
   border-bottom: 1px solid rgba(216, 227, 222, 0.5);
-  max-width: 100vw;
-  overflow: hidden;
 }
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 20px; }
@@ -63,12 +61,31 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   height: 48px;
   outline: none;
   padding: 0 14px;
-  text-align: right;
+  text-align: left;
   width: 110px;
   flex-shrink: 0;
 }
 .global-sum:focus { border-color: #1f8f5f; }
 .global-sum::placeholder { color: #8a9a92; }
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-wrap.flex1 { flex: 1; min-width: 0; }
+.input-wrap .search { flex: 1; width: 100%; }
+.input-wrap .global-sum { width: 110px; padding-right: 28px; }
+.input-clear {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #aab8b2;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  display: none;
+  -webkit-appearance: none;
+}
+.input-wrap.has-value .input-clear { display: block; }
+.search::-webkit-search-cancel-button { -webkit-appearance: none; }
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .merchant {
   background: #fff;
@@ -704,8 +721,14 @@ a.merchant-name:hover { text-decoration: underline; }
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
   <div class="search-wrap">
-    <input class="search" type="search" placeholder="Søk etter butikk..." autofocus>
-    <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
+    <div class="input-wrap flex1">
+      <input class="search" type="search" placeholder="Søk etter butikk..." autofocus>
+      <button class="input-clear" type="button" aria-label="Tøm søk">✕</button>
+    </div>
+    <div class="input-wrap">
+      <input class="global-sum" type="text" inputmode="decimal" placeholder="Sum">
+      <button class="input-clear" type="button" aria-label="Tøm kjøpesum">✕</button>
+    </div>
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <div class="bonus-section">
@@ -760,11 +783,32 @@ async function init() {
   }
   allMerchants.sort((a, b) => a.name.localeCompare(b.name, "nb"));
   render("");
-  document.querySelector(".search").addEventListener("input", (e) => {
+  const searchEl = document.querySelector(".search");
+  const sumEl = document.querySelector(".global-sum");
+  const searchWrap = searchEl.closest(".input-wrap");
+  const sumWrap = sumEl.closest(".input-wrap");
+
+  const updateClear = (input, wrap) => {
+    wrap.classList.toggle("has-value", input.value.length > 0);
+  };
+
+  searchEl.addEventListener("input", (e) => {
+    updateClear(e.target, searchWrap);
     render(e.target.value);
   });
-  document.querySelector(".global-sum").addEventListener("input", (e) => {
-    const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+
+  searchWrap.querySelector(".input-clear").addEventListener("click", () => {
+    searchEl.value = "";
+    updateClear(searchEl, searchWrap);
+    render("");
+    searchEl.focus();
+  });
+
+  sumEl.addEventListener("input", (e) => {
+    const cleaned = e.target.value.replace(/[^0-9.,]/g, "");
+    if (e.target.value !== cleaned) e.target.value = cleaned;
+    updateClear(e.target, sumWrap);
+    const raw = cleaned.replace(",", ".");
     currentAmount = raw.length > 0 ? parseFloat(raw) : 0;
     document.querySelectorAll(".offer-reward[data-reward]").forEach(el => {
       try {
@@ -785,6 +829,13 @@ async function init() {
       }
     });
     try { renderBonusChips(); } catch(e) { console.error("renderBonusChips error:", e); }
+  });
+
+  sumWrap.querySelector(".input-clear").addEventListener("click", () => {
+    sumEl.value = "";
+    updateClear(sumEl, sumWrap);
+    sumEl.dispatchEvent(new Event("input"));
+    sumEl.focus();
   });
 }
 
@@ -1048,7 +1099,7 @@ function render(query) {
       <div class="codes-inline${codesHtml || hostname ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
         <div class="codes-toggle-wrap">
           <button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
-          <button class="codes-add-icon-btn" type="button" title="Legg til rabattkode"><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="codes-add-icon-btn" type="button"><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
         <div class="codes-items">
           <div class="codes-add-form">
