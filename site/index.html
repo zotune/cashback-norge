@@ -383,6 +383,24 @@ a.merchant-name:hover { text-decoration: underline; }
 .vote-btn:hover { color: #5d6b71; }
 .vote-btn.voted { color: #1f8f5f; }
 .vote-btn.downvoted { color: #e05555; }
+.vote-btn { position: relative; }
+.vote-tooltip {
+  background: #222;
+  border-radius: 4px;
+  bottom: calc(100% + 6px);
+  color: #fff;
+  font-size: 11px;
+  left: 50%;
+  opacity: 0;
+  padding: 4px 8px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  z-index: 20;
+}
+.vote-btn:hover .vote-tooltip { opacity: 1; }
 .codes-add-btn {
   align-items: center;
   background: none;
@@ -917,8 +935,8 @@ function render(query) {
         <div class="code-item">
           <span class="code-reward">${esc(o.reward)}</span>
           <span class="code-value">${esc(code)}</span>
-          <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span></button>
-          <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span></button>
+          <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
+          <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
         </div>
         <button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button>
       </div>`;
@@ -1425,10 +1443,10 @@ function buildCodeRow(dbCode, hostname, ownedIds) {
   codeEl.textContent = dbCode.code;
   const downBtn = document.createElement("button");
   downBtn.className = "vote-btn"; downBtn.type = "button"; downBtn.dataset.vote = "-1";
-  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${dbCode.downvotes > 0 ? dbCode.downvotes : ""}</span>`;
+  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${dbCode.downvotes > 0 ? dbCode.downvotes : ""}</span><span class="vote-tooltip">Koden er utgått</span>`;
   const upBtn = document.createElement("button");
   upBtn.className = "vote-btn"; upBtn.type = "button"; upBtn.dataset.vote = "1";
-  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${dbCode.upvotes > 0 ? dbCode.upvotes : ""}</span>`;
+  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${dbCode.upvotes > 0 ? dbCode.upvotes : ""}</span><span class="vote-tooltip">Koden fungerer!</span>`;
   item.append(rewardEl, codeEl);
   if (dbCode.id && ownedIds && ownedIds.has(dbCode.id)) {
     const delBtn = makeDeleteBtn(dbCode.id, row, hostname);
