@@ -135,15 +135,561 @@
     "laundryheap.com": "Laundryheap+"
   };
   const SUPPORT_LINKS = [
-    { text: "Kron: 200 kr gratis i fond →", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d" },
-    { text: "Horde: Oversikt over alle kort + nedbetaling →", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube" },
-    { text: "Kjøp en kaffe til utvikler →", emoji: "☕", url: "https://buymeacoffee.com/adore" },
-    { text: "Wise: Gratis internasjonal overføring opptil 5 000 kr →", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41" },
-    { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift →", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene" },
-    { text: "Revolut: Gratis valutaveksling + bonus →", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK" },
-    { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix →", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou" },
-    { text: "Curve: Samle alle kort i ett + gratis valutaveksling →", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD" }
+    { text: "Kron: 200 kr gratis i fond", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
+    { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
+    { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
+    { text: "Wise: Gratis internasjonal overføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
+    { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
+    { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
+    { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
+    { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true }
   ];
+  const noWords = [
+    "asshole",
+    "dritt",
+    "drittsekk",
+    "faen",
+    "faen i helvete",
+    "fan",
+    "fanken",
+    "fitte",
+    "forbanna",
+    "forbannet",
+    "forjævlig",
+    "fuck",
+    "fy faen",
+    "føkk",
+    "føkka",
+    "føkkings",
+    "jævla",
+    "jævlig",
+    "helvete",
+    "helvetet",
+    "kuk",
+    "kukene",
+    "kuker",
+    "morraknuller",
+    "morrapuler",
+    "nigger",
+    "pakkis",
+    "pikk",
+    "pokker",
+    "ræva",
+    "ræven",
+    "satan",
+    "shit",
+    "sinnsykt",
+    "skitt",
+    "sotrør",
+    "ståpikk",
+    "ståpikkene",
+    "ståpikker",
+    "svartheiteste"
+  ];
+  const enWords = [
+    "2g1c",
+    "2 girls 1 cup",
+    "acrotomophilia",
+    "alabama hot pocket",
+    "alaskan pipeline",
+    "anal",
+    "anilingus",
+    "anus",
+    "apeshit",
+    "arsehole",
+    "ass",
+    "asshole",
+    "assmunch",
+    "auto erotic",
+    "autoerotic",
+    "babeland",
+    "baby batter",
+    "baby juice",
+    "ball gag",
+    "ball gravy",
+    "ball kicking",
+    "ball licking",
+    "ball sack",
+    "ball sucking",
+    "bangbros",
+    "bangbus",
+    "bareback",
+    "barely legal",
+    "barenaked",
+    "bastard",
+    "bastardo",
+    "bastinado",
+    "bbw",
+    "bdsm",
+    "beaner",
+    "beaners",
+    "beaver cleaver",
+    "beaver lips",
+    "beastiality",
+    "bestiality",
+    "big black",
+    "big breasts",
+    "big knockers",
+    "big tits",
+    "bimbos",
+    "birdlock",
+    "bitch",
+    "bitches",
+    "black cock",
+    "blonde action",
+    "blonde on blonde action",
+    "blowjob",
+    "blow job",
+    "blow your load",
+    "blue waffle",
+    "blumpkin",
+    "bollocks",
+    "bondage",
+    "boner",
+    "boob",
+    "boobs",
+    "booty call",
+    "brown showers",
+    "brunette action",
+    "bukkake",
+    "bulldyke",
+    "bullet vibe",
+    "bullshit",
+    "bung hole",
+    "bunghole",
+    "busty",
+    "butt",
+    "buttcheeks",
+    "butthole",
+    "camel toe",
+    "camgirl",
+    "camslut",
+    "camwhore",
+    "carpet muncher",
+    "carpetmuncher",
+    "chocolate rosebuds",
+    "cialis",
+    "circlejerk",
+    "cleveland steamer",
+    "clit",
+    "clitoris",
+    "clover clamps",
+    "clusterfuck",
+    "cock",
+    "cocks",
+    "coprolagnia",
+    "coprophilia",
+    "cornhole",
+    "coon",
+    "coons",
+    "creampie",
+    "cum",
+    "cumming",
+    "cumshot",
+    "cumshots",
+    "cunnilingus",
+    "cunt",
+    "darkie",
+    "date rape",
+    "daterape",
+    "deep throat",
+    "deepthroat",
+    "dendrophilia",
+    "dick",
+    "dildo",
+    "dingleberry",
+    "dingleberries",
+    "dirty pillows",
+    "dirty sanchez",
+    "doggie style",
+    "doggiestyle",
+    "doggy style",
+    "doggystyle",
+    "dog style",
+    "dolcett",
+    "domination",
+    "dominatrix",
+    "dommes",
+    "donkey punch",
+    "double dong",
+    "double penetration",
+    "dp action",
+    "dry hump",
+    "dvda",
+    "eat my ass",
+    "ecchi",
+    "ejaculation",
+    "erotic",
+    "erotism",
+    "escort",
+    "eunuch",
+    "fag",
+    "faggot",
+    "fecal",
+    "felch",
+    "fellatio",
+    "feltch",
+    "female squirting",
+    "femdom",
+    "figging",
+    "fingerbang",
+    "fingering",
+    "fisting",
+    "foot fetish",
+    "footjob",
+    "frotting",
+    "fuck",
+    "fuck buttons",
+    "fuckin",
+    "fucking",
+    "fucktards",
+    "fudge packer",
+    "fudgepacker",
+    "futanari",
+    "gangbang",
+    "gang bang",
+    "gay sex",
+    "genitals",
+    "giant cock",
+    "girl on",
+    "girl on top",
+    "girls gone wild",
+    "goatcx",
+    "goatse",
+    "god damn",
+    "gokkun",
+    "golden shower",
+    "goodpoop",
+    "goo girl",
+    "goregasm",
+    "grope",
+    "group sex",
+    "g-spot",
+    "guro",
+    "hand job",
+    "handjob",
+    "hard core",
+    "hardcore",
+    "hentai",
+    "homoerotic",
+    "honkey",
+    "hooker",
+    "horny",
+    "hot carl",
+    "hot chick",
+    "how to kill",
+    "how to murder",
+    "huge fat",
+    "humping",
+    "incest",
+    "intercourse",
+    "jack off",
+    "jail bait",
+    "jailbait",
+    "jelly donut",
+    "jerk off",
+    "jigaboo",
+    "jiggaboo",
+    "jiggerboo",
+    "jizz",
+    "juggs",
+    "kike",
+    "kinbaku",
+    "kinkster",
+    "kinky",
+    "knobbing",
+    "leather restraint",
+    "leather straight jacket",
+    "lemon party",
+    "livesex",
+    "lolita",
+    "lovemaking",
+    "make me come",
+    "male squirting",
+    "masturbate",
+    "masturbating",
+    "masturbation",
+    "menage a trois",
+    "milf",
+    "missionary position",
+    "mong",
+    "motherfucker",
+    "mound of venus",
+    "mr hands",
+    "muff diver",
+    "muffdiving",
+    "nambla",
+    "nawashi",
+    "negro",
+    "neonazi",
+    "nigga",
+    "nigger",
+    "nig nog",
+    "nimphomania",
+    "nipple",
+    "nipples",
+    "nsfw",
+    "nsfw images",
+    "nude",
+    "nudity",
+    "nutten",
+    "nympho",
+    "nymphomania",
+    "octopussy",
+    "omorashi",
+    "one cup two girls",
+    "one guy one jar",
+    "orgasm",
+    "orgy",
+    "paedophile",
+    "paki",
+    "panties",
+    "panty",
+    "pedobear",
+    "pedophile",
+    "pegging",
+    "penis",
+    "phone sex",
+    "piece of shit",
+    "pikey",
+    "pissing",
+    "piss pig",
+    "pisspig",
+    "playboy",
+    "pleasure chest",
+    "pole smoker",
+    "ponyplay",
+    "poof",
+    "poon",
+    "poontang",
+    "punany",
+    "poop chute",
+    "poopchute",
+    "porn",
+    "porno",
+    "pornography",
+    "prince albert piercing",
+    "pthc",
+    "pubes",
+    "pussy",
+    "queaf",
+    "queef",
+    "quim",
+    "raghead",
+    "raging boner",
+    "rape",
+    "raping",
+    "rapist",
+    "rectum",
+    "reverse cowgirl",
+    "rimjob",
+    "rimming",
+    "rosy palm",
+    "rosy palm and her 5 sisters",
+    "rusty trombone",
+    "sadism",
+    "santorum",
+    "scat",
+    "schlong",
+    "scissoring",
+    "semen",
+    "sex",
+    "sexcam",
+    "sexo",
+    "sexy",
+    "sexual",
+    "sexually",
+    "sexuality",
+    "shaved beaver",
+    "shaved pussy",
+    "shemale",
+    "shibari",
+    "shit",
+    "shitblimp",
+    "shitty",
+    "shota",
+    "shrimping",
+    "skeet",
+    "slanteye",
+    "slut",
+    "s&m",
+    "smut",
+    "snatch",
+    "snowballing",
+    "sodomize",
+    "sodomy",
+    "spastic",
+    "spic",
+    "splooge",
+    "splooge moose",
+    "spooge",
+    "spread legs",
+    "spunk",
+    "strap on",
+    "strapon",
+    "strappado",
+    "strip club",
+    "style doggy",
+    "suck",
+    "sucks",
+    "suicide girls",
+    "sultry women",
+    "swastika",
+    "swinger",
+    "tainted love",
+    "taste my",
+    "tea bagging",
+    "threesome",
+    "throating",
+    "thumbzilla",
+    "tied up",
+    "tight white",
+    "tit",
+    "tits",
+    "titties",
+    "titty",
+    "tongue in a",
+    "topless",
+    "tosser",
+    "towelhead",
+    "tranny",
+    "tribadism",
+    "tub girl",
+    "tubgirl",
+    "tushy",
+    "twat",
+    "twink",
+    "twinkie",
+    "two girls one cup",
+    "undressing",
+    "upskirt",
+    "urethra play",
+    "urophilia",
+    "vagina",
+    "venus mound",
+    "viagra",
+    "vibrator",
+    "violet wand",
+    "vorarephilia",
+    "voyeur",
+    "voyeurweb",
+    "voyuer",
+    "vulva",
+    "wank",
+    "wetback",
+    "wet dream",
+    "white power",
+    "whore",
+    "worldsex",
+    "wrapping men",
+    "wrinkled starfish",
+    "xx",
+    "xxx",
+    "yaoi",
+    "yellow showers",
+    "yiffy",
+    "zoophilia",
+    "🖕"
+  ];
+  const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
+  const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
+  async function fetchCodesForHost(hostname) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/discount_codes?hostname=eq.${encodeURIComponent(hostname)}&select=id,code,reward`,
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      if (!res.ok) return [];
+      const rows = await res.json();
+      const ids = rows.map((r) => r.id);
+      if (ids.length === 0) return [];
+      const vRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/code_votes?code_id=in.(${ids.join(",")})&select=code_id,vote`,
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      const votes = vRes.ok ? await vRes.json() : [];
+      return rows.map((r) => ({
+        ...r,
+        upvotes: votes.filter((v) => v.code_id === r.id && v.vote === 1).length,
+        downvotes: votes.filter((v) => v.code_id === r.id && v.vote === -1).length
+      }));
+    } catch {
+      return [];
+    }
+  }
+  async function apiSubmitCode(hostname, code, reward) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ hostname, code, reward })
+      });
+      if (res.status === 409) return { ok: false, duplicate: true };
+      if (res.status === 429) return { ok: false, rate_limited: true };
+      if (!res.ok) return { ok: false };
+      const data = await res.json();
+      return { ok: true, ...data.id !== void 0 ? { id: data.id } : {} };
+    } catch {
+      return { ok: false };
+    }
+  }
+  async function apiVote(codeId, vote, staticCode) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ code_id: codeId > 0 ? codeId : void 0, vote, ...staticCode ?? {} })
+      });
+      if (res.status === 429) return { rate_limited: true };
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+  async function apiDeleteCode(codeId) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ id: codeId })
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  const OWNED_CODES_KEY = (hostname) => `cashback-varsler-owned-codes-${hostname}`;
+  function getOwnedCodeIds(hostname) {
+    try {
+      const raw = localStorage.getItem(OWNED_CODES_KEY(hostname));
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(arr);
+    } catch {
+      return /* @__PURE__ */ new Set();
+    }
+  }
+  function addOwnedCodeId(hostname, id) {
+    const ids = getOwnedCodeIds(hostname);
+    ids.add(id);
+    localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
+  }
+  function removeOwnedCodeId(hostname, id) {
+    const ids = getOwnedCodeIds(hostname);
+    ids.delete(id);
+    localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
+  }
+  function showRateLimitFlash(near) {
+    const existing = near.closest(".code-item-row")?.parentElement?.querySelector(".rate-limit-flash");
+    if (existing) return;
+    const flash = document.createElement("div");
+    flash.className = "rate-limit-flash";
+    flash.textContent = "Du har nådd grensen på 5 handlinger per dag.";
+    flash.style.cssText = "font-size:11px;color:#888;padding:4px 8px;";
+    near.closest(".code-item-row")?.insertAdjacentElement("afterend", flash);
+    setTimeout(() => flash.remove(), 2500);
+  }
   const CBN_LOGO_B64 = "data:image/png;base64,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";
   const HOST_ID = "cashback-varsler-notice";
   const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
@@ -229,6 +775,12 @@
     } catch {
     }
     clearNotice();
+  }
+  function makeAdChip() {
+    const chip = document.createElement("span");
+    chip.textContent = "Ad";
+    chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
+    return chip;
   }
   function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed) {
     clearNotice();
@@ -325,6 +877,7 @@
       box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
       overflow: hidden;
       margin-left: 4px;
+      transform: translateZ(0);
       transition: width 0.25s ease, opacity 0.25s ease, margin-left 0.25s ease, border-width 0.25s ease;
     }
     .notice.collapsed .panel {
@@ -522,6 +1075,157 @@
     .copy-code-btn:hover {
       color: #166b47;
     }
+    .vote-btn {
+      align-items: center;
+      color: #b0c8bc;
+      cursor: pointer;
+      display: inline-flex;
+      gap: 3px;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1;
+      background: none;
+      border: none;
+    }
+    .vote-btn:hover {
+      color: #1f8f5f;
+    }
+    .vote-btn.voted {
+      color: #1f8f5f;
+    }
+    .vote-btn.downvoted {
+      color: #e05555;
+    }
+    .vote-count {
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .add-code-btn {
+      align-items: center;
+      background: none;
+      border: none;
+      color: #b0c8bc;
+      cursor: pointer;
+      display: inline-flex;
+      margin-left: auto;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .add-code-btn:hover {
+      color: #1f8f5f;
+    }
+    .add-code-form {
+      align-items: center;
+      display: flex;
+      gap: 4px;
+      padding: 2px 0;
+    }
+    .add-code-input {
+      background: #fff;
+      border: 1px solid #d0dbd5;
+      border-radius: 6px;
+      color: #172026;
+      flex: 1;
+      font-size: 12px;
+      min-width: 0;
+      padding: 5px 8px;
+      font-family: inherit;
+    }
+    .add-reward-input {
+      flex: 0 0 70px;
+    }
+    .add-code-input:focus {
+      border-color: #1f8f5f;
+      outline: none;
+    }
+    .add-code-submit {
+      align-items: center;
+      background: #1f8f5f;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      padding: 5px 8px;
+      flex-shrink: 0;
+    }
+    .add-code-submit:disabled {
+      background: #b0c8bc;
+      cursor: default;
+    }
+    .add-code-cancel {
+      background: none;
+      border: none;
+      color: #8a9ba3;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 4px;
+    }
+    .add-code-cancel:hover {
+      color: #172026;
+    }
+    .add-code-thanks {
+      color: #1f8f5f;
+      font-size: 11px;
+      margin: 0;
+      padding: 4px 0;
+    }
+    .delete-code-btn {
+      align-items: center;
+      background: none;
+      border: none;
+      color: #c0a0a0;
+      cursor: pointer;
+      display: inline-flex;
+      padding: 2px 3px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .delete-code-btn:hover {
+      color: #e05555;
+    }
+    .expired-section {
+      margin-top: 4px;
+      padding-top: 4px;
+    }
+    .expired-toggle {
+      align-items: center;
+      background: none;
+      border: none;
+      color: #8a9ba3;
+      cursor: pointer;
+      display: flex;
+      font-size: 11px;
+      gap: 4px;
+      padding: 2px 0;
+      width: 100%;
+    }
+    .expired-toggle:hover {
+      color: #172026;
+    }
+    .expired-toggle-arrow {
+      display: inline-block;
+      font-size: 9px;
+      transition: transform 0.15s;
+    }
+    .expired-section.collapsed .expired-toggle-arrow {
+      transform: rotate(-90deg);
+    }
+    .expired-list {
+      display: grid;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .expired-section.collapsed .expired-list {
+      display: none;
+    }
+    .code-item.expired {
+      opacity: 0.55;
+    }
     .copy-code-tooltip {
       background: #1a1a2e;
       border-radius: 6px;
@@ -562,7 +1266,6 @@
       gap: 5px;
     }
     .bonus-chips-section {
-      border-top: 1px solid #edf2ef;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
@@ -596,7 +1299,6 @@
       transform: rotate(-90deg);
     }
     .codes-section {
-      border-top: 1px solid #edf2ef;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
@@ -614,6 +1316,7 @@
       line-height: 1;
       margin-bottom: 5px;
       padding: 0;
+      width: 100%;
     }
     .codes-toggle:hover {
       color: #4f5f66;
@@ -626,6 +1329,9 @@
     .codes-section.collapsed .codes-list {
       display: none;
     }
+    .codes-section.collapsed .expired-section {
+      display: none !important;
+    }
     .codes-section.collapsed .codes-toggle-arrow {
       transform: rotate(-90deg);
     }
@@ -634,19 +1340,30 @@
       flex-direction: column;
       gap: 4px;
     }
+    .code-item-row {
+      align-items: center;
+      display: flex;
+      gap: 6px;
+    }
     .code-item {
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
       border-radius: 6px;
       display: flex;
+      flex: 1;
       font-size: 12px;
       gap: 6px;
+      min-width: 0;
       padding: 5px 8px;
     }
     .code-reward {
       font-weight: 700;
       white-space: nowrap;
+    }
+    .code-item-row--best .code-reward,
+    .code-item-row--best .code-value {
+      color: #3a7d55;
     }
     .code-value {
       color: #5d6b71;
@@ -736,7 +1453,6 @@
       display: block;
     }
     .support {
-      border-top: 1px solid #edf2ef;
       padding: 6px 14px;
       display: flex;
       align-items: center;
@@ -994,7 +1710,7 @@
     for (const [cardIdx, card] of FREE_CARDS.entries()) {
       const { chip, label } = createBonusChip(card);
       if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
-      bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, ebPer100kr: card.ebPer100kr, approx: card.approx, defaultText: label.textContent ?? "" });
+      bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, ...card.ebPer100kr !== void 0 ? { ebPer100kr: card.ebPer100kr } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
@@ -1030,7 +1746,14 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       if (card.label === "Curve") continue;
       if (card.label === "Crypto" && cryptoSub !== void 0) continue;
       const { chip, label } = createBonusChip(card);
-      bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : void 0, maxPct: card.maxPct != null ? card.maxPct * 100 : void 0, approx: card.approx, defaultText: label.textContent ?? "" });
+      if (card.label === "Crypto") {
+        const badge = chip.querySelector(".provider-badge");
+        const wrapper = document.createElement("span");
+        wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+        badge.replaceWith(wrapper);
+        wrapper.append(makeAdChip(), badge);
+      }
+      bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
       premiumItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot);
     }
@@ -1047,7 +1770,12 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     if (curveOffer !== void 0) {
       const curveCard = PREMIUM_CARDS.find((c) => c.label === "Curve");
       const { chip, label } = createBonusChip(curveCard, curveOffer.activationUrl);
-      bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, minPct: void 0, maxPct: void 0, approx: curveCard.approx, defaultText: label.textContent ?? "" });
+      const badge = chip.querySelector(".provider-badge");
+      const wrapper = document.createElement("span");
+      wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+      badge.replaceWith(wrapper);
+      wrapper.append(makeAdChip(), badge);
+      bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, approx: curveCard.approx, defaultText: label.textContent ?? "" });
       addChipTooltip(chip, curveCard.tip, shadowRoot);
       selectedItems.append(chip);
       hasSelectedItems = true;
@@ -1065,6 +1793,10 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       cryptoBadge.className = "provider-badge provider-crypto";
       cryptoBadge.textContent = "Crypto";
       cryptoChip.append(cryptoChipLabel, cryptoBadge);
+      const cryptoAdWrapper = document.createElement("span");
+      cryptoAdWrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+      cryptoBadge.replaceWith(cryptoAdWrapper);
+      cryptoAdWrapper.append(makeAdChip(), cryptoBadge);
       addChipTooltip(cryptoChip, `Crypto.com Visa-kort.
 Jade/Obsidian: 6 mnd gratis ${cryptoSub}
 Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
@@ -1093,73 +1825,536 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     chipsSection.append(chipsToggle, bonusChips);
     const codesSection = document.createElement("div");
     codesSection.className = "codes-section";
-    if (initialCodesCollapsed) {
+    if (initialCodesCollapsed && codeOffers.length > 0) {
       codesSection.classList.add("collapsed");
     }
-    if (codeOffers.length > 0) {
-      const codesToggle = document.createElement("button");
-      codesToggle.className = "codes-toggle";
-      codesToggle.type = "button";
-      const codesToggleArrow = document.createElement("span");
-      codesToggleArrow.className = "codes-toggle-arrow";
-      codesToggleArrow.textContent = "▼";
-      const codesToggleText = document.createElement("span");
-      codesToggleText.textContent = `Rabattkoder (${codeOffers.length})`;
-      codesToggle.append(codesToggleArrow, codesToggleText);
-      codesToggle.addEventListener("click", () => {
-        const isCollapsed = codesSection.classList.toggle("collapsed");
-        chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
-      });
-      const codesList = document.createElement("div");
-      codesList.className = "codes-list";
-      for (const codeOffer of codeOffers) {
-        const code = codeOffer.discountCode ?? "";
-        const item = document.createElement("div");
-        item.className = "code-item";
-        const reward = document.createElement("span");
-        reward.className = "code-reward";
-        reward.textContent = codeOffer.reward;
-        const codeSpan = document.createElement("span");
-        codeSpan.className = "code-value";
-        codeSpan.textContent = code;
-        const copyBtn = document.createElement("span");
-        copyBtn.className = "copy-code-btn";
-        copyBtn.innerHTML = COPY_ICON_SVG;
-        const copyTooltip = document.createElement("div");
-        copyTooltip.className = "copy-code-tooltip";
-        copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-        shadowRoot.append(copyTooltip);
-        copyBtn.addEventListener("mouseenter", () => {
-          const rect = copyBtn.getBoundingClientRect();
-          copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
-          copyTooltip.style.top = `${rect.top - 30}px`;
-          copyTooltip.style.transform = "translateX(-50%)";
-          copyTooltip.classList.add("visible");
-        });
-        copyBtn.addEventListener("mouseleave", () => {
-          copyTooltip.classList.remove("visible");
-        });
-        copyBtn.addEventListener("click", () => {
-          void navigator.clipboard.writeText(code).then(() => {
-            copyBtn.innerHTML = CHECK_ICON_SVG;
-            copyTooltip.textContent = "Kopiert!";
-            copyTooltip.classList.add("visible");
-            setTimeout(() => {
-              copyBtn.innerHTML = COPY_ICON_SVG;
-              copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-              copyTooltip.classList.remove("visible");
-            }, 1500);
-          });
-        });
-        item.append(reward, codeSpan, copyBtn);
-        codesList.append(item);
+    const codesToggle = document.createElement("button");
+    codesToggle.className = "codes-toggle";
+    codesToggle.type = "button";
+    const codesToggleArrow = document.createElement("span");
+    codesToggleArrow.className = "codes-toggle-arrow";
+    codesToggleArrow.textContent = "▼";
+    const codesToggleText = document.createElement("span");
+    codesToggleText.textContent = "Rabattkoder";
+    const addCodeBtn = document.createElement("button");
+    addCodeBtn.className = "add-code-btn";
+    addCodeBtn.type = "button";
+    addCodeBtn.title = "Legg til rabattkode";
+    addCodeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    codesToggle.append(codesToggleArrow, codesToggleText, addCodeBtn);
+    codesToggle.addEventListener("click", (e) => {
+      if (addCodeBtn.contains(e.target)) return;
+      const isCollapsed = codesSection.classList.toggle("collapsed");
+      chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
+    });
+    const codesList = document.createElement("div");
+    codesList.className = "codes-list";
+    const addCodeForm = document.createElement("div");
+    addCodeForm.className = "add-code-form";
+    addCodeForm.style.display = "none";
+    const addRewardInput = document.createElement("input");
+    addRewardInput.className = "add-code-input add-reward-input";
+    addRewardInput.type = "number";
+    addRewardInput.placeholder = "%";
+    addRewardInput.min = "0";
+    addRewardInput.max = "100";
+    const addCodeInput = document.createElement("input");
+    addCodeInput.className = "add-code-input";
+    addCodeInput.type = "text";
+    addCodeInput.placeholder = "Kode";
+    addCodeInput.maxLength = 30;
+    const addCodeSubmit = document.createElement("button");
+    addCodeSubmit.className = "add-code-submit";
+    addCodeSubmit.type = "button";
+    addCodeSubmit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    addCodeSubmit.disabled = true;
+    const addCodeCancel = document.createElement("button");
+    addCodeCancel.className = "add-code-cancel";
+    addCodeCancel.type = "button";
+    addCodeCancel.textContent = "✕";
+    addCodeForm.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
+    const updateSubmitState = () => {
+      addCodeSubmit.disabled = addCodeInput.value.trim().length === 0;
+    };
+    addCodeInput.addEventListener("input", updateSubmitState);
+    addRewardInput.addEventListener("input", () => {
+      const v = Number(addRewardInput.value);
+      if (addRewardInput.value !== "" && (v < 0 || v > 100)) {
+        addRewardInput.value = String(Math.min(100, Math.max(0, v)));
       }
-      codesSection.append(codesToggle, codesList);
+    });
+    const closeAddForm = () => {
+      addCodeForm.style.display = "none";
+      addCodeInput.value = "";
+      addRewardInput.value = "";
+      addCodeSubmit.disabled = true;
+    };
+    const parseRewardNum = (r) => parseFloat(r.replace(",", ".")) || 0;
+    const resortCodesList = () => {
+      const rows = [...codesList.querySelectorAll(".code-item-row")];
+      rows.sort((a, b) => {
+        const netA = parseFloat(a.dataset.net ?? "0");
+        const netB = parseFloat(b.dataset.net ?? "0");
+        if (netB !== netA) return netB - netA;
+        const rA = parseRewardNum(a.querySelector(".code-reward")?.textContent ?? "");
+        const rB = parseRewardNum(b.querySelector(".code-reward")?.textContent ?? "");
+        return rB - rA;
+      });
+      for (const row of rows) {
+        row.classList.remove("code-item-row--best");
+        codesList.append(row);
+      }
+      if (rows[0]) rows[0].classList.add("code-item-row--best");
+      codesList.prepend(addCodeForm);
+    };
+    const submitCode = () => {
+      const code = addCodeInput.value.trim().toUpperCase();
+      const rawReward = addRewardInput.value.trim();
+      const reward = rawReward.length > 0 ? `${rawReward} %` : "?";
+      if (code.length === 0) return;
+      const hasProfanity = (text) => text.toLowerCase().split(/[^a-z0-9æøå]+/).some((w) => w.length > 0 && PROFANITY_SET.has(w));
+      if (hasProfanity(code) || hasProfanity(rawReward)) {
+        addCodeInput.style.borderColor = "#e05555";
+        setTimeout(() => {
+          addCodeInput.style.borderColor = "";
+        }, 1500);
+        return;
+      }
+      console.info(`[cashback-varsler] User submitted code for ${CURRENT_HOST}: ${code} (${reward})`);
+      closeAddForm();
+      void apiSubmitCode(CURRENT_HOST, code, reward).then((result) => {
+        if (!result.ok) {
+          row1.remove();
+          let msg = "Noe gikk galt, prøv igjen.";
+          if (result.duplicate === true) msg = "Koden er allerede lagt til.";
+          if (result.rate_limited === true) msg = "Du har nådd grensen på 5 handlinger per dag.";
+          const warn = document.createElement("div");
+          warn.textContent = msg;
+          warn.style.cssText = "font-size:11px;color:#888;padding:4px 8px;";
+          addCodeForm.insertAdjacentElement("afterend", warn);
+          setTimeout(() => warn.remove(), 2500);
+          return;
+        }
+        if (result.id) {
+          item.dataset.codeId = String(result.id);
+          addOwnedCodeId(CURRENT_HOST, result.id);
+          const deleteBtn = makeDeleteBtn(result.id, row1);
+          item.insertBefore(deleteBtn, down1);
+        }
+      });
+      const item = document.createElement("div");
+      item.className = "code-item";
+      item.dataset.codeId = "pending";
+      const rewardEl = document.createElement("span");
+      rewardEl.className = "code-reward";
+      rewardEl.textContent = reward;
+      const codeSpan = document.createElement("span");
+      codeSpan.className = "code-value";
+      codeSpan.textContent = code;
+      const copyBtn = document.createElement("span");
+      copyBtn.className = "copy-code-btn";
+      copyBtn.innerHTML = COPY_ICON_SVG;
+      copyBtn.addEventListener("click", () => {
+        void navigator.clipboard.writeText(code).then(() => {
+          copyBtn.innerHTML = CHECK_ICON_SVG;
+          setTimeout(() => {
+            copyBtn.innerHTML = COPY_ICON_SVG;
+          }, 1500);
+        });
+      });
+      const { upBtn: up1, downBtn: down1 } = attachVoteButtons(item);
+      item.append(rewardEl, codeSpan, down1, up1);
+      const row1 = document.createElement("div");
+      row1.className = "code-item-row";
+      row1.dataset.net = "0";
+      row1.append(item, copyBtn);
+      addCodeForm.insertAdjacentElement("afterend", row1);
+      resortCodesList();
+    };
+    addRewardInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAddForm();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addCodeInput.focus();
+      }
+    });
+    addCodeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAddForm();
+      if (e.key === "Enter" && addCodeInput.value.trim().length > 0) submitCode();
+    });
+    addCodeCancel.addEventListener("click", closeAddForm);
+    addCodeSubmit.addEventListener("click", submitCode);
+    addCodeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      codesSection.classList.remove("collapsed");
+      addCodeForm.style.display = "";
+      addRewardInput.focus();
+    });
+    codesList.append(addCodeForm);
+    const expiredSection = document.createElement("div");
+    expiredSection.className = "expired-section collapsed";
+    expiredSection.style.display = "none";
+    const expiredToggle = document.createElement("button");
+    expiredToggle.className = "expired-toggle";
+    expiredToggle.type = "button";
+    const expiredToggleArrow = document.createElement("span");
+    expiredToggleArrow.className = "expired-toggle-arrow";
+    expiredToggleArrow.textContent = "▼";
+    const expiredToggleText = document.createElement("span");
+    expiredToggleText.textContent = "Utgåtte koder";
+    expiredToggle.append(expiredToggleArrow, expiredToggleText);
+    expiredToggle.addEventListener("click", () => {
+      expiredSection.classList.toggle("collapsed");
+    });
+    const expiredList = document.createElement("div");
+    expiredList.className = "expired-list";
+    expiredSection.append(expiredToggle, expiredList);
+    const makeDeleteBtn = (codeId, row) => {
+      const btn = document.createElement("button");
+      btn.className = "delete-code-btn";
+      btn.type = "button";
+      btn.title = "Slett koden din";
+      btn.innerHTML = `×`;
+      btn.addEventListener("click", () => {
+        void apiDeleteCode(codeId).then((ok) => {
+          if (ok) {
+            row.remove();
+            removeOwnedCodeId(CURRENT_HOST, codeId);
+          }
+        });
+      });
+      return btn;
+    };
+    const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+    const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
+    const attachVoteButtons = (item, staticCode) => {
+      let upvotes = 0;
+      let downvotes = 0;
+      let upvoted = false;
+      let downvoted = false;
+      const upBtn = document.createElement("button");
+      upBtn.className = "vote-btn";
+      upBtn.type = "button";
+      upBtn.innerHTML = THUMBS_UP_SVG;
+      const upCountEl = document.createElement("span");
+      upCountEl.className = "vote-count";
+      upBtn.append(upCountEl);
+      const upTooltip = document.createElement("div");
+      upTooltip.className = "copy-code-tooltip";
+      upTooltip.textContent = "Koden fungerer!";
+      shadowRoot.append(upTooltip);
+      upBtn.addEventListener("mouseenter", () => {
+        const rect = upBtn.getBoundingClientRect();
+        upTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        upTooltip.style.top = `${rect.top - 30}px`;
+        upTooltip.style.transform = "translateX(-50%)";
+        upTooltip.classList.add("visible");
+      });
+      upBtn.addEventListener("mouseleave", () => {
+        upTooltip.classList.remove("visible");
+      });
+      const downBtn = document.createElement("button");
+      downBtn.className = "vote-btn";
+      downBtn.type = "button";
+      downBtn.innerHTML = THUMBS_DOWN_SVG;
+      const downCountEl = document.createElement("span");
+      downCountEl.className = "vote-count";
+      downBtn.append(downCountEl);
+      const downTooltip = document.createElement("div");
+      downTooltip.className = "copy-code-tooltip";
+      downTooltip.textContent = "Koden er utgått";
+      shadowRoot.append(downTooltip);
+      downBtn.addEventListener("mouseenter", () => {
+        const rect = downBtn.getBoundingClientRect();
+        downTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        downTooltip.style.top = `${rect.top - 30}px`;
+        downTooltip.style.transform = "translateX(-50%)";
+        downTooltip.classList.add("visible");
+      });
+      downBtn.addEventListener("mouseleave", () => {
+        downTooltip.classList.remove("visible");
+      });
+      const syncExpired = () => {
+        upCountEl.textContent = upvotes > 0 ? String(upvotes) : "";
+        downCountEl.textContent = downvotes > 0 ? String(downvotes) : "";
+        const net = upvotes - downvotes;
+        const container = item.closest(".code-item-row") ?? item;
+        container.dataset.net = String(net);
+        if (net < 0 && container.parentElement === codesList) {
+          expiredList.append(container);
+          item.classList.add("expired");
+          expiredSection.style.display = "";
+        } else if (net >= 0 && container.parentElement === expiredList) {
+          codesList.append(container);
+          item.classList.remove("expired");
+          if (expiredList.children.length === 0) expiredSection.style.display = "none";
+        }
+      };
+      upBtn.addEventListener("click", () => {
+        userHasVoted = true;
+        const codeId = Number(item.dataset.codeId);
+        if (upvoted) {
+          upvotes--;
+          upvoted = false;
+          upBtn.classList.remove("voted");
+        } else {
+          if (downvoted) {
+            downvotes--;
+            downvoted = false;
+            downBtn.classList.remove("downvoted");
+          }
+          upvotes++;
+          upvoted = true;
+          upBtn.classList.add("voted");
+        }
+        syncExpired();
+        void apiVote(codeId, 1, staticCode).then((res) => {
+          if (res !== null && "rate_limited" in res) {
+            if (upvoted) {
+              upvotes--;
+              upvoted = false;
+              upBtn.classList.remove("voted");
+            } else {
+              upvotes++;
+              upvoted = true;
+              upBtn.classList.add("voted");
+            }
+            syncExpired();
+            showRateLimitFlash(upBtn);
+          } else if (res !== null) {
+            if ("registered_id" in res && res.registered_id !== void 0) item.dataset.codeId = String(res.registered_id);
+            if (res.deleted) {
+              delete item.dataset.codeId;
+            }
+            upvotes = res.upvotes;
+            downvotes = res.downvotes;
+            upvoted = !res.toggled_off && upvoted;
+            if (res.toggled_off) upBtn.classList.remove("voted");
+            syncExpired();
+          }
+        });
+      });
+      downBtn.addEventListener("click", () => {
+        userHasVoted = true;
+        const codeId = Number(item.dataset.codeId);
+        if (downvoted) {
+          downvotes--;
+          downvoted = false;
+          downBtn.classList.remove("downvoted");
+        } else {
+          if (upvoted) {
+            upvotes--;
+            upvoted = false;
+            upBtn.classList.remove("voted");
+          }
+          downvotes++;
+          downvoted = true;
+          downBtn.classList.add("downvoted");
+        }
+        syncExpired();
+        void apiVote(codeId, -1, staticCode).then((res) => {
+          if (res !== null && "rate_limited" in res) {
+            if (downvoted) {
+              downvotes--;
+              downvoted = false;
+              downBtn.classList.remove("downvoted");
+            } else {
+              downvotes++;
+              downvoted = true;
+              downBtn.classList.add("downvoted");
+            }
+            syncExpired();
+            showRateLimitFlash(downBtn);
+          } else if (res !== null) {
+            if ("registered_id" in res && res.registered_id !== void 0) item.dataset.codeId = String(res.registered_id);
+            if (res.deleted) {
+              delete item.dataset.codeId;
+            }
+            upvotes = res.upvotes;
+            downvotes = res.downvotes;
+            downvoted = !res.toggled_off && downvoted;
+            if (res.toggled_off) downBtn.classList.remove("downvoted");
+            syncExpired();
+          }
+        });
+      });
+      return { upBtn, downBtn };
+    };
+    const buildCrawlerRow = (codeOffer, dbId, initUpvotes = 0, initDownvotes = 0) => {
+      const code = codeOffer.discountCode ?? "";
+      const item = document.createElement("div");
+      item.className = "code-item";
+      const reward = document.createElement("span");
+      reward.className = "code-reward";
+      reward.textContent = codeOffer.reward;
+      const codeSpan = document.createElement("span");
+      codeSpan.className = "code-value";
+      codeSpan.textContent = code;
+      const copyBtn = document.createElement("span");
+      copyBtn.className = "copy-code-btn";
+      copyBtn.innerHTML = COPY_ICON_SVG;
+      const copyTooltip = document.createElement("div");
+      copyTooltip.className = "copy-code-tooltip";
+      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+      shadowRoot.append(copyTooltip);
+      copyBtn.addEventListener("mouseenter", () => {
+        const rect = copyBtn.getBoundingClientRect();
+        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        copyTooltip.style.top = `${rect.top - 30}px`;
+        copyTooltip.style.transform = "translateX(-50%)";
+        copyTooltip.classList.add("visible");
+      });
+      copyBtn.addEventListener("mouseleave", () => {
+        copyTooltip.classList.remove("visible");
+      });
+      copyBtn.addEventListener("click", () => {
+        void navigator.clipboard.writeText(code).then(() => {
+          copyBtn.innerHTML = CHECK_ICON_SVG;
+          copyTooltip.textContent = "Kopiert!";
+          copyTooltip.classList.add("visible");
+          setTimeout(() => {
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+            copyTooltip.classList.remove("visible");
+          }, 1500);
+        });
+      });
+      const { upBtn, downBtn } = attachVoteButtons(item, { code, reward: codeOffer.reward, hostname: CURRENT_HOST });
+      const upCountEl = upBtn.querySelector(".vote-count");
+      const downCountEl = downBtn.querySelector(".vote-count");
+      if (upCountEl && initUpvotes > 0) upCountEl.textContent = String(initUpvotes);
+      if (downCountEl && initDownvotes > 0) downCountEl.textContent = String(initDownvotes);
+      item.append(reward, codeSpan, downBtn, upBtn);
+      const row = document.createElement("div");
+      row.className = "code-item-row";
+      row.append(item, copyBtn);
+      return row;
+    };
+    codesSection.append(codesToggle, codesList, expiredSection);
+    body.append(header, offerList, chipsSection, codesSection);
+    let userHasVoted = false;
+    for (const codeOffer of codeOffers) {
+      codesList.append(buildCrawlerRow(codeOffer));
     }
-    body.append(header, offerList, chipsSection);
-    if (codeOffers.length > 0) {
-      body.append(codesSection);
-    }
+    void fetchCodesForHost(CURRENT_HOST).then((dbCodes) => {
+      if (userHasVoted) {
+        const shownCodes = new Set(
+          [...codesList.querySelectorAll(".code-value"), ...expiredList.querySelectorAll(".code-value")].map((el) => el.textContent?.toUpperCase() ?? "")
+        );
+        for (const dbCode of dbCodes) {
+          if (shownCodes.has(dbCode.code.toUpperCase())) continue;
+          const item = document.createElement("div");
+          item.className = "code-item";
+          item.dataset.codeId = String(dbCode.id);
+          const reward = document.createElement("span");
+          reward.className = "code-reward";
+          reward.textContent = dbCode.reward;
+          const codeSpan = document.createElement("span");
+          codeSpan.className = "code-value";
+          codeSpan.textContent = dbCode.code;
+          const copyBtn = document.createElement("span");
+          copyBtn.className = "copy-code-btn";
+          copyBtn.innerHTML = COPY_ICON_SVG;
+          copyBtn.addEventListener("click", () => {
+            void navigator.clipboard.writeText(dbCode.code).then(() => {
+              copyBtn.innerHTML = CHECK_ICON_SVG;
+              setTimeout(() => {
+                copyBtn.innerHTML = COPY_ICON_SVG;
+              }, 1500);
+            });
+          });
+          const { upBtn, downBtn } = attachVoteButtons(item);
+          const upCountEl = upBtn.querySelector(".vote-count");
+          const downCountEl = downBtn.querySelector(".vote-count");
+          if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
+          if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+          item.append(reward, codeSpan, downBtn, upBtn);
+          const row = document.createElement("div");
+          row.className = "code-item-row";
+          row.append(item, copyBtn);
+          if (dbCode.downvotes - dbCode.upvotes > 0) {
+            item.classList.add("expired");
+            expiredList.append(row);
+            expiredSection.style.display = "";
+          } else {
+            codesList.append(row);
+          }
+        }
+        return;
+      }
+      const crawlerByCode = new Map(
+        codeOffers.map((o) => [(o.discountCode ?? "").toUpperCase(), o])
+      );
+      const parseReward = (r) => parseFloat(r.replace(",", ".")) || 0;
+      const entries = [];
+      const ownedIds = getOwnedCodeIds(CURRENT_HOST);
+      for (const dbCode of dbCodes) {
+        const net = dbCode.upvotes - dbCode.downvotes;
+        entries.push({ net, reward: dbCode.reward, render: () => {
+          const item = document.createElement("div");
+          item.className = "code-item";
+          item.dataset.codeId = String(dbCode.id);
+          const reward = document.createElement("span");
+          reward.className = "code-reward";
+          reward.textContent = dbCode.reward;
+          const codeSpan = document.createElement("span");
+          codeSpan.className = "code-value";
+          codeSpan.textContent = dbCode.code;
+          const copyBtn = document.createElement("span");
+          copyBtn.className = "copy-code-btn";
+          copyBtn.innerHTML = COPY_ICON_SVG;
+          copyBtn.addEventListener("click", () => {
+            void navigator.clipboard.writeText(dbCode.code).then(() => {
+              copyBtn.innerHTML = CHECK_ICON_SVG;
+              setTimeout(() => {
+                copyBtn.innerHTML = COPY_ICON_SVG;
+              }, 1500);
+            });
+          });
+          const { upBtn, downBtn } = attachVoteButtons(item);
+          const upCountEl = upBtn.querySelector(".vote-count");
+          const downCountEl = downBtn.querySelector(".vote-count");
+          if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
+          if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+          item.append(reward, codeSpan, downBtn, upBtn);
+          const row = document.createElement("div");
+          row.className = "code-item-row";
+          row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
+          if (ownedIds.has(dbCode.id)) {
+            const deleteBtn = makeDeleteBtn(dbCode.id, row);
+            item.insertBefore(deleteBtn, downBtn);
+          }
+          row.append(item, copyBtn);
+          crawlerByCode.delete(dbCode.code.toUpperCase());
+          return row;
+        } });
+      }
+      for (const [, codeOffer] of crawlerByCode) {
+        entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
+      }
+      entries.sort((a, b) => b.net - a.net || parseReward(b.reward) - parseReward(a.reward));
+      codesList.removeChild(addCodeForm);
+      codesList.innerHTML = "";
+      expiredList.innerHTML = "";
+      expiredSection.style.display = "none";
+      codesList.append(addCodeForm);
+      for (const entry of entries) {
+        const row = entry.render();
+        const item = row.querySelector(".code-item");
+        if (entry.net < 0) {
+          item.classList.add("expired");
+          expiredList.append(row);
+          expiredSection.style.display = "";
+        } else {
+          codesList.append(row);
+        }
+      }
+      const firstRow = codesList.querySelector(".code-item-row");
+      if (firstRow) firstRow.classList.add("code-item-row--best");
+      crawlerByCode.size;
+      const total = dbCodes.length + crawlerByCode.size;
+      if (total > 0 || codeOffers.length > 0) ;
+    });
     const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
     if (pick !== void 0) {
       const support = document.createElement("div");
@@ -1179,12 +2374,22 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       logoImg.className = "support-logo";
       logoImg.alt = "CBN";
       logoLink.append(logoImg);
+      if (pick.affiliate) support.prepend(makeAdChip());
+      else supportLink.style.cssText = "flex:1;text-align:center;";
       support.append(supportLink, logoLink);
-      panel.append(topLine, body, support);
+      const disclosure = document.createElement("p");
+      disclosure.textContent = "Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
+      disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
+      panel.append(topLine, body, support, disclosure);
     } else {
       panel.append(topLine, body);
     }
     notice.append(sideTab, panel);
+    panel.addEventListener("transitionend", (e) => {
+      if (e.propertyName === "width" && !notice.classList.contains("collapsed")) {
+        void panel.offsetHeight;
+      }
+    });
     if (initialCollapsed) {
       notice.classList.add("collapsed", "no-transition");
       sideTabArrow.textContent = "›";

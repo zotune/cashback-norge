@@ -249,8 +249,11 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .code-value {
   color: #5d6b71;
+  flex: 1;
   font-family: monospace;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .code-copy-btn {
@@ -287,6 +290,12 @@ a.merchant-name:hover { text-decoration: underline; }
 .codes-inline {
   padding: 0 14px 12px;
 }
+.codes-toggle-wrap {
+  align-items: center;
+  display: flex;
+  margin-bottom: 6px;
+  width: 100%;
+}
 .codes-toggle {
   align-items: center;
   appearance: none;
@@ -295,12 +304,13 @@ a.merchant-name:hover { text-decoration: underline; }
   color: #5d6b71;
   cursor: pointer;
   display: flex;
+  flex: 1;
   font: inherit;
   font-size: 12px;
   font-weight: 600;
   gap: 5px;
   padding: 0;
-  margin-bottom: 6px;
+  text-align: left;
 }
 .codes-toggle:hover { color: #172026; }
 .codes-toggle-arrow {
@@ -311,6 +321,35 @@ a.merchant-name:hover { text-decoration: underline; }
 .codes-toggle.open .codes-toggle-arrow {
   transform: rotate(90deg);
 }
+.codes-add-icon-btn {
+  align-items: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #8a9a92;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 3px 5px;
+  position: relative;
+}
+.codes-add-icon-btn:hover { color: #1f8f5f; }
+.codes-add-icon-btn .add-tooltip {
+  background: #222;
+  border-radius: 4px;
+  bottom: calc(100% + 6px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 400;
+  left: 50%;
+  opacity: 0;
+  padding: 4px 8px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.codes-add-icon-btn:hover .add-tooltip { opacity: 1; }
 .codes-items {
   display: none;
   flex-direction: column;
@@ -319,6 +358,127 @@ a.merchant-name:hover { text-decoration: underline; }
 .codes-inline.open .codes-items {
   display: flex;
 }
+.code-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.code-item-row .code-item { flex: 1; min-width: 0; }
+.code-item-row--best .code-reward,
+.code-item-row--best .code-value { color: #3a7d55; }
+.vote-btn {
+  align-items: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #b0bec5;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 11px;
+  gap: 2px;
+  padding: 3px 5px;
+}
+.vote-btn:hover { color: #5d6b71; }
+.vote-btn.voted { color: #1f8f5f; }
+.vote-btn.downvoted { color: #e05555; }
+.codes-add-btn {
+  align-items: center;
+  background: none;
+  border: 1px dashed #d8e3de;
+  border-radius: 6px;
+  color: #8a9a92;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 12px;
+  gap: 6px;
+  justify-content: center;
+  padding: 6px 10px;
+  width: 100%;
+}
+.codes-add-btn:hover { border-color: #1f8f5f; color: #1f8f5f; }
+.codes-add-form {
+  background: #f7faf8;
+  border: 1px solid #d8e3de;
+  border-radius: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.codes-add-form.open { display: flex; }
+.codes-add-form-row { display: flex; gap: 6px; }
+.codes-add-input {
+  background: #fff;
+  border: 1px solid #d8e3de;
+  border-radius: 4px;
+  color: #172026;
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  min-width: 0;
+  outline: none;
+  padding: 5px 8px;
+}
+.codes-reward-input { flex: 0 0 60px; }
+.codes-add-input:focus { border-color: #1f8f5f; }
+.codes-add-submit {
+  align-items: center;
+  background: #1f8f5f;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 5px 8px;
+}
+.codes-add-submit:disabled { opacity: 0.4; cursor: default; }
+.codes-add-cancel {
+  background: none;
+  border: none;
+  color: #8a9a92;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.delete-code-btn {
+  background: none;
+  border: none;
+  color: #b0bec5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.delete-code-btn:hover { color: #e05555; }
+.rate-limit-msg {
+  color: #e05555;
+  font-size: 11px;
+  padding: 2px 0;
+}
+.codes-expired-toggle {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: none;
+  color: #8a9a92;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 11px;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+}
+.codes-expired-toggle:hover { color: #5d6b71; }
+.codes-expired-list { display: none; flex-direction: column; gap: 4px; margin-top: 4px; }
+.codes-expired-list.open { display: flex; }
+.hidden { display: none !important; }
 .bonus-toggle {
   align-items: center;
   appearance: none;
@@ -750,12 +910,17 @@ function render(query) {
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
-      return `<div class="code-item">
-        <span class="code-reward">${esc(o.reward)}</span>
-        <span class="code-value">${esc(code)}</span>
-        <button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      return `<div class="code-item-row" data-net="0">
+        <div class="code-item">
+          <span class="code-reward">${esc(o.reward)}</span>
+          <span class="code-value">${esc(code)}</span>
+          <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span></button>
+          <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span></button>
+        </div>
+        <button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button>
       </div>`;
     }).join("");
+    const hostname = domain ? domain.replace(/^www\./, "") : null;
     const storeUrl = domain ? `https://${domain}` : "";
     const nameHtml = storeUrl
       ? `<a class="merchant-name" href="${esc(storeUrl)}" target="_blank" rel="noreferrer">${esc(m.name)}</a>`
@@ -767,16 +932,47 @@ function render(query) {
       </div>
       <div class="offers">${offerHtml}</div>
       ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
-      ${codesHtml ? `<div class="codes-inline"><button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder (${codeOffers.length})</button><div class="codes-items">${codesHtml}</div></div>` : ""}
+      <div class="codes-inline${codesHtml || hostname ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
+        <div class="codes-toggle-wrap">
+          <button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
+          <button class="codes-add-icon-btn" type="button" title="Legg til rabattkode"><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        </div>
+        <div class="codes-items">
+          <div class="codes-add-form">
+            <div class="codes-add-form-row">
+              <input class="codes-add-input codes-reward-input" type="number" placeholder="%" min="0" max="100">
+              <input class="codes-add-input codes-code-input" type="text" placeholder="Kode" maxlength="50">
+              <button class="codes-add-submit" type="button" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button class="codes-add-cancel" type="button">✕</button>
+            </div>
+          </div>
+          ${codesHtml}
+          <div class="codes-expired-section" style="display:none">
+            <button class="codes-expired-toggle" type="button">▶ Utgåtte koder</button>
+            <div class="codes-expired-list"></div>
+          </div>
+        </div>
+      </div>
     </div>`;
   }).join("");
 
   // Attach codes toggle handlers
-  container.querySelectorAll(".codes-toggle").forEach(btn => {
+  container.querySelectorAll(".codes-toggle-wrap").forEach(wrap => {
+    const btn = wrap.querySelector(".codes-toggle");
+    const addIconBtn = wrap.querySelector(".codes-add-icon-btn");
     btn.addEventListener("click", () => {
       const section = btn.closest(".codes-inline");
       section.classList.toggle("open");
       btn.classList.toggle("open");
+    });
+    addIconBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const section = addIconBtn.closest(".codes-inline");
+      section.classList.add("open");
+      btn.classList.add("open");
+      const form = section.querySelector(".codes-add-form");
+      form.classList.add("open");
+      section.querySelector(".codes-reward-input")?.focus();
     });
   });
 
@@ -786,7 +982,7 @@ function render(query) {
       const origSvg = btn.querySelector('svg').outerHTML;
       const tooltip = btn.querySelector('.copy-tooltip');
       navigator.clipboard.writeText(btn.dataset.code).then(() => {
-        btn.querySelector('svg').outerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        btn.querySelector('svg').outerHTML = CHECK_SVG;
         if (tooltip) { tooltip.textContent = "Kopiert!"; tooltip.classList.add("visible"); }
         setTimeout(() => {
           btn.querySelector('svg').outerHTML = origSvg;
@@ -794,6 +990,199 @@ function render(query) {
         }, 1500);
       });
     });
+  });
+
+  // Attach vote + add-code handlers per codes-inline section
+  container.querySelectorAll(".codes-inline").forEach(section => {
+    const hostname = section.dataset.hostname;
+    if (!hostname) return;
+    const codesList = section.querySelector(".codes-items");
+    const expiredSection = section.querySelector(".codes-expired-section");
+    const expiredList = section.querySelector(".codes-expired-list");
+    const expiredToggle = section.querySelector(".codes-expired-toggle");
+    const addForm = section.querySelector(".codes-add-form");
+    const rewardInput = section.querySelector(".codes-reward-input");
+    const codeInput = section.querySelector(".codes-code-input");
+    const submitBtn = section.querySelector(".codes-add-submit");
+    const cancelBtn = section.querySelector(".codes-add-cancel");
+    let userHasVoted = false;
+
+    expiredToggle?.addEventListener("click", () => {
+      expiredList.classList.toggle("open");
+    });
+
+    cancelBtn?.addEventListener("click", () => {
+      addForm.classList.remove("open");
+      rewardInput.value = "";
+      codeInput.value = "";
+      submitBtn.disabled = true;
+    });
+    const updateSubmit = () => {
+      submitBtn.disabled = codeInput.value.trim().length === 0 || rewardInput.value.trim().length === 0;
+    };
+    codeInput?.addEventListener("input", updateSubmit);
+    rewardInput?.addEventListener("input", () => {
+      rewardInput.value = rewardInput.value.replace(/[^0-9]/g, "");
+      const v = Number(rewardInput.value);
+      if (rewardInput.value !== "" && v > 100) rewardInput.value = "100";
+      updateSubmit();
+    });
+
+    const parseRewardNum = r => parseFloat(r.replace(",", ".")) || 0;
+    const resortRows = () => {
+      const rows = [...codesList.querySelectorAll(":scope > .code-item-row")];
+      rows.sort((a, b) =>
+        parseRewardNum(b.querySelector(".code-reward")?.textContent || "0") -
+        parseRewardNum(a.querySelector(".code-reward")?.textContent || "0")
+      );
+      rows.forEach(r => codesList.appendChild(r));
+      codesList.appendChild(expiredSection);
+      // mark best
+      codesList.querySelectorAll(".code-item-row--best").forEach(r => r.classList.remove("code-item-row--best"));
+      const first = codesList.querySelector(":scope > .code-item-row");
+      if (first) first.classList.add("code-item-row--best");
+    };
+
+    const attachVotes = (row, staticCode) => {
+      const item = row.querySelector(".code-item");
+      let upvotes = parseInt(row.dataset.upvotes || "0");
+      let downvotes = parseInt(row.dataset.downvotes || "0");
+      let upvoted = false, downvoted = false;
+      const upBtn = row.querySelector('[data-vote="1"]');
+      const downBtn = row.querySelector('[data-vote="-1"]');
+      if (!upBtn || !downBtn) return;
+      const upCount = upBtn.querySelector(".vote-count");
+      const downCount = downBtn.querySelector(".vote-count");
+      const syncUI = () => {
+        if (upCount) upCount.textContent = upvotes > 0 ? String(upvotes) : "";
+        if (downCount) downCount.textContent = downvotes > 0 ? String(downvotes) : "";
+        const net = upvotes - downvotes;
+        row.dataset.net = String(net);
+        if (net < 0 && row.parentElement === codesList) {
+          expiredList.appendChild(row);
+          expiredSection.style.display = "";
+        } else if (net >= 0 && row.parentElement === expiredList) {
+          codesList.insertBefore(row, expiredSection);
+          if (!expiredList.querySelector(".code-item-row")) expiredSection.style.display = "none";
+          resortRows();
+        }
+      };
+      syncUI();
+      upBtn.addEventListener("click", () => {
+        userHasVoted = true;
+        const codeId = Number(item.dataset.codeId);
+        if (upvoted) { upvotes--; upvoted = false; upBtn.classList.remove("voted"); }
+        else { if (downvoted) { downvotes--; downvoted = false; downBtn.classList.remove("downvoted"); } upvotes++; upvoted = true; upBtn.classList.add("voted"); }
+        syncUI();
+        apiVote(codeId, 1, staticCode).then(res => {
+          if (!res) return;
+          if (res.rate_limited) {
+            if (upvoted) { upvotes--; upvoted = false; upBtn.classList.remove("voted"); } else { upvotes++; upvoted = true; upBtn.classList.add("voted"); }
+            showRateLimit(upBtn); syncUI(); return;
+          }
+          if (res.registered_id) { item.dataset.codeId = String(res.registered_id); }
+          if (res.deleted) { delete item.dataset.codeId; }
+          upvotes = res.upvotes; downvotes = res.downvotes;
+          upvoted = !res.toggled_off && upvoted;
+          if (res.toggled_off) upBtn.classList.remove("voted");
+          syncUI();
+        });
+      });
+      downBtn.addEventListener("click", () => {
+        userHasVoted = true;
+        const codeId = Number(item.dataset.codeId);
+        if (downvoted) { downvotes--; downvoted = false; downBtn.classList.remove("downvoted"); }
+        else { if (upvoted) { upvotes--; upvoted = false; upBtn.classList.remove("voted"); } downvotes++; downvoted = true; downBtn.classList.add("downvoted"); }
+        syncUI();
+        apiVote(codeId, -1, staticCode).then(res => {
+          if (!res) return;
+          if (res.rate_limited) {
+            if (downvoted) { downvotes--; downvoted = false; downBtn.classList.remove("downvoted"); } else { downvotes++; downvoted = true; downBtn.classList.add("downvoted"); }
+            showRateLimit(downBtn); syncUI(); return;
+          }
+          if (res.registered_id) { item.dataset.codeId = String(res.registered_id); }
+          if (res.deleted) { delete item.dataset.codeId; }
+          upvotes = res.upvotes; downvotes = res.downvotes;
+          downvoted = !res.toggled_off && downvoted;
+          if (res.toggled_off) downBtn.classList.remove("downvoted");
+          syncUI();
+        });
+      });
+    };
+
+    // Attach votes to existing crawler rows
+    section.querySelectorAll(".code-item-row").forEach(row => {
+      const code = row.querySelector(".code-value")?.textContent?.trim() || "";
+      const reward = row.querySelector(".code-reward")?.textContent?.trim() || "";
+      attachVotes(row, { code, reward, hostname });
+    });
+
+    // Load DB codes
+    const localOwnedIds = getOwnedIds(hostname);
+    Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname)]).then(([dbCodes, serverOwnedIds]) => {
+      const ownedIds = new Set([...localOwnedIds, ...serverOwnedIds]);
+      if (userHasVoted) return; // skip re-render if user already voted
+      const shownCodes = new Set([...section.querySelectorAll(".code-value")].map(el => el.textContent?.toUpperCase() || ""));
+      for (const dbCode of dbCodes) {
+        const isNew = !shownCodes.has(dbCode.code.toUpperCase());
+        if (isNew) {
+          const row = buildCodeRow(dbCode, hostname, ownedIds);
+          codesList.insertBefore(row, expiredSection);
+          attachVotes(row);
+        } else {
+          // Update existing crawler row with DB id and vote counts
+          for (const row of section.querySelectorAll(".code-item-row")) {
+            if (row.querySelector(".code-value")?.textContent?.trim().toUpperCase() === dbCode.code.toUpperCase()) {
+              const item = row.querySelector(".code-item");
+              item.dataset.codeId = String(dbCode.id);
+              row.dataset.upvotes = String(dbCode.upvotes);
+              row.dataset.downvotes = String(dbCode.downvotes);
+              row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
+              const upCount = row.querySelector('[data-vote="1"] .vote-count');
+              const downCount = row.querySelector('[data-vote="-1"] .vote-count');
+              if (upCount && dbCode.upvotes > 0) upCount.textContent = String(dbCode.upvotes);
+              if (downCount && dbCode.downvotes > 0) downCount.textContent = String(dbCode.downvotes);
+              // Move to expired if needed
+              if (dbCode.downvotes - dbCode.upvotes > 0) {
+                item.classList.add("expired");
+                expiredList.appendChild(row);
+                expiredSection.style.display = "";
+              }
+              break;
+            }
+          }
+        }
+      }
+      resortRows();
+    });
+
+    // Add code submission
+    const doSubmit = () => {
+      const code = codeInput.value.trim().toUpperCase();
+      const rawReward = rewardInput.value.trim();
+      const reward = rawReward.length > 0 ? `${rawReward} %` : "?";
+      if (!code) return;
+      cancelBtn.click();
+      apiSubmitCode(hostname, code, reward).then(result => {
+        if (!result.ok) {
+          const msg = result.rate_limited ? "Du har nådd grensen på 5 handlinger per dag." : result.duplicate ? "Koden er allerede lagt til." : "Noe gikk galt, prøv igjen.";
+          const el = document.createElement("div");
+          el.className = "rate-limit-msg";
+          el.textContent = msg;
+          addForm.insertAdjacentElement("afterend", el);
+          setTimeout(() => el.remove(), 2500);
+          return;
+        }
+        const row = buildCodeRow({ id: result.id, code, reward, upvotes: 0, downvotes: 0 }, hostname, new Set([result.id]));
+        row.dataset.net = "0";
+        if (result.id) addOwnedId(hostname, result.id);
+        codesList.insertBefore(row, expiredSection);
+        attachVotes(row);
+        resortRows();
+      });
+    };
+    submitBtn?.addEventListener("click", doSubmit);
+    codeInput?.addEventListener("keydown", e => { if (e.key === "Enter" && codeInput.value.trim()) doSubmit(); });
   });
 }
 
@@ -916,6 +1305,153 @@ function esc(s) {
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
+}
+
+const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
+
+const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
+const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+async function fetchCodesForHost(hostname) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/discount_codes?hostname=eq.${encodeURIComponent(hostname)}&select=id,code,reward,code_votes(vote)`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return [];
+    return rows.map(r => ({
+      id: r.id, code: r.code, reward: r.reward,
+      upvotes: (r.code_votes || []).filter(v => v.vote === 1).length,
+      downvotes: (r.code_votes || []).filter(v => v.vote === -1).length,
+    }));
+  } catch { return []; }
+}
+
+async function apiVote(codeId, vote, staticCode) {
+  try {
+    const body = { vote, ...(codeId > 0 ? { code_id: codeId } : {}), ...(staticCode || {}) };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/vote`, {
+      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 429) return { rate_limited: true };
+    return await res.json();
+  } catch { return null; }
+}
+
+async function apiSubmitCode(hostname, code, reward) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-code`, {
+      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ hostname, code, reward }),
+    });
+    if (res.status === 429) return { ok: false, rate_limited: true };
+    const data = await res.json();
+    if (data.error === "duplicate_code") return { ok: false, duplicate: true };
+    return { ok: res.ok, id: data.id };
+  } catch { return { ok: false }; }
+}
+
+async function apiDeleteCode(codeId) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-code`, {
+      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ id: codeId }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+async function fetchOwnedCodesForHost(hostname) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/owned-codes`, {
+      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ hostname }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.ids) ? data.ids : [];
+  } catch { return []; }
+}
+
+const OWNED_KEY = h => `cashback-norge-owned-${h}`;
+function getOwnedIds(hostname) {
+  try { return new Set(JSON.parse(localStorage.getItem(OWNED_KEY(hostname)) || "[]")); } catch { return new Set(); }
+}
+function addOwnedId(hostname, id) {
+  const ids = getOwnedIds(hostname); ids.add(id);
+  localStorage.setItem(OWNED_KEY(hostname), JSON.stringify([...ids]));
+}
+function removeOwnedId(hostname, id) {
+  const ids = getOwnedIds(hostname); ids.delete(id);
+  localStorage.setItem(OWNED_KEY(hostname), JSON.stringify([...ids]));
+}
+
+function showRateLimit(nearEl) {
+  const row = nearEl.closest(".code-item-row");
+  if (!row || row.nextElementSibling?.classList.contains("rate-limit-msg")) return;
+  const el = document.createElement("div");
+  el.className = "rate-limit-msg";
+  el.textContent = "Du har nådd grensen på 5 handlinger per dag.";
+  row.insertAdjacentElement("afterend", el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+function buildCodeRow(dbCode, hostname, ownedIds) {
+  const row = document.createElement("div");
+  row.className = "code-item-row";
+  row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
+  row.dataset.upvotes = String(dbCode.upvotes);
+  row.dataset.downvotes = String(dbCode.downvotes);
+  const item = document.createElement("div");
+  item.className = "code-item";
+  if (dbCode.id) item.dataset.codeId = String(dbCode.id);
+  const rewardEl = document.createElement("span");
+  rewardEl.className = "code-reward";
+  rewardEl.textContent = dbCode.reward;
+  const codeEl = document.createElement("span");
+  codeEl.className = "code-value";
+  codeEl.textContent = dbCode.code;
+  const downBtn = document.createElement("button");
+  downBtn.className = "vote-btn"; downBtn.type = "button"; downBtn.dataset.vote = "-1";
+  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${dbCode.downvotes > 0 ? dbCode.downvotes : ""}</span>`;
+  const upBtn = document.createElement("button");
+  upBtn.className = "vote-btn"; upBtn.type = "button"; upBtn.dataset.vote = "1";
+  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${dbCode.upvotes > 0 ? dbCode.upvotes : ""}</span>`;
+  item.append(rewardEl, codeEl);
+  if (dbCode.id && ownedIds && ownedIds.has(dbCode.id)) {
+    const delBtn = makeDeleteBtn(dbCode.id, row, hostname);
+    item.append(delBtn);
+  }
+  item.append(downBtn, upBtn);
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "code-copy-btn"; copyBtn.type = "button"; copyBtn.dataset.code = dbCode.code;
+  copyBtn.innerHTML = `<span class="copy-tooltip">Kopier: ${esc(dbCode.code)}</span>${COPY_SVG}`;
+  copyBtn.addEventListener("click", () => {
+    navigator.clipboard.writeText(dbCode.code).then(() => {
+      const origInner = copyBtn.innerHTML;
+      copyBtn.innerHTML = `<span class="copy-tooltip visible">Kopiert!</span>${CHECK_SVG}`;
+      setTimeout(() => { copyBtn.innerHTML = origInner; }, 1500);
+    });
+  });
+  row.append(item, copyBtn);
+  return row;
+}
+
+function makeDeleteBtn(codeId, row, hostname) {
+  const btn = document.createElement("button");
+  btn.className = "delete-code-btn";
+  btn.type = "button";
+  btn.textContent = "\u00d7";
+  btn.addEventListener("click", () => {
+    apiDeleteCode(codeId).then(ok => {
+      if (ok) { row.remove(); removeOwnedId(hostname, codeId); }
+    });
+  });
+  return btn;
 }
 
 function renderTips() {
