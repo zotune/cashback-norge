@@ -16,6 +16,10 @@ body {
   touch-action: pan-y;
 }
 .container { max-width: 480px; margin: 0 auto; padding: 24px 29px 16px; overflow-x: clip; }
+@media (max-width: 520px) {
+  .container { margin: 0; max-width: 100%; padding: 24px 30px 16px 8px; }
+  .sticky-header { margin: 0 -8px; padding: 8px 8px 4px; }
+}
 .sticky-header {
   position: sticky;
   top: 0;
