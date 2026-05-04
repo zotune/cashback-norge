@@ -107,7 +107,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .az-bar span {
   font-size: 10px;
   font-weight: 600;
-  color: #3a7d55;
+  color: #8a9a92;
   line-height: 1;
   padding: 2px 4px;
   cursor: pointer;
@@ -115,6 +115,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   min-width: 16px;
   text-align: center;
 }
+.az-bar span:hover { color: #3a7d55; }
 .az-bar span.active {
   background: #3a7d55;
   color: #fff;
@@ -1729,20 +1730,18 @@ function renderChipGroup(cards, container) {
 
 function setupAzBar() {
   const bar = document.getElementById("az-bar");
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ".split("");
+  const letters = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ".split("")];
+  bar.innerHTML = letters.map(l => `<span data-l="${l}">${l}</span>`).join("");
 
-  const scrollTo = (letter) => {
+  const jumpTo = (letter) => {
     const el = document.querySelector(`.merchant[data-letter="${letter}"]`);
     if (el) el.scrollIntoView({ behavior: "instant", block: "start" });
     bar.querySelectorAll("span").forEach(s => s.classList.toggle("active", s.dataset.l === letter));
   };
 
-  const letters = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ".split("")];
-  bar.innerHTML = letters.map(l => `<span data-l="${l}">${l}</span>`).join("");
-
   bar.addEventListener("click", (e) => {
     const span = e.target.closest("span[data-l]");
-    if (span) scrollTo(span.dataset.l);
+    if (span) jumpTo(span.dataset.l);
   });
 
   let lastLetter = null;
@@ -1753,7 +1752,7 @@ function setupAzBar() {
     if (el && el.dataset.l && el.dataset.l !== lastLetter) {
       lastLetter = el.dataset.l;
       if (navigator.vibrate) navigator.vibrate(8);
-      scrollTo(el.dataset.l);
+      jumpTo(el.dataset.l);
     }
   }, { passive: false });
 }
