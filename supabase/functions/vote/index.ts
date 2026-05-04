@@ -1,6 +1,8 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const DAILY_LIMIT = 5;
+const VOTE_CAP = 5; // max upvotes or downvotes per code
+const DELETE_THRESHOLD = -5; // auto-delete when net reaches this
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,12 +118,28 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "rate_limit" }), { status: 429, headers: corsHeaders });
   }
 
+  // Check vote cap: don't allow more than VOTE_CAP votes in one direction
+  const currentTotals = await getVoteTotals(supabase, codeId);
+  if (vote === 1 && currentTotals.upvotes >= VOTE_CAP) {
+    return new Response(JSON.stringify({ ok: true, capped: true, registered_id: codeId, ...currentTotals }), { headers: corsHeaders });
+  }
+  if (vote === -1 && currentTotals.downvotes >= VOTE_CAP) {
+    return new Response(JSON.stringify({ ok: true, capped: true, registered_id: codeId, ...currentTotals }), { headers: corsHeaders });
+  }
+
   const { error } = await supabase.from("code_votes").insert({ code_id: codeId, ip_hash: ipHash, vote });
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 
   const totals = await getVoteTotals(supabase, codeId);
+
+  // Auto-delete if net score hits the delete threshold
+  if (totals.upvotes - totals.downvotes <= DELETE_THRESHOLD) {
+    await supabase.from("discount_codes").delete().eq("id", codeId);
+    return new Response(JSON.stringify({ ok: true, deleted: true, upvotes: 0, downvotes: 0 }), { headers: corsHeaders });
+  }
+
   return new Response(JSON.stringify({ ok: true, registered_id: codeId, ...totals }), { headers: corsHeaders });
 });
 

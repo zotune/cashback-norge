@@ -118,6 +118,23 @@ function removeOwnedCodeId(hostname: string, id: number): void {
   localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
 }
 
+async function fetchMyVotes(hostname: string): Promise<Record<number, 1 | -1>> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/my-votes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ hostname }),
+    });
+    if (!res.ok) return {};
+    const data: { votes?: Array<{ code_id: number; vote: number }> } = await res.json();
+    const map: Record<number, 1 | -1> = {};
+    for (const v of data.votes ?? []) map[v.code_id] = v.vote as 1 | -1;
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 function showRateLimitFlash(near: HTMLElement): void {
   const existing = near.closest(".code-item-row")?.parentElement?.querySelector(".rate-limit-flash");
   if (existing) return;
@@ -1572,11 +1589,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
   const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
 
-  const attachVoteButtons = (item: HTMLElement, staticCode?: { code: string; reward: string; hostname: string }): { upBtn: HTMLButtonElement; downBtn: HTMLButtonElement } => {
+  const attachVoteButtons = (item: HTMLElement, staticCode?: { code: string; reward: string; hostname: string }, initialVote: 1 | -1 | 0 = 0): { upBtn: HTMLButtonElement; downBtn: HTMLButtonElement } => {
     let upvotes = 0;
     let downvotes = 0;
-    let upvoted = false;
-    let downvoted = false;
+    let upvoted = initialVote === 1;
+    let downvoted = initialVote === -1;
     const upBtn = document.createElement("button");
     upBtn.className = "vote-btn";
     upBtn.type = "button";
@@ -1616,9 +1633,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     });
     downBtn.addEventListener("mouseleave", () => { downTooltip.classList.remove("visible"); });
     const syncExpired = (): void => {
-      upCountEl.textContent = upvotes > 0 ? String(upvotes) : "";
-      downCountEl.textContent = downvotes > 0 ? String(downvotes) : "";
       const net = upvotes - downvotes;
+      upCountEl.textContent = net > 0 ? String(net) : "";
+      downCountEl.textContent = net < 0 ? String(Math.abs(net)) : "";
       const container = item.closest(".code-item-row") ?? item;
       (container as HTMLElement).dataset.net = String(net);
       if (net < 0 && container.parentElement === codesList) {
@@ -1756,7 +1773,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     });
 
   // Load community-submitted codes from Supabase, then merge + sort all
-  void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds]) => {
+  void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
     const ownedIds = new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
     // Don't wipe DOM if user has already voted — avoids race condition
     if (userHasVoted) {
@@ -1806,13 +1823,14 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         const { upBtn, downBtn } = attachVoteButtons(item);
         const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
         const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
-        if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
-        if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+        const initNet1 = dbCode.upvotes - dbCode.downvotes;
+        if (upCountEl) upCountEl.textContent = initNet1 > 0 ? String(initNet1) : "";
+        if (downCountEl) downCountEl.textContent = initNet1 < 0 ? String(Math.abs(initNet1)) : "";
         item.append(reward, codeSpan, downBtn, upBtn);
         const row = document.createElement("div");
         row.className = "code-item-row";
         row.append(item, copyBtn);
-        if (dbCode.downvotes - dbCode.upvotes > 0) {
+        if (initNet1 < 0) {
           item.classList.add("expired");
           expiredList.append(row);
           expiredSection.style.display = "";
@@ -1874,11 +1892,15 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
             }, 1500);
           });
         });
-        const { upBtn, downBtn } = attachVoteButtons(item);
+        const myVote = myVotes[dbCode.id] ?? 0;
+        const { upBtn, downBtn } = attachVoteButtons(item, undefined, myVote);
         const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
         const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
-        if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
-        if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+        const initNet2 = dbCode.upvotes - dbCode.downvotes;
+        if (upCountEl) upCountEl.textContent = initNet2 > 0 ? String(initNet2) : "";
+        if (downCountEl) downCountEl.textContent = initNet2 < 0 ? String(Math.abs(initNet2)) : "";
+        if (myVote === 1) upBtn.classList.add("voted");
+        else if (myVote === -1) downBtn.classList.add("downvoted");
         item.append(reward, codeSpan, downBtn, upBtn);
         const row = document.createElement("div");
         row.className = "code-item-row";

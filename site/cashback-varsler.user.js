@@ -660,6 +660,20 @@
       return false;
     }
   }
+  async function fetchOwnedCodesForHost(hostname) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/owned-codes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ hostname })
+      });
+      if (!res.ok) return /* @__PURE__ */ new Set();
+      const data = await res.json();
+      return new Set(data.ids ?? []);
+    } catch {
+      return /* @__PURE__ */ new Set();
+    }
+  }
   const OWNED_CODES_KEY = (hostname) => `cashback-varsler-owned-codes-${hostname}`;
   function getOwnedCodeIds(hostname) {
     try {
@@ -680,13 +694,29 @@
     ids.delete(id);
     localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
   }
+  async function fetchMyVotes(hostname) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/my-votes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ hostname })
+      });
+      if (!res.ok) return {};
+      const data = await res.json();
+      const map = {};
+      for (const v of data.votes ?? []) map[v.code_id] = v.vote;
+      return map;
+    } catch {
+      return {};
+    }
+  }
   function showRateLimitFlash(near) {
     const existing = near.closest(".code-item-row")?.parentElement?.querySelector(".rate-limit-flash");
     if (existing) return;
     const flash = document.createElement("div");
     flash.className = "rate-limit-flash";
     flash.textContent = "Du har nådd grensen på 5 handlinger per dag.";
-    flash.style.cssText = "font-size:11px;color:#888;padding:4px 8px;";
+    flash.style.cssText = "font-size:11px;color:#e05555;padding:4px 8px;";
     near.closest(".code-item-row")?.insertAdjacentElement("afterend", flash);
     setTimeout(() => flash.remove(), 2500);
   }
@@ -1119,49 +1149,64 @@
     .add-code-form {
       align-items: center;
       display: flex;
-      gap: 4px;
+      gap: 6px;
       padding: 2px 0;
     }
-    .add-code-input {
-      background: #fff;
+    .add-code-form-inner {
+      align-items: center;
+      background: #f7faf8;
       border: 1px solid #d0dbd5;
       border-radius: 6px;
+      display: flex;
+      flex: 1;
+      gap: 4px;
+      min-width: 0;
+      padding: 3px 6px;
+    }
+    .add-code-input {
+      background: transparent;
+      border: none;
       color: #172026;
       flex: 1;
       font-size: 12px;
       min-width: 0;
-      padding: 5px 8px;
+      padding: 4px 2px;
       font-family: inherit;
+      outline: none;
     }
     .add-reward-input {
-      flex: 0 0 70px;
-    }
-    .add-code-input:focus {
-      border-color: #1f8f5f;
-      outline: none;
+      flex: 0 0 48px;
+      border-right: 1px solid #d0dbd5;
+      padding-right: 6px;
     }
     .add-code-submit {
       align-items: center;
-      background: #1f8f5f;
+      background: none;
       border: none;
-      border-radius: 6px;
-      color: #fff;
+      border-radius: 4px;
+      color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
-      padding: 5px 8px;
+      padding: 4px;
       flex-shrink: 0;
     }
     .add-code-submit:disabled {
-      background: #b0c8bc;
+      color: #b0c8bc;
       cursor: default;
     }
     .add-code-cancel {
+      align-items: center;
       background: none;
       border: none;
       color: #8a9ba3;
       cursor: pointer;
-      font-size: 13px;
-      padding: 4px;
+      display: inline-flex;
+      flex-shrink: 0;
+      font-size: 14px;
+      height: 22px;
+      justify-content: center;
+      padding: 0;
+      width: 22px;
     }
     .add-code-cancel:hover {
       color: #172026;
@@ -1839,8 +1884,21 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const addCodeBtn = document.createElement("button");
     addCodeBtn.className = "add-code-btn";
     addCodeBtn.type = "button";
-    addCodeBtn.title = "Legg til rabattkode";
     addCodeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    const addCodeTooltip = document.createElement("div");
+    addCodeTooltip.className = "copy-code-tooltip";
+    addCodeTooltip.textContent = "Legg til rabattkode";
+    shadowRoot.append(addCodeTooltip);
+    addCodeBtn.addEventListener("mouseenter", () => {
+      const rect = addCodeBtn.getBoundingClientRect();
+      addCodeTooltip.style.left = `${rect.left + rect.width / 2}px`;
+      addCodeTooltip.style.top = `${rect.top - 30}px`;
+      addCodeTooltip.style.transform = "translateX(-50%)";
+      addCodeTooltip.classList.add("visible");
+    });
+    addCodeBtn.addEventListener("mouseleave", () => {
+      addCodeTooltip.classList.remove("visible");
+    });
     codesToggle.append(codesToggleArrow, codesToggleText, addCodeBtn);
     codesToggle.addEventListener("click", (e) => {
       if (addCodeBtn.contains(e.target)) return;
@@ -1872,16 +1930,19 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     addCodeCancel.className = "add-code-cancel";
     addCodeCancel.type = "button";
     addCodeCancel.textContent = "✕";
-    addCodeForm.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
+    const addCodeFormInner = document.createElement("div");
+    addCodeFormInner.className = "add-code-form-inner";
+    addCodeFormInner.append(addRewardInput, addCodeInput, addCodeSubmit);
+    addCodeForm.append(addCodeFormInner, addCodeCancel);
     const updateSubmitState = () => {
-      addCodeSubmit.disabled = addCodeInput.value.trim().length === 0;
+      addCodeSubmit.disabled = addCodeInput.value.trim().length === 0 || addRewardInput.value.trim().length === 0;
     };
     addCodeInput.addEventListener("input", updateSubmitState);
     addRewardInput.addEventListener("input", () => {
+      addRewardInput.value = addRewardInput.value.replace(/[^0-9]/g, "").replace(/^0+(\d)/, "$1");
       const v = Number(addRewardInput.value);
-      if (addRewardInput.value !== "" && (v < 0 || v > 100)) {
-        addRewardInput.value = String(Math.min(100, Math.max(0, v)));
-      }
+      if (addRewardInput.value !== "" && v > 100) addRewardInput.value = "100";
+      updateSubmitState();
     });
     const closeAddForm = () => {
       addCodeForm.style.display = "none";
@@ -1892,14 +1953,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const parseRewardNum = (r) => parseFloat(r.replace(",", ".")) || 0;
     const resortCodesList = () => {
       const rows = [...codesList.querySelectorAll(".code-item-row")];
-      rows.sort((a, b) => {
-        const netA = parseFloat(a.dataset.net ?? "0");
-        const netB = parseFloat(b.dataset.net ?? "0");
-        if (netB !== netA) return netB - netA;
-        const rA = parseRewardNum(a.querySelector(".code-reward")?.textContent ?? "");
-        const rB = parseRewardNum(b.querySelector(".code-reward")?.textContent ?? "");
-        return rB - rA;
-      });
+      rows.sort(
+        (a, b) => parseRewardNum(b.querySelector(".code-reward")?.textContent ?? "") - parseRewardNum(a.querySelector(".code-reward")?.textContent ?? "")
+      );
       for (const row of rows) {
         row.classList.remove("code-item-row--best");
         codesList.append(row);
@@ -1930,8 +1986,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           if (result.rate_limited === true) msg = "Du har nådd grensen på 5 handlinger per dag.";
           const warn = document.createElement("div");
           warn.textContent = msg;
-          warn.style.cssText = "font-size:11px;color:#888;padding:4px 8px;";
-          addCodeForm.insertAdjacentElement("afterend", warn);
+          warn.style.cssText = "font-size:11px;color:#e05555;padding:4px 8px;";
+          const firstRow = codesList.querySelector(".code-item-row");
+          if (firstRow) {
+            firstRow.insertAdjacentElement("beforebegin", warn);
+          } else {
+            codesList.append(warn);
+          }
           setTimeout(() => warn.remove(), 2500);
           return;
         }
@@ -1954,11 +2015,29 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const copyBtn = document.createElement("span");
       copyBtn.className = "copy-code-btn";
       copyBtn.innerHTML = COPY_ICON_SVG;
+      const copyTooltip1 = document.createElement("div");
+      copyTooltip1.className = "copy-code-tooltip";
+      copyTooltip1.textContent = `Kopier rabattkode: ${code}`;
+      shadowRoot.append(copyTooltip1);
+      copyBtn.addEventListener("mouseenter", () => {
+        const rect = copyBtn.getBoundingClientRect();
+        copyTooltip1.style.left = `${rect.left + rect.width / 2}px`;
+        copyTooltip1.style.top = `${rect.top - 30}px`;
+        copyTooltip1.style.transform = "translateX(-50%)";
+        copyTooltip1.classList.add("visible");
+      });
+      copyBtn.addEventListener("mouseleave", () => {
+        copyTooltip1.classList.remove("visible");
+      });
       copyBtn.addEventListener("click", () => {
         void navigator.clipboard.writeText(code).then(() => {
           copyBtn.innerHTML = CHECK_ICON_SVG;
+          copyTooltip1.textContent = "Kopiert!";
+          copyTooltip1.classList.add("visible");
           setTimeout(() => {
             copyBtn.innerHTML = COPY_ICON_SVG;
+            copyTooltip1.textContent = `Kopier rabattkode: ${code}`;
+            copyTooltip1.classList.remove("visible");
           }, 1500);
         });
       });
@@ -1980,7 +2059,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     });
     addCodeInput.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeAddForm();
-      if (e.key === "Enter" && addCodeInput.value.trim().length > 0) submitCode();
+      if (e.key === "Enter" && addCodeInput.value.trim().length > 0 && addRewardInput.value.trim().length > 0) submitCode();
     });
     addCodeCancel.addEventListener("click", closeAddForm);
     addCodeSubmit.addEventListener("click", submitCode);
@@ -2020,6 +2099,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           if (ok) {
             row.remove();
             removeOwnedCodeId(CURRENT_HOST, codeId);
+            resortCodesList();
           }
         });
       });
@@ -2027,11 +2107,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     };
     const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
     const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
-    const attachVoteButtons = (item, staticCode) => {
+    const attachVoteButtons = (item, staticCode, initialVote = 0) => {
       let upvotes = 0;
       let downvotes = 0;
-      let upvoted = false;
-      let downvoted = false;
+      let upvoted = initialVote === 1;
+      let downvoted = initialVote === -1;
       const upBtn = document.createElement("button");
       upBtn.className = "vote-btn";
       upBtn.type = "button";
@@ -2075,19 +2155,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         downTooltip.classList.remove("visible");
       });
       const syncExpired = () => {
-        upCountEl.textContent = upvotes > 0 ? String(upvotes) : "";
-        downCountEl.textContent = downvotes > 0 ? String(downvotes) : "";
         const net = upvotes - downvotes;
+        upCountEl.textContent = net > 0 ? String(net) : "";
+        downCountEl.textContent = net < 0 ? String(Math.abs(net)) : "";
         const container = item.closest(".code-item-row") ?? item;
         container.dataset.net = String(net);
         if (net < 0 && container.parentElement === codesList) {
           expiredList.append(container);
           item.classList.add("expired");
           expiredSection.style.display = "";
+          resortCodesList();
         } else if (net >= 0 && container.parentElement === expiredList) {
           codesList.append(container);
           item.classList.remove("expired");
           if (expiredList.children.length === 0) expiredSection.style.display = "none";
+          resortCodesList();
+        } else {
+          resortCodesList();
         }
       };
       upBtn.addEventListener("click", () => {
@@ -2233,10 +2317,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     codesSection.append(codesToggle, codesList, expiredSection);
     body.append(header, offerList, chipsSection, codesSection);
     let userHasVoted = false;
-    for (const codeOffer of codeOffers) {
-      codesList.append(buildCrawlerRow(codeOffer));
-    }
-    void fetchCodesForHost(CURRENT_HOST).then((dbCodes) => {
+    [...codeOffers].sort((a, b) => parseRewardNum(b.reward) - parseRewardNum(a.reward)).forEach((codeOffer, i) => {
+      const row = buildCrawlerRow(codeOffer);
+      if (i === 0) row.classList.add("code-item-row--best");
+      codesList.append(row);
+    });
+    void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
+      const ownedIds = /* @__PURE__ */ new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
       if (userHasVoted) {
         const shownCodes = new Set(
           [...codesList.querySelectorAll(".code-value"), ...expiredList.querySelectorAll(".code-value")].map((el) => el.textContent?.toUpperCase() ?? "")
@@ -2255,24 +2342,43 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           const copyBtn = document.createElement("span");
           copyBtn.className = "copy-code-btn";
           copyBtn.innerHTML = COPY_ICON_SVG;
+          const copyTooltipHv = document.createElement("div");
+          copyTooltipHv.className = "copy-code-tooltip";
+          copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
+          shadowRoot.append(copyTooltipHv);
+          copyBtn.addEventListener("mouseenter", () => {
+            const rect = copyBtn.getBoundingClientRect();
+            copyTooltipHv.style.left = `${rect.left + rect.width / 2}px`;
+            copyTooltipHv.style.top = `${rect.top - 30}px`;
+            copyTooltipHv.style.transform = "translateX(-50%)";
+            copyTooltipHv.classList.add("visible");
+          });
+          copyBtn.addEventListener("mouseleave", () => {
+            copyTooltipHv.classList.remove("visible");
+          });
           copyBtn.addEventListener("click", () => {
             void navigator.clipboard.writeText(dbCode.code).then(() => {
               copyBtn.innerHTML = CHECK_ICON_SVG;
+              copyTooltipHv.textContent = "Kopiert!";
+              copyTooltipHv.classList.add("visible");
               setTimeout(() => {
                 copyBtn.innerHTML = COPY_ICON_SVG;
+                copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
+                copyTooltipHv.classList.remove("visible");
               }, 1500);
             });
           });
           const { upBtn, downBtn } = attachVoteButtons(item);
           const upCountEl = upBtn.querySelector(".vote-count");
           const downCountEl = downBtn.querySelector(".vote-count");
-          if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
-          if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+          const initNet1 = dbCode.upvotes - dbCode.downvotes;
+          if (upCountEl) upCountEl.textContent = initNet1 > 0 ? String(initNet1) : "";
+          if (downCountEl) downCountEl.textContent = initNet1 < 0 ? String(Math.abs(initNet1)) : "";
           item.append(reward, codeSpan, downBtn, upBtn);
           const row = document.createElement("div");
           row.className = "code-item-row";
           row.append(item, copyBtn);
-          if (dbCode.downvotes - dbCode.upvotes > 0) {
+          if (initNet1 < 0) {
             item.classList.add("expired");
             expiredList.append(row);
             expiredSection.style.display = "";
@@ -2287,9 +2393,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       );
       const parseReward = (r) => parseFloat(r.replace(",", ".")) || 0;
       const entries = [];
-      const ownedIds = getOwnedCodeIds(CURRENT_HOST);
       for (const dbCode of dbCodes) {
         const net = dbCode.upvotes - dbCode.downvotes;
+        crawlerByCode.delete(dbCode.code.toUpperCase());
         entries.push({ net, reward: dbCode.reward, render: () => {
           const item = document.createElement("div");
           item.className = "code-item";
@@ -2303,19 +2409,41 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           const copyBtn = document.createElement("span");
           copyBtn.className = "copy-code-btn";
           copyBtn.innerHTML = COPY_ICON_SVG;
+          const copyTooltipDb = document.createElement("div");
+          copyTooltipDb.className = "copy-code-tooltip";
+          copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
+          shadowRoot.append(copyTooltipDb);
+          copyBtn.addEventListener("mouseenter", () => {
+            const rect = copyBtn.getBoundingClientRect();
+            copyTooltipDb.style.left = `${rect.left + rect.width / 2}px`;
+            copyTooltipDb.style.top = `${rect.top - 30}px`;
+            copyTooltipDb.style.transform = "translateX(-50%)";
+            copyTooltipDb.classList.add("visible");
+          });
+          copyBtn.addEventListener("mouseleave", () => {
+            copyTooltipDb.classList.remove("visible");
+          });
           copyBtn.addEventListener("click", () => {
             void navigator.clipboard.writeText(dbCode.code).then(() => {
               copyBtn.innerHTML = CHECK_ICON_SVG;
+              copyTooltipDb.textContent = "Kopiert!";
+              copyTooltipDb.classList.add("visible");
               setTimeout(() => {
                 copyBtn.innerHTML = COPY_ICON_SVG;
+                copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
+                copyTooltipDb.classList.remove("visible");
               }, 1500);
             });
           });
-          const { upBtn, downBtn } = attachVoteButtons(item);
+          const myVote = myVotes[dbCode.id] ?? 0;
+          const { upBtn, downBtn } = attachVoteButtons(item, void 0, myVote);
           const upCountEl = upBtn.querySelector(".vote-count");
           const downCountEl = downBtn.querySelector(".vote-count");
-          if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
-          if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+          const initNet2 = dbCode.upvotes - dbCode.downvotes;
+          if (upCountEl) upCountEl.textContent = initNet2 > 0 ? String(initNet2) : "";
+          if (downCountEl) downCountEl.textContent = initNet2 < 0 ? String(Math.abs(initNet2)) : "";
+          if (myVote === 1) upBtn.classList.add("voted");
+          else if (myVote === -1) downBtn.classList.add("downvoted");
           item.append(reward, codeSpan, downBtn, upBtn);
           const row = document.createElement("div");
           row.className = "code-item-row";
@@ -2325,14 +2453,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
             item.insertBefore(deleteBtn, downBtn);
           }
           row.append(item, copyBtn);
-          crawlerByCode.delete(dbCode.code.toUpperCase());
           return row;
         } });
       }
       for (const [, codeOffer] of crawlerByCode) {
         entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
       }
-      entries.sort((a, b) => b.net - a.net || parseReward(b.reward) - parseReward(a.reward));
+      entries.sort((a, b) => parseReward(b.reward) - parseReward(a.reward));
       codesList.removeChild(addCodeForm);
       codesList.innerHTML = "";
       expiredList.innerHTML = "";

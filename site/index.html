@@ -1066,20 +1066,20 @@ function render(query) {
       if (first) first.classList.add("code-item-row--best");
     };
 
-    const attachVotes = (row, staticCode) => {
+    const attachVotes = (row, staticCode, initialVote = 0) => {
       const item = row.querySelector(".code-item");
       let upvotes = parseInt(row.dataset.upvotes || "0");
       let downvotes = parseInt(row.dataset.downvotes || "0");
-      let upvoted = false, downvoted = false;
+      let upvoted = initialVote === 1, downvoted = initialVote === -1;
       const upBtn = row.querySelector('[data-vote="1"]');
       const downBtn = row.querySelector('[data-vote="-1"]');
       if (!upBtn || !downBtn) return;
       const upCount = upBtn.querySelector(".vote-count");
       const downCount = downBtn.querySelector(".vote-count");
       const syncUI = () => {
-        if (upCount) upCount.textContent = upvotes > 0 ? String(upvotes) : "";
-        if (downCount) downCount.textContent = downvotes > 0 ? String(downvotes) : "";
         const net = upvotes - downvotes;
+        if (upCount) upCount.textContent = net > 0 ? String(net) : "";
+        if (downCount) downCount.textContent = net < 0 ? String(Math.abs(net)) : "";
         row.dataset.net = String(net);
         if (net < 0 && row.parentElement === codesList) {
           expiredList.appendChild(row);
@@ -1145,16 +1145,19 @@ function render(query) {
 
     // Load DB codes
     const localOwnedIds = getOwnedIds(hostname);
-    Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname)]).then(([dbCodes, serverOwnedIds]) => {
+    Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
       const ownedIds = new Set([...localOwnedIds, ...serverOwnedIds]);
       if (userHasVoted) return; // skip re-render if user already voted
       const shownCodes = new Set([...section.querySelectorAll(".code-value")].map(el => el.textContent?.toUpperCase() || ""));
       for (const dbCode of dbCodes) {
         const isNew = !shownCodes.has(dbCode.code.toUpperCase());
         if (isNew) {
+          const mv = myVotes[dbCode.id] ?? 0;
           const row = buildCodeRow(dbCode, hostname, ownedIds);
           codesList.insertBefore(row, expiredSection);
-          attachVotes(row);
+          attachVotes(row, undefined, mv);
+          if (mv === 1) row.querySelector('[data-vote="1"]')?.classList.add("voted");
+          else if (mv === -1) row.querySelector('[data-vote="-1"]')?.classList.add("downvoted");
         } else {
           // Update existing crawler row with DB id and vote counts
           for (const row of section.querySelectorAll(".code-item-row")) {
@@ -1168,6 +1171,11 @@ function render(query) {
               const downCount = row.querySelector('[data-vote="-1"] .vote-count');
               if (upCount && dbCode.upvotes > 0) upCount.textContent = String(dbCode.upvotes);
               if (downCount && dbCode.downvotes > 0) downCount.textContent = String(dbCode.downvotes);
+              // Restore vote state from DB — re-attach with correct initial state
+              const mv2 = myVotes[dbCode.id] ?? 0;
+              attachVotes(row, undefined, mv2);
+              if (mv2 === 1) row.querySelector('[data-vote="1"]')?.classList.add("voted");
+              else if (mv2 === -1) row.querySelector('[data-vote="-1"]')?.classList.add("downvoted");
               // Move to expired if needed
               if (dbCode.downvotes - dbCode.upvotes > 0) {
                 item.classList.add("expired");
@@ -1356,6 +1364,20 @@ async function fetchCodesForHost(hostname) {
   } catch { return []; }
 }
 
+async function fetchMyVotes(hostname) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/my-votes`, {
+      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ hostname }),
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    const map = {};
+    for (const v of (data.votes || [])) map[v.code_id] = v.vote;
+    return map;
+  } catch { return {}; }
+}
+
 async function apiVote(codeId, vote, staticCode) {
   try {
     const body = { vote, ...(codeId > 0 ? { code_id: codeId } : {}), ...(staticCode || {}) };
@@ -1443,10 +1465,11 @@ function buildCodeRow(dbCode, hostname, ownedIds) {
   codeEl.textContent = dbCode.code;
   const downBtn = document.createElement("button");
   downBtn.className = "vote-btn"; downBtn.type = "button"; downBtn.dataset.vote = "-1";
-  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${dbCode.downvotes > 0 ? dbCode.downvotes : ""}</span><span class="vote-tooltip">Koden er utgått</span>`;
+  const initNet = dbCode.upvotes - dbCode.downvotes;
+  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${initNet < 0 ? Math.abs(initNet) : ""}</span><span class="vote-tooltip">Koden er utgått</span>`;
   const upBtn = document.createElement("button");
   upBtn.className = "vote-btn"; upBtn.type = "button"; upBtn.dataset.vote = "1";
-  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${dbCode.upvotes > 0 ? dbCode.upvotes : ""}</span><span class="vote-tooltip">Koden fungerer!</span>`;
+  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${initNet > 0 ? initNet : ""}</span><span class="vote-tooltip">Koden fungerer!</span>`;
   item.append(rewardEl, codeEl);
   if (dbCode.id && ownedIds && ownedIds.has(dbCode.id)) {
     const delBtn = makeDeleteBtn(dbCode.id, row, hostname);
