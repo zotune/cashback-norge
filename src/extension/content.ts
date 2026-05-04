@@ -1506,7 +1506,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   });
   addCodeInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAddForm();
-    if (e.key === "Enter" && addCodeInput.value.trim().length > 0) submitCode();
+    if (e.key === "Enter" && addCodeInput.value.trim().length > 0 && addRewardInput.value.trim().length > 0) submitCode();
   });
   addCodeCancel.addEventListener("click", closeAddForm);
   addCodeSubmit.addEventListener("click", submitCode);
@@ -1546,6 +1546,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         if (ok) {
           row.remove();
           removeOwnedCodeId(CURRENT_HOST, codeId);
+          resortCodesList();
         }
       });
     });
@@ -1608,10 +1609,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         expiredList.append(container);
         item.classList.add("expired");
         expiredSection.style.display = "";
+        resortCodesList();
       } else if (net >= 0 && container.parentElement === expiredList) {
         codesList.append(container);
         item.classList.remove("expired");
         if (expiredList.children.length === 0) expiredSection.style.display = "none";
+        resortCodesList();
+      } else {
         resortCodesList();
       }
     };
