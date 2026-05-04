@@ -1745,7 +1745,11 @@ function setupAzBar() {
   });
 
   let lastLetter = null;
+  let touchingBar = false;
+  bar.addEventListener("touchstart", () => { touchingBar = true; lastLetter = null; }, { passive: true });
+  bar.addEventListener("touchend", () => { touchingBar = false; }, { passive: true });
   bar.addEventListener("touchmove", (e) => {
+    if (!touchingBar) return;
     e.preventDefault();
     const touch = e.touches[0];
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
