@@ -1159,6 +1159,8 @@ function render(query) {
     </div>`;
   }).join("");
 
+  if (window._azObserveAll) window._azObserveAll();
+
   // Attach codes toggle handlers
   container.querySelectorAll(".codes-toggle-wrap").forEach(wrap => {
     const btn = wrap.querySelector(".codes-toggle");
@@ -1733,11 +1735,31 @@ function setupAzBar() {
   const letters = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ".split("")];
   bar.innerHTML = letters.map(l => `<span data-l="${l}">${l}</span>`).join("");
 
+  const setActive = (letter) => {
+    bar.querySelectorAll("span").forEach(s => s.classList.toggle("active", s.dataset.l === letter));
+  };
+
   const jumpTo = (letter) => {
     const el = document.querySelector(`.merchant[data-letter="${letter}"]`);
     if (el) el.scrollIntoView({ behavior: "instant", block: "start" });
-    bar.querySelectorAll("span").forEach(s => s.classList.toggle("active", s.dataset.l === letter));
+    setActive(letter);
   };
+
+  // Update active letter on scroll
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        setActive(entry.target.dataset.letter);
+        break;
+      }
+    }
+  }, { threshold: 0, rootMargin: "-40% 0px -55% 0px" });
+
+  window._azObserveAll = () => {
+    observer.disconnect();
+    document.querySelectorAll(".merchant[data-letter]").forEach(el => observer.observe(el));
+  };
+  window._azObserveAll();
 
   bar.addEventListener("click", (e) => {
     const span = e.target.closest("span[data-l]");
