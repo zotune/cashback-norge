@@ -163,14 +163,18 @@ export function findOffersForHostname(
 
   const all = sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
 
-  // Keep only the best offer per provider (highest reward wins)
+  // Keep only the best offer per provider (highest reward wins),
+  // but discount codes are always kept individually regardless of provider
   const bestByProvider = new Map<string, CashbackOffer>();
+  const discountCodeOffers: CashbackOffer[] = [];
   for (const offer of all) {
-    if (!bestByProvider.has(offer.provider)) {
+    if (offer.discountCode !== undefined && offer.discountCode.length > 0) {
+      discountCodeOffers.push(offer);
+    } else if (!bestByProvider.has(offer.provider)) {
       bestByProvider.set(offer.provider, offer);
     }
   }
-  return sortOffersByReward([...bestByProvider.values()]);
+  return sortOffersByReward([...bestByProvider.values(), ...discountCodeOffers]);
 }
 
 const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
