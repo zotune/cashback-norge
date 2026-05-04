@@ -1845,6 +1845,11 @@ function setupBonusToggle() {
     chips.style.display = open ? "none" : "flex";
     btn.classList.toggle("open", !open);
     localStorage.setItem("cashback-bonus-open", open ? "0" : "1");
+    // Close iPhone guide if opening
+    if (!open) {
+      document.getElementById("iphone-guide").style.display = "none";
+      document.getElementById("iphone-guide-arrow").style.transform = "";
+    }
   });
 
   // Swipe up to close
@@ -1876,6 +1881,14 @@ function setupBonusToggle() {
     const open = guide.style.display !== "none";
     guide.style.display = open ? "none" : "block";
     arrow.style.transform = open ? "" : "rotate(90deg)";
+    // Close bonus chips if opening
+    if (!open) {
+      const chips = document.querySelector(".bonus-chips-portal");
+      const bonusBtn = document.querySelector(".bonus-toggle");
+      chips.style.display = "none";
+      bonusBtn.classList.remove("open");
+      localStorage.setItem("cashback-bonus-open", "0");
+    }
   });
   document.getElementById("iphone-guide-copy").addEventListener("click", function() {
     const origSvg = this.querySelector("svg").outerHTML;
