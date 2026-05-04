@@ -762,15 +762,16 @@ a.merchant-name:hover { text-decoration: underline; }
   <img src="favicon.png" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
-  <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge#readme" target="_blank">iPhone</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
+  <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
   <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
   <div style="display:flex;align-items:center;justify-content:space-between;">
-    <div class="bonus-section">
+    <div style="display:flex;align-items:center;gap:12px;">
       <button class="bonus-toggle" type="button">
         <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
       </button>
+      <button id="iphone-guide-btn" type="button" style="align-items:center;appearance:none;background:none;border:none;color:#5d6b71;cursor:pointer;display:flex;font:inherit;font-size:13px;font-weight:600;gap:6px;padding:0;margin-bottom:8px;"><span id="iphone-guide-arrow" style="display:inline-block;font-size:10px;transition:transform 0.15s;">▶</span> iPhone/iPad</button>
     </div>
     <div class="count"></div>
   </div>
@@ -793,6 +794,20 @@ a.merchant-name:hover { text-decoration: underline; }
       <span class="chip-group-label">Premium</span>
       <div class="chip-group-items" id="premium-chips"></div>
     </div>
+  </div>
+  <div id="iphone-guide" style="display:none;padding:6px 0 4px;font-size:12px;color:#5d6b71;line-height:1.9;">
+    <ol style="padding-left:16px;margin:0;">
+      <li>Installer <a href="https://apps.apple.com/no/app/stay-for-safari/id1591620171" target="_blank" rel="noreferrer" style="color:#3a7d55;">Stay for Safari</a> fra App Store</li>
+      <li>Åpne Safari → trykk <strong>aA</strong> → <strong>Manage Extensions</strong> → skru på <strong>Stay</strong></li>
+      <li>Åpne Stay-appen → <strong>Userscript</strong> → lim inn og trykk <strong>Continue</strong>:</li>
+    </ol>
+    <div style="margin:4px 0 0 16px;background:#eef2f0;border-radius:6px;padding:6px 10px;font-family:monospace;font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span>https://cashbacknorge.no/cashback-varsler.user.js</span>
+      <button id="iphone-guide-copy" class="code-copy-btn" type="button"><span class="copy-tooltip">Kopiert!</span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+    </div>
+    <ol style="padding-left:16px;margin:6px 0 0;" start="4">
+      <li>Trykk på navnet til en av butikkene under — Cashback Norge dukker opp nede til venstre på skjermen (oppdateres automatisk)</li>
+    </ol>
   </div>
   </div>
   <div class="results"></div>
@@ -1851,6 +1866,30 @@ function setupBonusToggle() {
     }
   });
 }
+
+// iPhone guide
+(function() {
+  const btn = document.getElementById("iphone-guide-btn");
+  const guide = document.getElementById("iphone-guide");
+  const arrow = document.getElementById("iphone-guide-arrow");
+  btn.addEventListener("click", () => {
+    const open = guide.style.display !== "none";
+    guide.style.display = open ? "none" : "block";
+    arrow.style.transform = open ? "" : "rotate(90deg)";
+  });
+  document.getElementById("iphone-guide-copy").addEventListener("click", function() {
+    const origSvg = this.querySelector("svg").outerHTML;
+    navigator.clipboard.writeText("https://cashbacknorge.no/cashback-varsler.user.js").then(() => {
+      this.querySelector("svg").outerHTML = CHECK_SVG;
+      const tooltip = this.querySelector(".copy-tooltip");
+      tooltip.classList.add("visible");
+      setTimeout(() => {
+        this.querySelector("svg").outerHTML = origSvg;
+        tooltip.classList.remove("visible");
+      }, 1500);
+    });
+  });
+})();
 
 init();
 

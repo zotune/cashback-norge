@@ -10,7 +10,7 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
    ```
    https://cashbacknorge.no/cashback-varsler.user.js
    ```
-4. Gå tilbake til Safari og besøk en støttet nettbutikk, f.eks. [lyko.no](https://lyko.no) — cashback-varselet dukker opp nede til venstre på skjermen
+4. Gå tilbake til Safari og besøk en støttet nettbutikk, f.eks. [lyko.no](https://lyko.no) — Cashback Norge dukker opp nede til venstre på skjermen (oppdateres automatisk)
 
 Stay oppdaterer scriptet automatisk når nye versjoner slippes.
 
