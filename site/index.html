@@ -285,13 +285,14 @@ a.merchant-name:hover { text-decoration: underline; }
   border-top: 1px solid rgba(216, 227, 222, 0.5);
   color: #8a9a92;
   font-size: 11px;
-  padding: 7px 16px;
-  text-align: center;
+  padding: 7px 29px;
+  text-align: left;
   z-index: 100;
   max-width: 480px;
   overflow: hidden;
 }
-.fixed-footer .tip-line { justify-content: center; margin-bottom: 0; }
+.fixed-footer .tip-line { justify-content: flex-start; margin-bottom: 0; }
+@media (max-width: 520px) { .fixed-footer { padding-left: 8px; } }
 .fixed-footer .tip-line .ad-chip { position: static !important; margin-right: 6px; }
 .fixed-footer .bonus-section-wrap { display: flex; justify-content: space-between; align-items: center; }
 .fixed-footer .bonus-toggle { margin: 0; }
