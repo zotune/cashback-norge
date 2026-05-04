@@ -375,13 +375,13 @@ function formatRewardLabel(reward: string, provider: string): string {
 function convertSasToPercent(reward: string): string {
   const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (fixedMatch !== null) {
-    const points = Number.parseInt(fixedMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(fixedMatch[1]!.replace(/\s/g, ""), 10);
     const kr = Math.round(points / EB_PER_TRUMF_KR);
     return `~${kr} kr (~${points.toLocaleString("nb-NO")} EB)`;
   }
   const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (rateMatch !== null) {
-    const points = Number.parseInt(rateMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(rateMatch[1]!.replace(/\s/g, ""), 10);
     const pct = points / EB_PER_TRUMF_KR;
     return `~${formatNo(pct)} % (~${points} EB/100kr)`;
   }
@@ -391,21 +391,21 @@ function convertSasToPercent(reward: string): string {
 function convertTrumfToEb(reward: string): string {
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
-    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
-    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minPct = Number.parseFloat(rangeMatch[1]!.replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));
     const minEb = Math.round(minPct * EB_PER_TRUMF_KR);
     const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR);
     return `~${minEb}-${maxEb} EB/100kr`;
   }
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
-    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const pct = Number.parseFloat(pctMatch[1]!.replace(",", "."));
     const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR);
     return `~${ebPer100} EB/100kr`;
   }
   const krMatch = reward.match(/^([\d\s]+)\s*kr$/);
   if (krMatch !== null) {
-    const kr = Number.parseInt(krMatch[1].replace(/\s/g, ""), 10);
+    const kr = Number.parseInt(krMatch[1]!.replace(/\s/g, ""), 10);
     const eb = Math.round(kr * EB_PER_TRUMF_KR);
     return `~${eb.toLocaleString("nb-NO")} EB`;
   }
@@ -480,8 +480,8 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
 
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
-    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
-    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minPct = Number.parseFloat(rangeMatch[1]!.replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));
     const minKr = amount * minPct / 100;
     const maxKr = amount * maxPct / 100;
     const label = minKr === maxKr ? `${formatKr(minKr)} kr` : `${formatKr(minKr)}-${formatKr(maxKr)} kr`;
@@ -490,14 +490,14 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
 
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
-    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const pct = Number.parseFloat(pctMatch[1]!.replace(",", "."));
     const kr = amount * pct / 100;
     return addEbSuffix(`${formatKr(kr)} kr`, pct, pct, amount, offer.provider);
   }
 
   const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sasRateMatch !== null) {
-    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(sasRateMatch[1]!.replace(/\s/g, ""), 10);
     const eb = Math.round(amount * points / 100);
     const kr = amount * points / 100 / EB_PER_TRUMF_KR;
     return `~${formatKr(kr)} kr (~${eb} EB)`;
@@ -505,14 +505,14 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
 
   const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (sasFixedMatch !== null) {
-    const points = Number.parseInt(sasFixedMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(sasFixedMatch[1]!.replace(/\s/g, ""), 10);
     const kr = points / EB_PER_TRUMF_KR;
     return `~${formatKr(kr)} kr (~${points} EB)`;
   }
 
   const klarnaMatch = reward.match(/^([\d.]+)%$/);
   if (klarnaMatch !== null) {
-    const pct = Number.parseFloat(klarnaMatch[1]);
+    const pct = Number.parseFloat(klarnaMatch[1]!);
     const kr = amount * pct / 100;
     return `${formatKr(kr)} kr`;
   }

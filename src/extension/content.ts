@@ -3,6 +3,116 @@ import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
 
 const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
+
+const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
+
+type DbCode = { id: number; code: string; reward: string; upvotes: number; downvotes: number };
+
+async function fetchCodesForHost(hostname: string): Promise<DbCode[]> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/discount_codes?hostname=eq.${encodeURIComponent(hostname)}&select=id,code,reward`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
+    );
+    if (!res.ok) return [];
+    const rows: Array<{ id: number; code: string; reward: string }> = await res.json();
+    // Fetch vote sums
+    const ids = rows.map((r) => r.id);
+    if (ids.length === 0) return [];
+    const vRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/code_votes?code_id=in.(${ids.join(",")})&select=code_id,vote`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
+    );
+    const votes: Array<{ code_id: number; vote: number }> = vRes.ok ? await vRes.json() : [];
+    return rows.map((r) => ({
+      ...r,
+      upvotes: votes.filter((v) => v.code_id === r.id && v.vote === 1).length,
+      downvotes: votes.filter((v) => v.code_id === r.id && v.vote === -1).length,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function apiSubmitCode(hostname: string, code: string, reward: string): Promise<{ ok: boolean; duplicate?: boolean; rate_limited?: boolean; id?: number }> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ hostname, code, reward }),
+    });
+    if (res.status === 409) return { ok: false, duplicate: true };
+    if (res.status === 429) return { ok: false, rate_limited: true };
+    if (!res.ok) return { ok: false };
+    const data: { ok: boolean; id?: number } = await res.json();
+    return { ok: true, ...(data.id !== undefined ? { id: data.id } : {}) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+async function apiVote(codeId: number, vote: 1 | -1, staticCode?: { code: string; reward: string; hostname: string }): Promise<{ upvotes: number; downvotes: number; toggled_off?: boolean; registered_id?: number } | { rate_limited: true } | null> {  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ code_id: codeId > 0 ? codeId : undefined, vote, ...(staticCode ?? {}) }),
+    });
+    if (res.status === 429) return { rate_limited: true };
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function apiDeleteCode(codeId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ id: codeId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+const OWNED_CODES_KEY = (hostname: string): string => `cashback-varsler-owned-codes-${hostname}`;
+
+function getOwnedCodeIds(hostname: string): Set<number> {
+  try {
+    const raw = localStorage.getItem(OWNED_CODES_KEY(hostname));
+    const arr: number[] = raw ? JSON.parse(raw) : [];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+function addOwnedCodeId(hostname: string, id: number): void {
+  const ids = getOwnedCodeIds(hostname);
+  ids.add(id);
+  localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
+}
+
+function removeOwnedCodeId(hostname: string, id: number): void {
+  const ids = getOwnedCodeIds(hostname);
+  ids.delete(id);
+  localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
+}
+
+function showRateLimitFlash(near: HTMLElement): void {
+  const existing = near.closest(".code-item-row")?.parentElement?.querySelector(".rate-limit-flash");
+  if (existing) return;
+  const flash = document.createElement("div");
+  flash.className = "rate-limit-flash";
+  flash.textContent = "Du har nådd grensen på 5 handlinger per dag.";
+  flash.style.cssText = "font-size:11px;color:#888;padding:4px 8px;";
+  near.closest(".code-item-row")?.insertAdjacentElement("afterend", flash);
+  setTimeout(() => flash.remove(), 2500);
+}
 const CBN_LOGO_B64 = "data:image/png;base64,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";
 type CashbackOffer = {
   provider: string;
@@ -527,8 +637,23 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       margin: 0;
       padding: 4px 0;
     }
+    .delete-code-btn {
+      align-items: center;
+      background: none;
+      border: none;
+      color: #c0a0a0;
+      cursor: pointer;
+      display: inline-flex;
+      padding: 2px 3px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .delete-code-btn:hover {
+      color: #e05555;
+    }
     .expired-section {
-      border-top: 1px solid #e8f0ec;
       margin-top: 4px;
       padding-top: 4px;
     }
@@ -606,7 +731,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       gap: 5px;
     }
     .bonus-chips-section {
-      border-top: 1px solid #edf2ef;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
@@ -640,7 +764,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       transform: rotate(-90deg);
     }
     .codes-section {
-      border-top: 1px solid #edf2ef;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
@@ -670,6 +793,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
     .codes-section.collapsed .codes-list {
       display: none;
+    }
+    .codes-section.collapsed .expired-section {
+      display: none !important;
     }
     .codes-section.collapsed .codes-toggle-arrow {
       transform: rotate(-90deg);
@@ -788,7 +914,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       display: block;
     }
     .support {
-      border-top: 1px solid #edf2ef;
       padding: 6px 14px;
       display: flex;
       align-items: center;
@@ -1049,11 +1174,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     chip.append(label, badge);
     return { chip, label };
   }
-  const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0].provider);
+  const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0]!.provider);
   for (const [cardIdx, card] of FREE_CARDS.entries()) {
     const { chip, label } = createBonusChip(card);
     if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
-    bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, ebPer100kr: card.ebPer100kr, approx: card.approx, defaultText: label.textContent ?? "" });
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), ...(card.ebPer100kr !== undefined ? { ebPer100kr: card.ebPer100kr } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
@@ -1096,7 +1221,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       badge.replaceWith(wrapper);
       wrapper.append(makeAdChip(), badge);
     }
-    bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, approx: card.approx, defaultText: label.textContent ?? "" });
+    bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
     premiumItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
   }
@@ -1119,7 +1244,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
     badge.replaceWith(wrapper);
     wrapper.append(makeAdChip(), badge);
-    bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, minPct: undefined, maxPct: undefined, approx: curveCard.approx, defaultText: label.textContent ?? "" });
+    bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, approx: curveCard.approx, defaultText: label.textContent ?? "" });
     addChipTooltip(chip, curveCard.tip, shadowRoot);
     selectedItems.append(chip);
     hasSelectedItems = true;
@@ -1253,9 +1378,32 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     console.info(`[cashback-varsler] User submitted code for ${CURRENT_HOST}: ${code} (${reward})`);
     closeAddForm();
 
+    void apiSubmitCode(CURRENT_HOST, code, reward).then((result) => {
+      if (!result.ok) {
+        row1.remove();
+        let msg = "Noe gikk galt, prøv igjen.";
+        if (result.duplicate === true) msg = "Koden er allerede lagt til.";
+        if (result.rate_limited === true) msg = "Du har nådd grensen på 5 handlinger per dag.";
+        const warn = document.createElement("div");
+        warn.textContent = msg;
+        warn.style.cssText = "font-size:11px;color:#888;padding:4px 8px;";
+        addCodeForm.insertAdjacentElement("afterend", warn);
+        setTimeout(() => warn.remove(), 2500);
+        return;
+      }
+      if (result.id) {
+        item.dataset.codeId = String(result.id);
+        addOwnedCodeId(CURRENT_HOST, result.id);
+        // Show delete button inside chip, left of downvote
+        const deleteBtn = makeDeleteBtn(result.id, row1);
+        item.insertBefore(deleteBtn, down1);
+      }
+    });
+
     // Add immediately to the list (after addCodeForm, i.e. at the top)
     const item = document.createElement("div");
     item.className = "code-item";
+    item.dataset.codeId = "pending";
     const rewardEl = document.createElement("span");
     rewardEl.className = "code-reward";
     rewardEl.textContent = reward;
@@ -1277,6 +1425,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     row1.className = "code-item-row";
     row1.append(item, copyBtn);
     addCodeForm.insertAdjacentElement("afterend", row1);
+    // Update count in header
+    const currentCount = codesList.querySelectorAll(".code-item-row").length + expiredList.querySelectorAll(".code-item-row").length;
+    codesToggleText.textContent = `Rabattkoder (${currentCount})`;
   };
   addRewardInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAddForm();
@@ -1313,10 +1464,27 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   expiredList.className = "expired-list";
   expiredSection.append(expiredToggle, expiredList);
 
+  const makeDeleteBtn = (codeId: number, row: HTMLElement): HTMLButtonElement => {
+    const btn = document.createElement("button");
+    btn.className = "delete-code-btn";
+    btn.type = "button";
+    btn.title = "Slett koden din";
+    btn.innerHTML = `×`;
+    btn.addEventListener("click", () => {
+      void apiDeleteCode(codeId).then((ok) => {
+        if (ok) {
+          row.remove();
+          removeOwnedCodeId(CURRENT_HOST, codeId);
+        }
+      });
+    });
+    return btn;
+  };
+
   const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
   const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
 
-  const attachVoteButtons = (item: HTMLElement): { upBtn: HTMLButtonElement; downBtn: HTMLButtonElement } => {
+  const attachVoteButtons = (item: HTMLElement, staticCode?: { code: string; reward: string; hostname: string }): { upBtn: HTMLButtonElement; downBtn: HTMLButtonElement } => {
     let upvotes = 0;
     let downvotes = 0;
     let upvoted = false;
@@ -1353,6 +1521,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       }
     };
     upBtn.addEventListener("click", () => {
+      const codeId = Number(item.dataset.codeId);
       if (upvoted) {
         upvotes--; upvoted = false; upBtn.classList.remove("voted");
       } else {
@@ -1360,8 +1529,23 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         upvotes++; upvoted = true; upBtn.classList.add("voted");
       }
       syncExpired();
+      void apiVote(codeId, 1, staticCode).then((res) => {
+        if (res !== null && "rate_limited" in res) {
+          if (upvoted) { upvotes--; upvoted = false; upBtn.classList.remove("voted"); }
+          else { upvotes++; upvoted = true; upBtn.classList.add("voted"); }
+          syncExpired();
+          showRateLimitFlash(upBtn);
+        } else if (res !== null) {
+          if ("registered_id" in res && res.registered_id !== undefined) item.dataset.codeId = String(res.registered_id);
+          upvotes = res.upvotes; downvotes = res.downvotes;
+          upvoted = !res.toggled_off && upvoted;
+          if (res.toggled_off) upBtn.classList.remove("voted");
+          syncExpired();
+        }
+      });
     });
     downBtn.addEventListener("click", () => {
+      const codeId = Number(item.dataset.codeId);
       if (downvoted) {
         downvotes--; downvoted = false; downBtn.classList.remove("downvoted");
       } else {
@@ -1369,6 +1553,20 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         downvotes++; downvoted = true; downBtn.classList.add("downvoted");
       }
       syncExpired();
+      void apiVote(codeId, -1, staticCode).then((res) => {
+        if (res !== null && "rate_limited" in res) {
+          if (downvoted) { downvotes--; downvoted = false; downBtn.classList.remove("downvoted"); }
+          else { downvotes++; downvoted = true; downBtn.classList.add("downvoted"); }
+          syncExpired();
+          showRateLimitFlash(downBtn);
+        } else if (res !== null) {
+          if ("registered_id" in res && res.registered_id !== undefined) item.dataset.codeId = String(res.registered_id);
+          upvotes = res.upvotes; downvotes = res.downvotes;
+          downvoted = !res.toggled_off && downvoted;
+          if (res.toggled_off) downBtn.classList.remove("downvoted");
+          syncExpired();
+        }
+      });
     });
     return { upBtn, downBtn };
   };
@@ -1412,7 +1610,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         }, 1500);
       });
     });
-    const { upBtn, downBtn } = attachVoteButtons(item);
+    const { upBtn, downBtn } = attachVoteButtons(item, { code, reward: codeOffer.reward, hostname: CURRENT_HOST });
     item.append(reward, codeSpan, downBtn, upBtn);
     const row = document.createElement("div");
     row.className = "code-item-row";
@@ -1421,6 +1619,58 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   }
   codesSection.append(codesToggle, codesList, expiredSection);
   body.append(header, offerList, chipsSection, codesSection);
+
+  // Load community-submitted codes from Supabase
+  void fetchCodesForHost(CURRENT_HOST).then((dbCodes) => {
+    for (const dbCode of dbCodes) {
+      const item = document.createElement("div");
+      item.className = "code-item";
+      item.dataset.codeId = String(dbCode.id);
+      const reward = document.createElement("span");
+      reward.className = "code-reward";
+      reward.textContent = dbCode.reward;
+      const codeSpan = document.createElement("span");
+      codeSpan.className = "code-value";
+      codeSpan.textContent = dbCode.code;
+      const copyBtn = document.createElement("span");
+      copyBtn.className = "copy-code-btn";
+      copyBtn.innerHTML = COPY_ICON_SVG;
+      copyBtn.addEventListener("click", () => {
+        void navigator.clipboard.writeText(dbCode.code).then(() => {
+          copyBtn.innerHTML = CHECK_ICON_SVG;
+          setTimeout(() => { copyBtn.innerHTML = COPY_ICON_SVG; }, 1500);
+        });
+      });
+      const { upBtn, downBtn } = attachVoteButtons(item);
+      // Set initial vote counts
+      const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
+      const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
+      if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
+      if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+      item.append(reward, codeSpan, downBtn, upBtn);
+      const row = document.createElement("div");
+      row.className = "code-item-row";
+      const ownedIds = getOwnedCodeIds(CURRENT_HOST);
+      if (ownedIds.has(dbCode.id)) {
+        const deleteBtn = makeDeleteBtn(dbCode.id, row);
+        item.insertBefore(deleteBtn, downBtn);
+        row.append(item, copyBtn);
+      } else {
+        row.append(item, copyBtn);
+      }
+      // net negative → start in expired
+      if (dbCode.downvotes - dbCode.upvotes > 0) {
+        item.classList.add("expired");
+        expiredList.append(row);
+        expiredSection.style.display = "";
+      } else {
+        codesList.append(row);
+      }
+    }
+    if (dbCodes.length > 0) {
+      codesToggleText.textContent = `Rabattkoder (${codeOffers.length + dbCodes.length})`;
+    }
+  });
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
   if (pick !== undefined) {
     const support = document.createElement("div");
@@ -1787,8 +2037,8 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   // Percentage range: "2-3,5 %"
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
-    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
-    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minPct = Number.parseFloat(rangeMatch[1]!.replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));
     const minKr = amount * minPct / 100;
     const maxKr = amount * maxPct / 100;
     const label = minKr === maxKr ? `${formatKr(minKr)} kr` : `${formatKr(minKr)}-${formatKr(maxKr)} kr`;
@@ -1797,14 +2047,14 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   // Single percentage: "6,2 %"
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
-    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const pct = Number.parseFloat(pctMatch[1]!.replace(",", "."));
     const kr = amount * pct / 100;
     return addEbSuffix(`${formatKr(kr)} kr`, pct, pct, amount, offer.provider);
   }
   // SAS rate: "15 poeng per 100 kr"
   const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sasRateMatch !== null) {
-    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(sasRateMatch[1]!.replace(/\s/g, ""), 10);
     const eb = Math.round(amount * points / 100);
     const kr = amount * points / 100 / EB_PER_TRUMF_KR;
     return `~${formatKr(kr)} kr (~${eb} EB)`;
@@ -1812,14 +2062,14 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
   // SAS fixed: "500 poeng"
   const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (sasFixedMatch !== null) {
-    const points = Number.parseInt(sasFixedMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(sasFixedMatch[1]!.replace(/\s/g, ""), 10);
     const kr = points / EB_PER_TRUMF_KR;
     return `~${formatKr(kr)} kr (~${points} EB)`;
   }
   // Klarna "5.5%"
   const klarnaMatch = reward.match(/^([\d.]+)%$/);
   if (klarnaMatch !== null) {
-    const pct = Number.parseFloat(klarnaMatch[1]);
+    const pct = Number.parseFloat(klarnaMatch[1]!);
     const kr = amount * pct / 100;
     return `${formatKr(kr)} kr`;
   }
@@ -1848,15 +2098,15 @@ function getMaxRewardPercent(offer: CashbackOffer): number {
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
-    return Number.parseFloat(rangeMatch[2].replace(",", "."));
+    return Number.parseFloat(rangeMatch[2]!.replace(",", "."));
   }
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
-    return Number.parseFloat(pctMatch[1].replace(",", "."));
+    return Number.parseFloat(pctMatch[1]!.replace(",", "."));
   }
   const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sasRateMatch !== null) {
-    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(sasRateMatch[1]!.replace(/\s/g, ""), 10);
     return points / EB_PER_TRUMF_KR;
   }
   return 0;
@@ -1869,20 +2119,20 @@ function calculateCashbackMaxKr(offer: CashbackOffer, amount: number): number {
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
-    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));
     return amount * maxPct / 100;
   }
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
-    return amount * Number.parseFloat(pctMatch[1].replace(",", ".")) / 100;
+    return amount * Number.parseFloat(pctMatch[1]!.replace(",", ".")) / 100;
   }
   const klarnaMatch = reward.match(/^([\d.]+)%$/);
   if (klarnaMatch !== null) {
-    return amount * Number.parseFloat(klarnaMatch[1]) / 100;
+    return amount * Number.parseFloat(klarnaMatch[1]!) / 100;
   }
   const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sasRateMatch !== null) {
-    const points = Number.parseInt(sasRateMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(sasRateMatch[1]!.replace(/\s/g, ""), 10);
     return amount * points / 100 / EB_PER_TRUMF_KR;
   }
   return 0;
@@ -1893,7 +2143,7 @@ function formatBreakdownWithAmounts(terms: string, amount: number): string {
     .map((line) => {
       const match = line.match(/^([\d,]+)\s*%/);
       if (match !== null) {
-        const pct = Number.parseFloat(match[1].replace(",", "."));
+        const pct = Number.parseFloat(match[1]!.replace(",", "."));
         const kr = amount * pct / 100;
         return `${line} (${formatKr(kr)} kr)`;
       }
@@ -2057,13 +2307,13 @@ function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
 function convertSasToPercent(reward: string): string {
   const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
   if (fixedMatch !== null) {
-    const points = Number.parseInt(fixedMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(fixedMatch[1]!.replace(/\s/g, ""), 10);
     const kr = Math.round(points / EB_PER_TRUMF_KR);
     return `~${kr} kr (~${points.toLocaleString("nb-NO")} EB)`;
   }
   const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (rateMatch !== null) {
-    const points = Number.parseInt(rateMatch[1].replace(/\s/g, ""), 10);
+    const points = Number.parseInt(rateMatch[1]!.replace(/\s/g, ""), 10);
     const pct = points / EB_PER_TRUMF_KR;
     return `~${formatNo(pct)} % (~${points} EB/100kr)`;
   }
@@ -2073,8 +2323,8 @@ function convertTrumfToEb(reward: string): string {
   // "1,1-1,5 %" → ~15-20 EB/100kr
   const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
   if (rangeMatch !== null) {
-    const minPct = Number.parseFloat(rangeMatch[1].replace(",", "."));
-    const maxPct = Number.parseFloat(rangeMatch[2].replace(",", "."));
+    const minPct = Number.parseFloat(rangeMatch[1]!.replace(",", "."));
+    const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));
     const minEb = Math.round(minPct * EB_PER_TRUMF_KR);
     const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR);
     return `~${minEb}-${maxEb} EB/100kr`;
@@ -2082,14 +2332,14 @@ function convertTrumfToEb(reward: string): string {
   // "3,1 %" → ~42 EB/100kr
   const pctMatch = reward.match(/^([\d,]+)\s*%$/);
   if (pctMatch !== null) {
-    const pct = Number.parseFloat(pctMatch[1].replace(",", "."));
+    const pct = Number.parseFloat(pctMatch[1]!.replace(",", "."));
     const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR);
     return `~${ebPer100} EB/100kr`;
   }
   // "295 kr" → ~3 983 EB
   const krMatch = reward.match(/^([\d\s]+)\s*kr$/);
   if (krMatch !== null) {
-    const kr = Number.parseInt(krMatch[1].replace(/\s/g, ""), 10);
+    const kr = Number.parseInt(krMatch[1]!.replace(/\s/g, ""), 10);
     const eb = Math.round(kr * EB_PER_TRUMF_KR);
     return `~${eb.toLocaleString("nb-NO")} EB`;
   }
