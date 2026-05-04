@@ -18,11 +18,13 @@ body {
 .sticky-header {
   position: sticky;
   top: 0;
-  background: #f4f8f6;
+  background: rgba(244, 248, 246, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   z-index: 100;
   margin: 0 -16px;
-  padding: 8px 16px;
-  border-bottom: 1px solid #d8e3de;
+  padding: 8px 16px 4px;
+  border-bottom: 1px solid rgba(216, 227, 222, 0.5);
 }
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 20px; }
@@ -212,8 +214,10 @@ a.merchant-name:hover { text-decoration: underline; }
   transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
-  background: #f4f8f6;
-  border-top: 1px solid #d8e3de;
+  background: rgba(244, 248, 246, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(216, 227, 222, 0.5);
   color: #8a9a92;
   font-size: 11px;
   padding: 7px 16px;
@@ -226,7 +230,26 @@ a.merchant-name:hover { text-decoration: underline; }
 .fixed-footer .bonus-toggle { margin: 0; }
 .fixed-footer .bonus-toggle-arrow { transform: rotate(0deg); }
 .fixed-footer .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(-90deg); }
-.fixed-footer .bonus-chips { left: 50%; right: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: rgba(244, 248, 246, 0.4); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(216, 227, 222, 0.5); }
+.sticky-header .bonus-toggle-arrow { transform: rotate(0deg); }
+.sticky-header .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(90deg); }
+.fixed-footer .bonus-chips { left: 50%; right: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: rgba(255, 255, 255, 0.92); border: 1px solid #d8e3de; isolation: isolate; }
+.bonus-chips-portal {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid rgba(216, 227, 222, 0.6);
+  border-radius: 10px;
+  padding: 12px;
+  z-index: 99;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .fixed-footer a { color: #5d6b71; }
 .count {
   color: #8a9a92;
@@ -268,6 +291,9 @@ a.merchant-name:hover { text-decoration: underline; }
 .adblock-warning.visible { display: flex; }
 .bonus-section {
   margin-bottom: 8px;
+}
+.sticky-header .bonus-section {
+  margin-bottom: 0;
 }
 .code-item {
   align-items: center;
@@ -678,34 +704,36 @@ a.merchant-name:hover { text-decoration: underline; }
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
   <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge#readme" target="_blank">iPhone</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
+  <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
   <div class="search-wrap">
     <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
     <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
   </div>
-  <div style="font-size:11px;color:#8a9a92;text-align:center;padding:3px 0 1px;">Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</div>
-  <div class="count"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="bonus-section">
+      <button class="bonus-toggle" type="button">
+        <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
+      </button>
+    </div>
+    <div class="count"></div>
+  </div>
   </div>
   <div class="results"></div>
 </div>
 <div class="fixed-footer">
-  <div class="bonus-section">
-    <button class="bonus-toggle" type="button">
-      <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
-    </button>
-    <div class="bonus-chips" style="display:none">
-      <div class="chip-group">
-        <span class="chip-group-label">Gratis</span>
-        <div class="chip-group-items" id="free-chips"></div>
-      </div>
-      <div class="chip-group">
-        <span class="chip-group-label">Premium</span>
-        <div class="chip-group-items" id="premium-chips"></div>
-      </div>
-    </div>
-  </div>
   <div class="tip-line"></div>
+</div>
+<div class="bonus-chips-portal" style="display:none">
+  <div class="chip-group">
+    <span class="chip-group-label">Gratis</span>
+    <div class="chip-group-items" id="free-chips"></div>
+  </div>
+  <div class="chip-group">
+    <span class="chip-group-label">Premium</span>
+    <div class="chip-group-items" id="premium-chips"></div>
+  </div>
 </div>
 <script src="shared-data.js"></script>
 <script>
@@ -746,7 +774,7 @@ async function init() {
       try {
         const o = JSON.parse(el.dataset.reward);
         el.textContent = currentAmount > 0 ? calcReward(o, currentAmount) : formatCompactReward(o);
-      } catch {}
+      } catch(e) { console.error("offer-reward parse error:", e, el.dataset.reward?.slice(0,100)); }
     });
     document.querySelectorAll(".offer-reward[data-pct-curve]").forEach(el => {
       el.textContent = currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %';
@@ -760,7 +788,7 @@ async function init() {
         el.textContent = el.dataset.origReward || el.textContent;
       }
     });
-    renderBonusChips();
+    try { renderBonusChips(); } catch(e) { console.error("renderBonusChips error:", e); }
   });
 }
 
@@ -981,7 +1009,7 @@ function render(query) {
       const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : "";
       const bestClass = idx === 0 ? " offer--best" : "";
       return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
-        <span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span>
+        <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
         ${warnIconHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a></span>`;
     }).join("");
@@ -1623,14 +1651,21 @@ function renderBonusChips() {
 
 function setupBonusToggle() {
   const btn = document.querySelector(".bonus-toggle");
-  const chips = document.querySelector(".bonus-chips");
+  const chips = document.querySelector(".bonus-chips-portal");
+  const header = document.querySelector(".sticky-header");
   renderBonusChips();
+  const updatePortalPos = () => {
+    if (header) chips.style.top = header.getBoundingClientRect().bottom + "px";
+  };
+  updatePortalPos();
+  window.addEventListener("scroll", updatePortalPos, { passive: true });
   const savedOpen = localStorage.getItem("cashback-bonus-open") === "1";
   if (savedOpen) {
     chips.style.display = "flex";
     btn.classList.add("open");
   }
   btn.addEventListener("click", () => {
+    updatePortalPos();
     const open = chips.style.display !== "none";
     chips.style.display = open ? "none" : "flex";
     btn.classList.toggle("open", !open);
