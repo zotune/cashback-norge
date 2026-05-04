@@ -33,9 +33,17 @@ type ParseResult = {
   maskedCodeCount: number;
 };
 
-export async function crawlFinnkupongkoder(
+type FinnkupongkoderCrawlResult = {
+  offers: CashbackOffer[];
+  visibleOfferCount: number;
+  maskedCodeCount: number;
+  blocked: boolean;
+};
+
+async function runFinnkupongkoderCrawl(
   input: CrawlFinnkupongkoderInput,
-): Promise<CashbackOffer[]> {
+  proxyUrl?: string,
+): Promise<FinnkupongkoderCrawlResult> {
   const rawOffers: CashbackOffer[] = [];
   let visibleOfferCount = 0;
   let maskedCodeCount = 0;
@@ -45,8 +53,8 @@ export async function crawlFinnkupongkoder(
   const config = new Configuration();
   config.useStorageClient(storage);
 
-  const proxyConfiguration = input.proxyUrl
-    ? new ProxyConfiguration({ proxyUrls: [input.proxyUrl] })
+  const proxyConfiguration = proxyUrl
+    ? new ProxyConfiguration({ proxyUrls: [proxyUrl] })
     : undefined;
 
   const crawler = new CheerioCrawler({
@@ -84,17 +92,30 @@ export async function crawlFinnkupongkoder(
 
   await crawler.run([input.startUrl]);
 
-  if (blockedByCloudflare) {
+  return { offers: rawOffers, visibleOfferCount, maskedCodeCount, blocked: blockedByCloudflare };
+}
+
+export async function crawlFinnkupongkoder(
+  input: CrawlFinnkupongkoderInput,
+): Promise<CashbackOffer[]> {
+  let result = await runFinnkupongkoderCrawl(input);
+
+  if (result.blocked && input.proxyUrl) {
+    input.logger.info("FinnKupongkoder: blocked, retrying via proxy");
+    result = await runFinnkupongkoderCrawl(input, input.proxyUrl);
+  }
+
+  if (result.blocked) {
     input.logger.warn(
       "FinnKupongkoder: Cloudflare returned a block page; skipping this source.",
     );
   }
 
   input.logger.info(
-    `FinnKupongkoder: ${visibleOfferCount} visible offers, ${maskedCodeCount} masked codes, ${rawOffers.length} usable full codes`,
+    `FinnKupongkoder: ${result.visibleOfferCount} visible offers, ${result.maskedCodeCount} masked codes, ${result.offers.length} usable full codes`,
   );
 
-  return uniqueOffers(rawOffers);
+  return uniqueOffers(result.offers);
 }
 
 function parseFinnkupongkoderPage(

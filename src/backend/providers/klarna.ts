@@ -19,8 +19,9 @@ export type CrawlKlarnaInput = {
   proxyUrl?: string;
 };
 
-export async function crawlKlarna(
+async function runKlarnaCrawl(
   input: CrawlKlarnaInput,
+  proxyUrl?: string,
 ): Promise<CashbackOffer[]> {
   const rawOffers: CashbackOffer[] = [];
 
@@ -28,8 +29,8 @@ export async function crawlKlarna(
   const config = new Configuration();
   config.useStorageClient(storage);
 
-  const proxyConfiguration = input.proxyUrl
-    ? new ProxyConfiguration({ proxyUrls: [input.proxyUrl] })
+  const proxyConfiguration = proxyUrl
+    ? new ProxyConfiguration({ proxyUrls: [proxyUrl] })
     : undefined;
 
   const crawler = new CheerioCrawler({
@@ -47,6 +48,18 @@ export async function crawlKlarna(
 
   const pageUrls = buildPageUrls(input.startUrl, input.maxPages);
   await crawler.run(pageUrls);
+  return rawOffers;
+}
+
+export async function crawlKlarna(
+  input: CrawlKlarnaInput,
+): Promise<CashbackOffer[]> {
+  let rawOffers = await runKlarnaCrawl(input);
+
+  if (rawOffers.length === 0 && input.proxyUrl) {
+    input.logger.info("Klarna: direct crawl returned 0 offers, retrying via proxy");
+    rawOffers = await runKlarnaCrawl(input, input.proxyUrl);
+  }
 
   input.logger.info(
     `Klarna listing pages yielded ${rawOffers.length} raw offers`,
