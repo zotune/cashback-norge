@@ -1144,13 +1144,12 @@ function render(query) {
     });
 
     // Load DB codes — deferred until section is first expanded
-    const localOwnedIds = getOwnedIds(hostname);
     let dbLoaded = false;
     const loadDbCodes = () => {
       if (dbLoaded) return;
       dbLoaded = true;
       Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
-        const ownedIds = new Set([...localOwnedIds, ...serverOwnedIds]);
+        const ownedIds = new Set(serverOwnedIds);
         if (userHasVoted) return; // skip re-render if user already voted
       const shownCodes = new Set([...section.querySelectorAll(".code-value")].map(el => el.textContent?.toUpperCase() || ""));
       for (const dbCode of dbCodes) {
@@ -1214,7 +1213,6 @@ function render(query) {
         }
         const row = buildCodeRow({ id: result.id, code, reward, upvotes: 0, downvotes: 0 }, hostname, new Set([result.id]));
         row.dataset.net = "0";
-        if (result.id) addOwnedId(hostname, result.id);
         codesList.insertBefore(row, expiredSection);
         attachVotes(row);
         resortRows();
@@ -1435,18 +1433,7 @@ async function fetchOwnedCodesForHost(hostname) {
   } catch { return []; }
 }
 
-const OWNED_KEY = h => `cashback-norge-owned-${h}`;
-function getOwnedIds(hostname) {
-  try { return new Set(JSON.parse(localStorage.getItem(OWNED_KEY(hostname)) || "[]")); } catch { return new Set(); }
-}
-function addOwnedId(hostname, id) {
-  const ids = getOwnedIds(hostname); ids.add(id);
-  localStorage.setItem(OWNED_KEY(hostname), JSON.stringify([...ids]));
-}
-function removeOwnedId(hostname, id) {
-  const ids = getOwnedIds(hostname); ids.delete(id);
-  localStorage.setItem(OWNED_KEY(hostname), JSON.stringify([...ids]));
-}
+
 
 function showRateLimit(nearEl) {
   const row = nearEl.closest(".code-item-row");
@@ -1507,7 +1494,7 @@ function makeDeleteBtn(codeId, row, hostname) {
   btn.textContent = "\u00d7";
   btn.addEventListener("click", () => {
     apiDeleteCode(codeId).then(ok => {
-      if (ok) { row.remove(); removeOwnedId(hostname, codeId); resortRows(); }
+      if (ok) { row.remove(); resortRows(); }
     });
   });
   return btn;

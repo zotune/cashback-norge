@@ -94,29 +94,7 @@ async function fetchOwnedCodesForHost(hostname: string): Promise<Set<number>> {
   }
 }
 
-const OWNED_CODES_KEY = (hostname: string): string => `cashback-varsler-owned-codes-${hostname}`;
 
-function getOwnedCodeIds(hostname: string): Set<number> {
-  try {
-    const raw = localStorage.getItem(OWNED_CODES_KEY(hostname));
-    const arr: number[] = raw ? JSON.parse(raw) : [];
-    return new Set(arr);
-  } catch {
-    return new Set();
-  }
-}
-
-function addOwnedCodeId(hostname: string, id: number): void {
-  const ids = getOwnedCodeIds(hostname);
-  ids.add(id);
-  localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
-}
-
-function removeOwnedCodeId(hostname: string, id: number): void {
-  const ids = getOwnedCodeIds(hostname);
-  ids.delete(id);
-  localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
-}
 
 async function fetchMyVotes(hostname: string): Promise<Record<number, 1 | -1>> {
   try {
@@ -1480,7 +1458,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       }
       if (result.id) {
         item.dataset.codeId = String(result.id);
-        addOwnedCodeId(CURRENT_HOST, result.id);
         // Show delete button inside chip, left of downvote
         const deleteBtn = makeDeleteBtn(result.id, row1);
         item.insertBefore(deleteBtn, down1);
@@ -1579,7 +1556,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       void apiDeleteCode(codeId).then((ok) => {
         if (ok) {
           row.remove();
-          removeOwnedCodeId(CURRENT_HOST, codeId);
           resortCodesList();
         }
       });
@@ -1779,7 +1755,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     dbLoaded = true;
     // Load community-submitted codes from Supabase, then merge + sort all
     void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
-    const ownedIds = new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
+    const ownedIds = new Set(serverOwnedIds);
     // Don't wipe DOM if user has already voted — avoids race condition
     if (userHasVoted) {
       // Just append any DB codes not already shown

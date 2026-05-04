@@ -674,26 +674,6 @@
       return /* @__PURE__ */ new Set();
     }
   }
-  const OWNED_CODES_KEY = (hostname) => `cashback-varsler-owned-codes-${hostname}`;
-  function getOwnedCodeIds(hostname) {
-    try {
-      const raw = localStorage.getItem(OWNED_CODES_KEY(hostname));
-      const arr = raw ? JSON.parse(raw) : [];
-      return new Set(arr);
-    } catch {
-      return /* @__PURE__ */ new Set();
-    }
-  }
-  function addOwnedCodeId(hostname, id) {
-    const ids = getOwnedCodeIds(hostname);
-    ids.add(id);
-    localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
-  }
-  function removeOwnedCodeId(hostname, id) {
-    const ids = getOwnedCodeIds(hostname);
-    ids.delete(id);
-    localStorage.setItem(OWNED_CODES_KEY(hostname), JSON.stringify([...ids]));
-  }
   async function fetchMyVotes(hostname) {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/my-votes`, {
@@ -1999,7 +1979,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         }
         if (result.id) {
           item.dataset.codeId = String(result.id);
-          addOwnedCodeId(CURRENT_HOST, result.id);
           const deleteBtn = makeDeleteBtn(result.id, row1);
           item.insertBefore(deleteBtn, down1);
         }
@@ -2099,7 +2078,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         void apiDeleteCode(codeId).then((ok) => {
           if (ok) {
             row.remove();
-            removeOwnedCodeId(CURRENT_HOST, codeId);
             resortCodesList();
           }
         });
@@ -2328,7 +2306,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       if (dbLoaded) return;
       dbLoaded = true;
       void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
-        const ownedIds = /* @__PURE__ */ new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
+        const ownedIds = new Set(serverOwnedIds);
         if (userHasVoted) {
           const shownCodes = new Set(
             [...codesList.querySelectorAll(".code-value"), ...expiredList.querySelectorAll(".code-value")].map((el) => el.textContent?.toUpperCase() ?? "")
