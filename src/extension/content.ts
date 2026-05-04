@@ -126,6 +126,13 @@ async function renderBundledOffersForCurrentUrl(): Promise<void> {
   }
   clearNotice();
 }
+function makeAdChip(): HTMLSpanElement {
+  const chip = document.createElement("span");
+  chip.textContent = "Ad";
+  chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
+  return chip;
+}
+
 function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initialChipsCollapsed: boolean, initialCodesCollapsed: boolean): void {
   clearNotice();
   const host = document.createElement("div");
@@ -934,6 +941,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (card.label === "Curve") continue;
     if (card.label === "Crypto" && cryptoSub !== undefined) continue;
     const { chip, label } = createBonusChip(card);
+    if (card.label === "Crypto") {
+      const badge = chip.querySelector(".provider-badge")!;
+      const wrapper = document.createElement("span");
+      wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+      badge.replaceWith(wrapper);
+      wrapper.append(makeAdChip(), badge);
+    }
     bonusChipLabels.push({ element: label, pct: card.pct * 100, minPct: card.minPct != null ? card.minPct * 100 : undefined, maxPct: card.maxPct != null ? card.maxPct * 100 : undefined, approx: card.approx, defaultText: label.textContent ?? "" });
     premiumItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot);
@@ -952,6 +966,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   if (curveOffer !== undefined) {
     const curveCard = PREMIUM_CARDS.find((c) => c.label === "Curve")!;
     const { chip, label } = createBonusChip(curveCard, curveOffer.activationUrl);
+    const badge = chip.querySelector(".provider-badge")!;
+    const wrapper = document.createElement("span");
+    wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+    badge.replaceWith(wrapper);
+    wrapper.append(makeAdChip(), badge);
     bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, minPct: undefined, maxPct: undefined, approx: curveCard.approx, defaultText: label.textContent ?? "" });
     addChipTooltip(chip, curveCard.tip, shadowRoot);
     selectedItems.append(chip);
@@ -970,6 +989,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     cryptoBadge.className = "provider-badge provider-crypto";
     cryptoBadge.textContent = "Crypto";
     cryptoChip.append(cryptoChipLabel, cryptoBadge);
+    const cryptoAdWrapper = document.createElement("span");
+    cryptoAdWrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+    cryptoBadge.replaceWith(cryptoAdWrapper);
+    cryptoAdWrapper.append(makeAdChip(), cryptoBadge);
     addChipTooltip(cryptoChip, `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSub}\nPlatin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     selectedItems.append(cryptoChip);
     hasSelectedItems = true;
@@ -1084,6 +1107,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     logoImg.className = "support-logo";
     logoImg.alt = "CBN";
     logoLink.append(logoImg);
+    if (pick.affiliate) support.prepend(makeAdChip());
     support.append(supportLink, logoLink);
     panel.append(topLine, body, support);
   } else {

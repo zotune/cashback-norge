@@ -104,10 +104,12 @@ a.merchant-name:hover { text-decoration: underline; }
   color: #172026;
   display: flex;
   gap: 8px;
+  justify-content: space-between;
   min-height: 38px;
   padding: 7px 10px;
   text-decoration: none;
 }
+.offer .offer-reward { flex: 1; }
 .offer:active { background: #edf2ef; }
 .offer-card-only { justify-content: space-between; }
 .offer-card-only .offer-reward { flex: 1; }
@@ -200,9 +202,17 @@ a.merchant-name:hover { text-decoration: underline; }
   color: #5d6b71;
   font-size: 13px;
   margin-bottom: 12px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.tip-line .ad-chip {
+  position: absolute;
+  left: 0;
 }
 .tip-line a {
+  flex: 1;
+  text-align: center;
   color: #5d6b71;
   text-decoration: none;
 }
@@ -417,6 +427,19 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .bonus-chip:active { background: #e4ebe7; }
 .bonus-chip .badge { font-size: 9px; min-height: 16px; padding: 0 5px; }
+.ad-chip {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #78909c;
+  border: 1px solid #78909c;
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 14px;
+  vertical-align: middle;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .badge-sas-amex { background: #00005c; color: #fff; }
 .badge-norwegian { background: #d81939; color: #fff; }
 .badge-lunar { background: #2bb24c; color: #fff; }
@@ -716,12 +739,12 @@ function render(query) {
     const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
     const cryptoSelectedHtml = cryptoSubName ? (() => {
       const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="badge badge-crypto">Crypto</span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-crypto">Crypto</span></span></a></span>`;
     })() : "";
     const hasCurve = m.domains.some(d => curveDomains.has(d));
     const curveSelectedHtml = hasCurve ? (() => {
       const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward">+1 %</span><span class="badge badge-curve">Curve</span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward">+1 %</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-curve">Curve</span></span></a></span>`;
     })() : "";
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
@@ -898,7 +921,8 @@ function renderTips() {
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
   const container = document.querySelector(".tip-line");
   if (pick) {
-    container.innerHTML = `<a href="${esc(pick.url)}" target="_blank" rel="noreferrer">${esc(pick.text)}</a>`;
+    const adHtml = pick.affiliate ? '<span class="ad-chip">Ad</span> ' : '';
+    container.innerHTML = `${adHtml}<a href="${esc(pick.url)}" target="_blank" rel="noreferrer">${esc(pick.text)}</a>`;
   }
 }
 
@@ -930,7 +954,7 @@ function renderChipGroup(cards, container) {
     return `<span class="tooltip-wrap">
       <span class="tooltip">${esc(c.tip)}</span>
       <a class="bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
-        ${rewardText} <span class="badge badge-${c.badge}">${esc(c.label)}</span>
+        ${rewardText} <span style="display:inline-flex;align-items:center;gap:6px;">${(c.label === 'Crypto' || c.label === 'Curve') ? '<span class="ad-chip">Ad</span>' : ''}<span class="badge badge-${c.badge}">${esc(c.label)}</span></span>
       </a>
     </span>`;
   }).join("");
