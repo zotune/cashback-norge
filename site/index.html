@@ -208,8 +208,10 @@ a.merchant-name:hover { text-decoration: underline; }
 .fixed-footer {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
   background: #f4f8f6;
   border-top: 1px solid #d8e3de;
   color: #8a9a92;
@@ -218,11 +220,13 @@ a.merchant-name:hover { text-decoration: underline; }
   text-align: center;
   z-index: 100;
 }
-.fixed-footer .bonus-section { position: relative; margin-bottom: 4px; text-align: center; }
-.fixed-footer .bonus-toggle { margin: 0 auto; }
-.fixed-footer .bonus-toggle-arrow { transform: rotate(-90deg); }
-.fixed-footer .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(90deg); }
-.fixed-footer .bonus-chips { left: 50%; right: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: #fff; }
+.fixed-footer .tip-line { justify-content: center; margin-bottom: 0; }
+.fixed-footer .tip-line .ad-chip { position: static !important; margin-right: 6px; }
+.fixed-footer .bonus-section-wrap { display: flex; justify-content: space-between; align-items: center; }
+.fixed-footer .bonus-toggle { margin: 0; }
+.fixed-footer .bonus-toggle-arrow { transform: rotate(0deg); }
+.fixed-footer .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(-90deg); }
+.fixed-footer .bonus-chips { left: 0; right: auto; transform: none; width: min(460px, calc(100vw - 32px)); background: #fff; }
 .fixed-footer a { color: #5d6b71; }
 .count {
   color: #8a9a92;
@@ -680,7 +684,7 @@ a.merchant-name:hover { text-decoration: underline; }
     <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
     <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
   </div>
-  <div class="tip-line"></div>
+  <div style="font-size:11px;color:#8a9a92;text-align:center;padding:3px 0 1px;">Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</div>
   <div class="count"></div>
   </div>
   <div class="results"></div>
@@ -701,7 +705,7 @@ a.merchant-name:hover { text-decoration: underline; }
       </div>
     </div>
   </div>
-  <div>Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</div>
+  <div class="tip-line"></div>
 </div>
 <script src="shared-data.js"></script>
 <script>
