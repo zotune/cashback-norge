@@ -1724,7 +1724,7 @@
       label.className = "bonus-chip-label";
       const ebInfo = card.ebPer100kr ? ` (~${card.ebPer100kr} EB/100kr)` : "";
       const pctStr = card.minPct != null && card.maxPct != null ? `${(card.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}-${(card.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}` : (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
-      label.textContent = `+${card.approx ? "~" : ""}${pctStr}%${ebInfo}`;
+      label.textContent = `+${card.approx ? "~" : ""}${pctStr} %${ebInfo}`;
       const badge = document.createElement("span");
       badge.className = `provider-badge provider-${card.badge}`;
       badge.textContent = card.label;
@@ -2624,8 +2624,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function findOffersForHostname(cashbackIndex, hostname) {
     const normalizedHostname = normalizeHostname(hostname);
+    const canonical = DOMAIN_ALIASES[normalizedHostname] ?? normalizedHostname;
     const lookupDomains = [
       normalizedHostname,
+      ...canonical !== normalizedHostname ? [canonical] : [],
       ...getAlternateTldDomains(normalizedHostname),
       ...CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`)
     ];
@@ -2656,6 +2658,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const hostPart = firstSlashIndex === -1 ? trimmedInput : trimmedInput.slice(0, firstSlashIndex);
     return normalizeHostname(hostPart);
   }
+  const DOMAIN_ALIASES = {
+    "jbl.com": "no.jbl.com"
+  };
   const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
   const CC_SUBDOMAINS = ["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"];
   function getAlternateTldDomains(domain) {

@@ -291,7 +291,7 @@ async function enrichBenefitDetails(
       const detailLookupNames = extractDetailLookupNames(detail);
 
       if (storeUrl !== undefined) benefit.storeUrl = storeUrl;
-      if (reward && !benefit.reward) benefit.reward = reward;
+      if (reward) benefit.reward = reward;
       benefit.lookupNames = uniqueStringsPreserveOrder([
         ...benefit.lookupNames,
         ...detailLookupNames,
@@ -398,9 +398,9 @@ function extractDetailReward(value: unknown): string {
     : [];
 
   return (
-    normalizeReward(readString(value.discountBadge)) ||
     extractRewardFromText(keyInformationItems.join(" ")) ||
-    extractRewardFromText(collectText(value.body).join(" "))
+    extractRewardFromText(collectText(value.body).join(" ")) ||
+    normalizeReward(readString(value.discountBadge))
   );
 }
 

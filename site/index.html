@@ -739,6 +739,7 @@ function groupByMerchant(offers) {
   const DOMAIN_ALIASES = {
     "bestdrive.no": "dekkmann.no",
     "dekkhotell.no": "dekkmann.no",
+    "jbl.com": "no.jbl.com",
   };
 
   // Normalize domains through aliases before grouping
@@ -1532,7 +1533,7 @@ function renderChipGroup(cards, container) {
     } else {
       const pctStr = (c.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
       const ebInfo = c.ebPer100kr ? ` (~${c.ebPer100kr} EB/100kr)` : "";
-      rewardText = (c.approx ? `+~${pctStr}%` : `+${pctStr}%`) + ebInfo;
+      rewardText = (c.approx ? `+~${pctStr} %` : `+${pctStr} %`) + ebInfo;
     }
     return `<span class="tooltip-wrap">
       <span class="tooltip">${esc(c.tip)}</span>
