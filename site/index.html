@@ -91,26 +91,29 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .az-bar {
   position: fixed;
-  right: 4px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
+  gap: 1px;
   z-index: 200;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  padding: 4px 2px;
 }
 .az-bar span {
   font-size: 10px;
   font-weight: 600;
   color: #3a7d55;
   line-height: 1;
-  padding: 2px 3px;
+  padding: 2px 4px;
   cursor: pointer;
   border-radius: 4px;
+  min-width: 16px;
+  text-align: center;
 }
 .az-bar span.active {
   background: #3a7d55;
@@ -1120,7 +1123,9 @@ function render(query) {
     const nameHtml = storeUrl
       ? `<a class="merchant-name" href="${esc(storeUrl)}" target="_blank" rel="noreferrer">${esc(m.name)}</a>`
       : `<span class="merchant-name">${esc(m.name)}</span>`;
-    return `<div class="merchant" data-letter="${esc(m.name.charAt(0).toUpperCase())}">
+    return `<div class="merchant" data-letter="${
+      /^[A-ZÆØÅ]/i.test(m.name) ? esc(m.name.charAt(0).toUpperCase()) : '#'
+    }">
       <div class="merchant-header">
         ${iconHtml}
         ${nameHtml}
@@ -1728,10 +1733,11 @@ function setupAzBar() {
 
   const scrollTo = (letter) => {
     const el = document.querySelector(`.merchant[data-letter="${letter}"]`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (el) el.scrollIntoView({ behavior: "instant", block: "start" });
     bar.querySelectorAll("span").forEach(s => s.classList.toggle("active", s.dataset.l === letter));
   };
 
+  const letters = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ".split("")];
   bar.innerHTML = letters.map(l => `<span data-l="${l}">${l}</span>`).join("");
 
   bar.addEventListener("click", (e) => {
@@ -1739,11 +1745,16 @@ function setupAzBar() {
     if (span) scrollTo(span.dataset.l);
   });
 
+  let lastLetter = null;
   bar.addEventListener("touchmove", (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (el && el.dataset.l) scrollTo(el.dataset.l);
+    if (el && el.dataset.l && el.dataset.l !== lastLetter) {
+      lastLetter = el.dataset.l;
+      if (navigator.vibrate) navigator.vibrate(8);
+      scrollTo(el.dataset.l);
+    }
   }, { passive: false });
 }
 
