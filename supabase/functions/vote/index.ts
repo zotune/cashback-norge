@@ -134,10 +134,13 @@ Deno.serve(async (req: Request) => {
 
   const totals = await getVoteTotals(supabase, codeId);
 
-  // Auto-delete if net score hits the delete threshold
+  // Auto-delete if net score hits the delete threshold — but not for crawler/static codes
   if (totals.upvotes - totals.downvotes <= DELETE_THRESHOLD) {
-    await supabase.from("discount_codes").delete().eq("id", codeId);
-    return new Response(JSON.stringify({ ok: true, deleted: true, upvotes: 0, downvotes: 0 }), { headers: corsHeaders });
+    const { data: dc } = await supabase.from("discount_codes").select("ip_hash").eq("id", codeId).maybeSingle();
+    if (dc?.ip_hash !== "__static__") {
+      await supabase.from("discount_codes").delete().eq("id", codeId);
+      return new Response(JSON.stringify({ ok: true, deleted: true, upvotes: 0, downvotes: 0 }), { headers: corsHeaders });
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, registered_id: codeId, ...totals }), { headers: corsHeaders });
