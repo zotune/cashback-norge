@@ -688,7 +688,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       align-items: center;
       background: none;
       border: none;
-      color: #c0a0a0;
+      color: #b0bec5;
       cursor: pointer;
       display: inline-flex;
       padding: 2px 3px;
