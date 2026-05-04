@@ -56,6 +56,7 @@ type CliConfig = {
   dnbPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
+  finnkupongkoderProxyUrl: string | undefined;
   kickbackStartUrl: string;
   trustdealsStartUrl: string;
   logbuyStartUrl: string;
@@ -159,6 +160,7 @@ async function main(): Promise<void> {
     config.skipFinnkupongkoder ? Promise.resolve([]) : crawlFinnkupongkoder({
         generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl, startUrl: config.finnkupongkoderStartUrl,
+        ...(config.finnkupongkoderProxyUrl ? { proxyUrl: config.finnkupongkoderProxyUrl } : {}),
       }),
     config.skipLogbuy ? Promise.resolve([]) : crawlLogbuy({
         domainLookup, generatedAt, logger,
@@ -248,6 +250,9 @@ function readCliConfig(args: string[]): CliConfig {
     finnkupongkoderStartUrl:
       readArgumentValue(args, "--finnkupongkoder-start-url") ??
       "https://www.finnkupongkoder.no/top",
+    finnkupongkoderProxyUrl: process.env.SCRAPERAPI_KEY
+      ? `http://scraperapi:${process.env.SCRAPERAPI_KEY}@proxy-server.scraperapi.com:8001`
+      : undefined,
     kickbackStartUrl:
       readArgumentValue(args, "--kickback-start-url") ??
       "https://kickback.no/",

@@ -3,6 +3,7 @@ import {
   type CheerioCrawlingContext,
   Configuration,
   MemoryStorage,
+  ProxyConfiguration,
 } from "crawlee";
 import {
   type CashbackOffer,
@@ -23,6 +24,7 @@ export type CrawlFinnkupongkoderInput = {
   maxRequestsPerCrawl: number;
   generatedAt: string;
   logger: Logger;
+  proxyUrl?: string;
 };
 
 type ParseResult = {
@@ -43,9 +45,14 @@ export async function crawlFinnkupongkoder(
   const config = new Configuration();
   config.useStorageClient(storage);
 
+  const proxyConfiguration = input.proxyUrl
+    ? new ProxyConfiguration({ proxyUrls: [input.proxyUrl] })
+    : undefined;
+
   const crawler = new CheerioCrawler({
     maxRequestRetries: 0,
     maxRequestsPerCrawl: input.maxRequestsPerCrawl,
+    ...(proxyConfiguration ? { proxyConfiguration } : {}),
     requestHandler: async ({ $, request }) => {
       const loadedUrl = request.loadedUrl ?? request.url;
 
@@ -65,6 +72,10 @@ export async function crawlFinnkupongkoder(
     },
     failedRequestHandler: async ({ request, error }) => {
       const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("403") || message.includes("blocked")) {
+        blockedByCloudflare = true;
+        return;
+      }
       input.logger.warn(
         `FinnKupongkoder: could not fetch ${request.url}: ${message}`,
       );
