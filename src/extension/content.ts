@@ -426,6 +426,100 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .copy-code-btn:hover {
       color: #166b47;
     }
+    .vote-btn {
+      align-items: center;
+      color: #b0c8bc;
+      cursor: pointer;
+      display: inline-flex;
+      gap: 3px;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1;
+      background: none;
+      border: none;
+    }
+    .vote-btn:hover {
+      color: #1f8f5f;
+    }
+    .vote-btn.voted {
+      color: #1f8f5f;
+    }
+    .vote-count {
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .add-code-btn {
+      align-items: center;
+      background: none;
+      border: none;
+      color: #b0c8bc;
+      cursor: pointer;
+      display: inline-flex;
+      margin-left: auto;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .add-code-btn:hover {
+      color: #1f8f5f;
+    }
+    .add-code-form {
+      align-items: center;
+      display: flex;
+      gap: 4px;
+      padding: 2px 0;
+    }
+    .add-code-input {
+      background: #fff;
+      border: 1px solid #d0dbd5;
+      border-radius: 6px;
+      color: #172026;
+      flex: 1;
+      font-size: 12px;
+      min-width: 0;
+      padding: 5px 8px;
+      font-family: inherit;
+    }
+    .add-reward-input {
+      flex: 0 0 70px;
+    }
+    .add-code-input:focus {
+      border-color: #1f8f5f;
+      outline: none;
+    }
+    .add-code-submit {
+      align-items: center;
+      background: #1f8f5f;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      padding: 5px 8px;
+      flex-shrink: 0;
+    }
+    .add-code-submit:disabled {
+      background: #b0c8bc;
+      cursor: default;
+    }
+    .add-code-cancel {
+      background: none;
+      border: none;
+      color: #8a9ba3;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 4px;
+    }
+    .add-code-cancel:hover {
+      color: #172026;
+    }
+    .add-code-thanks {
+      color: #1f8f5f;
+      font-size: 11px;
+      margin: 0;
+      padding: 4px 0;
+    }
     .copy-code-tooltip {
       background: #1a1a2e;
       border-radius: 6px;
@@ -518,6 +612,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       line-height: 1;
       margin-bottom: 5px;
       padding: 0;
+      width: 100%;
     }
     .codes-toggle:hover {
       color: #4f5f66;
@@ -1021,73 +1116,190 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   // --- Rabattkoder section ---
   const codesSection = document.createElement("div");
   codesSection.className = "codes-section";
-  if (initialCodesCollapsed) {
+  if (initialCodesCollapsed && codeOffers.length > 0) {
     codesSection.classList.add("collapsed");
   }
-  if (codeOffers.length > 0) {
-    const codesToggle = document.createElement("button");
-    codesToggle.className = "codes-toggle";
-    codesToggle.type = "button";
-    const codesToggleArrow = document.createElement("span");
-    codesToggleArrow.className = "codes-toggle-arrow";
-    codesToggleArrow.textContent = "\u25BC";
-    const codesToggleText = document.createElement("span");
-    codesToggleText.textContent = `Rabattkoder (${codeOffers.length})`;
-    codesToggle.append(codesToggleArrow, codesToggleText);
-    codesToggle.addEventListener("click", () => {
-      const isCollapsed = codesSection.classList.toggle("collapsed");
-      chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
-    });
-    const codesList = document.createElement("div");
-    codesList.className = "codes-list";
-    for (const codeOffer of codeOffers) {
-      const code = codeOffer.discountCode ?? "";
-      const item = document.createElement("div");
-      item.className = "code-item";
-      const reward = document.createElement("span");
-      reward.className = "code-reward";
-      reward.textContent = codeOffer.reward;
-      const codeSpan = document.createElement("span");
-      codeSpan.className = "code-value";
-      codeSpan.textContent = code;
-      const copyBtn = document.createElement("span");
-      copyBtn.className = "copy-code-btn";
-      copyBtn.innerHTML = COPY_ICON_SVG;
-      const copyTooltip = document.createElement("div");
-      copyTooltip.className = "copy-code-tooltip";
-      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-      shadowRoot.append(copyTooltip);
-      copyBtn.addEventListener("mouseenter", () => {
-        const rect = copyBtn.getBoundingClientRect();
-        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
-        copyTooltip.style.top = `${rect.top - 30}px`;
-        copyTooltip.style.transform = "translateX(-50%)";
-        copyTooltip.classList.add("visible");
-      });
-      copyBtn.addEventListener("mouseleave", () => {
-        copyTooltip.classList.remove("visible");
-      });
-      copyBtn.addEventListener("click", () => {
-        void navigator.clipboard.writeText(code).then(() => {
-          copyBtn.innerHTML = CHECK_ICON_SVG;
-          copyTooltip.textContent = "Kopiert!";
-          copyTooltip.classList.add("visible");
-          setTimeout(() => {
-            copyBtn.innerHTML = COPY_ICON_SVG;
-            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-            copyTooltip.classList.remove("visible");
-          }, 1500);
-        });
-      });
-      item.append(reward, codeSpan, copyBtn);
-      codesList.append(item);
+
+  // Header row: "▼ Rabattkoder (N)" + "+" button
+  const codesToggle = document.createElement("button");
+  codesToggle.className = "codes-toggle";
+  codesToggle.type = "button";
+  const codesToggleArrow = document.createElement("span");
+  codesToggleArrow.className = "codes-toggle-arrow";
+  codesToggleArrow.textContent = "\u25BC";
+  const codesToggleText = document.createElement("span");
+  codesToggleText.textContent = codeOffers.length > 0 ? `Rabattkoder (${codeOffers.length})` : "Rabattkoder";
+  const addCodeBtn = document.createElement("button");
+  addCodeBtn.className = "add-code-btn";
+  addCodeBtn.type = "button";
+  addCodeBtn.title = "Legg til rabattkode";
+  addCodeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+  codesToggle.append(codesToggleArrow, codesToggleText, addCodeBtn);
+  codesToggle.addEventListener("click", (e) => {
+    if (addCodeBtn.contains(e.target as Node)) return;
+    const isCollapsed = codesSection.classList.toggle("collapsed");
+    chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
+  });
+
+  const codesList = document.createElement("div");
+  codesList.className = "codes-list";
+
+  // Inline add-code form (hidden by default, appears at top of list)
+  const addCodeForm = document.createElement("div");
+  addCodeForm.className = "add-code-form";
+  addCodeForm.style.display = "none";
+  const addRewardInput = document.createElement("input");
+  addRewardInput.className = "add-code-input add-reward-input";
+  addRewardInput.type = "number";
+  addRewardInput.placeholder = "Rabatt %";
+  addRewardInput.min = "0";
+  addRewardInput.max = "100";
+  const addCodeInput = document.createElement("input");
+  addCodeInput.className = "add-code-input";
+  addCodeInput.type = "text";
+  addCodeInput.placeholder = "Kode";
+  addCodeInput.maxLength = 30;
+  const addCodeSubmit = document.createElement("button");
+  addCodeSubmit.className = "add-code-submit";
+  addCodeSubmit.type = "button";
+  addCodeSubmit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  addCodeSubmit.disabled = true;
+  const addCodeCancel = document.createElement("button");
+  addCodeCancel.className = "add-code-cancel";
+  addCodeCancel.type = "button";
+  addCodeCancel.textContent = "\u2715";
+  addCodeForm.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
+  const updateSubmitState = (): void => {
+    addCodeSubmit.disabled = addCodeInput.value.trim().length === 0;
+  };
+  addCodeInput.addEventListener("input", updateSubmitState);
+  addRewardInput.addEventListener("input", () => {
+    const v = Number(addRewardInput.value);
+    if (addRewardInput.value !== "" && (v < 0 || v > 100)) {
+      addRewardInput.value = String(Math.min(100, Math.max(0, v)));
     }
-    codesSection.append(codesToggle, codesList);
+  });
+  const closeAddForm = (): void => {
+    addCodeForm.style.display = "none";
+    addCodeInput.value = "";
+    addRewardInput.value = "";
+    addCodeSubmit.disabled = true;
+  };
+  const submitCode = (): void => {
+    const code = addCodeInput.value.trim().toUpperCase();
+    const rawReward = addRewardInput.value.trim();
+    const reward = rawReward.length > 0 ? `${rawReward} %` : "?";
+    if (code.length === 0) return;
+    console.info(`[cashback-varsler] User submitted code for ${CURRENT_HOST}: ${code} (${reward})`);
+    closeAddForm();
+
+    // Add immediately to the list
+    const item = document.createElement("div");
+    item.className = "code-item";
+    const rewardEl = document.createElement("span");
+    rewardEl.className = "code-reward";
+    rewardEl.textContent = reward;
+    const codeSpan = document.createElement("span");
+    codeSpan.className = "code-value";
+    codeSpan.textContent = code;
+    const copyBtn = document.createElement("span");
+    copyBtn.className = "copy-code-btn";
+    copyBtn.innerHTML = COPY_ICON_SVG;
+    copyBtn.addEventListener("click", () => {
+      void navigator.clipboard.writeText(code).then(() => {
+        copyBtn.innerHTML = CHECK_ICON_SVG;
+        setTimeout(() => { copyBtn.innerHTML = COPY_ICON_SVG; }, 1500);
+      });
+    });
+    item.append(rewardEl, codeSpan, copyBtn);
+    codesList.append(item);
+  };
+  addRewardInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAddForm();
+    if (e.key === "Enter") { e.preventDefault(); addCodeInput.focus(); }
+  });
+  addCodeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAddForm();
+    if (e.key === "Enter" && addCodeInput.value.trim().length > 0) submitCode();
+  });
+  addCodeCancel.addEventListener("click", closeAddForm);
+  addCodeSubmit.addEventListener("click", submitCode);
+  addCodeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    codesSection.classList.remove("collapsed");
+    addCodeForm.style.display = "";
+    addRewardInput.focus();
+  });
+  codesList.append(addCodeForm);
+
+  for (const codeOffer of codeOffers) {
+    const code = codeOffer.discountCode ?? "";
+    const item = document.createElement("div");
+    item.className = "code-item";
+    const reward = document.createElement("span");
+    reward.className = "code-reward";
+    reward.textContent = codeOffer.reward;
+    const codeSpan = document.createElement("span");
+    codeSpan.className = "code-value";
+    codeSpan.textContent = code;
+    const copyBtn = document.createElement("span");
+    copyBtn.className = "copy-code-btn";
+    copyBtn.innerHTML = COPY_ICON_SVG;
+    const copyTooltip = document.createElement("div");
+    copyTooltip.className = "copy-code-tooltip";
+    copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+    shadowRoot.append(copyTooltip);
+    copyBtn.addEventListener("mouseenter", () => {
+      const rect = copyBtn.getBoundingClientRect();
+      copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
+      copyTooltip.style.top = `${rect.top - 30}px`;
+      copyTooltip.style.transform = "translateX(-50%)";
+      copyTooltip.classList.add("visible");
+    });
+    copyBtn.addEventListener("mouseleave", () => {
+      copyTooltip.classList.remove("visible");
+    });
+    copyBtn.addEventListener("click", () => {
+      void navigator.clipboard.writeText(code).then(() => {
+        copyBtn.innerHTML = CHECK_ICON_SVG;
+        copyTooltip.textContent = "Kopiert!";
+        copyTooltip.classList.add("visible");
+        setTimeout(() => {
+          copyBtn.innerHTML = COPY_ICON_SVG;
+          copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+          copyTooltip.classList.remove("visible");
+        }, 1500);
+      });
+    });
+    const voteBtn = document.createElement("button");
+    voteBtn.className = "vote-btn";
+    voteBtn.type = "button";
+    voteBtn.title = "Koden fungerer!";
+    voteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+    let votes = 0;
+    let voted = false;
+    const voteCount = document.createElement("span");
+    voteCount.className = "vote-count";
+    voteBtn.append(voteCount);
+    voteBtn.addEventListener("click", () => {
+      if (voted) {
+        votes--;
+        voted = false;
+        voteBtn.classList.remove("voted");
+        voteBtn.title = "Koden fungerer!";
+      } else {
+        votes++;
+        voted = true;
+        voteBtn.classList.add("voted");
+        voteBtn.title = "Fjern stemme";
+      }
+      voteCount.textContent = votes > 0 ? String(votes) : "";
+    });
+    item.append(reward, codeSpan, voteBtn, copyBtn);
+    codesList.append(item);
   }
-  body.append(header, offerList, chipsSection);
-  if (codeOffers.length > 0) {
-    body.append(codesSection);
-  }
+  codesSection.append(codesToggle, codesList);
+  body.append(header, offerList, chipsSection, codesSection);
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
   if (pick !== undefined) {
     const support = document.createElement("div");
