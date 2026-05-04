@@ -234,18 +234,8 @@ a.merchant-name:hover { text-decoration: underline; }
 .sticky-header .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(90deg); }
 .fixed-footer .bonus-chips { left: 50%; right: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: rgba(255, 255, 255, 0.92); border: 1px solid #d8e3de; isolation: isolate; }
 .bonus-chips-portal {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(460px, calc(100vw - 32px));
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  border: 1px solid rgba(216, 227, 222, 0.6);
-  border-radius: 10px;
-  padding: 12px;
-  z-index: 99;
+  padding-top: 6px;
+  margin-top: 2px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -719,21 +709,21 @@ a.merchant-name:hover { text-decoration: underline; }
     </div>
     <div class="count"></div>
   </div>
+  <div class="bonus-chips-portal" style="display:none">
+    <div class="chip-group">
+      <span class="chip-group-label">Gratis</span>
+      <div class="chip-group-items" id="free-chips"></div>
+    </div>
+    <div class="chip-group">
+      <span class="chip-group-label">Premium</span>
+      <div class="chip-group-items" id="premium-chips"></div>
+    </div>
+  </div>
   </div>
   <div class="results"></div>
 </div>
 <div class="fixed-footer">
   <div class="tip-line"></div>
-</div>
-<div class="bonus-chips-portal" style="display:none">
-  <div class="chip-group">
-    <span class="chip-group-label">Gratis</span>
-    <div class="chip-group-items" id="free-chips"></div>
-  </div>
-  <div class="chip-group">
-    <span class="chip-group-label">Premium</span>
-    <div class="chip-group-items" id="premium-chips"></div>
-  </div>
 </div>
 <script src="shared-data.js"></script>
 <script>
@@ -1652,20 +1642,13 @@ function renderBonusChips() {
 function setupBonusToggle() {
   const btn = document.querySelector(".bonus-toggle");
   const chips = document.querySelector(".bonus-chips-portal");
-  const header = document.querySelector(".sticky-header");
   renderBonusChips();
-  const updatePortalPos = () => {
-    if (header) chips.style.top = header.getBoundingClientRect().bottom + "px";
-  };
-  updatePortalPos();
-  window.addEventListener("scroll", updatePortalPos, { passive: true });
   const savedOpen = localStorage.getItem("cashback-bonus-open") === "1";
   if (savedOpen) {
     chips.style.display = "flex";
     btn.classList.add("open");
   }
   btn.addEventListener("click", () => {
-    updatePortalPos();
     const open = chips.style.display !== "none";
     chips.style.display = open ? "none" : "flex";
     btn.classList.toggle("open", !open);
