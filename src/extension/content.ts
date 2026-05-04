@@ -52,7 +52,7 @@ async function apiSubmitCode(hostname: string, code: string, reward: string): Pr
   }
 }
 
-async function apiVote(codeId: number, vote: 1 | -1, staticCode?: { code: string; reward: string; hostname: string }): Promise<{ upvotes: number; downvotes: number; toggled_off?: boolean; registered_id?: number } | { rate_limited: true } | null> {  try {
+async function apiVote(codeId: number, vote: 1 | -1, staticCode?: { code: string; reward: string; hostname: string }): Promise<{ upvotes: number; downvotes: number; toggled_off?: boolean; deleted?: boolean; registered_id?: number } | { rate_limited: true } | null> {  try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
@@ -1306,7 +1306,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   codesToggleArrow.className = "codes-toggle-arrow";
   codesToggleArrow.textContent = "\u25BC";
   const codesToggleText = document.createElement("span");
-  codesToggleText.textContent = codeOffers.length > 0 ? `Rabattkoder (${codeOffers.length})` : "Rabattkoder";
+  codesToggleText.textContent = "Rabattkoder";
   const addCodeBtn = document.createElement("button");
   addCodeBtn.className = "add-code-btn";
   addCodeBtn.type = "button";
@@ -1362,6 +1362,20 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     addCodeInput.value = "";
     addRewardInput.value = "";
     addCodeSubmit.disabled = true;
+  };
+  const parseRewardNum = (r: string): number => parseFloat(r.replace(",", ".")) || 0;
+  const resortCodesList = (): void => {
+    const rows = [...codesList.querySelectorAll<HTMLElement>(".code-item-row")];
+    rows.sort((a, b) => {
+      const netA = parseFloat(a.dataset.net ?? "0");
+      const netB = parseFloat(b.dataset.net ?? "0");
+      if (netB !== netA) return netB - netA;
+      const rA = parseRewardNum(a.querySelector<HTMLElement>(".code-reward")?.textContent ?? "");
+      const rB = parseRewardNum(b.querySelector<HTMLElement>(".code-reward")?.textContent ?? "");
+      return rB - rA;
+    });
+    for (const row of rows) codesList.append(row);
+    codesList.prepend(addCodeForm);
   };
   const submitCode = (): void => {
     const code = addCodeInput.value.trim().toUpperCase();
@@ -1423,11 +1437,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     item.append(rewardEl, codeSpan, down1, up1);
     const row1 = document.createElement("div");
     row1.className = "code-item-row";
+    row1.dataset.net = "0";
     row1.append(item, copyBtn);
     addCodeForm.insertAdjacentElement("afterend", row1);
-    // Update count in header
-    const currentCount = codesList.querySelectorAll(".code-item-row").length + expiredList.querySelectorAll(".code-item-row").length;
-    codesToggleText.textContent = `Rabattkoder (${currentCount})`;
+    resortCodesList();
+    // count no longer shown
   };
   addRewardInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAddForm();
@@ -1492,24 +1506,47 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const upBtn = document.createElement("button");
     upBtn.className = "vote-btn";
     upBtn.type = "button";
-    upBtn.title = "Koden fungerer!";
     upBtn.innerHTML = THUMBS_UP_SVG;
     const upCountEl = document.createElement("span");
     upCountEl.className = "vote-count";
     upBtn.append(upCountEl);
+    const upTooltip = document.createElement("div");
+    upTooltip.className = "copy-code-tooltip";
+    upTooltip.textContent = "Koden fungerer!";
+    shadowRoot.append(upTooltip);
+    upBtn.addEventListener("mouseenter", () => {
+      const rect = upBtn.getBoundingClientRect();
+      upTooltip.style.left = `${rect.left + rect.width / 2}px`;
+      upTooltip.style.top = `${rect.top - 30}px`;
+      upTooltip.style.transform = "translateX(-50%)";
+      upTooltip.classList.add("visible");
+    });
+    upBtn.addEventListener("mouseleave", () => { upTooltip.classList.remove("visible"); });
     const downBtn = document.createElement("button");
     downBtn.className = "vote-btn";
     downBtn.type = "button";
-    downBtn.title = "Koden er utgått";
     downBtn.innerHTML = THUMBS_DOWN_SVG;
     const downCountEl = document.createElement("span");
     downCountEl.className = "vote-count";
     downBtn.append(downCountEl);
+    const downTooltip = document.createElement("div");
+    downTooltip.className = "copy-code-tooltip";
+    downTooltip.textContent = "Koden er utgått";
+    shadowRoot.append(downTooltip);
+    downBtn.addEventListener("mouseenter", () => {
+      const rect = downBtn.getBoundingClientRect();
+      downTooltip.style.left = `${rect.left + rect.width / 2}px`;
+      downTooltip.style.top = `${rect.top - 30}px`;
+      downTooltip.style.transform = "translateX(-50%)";
+      downTooltip.classList.add("visible");
+    });
+    downBtn.addEventListener("mouseleave", () => { downTooltip.classList.remove("visible"); });
     const syncExpired = (): void => {
       upCountEl.textContent = upvotes > 0 ? String(upvotes) : "";
       downCountEl.textContent = downvotes > 0 ? String(downvotes) : "";
       const net = upvotes - downvotes;
       const container = item.closest(".code-item-row") ?? item;
+      (container as HTMLElement).dataset.net = String(net);
       if (net < 0 && container.parentElement === codesList) {
         expiredList.append(container);
         item.classList.add("expired");
@@ -1521,6 +1558,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       }
     };
     upBtn.addEventListener("click", () => {
+      userHasVoted = true;
       const codeId = Number(item.dataset.codeId);
       if (upvoted) {
         upvotes--; upvoted = false; upBtn.classList.remove("voted");
@@ -1537,6 +1575,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
           showRateLimitFlash(upBtn);
         } else if (res !== null) {
           if ("registered_id" in res && res.registered_id !== undefined) item.dataset.codeId = String(res.registered_id);
+          if (res.deleted) { item.closest(".code-item-row")?.remove(); return; }
           upvotes = res.upvotes; downvotes = res.downvotes;
           upvoted = !res.toggled_off && upvoted;
           if (res.toggled_off) upBtn.classList.remove("voted");
@@ -1545,6 +1584,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       });
     });
     downBtn.addEventListener("click", () => {
+      userHasVoted = true;
       const codeId = Number(item.dataset.codeId);
       if (downvoted) {
         downvotes--; downvoted = false; downBtn.classList.remove("downvoted");
@@ -1561,6 +1601,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
           showRateLimitFlash(downBtn);
         } else if (res !== null) {
           if ("registered_id" in res && res.registered_id !== undefined) item.dataset.codeId = String(res.registered_id);
+          if (res.deleted) { item.closest(".code-item-row")?.remove(); return; }
           upvotes = res.upvotes; downvotes = res.downvotes;
           downvoted = !res.toggled_off && downvoted;
           if (res.toggled_off) downBtn.classList.remove("downvoted");
@@ -1571,10 +1612,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     return { upBtn, downBtn };
   };
 
-  for (const codeOffer of codeOffers) {
+  // Helper to build a row for a crawler offer
+  const buildCrawlerRow = (codeOffer: typeof codeOffers[number], dbId?: number, initUpvotes = 0, initDownvotes = 0): HTMLDivElement => {
     const code = codeOffer.discountCode ?? "";
     const item = document.createElement("div");
     item.className = "code-item";
+    if (dbId !== undefined) item.dataset.codeId = String(dbId);
     const reward = document.createElement("span");
     reward.className = "code-reward";
     reward.textContent = codeOffer.reward;
@@ -1595,9 +1638,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       copyTooltip.style.transform = "translateX(-50%)";
       copyTooltip.classList.add("visible");
     });
-    copyBtn.addEventListener("mouseleave", () => {
-      copyTooltip.classList.remove("visible");
-    });
+    copyBtn.addEventListener("mouseleave", () => { copyTooltip.classList.remove("visible"); });
     copyBtn.addEventListener("click", () => {
       void navigator.clipboard.writeText(code).then(() => {
         copyBtn.innerHTML = CHECK_ICON_SVG;
@@ -1611,64 +1652,161 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       });
     });
     const { upBtn, downBtn } = attachVoteButtons(item, { code, reward: codeOffer.reward, hostname: CURRENT_HOST });
+    const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
+    const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
+    if (upCountEl && initUpvotes > 0) upCountEl.textContent = String(initUpvotes);
+    if (downCountEl && initDownvotes > 0) downCountEl.textContent = String(initDownvotes);
     item.append(reward, codeSpan, downBtn, upBtn);
     const row = document.createElement("div");
     row.className = "code-item-row";
     row.append(item, copyBtn);
-    codesList.append(row);
-  }
+    return row;
+  };
+
   codesSection.append(codesToggle, codesList, expiredSection);
   body.append(header, offerList, chipsSection, codesSection);
 
-  // Load community-submitted codes from Supabase
+  let userHasVoted = false;
+
+  // Render crawler codes immediately (no votes yet) so list isn't empty while DB loads
+  for (const codeOffer of codeOffers) {
+    codesList.append(buildCrawlerRow(codeOffer));
+  }
+
+  // Load community-submitted codes from Supabase, then merge + sort all
   void fetchCodesForHost(CURRENT_HOST).then((dbCodes) => {
-    for (const dbCode of dbCodes) {
-      const item = document.createElement("div");
-      item.className = "code-item";
-      item.dataset.codeId = String(dbCode.id);
-      const reward = document.createElement("span");
-      reward.className = "code-reward";
-      reward.textContent = dbCode.reward;
-      const codeSpan = document.createElement("span");
-      codeSpan.className = "code-value";
-      codeSpan.textContent = dbCode.code;
-      const copyBtn = document.createElement("span");
-      copyBtn.className = "copy-code-btn";
-      copyBtn.innerHTML = COPY_ICON_SVG;
-      copyBtn.addEventListener("click", () => {
-        void navigator.clipboard.writeText(dbCode.code).then(() => {
-          copyBtn.innerHTML = CHECK_ICON_SVG;
-          setTimeout(() => { copyBtn.innerHTML = COPY_ICON_SVG; }, 1500);
+    // Don't wipe DOM if user has already voted — avoids race condition
+    if (userHasVoted) {
+      // Just append any DB codes not already shown
+      const shownCodes = new Set(
+        [...codesList.querySelectorAll<HTMLElement>(".code-value"), ...expiredList.querySelectorAll<HTMLElement>(".code-value")]
+          .map((el) => el.textContent?.toUpperCase() ?? "")
+      );
+      for (const dbCode of dbCodes) {
+        if (shownCodes.has(dbCode.code.toUpperCase())) continue;
+        const item = document.createElement("div");
+        item.className = "code-item";
+        item.dataset.codeId = String(dbCode.id);
+        const reward = document.createElement("span");
+        reward.className = "code-reward";
+        reward.textContent = dbCode.reward;
+        const codeSpan = document.createElement("span");
+        codeSpan.className = "code-value";
+        codeSpan.textContent = dbCode.code;
+        const copyBtn = document.createElement("span");
+        copyBtn.className = "copy-code-btn";
+        copyBtn.innerHTML = COPY_ICON_SVG;
+        copyBtn.addEventListener("click", () => {
+          void navigator.clipboard.writeText(dbCode.code).then(() => {
+            copyBtn.innerHTML = CHECK_ICON_SVG;
+            setTimeout(() => { copyBtn.innerHTML = COPY_ICON_SVG; }, 1500);
+          });
         });
-      });
-      const { upBtn, downBtn } = attachVoteButtons(item);
-      // Set initial vote counts
-      const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
-      const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
-      if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
-      if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
-      item.append(reward, codeSpan, downBtn, upBtn);
-      const row = document.createElement("div");
-      row.className = "code-item-row";
-      const ownedIds = getOwnedCodeIds(CURRENT_HOST);
-      if (ownedIds.has(dbCode.id)) {
-        const deleteBtn = makeDeleteBtn(dbCode.id, row);
-        item.insertBefore(deleteBtn, downBtn);
+        const { upBtn, downBtn } = attachVoteButtons(item);
+        const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
+        const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
+        if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
+        if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+        item.append(reward, codeSpan, downBtn, upBtn);
+        const row = document.createElement("div");
+        row.className = "code-item-row";
         row.append(item, copyBtn);
-      } else {
-        row.append(item, copyBtn);
+        if (dbCode.downvotes - dbCode.upvotes > 0) {
+          item.classList.add("expired");
+          expiredList.append(row);
+          expiredSection.style.display = "";
+        } else {
+          codesList.append(row);
+        }
       }
-      // net negative → start in expired
-      if (dbCode.downvotes - dbCode.upvotes > 0) {
+      return;
+    }
+    // Map crawler codes by normalised code string for dedup/merge
+    const crawlerByCode = new Map(
+      codeOffers.map((o) => [( o.discountCode ?? "").toUpperCase(), o])
+    );
+
+    // Build unified entry list
+    const parseReward = (r: string): number => parseFloat(r.replace(",", ".")) || 0;
+    type Entry = { net: number; reward: string; render: () => HTMLDivElement };
+    const entries: Entry[] = [];
+
+    // DB codes (user-submitted + previously voted static)
+    const ownedIds = getOwnedCodeIds(CURRENT_HOST);
+    for (const dbCode of dbCodes) {
+      const net = dbCode.upvotes - dbCode.downvotes;
+      entries.push({ net, reward: dbCode.reward, render: () => {
+        const item = document.createElement("div");
+        item.className = "code-item";
+        item.dataset.codeId = String(dbCode.id);
+        const reward = document.createElement("span");
+        reward.className = "code-reward";
+        reward.textContent = dbCode.reward;
+        const codeSpan = document.createElement("span");
+        codeSpan.className = "code-value";
+        codeSpan.textContent = dbCode.code;
+        const copyBtn = document.createElement("span");
+        copyBtn.className = "copy-code-btn";
+        copyBtn.innerHTML = COPY_ICON_SVG;
+        copyBtn.addEventListener("click", () => {
+          void navigator.clipboard.writeText(dbCode.code).then(() => {
+            copyBtn.innerHTML = CHECK_ICON_SVG;
+            setTimeout(() => { copyBtn.innerHTML = COPY_ICON_SVG; }, 1500);
+          });
+        });
+        const { upBtn, downBtn } = attachVoteButtons(item);
+        const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
+        const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
+        if (upCountEl && dbCode.upvotes > 0) upCountEl.textContent = String(dbCode.upvotes);
+        if (downCountEl && dbCode.downvotes > 0) downCountEl.textContent = String(dbCode.downvotes);
+        item.append(reward, codeSpan, downBtn, upBtn);
+        const row = document.createElement("div");
+        row.className = "code-item-row";
+        row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
+        if (ownedIds.has(dbCode.id)) {
+          const deleteBtn = makeDeleteBtn(dbCode.id, row);
+          item.insertBefore(deleteBtn, downBtn);
+        }
+        row.append(item, copyBtn);
+        // Remove crawler placeholder if this DB entry matches one
+        crawlerByCode.delete(dbCode.code.toUpperCase());
+        return row;
+      }});
+    }
+
+    // Remaining crawler codes not in DB (net = 0)
+    for (const [, codeOffer] of crawlerByCode) {
+      entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
+    }
+
+    // Sort by net score descending, then by numeric reward descending
+    entries.sort((a, b) => b.net - a.net || parseReward(b.reward) - parseReward(a.reward));
+
+    // Clear placeholder crawler rows and re-render sorted
+    codesList.removeChild(addCodeForm);
+    codesList.innerHTML = "";
+    expiredList.innerHTML = "";
+    expiredSection.style.display = "none";
+    codesList.append(addCodeForm);
+
+    let totalCount = 0;
+    for (const entry of entries) {
+      const row = entry.render();
+      const item = row.querySelector<HTMLElement>(".code-item")!;
+      if (entry.net < 0) {
         item.classList.add("expired");
         expiredList.append(row);
         expiredSection.style.display = "";
       } else {
         codesList.append(row);
       }
+      totalCount++;
     }
-    if (dbCodes.length > 0) {
-      codesToggleText.textContent = `Rabattkoder (${codeOffers.length + dbCodes.length})`;
+
+    const crawlerOnlyCount = crawlerByCode.size; // already deleted matched ones above — but we need total
+    const total = dbCodes.length + crawlerByCode.size; // remaining crawler + db
+    if (total > 0 || codeOffers.length > 0) {
+    // count no longer shown
     }
   });
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];

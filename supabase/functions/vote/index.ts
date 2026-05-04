@@ -49,6 +49,11 @@ Deno.serve(async (req: Request) => {
   let codeId = body.code_id;
   const vote = body.vote; // 1 or -1
 
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
   if (!codeId && body.code && body.hostname) {
     // Static code: get-or-create without counting toward rate limit
     const hostname = body.hostname.trim().toLowerCase().replace(/^www\./, "");
@@ -76,11 +81,6 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "missing fields" }), { status: 400, headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
   // Check if this IP has already voted on this code
   const { data: existing } = await supabase
     .from("code_votes")
@@ -94,6 +94,14 @@ Deno.serve(async (req: Request) => {
       // Toggle off: delete the vote (free action, refunds 1 if within 24h)
       await supabase.from("code_votes").delete().eq("id", existing.id);
       const totals = await getVoteTotals(supabase, codeId);
+      // If static code now has zero votes, remove it entirely from DB
+      if (totals.upvotes === 0 && totals.downvotes === 0) {
+        const { data: dc } = await supabase.from("discount_codes").select("ip_hash").eq("id", codeId).maybeSingle();
+        if (dc?.ip_hash === "__static__") {
+          await supabase.from("discount_codes").delete().eq("id", codeId);
+          return new Response(JSON.stringify({ ok: true, toggled_off: true, deleted: true, upvotes: 0, downvotes: 0 }), { headers: corsHeaders });
+        }
+      }
       return new Response(JSON.stringify({ ok: true, toggled_off: true, registered_id: codeId, ...totals }), { headers: corsHeaders });
     }
     // Changing vote direction: upsert without counting as new action
