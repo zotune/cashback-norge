@@ -303,6 +303,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .bonus-chips-portal {
   padding-top: 4px;
   margin-top: 0;
+  margin-bottom: 6px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -764,6 +765,14 @@ a.merchant-name:hover { text-decoration: underline; }
   <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="bonus-section">
+      <button class="bonus-toggle" type="button">
+        <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
+      </button>
+    </div>
+    <div class="count"></div>
+  </div>
   <div class="search-wrap">
     <div class="input-wrap flex1">
       <input class="search" type="search" placeholder="Søk etter butikk..." autofocus>
@@ -773,14 +782,6 @@ a.merchant-name:hover { text-decoration: underline; }
       <input class="global-sum" type="text" inputmode="decimal" placeholder="Sum">
       <button class="input-clear" type="button" aria-label="Tøm kjøpesum">✕</button>
     </div>
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;">
-    <div class="bonus-section">
-      <button class="bonus-toggle" type="button">
-        <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
-      </button>
-    </div>
-    <div class="count"></div>
   </div>
   <div class="bonus-chips-portal" style="display:none">
     <div class="chip-group">
