@@ -6,7 +6,7 @@
 <title>Cashback Norge</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: rgba(0,0,0,0); }
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f7faf8;
@@ -15,7 +15,7 @@ body {
   -webkit-font-smoothing: antialiased;
   touch-action: pan-y;
 }
-.container { max-width: 480px; margin: 0 auto; padding: 24px 28px 16px; overflow-x: clip; }
+.container { max-width: 480px; margin: 0 auto; padding: 24px 16px 16px 28px; overflow-x: clip; }
 .sticky-header {
   position: sticky;
   top: 0;
@@ -91,7 +91,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .az-bar {
   position: fixed;
-  right: 0;
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
