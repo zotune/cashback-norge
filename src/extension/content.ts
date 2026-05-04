@@ -1137,6 +1137,16 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sumInput.addEventListener("input", () => {
     const raw = sumInput.value.replace(/[^0-9.,]/g, "").replace(",", ".");
     const amount = raw.length > 0 ? Number.parseFloat(raw) : 0;
+    for (const el of shadowRoot.querySelectorAll<HTMLElement>(".code-reward[data-pct]")) {
+      const pct = parseFloat(el.dataset.pct ?? "0");
+      if (!el.dataset.origReward) el.dataset.origReward = el.textContent ?? "";
+      const orig = el.dataset.origReward;
+      if (pct > 0 && amount > 0) {
+        el.textContent = `${Math.round(amount * pct / 100)} kr`;
+      } else {
+        el.textContent = orig;
+      }
+    }
     for (const { element, offer } of rewardLabels) {
       if (amount > 0) {
         const result = calculateCashback(offer, amount);
@@ -1411,10 +1421,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const parseRewardNum = (r: string): number => parseFloat(r.replace(",", ".")) || 0;
   const resortCodesList = (): void => {
     const rows = [...codesList.querySelectorAll<HTMLElement>(".code-item-row")];
-    rows.sort((a, b) =>
-      parseRewardNum(b.querySelector<HTMLElement>(".code-reward")?.textContent ?? "") -
-      parseRewardNum(a.querySelector<HTMLElement>(".code-reward")?.textContent ?? "")
-    );
+    rows.sort((a, b) => {
+      const pa = parseFloat(a.querySelector<HTMLElement>(".code-reward")?.dataset.pct ?? "0") || 0;
+      const pb = parseFloat(b.querySelector<HTMLElement>(".code-reward")?.dataset.pct ?? "0") || 0;
+      return pb - pa;
+    });
     for (const row of rows) {
       row.classList.remove("code-item-row--best");
       codesList.append(row);
@@ -1692,6 +1703,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (dbId !== undefined) item.dataset.codeId = String(dbId);
     const reward = document.createElement("span");
     reward.className = "code-reward";
+    if (/%/.test(codeOffer.reward)) {
+      reward.dataset.pct = String(parseRewardNum(codeOffer.reward));
+      reward.dataset.origReward = codeOffer.reward;
+    }
     reward.textContent = codeOffer.reward;
     const codeSpan = document.createElement("span");
     codeSpan.className = "code-value";
@@ -1770,6 +1785,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         item.dataset.codeId = String(dbCode.id);
         const reward = document.createElement("span");
         reward.className = "code-reward";
+        if (/%/.test(dbCode.reward)) {
+          reward.dataset.pct = String(parseRewardNum(dbCode.reward));
+          reward.dataset.origReward = dbCode.reward;
+        }
         reward.textContent = dbCode.reward;
         const codeSpan = document.createElement("span");
         codeSpan.className = "code-value";
@@ -1842,6 +1861,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         item.dataset.codeId = String(dbCode.id);
         const reward = document.createElement("span");
         reward.className = "code-reward";
+        if (/%/.test(dbCode.reward)) {
+          reward.dataset.pct = String(parseRewardNum(dbCode.reward));
+          reward.dataset.origReward = dbCode.reward;
+        }
         reward.textContent = dbCode.reward;
         const codeSpan = document.createElement("span");
         codeSpan.className = "code-value";
@@ -1900,8 +1923,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
     }
 
-    // Sort by numeric reward descending
-    entries.sort((a, b) => parseReward(b.reward) - parseReward(a.reward));
+    // Sort by numeric reward descending (% only — kr amounts are not comparable)
+    const rewardPct = (r: string): number => /%/.test(r) ? (parseFloat(r.replace(",", ".")) || 0) : 0;
+    entries.sort((a, b) => rewardPct(b.reward) - rewardPct(a.reward));
 
     // Clear placeholder crawler rows and re-render sorted
     codesList.removeChild(addCodeForm);

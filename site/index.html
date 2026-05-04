@@ -14,14 +14,23 @@ body {
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
-.container { max-width: 480px; margin: 0 auto; padding: 24px 16px; }
+.container { max-width: 480px; margin: 0 auto; padding: 24px 16px 16px; }
+.sticky-header {
+  position: sticky;
+  top: 0;
+  background: #f4f8f6;
+  z-index: 100;
+  margin: 0 -16px;
+  padding: 10px 16px 6px;
+  border-bottom: 1px solid #d8e3de;
+}
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 20px; }
 .search-wrap {
   display: flex;
   gap: 8px;
   position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 .search {
   background: #fff;
@@ -54,7 +63,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 }
 .global-sum:focus { border-color: #1f8f5f; }
 .global-sum::placeholder { color: #8a9a92; }
-.results { display: grid; gap: 12px; }
+.results { display: grid; gap: 12px; padding-top: 12px; }
 .merchant {
   background: #fff;
   border: 1px solid #d6e1dc;
@@ -111,6 +120,8 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .offer .offer-reward { flex: 1; }
 .offer:active { background: #edf2ef; }
+.offer--best { color: #3a7d55; }
+.offer--best:active { background: #edf2ef; }
 .offer-card-only { justify-content: space-between; }
 .offer-card-only .offer-reward { flex: 1; }
 .offer-card-only-warn { color: #b0bec5; font-size: 11px; cursor: help; }
@@ -196,7 +207,8 @@ a.merchant-name:hover { text-decoration: underline; }
 .count {
   color: #8a9a92;
   font-size: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
+  padding-bottom: 2px;
 }
 .tip-line {
   color: #5d6b71;
@@ -635,6 +647,7 @@ a.merchant-name:hover { text-decoration: underline; }
   <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge#readme" target="_blank">iPhone</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
   <p class="subtitle" style="font-size:11px;margin-bottom:12px;">Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
+  <div class="sticky-header">
   <div class="search-wrap">
     <input class="search" type="search" placeholder="Søk etter butikk eller nettside..." autofocus>
     <input class="global-sum" type="text" inputmode="decimal" placeholder="Kjøpesum">
@@ -656,6 +669,7 @@ a.merchant-name:hover { text-decoration: underline; }
     </div>
   </div>
   <div class="count"></div>
+  </div>
   <div class="results"></div>
 </div>
 <script src="shared-data.js"></script>
@@ -693,7 +707,24 @@ async function init() {
   document.querySelector(".global-sum").addEventListener("input", (e) => {
     const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
     currentAmount = raw.length > 0 ? parseFloat(raw) : 0;
-    render(document.querySelector(".search").value);
+    document.querySelectorAll(".offer-reward[data-reward]").forEach(el => {
+      try {
+        const o = JSON.parse(el.dataset.reward);
+        el.textContent = currentAmount > 0 ? calcReward(o, currentAmount) : formatCompactReward(o);
+      } catch {}
+    });
+    document.querySelectorAll(".offer-reward[data-pct-curve]").forEach(el => {
+      el.textContent = currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %';
+    });
+    document.querySelectorAll(".code-reward[data-pct]").forEach(el => {
+      const pct = parseFloat(el.dataset.pct ?? "0");
+      if (!el.dataset.origReward) el.dataset.origReward = el.textContent;
+      if (pct > 0 && currentAmount > 0) {
+        el.textContent = `${Math.round(currentAmount * pct / 100)} kr`;
+      } else {
+        el.textContent = el.dataset.origReward || el.textContent;
+      }
+    });
     renderBonusChips();
   });
 }
@@ -894,7 +925,7 @@ function render(query) {
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
     const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode" && o.provider !== "dnb");
     const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb") && o.discountCode);
-    const offerHtml = cashbackOffers.map(o => {
+    const offerHtml = cashbackOffers.map((o, idx) => {
       const url = o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
       const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatCompactReward(o);
       const fullReward = formatReward(o);
@@ -913,8 +944,9 @@ function render(query) {
       const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : tipText;
       const tooltipHtml = fullTip ? `<span class="offer-tooltip">${esc(fullTip)}</span>` : "";
       const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : "";
-      return `<span class="offer-wrap">${tooltipHtml}<a class="offer ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
-        <span class="offer-reward">${esc(label)}</span>
+      const bestClass = idx === 0 ? " offer--best" : "";
+      return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
+        <span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span>
         ${warnIconHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
       </a></span>`;
     }).join("");
@@ -927,14 +959,14 @@ function render(query) {
     const hasCurve = m.domains.some(d => curveDomains.has(d));
     const curveSelectedHtml = hasCurve ? (() => {
       const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward">+1 %</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-curve">Curve</span></span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-curve">Curve</span></span></a></span>`;
     })() : "";
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       return `<div class="code-item-row" data-net="0">
         <div class="code-item">
-          <span class="code-reward">${esc(o.reward)}</span>
+          <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(o.reward)}</span>
           <span class="code-value">${esc(code)}</span>
           <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
           <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
@@ -1055,10 +1087,11 @@ function render(query) {
     const parseRewardNum = r => parseFloat(r.replace(",", ".")) || 0;
     const resortRows = () => {
       const rows = [...codesList.querySelectorAll(":scope > .code-item-row")];
-      rows.sort((a, b) =>
-        parseRewardNum(b.querySelector(".code-reward")?.textContent || "0") -
-        parseRewardNum(a.querySelector(".code-reward")?.textContent || "0")
-      );
+      rows.sort((a, b) => {
+        const pa = parseFloat(a.querySelector(".code-reward")?.dataset.pct ?? "0") || 0;
+        const pb = parseFloat(b.querySelector(".code-reward")?.dataset.pct ?? "0") || 0;
+        return pb - pa;
+      });
       rows.forEach(r => codesList.appendChild(r));
       codesList.appendChild(expiredSection);
       // mark best
@@ -1457,6 +1490,10 @@ function buildCodeRow(dbCode, hostname, ownedIds) {
   if (dbCode.id) item.dataset.codeId = String(dbCode.id);
   const rewardEl = document.createElement("span");
   rewardEl.className = "code-reward";
+  if (/%/.test(dbCode.reward)) {
+    rewardEl.dataset.pct = String(parseFloat(dbCode.reward) || 0);
+    rewardEl.dataset.origReward = dbCode.reward;
+  }
   rewardEl.textContent = dbCode.reward;
   const codeEl = document.createElement("span");
   codeEl.className = "code-value";

@@ -1668,6 +1668,16 @@
     sumInput.addEventListener("input", () => {
       const raw = sumInput.value.replace(/[^0-9.,]/g, "").replace(",", ".");
       const amount = raw.length > 0 ? Number.parseFloat(raw) : 0;
+      for (const el of shadowRoot.querySelectorAll(".code-reward[data-pct]")) {
+        const pct = parseFloat(el.dataset.pct ?? "0");
+        if (!el.dataset.origReward) el.dataset.origReward = el.textContent ?? "";
+        const orig = el.dataset.origReward;
+        if (pct > 0 && amount > 0) {
+          el.textContent = `${Math.round(amount * pct / 100)} kr`;
+        } else {
+          el.textContent = orig;
+        }
+      }
       for (const { element, offer: offer2 } of rewardLabels) {
         if (amount > 0) {
           const result = calculateCashback(offer2, amount);
@@ -1934,9 +1944,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const parseRewardNum = (r) => parseFloat(r.replace(",", ".")) || 0;
     const resortCodesList = () => {
       const rows = [...codesList.querySelectorAll(".code-item-row")];
-      rows.sort(
-        (a, b) => parseRewardNum(b.querySelector(".code-reward")?.textContent ?? "") - parseRewardNum(a.querySelector(".code-reward")?.textContent ?? "")
-      );
+      rows.sort((a, b) => {
+        const pa = parseFloat(a.querySelector(".code-reward")?.dataset.pct ?? "0") || 0;
+        const pb = parseFloat(b.querySelector(".code-reward")?.dataset.pct ?? "0") || 0;
+        return pb - pa;
+      });
       for (const row of rows) {
         row.classList.remove("code-item-row--best");
         codesList.append(row);
@@ -2249,6 +2261,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       item.className = "code-item";
       const reward = document.createElement("span");
       reward.className = "code-reward";
+      if (/%/.test(codeOffer.reward)) {
+        reward.dataset.pct = String(parseRewardNum(codeOffer.reward));
+        reward.dataset.origReward = codeOffer.reward;
+      }
       reward.textContent = codeOffer.reward;
       const codeSpan = document.createElement("span");
       codeSpan.className = "code-value";
@@ -2318,6 +2334,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
             item.dataset.codeId = String(dbCode.id);
             const reward = document.createElement("span");
             reward.className = "code-reward";
+            if (/%/.test(dbCode.reward)) {
+              reward.dataset.pct = String(parseRewardNum(dbCode.reward));
+              reward.dataset.origReward = dbCode.reward;
+            }
             reward.textContent = dbCode.reward;
             const codeSpan = document.createElement("span");
             codeSpan.className = "code-value";
