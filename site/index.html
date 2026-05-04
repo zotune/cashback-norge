@@ -1143,11 +1143,15 @@ function render(query) {
       attachVotes(row, { code, reward, hostname });
     });
 
-    // Load DB codes
+    // Load DB codes — deferred until section is first expanded
     const localOwnedIds = getOwnedIds(hostname);
-    Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
-      const ownedIds = new Set([...localOwnedIds, ...serverOwnedIds]);
-      if (userHasVoted) return; // skip re-render if user already voted
+    let dbLoaded = false;
+    const loadDbCodes = () => {
+      if (dbLoaded) return;
+      dbLoaded = true;
+      Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
+        const ownedIds = new Set([...localOwnedIds, ...serverOwnedIds]);
+        if (userHasVoted) return; // skip re-render if user already voted
       const shownCodes = new Set([...section.querySelectorAll(".code-value")].map(el => el.textContent?.toUpperCase() || ""));
       for (const dbCode of dbCodes) {
         const isNew = !shownCodes.has(dbCode.code.toUpperCase());
@@ -1188,7 +1192,8 @@ function render(query) {
         }
       }
       resortRows();
-    });
+      });
+    }; // end loadDbCodes
 
     // Add code submission
     const doSubmit = () => {
@@ -1217,6 +1222,11 @@ function render(query) {
     };
     submitBtn?.addEventListener("click", doSubmit);
     codeInput?.addEventListener("keydown", e => { if (e.key === "Enter" && codeInput.value.trim() && rewardInput?.value.trim()) doSubmit(); });
+
+    // Trigger DB load: immediately if already open, else on first expand
+    if (section.classList.contains("open")) loadDbCodes();
+    const toggleBtn = section.querySelector(".codes-toggle");
+    toggleBtn?.addEventListener("click", loadDbCodes);
   });
 }
 

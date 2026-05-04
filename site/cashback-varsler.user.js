@@ -1904,6 +1904,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       if (addCodeBtn.contains(e.target)) return;
       const isCollapsed = codesSection.classList.toggle("collapsed");
       chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
+      if (!isCollapsed) loadDbCodes();
     });
     const codesList = document.createElement("div");
     codesList.className = "codes-list";
@@ -2322,63 +2323,157 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       if (i === 0) row.classList.add("code-item-row--best");
       codesList.append(row);
     });
-    void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
-      const ownedIds = /* @__PURE__ */ new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
-      if (userHasVoted) {
-        const shownCodes = new Set(
-          [...codesList.querySelectorAll(".code-value"), ...expiredList.querySelectorAll(".code-value")].map((el) => el.textContent?.toUpperCase() ?? "")
-        );
-        for (const dbCode of dbCodes) {
-          if (shownCodes.has(dbCode.code.toUpperCase())) continue;
-          const item = document.createElement("div");
-          item.className = "code-item";
-          item.dataset.codeId = String(dbCode.id);
-          const reward = document.createElement("span");
-          reward.className = "code-reward";
-          reward.textContent = dbCode.reward;
-          const codeSpan = document.createElement("span");
-          codeSpan.className = "code-value";
-          codeSpan.textContent = dbCode.code;
-          const copyBtn = document.createElement("span");
-          copyBtn.className = "copy-code-btn";
-          copyBtn.innerHTML = COPY_ICON_SVG;
-          const copyTooltipHv = document.createElement("div");
-          copyTooltipHv.className = "copy-code-tooltip";
-          copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
-          shadowRoot.append(copyTooltipHv);
-          copyBtn.addEventListener("mouseenter", () => {
-            const rect = copyBtn.getBoundingClientRect();
-            copyTooltipHv.style.left = `${rect.left + rect.width / 2}px`;
-            copyTooltipHv.style.top = `${rect.top - 30}px`;
-            copyTooltipHv.style.transform = "translateX(-50%)";
-            copyTooltipHv.classList.add("visible");
-          });
-          copyBtn.addEventListener("mouseleave", () => {
-            copyTooltipHv.classList.remove("visible");
-          });
-          copyBtn.addEventListener("click", () => {
-            void navigator.clipboard.writeText(dbCode.code).then(() => {
-              copyBtn.innerHTML = CHECK_ICON_SVG;
-              copyTooltipHv.textContent = "Kopiert!";
+    let dbLoaded = false;
+    const loadDbCodes = () => {
+      if (dbLoaded) return;
+      dbLoaded = true;
+      void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
+        const ownedIds = /* @__PURE__ */ new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
+        if (userHasVoted) {
+          const shownCodes = new Set(
+            [...codesList.querySelectorAll(".code-value"), ...expiredList.querySelectorAll(".code-value")].map((el) => el.textContent?.toUpperCase() ?? "")
+          );
+          for (const dbCode of dbCodes) {
+            if (shownCodes.has(dbCode.code.toUpperCase())) continue;
+            const item = document.createElement("div");
+            item.className = "code-item";
+            item.dataset.codeId = String(dbCode.id);
+            const reward = document.createElement("span");
+            reward.className = "code-reward";
+            reward.textContent = dbCode.reward;
+            const codeSpan = document.createElement("span");
+            codeSpan.className = "code-value";
+            codeSpan.textContent = dbCode.code;
+            const copyBtn = document.createElement("span");
+            copyBtn.className = "copy-code-btn";
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            const copyTooltipHv = document.createElement("div");
+            copyTooltipHv.className = "copy-code-tooltip";
+            copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
+            shadowRoot.append(copyTooltipHv);
+            copyBtn.addEventListener("mouseenter", () => {
+              const rect = copyBtn.getBoundingClientRect();
+              copyTooltipHv.style.left = `${rect.left + rect.width / 2}px`;
+              copyTooltipHv.style.top = `${rect.top - 30}px`;
+              copyTooltipHv.style.transform = "translateX(-50%)";
               copyTooltipHv.classList.add("visible");
-              setTimeout(() => {
-                copyBtn.innerHTML = COPY_ICON_SVG;
-                copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
-                copyTooltipHv.classList.remove("visible");
-              }, 1500);
             });
-          });
-          const { upBtn, downBtn } = attachVoteButtons(item);
-          const upCountEl = upBtn.querySelector(".vote-count");
-          const downCountEl = downBtn.querySelector(".vote-count");
-          const initNet1 = dbCode.upvotes - dbCode.downvotes;
-          if (upCountEl) upCountEl.textContent = initNet1 > 0 ? String(initNet1) : "";
-          if (downCountEl) downCountEl.textContent = initNet1 < 0 ? String(Math.abs(initNet1)) : "";
-          item.append(reward, codeSpan, downBtn, upBtn);
-          const row = document.createElement("div");
-          row.className = "code-item-row";
-          row.append(item, copyBtn);
-          if (initNet1 < 0) {
+            copyBtn.addEventListener("mouseleave", () => {
+              copyTooltipHv.classList.remove("visible");
+            });
+            copyBtn.addEventListener("click", () => {
+              void navigator.clipboard.writeText(dbCode.code).then(() => {
+                copyBtn.innerHTML = CHECK_ICON_SVG;
+                copyTooltipHv.textContent = "Kopiert!";
+                copyTooltipHv.classList.add("visible");
+                setTimeout(() => {
+                  copyBtn.innerHTML = COPY_ICON_SVG;
+                  copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
+                  copyTooltipHv.classList.remove("visible");
+                }, 1500);
+              });
+            });
+            const { upBtn, downBtn } = attachVoteButtons(item);
+            const upCountEl = upBtn.querySelector(".vote-count");
+            const downCountEl = downBtn.querySelector(".vote-count");
+            const initNet1 = dbCode.upvotes - dbCode.downvotes;
+            if (upCountEl) upCountEl.textContent = initNet1 > 0 ? String(initNet1) : "";
+            if (downCountEl) downCountEl.textContent = initNet1 < 0 ? String(Math.abs(initNet1)) : "";
+            item.append(reward, codeSpan, downBtn, upBtn);
+            const row = document.createElement("div");
+            row.className = "code-item-row";
+            row.append(item, copyBtn);
+            if (initNet1 < 0) {
+              item.classList.add("expired");
+              expiredList.append(row);
+              expiredSection.style.display = "";
+            } else {
+              codesList.append(row);
+            }
+          }
+          return;
+        }
+        const crawlerByCode = new Map(
+          codeOffers.map((o) => [(o.discountCode ?? "").toUpperCase(), o])
+        );
+        const parseReward = (r) => parseFloat(r.replace(",", ".")) || 0;
+        const entries = [];
+        for (const dbCode of dbCodes) {
+          const net = dbCode.upvotes - dbCode.downvotes;
+          crawlerByCode.delete(dbCode.code.toUpperCase());
+          entries.push({ net, reward: dbCode.reward, render: () => {
+            const item = document.createElement("div");
+            item.className = "code-item";
+            item.dataset.codeId = String(dbCode.id);
+            const reward = document.createElement("span");
+            reward.className = "code-reward";
+            reward.textContent = dbCode.reward;
+            const codeSpan = document.createElement("span");
+            codeSpan.className = "code-value";
+            codeSpan.textContent = dbCode.code;
+            const copyBtn = document.createElement("span");
+            copyBtn.className = "copy-code-btn";
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            const copyTooltipDb = document.createElement("div");
+            copyTooltipDb.className = "copy-code-tooltip";
+            copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
+            shadowRoot.append(copyTooltipDb);
+            copyBtn.addEventListener("mouseenter", () => {
+              const rect = copyBtn.getBoundingClientRect();
+              copyTooltipDb.style.left = `${rect.left + rect.width / 2}px`;
+              copyTooltipDb.style.top = `${rect.top - 30}px`;
+              copyTooltipDb.style.transform = "translateX(-50%)";
+              copyTooltipDb.classList.add("visible");
+            });
+            copyBtn.addEventListener("mouseleave", () => {
+              copyTooltipDb.classList.remove("visible");
+            });
+            copyBtn.addEventListener("click", () => {
+              void navigator.clipboard.writeText(dbCode.code).then(() => {
+                copyBtn.innerHTML = CHECK_ICON_SVG;
+                copyTooltipDb.textContent = "Kopiert!";
+                copyTooltipDb.classList.add("visible");
+                setTimeout(() => {
+                  copyBtn.innerHTML = COPY_ICON_SVG;
+                  copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
+                  copyTooltipDb.classList.remove("visible");
+                }, 1500);
+              });
+            });
+            const myVote = myVotes[dbCode.id] ?? 0;
+            const { upBtn, downBtn } = attachVoteButtons(item, void 0, myVote);
+            const upCountEl = upBtn.querySelector(".vote-count");
+            const downCountEl = downBtn.querySelector(".vote-count");
+            const initNet2 = dbCode.upvotes - dbCode.downvotes;
+            if (upCountEl) upCountEl.textContent = initNet2 > 0 ? String(initNet2) : "";
+            if (downCountEl) downCountEl.textContent = initNet2 < 0 ? String(Math.abs(initNet2)) : "";
+            if (myVote === 1) upBtn.classList.add("voted");
+            else if (myVote === -1) downBtn.classList.add("downvoted");
+            item.append(reward, codeSpan, downBtn, upBtn);
+            const row = document.createElement("div");
+            row.className = "code-item-row";
+            row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
+            if (ownedIds.has(dbCode.id)) {
+              const deleteBtn = makeDeleteBtn(dbCode.id, row);
+              item.insertBefore(deleteBtn, downBtn);
+            }
+            row.append(item, copyBtn);
+            return row;
+          } });
+        }
+        for (const [, codeOffer] of crawlerByCode) {
+          entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
+        }
+        entries.sort((a, b) => parseReward(b.reward) - parseReward(a.reward));
+        codesList.removeChild(addCodeForm);
+        codesList.innerHTML = "";
+        expiredList.innerHTML = "";
+        expiredSection.style.display = "none";
+        codesList.append(addCodeForm);
+        for (const entry of entries) {
+          const row = entry.render();
+          const item = row.querySelector(".code-item");
+          if (entry.net < 0) {
             item.classList.add("expired");
             expiredList.append(row);
             expiredSection.style.display = "";
@@ -2386,102 +2481,16 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
             codesList.append(row);
           }
         }
-        return;
-      }
-      const crawlerByCode = new Map(
-        codeOffers.map((o) => [(o.discountCode ?? "").toUpperCase(), o])
-      );
-      const parseReward = (r) => parseFloat(r.replace(",", ".")) || 0;
-      const entries = [];
-      for (const dbCode of dbCodes) {
-        const net = dbCode.upvotes - dbCode.downvotes;
-        crawlerByCode.delete(dbCode.code.toUpperCase());
-        entries.push({ net, reward: dbCode.reward, render: () => {
-          const item = document.createElement("div");
-          item.className = "code-item";
-          item.dataset.codeId = String(dbCode.id);
-          const reward = document.createElement("span");
-          reward.className = "code-reward";
-          reward.textContent = dbCode.reward;
-          const codeSpan = document.createElement("span");
-          codeSpan.className = "code-value";
-          codeSpan.textContent = dbCode.code;
-          const copyBtn = document.createElement("span");
-          copyBtn.className = "copy-code-btn";
-          copyBtn.innerHTML = COPY_ICON_SVG;
-          const copyTooltipDb = document.createElement("div");
-          copyTooltipDb.className = "copy-code-tooltip";
-          copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
-          shadowRoot.append(copyTooltipDb);
-          copyBtn.addEventListener("mouseenter", () => {
-            const rect = copyBtn.getBoundingClientRect();
-            copyTooltipDb.style.left = `${rect.left + rect.width / 2}px`;
-            copyTooltipDb.style.top = `${rect.top - 30}px`;
-            copyTooltipDb.style.transform = "translateX(-50%)";
-            copyTooltipDb.classList.add("visible");
-          });
-          copyBtn.addEventListener("mouseleave", () => {
-            copyTooltipDb.classList.remove("visible");
-          });
-          copyBtn.addEventListener("click", () => {
-            void navigator.clipboard.writeText(dbCode.code).then(() => {
-              copyBtn.innerHTML = CHECK_ICON_SVG;
-              copyTooltipDb.textContent = "Kopiert!";
-              copyTooltipDb.classList.add("visible");
-              setTimeout(() => {
-                copyBtn.innerHTML = COPY_ICON_SVG;
-                copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
-                copyTooltipDb.classList.remove("visible");
-              }, 1500);
-            });
-          });
-          const myVote = myVotes[dbCode.id] ?? 0;
-          const { upBtn, downBtn } = attachVoteButtons(item, void 0, myVote);
-          const upCountEl = upBtn.querySelector(".vote-count");
-          const downCountEl = downBtn.querySelector(".vote-count");
-          const initNet2 = dbCode.upvotes - dbCode.downvotes;
-          if (upCountEl) upCountEl.textContent = initNet2 > 0 ? String(initNet2) : "";
-          if (downCountEl) downCountEl.textContent = initNet2 < 0 ? String(Math.abs(initNet2)) : "";
-          if (myVote === 1) upBtn.classList.add("voted");
-          else if (myVote === -1) downBtn.classList.add("downvoted");
-          item.append(reward, codeSpan, downBtn, upBtn);
-          const row = document.createElement("div");
-          row.className = "code-item-row";
-          row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
-          if (ownedIds.has(dbCode.id)) {
-            const deleteBtn = makeDeleteBtn(dbCode.id, row);
-            item.insertBefore(deleteBtn, downBtn);
-          }
-          row.append(item, copyBtn);
-          return row;
-        } });
-      }
-      for (const [, codeOffer] of crawlerByCode) {
-        entries.push({ net: 0, reward: codeOffer.reward, render: () => buildCrawlerRow(codeOffer) });
-      }
-      entries.sort((a, b) => parseReward(b.reward) - parseReward(a.reward));
-      codesList.removeChild(addCodeForm);
-      codesList.innerHTML = "";
-      expiredList.innerHTML = "";
-      expiredSection.style.display = "none";
-      codesList.append(addCodeForm);
-      for (const entry of entries) {
-        const row = entry.render();
-        const item = row.querySelector(".code-item");
-        if (entry.net < 0) {
-          item.classList.add("expired");
-          expiredList.append(row);
-          expiredSection.style.display = "";
-        } else {
-          codesList.append(row);
-        }
-      }
-      const firstRow = codesList.querySelector(".code-item-row");
-      if (firstRow) firstRow.classList.add("code-item-row--best");
-      crawlerByCode.size;
-      const total = dbCodes.length + crawlerByCode.size;
-      if (total > 0 || codeOffers.length > 0) ;
-    });
+        const firstRow = codesList.querySelector(".code-item-row");
+        if (firstRow) firstRow.classList.add("code-item-row--best");
+        crawlerByCode.size;
+        const total = dbCodes.length + crawlerByCode.size;
+        if (total > 0 || codeOffers.length > 0) ;
+      });
+    };
+    if (!codesSection.classList.contains("collapsed")) {
+      loadDbCodes();
+    }
     const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
     if (pick !== void 0) {
       const support = document.createElement("div");

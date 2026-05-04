@@ -1379,6 +1379,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (addCodeBtn.contains(e.target as Node)) return;
     const isCollapsed = codesSection.classList.toggle("collapsed");
     chrome.storage.local.set({ [CODES_COLLAPSED_KEY]: isCollapsed });
+    if (!isCollapsed) loadDbCodes();
   });
 
   const codesList = document.createElement("div");
@@ -1772,8 +1773,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       codesList.append(row);
     });
 
-  // Load community-submitted codes from Supabase, then merge + sort all
-  void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
+  let dbLoaded = false;
+  const loadDbCodes = (): void => {
+    if (dbLoaded) return;
+    dbLoaded = true;
+    // Load community-submitted codes from Supabase, then merge + sort all
+    void Promise.all([fetchCodesForHost(CURRENT_HOST), fetchOwnedCodesForHost(CURRENT_HOST), fetchMyVotes(CURRENT_HOST)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
     const ownedIds = new Set([...getOwnedCodeIds(CURRENT_HOST), ...serverOwnedIds]);
     // Don't wipe DOM if user has already voted — avoids race condition
     if (userHasVoted) {
@@ -1953,6 +1958,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     // count no longer shown
     }
   });
+  };
+
+  // If section is already expanded on load, fetch immediately
+  if (!codesSection.classList.contains("collapsed")) {
+    loadDbCodes();
+  }
+
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
   if (pick !== undefined) {
     const support = document.createElement("div");
