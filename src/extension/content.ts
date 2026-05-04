@@ -445,6 +445,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .vote-btn.voted {
       color: #1f8f5f;
     }
+    .vote-btn.downvoted {
+      color: #e05555;
+    }
     .vote-count {
       font-size: 11px;
       font-weight: 600;
@@ -519,6 +522,45 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       font-size: 11px;
       margin: 0;
       padding: 4px 0;
+    }
+    .expired-section {
+      border-top: 1px solid #e8f0ec;
+      margin-top: 4px;
+      padding-top: 4px;
+    }
+    .expired-toggle {
+      align-items: center;
+      background: none;
+      border: none;
+      color: #8a9ba3;
+      cursor: pointer;
+      display: flex;
+      font-size: 11px;
+      gap: 4px;
+      padding: 2px 0;
+      width: 100%;
+    }
+    .expired-toggle:hover {
+      color: #172026;
+    }
+    .expired-toggle-arrow {
+      display: inline-block;
+      font-size: 9px;
+      transition: transform 0.15s;
+    }
+    .expired-section.collapsed .expired-toggle-arrow {
+      transform: rotate(-90deg);
+    }
+    .expired-list {
+      display: grid;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .expired-section.collapsed .expired-list {
+      display: none;
+    }
+    .code-item.expired {
+      opacity: 0.55;
     }
     .copy-code-tooltip {
       background: #1a1a2e;
@@ -633,14 +675,21 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       flex-direction: column;
       gap: 4px;
     }
+    .code-item-row {
+      align-items: center;
+      display: flex;
+      gap: 6px;
+    }
     .code-item {
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
       border-radius: 6px;
       display: flex;
+      flex: 1;
       font-size: 12px;
       gap: 6px;
+      min-width: 0;
       padding: 5px 8px;
     }
     .code-reward {
@@ -1151,7 +1200,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const addRewardInput = document.createElement("input");
   addRewardInput.className = "add-code-input add-reward-input";
   addRewardInput.type = "number";
-  addRewardInput.placeholder = "Rabatt %";
+  addRewardInput.placeholder = "%";
   addRewardInput.min = "0";
   addRewardInput.max = "100";
   const addCodeInput = document.createElement("input");
@@ -1193,7 +1242,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     console.info(`[cashback-varsler] User submitted code for ${CURRENT_HOST}: ${code} (${reward})`);
     closeAddForm();
 
-    // Add immediately to the list
+    // Add immediately to the list (after addCodeForm, i.e. at the top)
     const item = document.createElement("div");
     item.className = "code-item";
     const rewardEl = document.createElement("span");
@@ -1211,8 +1260,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         setTimeout(() => { copyBtn.innerHTML = COPY_ICON_SVG; }, 1500);
       });
     });
-    item.append(rewardEl, codeSpan, copyBtn);
-    codesList.append(item);
+    const { upBtn: up1, downBtn: down1 } = attachVoteButtons(item);
+    item.append(rewardEl, codeSpan, down1, up1);
+    const row1 = document.createElement("div");
+    row1.className = "code-item-row";
+    row1.append(item, copyBtn);
+    addCodeForm.insertAdjacentElement("afterend", row1);
   };
   addRewardInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAddForm();
@@ -1231,6 +1284,83 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     addRewardInput.focus();
   });
   codesList.append(addCodeForm);
+
+  const expiredSection = document.createElement("div");
+  expiredSection.className = "expired-section collapsed";
+  expiredSection.style.display = "none";
+  const expiredToggle = document.createElement("button");
+  expiredToggle.className = "expired-toggle";
+  expiredToggle.type = "button";
+  const expiredToggleArrow = document.createElement("span");
+  expiredToggleArrow.className = "expired-toggle-arrow";
+  expiredToggleArrow.textContent = "\u25BC";
+  const expiredToggleText = document.createElement("span");
+  expiredToggleText.textContent = "Utgåtte koder";
+  expiredToggle.append(expiredToggleArrow, expiredToggleText);
+  expiredToggle.addEventListener("click", () => { expiredSection.classList.toggle("collapsed"); });
+  const expiredList = document.createElement("div");
+  expiredList.className = "expired-list";
+  expiredSection.append(expiredToggle, expiredList);
+
+  const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+  const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
+
+  const attachVoteButtons = (item: HTMLElement): { upBtn: HTMLButtonElement; downBtn: HTMLButtonElement } => {
+    let upvotes = 0;
+    let downvotes = 0;
+    let upvoted = false;
+    let downvoted = false;
+    const upBtn = document.createElement("button");
+    upBtn.className = "vote-btn";
+    upBtn.type = "button";
+    upBtn.title = "Koden fungerer!";
+    upBtn.innerHTML = THUMBS_UP_SVG;
+    const upCountEl = document.createElement("span");
+    upCountEl.className = "vote-count";
+    upBtn.append(upCountEl);
+    const downBtn = document.createElement("button");
+    downBtn.className = "vote-btn";
+    downBtn.type = "button";
+    downBtn.title = "Koden er utgått";
+    downBtn.innerHTML = THUMBS_DOWN_SVG;
+    const downCountEl = document.createElement("span");
+    downCountEl.className = "vote-count";
+    downBtn.append(downCountEl);
+    const syncExpired = (): void => {
+      upCountEl.textContent = upvotes > 0 ? String(upvotes) : "";
+      downCountEl.textContent = downvotes > 0 ? String(downvotes) : "";
+      const net = upvotes - downvotes;
+      const container = item.closest(".code-item-row") ?? item;
+      if (net < 0 && container.parentElement === codesList) {
+        expiredList.append(container);
+        item.classList.add("expired");
+        expiredSection.style.display = "";
+      } else if (net >= 0 && container.parentElement === expiredList) {
+        codesList.append(container);
+        item.classList.remove("expired");
+        if (expiredList.children.length === 0) expiredSection.style.display = "none";
+      }
+    };
+    upBtn.addEventListener("click", () => {
+      if (upvoted) {
+        upvotes--; upvoted = false; upBtn.classList.remove("voted");
+      } else {
+        if (downvoted) { downvotes--; downvoted = false; downBtn.classList.remove("downvoted"); }
+        upvotes++; upvoted = true; upBtn.classList.add("voted");
+      }
+      syncExpired();
+    });
+    downBtn.addEventListener("click", () => {
+      if (downvoted) {
+        downvotes--; downvoted = false; downBtn.classList.remove("downvoted");
+      } else {
+        if (upvoted) { upvotes--; upvoted = false; upBtn.classList.remove("voted"); }
+        downvotes++; downvoted = true; downBtn.classList.add("downvoted");
+      }
+      syncExpired();
+    });
+    return { upBtn, downBtn };
+  };
 
   for (const codeOffer of codeOffers) {
     const code = codeOffer.discountCode ?? "";
@@ -1271,34 +1401,14 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         }, 1500);
       });
     });
-    const voteBtn = document.createElement("button");
-    voteBtn.className = "vote-btn";
-    voteBtn.type = "button";
-    voteBtn.title = "Koden fungerer!";
-    voteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
-    let votes = 0;
-    let voted = false;
-    const voteCount = document.createElement("span");
-    voteCount.className = "vote-count";
-    voteBtn.append(voteCount);
-    voteBtn.addEventListener("click", () => {
-      if (voted) {
-        votes--;
-        voted = false;
-        voteBtn.classList.remove("voted");
-        voteBtn.title = "Koden fungerer!";
-      } else {
-        votes++;
-        voted = true;
-        voteBtn.classList.add("voted");
-        voteBtn.title = "Fjern stemme";
-      }
-      voteCount.textContent = votes > 0 ? String(votes) : "";
-    });
-    item.append(reward, codeSpan, voteBtn, copyBtn);
-    codesList.append(item);
+    const { upBtn, downBtn } = attachVoteButtons(item);
+    item.append(reward, codeSpan, downBtn, upBtn);
+    const row = document.createElement("div");
+    row.className = "code-item-row";
+    row.append(item, copyBtn);
+    codesList.append(row);
   }
-  codesSection.append(codesToggle, codesList);
+  codesSection.append(codesToggle, codesList, expiredSection);
   body.append(header, offerList, chipsSection, codesSection);
   const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
   if (pick !== undefined) {
