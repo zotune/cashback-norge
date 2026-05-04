@@ -826,6 +826,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       font-weight: 700;
       white-space: nowrap;
     }
+    .code-item-row--best .code-reward,
+    .code-item-row--best .code-value {
+      color: #3a7d55;
+    }
     .code-value {
       color: #5d6b71;
       flex: 1;
@@ -1374,7 +1378,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const rB = parseRewardNum(b.querySelector<HTMLElement>(".code-reward")?.textContent ?? "");
       return rB - rA;
     });
-    for (const row of rows) codesList.append(row);
+    for (const row of rows) {
+      row.classList.remove("code-item-row--best");
+      codesList.append(row);
+    }
+    if (rows[0]) rows[0].classList.add("code-item-row--best");
     codesList.prepend(addCodeForm);
   };
   const submitCode = (): void => {
@@ -1575,7 +1583,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
           showRateLimitFlash(upBtn);
         } else if (res !== null) {
           if ("registered_id" in res && res.registered_id !== undefined) item.dataset.codeId = String(res.registered_id);
-          if (res.deleted) { item.closest(".code-item-row")?.remove(); return; }
+          if (res.deleted) { delete item.dataset.codeId; }
           upvotes = res.upvotes; downvotes = res.downvotes;
           upvoted = !res.toggled_off && upvoted;
           if (res.toggled_off) upBtn.classList.remove("voted");
@@ -1601,7 +1609,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
           showRateLimitFlash(downBtn);
         } else if (res !== null) {
           if ("registered_id" in res && res.registered_id !== undefined) item.dataset.codeId = String(res.registered_id);
-          if (res.deleted) { item.closest(".code-item-row")?.remove(); return; }
+          if (res.deleted) { delete item.dataset.codeId; }
           upvotes = res.upvotes; downvotes = res.downvotes;
           downvoted = !res.toggled_off && downvoted;
           if (res.toggled_off) downBtn.classList.remove("downvoted");
@@ -1802,6 +1810,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       }
       totalCount++;
     }
+
+    // Mark best code green
+    const firstRow = codesList.querySelector<HTMLElement>(".code-item-row");
+    if (firstRow) firstRow.classList.add("code-item-row--best");
 
     const crawlerOnlyCount = crawlerByCode.size; // already deleted matched ones above — but we need total
     const total = dbCodes.length + crawlerByCode.size; // remaining crawler + db
