@@ -161,7 +161,21 @@ export function findOffersForHostname(
     });
   });
 
-  const all = sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
+  const childDomainMatches = cashbackIndex.offers.filter((offer) => {
+    return offer.domains.some((domain) => {
+      const normalizedDomain = normalizeDomainInput(domain);
+      return lookupDomains.some((lookupDomain) => {
+        return (
+          normalizedDomain !== lookupDomain &&
+          normalizedDomain.endsWith(`.${lookupDomain}`)
+        );
+      });
+    });
+  });
+
+  const all = sortOffersByReward(
+    uniqueOffers([...indexMatches, ...suffixMatches, ...childDomainMatches]),
+  );
 
   // Keep only the best offer per provider (highest reward wins),
   // but discount codes are always kept individually regardless of provider

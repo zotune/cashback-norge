@@ -2316,7 +2316,20 @@ function findOffersForHostname(
       );
     });
   });
-  return sortOffersByReward(uniqueOffers([...indexMatches, ...suffixMatches]));
+  const childDomainMatches = cashbackIndex.offers.filter((offer) => {
+    return offer.domains.some((domain) => {
+      const normalizedDomain = normalizeDomainInput(domain);
+      return lookupDomains.some((lookupDomain) => {
+        return (
+          normalizedDomain !== lookupDomain &&
+          normalizedDomain.endsWith(`.${lookupDomain}`)
+        );
+      });
+    });
+  });
+  return sortOffersByReward(
+    uniqueOffers([...indexMatches, ...suffixMatches, ...childDomainMatches]),
+  );
 }
 function normalizeHostname(hostname: string): string {
   const lowerCaseHostname = hostname.trim().toLowerCase();
