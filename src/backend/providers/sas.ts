@@ -125,7 +125,10 @@ function formatSasTerms(shop: SasShop): string {
     line += ` per 100 kr.`;
     parts.push(line);
   } else if (shop.fixed_cashback_text === null || shop.fixed_cashback_text.length === 0) {
-    parts.push(`Tjen ${formatPoints(shop.points)} poeng.`);
+    let line = `Tjen ${formatPoints(shop.points)} poeng`;
+    if (shop.points_channel > 0) line += ` + ${shop.points_channel} nivåpoeng`;
+    line += `.`;
+    parts.push(line);
   }
 
   if (shop.has_campaign === 1 && shop.points_campaign !== null && shop.points_campaign > 0) {
