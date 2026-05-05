@@ -2298,16 +2298,25 @@ function findOffersForHostname(
 ): CashbackOffer[] {
   const normalizedHostname = normalizeHostname(hostname);
   const canonical = DOMAIN_ALIASES[normalizedHostname] ?? normalizedHostname;
+  // Also check parent domain when on a CC subdomain: visiting no.jbl.com should find jbl.com
+  const ccParentDomains = CC_SUBDOMAINS.flatMap((cc) =>
+    normalizedHostname.startsWith(`${cc}.`) ? [normalizedHostname.slice(cc.length + 1)] : []
+  );
   const lookupDomains = [
     normalizedHostname,
     ...(canonical !== normalizedHostname ? [canonical] : []),
     ...getAlternateTldDomains(normalizedHostname),
     ...CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`),
+    ...ccParentDomains,
   ];
   const indexMatches = lookupDomains.flatMap((domain) => {
     return cashbackIndex.domainIndex[domain] ?? [];
   });
-  const suffixMatches = cashbackIndex.offers.filter((offer) => {
+  // Only use suffix/child matches if there are no exact matches for the current hostname.
+  // This prevents e.g. apple.com offers on music.apple.com (suffixMatches)
+  // and music.apple.com offers on apple.com (childDomainMatches).
+  const hasExactMatches = (cashbackIndex.domainIndex[normalizedHostname] ?? []).length > 0;
+  const suffixMatches = hasExactMatches ? [] : cashbackIndex.offers.filter((offer) => {
     return offer.domains.some((domain) => {
       const normalizedDomain = normalizeDomainInput(domain);
       return (
@@ -2316,7 +2325,7 @@ function findOffersForHostname(
       );
     });
   });
-  const childDomainMatches = cashbackIndex.offers.filter((offer) => {
+  const childDomainMatches = hasExactMatches ? [] : cashbackIndex.offers.filter((offer) => {
     return offer.domains.some((domain) => {
       const normalizedDomain = normalizeDomainInput(domain);
       return lookupDomains.some((lookupDomain) => {

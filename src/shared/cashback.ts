@@ -143,7 +143,11 @@ export function findOffersForHostname(
   const altDomains = getAlternateTldDomains(normalizedHostname);
   // Also check country-code subdomains: visiting lookfantastic.com should find no.lookfantastic.com
   const ccSubdomains = CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`);
-  const lookupDomains = [normalizedHostname, ...altDomains, ...ccSubdomains];
+  // Also check parent domain when on a CC subdomain: visiting no.jbl.com should find jbl.com
+  const ccParentDomains = CC_SUBDOMAINS.flatMap((cc) =>
+    normalizedHostname.startsWith(`${cc}.`) ? [normalizedHostname.slice(cc.length + 1)] : []
+  );
+  const lookupDomains = [normalizedHostname, ...altDomains, ...ccSubdomains, ...ccParentDomains];
 
   const indexMatches: CashbackOffer[] = [];
   for (const domain of lookupDomains) {
@@ -151,7 +155,9 @@ export function findOffersForHostname(
     indexMatches.push(...matches);
   }
 
-  const suffixMatches = cashbackIndex.offers.filter((offer) => {
+  const hasExactMatches = (cashbackIndex.domainIndex[normalizedHostname] ?? []).length > 0;
+
+  const suffixMatches = hasExactMatches ? [] : cashbackIndex.offers.filter((offer) => {
     return offer.domains.some((domain) => {
       const normalizedDomain = normalizeDomainInput(domain);
       return (
@@ -161,7 +167,7 @@ export function findOffersForHostname(
     });
   });
 
-  const childDomainMatches = cashbackIndex.offers.filter((offer) => {
+  const childDomainMatches = hasExactMatches ? [] : cashbackIndex.offers.filter((offer) => {
     return offer.domains.some((domain) => {
       const normalizedDomain = normalizeDomainInput(domain);
       return lookupDomains.some((lookupDomain) => {
