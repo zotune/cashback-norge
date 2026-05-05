@@ -1097,7 +1097,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   const title = document.createElement("p");
   title.className = "title";
   title.textContent = offer !== undefined
-    ? `Cashback hos ${offer.merchantName}`
+    ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}`
     : `Rabattkode hos ${primaryOffer.merchantName}`;
   header.append(siteIcon, title);
   const sumInput = document.createElement("input");
@@ -2081,12 +2081,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     const showRewardInTooltip = compact !== undefined && fullReward !== compact;
     const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
-    if (
-      currentOffer.provider !== "cbn" &&
-      !showRewardInTooltip &&
-      !hasRateBreakdown(currentOffer.terms) &&
-      !isCardOnlyOffer
-    ) continue;
+    const hasTerms = currentOffer.terms.trim().length > 0;
+    if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
     const tooltip = document.createElement("div");
@@ -2107,9 +2103,19 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       tooltip.style.top = "-9999px";
       tooltip.classList.add("visible");
       const tooltipHeight = tooltip.offsetHeight;
+      const tooltipWidth = tooltip.offsetWidth;
       const rightEdge = panelRect ? panelRect.right + 6 : wrapperRect.right + 6;
-      tooltip.style.left = `${rightEdge}px`;
-      tooltip.style.top = `${wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2}px`;
+      const preferredLeft = rightEdge;
+      const fallbackLeft = wrapperRect.left + wrapperRect.width / 2 - tooltipWidth / 2;
+      const left = preferredLeft + tooltipWidth > window.innerWidth - 8
+        ? Math.max(8, Math.min(fallbackLeft, window.innerWidth - tooltipWidth - 8))
+        : preferredLeft;
+      const top = Math.max(
+        8,
+        Math.min(wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2, window.innerHeight - tooltipHeight - 8),
+      );
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
     });
     wrapper.addEventListener("mouseleave", () => {
       tooltip.classList.remove("visible");
@@ -2169,7 +2175,7 @@ function createTooltipSection(part: string): HTMLDivElement | undefined {
   }
 
   const firstLine = lines[0] ?? "";
-  const listLines = /^medlemsfordel$/i.test(firstLine) ? lines.slice(1) : lines;
+  const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) ? lines.slice(1) : lines;
 
   if (listLines.length !== lines.length) {
     const title = document.createElement("span");
@@ -2366,7 +2372,10 @@ function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const newVal = parseRewardValue(offer.reward);
     const existingVal = existing !== undefined ? parseRewardValue(existing.reward) : null;
     const isRange = offer.reward.includes("-");
-    if (existing === undefined || newVal.amount > existingVal!.amount || (newVal.amount === existingVal!.amount && isRange && !existing.reward.includes("-"))) {
+    const isBetterReward = existingVal === null ||
+      rewardKindRank(newVal.kind) > rewardKindRank(existingVal.kind) ||
+      (newVal.kind === existingVal.kind && newVal.amount > existingVal.amount);
+    if (existing === undefined || isBetterReward || (newVal.amount === existingVal!.amount && isRange && !existing.reward.includes("-"))) {
       byKey.set(key, offer);
     }
   }
@@ -2394,7 +2403,7 @@ function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
   });
 }
 type RewardValue = {
-  kind: "percentage" | "fixed" | "points" | "unknown";
+  kind: "percentage" | "fixed" | "unit" | "points" | "unknown";
   amount: number;
 };
 function parseRewardValue(reward: string): RewardValue {
@@ -2408,11 +2417,25 @@ function parseRewardValue(reward: string): RewardValue {
       amount: parseLocalizedNumber(percentageMatch[1] ?? "0"),
     };
   }
-  const fixedMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+  const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
+  if (unitMatch !== null) {
+    return {
+      kind: "unit",
+      amount: parseLocalizedNumber(unitMatch[1] ?? "0"),
+    };
+  }
+  const krRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+  if (krRangeMatch !== null) {
+    return {
+      kind: "fixed",
+      amount: parseLocalizedNumber((krRangeMatch[1] ?? "0").replace(/\s/g, "")),
+    };
+  }
+  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
   if (fixedMatch !== null) {
     return {
       kind: "fixed",
-      amount: parseLocalizedNumber(fixedMatch[1] ?? "0"),
+      amount: parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
     };
   }
   const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
@@ -2434,8 +2457,9 @@ function parseLocalizedNumber(value: string): number {
 function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "percentage") return 4;
   if (kind === "fixed") return 3;
-  if (kind === "points") return 2;
-  return 1;
+  if (kind === "unit") return 2;
+  if (kind === "points") return 1;
+  return 0;
 }
 function formatProviderName(provider: CashbackOffer["provider"]): string {
   return PROVIDER_NAMES[provider] ?? provider;
@@ -2685,6 +2709,7 @@ async function detectConflicts(shadowRoot: ShadowRoot, titleEl: HTMLElement): Pr
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
   if (trimmedReward.length === 0) {
+    if (provider === "obos") return "Medlemsfordel";
     return "Cashback";
   }
   // For SAS, convert to percentage-first display with ~ prefix
@@ -2699,6 +2724,12 @@ function formatRewardLabel(reward: string, provider: string): string {
   }
   return trimmedReward;
 }
+function formatOfferTitlePrefix(offer: CashbackOffer): string {
+  if (offer.provider === "obos") {
+    return "Medlemsfordel";
+  }
+  return "Cashback";
+}
 function formatSideTabText(
   cashbackOffer: CashbackOffer | undefined,
   primaryOffer: CashbackOffer,
@@ -2711,12 +2742,19 @@ function formatSideTabText(
 }
 function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
+  if (/\d+(?:[,.]\d+)?\s*kr\s*\/\s*/i.test(label) && label.includes("+")) {
+    return label.replace(/\s+/g, " ");
+  }
   const percentMatch = label.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (percentMatch !== null) {
     const prefix = percentMatch[1] ?? "";
     return (prefix + percentMatch[2]!).replace(/\s+/g, " ");
   }
-  const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
+  const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+  if (krRangeMatch !== null) {
+    return krRangeMatch[0].replace(/\s+/g, " ");
+  }
+  const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
   if (krMatch !== null) {
     return krMatch[0].replace(/\s+/g, " ");
   }

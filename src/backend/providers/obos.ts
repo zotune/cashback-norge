@@ -7,7 +7,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -17,6 +17,7 @@ const LIST_URL = "https://www.obos.no/medlem/medlemsfordeler";
 const LABEL_LIST = "list";
 const LABEL_DETAIL = "detail";
 const DEFAULT_TERMS = "Krever OBOS-medlemskap.";
+const TERMS_HEADING_LABELS = new Set(["medlemsfordel", "medlemstilbud"]);
 
 const SKIP_HOSTNAMES = new Set([
   "obos.no",
@@ -122,16 +123,23 @@ function extractTerms($: ObosCheerio): string {
 
 function extractMemberBenefitTerms($: ObosCheerio): string {
   const heading = $("h2, h3")
-    .filter((_, el) => normalizeTextLine($(el).text()).toLowerCase() === "medlemsfordel")
+    .filter((_, el) => TERMS_HEADING_LABELS.has(normalizeHeadingLabel($(el).text())))
     .first();
 
   if (!heading.length) return "";
 
-  const lines = ["Medlemsfordel"];
+  const lines = [normalizeTermHeading(heading.text())];
   let node = heading.next();
 
   while (node.length) {
-    if (node.is("h1, h2, h3")) break;
+    if (node.is("h1")) break;
+    if (node.is("h2, h3")) {
+      const headingText = normalizeTextLine(node.text());
+      if (/^(slik|om\b|relaterte|relevante|flere aktuelle)/i.test(headingText)) break;
+      if (headingText) lines.push(headingText.replace(/:$/, ""));
+      node = node.next();
+      continue;
+    }
     lines.push(...extractTextLines($, node));
     node = node.next();
   }
@@ -141,7 +149,7 @@ function extractMemberBenefitTerms($: ObosCheerio): string {
 
 function extractTermsFromText(text: string): string {
   const scopedText = trimRelatedBenefits(text);
-  const startMatch = scopedText.match(/\bmedlemsfordel\b/i);
+  const startMatch = scopedText.match(/\b(?:medlemsfordel|medlemstilbud)\b/i);
   if (!startMatch || startMatch.index === undefined) return "";
 
   const afterStart = scopedText.slice(startMatch.index);
@@ -162,8 +170,12 @@ function extractTextLines($: ObosCheerio, element: ReturnType<ObosCheerio>): str
   if (element.is("ul, ol")) {
     const lines: string[] = [];
     element.children("li").each((_, li) => {
-      const text = normalizeTextLine($(li).text());
+      const liElement = $(li);
+      const text = normalizeTextLine(liElement.clone().children("ul, ol").remove().end().text());
       if (text) lines.push(text);
+      liElement.children("ul, ol").each((__, nestedList) => {
+        lines.push(...extractTextLines($, $(nestedList)));
+      });
     });
     return lines;
   }
@@ -190,6 +202,15 @@ function normalizeTextLine(value: string): string {
   return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function normalizeHeadingLabel(value: string): string {
+  return normalizeTextLine(value).replace(/:$/, "").toLowerCase();
+}
+
+function normalizeTermHeading(value: string): string {
+  const normalized = normalizeTextLine(value).replace(/:$/, "");
+  return normalized || "Medlemsfordel";
+}
+
 function uniqueTextLines(lines: string[]): string[] {
   const seen = new Set<string>();
   const uniqueLines: string[] = [];
@@ -203,7 +224,42 @@ function uniqueTextLines(lines: string[]): string[] {
 }
 
 function extractDiscountFromText(text: string): string {
-  return extractPercentageReward(text) || extractKrReward(text);
+  return extractPercentageReward(text) || extractOreLitreReward(text) || extractKrReward(text);
+}
+
+function extractRewardFromTerms(terms: string): string {
+  const hourlyPrices = [...terms.matchAll(/(\d[\d\s]*)\s*kr\s+per\s+time/gi)]
+    .map((match) => Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const fixedPrices = [...terms.replace(/\([^)]*\)/g, "").matchAll(/:\s*(\d[\d\s]*)\s*(?:kr|kroner)\b(?!\s+per\s+time)/gi)]
+    .map((match) => Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (fixedPrices.length > 0 && hourlyPrices.length > 0) {
+    return formatKrRange(Math.min(...fixedPrices), Math.min(...hourlyPrices));
+  }
+
+  if (fixedPrices.length > 0) {
+    return formatKrRange(Math.min(...fixedPrices), Math.max(...fixedPrices));
+  }
+
+  if (hourlyPrices.length > 0) {
+    const min = Math.min(...hourlyPrices);
+    const max = Math.max(...hourlyPrices);
+    return min === max
+      ? `Fra ${formatKrNumber(min)} kr/time`
+      : `${formatKrNumber(min)}-${formatKrNumber(max)} kr/time`;
+  }
+
+  return extractDiscountFromText(terms);
+}
+
+function formatKrRange(min: number, max: number): string {
+  return min === max ? `${formatKrNumber(max)} kr` : `${formatKrNumber(min)}-${formatKrNumber(max)} kr`;
+}
+
+function formatKrNumber(value: number): string {
+  return value.toLocaleString("nb-NO");
 }
 
 function trimRelatedBenefits(text: string): string {
@@ -396,8 +452,8 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
     }
 
     const sourceUrl = `${LIST_URL}/${encodeURIComponent(slug)}`;
-    const reward = slugToDiscount.get(slug) ?? "";
     const terms = slugToTerms.get(slug) ?? DEFAULT_TERMS;
+    const reward = slugToDiscount.get(slug) ?? extractRewardFromTerms(terms);
 
     offers.push({
       provider: "obos",

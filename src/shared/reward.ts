@@ -87,15 +87,43 @@ export function extractKrReward(text: string): string {
 }
 
 export function extractOreLitreReward(text: string): string {
+  const litreValues = extractOreValues(
+    text,
+    /(?:opptil\s+|minst\s+)?(\d+)\s*øre(?:\s*\/\s*l|\s+(?:rabatt\s+)?per\s+liter)/gi,
+  );
+  const chargeValues = extractOreValues(
+    text,
+    /(?:opptil\s+|minst\s+)?(\d+)\s*øre\s*\/\s*k(?:w|v)t/gi,
+  );
+  const parts = [
+    formatOreUnitReward(litreValues, "kr/l"),
+    formatOreUnitReward(chargeValues, "kr/kWt"),
+  ].filter(Boolean);
+
+  return parts.join(" + ");
+}
+
+function extractOreValues(text: string, pattern: RegExp): number[] {
   const values: number[] = [];
-  for (const m of text.matchAll(/(?:opptil\s+)?(\d+)\s*øre\/l/gi)) {
-    const n = Number.parseInt(m[1] ?? "", 10);
-    if (n > 0) values.push(n);
+  for (const match of text.matchAll(pattern)) {
+    const value = Number.parseInt(match[1] ?? "", 10);
+    if (value > 0) values.push(value);
   }
+  return values;
+}
+
+function formatOreUnitReward(values: number[], unit: string): string {
   if (values.length === 0) return "";
+
   const min = Math.min(...values);
   const max = Math.max(...values);
-  return min < max ? `${min}-${max} øre/l` : `Opptil ${max} øre/l`;
+  return min < max
+    ? `${formatOreAsKr(min)}-${formatOreAsKr(max)} ${unit}`
+    : `${formatOreAsKr(max)} ${unit}`;
+}
+
+function formatOreAsKr(ore: number): string {
+  return (ore / 100).toFixed(2).replace(".", ",");
 }
 
 function parseKrNumber(value: string): number {

@@ -353,6 +353,7 @@ function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
 
   if (trimmedReward.length === 0) {
+    if (provider === "obos") return "Medlemsfordel";
     return "Cashback";
   }
 
@@ -448,7 +449,31 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "SB1 Ung";
   }
 
-  return "Klarna";
+  if (provider === "klarna") {
+    return "Klarna";
+  }
+
+  if (provider === "obos") {
+    return "OBOS";
+  }
+
+  if (provider === "logbuy") {
+    return "Logbuy";
+  }
+
+  if (provider === "naf") {
+    return "NAF";
+  }
+
+  if (provider === "norskfamilie") {
+    return "Norsk Familie";
+  }
+
+  if (provider === "rabattkode") {
+    return "Kode";
+  }
+
+  return provider;
 }
 
 function formatKr(value: number): string {
@@ -580,5 +605,3 @@ function parseUrl(url: string): URL | undefined {
     return undefined;
   }
 }
-
-

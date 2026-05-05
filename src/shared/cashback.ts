@@ -276,7 +276,10 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const newVal = parseRewardValue(offer.reward);
     const existingVal = existing !== undefined ? parseRewardValue(existing.reward) : null;
     const isRange = offer.reward.includes("-");
-    if (existing === undefined || newVal > existingVal! || (newVal === existingVal! && isRange && !existing.reward.includes("-"))) {
+    const isBetterReward = existingVal === null ||
+      rewardKindRank(newVal.kind) > rewardKindRank(existingVal.kind) ||
+      (newVal.kind === existingVal.kind && newVal.amount > existingVal.amount);
+    if (existing === undefined || isBetterReward || (newVal.amount === existingVal!.amount && isRange && !existing.reward.includes("-"))) {
       byKey.set(key, offer);
     }
   }
@@ -336,7 +339,7 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
 }
 
 type RewardValue = {
-  kind: "percentage" | "fixed" | "points" | "unknown";
+  kind: "percentage" | "fixed" | "unit" | "points" | "unknown";
   amount: number;
 };
 
@@ -353,12 +356,30 @@ function parseRewardValue(reward: string): RewardValue {
     };
   }
 
-  const fixedMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+  const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
+
+  if (unitMatch !== null) {
+    return {
+      kind: "unit",
+      amount: parseLocalizedNumber(unitMatch[1] ?? "0"),
+    };
+  }
+
+  const krRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+
+  if (krRangeMatch !== null) {
+    return {
+      kind: "fixed",
+      amount: parseLocalizedNumber((krRangeMatch[1] ?? "0").replace(/\s/g, "")),
+    };
+  }
+
+  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
 
   if (fixedMatch !== null) {
     return {
       kind: "fixed",
-      amount: parseLocalizedNumber(fixedMatch[1] ?? "0"),
+      amount: parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
     };
   }
 
@@ -391,11 +412,15 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
     return 3;
   }
 
-  if (kind === "points") {
+  if (kind === "unit") {
     return 2;
   }
 
-  return 1;
+  if (kind === "points") {
+    return 1;
+  }
+
+  return 0;
 }
 
 function sortOffers(offers: CashbackOffer[]): CashbackOffer[] {

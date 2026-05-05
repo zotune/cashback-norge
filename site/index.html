@@ -905,7 +905,8 @@ async function init() {
     document.querySelectorAll(".offer-reward[data-reward]").forEach(el => {
       try {
         const o = JSON.parse(el.dataset.reward);
-        el.textContent = currentAmount > 0 ? calcReward(o, currentAmount) : formatCompactReward(o);
+        const calculated = currentAmount > 0 ? calcReward(o, currentAmount) : "";
+        el.textContent = calculated || formatCompactReward(o);
       } catch(e) { console.error("offer-reward parse error:", e, el.dataset.reward?.slice(0,100)); }
     });
     document.querySelectorAll(".offer-reward[data-pct-curve]").forEach(el => {
@@ -1133,7 +1134,8 @@ function render(query) {
     const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb") && o.discountCode);
     const offerHtml = cashbackOffers.map((o, idx) => {
       const url = o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
-      const label = currentAmount > 0 ? calcReward(o, currentAmount) : formatCompactReward(o);
+      const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
+      const label = calculatedLabel || formatCompactReward(o);
       const fullReward = formatReward(o);
       const compact = formatCompactReward(o);
       const terms = o.terms || "";
@@ -1478,9 +1480,12 @@ function formatCompactReward(o) {
   const full = formatReward(o);
   if (o.provider === "cbn") return full;
   if (o.provider === "trumf" || o.provider === "sas") return full;
+  if (/\d+(?:[,.]\d+)?\s*kr\s*\/\s*/i.test(full) && full.includes("+")) return full.replace(/\s+/g, " ");
   const pct = full.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (pct) return ((pct[1] || "") + pct[2]).replace(/\s+/g, " ");
-  const kr = full.match(/\d+(?:[,.]\d+)?\s*kr/i);
+  const krRange = full.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+  if (krRange) return krRange[0].replace(/\s+/g, " ");
+  const kr = full.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
   if (kr) return kr[0].replace(/\s+/g, " ");
   if (/gratis\s+frakt/i.test(full)) return "Gratis frakt";
   if (/gratis/i.test(full)) return "Gratis";
@@ -1488,6 +1493,10 @@ function formatCompactReward(o) {
 }
 function formatReward(o) {
   const r = o.reward.trim();
+  if (!r) {
+    if (o.provider === "obos") return "Medlemsfordel";
+    return "Cashback";
+  }
   if (o.provider === "sas") {
     const rate = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
     if (rate) {
@@ -1611,7 +1620,7 @@ function formatTooltipSectionHtml(part) {
   }
 
   const firstLine = lines[0] || "";
-  const hasHeading = /^medlemsfordel$/i.test(firstLine);
+  const hasHeading = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine);
   const listLines = hasHeading ? lines.slice(1) : lines;
   const titleHtml = hasHeading
     ? `<span class="offer-tooltip-title">${esc(firstLine)}</span>`

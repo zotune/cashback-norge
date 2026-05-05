@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778000318
+// @version      1778001899
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1630,7 +1630,7 @@
     const siteIcon = createSiteIcon();
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = offer !== void 0 ? `Cashback hos ${offer.merchantName}` : `Rabattkode hos ${primaryOffer.merchantName}`;
+    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : `Rabattkode hos ${primaryOffer.merchantName}`;
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
     sumInput.className = "sum-input";
@@ -2606,7 +2606,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       const showRewardInTooltip = compact !== void 0 && fullReward !== compact;
       const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
-      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasRateBreakdown(currentOffer.terms) && !isCardOnlyOffer) continue;
+      const hasTerms = currentOffer.terms.trim().length > 0;
+      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer) continue;
       const wrapper = wrappers[idx];
       if (wrapper === void 0) continue;
       const tooltip = document.createElement("div");
@@ -2626,9 +2627,17 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         tooltip.style.top = "-9999px";
         tooltip.classList.add("visible");
         const tooltipHeight = tooltip.offsetHeight;
+        const tooltipWidth = tooltip.offsetWidth;
         const rightEdge = panelRect ? panelRect.right + 6 : wrapperRect.right + 6;
-        tooltip.style.left = `${rightEdge}px`;
-        tooltip.style.top = `${wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2}px`;
+        const preferredLeft = rightEdge;
+        const fallbackLeft = wrapperRect.left + wrapperRect.width / 2 - tooltipWidth / 2;
+        const left = preferredLeft + tooltipWidth > window.innerWidth - 8 ? Math.max(8, Math.min(fallbackLeft, window.innerWidth - tooltipWidth - 8)) : preferredLeft;
+        const top = Math.max(
+          8,
+          Math.min(wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2, window.innerHeight - tooltipHeight - 8)
+        );
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
       });
       wrapper.addEventListener("mouseleave", () => {
         tooltip.classList.remove("visible");
@@ -2673,7 +2682,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return section;
     }
     const firstLine = lines[0] ?? "";
-    const listLines = /^medlemsfordel$/i.test(firstLine) ? lines.slice(1) : lines;
+    const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) ? lines.slice(1) : lines;
     if (listLines.length !== lines.length) {
       const title = document.createElement("span");
       title.className = "offer-tooltip-title";
@@ -2821,7 +2830,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const newVal = parseRewardValue(offer.reward);
       const existingVal = existing !== void 0 ? parseRewardValue(existing.reward) : null;
       const isRange = offer.reward.includes("-");
-      if (existing === void 0 || newVal.amount > existingVal.amount || newVal.amount === existingVal.amount && isRange && !existing.reward.includes("-")) {
+      const isBetterReward = existingVal === null || rewardKindRank(newVal.kind) > rewardKindRank(existingVal.kind) || newVal.kind === existingVal.kind && newVal.amount > existingVal.amount;
+      if (existing === void 0 || isBetterReward || newVal.amount === existingVal.amount && isRange && !existing.reward.includes("-")) {
         byKey.set(key, offer);
       }
     }
@@ -2854,11 +2864,25 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         amount: parseLocalizedNumber(percentageMatch[1] ?? "0")
       };
     }
-    const fixedMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+    const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
+    if (unitMatch !== null) {
+      return {
+        kind: "unit",
+        amount: parseLocalizedNumber(unitMatch[1] ?? "0")
+      };
+    }
+    const krRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+    if (krRangeMatch !== null) {
+      return {
+        kind: "fixed",
+        amount: parseLocalizedNumber((krRangeMatch[1] ?? "0").replace(/\s/g, ""))
+      };
+    }
+    const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
     if (fixedMatch !== null) {
       return {
         kind: "fixed",
-        amount: parseLocalizedNumber(fixedMatch[1] ?? "0")
+        amount: parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, ""))
       };
     }
     const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
@@ -2880,8 +2904,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function rewardKindRank(kind) {
     if (kind === "percentage") return 4;
     if (kind === "fixed") return 3;
-    if (kind === "points") return 2;
-    return 1;
+    if (kind === "unit") return 2;
+    if (kind === "points") return 1;
+    return 0;
   }
   function formatProviderName(provider) {
     return PROVIDER_NAMES[provider] ?? provider;
@@ -2997,9 +3022,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   const WARNING_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   const COPY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   const CHECK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-  function hasRateBreakdown(terms) {
-    return terms.includes("\n") && /\d+.*%/.test(terms);
-  }
   async function detectAdblock() {
     const [urlBlocked, domBlocked] = await Promise.all([
       detectAdblockByUrl(),
@@ -3071,6 +3093,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
     if (trimmedReward.length === 0) {
+      if (provider === "obos") return "Medlemsfordel";
       return "Cashback";
     }
     if (provider === "sas") {
@@ -3083,14 +3106,27 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     }
     return trimmedReward;
   }
+  function formatOfferTitlePrefix(offer) {
+    if (offer.provider === "obos") {
+      return "Medlemsfordel";
+    }
+    return "Cashback";
+  }
   function formatCompactRewardLabel(offer) {
     const label = formatRewardLabel(offer.reward, offer.provider);
+    if (/\d+(?:[,.]\d+)?\s*kr\s*\/\s*/i.test(label) && label.includes("+")) {
+      return label.replace(/\s+/g, " ");
+    }
     const percentMatch = label.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
     if (percentMatch !== null) {
       const prefix = percentMatch[1] ?? "";
       return (prefix + percentMatch[2]).replace(/\s+/g, " ");
     }
-    const krMatch = label.match(/\d+(?:[,.]\d+)?\s*kr/i);
+    const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+    if (krRangeMatch !== null) {
+      return krRangeMatch[0].replace(/\s+/g, " ");
+    }
+    const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
     if (krMatch !== null) {
       return krMatch[0].replace(/\s+/g, " ");
     }
