@@ -469,17 +469,13 @@ function extractDetailTerms(value: unknown): string {
   const items = isRecord(value.keyInformation) && Array.isArray(value.keyInformation.items)
     ? value.keyInformation.items.map(readString).filter(Boolean)
     : [];
-  if (items.length > 0) return items.join("\n");
 
   const campaigns = extractCampaigns(value);
-  if (campaigns.length > 0) {
-    return campaigns
-      .map((c) => [c.label, c.text].filter(Boolean).join(": "))
-      .filter(Boolean)
-      .join("\n");
-  }
+  const campaignLines = campaigns
+    .map((c) => [c.label, c.text].filter(Boolean).join(": "))
+    .filter(Boolean);
 
-  return "";
+  return [...items, ...campaignLines].join("\n");
 }
 
 function extractDetailLookupNames(value: unknown): string[] {
