@@ -7,7 +7,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -497,6 +497,9 @@ function normalizeReward(value: string): string {
 }
 
 function extractRewardFromText(text: string): string {
+  const oreLitre = extractOreLitreReward(text);
+  if (oreLitre !== "") return oreLitre;
+
   const percentageReward = extractPercentageReward(
     text,
     /\bbonus\b/i.test(text) ? " bonus" : "",

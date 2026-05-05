@@ -86,6 +86,11 @@ export function extractKrReward(text: string): string {
   return "";
 }
 
+export function extractOreLitreReward(text: string): string {
+  const match = text.match(/(?:opptil\s+)?(\d+)\s*øre\/l/i);
+  return match ? `Opptil ${match[1]} øre/l` : "";
+}
+
 function parseKrNumber(value: string): number {
   return Number.parseInt(value.replace(/[,–\s]+$/, "").replace(/\s+/g, ""), 10);
 }
