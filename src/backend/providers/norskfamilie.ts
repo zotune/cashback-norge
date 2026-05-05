@@ -15,7 +15,7 @@ const SLUG_TO_DOMAIN: Record<string, string> = {
   bemz: "bemz.com",
   bodystore: "bodystore.com",
   bubbleroom: "bubbleroom.no",
-  "christiania-glasmagasin": "glasmagasinet.no",
+  "christiania-glasmagasin": "cg.no",
   coolstuff: "coolstuff.no",
   "daniel-wellington": "danielwellington.com",
   devold: "devold.no",

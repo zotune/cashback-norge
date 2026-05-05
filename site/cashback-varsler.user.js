@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778013849
+// @version      1778014780
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1636,7 +1636,10 @@
     sumInput.className = "sum-input";
     sumInput.type = "text";
     sumInput.inputMode = "decimal";
-    sumInput.placeholder = "Kjøpesum";
+    sumInput.placeholder = "Sum";
+    sumInput.addEventListener("keydown", (e) => {
+      if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+    });
     header.append(sumInput);
     const rewardLabels = [];
     const tooltipElements = [];
@@ -1923,6 +1926,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       addCodeTooltip.style.left = `${rect.left + rect.width / 2}px`;
       addCodeTooltip.style.top = `${rect.top - 30}px`;
       addCodeTooltip.style.transform = "translateX(-50%)";
+      shadowRoot.append(addCodeTooltip);
       addCodeTooltip.classList.add("visible");
     });
     addCodeBtn.addEventListener("mouseleave", () => {
@@ -2321,6 +2325,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
         copyTooltip.style.top = `${rect.top - 30}px`;
         copyTooltip.style.transform = "translateX(-50%)";
+        shadowRoot.append(copyTooltip);
         copyTooltip.classList.add("visible");
       });
       copyBtn.addEventListener("mouseleave", () => {
