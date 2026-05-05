@@ -1059,6 +1059,12 @@
     "avis-f-inntil-20-rabatt-p-alle-bookinger": [
       "avis.no"
     ],
+    "clarion-hotel-ernst": [
+      "strawberry.no"
+    ],
+    "the-social-bar-bistro-clarion-hotel-ernst": [
+      "strawberry.no"
+    ],
     "berg-watches": [
       "bergwatches.no"
     ],
@@ -1144,6 +1150,9 @@
     ]
   },
   "naf": {
+    "strawberry": [
+      "strawberry.no"
+    ],
     "tui": [
       "tui.no"
     ],
@@ -1173,9 +1182,6 @@
     ],
     "de-historiske-hotel": [
       "dehistoriske.no"
-    ],
-    "strawberry": [
-      "strawberry.com"
     ],
     "citybox-hotels": [
       "cityboxhotels.com"
