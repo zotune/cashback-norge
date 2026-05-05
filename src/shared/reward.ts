@@ -87,8 +87,15 @@ export function extractKrReward(text: string): string {
 }
 
 export function extractOreLitreReward(text: string): string {
-  const match = text.match(/(?:opptil\s+)?(\d+)\s*øre\/l/i);
-  return match ? `Opptil ${match[1]} øre/l` : "";
+  const values: number[] = [];
+  for (const m of text.matchAll(/(?:opptil\s+)?(\d+)\s*øre\/l/gi)) {
+    const n = Number.parseInt(m[1] ?? "", 10);
+    if (n > 0) values.push(n);
+  }
+  if (values.length === 0) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return min < max ? `${min}-${max} øre/l` : `Opptil ${max} øre/l`;
 }
 
 function parseKrNumber(value: string): number {
