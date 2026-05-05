@@ -4,6 +4,7 @@ import {
   isRecord,
   normalizeDomainInput,
   parseUrl,
+  stripHtml,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
@@ -453,7 +454,7 @@ function extractTerms(store: RememberStore): string {
   }
 
   return (
-    store.terms ||
+    (store.terms ? stripHtml(store.terms) : "") ||
     "Requires re:member reward login and payment with a re:member card."
   );
 }

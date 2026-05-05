@@ -284,6 +284,21 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
   return sortOffers([...byKey.values()]);
 }
 
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li>/gi, "• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\n{2,}/g, "\n\n")
+    .trim();
+}
+
 export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
   return [...offers].sort((firstOffer, secondOffer) => {
     const firstIsSupport = firstOffer.provider === "cbn";

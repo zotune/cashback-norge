@@ -150,20 +150,20 @@ function extractTerms($: TrumfCheerio): string {
 
   if (categories.length > 1) {
     return categories
-      .map((c) => `${formatRate(c.rate)} % – ${c.category}`)
+      .map((c) => c.krValue ? `${c.krValue} – ${c.category}` : `${formatRate(c.rate)} % – ${c.category}`)
       .join("\n");
   }
+
+  const NOISE_PATTERNS = /^hei\s+(du|der)!?$/i;
 
   const paragraphs = $("p")
     .toArray()
     .map((element) => normalizeWhitespace($(element).text()))
-    .filter((text) => text.length > 0);
+    .filter((text) => text.length > 10 && !NOISE_PATTERNS.test(text.trim()));
   const firstParagraph = paragraphs[0] ?? "";
 
   return firstParagraph;
 }
-
-type CategoryRate = { category: string; rate: number };
 
 type CategoryRate = { category: string; rate: number; krValue?: string };
 

@@ -272,7 +272,9 @@ const CARD_ONLY_PROVIDERS = ["sparebank1", "remember"];
 const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
 
 function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement {
-  const hasBreakdown = props.offer.provider === "cbn" || (props.offer.terms.includes("\n") && /\d+.*%/.test(props.offer.terms));
+  const hasBreakdown = props.offer.provider === "cbn" ||
+    props.offer.terms.length > 60 ||
+    (props.offer.terms.includes("\n") && props.offer.terms.trim().length > 0);
   const isCardOnly = (CARD_ONLY_PROVIDERS as string[]).includes(props.offer.provider);
   const [copied, setCopied] = useState(false);
 
