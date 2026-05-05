@@ -38,7 +38,7 @@ const SLUG_TO_DOMAIN: Record<string, string> = {
   "munk-store": "munkstore.com",
   newport: "newport.se",
   "nly-man": "nlyman.com",
-  "nordic-choice-hotels": "nordicchoicehotels.no",
+  "nordic-choice-hotels": "strawberry.no",
   "polarn-o-pyret": "polarnopyret.no",
   "skogstad-sport": "skogstadsport.no",
   slikkepott: "slikkepott.no",
