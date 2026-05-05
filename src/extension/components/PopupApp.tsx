@@ -278,6 +278,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
   const isCardOnly = (CARD_ONLY_PROVIDERS as string[]).includes(props.offer.provider);
   const [copied, setCopied] = useState(false);
 
+  const isNumericReward = /\d/.test(props.offer.reward) && (/%/.test(props.offer.reward) || /kr/i.test(props.offer.reward));
   let rewardText: string;
   if (props.amount > 0) {
     const result = calculateCashback(props.offer, props.amount);
@@ -285,6 +286,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
   } else {
     rewardText = formatRewardLabel(props.offer.reward, props.offer.provider);
   }
+  if (!isNumericReward && props.offer.discountCode !== undefined) rewardText = "?";
 
   const discountCode = props.offer.discountCode;
 
@@ -298,7 +300,12 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
     });
   }
 
-  const tooltipContent = hasBreakdown && isCardOnly
+  const nonNumericCodeDescription = !isNumericReward && props.offer.discountCode !== undefined
+    ? (props.offer.terms || props.offer.reward)
+    : null;
+  const tooltipContent = nonNumericCodeDescription
+    ? nonNumericCodeDescription
+    : hasBreakdown && isCardOnly
     ? `${props.offer.terms}\n\n⚠ ${CARD_ONLY_TIP}`
     : hasBreakdown
     ? props.offer.terms

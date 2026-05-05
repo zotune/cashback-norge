@@ -1741,11 +1741,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (dbId !== undefined) item.dataset.codeId = String(dbId);
     const reward = document.createElement("span");
     reward.className = "code-reward";
+    const isNumericReward = /\d/.test(codeOffer.reward) && (/%/.test(codeOffer.reward) || /kr/i.test(codeOffer.reward));
     if (/%/.test(codeOffer.reward)) {
       reward.dataset.pct = String(parseRewardNum(codeOffer.reward));
       reward.dataset.origReward = codeOffer.reward;
     }
-    reward.textContent = codeOffer.reward;
+    reward.textContent = isNumericReward ? codeOffer.reward : "?";
     const codeSpan = document.createElement("span");
     codeSpan.className = "code-value";
     codeSpan.textContent = code;

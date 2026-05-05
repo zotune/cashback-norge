@@ -1173,10 +1173,13 @@ function render(query) {
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       const codeTerms = o.terms || "";
-      const codeTooltipHtml = codeTerms ? `<span class="offer-tooltip">${formatTooltipHtml(codeTerms)}</span>` : "";
+      const isNumericReward = /\d/.test(o.reward) && (/[%]/.test(o.reward) || /kr/i.test(o.reward));
+      const tooltipText = isNumericReward ? codeTerms : (codeTerms || o.reward);
+      const codeLabel = isNumericReward ? o.reward : "?";
+      const codeTooltipHtml = tooltipText ? `<span class="offer-tooltip">${formatTooltipHtml(tooltipText)}</span>` : "";
       return `<div class="code-item-row" data-net="0">
         ${codeTooltipHtml}<div class="code-item">
-          <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(o.reward)}</span>
+          <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</span>
           <span class="code-value">${esc(code)}</span>
           <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
           <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
