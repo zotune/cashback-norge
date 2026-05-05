@@ -1104,7 +1104,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   sumInput.className = "sum-input";
   sumInput.type = "text";
   sumInput.inputMode = "decimal";
-  sumInput.placeholder = "Kjøpesum";
+  sumInput.placeholder = "Sum";
+  sumInput.addEventListener("keydown", (e) => {
+    if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+  });
   header.append(sumInput);
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];

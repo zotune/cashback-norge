@@ -110,9 +110,10 @@ export function PopupApp(): ReactElement {
           className="sum-input"
           type="text"
           inputMode="decimal"
-          placeholder="Kjøpesum"
+          placeholder="Sum"
           value={sumInput}
           onChange={(e) => setSumInput(e.target.value.replace(/[^0-9.,]/g, ""))}
+          onKeyDown={(e) => { if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault(); }}
         />
       </div>
       <div className="offers">
