@@ -11,7 +11,7 @@ import {
   parseUrl,
   uniqueOffers,
 } from "../../shared/cashback.js";
-import { extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 type FinnkupongkoderCheerio = CheerioCrawlingContext["$"];
@@ -508,13 +508,8 @@ function extractReward(containerText: string, title: string): string {
 }
 
 function findRewardValue(text: string): string | undefined {
-  const percentageReward = extractPercentageReward(text);
-
-  if (percentageReward !== "") return percentageReward;
-
-  const match = text.match(/(?:^|\s)(\d[\d\s]*(?:[,.]\d+)?\s*kr)(?:\s|$)/i);
-
-  return match?.[1]?.replace(/\s+/g, " ").trim();
+  const reward = extractPercentageReward(text) || extractKrReward(text);
+  return reward !== "" ? reward : undefined;
 }
 
 function extractTerms(containerText: string, title: string): string {

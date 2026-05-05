@@ -1,6 +1,6 @@
 import { CheerioCrawler, Configuration, MemoryStorage } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
-import { extractPercentageReward, normalizeRewardLabel } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward, normalizeRewardLabel } from "../../shared/reward.js";
 
 const BUTIKKER_URL = "https://www.norskfamilie.no/netthandel/butikker/";
 const LABEL_LIST = "list";
@@ -71,7 +71,7 @@ export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
         if (offer === undefined) return;
 
         const detailText = $(".shopping-content").first().text().replace(/\s+/g, " ").trim();
-        const detailReward = extractPercentageReward(detailText);
+        const detailReward = extractPercentageReward(detailText) || extractKrReward(detailText);
         if (detailReward !== "") {
           offer.reward = detailReward;
         }
@@ -87,7 +87,7 @@ export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
 
         const rateText = card.find(".shop-comission").text().trim();
         const normalizedRateText = rateText.replace(/\s+/g, " ").trim();
-        const reward = extractPercentageReward(normalizedRateText) ||
+        const reward = extractPercentageReward(normalizedRateText) || extractKrReward(normalizedRateText) ||
           normalizeRewardLabel(normalizedRateText);
         if (!reward || reward === "\u00a0") return;
 

@@ -82,15 +82,8 @@ export async function crawlSparebank1(
 
 function extractReward($: Sparebank1Cheerio): string | undefined {
   const text = $("body").text().replace(/\s+/g, " ");
-  const match =
-    text.match(/får du\s+(\d+(?:[,.]\d+)?)\s*%\s+rabatt/i) ??
-    text.match(/(\d+(?:[,.]\d+)?)\s*%\s+rabatt\s+på\s+strømmetjenester/i);
-
-  if (match?.[1] === undefined) {
-    return undefined;
-  }
-
-  return `${match[1].replace(".", ",")} %`;
+  const reward = extractPercentageReward(text) || extractKrReward(text);
+  return reward !== "" ? reward : undefined;
 }
 
 function extractStreamingServices(

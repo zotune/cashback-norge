@@ -10,7 +10,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import { isDomainLike, merchantDomainsFromUrl } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
@@ -354,22 +354,9 @@ function isReusableDiscountCode(code: string): boolean {
 }
 
 function extractReward(title: string): string {
-  const percentageReward = extractPercentageReward(title);
-
-  if (percentageReward !== "") {
-    return percentageReward;
-  }
-
-  const fixedMatch = title.match(/\d+(?:[,.]\d+)?\s*kr/i);
-
-  if (fixedMatch !== null) {
-    return fixedMatch[0].replace(/\s+/g, " ");
-  }
-
-  if (/gratis/i.test(title)) {
-    return "Gratis";
-  }
-
+  const reward = extractPercentageReward(title) || extractKrReward(title);
+  if (reward !== "") return reward;
+  if (/gratis/i.test(title)) return "Gratis";
   return title;
 }
 
