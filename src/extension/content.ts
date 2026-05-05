@@ -952,9 +952,31 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       padding: 8px 10px;
       pointer-events: none;
       position: fixed;
-      white-space: pre-line;
+      white-space: normal;
       width: max-content;
       z-index: 2147483647;
+    }
+    .offer-tooltip-section + .offer-tooltip-section {
+      margin-top: 8px;
+    }
+    .offer-tooltip-title {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .offer-tooltip-text {
+      display: block;
+      white-space: pre-line;
+    }
+    .offer-tooltip-list {
+      display: grid;
+      gap: 4px;
+      list-style: disc;
+      margin: 0;
+      padding-left: 16px;
+    }
+    .offer-tooltip-list li {
+      padding-left: 2px;
     }
     .offer-tooltip.visible {
       display: block;
@@ -1180,7 +1202,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const parts: string[] = [];
       if (showRewardInTooltip) parts.push(fullReward);
       if (breakdown) parts.push(breakdown);
-      element.textContent = parts.join("\n\n");
+      setTooltipContent(element, parts);
     }
     for (const { element, pct, minPct, maxPct, ebPer100kr, approx, defaultText } of bonusChipLabels) {
       if (amount > 0 && minPct != null && maxPct != null) {
@@ -1769,7 +1791,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (codeOffer.terms) {
       const termsTooltip = document.createElement("div");
       termsTooltip.className = "offer-tooltip";
-      termsTooltip.textContent = codeOffer.terms;
+      setTooltipContent(termsTooltip, [codeOffer.terms]);
       shadowRoot.append(termsTooltip);
       row.addEventListener("mouseenter", () => {
         const panelEl = shadowRoot.querySelector(".panel");
@@ -2073,7 +2095,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     if (showRewardInTooltip) tooltipParts.push(fullReward);
     if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
     if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
-    tooltip.textContent = tooltipParts.join("\n\n");
+    setTooltipContent(tooltip, tooltipParts);
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });
     wrapper.addEventListener("mouseenter", () => {
@@ -2118,6 +2140,55 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
 }
+
+function setTooltipContent(tooltip: HTMLElement, parts: string[]): void {
+  const sections = parts
+    .flatMap((part) => part.split(/\n{2,}/))
+    .map(createTooltipSection)
+    .filter((section): section is HTMLDivElement => section !== undefined);
+  tooltip.replaceChildren(...sections);
+}
+
+function createTooltipSection(part: string): HTMLDivElement | undefined {
+  const lines = part
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return undefined;
+
+  const section = document.createElement("div");
+  section.className = "offer-tooltip-section";
+
+  if (lines.length === 1) {
+    const text = document.createElement("span");
+    text.className = "offer-tooltip-text";
+    text.textContent = lines[0] ?? "";
+    section.append(text);
+    return section;
+  }
+
+  const firstLine = lines[0] ?? "";
+  const listLines = /^medlemsfordel$/i.test(firstLine) ? lines.slice(1) : lines;
+
+  if (listLines.length !== lines.length) {
+    const title = document.createElement("span");
+    title.className = "offer-tooltip-title";
+    title.textContent = firstLine;
+    section.append(title);
+  }
+
+  const list = document.createElement("ul");
+  list.className = "offer-tooltip-list";
+  for (const line of listLines) {
+    const item = document.createElement("li");
+    item.textContent = line;
+    list.append(item);
+  }
+  section.append(list);
+  return section;
+}
+
 function applyHostOverlayStyle(host: HTMLElement): void {
   host.style.setProperty("background", "transparent", "important");
   host.style.setProperty("border", "0", "important");

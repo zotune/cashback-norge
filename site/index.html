@@ -209,10 +209,36 @@ a.merchant-name:hover { text-decoration: underline; }
   pointer-events: none;
   position: absolute;
   transition: opacity 0.15s;
-  white-space: pre-line;
+  white-space: normal;
   width: max-content;
   max-width: min(340px, calc(100vw - 32px));
   z-index: 200;
+}
+.offer-tooltip-section + .offer-tooltip-section {
+  margin-top: 8px;
+}
+.offer-tooltip-title {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+.offer-tooltip-text {
+  display: block;
+  white-space: pre-line;
+}
+.offer-tooltip-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 0;
+}
+.offer-tooltip-list-item {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 10px minmax(0, 1fr);
+}
+.offer-tooltip-bullet {
+  line-height: 1.45;
 }
 .offer-tooltip::after {
   content: "";
@@ -1122,7 +1148,7 @@ function render(query) {
       const cardOnly = ["sparebank1", "remember"].includes(o.provider);
       const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
       const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : tipText;
-      const tooltipHtml = fullTip ? `<span class="offer-tooltip">${esc(fullTip)}</span>` : "";
+      const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
       const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : "";
       const bestClass = idx === 0 ? " offer--best" : "";
       return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
@@ -1134,18 +1160,18 @@ function render(query) {
     const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
     const cryptoSelectedHtml = cryptoSubName ? (() => {
       const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-crypto">Crypto</span></span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-crypto">Crypto</span></span></a></span>`;
     })() : "";
     const hasCurve = m.domains.some(d => curveDomains.has(d));
     const curveSelectedHtml = hasCurve ? (() => {
       const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${esc(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-curve">Curve</span></span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-curve">Curve</span></span></a></span>`;
     })() : "";
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       const codeTerms = o.terms || "";
-      const codeTooltipHtml = codeTerms ? `<span class="offer-tooltip">${esc(codeTerms)}</span>` : "";
+      const codeTooltipHtml = codeTerms ? `<span class="offer-tooltip">${formatTooltipHtml(codeTerms)}</span>` : "";
       return `<div class="code-item-row" data-net="0">
         ${codeTooltipHtml}<div class="code-item">
           <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(o.reward)}</span>
@@ -1567,6 +1593,33 @@ function esc(s) {
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
+}
+
+function formatTooltipHtml(text) {
+  return text
+    .split(/\n{2,}/)
+    .map(formatTooltipSectionHtml)
+    .filter(Boolean)
+    .join("");
+}
+
+function formatTooltipSectionHtml(part) {
+  const lines = part.split("\n").map(line => line.trim()).filter(Boolean);
+  if (lines.length === 0) return "";
+  if (lines.length === 1) {
+    return `<span class="offer-tooltip-section"><span class="offer-tooltip-text">${esc(lines[0])}</span></span>`;
+  }
+
+  const firstLine = lines[0] || "";
+  const hasHeading = /^medlemsfordel$/i.test(firstLine);
+  const listLines = hasHeading ? lines.slice(1) : lines;
+  const titleHtml = hasHeading
+    ? `<span class="offer-tooltip-title">${esc(firstLine)}</span>`
+    : "";
+  const listHtml = listLines
+    .map(line => `<span class="offer-tooltip-list-item"><span class="offer-tooltip-bullet">•</span><span>${esc(line)}</span></span>`)
+    .join("");
+  return `<span class="offer-tooltip-section">${titleHtml}<span class="offer-tooltip-list">${listHtml}</span></span>`;
 }
 
 const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
