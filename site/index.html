@@ -1173,7 +1173,7 @@ function render(query) {
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       const codeTerms = o.terms || "";
-      const isNumericReward = /\d/.test(o.reward) && (/[%]/.test(o.reward) || /kr/i.test(o.reward));
+      const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(o.reward.trim());
       const tooltipText = isNumericReward ? codeTerms : (codeTerms || o.reward);
       const codeLabel = isNumericReward ? o.reward : "?";
       const codeTooltipHtml = tooltipText ? `<span class="offer-tooltip">${formatTooltipHtml(tooltipText)}</span>` : "";

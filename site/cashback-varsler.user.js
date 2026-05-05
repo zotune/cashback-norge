@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778009848
+// @version      1778010503
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -2300,11 +2300,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       item.className = "code-item";
       const reward = document.createElement("span");
       reward.className = "code-reward";
+      const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(codeOffer.reward.trim());
       if (/%/.test(codeOffer.reward)) {
         reward.dataset.pct = String(parseRewardNum(codeOffer.reward));
         reward.dataset.origReward = codeOffer.reward;
       }
-      reward.textContent = codeOffer.reward;
+      reward.textContent = isNumericReward ? codeOffer.reward : "?";
       const codeSpan = document.createElement("span");
       codeSpan.className = "code-value";
       codeSpan.textContent = code;

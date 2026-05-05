@@ -278,7 +278,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
   const isCardOnly = (CARD_ONLY_PROVIDERS as string[]).includes(props.offer.provider);
   const [copied, setCopied] = useState(false);
 
-  const isNumericReward = /\d/.test(props.offer.reward) && (/%/.test(props.offer.reward) || /kr/i.test(props.offer.reward));
+  const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(props.offer.reward.trim());
   let rewardText: string;
   if (props.amount > 0) {
     const result = calculateCashback(props.offer, props.amount);
