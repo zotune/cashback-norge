@@ -123,7 +123,10 @@ function extractTerms($: ObosCheerio): string {
 
 function extractMemberBenefitTerms($: ObosCheerio): string {
   const heading = $("h2, h3")
-    .filter((_, el) => TERMS_HEADING_LABELS.has(normalizeHeadingLabel($(el).text())))
+    .filter((_, el) => {
+      const label = normalizeHeadingLabel($(el).text());
+      return [...TERMS_HEADING_LABELS].some((h) => label === h || label.startsWith(h));
+    })
     .first();
 
   if (!heading.length) return "";
