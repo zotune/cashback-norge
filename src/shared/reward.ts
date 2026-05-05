@@ -67,7 +67,7 @@ export function extractKrReward(text: string): string {
   if (rabattValues.length > 0) {
     const min = Math.min(...rabattValues);
     const max = Math.max(...rabattValues);
-    return min < max ? `${min}-${max} kr rabatt` : `${max} kr rabatt`;
+    return min < max ? `${min}-${max} kr` : `${max} kr`;
   }
 
   // "Spar opptil 600 kr", "Spar 600 kr", "Opptil 600 kr"
