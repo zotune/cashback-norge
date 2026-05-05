@@ -373,7 +373,7 @@ function parseBenefitSummary(value: unknown): BenefitEntry | undefined {
   return {
     lookupNames: uniqueStringsPreserveOrder([name, partnerName, title]),
     name,
-    reward: normalizeReward(readString(value.discountBadge)),
+    reward: INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : normalizeReward(readString(value.discountBadge)),
     slug,
   };
 }
@@ -403,9 +403,9 @@ function extractDetailReward(value: unknown): string {
     : [];
 
   return (
-    extractRewardFromText(keyInformationItems.join(" ")) ||
+    extractRewardFromItems(keyInformationItems) ||
     extractRewardFromText(collectText(value.body).join(" ")) ||
-    normalizeReward(readString(value.discountBadge))
+    (INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : normalizeReward(readString(value.discountBadge)))
   );
 }
 
@@ -496,18 +496,30 @@ function normalizeReward(value: string): string {
   return normalized;
 }
 
+// Insurance-specific terms that contain % values irrelevant to the member discount
+const INSURANCE_NOISE_PATTERN = /\b(?:startbonus|bonustap|bonus(?:nivå|level))\b/i;
+
 function extractRewardFromText(text: string): string {
   const oreLitre = extractOreLitreReward(text);
   if (oreLitre !== "") return oreLitre;
 
+  // Strip sentences containing insurance bonus terms before % parsing
+  const cleaned = text.split(/[.\n]/).filter(s => !INSURANCE_NOISE_PATTERN.test(s)).join(". ");
+
   const percentageReward = extractPercentageReward(
-    text,
-    /\bbonus\b/i.test(text) ? " bonus" : "",
+    cleaned,
+    /\bbonus\b/i.test(cleaned) ? " bonus" : "",
   );
 
   if (percentageReward !== "") return percentageReward;
 
-  return extractKrReward(text);
+  return extractKrReward(cleaned);
+}
+
+function extractRewardFromItems(items: string[]): string {
+  // Filter noise items individually before joining, so one bad item doesn't kill the whole text
+  const cleaned = items.filter(s => !INSURANCE_NOISE_PATTERN.test(s));
+  return extractRewardFromText(cleaned.join(" "));
 }
 
 function extractPartnerName(value: unknown): string {
