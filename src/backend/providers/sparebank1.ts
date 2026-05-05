@@ -20,6 +20,7 @@ const SECTION_END = /les mer om rabatt på streaming|kontakt oss|til toppen/i;
 
 const SERVICE_DOMAIN_OVERRIDES: Record<string, string[]> = {
   "Apple Music": ["music.apple.com"],
+  "Audible": ["audible.com", "audible.co.uk"],
   "HBO Max": ["hbomax.com", "max.com"],
 };
 
