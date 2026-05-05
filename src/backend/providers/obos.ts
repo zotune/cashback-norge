@@ -230,41 +230,6 @@ function extractDiscountFromText(text: string): string {
   return extractPercentageReward(text) || extractOreLitreReward(text) || extractKrReward(text);
 }
 
-function extractRewardFromTerms(terms: string): string {
-  const hourlyPrices = [...terms.matchAll(/(\d[\d\s]*)\s*kr\s+per\s+time/gi)]
-    .map((match) => Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  const fixedPrices = [...terms.replace(/\([^)]*\)/g, "").matchAll(/(?:^|:\s*)(\d[\d\s]*)\s*(?:kr|kroner)\b(?!\s+per\s+time)/gim)]
-    .map((match) => Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10))
-    .filter((value) => Number.isFinite(value) && value > 0);
-
-  if (fixedPrices.length > 0 && hourlyPrices.length > 0) {
-    return formatKrRange(Math.min(...fixedPrices), Math.min(...hourlyPrices));
-  }
-
-  if (fixedPrices.length > 0) {
-    return formatKrRange(Math.min(...fixedPrices), Math.max(...fixedPrices));
-  }
-
-  if (hourlyPrices.length > 0) {
-    const min = Math.min(...hourlyPrices);
-    const max = Math.max(...hourlyPrices);
-    return min === max
-      ? `Fra ${formatKrNumber(min)} kr/time`
-      : `${formatKrNumber(min)}-${formatKrNumber(max)} kr/time`;
-  }
-
-  return extractDiscountFromText(terms);
-}
-
-function formatKrRange(min: number, max: number): string {
-  return min === max ? `${formatKrNumber(max)} kr` : `${formatKrNumber(min)}-${formatKrNumber(max)} kr`;
-}
-
-function formatKrNumber(value: number): string {
-  return value.toLocaleString("nb-NO");
-}
-
 function trimRelatedBenefits(text: string): string {
   const relatedSectionMatch = text.search(
     /(?:relevante|relaterte|flere aktuelle)\s+medlemsfordeler/i,
@@ -456,7 +421,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
 
     const sourceUrl = `${LIST_URL}/${encodeURIComponent(slug)}`;
     const terms = slugToTerms.get(slug) ?? DEFAULT_TERMS;
-    const reward = slugToDiscount.get(slug) ?? extractRewardFromTerms(terms);
+    const reward = slugToDiscount.get(slug) ?? extractDiscountFromText(terms);
 
     offers.push({
       provider: "obos",

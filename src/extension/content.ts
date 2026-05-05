@@ -2787,6 +2787,10 @@ function formatCompactRewardLabel(offer: CashbackOffer): string | undefined {
     const prefix = percentMatch[1] ?? "";
     return (prefix + percentMatch[2]!).replace(/\s+/g, " ");
   }
+  const totalSumMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
+  if (totalSumMatch !== null) {
+    return totalSumMatch[0].replace(/\s+/g, " ");
+  }
   const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
   if (krRangeMatch !== null) {
     return krRangeMatch[0].replace(/\s+/g, " ");

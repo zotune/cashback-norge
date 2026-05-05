@@ -49,46 +49,123 @@ export function normalizeRewardLabel(reward: string): string {
 }
 
 export function extractKrReward(text: string): string {
+  const cleanedText = stripOrdinaryPriceParentheticals(text);
+
   // Split into sentences/clauses and look for ones containing rabatt/avslag
-  const clauses = text.split(/[.;]/);
+  const clauses = cleanedText.split(/[.;]/);
   const rabattValues: number[] = [];
 
   for (const clause of clauses) {
     if (!/\b(?:rabatt|avslag)\b/i.test(clause)) continue;
-    // Extract all kr amounts in this clause, excluding "minst/minimum/over X kr"
-    const amounts = clause.matchAll(/(?<!(?:minst|minimum|over|fra)\s{0,5})(\d[\d\s]*(?:,–)?)\s*(?:kroner|kr)\b/gi);
+    // Also "kr X,- i rabatt"
+    const prefixedAmounts = clause.matchAll(/\bkr\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(?:[,.-]\s*[-–]?)?\s*(?:i\s+)?(?:rabatt|avslag)\b/gi);
+    for (const m of prefixedAmounts) {
+      if (hasExcludedKrPrefix(clause, m.index ?? 0)) continue;
+      const n = parseKrNumber(m[1] ?? "");
+      if (n > 0) rabattValues.push(n);
+    }
+    // Extract all kr amounts in this clause, excluding "minst/minimum/over/fra X kr"
+    const amounts = clause.matchAll(/(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr)\b/gi);
     for (const m of amounts) {
+      if (hasExcludedKrPrefix(clause, m.index ?? 0)) continue;
       const n = parseKrNumber(m[1] ?? "");
       if (n > 0) rabattValues.push(n);
     }
     // Also "X,– i rabatt" (no kr keyword)
     const dashAmounts = clause.matchAll(/(\d[\d\s]*),–\s*(?:i\s+)?(?:rabatt|avslag)\b/gi);
     for (const m of dashAmounts) {
+      if (hasExcludedKrPrefix(clause, m.index ?? 0)) continue;
       const n = parseKrNumber(m[1] ?? "");
       if (n > 0) rabattValues.push(n);
     }
   }
 
   if (rabattValues.length > 0) {
-    const min = Math.min(...rabattValues);
-    const max = Math.max(...rabattValues);
-    return min < max ? `${min}-${max} kr` : `${max} kr`;
+    return formatKrReward(rabattValues);
   }
 
   // "Spar opptil 600 kr", "Spar 600 kr", "Opptil 600 kr"
   const sparValues: number[] = [];
   const sparPattern = /(?:(?:spar\s+)?opptil|spar)\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*kr?\b/gi;
-  for (const m of text.matchAll(sparPattern)) {
+  for (const m of cleanedText.matchAll(sparPattern)) {
     const n = parseKrNumber(m[1] ?? "");
     if (n > 0) sparValues.push(n);
   }
   if (sparValues.length > 0) {
-    const min = Math.min(...sparValues);
-    const max = Math.max(...sparValues);
-    return min < max ? `${min}-${max} kr` : `${max} kr`;
+    return formatKrReward(sparValues);
+  }
+
+  return extractPositionedKrReward(cleanedText);
+}
+
+function stripOrdinaryPriceParentheticals(text: string): string {
+  return text.replace(/\([^()]*\b(?:ordinær|vanlig)\s+pris\b[^()]*\)/gi, " ");
+}
+
+function hasExcludedKrPrefix(text: string, amountIndex: number): boolean {
+  const beforeAmount = text.slice(0, amountIndex).replace(/\s+/g, " ");
+  return /(?:^|[\s(])(?:fra|minst|minimum|over)\s+(?:kr\s*)?$/i.test(beforeAmount);
+}
+
+function extractPositionedKrReward(text: string): string {
+  const fixedValues: number[] = [];
+  const hourlyValues: number[] = [];
+  const positionedAmountPattern =
+    /(?:^|[\r\n]|:)\s*(?:[-*•]\s*)?(?!(?:minst|minimum|over)\b)(?:fra\s+)?(?:kr\s*(\d[\d\s]*(?:[,.]\d+)?)|(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr)\b)/gim;
+
+  for (const match of text.matchAll(positionedAmountPattern)) {
+    const rawValue = match[1] ?? match[2] ?? "";
+    const value = parseKrNumber(rawValue);
+    if (value <= 0) continue;
+
+    const afterMatch = text.slice((match.index ?? 0) + match[0].length);
+    if (/^\s+per\s+time\b/i.test(afterMatch)) {
+      hourlyValues.push(value);
+    } else {
+      fixedValues.push(value);
+    }
+  }
+
+  const offerPricePattern =
+    /\b(?:earlybird-tilbud|kampanjepris|medlemspris|obos-pris|tilbud)\s+på\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr)\b/gi;
+  for (const match of text.matchAll(offerPricePattern)) {
+    const value = parseKrNumber(match[1] ?? "");
+    if (value > 0) addUniqueNumber(fixedValues, value);
+  }
+
+  if (fixedValues.length > 0 && hourlyValues.length > 0) {
+    return formatKrRange(Math.min(...fixedValues), Math.min(...hourlyValues));
+  }
+
+  if (fixedValues.length > 0) {
+    return `${formatKrReward(fixedValues)} totalsum`;
+  }
+
+  if (hourlyValues.length > 0) {
+    const min = Math.min(...hourlyValues);
+    const max = Math.max(...hourlyValues);
+    return min === max
+      ? `Fra ${formatKrNumber(min)} kr/time`
+      : `${formatKrNumber(min)}-${formatKrNumber(max)} kr/time`;
   }
 
   return "";
+}
+
+function addUniqueNumber(values: number[], value: number): void {
+  if (!values.includes(value)) values.push(value);
+}
+
+function formatKrReward(values: number[]): string {
+  return formatKrRange(Math.min(...values), Math.max(...values));
+}
+
+function formatKrRange(min: number, max: number): string {
+  return min === max ? `${formatKrNumber(max)} kr` : `${formatKrNumber(min)}-${formatKrNumber(max)} kr`;
+}
+
+function formatKrNumber(value: number): string {
+  return value.toLocaleString("nb-NO").replace(/[\u00a0\u202f]/g, " ");
 }
 
 export function extractOreLitreReward(text: string): string {
