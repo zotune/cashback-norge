@@ -174,6 +174,15 @@ async function main(): Promise<void> {
   ]);
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
   const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers, ...sparebank1Offers]);
+
+  const offersWithoutReward = offers.filter((o) => !o.reward);
+  if (offersWithoutReward.length > 0) {
+    logger.warn(`${offersWithoutReward.length} offers have no reward:`);
+    for (const o of offersWithoutReward) {
+      logger.warn(`  [${o.provider}] ${o.merchantName} (${o.sourceUrl})`);
+    }
+  }
+
   const cashbackIndex = buildCashbackIndex(offers, generatedAt);
 
   await writeJsonFile(config.outputPath, cashbackIndex);

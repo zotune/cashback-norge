@@ -44,25 +44,50 @@ export function normalizeRewardLabel(reward: string): string {
 }
 
 export function extractKrReward(text: string): string {
-  // "600,– i rabatt", "600 kr i rabatt", "600 kr rabatt", "600 kr avslag"
-  const rabattMatch = text.match(
-    /(\d[\d\s]*(?:,–)?)\s*(?:kr\b)?\s*(?:i\s+)?(?:rabatt|avslag)\b/i,
-  );
-  if (rabattMatch) {
-    const value = rabattMatch[1].replace(/[,–\s]+$/, "").replace(/\s+/g, " ").trim();
-    return `${value} kr rabatt`;
+  // Split into sentences/clauses and look for ones containing rabatt/avslag
+  const clauses = text.split(/[.;]/);
+  const rabattValues: number[] = [];
+
+  for (const clause of clauses) {
+    if (!/\b(?:rabatt|avslag)\b/i.test(clause)) continue;
+    // Extract all kr amounts in this clause, excluding "minst/minimum/over X kr"
+    const amounts = clause.matchAll(/(?<!(?:minst|minimum|over|fra)\s{0,5})(\d[\d\s]*(?:,–)?)\s*kr\b/gi);
+    for (const m of amounts) {
+      const n = parseKrNumber(m[1]);
+      if (n > 0) rabattValues.push(n);
+    }
+    // Also "X,– i rabatt" (no kr keyword)
+    const dashAmounts = clause.matchAll(/(\d[\d\s]*),–\s*(?:i\s+)?(?:rabatt|avslag)\b/gi);
+    for (const m of dashAmounts) {
+      const n = parseKrNumber(m[1]);
+      if (n > 0) rabattValues.push(n);
+    }
+  }
+
+  if (rabattValues.length > 0) {
+    const min = Math.min(...rabattValues);
+    const max = Math.max(...rabattValues);
+    return min < max ? `${min}-${max} kr rabatt` : `${max} kr rabatt`;
   }
 
   // "Spar opptil 600 kr", "Spar 600 kr", "Opptil 600 kr"
-  const sparMatch = text.match(
-    /(?:(?:spar\s+)?opptil|spar)\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*kr?\b/i,
-  );
-  if (sparMatch) {
-    const value = sparMatch[1].replace(/\s+/g, " ").trim();
-    return `${value} kr`;
+  const sparValues: number[] = [];
+  const sparPattern = /(?:(?:spar\s+)?opptil|spar)\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*kr?\b/gi;
+  for (const m of text.matchAll(sparPattern)) {
+    const n = parseKrNumber(m[1]);
+    if (n > 0) sparValues.push(n);
+  }
+  if (sparValues.length > 0) {
+    const min = Math.min(...sparValues);
+    const max = Math.max(...sparValues);
+    return min < max ? `${min}-${max} kr` : `${max} kr`;
   }
 
   return "";
+}
+
+function parseKrNumber(value: string): number {
+  return Number.parseInt(value.replace(/[,–\s]+$/, "").replace(/\s+/g, ""), 10);
 }
 
 export function formatRewardNumber(value: number): string {

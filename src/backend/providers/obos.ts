@@ -7,7 +7,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -111,14 +111,7 @@ function extractDiscount($: ObosCheerio): string {
 }
 
 function extractDiscountFromText(text: string): string {
-  const percentageReward = extractPercentageReward(text);
-  const krMatches = [...text.matchAll(/(\d+)\s*kr\s+(?:i\s+)?rabatt/gi)];
-
-  if (percentageReward === "" && krMatches.length === 0) return "";
-
-  if (percentageReward !== "") return percentageReward;
-
-  return (krMatches[0]?.[0] ?? "").trim();
+  return extractPercentageReward(text) || extractKrReward(text);
 }
 
 function trimRelatedBenefits(text: string): string {

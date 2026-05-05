@@ -6,7 +6,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward, formatPercentageReward } from "../../shared/reward.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -124,21 +124,25 @@ function extractReward($: TrumfCheerio): string {
   const categories = extractCategoryRates($);
 
   if (categories.length > 0) {
-    const rates = categories.map((c) => c.rate);
-    const min = Math.min(...rates);
-    const max = Math.max(...rates);
+    const percentCategories = categories.filter((c) => c.rate > 0);
+    const krCategories = categories.filter((c) => c.krValue);
 
-    if (min === max) {
-      return `${formatRate(min)} %`;
+    if (percentCategories.length > 0) {
+      return formatPercentageReward(percentCategories.map((c) => c.rate));
     }
 
-    return `${formatRate(min)}-${formatRate(max)} %`;
+    if (krCategories.length > 0) {
+      const amounts = krCategories
+        .map((c) => Number.parseInt((c.krValue ?? "").replace(/[^\d]/g, ""), 10))
+        .filter((n) => n > 0);
+      const min = Math.min(...amounts);
+      const max = Math.max(...amounts);
+      return min < max ? `${min}-${max} kr` : `${max} kr`;
+    }
   }
 
   const text = normalizeWhitespace($("body").text());
-  const percentageReward = extractPercentageReward(text);
-
-  return percentageReward || extractKrReward(text);
+  return extractPercentageReward(text) || extractKrReward(text);
 }
 
 function extractTerms($: TrumfCheerio): string {
@@ -161,6 +165,8 @@ function extractTerms($: TrumfCheerio): string {
 
 type CategoryRate = { category: string; rate: number };
 
+type CategoryRate = { category: string; rate: number; krValue?: string };
+
 function extractCategoryRates($: TrumfCheerio): CategoryRate[] {
   const titles = $(".merchant-list-offer-title").toArray();
   const values = $(".merchant-list-offer-value").toArray();
@@ -174,6 +180,11 @@ function extractCategoryRates($: TrumfCheerio): CategoryRate[] {
     if (rateMatch !== null && rateMatch[1] !== undefined) {
       const rate = Number.parseFloat(rateMatch[1].replace(",", "."));
       categories.push({ category, rate });
+    } else {
+      const krMatch = valueText.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
+      if (krMatch !== null) {
+        categories.push({ category, rate: 0, krValue: valueText });
+      }
     }
   }
 
