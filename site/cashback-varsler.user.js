@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778020274
+// @version      1778021747
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1494,6 +1494,9 @@
     }
     .offer-tooltip-section + .offer-tooltip-section {
       margin-top: 8px;
+    }
+    .offer-tooltip-section + .offer-tooltip-section:has(.offer-tooltip-list) {
+      margin-top: 14px;
     }
     .offer-tooltip-title {
       display: block;

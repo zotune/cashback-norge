@@ -466,6 +466,11 @@ function extractDetailReward(value: unknown): string {
 function extractDetailTerms(value: unknown): string {
   if (!isRecord(value)) return "";
 
+  const items = isRecord(value.keyInformation) && Array.isArray(value.keyInformation.items)
+    ? value.keyInformation.items.map(readString).filter(Boolean)
+    : [];
+  if (items.length > 0) return items.join("\n");
+
   const campaigns = extractCampaigns(value);
   if (campaigns.length > 0) {
     return campaigns
@@ -474,10 +479,7 @@ function extractDetailTerms(value: unknown): string {
       .join("\n");
   }
 
-  const items = isRecord(value.keyInformation) && Array.isArray(value.keyInformation.items)
-    ? value.keyInformation.items.map(readString).filter(Boolean)
-    : [];
-  return items.join("\n");
+  return "";
 }
 
 function extractDetailLookupNames(value: unknown): string[] {
