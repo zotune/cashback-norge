@@ -5,6 +5,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 const DEFAULT_TERMS = [

@@ -1,6 +1,6 @@
 export function extractPercentageValues(text: string): number[] {
   const values: number[] = [];
-  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?%(?!\s*[a-zA-ZæøåÆØÅ])/gi;
+  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?%(?![a-zA-ZæøåÆØÅ])/gi;
 
   for (const match of text.matchAll(percentPattern)) {
     values.push(parseRewardNumber(match[1]));
@@ -53,13 +53,13 @@ export function extractKrReward(text: string): string {
     // Extract all kr amounts in this clause, excluding "minst/minimum/over X kr"
     const amounts = clause.matchAll(/(?<!(?:minst|minimum|over|fra)\s{0,5})(\d[\d\s]*(?:,–)?)\s*kr\b/gi);
     for (const m of amounts) {
-      const n = parseKrNumber(m[1]);
+      const n = parseKrNumber(m[1] ?? "");
       if (n > 0) rabattValues.push(n);
     }
     // Also "X,– i rabatt" (no kr keyword)
     const dashAmounts = clause.matchAll(/(\d[\d\s]*),–\s*(?:i\s+)?(?:rabatt|avslag)\b/gi);
     for (const m of dashAmounts) {
-      const n = parseKrNumber(m[1]);
+      const n = parseKrNumber(m[1] ?? "");
       if (n > 0) rabattValues.push(n);
     }
   }
@@ -74,7 +74,7 @@ export function extractKrReward(text: string): string {
   const sparValues: number[] = [];
   const sparPattern = /(?:(?:spar\s+)?opptil|spar)\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*kr?\b/gi;
   for (const m of text.matchAll(sparPattern)) {
-    const n = parseKrNumber(m[1]);
+    const n = parseKrNumber(m[1] ?? "");
     if (n > 0) sparValues.push(n);
   }
   if (sparValues.length > 0) {
