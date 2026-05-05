@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778006558
+// @version      1778008017
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1572,7 +1572,7 @@
       display: block;
     }
   `;
-    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
+    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
     const CRYPTO_SUBSCRIPTIONS = {
@@ -1729,10 +1729,9 @@
       for (const { element, offer: offer2 } of tooltipElements) {
         const fullReward = formatRewardLabel(offer2.reward, offer2.provider);
         const compact = formatCompactRewardLabel(offer2);
-        const showRewardInTooltip = compact !== void 0 && fullReward !== compact && !fullReward.startsWith(compact);
+        compact !== void 0 && fullReward !== compact && !fullReward.startsWith(compact);
         const breakdown = amount > 0 ? formatBreakdownWithAmounts(offer2.terms, amount) : offer2.terms;
         const parts = [];
-        if (showRewardInTooltip) parts.push(fullReward);
         if (breakdown) parts.push(breakdown);
         setTooltipContent(element, parts);
       }
@@ -2613,7 +2612,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const tooltip = document.createElement("div");
       tooltip.className = "offer-tooltip";
       const tooltipParts = [];
-      if (showRewardInTooltip) tooltipParts.push(fullReward);
       if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
       if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
       setTooltipContent(tooltip, tooltipParts);

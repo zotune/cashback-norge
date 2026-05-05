@@ -1,8 +1,13 @@
+const MATERIAL_WORD_AFTER_PERCENT = /^\s+(?:bomull|polyester|lin|ull|nylon|akryl|viskose|elastan|silke|modal|lyocell|tencel|fleece|lær|skinn|rayon|spandex|denim)\b/i;
+
 export function extractPercentageValues(text: string): number[] {
   const values: number[] = [];
   const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?%(?![a-zA-ZæøåÆØÅ])/gi;
 
   for (const match of text.matchAll(percentPattern)) {
+    const afterMatch = text.slice((match.index ?? 0) + match[0].length);
+    if (MATERIAL_WORD_AFTER_PERCENT.test(afterMatch)) continue;
+
     values.push(parseRewardNumber(match[1]));
 
     if (match[2] !== undefined) {
