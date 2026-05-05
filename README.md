@@ -12,7 +12,7 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
    ```
 4. Åpne **[Safari](https://apps.apple.com/no/app/safari/id1146562112)** igjen og besøk en av butikkene under — Cashback Norge dukker opp nede til venstre på skjermen
 
-Husk å oppdatere scriptet i blant i Stay → Userscript.
+Cashback-data oppdateres automatisk. For nye funksjoner: åpne Stay → Userscript → Update.
 
 ## Chrome / Firefox (desktop)
 
