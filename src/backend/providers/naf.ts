@@ -373,7 +373,7 @@ function parseBenefitSummary(value: unknown): BenefitEntry | undefined {
   return {
     lookupNames: uniqueStringsPreserveOrder([name, partnerName, title]),
     name,
-    reward: INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : normalizeReward(readString(value.discountBadge)),
+    reward: INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : extractRewardFromText(readString(value.discountBadge)),
     slug,
   };
 }
@@ -405,7 +405,7 @@ function extractDetailReward(value: unknown): string {
   return (
     extractRewardFromItems(keyInformationItems) ||
     extractRewardFromText(collectText(value.body).join(" ")) ||
-    (INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : normalizeReward(readString(value.discountBadge)))
+    (INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : extractRewardFromText(readString(value.discountBadge)))
   );
 }
 
@@ -474,26 +474,6 @@ function collectValues(value: unknown, visit: (value: unknown) => void): void {
 
   if (!isRecord(value)) return;
   for (const item of Object.values(value)) collectValues(item, visit);
-}
-
-function normalizeReward(value: string): string {
-  const normalized = value
-    .replace(/\s+/g, " ")
-    .replace(/(\d)\s*–\s*(\d)/g, "$1-$2")
-    .replace(/(\d[\d\s]*),\s*[–-]/g, "$1 kr")
-    .replace(/(\d[\d\s]*),-/g, "$1 kr")
-    .replace(/\b[Ss]par opptil kr\s+/g, "Spar opptil ")
-    .replace(/\b[Ss]par kr\s+/g, "Spar ")
-    .replace(/\bkr\s+i rabatt\b/g, "kr rabatt")
-    .replace(/\bkr\s+(\d[\d\s]*)\s+kr\b/g, "$1 kr")
-    .trim();
-
-  if (!normalized || /^les mer$/i.test(normalized)) return "";
-
-  const negativeKrMatch = normalized.match(/^-\s*kr\s*(\d[\d\s]*)$/i);
-  if (negativeKrMatch) return `${negativeKrMatch[1]?.replace(/\s+/g, " ")} kr rabatt`;
-
-  return normalized;
 }
 
 // Insurance-specific terms that contain % values irrelevant to the member discount
