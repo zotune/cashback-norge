@@ -16,6 +16,7 @@ type ObosCheerio = CheerioCrawlingContext["$"];
 const LIST_URL = "https://www.obos.no/medlem/medlemsfordeler";
 const LABEL_LIST = "list";
 const LABEL_DETAIL = "detail";
+const DEFAULT_TERMS = "Krever OBOS-medlemskap.";
 
 const SKIP_HOSTNAMES = new Set([
   "obos.no",
@@ -110,6 +111,97 @@ function extractDiscount($: ObosCheerio): string {
   return extractDiscountFromText(trimRelatedBenefits(fullText));
 }
 
+function extractTerms($: ObosCheerio): string {
+  const memberBenefitTerms = extractMemberBenefitTerms($);
+  if (memberBenefitTerms) return memberBenefitTerms;
+
+  const contentEl = $("main, article").first();
+  const fullText = contentEl.length ? contentEl.text() : $("body").text();
+  return extractTermsFromText(fullText);
+}
+
+function extractMemberBenefitTerms($: ObosCheerio): string {
+  const heading = $("h2, h3")
+    .filter((_, el) => normalizeTextLine($(el).text()).toLowerCase() === "medlemsfordel")
+    .first();
+
+  if (!heading.length) return "";
+
+  const lines = ["Medlemsfordel"];
+  let node = heading.next();
+
+  while (node.length) {
+    if (node.is("h1, h2, h3")) break;
+    lines.push(...extractTextLines($, node));
+    node = node.next();
+  }
+
+  return uniqueTextLines(lines).join("\n");
+}
+
+function extractTermsFromText(text: string): string {
+  const scopedText = trimRelatedBenefits(text);
+  const startMatch = scopedText.match(/\bmedlemsfordel\b/i);
+  if (!startMatch || startMatch.index === undefined) return "";
+
+  const afterStart = scopedText.slice(startMatch.index);
+  const endMatch = afterStart.search(/slik får du rabatt|om [^\n]+|relaterte fordeler/i);
+  const sectionText = endMatch === -1 ? afterStart : afterStart.slice(0, endMatch);
+
+  return uniqueTextLines(
+    sectionText
+      .split(/\n+/)
+      .map(normalizeTextLine)
+      .filter(Boolean),
+  ).join("\n");
+}
+
+function extractTextLines($: ObosCheerio, element: ReturnType<ObosCheerio>): string[] {
+  if (element.is("script, style, svg, picture, img")) return [];
+
+  if (element.is("ul, ol")) {
+    const lines: string[] = [];
+    element.children("li").each((_, li) => {
+      const text = normalizeTextLine($(li).text());
+      if (text) lines.push(text);
+    });
+    return lines;
+  }
+
+  if (element.is("li, p")) {
+    const text = normalizeTextLine(element.text());
+    return text ? [text] : [];
+  }
+
+  const children = element.children("p, ul, ol, li");
+  if (children.length) {
+    const lines: string[] = [];
+    children.each((_, child) => {
+      lines.push(...extractTextLines($, $(child)));
+    });
+    return lines;
+  }
+
+  const text = normalizeTextLine(element.text());
+  return text ? [text] : [];
+}
+
+function normalizeTextLine(value: string): string {
+  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function uniqueTextLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const uniqueLines: string[] = [];
+  for (const line of lines) {
+    const normalized = normalizeTextLine(line);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    uniqueLines.push(normalized);
+  }
+  return uniqueLines;
+}
+
 function extractDiscountFromText(text: string): string {
   return extractPercentageReward(text) || extractKrReward(text);
 }
@@ -148,6 +240,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
   const slugToName = new Map<string, string>();
   const slugToDiscount = new Map<string, string>();
   const slugToDomain = new Map<string, string>();
+  const slugToTerms = new Map<string, string>();
 
   const storage = new MemoryStorage({ persistStorage: false });
   const config = new Configuration();
@@ -261,6 +354,8 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
 
         const discount = extractDiscount($);
         if (discount) slugToDiscount.set(slug, discount);
+        const terms = extractTerms($);
+        if (terms) slugToTerms.set(slug, terms);
 
         if (ctaUrl) {
           try {
@@ -302,6 +397,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
 
     const sourceUrl = `${LIST_URL}/${encodeURIComponent(slug)}`;
     const reward = slugToDiscount.get(slug) ?? "";
+    const terms = slugToTerms.get(slug) ?? DEFAULT_TERMS;
 
     offers.push({
       provider: "obos",
@@ -310,7 +406,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
       reward,
       sourceUrl,
       activationUrl: sourceUrl,
-      terms: "Krever OBOS-medlemskap.",
+      terms,
       updatedAt: input.generatedAt,
     });
   }
