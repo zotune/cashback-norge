@@ -394,6 +394,29 @@ function extractStoreUrl(value: unknown): string | undefined {
   });
 }
 
+type NafCampaign = { label: string; text: string };
+
+const CAMPAIGN_CTA_NOISE = /^logg inn/i;
+
+function extractCampaigns(value: unknown): NafCampaign[] {
+  if (!isRecord(value) || !Array.isArray(value.campaign)) return [];
+  const result: NafCampaign[] = [];
+  for (const item of value.campaign) {
+    if (!isRecord(item)) continue;
+    const label = readString(item.label);
+    const rawText = collectPortableText(item.mainText);
+    const bodyText = rawText
+      .split(/\s{2,}/)
+      .filter((t) => !CAMPAIGN_CTA_NOISE.test(t.trim()))
+      .join(" ")
+      .trim();
+    if (label || bodyText) {
+      result.push({ label, text: bodyText });
+    }
+  }
+  return result;
+}
+
 function extractDetailReward(value: unknown): string {
   if (!isRecord(value)) return "";
 
@@ -402,15 +425,55 @@ function extractDetailReward(value: unknown): string {
     ? value.keyInformation.items.map(readString).filter(Boolean)
     : [];
 
-  return (
-    extractRewardFromItems(keyInformationItems) ||
-    extractRewardFromText(collectText(value.body).join(" ")) ||
-    (INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : extractRewardFromText(readString(value.discountBadge)))
-  );
+  const fromItems = extractRewardFromItems(keyInformationItems);
+  if (fromItems) return fromItems;
+
+  // Collect rewards from top-level discountBadge and all campaign labels/text
+  const badges: string[] = [];
+  if (!INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge))) {
+    badges.push(readString(value.discountBadge));
+  }
+  for (const c of extractCampaigns(value)) {
+    badges.push(c.label, c.text);
+  }
+
+  const percents: number[] = [];
+  for (const text of badges.filter(Boolean)) {
+    const r = extractRewardFromText(text);
+    const m = r.match(/(\d+(?:[,.]\d+)?)(?:\s*[-–]\s*(\d+(?:[,.]\d+)?))?\s*%/);
+    if (m) {
+      if (m[2] !== undefined) {
+        percents.push(Number.parseFloat(m[1]!.replace(",", ".")), Number.parseFloat(m[2].replace(",", ".")));
+      } else if (m[1] !== undefined) {
+        percents.push(Number.parseFloat(m[1].replace(",", ".")));
+      }
+    } else if (r.endsWith("%") || r.includes(" %")) {
+      const n = Number.parseFloat(r.replace(/[^\d,.]/g, "").replace(",", "."));
+      if (!Number.isNaN(n)) percents.push(n);
+    }
+  }
+
+  if (percents.length > 0) {
+    const min = Math.min(...percents);
+    const max = Math.max(...percents);
+    const fmt = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(1).replace(".", ","));
+    return min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
+  }
+
+  return extractRewardFromText(collectText(value.body).join(" "));
 }
 
 function extractDetailTerms(value: unknown): string {
   if (!isRecord(value)) return "";
+
+  const campaigns = extractCampaigns(value);
+  if (campaigns.length > 0) {
+    return campaigns
+      .map((c) => [c.label, c.text].filter(Boolean).join(": "))
+      .filter(Boolean)
+      .join("\n");
+  }
+
   const items = isRecord(value.keyInformation) && Array.isArray(value.keyInformation.items)
     ? value.keyInformation.items.map(readString).filter(Boolean)
     : [];
@@ -462,6 +525,31 @@ function collectText(value: unknown): string[] {
     if (typeof candidate === "string") text.push(candidate);
   });
   return text;
+}
+
+/** Extract plain text from Sanity portable text blocks (only span.text fields) */
+function collectPortableText(value: unknown): string {
+  const parts: string[] = [];
+
+  function visitBlock(block: unknown): void {
+    if (!isRecord(block)) return;
+    // portable text block: gather text from children spans
+    if (Array.isArray(block.children)) {
+      for (const child of block.children) {
+        if (isRecord(child) && typeof child.text === "string" && child.text.trim()) {
+          parts.push(child.text.trim());
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(value)) {
+    for (const block of value) visitBlock(block);
+  } else {
+    visitBlock(value);
+  }
+
+  return parts.join(" ");
 }
 
 function collectValues(value: unknown, visit: (value: unknown) => void): void {
