@@ -941,8 +941,10 @@ function getMaxPct(o) {
   if (pct) return parseFloat(pct[1].replace(",", "."));
   const sas = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
   if (sas) return parseInt(sas[1].replace(/\s/g, ""), 10) / EB_PER_TRUMF_KR;
-  const kr = r.match(/([\d.,]+)\s*kr/i);
-  if (kr) return parseFloat(kr[1].replace(",", ".")) / 1000;
+  const kr = r.match(/^([\d.,]+)-([\d.,]+)\s*kr/i);
+  if (kr) return parseFloat(kr[2].replace(",", ".")) / 1000;
+  const krSingle = r.match(/([\d.,]+)\s*kr/i);
+  if (krSingle) return parseFloat(krSingle[1].replace(",", ".")) / 1000;
   return 0;
 }
 
