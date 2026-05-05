@@ -466,8 +466,9 @@ function extractDetailReward(value: unknown): string {
 function extractDetailTerms(value: unknown): string {
   if (!isRecord(value)) return "";
 
-  const items = isRecord(value.keyInformation) && Array.isArray(value.keyInformation.items)
-    ? value.keyInformation.items.map(readString).filter(Boolean)
+  const keyInfo = value.keyInformation;
+  const items = isRecord(keyInfo) && Array.isArray(keyInfo.items)
+    ? keyInfo.items.map(readString).filter(Boolean)
     : [];
 
   const campaigns = extractCampaigns(value);
@@ -475,7 +476,18 @@ function extractDetailTerms(value: unknown): string {
     .map((c) => [c.label, c.text].filter(Boolean).join(": "))
     .filter(Boolean);
 
-  return [...items, ...campaignLines].join("\n");
+  const parts: string[] = [];
+
+  if (items.length > 0) {
+    const title = isRecord(keyInfo) ? readString(keyInfo.title) : "";
+    parts.push(title ? `${title}\n${items.join("\n")}` : items.join("\n"));
+  }
+
+  for (const line of campaignLines) {
+    parts.push(line);
+  }
+
+  return parts.join("\n\n");
 }
 
 function extractDetailLookupNames(value: unknown): string[] {
