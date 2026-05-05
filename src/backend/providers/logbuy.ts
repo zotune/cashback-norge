@@ -31,6 +31,7 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
     slug: string;
     name: string;
     reward: string;
+    fordeler: string;
   };
 
   const deals = new Map<string, DealEntry>(); // slug → entry
@@ -61,7 +62,7 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
           let name = card.find("h3.product-finder__card-title").first().text().trim();
           if (!name) name = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-          deals.set(slug, { slug, name, reward: "" });
+          deals.set(slug, { slug, name, reward: "", fordeler: "" });
           detailUrls.push(`${LIST_URL}/${slug}-rabattkode`);
         });
 
@@ -80,10 +81,14 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
         const entry = deals.get(slug);
         if (!entry) return;
 
-        // p.text-medium holds the precise discount description, e.g. "10 % rabatt på bøker fra Adlibris."
+        // p.text-medium holds the precise discount description
         const raw = $("p.text-medium").first().text().trim().replace(/\s+/g, " ");
         const reward = extractPercentageReward(raw) || extractKrReward(raw);
         if (reward) entry.reward = reward;
+
+        // Extract "Hvilke fordeler" FAQ answer
+        const fordeler = $(".panel [itemprop='text']").first().text().trim().replace(/\s+/g, " ");
+        if (fordeler) entry.fordeler = fordeler;
       }
     },
   }, config);
@@ -125,7 +130,7 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
       reward: deal.reward,
       sourceUrl,
       activationUrl: sourceUrl,
-      terms: "Krever LogBuy-tilgang gjennom din arbeidsgiver.",
+      terms: deal.fordeler || "Krever LogBuy-tilgang gjennom din arbeidsgiver.",
       updatedAt: input.generatedAt,
     });
   }
