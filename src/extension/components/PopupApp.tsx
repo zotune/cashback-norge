@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import React, { useEffect, useState, type ReactElement } from "react";
 import type { CashbackOffer } from "../../shared/cashback.js";
 import {
   type GetOffersForUrlMessage,
@@ -307,10 +307,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
     : null;
 
   return (
-    <div className="offer-wrapper" style={{ position: "relative" }}>
-      {tooltipContent !== null && (
-        <div className="offer-tooltip">{tooltipContent}</div>
-      )}
+    <div className="offer-wrapper">
       <a
         className="offer"
         href={props.offer.provider === "trumf" || props.offer.provider === "klarna" ? props.offer.sourceUrl : props.offer.activationUrl}

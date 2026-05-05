@@ -1747,6 +1747,28 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const row = document.createElement("div");
     row.className = "code-item-row";
     row.append(item, copyBtn);
+
+    // Terms tooltip for provider codes (e.g. DNB)
+    if (codeOffer.terms) {
+      const termsTooltip = document.createElement("div");
+      termsTooltip.className = "offer-tooltip";
+      termsTooltip.textContent = codeOffer.terms;
+      shadowRoot.append(termsTooltip);
+      row.addEventListener("mouseenter", () => {
+        const panelEl = shadowRoot.querySelector(".panel");
+        const panelRect = panelEl?.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        termsTooltip.style.left = "-9999px";
+        termsTooltip.style.top = "-9999px";
+        termsTooltip.classList.add("visible");
+        const tooltipHeight = termsTooltip.offsetHeight;
+        const rightEdge = panelRect ? panelRect.right + 6 : rowRect.right + 6;
+        termsTooltip.style.left = `${rightEdge}px`;
+        termsTooltip.style.top = `${rowRect.top + rowRect.height / 2 - tooltipHeight / 2}px`;
+      });
+      row.addEventListener("mouseleave", () => { termsTooltip.classList.remove("visible"); });
+    }
+
     return row;
   };
 

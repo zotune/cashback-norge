@@ -2,6 +2,143 @@ import { gotScraping } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
 
+// ---------------------------------------------------------------------------
+// Supertilbud
+// ---------------------------------------------------------------------------
+
+type RichTextBlock = { type: string; children: Array<{ text?: string; bold?: boolean }> };
+
+type DnbSuperOfferItem = {
+  offer: string;
+  title: string;
+  description: RichTextBlock[];
+  disclaimer: RichTextBlock[];
+  url: { path: string; href: string };
+};
+
+function extractRichText(blocks: RichTextBlock[]): string {
+  return blocks
+    .flatMap((p) => p.children.map((c) => c.text ?? ""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+type DnbSuperOfferSection = {
+  title: string;
+  superOfferItems: DnbSuperOfferItem[];
+};
+
+export type FetchDnbSupertilbudInput = {
+  pageDataUrl: string;
+  generatedAt: string;
+  logger: Logger;
+};
+
+/** Parse date range from title like "Supertilbud torsdag 7. – lørdag 9. mai." */
+function parseSuperOfferDateRange(title: string): { start: Date; end: Date } | undefined {
+  const MONTHS: Record<string, number> = {
+    januar: 0, februar: 1, mars: 2, april: 3, mai: 4, juni: 5,
+    juli: 6, august: 7, september: 8, oktober: 9, november: 10, desember: 11,
+  };
+  // "7. – 9. mai" — skip any non-digit chars between the two day numbers
+  const m = title.match(/(\d{1,2})\.[^\d]+(\d{1,2})\.\s*([a-zæøåA-ZÆØÅ]+)/u);
+  if (!m) return undefined;
+  const [, startDay, endDay, monthStr] = m;
+  const month = MONTHS[monthStr?.toLowerCase() ?? ""];
+  if (month === undefined) return undefined;
+  const year = new Date().getFullYear();
+  const start = new Date(year, month, Number(startDay), 0, 0, 0);
+  const end = new Date(year, month, Number(endDay), 23, 59, 59);
+  return { start, end };
+}
+
+function extractDisclaimerCode(item: DnbSuperOfferItem): string | undefined {
+  const text = extractRichText(item.disclaimer);
+  const m = text.match(/Rabattkode[:\s]+([A-Z0-9]+)/i);
+  return m?.[1];
+}
+
+function buildSuperOfferTerms(sectionTitle: string, item: DnbSuperOfferItem): string {
+  const parts: string[] = [];
+  parts.push(sectionTitle.replace(/\.\s*$/, ""));
+  const desc = extractRichText(item.description);
+  if (desc) parts.push(desc);
+  const disclaimer = extractRichText(item.disclaimer)
+    .replace(/Rabattkode[:\s]+[A-Z0-9]+\.?\s*/gi, "")
+    .trim();
+  if (disclaimer) parts.push(disclaimer);
+  const code = extractDisclaimerCode(item);
+  parts.push(`Rabattkode: ${code ?? "DNBSUPER75"}. Betal med DNB-kort.`);
+  return parts.join("\n");
+}
+
+export async function fetchDnbSupertilbud(
+  input: FetchDnbSupertilbudInput,
+): Promise<CashbackOffer[]> {
+  input.logger.info(`Fetching DNB Supertilbud from ${input.pageDataUrl}`);
+
+  const response = await gotScraping(input.pageDataUrl, {
+    responseType: "json",
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`DNB Supertilbud returned ${response.statusCode}`);
+  }
+
+  const body: unknown = response.body;
+  if (!isDnbPageData(body)) throw new Error("DNB Supertilbud: unexpected format");
+
+  const contentJson: unknown = JSON.parse(body.result.data.aemPage.data.content);
+  if (!isContentSections(contentJson)) throw new Error("DNB Supertilbud: no sections");
+
+  // Find the superOffer section
+  const superSection = contentJson.sections.find(
+    (s): s is DnbSuperOfferSection =>
+      isRecord(s) && Array.isArray((s as Record<string, unknown>).superOfferItems),
+  ) as DnbSuperOfferSection | undefined;
+
+  if (!superSection) {
+    input.logger.info("DNB Supertilbud: no superOfferItems found");
+    return [];
+  }
+
+  const sourceUrl = "https://www.dnb.no/kundeprogram/fordeler/supertilbud/manedens-tilbud";
+  const offers: CashbackOffer[] = [];
+
+  for (const item of superSection.superOfferItems) {
+    const reward = item.offer.trim();
+    if (!reward) continue;
+
+    const domain = extractDomainFromUrl(item.url.href ?? item.url.path);
+    if (!domain) continue;
+
+    const discountCode = extractDisclaimerCode(item);
+    const rewardLabel = reward.endsWith("%") ? reward : `${reward} %`;
+
+    offers.push({
+      provider: "dnb",
+      merchantName: item.title,
+      domains: [domain],
+      reward: rewardLabel,
+      sourceUrl,
+      activationUrl: sourceUrl,
+      terms: buildSuperOfferTerms(superSection.title, item),
+      ...(discountCode !== undefined ? { discountCode } : {}),
+      updatedAt: input.generatedAt,
+    });
+  }
+
+  input.logger.info(`DNB Supertilbud: found ${offers.length} offers`);
+  return offers;
+}
+
+// ---------------------------------------------------------------------------
+// Faste rabatter
+// ---------------------------------------------------------------------------
+
 type DnbCardDiscount = {
   offer: string;
   title: string;
@@ -78,6 +215,9 @@ export async function fetchDnb(
     }
 
     const dnbUrl = "https://www.dnb.no/kundeprogram/fordeler/faste-rabatter";
+    const termsParts: string[] = [];
+    if (discount.description) termsParts.push(discount.description);
+    termsParts.push("Rabattkode: DNB4935. Betal med DNB-kort.");
 
     offers.push({
       provider: "dnb",
@@ -86,7 +226,7 @@ export async function fetchDnb(
       reward,
       sourceUrl: dnbUrl,
       activationUrl: dnbUrl,
-      terms: "Rabattkode DNB4935 i handlekurven. Betal med DNB-kort.",
+      terms: termsParts.join("\n"),
       discountCode: "DNB4935",
       updatedAt: input.generatedAt,
     });

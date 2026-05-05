@@ -12,7 +12,7 @@ import { fetchSas } from "./providers/sas.js";
 import { fetchTfBank } from "./providers/tfbank.js";
 import { crawlTrumf } from "./providers/trumf.js";
 import { crawlCuponation } from "./providers/cuponation.js";
-import { fetchDnb } from "./providers/dnb.js";
+import { fetchDnb, fetchDnbSupertilbud } from "./providers/dnb.js";
 import { fetchCurve } from "./providers/curve.js";
 import { crawlFinnkupongkoder } from "./providers/finnkupongkoder.js";
 import { crawlKickback } from "./providers/kickback.js";
@@ -53,7 +53,9 @@ type CliConfig = {
   skipObos: boolean;
   skipNaf: boolean;
   skipSparebank1: boolean;
+  skipDnbSupertilbud: boolean;
   dnbPageDataUrl: string;
+  dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
   finnkupongkoderProxyUrl: string | undefined;
@@ -79,6 +81,7 @@ async function main(): Promise<void> {
     rememberOffers,
     tfBankOffers,
     dnbOffers,
+    dnbSupertilbudOffers,
     norskfamilieOffers,
     obosOffers,
     sparebank1Offers,
@@ -99,6 +102,9 @@ async function main(): Promise<void> {
     config.skipDnb ? Promise.resolve([]) : fetchDnb({
         generatedAt, logger, pageDataUrl: config.dnbPageDataUrl,
       }),
+    config.skipDnbSupertilbud ? Promise.resolve([]) : fetchDnbSupertilbud({
+        generatedAt, logger, pageDataUrl: config.dnbSupertilbudPageDataUrl,
+      }),
     config.skipNorskfamilie ? Promise.resolve([]) : crawlNorskfamilie(),
     config.skipObos ? Promise.resolve([]) : crawlObos({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -117,6 +123,7 @@ async function main(): Promise<void> {
     ...rememberOffers,
     ...tfBankOffers,
     ...dnbOffers,
+    ...dnbSupertilbudOffers,
     ...norskfamilieOffers,
     ...obosOffers,
     ...sparebank1Offers,
@@ -173,7 +180,7 @@ async function main(): Promise<void> {
       }),
   ]);
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers, ...sparebank1Offers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers, ...sparebank1Offers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -250,9 +257,13 @@ function readCliConfig(args: string[]): CliConfig {
     skipObos: args.includes("--skip-obos"),
     skipNaf: args.includes("--skip-naf"),
     skipSparebank1: args.includes("--skip-sparebank1"),
+    skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
+    dnbSupertilbudPageDataUrl:
+      readArgumentValue(args, "--dnb-supertilbud-page-data-url") ??
+      "https://www.dnb.no/web/page-data/kundeprogram/fordeler/supertilbud/manedens-tilbud/page-data.json",
     cuponationStartUrl:
       readArgumentValue(args, "--cuponation-start-url") ??
       "https://www.cuponation.no/topp-20",

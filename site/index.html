@@ -222,7 +222,8 @@ a.merchant-name:hover { text-decoration: underline; }
   border: 5px solid transparent;
   border-top-color: #172026;
 }
-.offer-wrap:hover > .offer-tooltip {
+.offer-wrap:hover > .offer-tooltip,
+.code-item-row:hover > .offer-tooltip {
   opacity: 1;
   pointer-events: auto;
 }
@@ -483,6 +484,7 @@ a.merchant-name:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
 }
 .code-item-row .code-item { flex: 1; min-width: 0; }
 .code-item-row--best .code-reward,
@@ -1115,7 +1117,7 @@ function render(query) {
         ? terms
         : hasBreakdown
         ? (currentAmount > 0 ? formatBreakdownWithAmounts(terms, currentAmount) : terms)
-        : (PROVIDER_TIPS[o.provider] || "");
+        : (terms || PROVIDER_TIPS[o.provider] || "");
       const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
       const cardOnly = ["sparebank1", "remember"].includes(o.provider);
       const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
@@ -1142,8 +1144,10 @@ function render(query) {
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
+      const codeTerms = o.terms || "";
+      const codeTooltipHtml = codeTerms ? `<span class="offer-tooltip">${esc(codeTerms)}</span>` : "";
       return `<div class="code-item-row" data-net="0">
-        <div class="code-item">
+        ${codeTooltipHtml}<div class="code-item">
           <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(o.reward)}</span>
           <span class="code-value">${esc(code)}</span>
           <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
