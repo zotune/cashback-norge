@@ -1036,7 +1036,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       display: block;
     }
   `;
-  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb");
+  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
   const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {

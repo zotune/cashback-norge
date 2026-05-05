@@ -1130,8 +1130,8 @@ function render(query) {
     const iconHtml = hasIcon
       ? `<img class="merchant-icon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
-    const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode" && o.provider !== "dnb");
-    const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb") && o.discountCode);
+    const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+    const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
     const offerHtml = cashbackOffers.map((o, idx) => {
       const url = o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
       const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
