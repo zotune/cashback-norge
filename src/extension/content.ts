@@ -1200,7 +1200,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       const showRewardInTooltip = compact !== undefined && fullReward !== compact && !fullReward.startsWith(compact);
       const breakdown = amount > 0 ? formatBreakdownWithAmounts(offer.terms, amount) : offer.terms;
       const parts: string[] = [];
-      if (showRewardInTooltip) parts.push(fullReward);
       if (breakdown) parts.push(breakdown);
       setTooltipContent(element, parts);
     }
@@ -2088,7 +2087,6 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     const tooltip = document.createElement("div");
     tooltip.className = "offer-tooltip";
     const tooltipParts: string[] = [];
-    if (showRewardInTooltip) tooltipParts.push(fullReward);
     if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
     if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
     setTooltipContent(tooltip, tooltipParts);

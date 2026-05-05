@@ -14,6 +14,7 @@ type SasShop = {
   slug: string;
   commission_type: string;
   points: number;
+  points_channel: number;
   fixed_cashback_text: string | null;
   has_campaign: number;
   points_campaign: number | null;
@@ -114,15 +115,26 @@ function formatSasReward(shop: SasShop): string {
 }
 
 function formatSasTerms(shop: SasShop): string {
-  if (shop.has_campaign !== 1 || shop.points_campaign === null || shop.points_campaign <= 0) {
-    return "";
+  const parts: string[] = [];
+
+  if (shop.commission_type === "variable") {
+    const basePoints = shop.points;
+    const channelPoints = shop.points_channel;
+    let line = `Tjen ${formatPoints(basePoints)} poeng`;
+    if (channelPoints > 0) line += ` + ${channelPoints} nivåpoeng`;
+    line += ` per 100 kr.`;
+    parts.push(line);
+  } else if (shop.fixed_cashback_text === null || shop.fixed_cashback_text.length === 0) {
+    parts.push(`Tjen ${formatPoints(shop.points)} poeng.`);
   }
 
-  const parts: string[] = [];
-  parts.push(`Kampanje: ${shop.points_campaign} poeng (normalt ${shop.points})`);
-  if (shop.campaign_ends_date !== null && shop.campaign_ends_date.length > 0) {
-    parts.push(`Gyldig til ${shop.campaign_ends_date}`);
+  if (shop.has_campaign === 1 && shop.points_campaign !== null && shop.points_campaign > 0) {
+    parts.push(`Kampanje: ${shop.points_campaign} poeng (normalt ${shop.points}).`);
+    if (shop.campaign_ends_date !== null && shop.campaign_ends_date.length > 0) {
+      parts.push(`Kampanje gyldig til ${shop.campaign_ends_date}.`);
+    }
   }
+
   return parts.join("\n");
 }
 
@@ -150,6 +162,7 @@ function isSasShop(value: unknown): value is SasShop {
     typeof value.slug === "string" &&
     typeof value.commission_type === "string" &&
     typeof value.points === "number" &&
+    typeof value.points_channel === "number" &&
     typeof value.has_campaign === "number" &&
     (value.points_campaign === null || typeof value.points_campaign === "number") &&
     (value.campaign_ends_date === null || typeof value.campaign_ends_date === "string")
