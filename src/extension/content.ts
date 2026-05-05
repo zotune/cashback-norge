@@ -2718,14 +2718,12 @@ async function detectConflicts(shadowRoot: ShadowRoot, titleEl: HTMLElement): Pr
   conflictTooltip.textContent = "Adblock er aktivert – kan blokkere cashback-sporing";
   shadowRoot.append(conflictTooltip);
   warningIcon.addEventListener("mouseenter", () => {
-    conflictTooltip.style.left = "-9999px";
-    conflictTooltip.style.top = "-9999px";
-    conflictTooltip.classList.add("visible");
-    const tooltipHeight = conflictTooltip.offsetHeight;
     const rect = warningIcon.getBoundingClientRect();
-    conflictTooltip.style.left = `${rect.left + rect.width / 2}px`;
-    conflictTooltip.style.top = `${rect.top - tooltipHeight - 6}px`;
-    conflictTooltip.style.transform = "translateX(-50%)";
+    conflictTooltip.style.left = `${rect.right + 8}px`;
+    conflictTooltip.style.top = `${rect.top + rect.height / 2}px`;
+    conflictTooltip.style.transform = "translateY(-50%)";
+    shadowRoot.append(conflictTooltip);
+    conflictTooltip.classList.add("visible");
   });
   warningIcon.addEventListener("mouseleave", () => {
     conflictTooltip.classList.remove("visible");
