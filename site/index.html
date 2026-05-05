@@ -997,7 +997,6 @@ function groupByMerchant(offers) {
   const groups = [];
 
   for (const o of offers) {
-    if (!o.reward || !o.reward.trim()) continue;
     if (o.provider === "curve") continue;
 
     const usableDomains = (o.domains || []).map(canonicalDomain).filter(d => !sharedDomains.has(d));
@@ -1500,7 +1499,7 @@ function formatReward(o) {
   const r = o.reward.trim();
   if (!r) {
     if (o.provider === "obos") return "Medlemsfordel";
-    return "Cashback";
+    return "?";
   }
   if (o.provider === "sas") {
     const rate = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);

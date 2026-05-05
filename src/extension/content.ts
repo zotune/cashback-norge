@@ -2736,7 +2736,7 @@ function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
   if (trimmedReward.length === 0) {
     if (provider === "obos") return "Medlemsfordel";
-    return "Cashback";
+    return "?";
   }
   // For SAS, convert to percentage-first display with ~ prefix
   if (provider === "sas") {
