@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778016761
+// @version      1778017846
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -3113,7 +3113,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const trimmedReward = reward.trim();
     if (trimmedReward.length === 0) {
       if (provider === "obos") return "Medlemsfordel";
-      return "Cashback";
+      return "?";
     }
     if (provider === "sas") {
       const converted = convertSasToPercent(trimmedReward);

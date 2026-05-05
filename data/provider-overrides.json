@@ -1,5 +1,9 @@
 {
   "trumf": {
+    "db-trumf1": [
+      "dbjourney.com",
+      "db-journey.com"
+    ],
     "askeladden-navnelapper": [
       "navnelapper.no"
     ],
@@ -431,6 +435,10 @@
     ]
   },
   "klarna": {
+    "db": [
+      "dbjourney.com",
+      "db-journey.com"
+    ],
     "-other-stories": [
       "stories.com"
     ],
@@ -452,9 +460,6 @@
     ],
     "cpyou-b.v.": [
       "cpcompany.com"
-    ],
-    "db": [
-      "db-journey.com"
     ],
     "dekk": [
       "dekk.eu"
