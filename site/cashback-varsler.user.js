@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cashback Varsler
 // @namespace    https://cashbacknorge.no/
-// @version      1777939851
+// @version      1777939929
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @match        *://*/*
