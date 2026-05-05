@@ -9,7 +9,7 @@ const LABEL_DETAIL = "detail";
 const SLUG_TO_DOMAIN: Record<string, string> = {
   adlibris: "adlibris.com",
   apotekhjemno: "apotekhjem.no",
-  "askeladden-navnelapper": "askeladden.no",
+  "askeladden-navnelapper": "navnelapper.no",
   bagbrokers: "bagbrokers.no",
   "bakeren-og-kokken": "bakerenogkokken.no",
   bemz: "bemz.com",

@@ -1,5 +1,8 @@
 {
   "trumf": {
+    "askeladden-navnelapper": [
+      "navnelapper.no"
+    ],
     "acer-trumf": [
       "acer.com"
     ],
@@ -622,6 +625,9 @@
     ]
   },
   "sas": {
+    "navnelapper": [
+      "navnelapper.no"
+    ],
     "a-retro-tale": [
       "aretrotale.com"
     ],
@@ -825,8 +831,7 @@
       "myprotein.no"
     ],
     "navnelapper": [
-      "navnelapper.no",
-      "askeladden.no"
+      "navnelapper.no"
     ],
     "nespresso": [
       "nespresso.com"

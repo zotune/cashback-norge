@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778003417
+// @version      1778005727
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -2768,22 +2768,27 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function findOffersForHostname(cashbackIndex, hostname) {
     const normalizedHostname = normalizeHostname(hostname);
     const canonical = DOMAIN_ALIASES[normalizedHostname] ?? normalizedHostname;
+    const ccParentDomains = CC_SUBDOMAINS.flatMap(
+      (cc) => normalizedHostname.startsWith(`${cc}.`) ? [normalizedHostname.slice(cc.length + 1)] : []
+    );
     const lookupDomains = [
       normalizedHostname,
       ...canonical !== normalizedHostname ? [canonical] : [],
       ...getAlternateTldDomains(normalizedHostname),
-      ...CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`)
+      ...CC_SUBDOMAINS.map((cc) => `${cc}.${normalizedHostname}`),
+      ...ccParentDomains
     ];
     const indexMatches = lookupDomains.flatMap((domain) => {
       return cashbackIndex.domainIndex[domain] ?? [];
     });
-    const suffixMatches = cashbackIndex.offers.filter((offer) => {
+    const hasExactMatches = (cashbackIndex.domainIndex[normalizedHostname] ?? []).length > 0;
+    const suffixMatches = hasExactMatches ? [] : cashbackIndex.offers.filter((offer) => {
       return offer.domains.some((domain) => {
         const normalizedDomain = normalizeDomainInput(domain);
         return normalizedDomain !== normalizedHostname && normalizedHostname.endsWith(`.${normalizedDomain}`);
       });
     });
-    const childDomainMatches = cashbackIndex.offers.filter((offer) => {
+    const childDomainMatches = hasExactMatches ? [] : cashbackIndex.offers.filter((offer) => {
       return offer.domains.some((domain) => {
         const normalizedDomain = normalizeDomainInput(domain);
         return lookupDomains.some((lookupDomain) => {
