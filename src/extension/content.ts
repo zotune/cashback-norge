@@ -261,14 +261,25 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   clearNotice();
   const host = document.createElement("div");
   host.id = HOST_ID;
+  applyHostOverlayStyle(host);
   const shadowRoot = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = `
     :host {
       all: initial;
+      background: transparent;
+      border: 0;
       bottom: 16px;
+      box-sizing: border-box;
+      display: block;
+      height: 0;
+      inset: auto auto 16px 0;
       left: 0;
+      margin: 0;
+      overflow: visible;
+      padding: 0;
       position: fixed;
+      width: 0;
       z-index: 2147483647;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       -webkit-font-smoothing: antialiased;
@@ -280,6 +291,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .notice {
       display: flex;
       align-items: flex-end;
+      bottom: 16px;
+      left: 0;
+      max-width: 100vw;
+      position: fixed;
+      width: max-content;
+      z-index: 2147483647;
     }
     .side-tab {
       appearance: none;
@@ -2100,6 +2117,21 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
 }
 function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
+}
+function applyHostOverlayStyle(host: HTMLElement): void {
+  host.style.setProperty("background", "transparent", "important");
+  host.style.setProperty("border", "0", "important");
+  host.style.setProperty("bottom", "16px", "important");
+  host.style.setProperty("display", "block", "important");
+  host.style.setProperty("height", "0", "important");
+  host.style.setProperty("inset", "auto auto 16px 0", "important");
+  host.style.setProperty("left", "0", "important");
+  host.style.setProperty("margin", "0", "important");
+  host.style.setProperty("overflow", "visible", "important");
+  host.style.setProperty("padding", "0", "important");
+  host.style.setProperty("position", "fixed", "important");
+  host.style.setProperty("width", "0", "important");
+  host.style.setProperty("z-index", "2147483647", "important");
 }
 function createSiteIcon(): HTMLImageElement {
   const siteIcon = document.createElement("img");

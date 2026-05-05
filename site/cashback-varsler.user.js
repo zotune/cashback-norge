@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1777978128
+// @version      1777980450
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -797,14 +797,25 @@
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
+    applyHostOverlayStyle(host);
     const shadowRoot = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = `
     :host {
       all: initial;
+      background: transparent;
+      border: 0;
       bottom: 16px;
+      box-sizing: border-box;
+      display: block;
+      height: 0;
+      inset: auto auto 16px 0;
       left: 0;
+      margin: 0;
+      overflow: visible;
+      padding: 0;
       position: fixed;
+      width: 0;
       z-index: 2147483647;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       -webkit-font-smoothing: antialiased;
@@ -816,6 +827,12 @@
     .notice {
       display: flex;
       align-items: flex-end;
+      bottom: 16px;
+      left: 0;
+      max-width: 100vw;
+      position: fixed;
+      width: max-content;
+      z-index: 2147483647;
     }
     .side-tab {
       appearance: none;
@@ -2308,6 +2325,27 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const row = document.createElement("div");
       row.className = "code-item-row";
       row.append(item, copyBtn);
+      if (codeOffer.terms) {
+        const termsTooltip = document.createElement("div");
+        termsTooltip.className = "offer-tooltip";
+        termsTooltip.textContent = codeOffer.terms;
+        shadowRoot.append(termsTooltip);
+        row.addEventListener("mouseenter", () => {
+          const panelEl = shadowRoot.querySelector(".panel");
+          const panelRect = panelEl?.getBoundingClientRect();
+          const rowRect = row.getBoundingClientRect();
+          termsTooltip.style.left = "-9999px";
+          termsTooltip.style.top = "-9999px";
+          termsTooltip.classList.add("visible");
+          const tooltipHeight = termsTooltip.offsetHeight;
+          const rightEdge = panelRect ? panelRect.right + 6 : rowRect.right + 6;
+          termsTooltip.style.left = `${rightEdge}px`;
+          termsTooltip.style.top = `${rowRect.top + rowRect.height / 2 - tooltipHeight / 2}px`;
+        });
+        row.addEventListener("mouseleave", () => {
+          termsTooltip.classList.remove("visible");
+        });
+      }
       return row;
     };
     codesSection.append(codesToggle, codesList, expiredSection);
@@ -2595,6 +2633,21 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function clearNotice() {
     document.getElementById(HOST_ID)?.remove();
+  }
+  function applyHostOverlayStyle(host) {
+    host.style.setProperty("background", "transparent", "important");
+    host.style.setProperty("border", "0", "important");
+    host.style.setProperty("bottom", "16px", "important");
+    host.style.setProperty("display", "block", "important");
+    host.style.setProperty("height", "0", "important");
+    host.style.setProperty("inset", "auto auto 16px 0", "important");
+    host.style.setProperty("left", "0", "important");
+    host.style.setProperty("margin", "0", "important");
+    host.style.setProperty("overflow", "visible", "important");
+    host.style.setProperty("padding", "0", "important");
+    host.style.setProperty("position", "fixed", "important");
+    host.style.setProperty("width", "0", "important");
+    host.style.setProperty("z-index", "2147483647", "important");
   }
   function createSiteIcon() {
     const siteIcon = document.createElement("img");
