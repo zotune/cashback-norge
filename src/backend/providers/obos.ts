@@ -234,7 +234,7 @@ function extractRewardFromTerms(terms: string): string {
   const hourlyPrices = [...terms.matchAll(/(\d[\d\s]*)\s*kr\s+per\s+time/gi)]
     .map((match) => Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10))
     .filter((value) => Number.isFinite(value) && value > 0);
-  const fixedPrices = [...terms.replace(/\([^)]*\)/g, "").matchAll(/:\s*(\d[\d\s]*)\s*(?:kr|kroner)\b(?!\s+per\s+time)/gi)]
+  const fixedPrices = [...terms.replace(/\([^)]*\)/g, "").matchAll(/(?:^|:\s*)(\d[\d\s]*)\s*(?:kr|kroner)\b(?!\s+per\s+time)/gim)]
     .map((match) => Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10))
     .filter((value) => Number.isFinite(value) && value > 0);
 
