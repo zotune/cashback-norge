@@ -8,6 +8,8 @@
     "build:userscript": "vite build --config vite.userscript.config.ts",
     "build:backend": "tsc --project tsconfig.backend.json",
     "build:extension": "vite build --config vite.extension.config.ts",
+    "build:extension:store": "pnpm run build:extension && node scripts/build-extension-store.mjs",
+    "build:store": "pnpm run build:extension:store",
     "build:site": "vite build --config vite.site.config.ts",
     "check": "tsc --project tsconfig.json --noEmit",
     "crawl": "tsx src/backend/index.ts && cp data/cashback-index.json site/cashback-index.json"

@@ -16,3 +16,11 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
 ## Chrome / Firefox (desktop)
 
 Last ned og installer extensionen manuelt fra `dist/extension/` etter bygging.
+
+For Chrome Web Store:
+
+```bash
+pnpm run build:store
+```
+
+Kommandoen bygger extensionen og lager en opplastbar zip i `dist/` med versjonen fra `src/extension/public/manifest.json`.
