@@ -19,7 +19,7 @@ const VERSION = `${Math.floor(Date.now() / 1000)}`;
 
 const USERSCRIPT_BANNER = `\
 // ==UserScript==
-// @name         Cashback Norge
+// @name         cashbacknorge.no
 // @namespace    ${PAGES_URL}/
 // @version      ${VERSION}
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
