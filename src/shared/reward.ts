@@ -51,7 +51,7 @@ export function extractKrReward(text: string): string {
   for (const clause of clauses) {
     if (!/\b(?:rabatt|avslag)\b/i.test(clause)) continue;
     // Extract all kr amounts in this clause, excluding "minst/minimum/over X kr"
-    const amounts = clause.matchAll(/(?<!(?:minst|minimum|over|fra)\s{0,5})(\d[\d\s]*(?:,–)?)\s*kr\b/gi);
+    const amounts = clause.matchAll(/(?<!(?:minst|minimum|over|fra)\s{0,5})(\d[\d\s]*(?:,–)?)\s*(?:kroner|kr)\b/gi);
     for (const m of amounts) {
       const n = parseKrNumber(m[1] ?? "");
       if (n > 0) rabattValues.push(n);
