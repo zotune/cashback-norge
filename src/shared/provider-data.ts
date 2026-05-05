@@ -191,4 +191,5 @@ export const MERCHANT_ALIASES: Record<string, string> = {
   "vetzoo.no": "vetzoo",
   "new vetzoo.no kco v.3 b2b recurring": "vetzoo",
   "veromoda": "vero moda",
+  "bo hos strawberry": "strawberry",
 };

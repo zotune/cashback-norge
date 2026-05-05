@@ -1109,7 +1109,7 @@ function render(query) {
       const fullReward = formatReward(o);
       const compact = formatCompactReward(o);
       const terms = o.terms || "";
-      const hasBreakdown = terms.includes("\n") && /\d+.*%/.test(terms);
+      const hasBreakdown = terms.includes("\n") && (/\d+.*%/.test(terms) || /\d+\s*prosent/i.test(terms));
       const rewardDetail = o.provider === "cbn" ? "" : (compact !== fullReward) ? fullReward : "";
       const tipBase = o.provider === "cbn"
         ? terms
