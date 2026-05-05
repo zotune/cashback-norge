@@ -108,6 +108,7 @@ type BenefitEntry = {
   reward: string;
   slug: string;
   storeUrl?: string;
+  terms?: string;
 };
 
 type NafApiConfig = {
@@ -176,7 +177,9 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
       reward: b.reward,
       sourceUrl,
       activationUrl: sourceUrl,
-      terms: "Krever NAF-medlemskap.",
+      terms: b.terms ? `${b.terms}
+
+Krever NAF-medlemskap.` : "Krever NAF-medlemskap.",
       updatedAt: input.generatedAt,
     });
   }
@@ -292,6 +295,8 @@ async function enrichBenefitDetails(
 
       if (storeUrl !== undefined) benefit.storeUrl = storeUrl;
       if (reward) benefit.reward = reward;
+      const terms = extractDetailTerms(detail);
+      if (terms) benefit.terms = terms;
       benefit.lookupNames = uniqueStringsPreserveOrder([
         ...benefit.lookupNames,
         ...detailLookupNames,
@@ -402,6 +407,14 @@ function extractDetailReward(value: unknown): string {
     extractRewardFromText(collectText(value.body).join(" ")) ||
     normalizeReward(readString(value.discountBadge))
   );
+}
+
+function extractDetailTerms(value: unknown): string {
+  if (!isRecord(value)) return "";
+  const items = isRecord(value.keyInformation) && Array.isArray(value.keyInformation.items)
+    ? value.keyInformation.items.map(readString).filter(Boolean)
+    : [];
+  return items.join("\n");
 }
 
 function extractDetailLookupNames(value: unknown): string[] {
