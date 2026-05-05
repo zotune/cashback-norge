@@ -1397,6 +1397,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     addCodeTooltip.style.left = `${rect.left + rect.width / 2}px`;
     addCodeTooltip.style.top = `${rect.top - 30}px`;
     addCodeTooltip.style.transform = "translateX(-50%)";
+    shadowRoot.append(addCodeTooltip); // re-append to ensure paint order on top
     addCodeTooltip.classList.add("visible");
   });
   addCodeBtn.addEventListener("mouseleave", () => { addCodeTooltip.classList.remove("visible"); });
