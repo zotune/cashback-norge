@@ -1622,6 +1622,11 @@ function formatTooltipSectionHtml(part) {
   const lines = part.split("\n").map(line => line.trim()).filter(Boolean);
   if (lines.length === 0) return "";
   if (lines.length === 1) {
+    const isRateLine = /^\d[\d.,]* (%|kr)/.test(lines[0] || "");
+    if (isRateLine) {
+      const item = `<span class="offer-tooltip-list-item"><span class="offer-tooltip-bullet">•</span><span>${esc(lines[0])}</span></span>`;
+      return `<span class="offer-tooltip-section"><span class="offer-tooltip-list">${item}</span></span>`;
+    }
     return `<span class="offer-tooltip-section"><span class="offer-tooltip-text">${esc(lines[0])}</span></span>`;
   }
 

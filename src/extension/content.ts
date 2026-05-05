@@ -959,6 +959,9 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     .offer-tooltip-section + .offer-tooltip-section {
       margin-top: 8px;
     }
+    .offer-tooltip-section + .offer-tooltip-section:has(.offer-tooltip-list) {
+      margin-top: 14px;
+    }
     .offer-tooltip-title {
       display: block;
       font-weight: 700;
@@ -2171,10 +2174,20 @@ function createTooltipSection(part: string): HTMLDivElement | undefined {
   section.className = "offer-tooltip-section";
 
   if (lines.length === 1) {
-    const text = document.createElement("span");
-    text.className = "offer-tooltip-text";
-    text.textContent = lines[0] ?? "";
-    section.append(text);
+    const isRateLine = /^\d[\d.,]* (%|kr)/.test(lines[0] ?? "");
+    if (isRateLine) {
+      const list = document.createElement("ul");
+      list.className = "offer-tooltip-list";
+      const item = document.createElement("li");
+      item.textContent = lines[0] ?? "";
+      list.append(item);
+      section.append(list);
+    } else {
+      const text = document.createElement("span");
+      text.className = "offer-tooltip-text";
+      text.textContent = lines[0] ?? "";
+      section.append(text);
+    }
     return section;
   }
 

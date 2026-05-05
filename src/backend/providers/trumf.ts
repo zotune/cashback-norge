@@ -149,9 +149,17 @@ function extractTerms($: TrumfCheerio): string {
   const categories = extractCategoryRates($);
 
   if (categories.length > 0) {
-    return categories
-      .map((c) => c.krValue ? `${c.krValue} – ${c.category}` : `${formatRate(c.rate)} % – ${c.category}`)
-      .join("\n");
+    const titles = $(".merchant-list-offer-title").toArray();
+    const values = $(".merchant-list-offer-value").toArray();
+    const details = $(".merchant-list-offer-detail").toArray();
+    const lines: string[] = [];
+    for (let i = 0; i < categories.length; i++) {
+      const c = categories[i]!;
+      const label = c.krValue ? `${c.krValue} – ${c.category}` : `${formatRate(c.rate)} % – ${c.category}`;
+      const detail = details[i] ? normalizeWhitespace($(details[i]).text()) : "";
+      lines.push(detail ? `${label}\n\n${detail}` : label);
+    }
+    return lines.join("\n\n");
   }
 
   const NOISE_PATTERNS = /^hei\s+(du|der)!?$/i;
