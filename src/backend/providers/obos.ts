@@ -119,7 +119,11 @@ function trimRelatedBenefits(text: string): string {
     /(?:relevante|relaterte|flere aktuelle)\s+medlemsfordeler/i,
   );
 
-  return relatedSectionMatch === -1 ? text : text.slice(0, relatedSectionMatch);
+  const trimmed = relatedSectionMatch === -1 ? text : text.slice(0, relatedSectionMatch);
+
+  // Strip lines mentioning "bonus-nivå" — OBOS uses this to describe a temporary registration
+  // tier (e.g. "10 % bonus-nivå") that doesn't reflect the actual member benefit (20 %)
+  return trimmed.split("\n").filter(line => !/bonus-nivå/i.test(line)).join("\n").trim();
 }
 
 function extractNextData($: ObosCheerio): unknown {
