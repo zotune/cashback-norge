@@ -1763,6 +1763,7 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
       copyTooltip.style.top = `${rect.top - 30}px`;
       copyTooltip.style.transform = "translateX(-50%)";
+      shadowRoot.append(copyTooltip); // re-append to paint on top
       copyTooltip.classList.add("visible");
     });
     copyBtn.addEventListener("mouseleave", () => { copyTooltip.classList.remove("visible"); });
