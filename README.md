@@ -10,9 +10,9 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
    ```
    https://cashbacknorge.no/cashback-varsler.user.js
    ```
-4. Åpne **[Safari](https://apps.apple.com/no/app/safari/id1146562112)** igjen og besøk en av butikkene under — Cashback Norge dukker opp nede til venstre på skjermen (oppdateres automatisk)
+4. Åpne **[Safari](https://apps.apple.com/no/app/safari/id1146562112)** igjen og besøk en av butikkene under — Cashback Norge dukker opp nede til venstre på skjermen
 
-Stay oppdaterer scriptet automatisk når nye versjoner slippes.
+Husk å oppdatere scriptet i blant i Stay → Userscript.
 
 ## Chrome / Firefox (desktop)
 
