@@ -148,7 +148,7 @@ function extractReward($: TrumfCheerio): string {
 function extractTerms($: TrumfCheerio): string {
   const categories = extractCategoryRates($);
 
-  if (categories.length > 1) {
+  if (categories.length > 0) {
     return categories
       .map((c) => c.krValue ? `${c.krValue} – ${c.category}` : `${formatRate(c.rate)} % – ${c.category}`)
       .join("\n");
