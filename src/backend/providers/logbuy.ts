@@ -86,9 +86,18 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
         const reward = extractPercentageReward(raw) || extractKrReward(raw);
         if (reward) entry.reward = reward;
 
-        // Extract "Hvilke fordeler" FAQ answer
-        const fordeler = $(".panel [itemprop='text']").first().text().trim().replace(/\s+/g, " ");
-        if (fordeler) entry.fordeler = fordeler;
+        // Extract first and last FAQ answers
+        const faqEls = $(".panel [itemprop='text']").toArray();
+        const faqParts: string[] = [];
+        if (faqEls.length > 0) {
+          const first = $(faqEls[0]).text().trim().replace(/\s+/g, " ");
+          if (first) faqParts.push(first);
+          if (faqEls.length > 1) {
+            const last = $(faqEls[faqEls.length - 1]).text().trim().replace(/\s+/g, " ");
+            if (last && last !== first) faqParts.push(last);
+          }
+        }
+        if (faqParts.length > 0) entry.fordeler = faqParts.join("\n\n");
       }
     },
   }, config);
