@@ -6,7 +6,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -137,9 +137,8 @@ function extractReward($: TrumfCheerio): string {
 
   const text = normalizeWhitespace($("body").text());
   const percentageReward = extractPercentageReward(text);
-  const krMatch = text.match(/(?:Opptil\s+)?\d+(?:[,.]\d+)?\s*kr/i);
 
-  return percentageReward || krMatch?.[0] || "";
+  return percentageReward || extractKrReward(text);
 }
 
 function extractTerms($: TrumfCheerio): string {

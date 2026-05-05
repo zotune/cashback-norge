@@ -1,6 +1,6 @@
 export function extractPercentageValues(text: string): number[] {
   const values: number[] = [];
-  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?%/gi;
+  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?%(?!\s*[a-zA-ZæøåÆØÅ])/gi;
 
   for (const match of text.matchAll(percentPattern)) {
     values.push(parseRewardNumber(match[1]));
@@ -41,6 +41,28 @@ export function normalizeRewardLabel(reward: string): string {
     .replace(/(\d+(?:[,.]\d+)?)\s*kr\b/gi, (_match, value: string) => {
       return `${formatLocalizedNumber(value)} kr`;
     });
+}
+
+export function extractKrReward(text: string): string {
+  // "600,– i rabatt", "600 kr i rabatt", "600 kr rabatt", "600 kr avslag"
+  const rabattMatch = text.match(
+    /(\d[\d\s]*(?:,–)?)\s*(?:kr\b)?\s*(?:i\s+)?(?:rabatt|avslag)\b/i,
+  );
+  if (rabattMatch) {
+    const value = rabattMatch[1].replace(/[,–\s]+$/, "").replace(/\s+/g, " ").trim();
+    return `${value} kr rabatt`;
+  }
+
+  // "Spar opptil 600 kr", "Spar 600 kr", "Opptil 600 kr"
+  const sparMatch = text.match(
+    /(?:(?:spar\s+)?opptil|spar)\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*kr?\b/i,
+  );
+  if (sparMatch) {
+    const value = sparMatch[1].replace(/\s+/g, " ").trim();
+    return `${value} kr`;
+  }
+
+  return "";
 }
 
 export function formatRewardNumber(value: number): string {

@@ -7,7 +7,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -491,10 +491,7 @@ function extractRewardFromText(text: string): string {
 
   if (percentageReward !== "") return percentageReward;
 
-  const krMatch = text.match(/(\d[\d\s]*)\s*kr\s*(?:i\s*)?(?:rabatt|avslag)?/i) ??
-    text.match(/spar\s+(?:opptil\s+)?(?:kr\s*)?(\d[\d\s]*)/i);
-  const krValue = krMatch?.[1]?.replace(/\s+/g, " ").trim();
-  return krValue ? `${krValue} kr rabatt` : "";
+  return extractKrReward(text);
 }
 
 function extractPartnerName(value: unknown): string {
