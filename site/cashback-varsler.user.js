@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778022887
+// @version      1778028130
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -2896,6 +2896,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         amount: parseLocalizedNumber(percentageMatch[1] ?? "0")
       };
     }
+    const pointsRateMatch = reward.match(/(\d[\d\s]*)\s*poeng\s+per\s+100\s*kr/i);
+    if (pointsRateMatch !== null) {
+      return {
+        kind: "percentage",
+        amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR
+      };
+    }
     const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
     if (unitMatch !== null) {
       return {
@@ -3151,6 +3158,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (percentMatch !== null) {
       const prefix = percentMatch[1] ?? "";
       return (prefix + percentMatch[2]).replace(/\s+/g, " ");
+    }
+    const totalSumMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
+    if (totalSumMatch !== null) {
+      return totalSumMatch[0].replace(/\s+/g, " ");
     }
     const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
     if (krRangeMatch !== null) {

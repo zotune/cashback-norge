@@ -30,9 +30,20 @@ export async function crawlTrumf(
   const config = new Configuration();
   config.useStorageClient(storage);
 
+  const baseUrl = new URL(input.startUrl).origin;
+  const pagedUrls: string[] = [];
+  for (let page = 0; ; page++) {
+    const url = `${baseUrl}/category/paged/all/100/${page}/alphabetical`;
+    const res = await fetch(url);
+    const html = await res.text();
+    const links = [...html.matchAll(/href="(\/cashback\/[^"]+)"/g)].map((m) => `${baseUrl}${m[1]}`);
+    if (links.length === 0) break;
+    pagedUrls.push(...links);
+  }
+
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.maxRequestsPerCrawl,
-    requestHandler: async ({ $, enqueueLinks, request }) => {
+    requestHandler: async ({ $, request }) => {
       const loadedUrl = request.loadedUrl ?? request.url;
       const parsedUrl = parseUrl(loadedUrl);
 
@@ -58,20 +69,10 @@ export async function crawlTrumf(
         offers.push(offer);
         return;
       }
-
-      await enqueueLinks({
-        label: "detail",
-        selector: 'a[href*="/cashback/"]',
-      });
-
-      await enqueueLinks({
-        label: "category",
-        selector: 'a[href*="/kategori/"]',
-      });
     },
   }, config);
 
-  await crawler.run([input.startUrl]);
+  await crawler.run(pagedUrls);
 
   const resolved = resolveDomainsForOffers(
     uniqueOffers(offers),
