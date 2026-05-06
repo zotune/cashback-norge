@@ -1,5 +1,8 @@
 {
   "trumf": {
+    "onyx-cookware-trumf": [
+      "onyxcookware.no"
+    ],
     "inkmann-trumf": [
       "inkmann.no"
     ],
@@ -536,6 +539,12 @@
   "remember": {
     "oakley-direct-deals": [
       "oakley.com"
+    ],
+    "ortovox-direct-deals": [
+      "ortovox.com"
+    ],
+    "orrefors-direct-deals": [
+      "orrefors.com"
     ],
     "newport-direct-deals": [
       "newport.se"
