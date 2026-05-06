@@ -223,7 +223,7 @@ function normalizeResolvedMerchantDomain(hostname: string): string {
   const normalizedDomain = normalizeDomainInput(hostname);
   const parts = normalizedDomain.split(".");
   const firstPart = parts[0] ?? "";
-  const affiliateSubdomainPrefixes = ["at", "go", "in", "ion", "pin", "dot", "do", "id", "on", "track", "click", "link", "out"];
+  const affiliateSubdomainPrefixes = ["at", "go", "in", "ion", "pin", "dot", "do", "id", "on", "to", "track", "click", "link", "out", "no-pin"];
 
   if (
     parts.length > 2 &&
