@@ -143,8 +143,7 @@ export async function crawlNaf(input: CrawlNafInput): Promise<CashbackOffer[]> {
     let domains: string[] = [];
 
     const overrideDomains = input.overrides.naf?.[b.slug] ?? [];
-    const firstOverride = overrideDomains[0];
-    if (firstOverride) { domains = [normalizeDomainInput(firstOverride)]; overrideCount++; }
+    if (overrideDomains.length > 0) { domains = overrideDomains.map(normalizeDomainInput); overrideCount++; }
 
     if (domains.length === 0 && b.storeUrl) {
       try {

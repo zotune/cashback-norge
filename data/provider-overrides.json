@@ -1174,6 +1174,10 @@
     ]
   },
   "naf": {
+    "noddi-hjulskift": [
+      "noddi.no",
+      "noddi.co"
+    ],
     "strawberry": [
       "strawberry.no"
     ],
@@ -1197,9 +1201,6 @@
     ],
     "dekkmann-mc-dekk": [
       "bestdrive.no"
-    ],
-    "noddi-hjulskift": [
-      "noddi.no"
     ],
     "fabel": [
       "fabel.no"
