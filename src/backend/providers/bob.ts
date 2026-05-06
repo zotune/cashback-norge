@@ -190,13 +190,16 @@ export async function crawlBob(input: CrawlBobInput): Promise<CashbackOffer[]> {
     const membershipDomains = selectDomainsForEntry(entry.name, allDomains)
       .filter((domain) => !codeDomainSet.has(domain));
     if (reward && membershipDomains.length > 0) {
+      const activationUrl = findActivationUrlForDomains(entry.externalUrls, membershipDomains) ??
+        entry.activationUrl ??
+        entry.sourceUrl;
       offers.push({
         provider: "bob",
         merchantName: merchantNameForEntry(entry.name, membershipDomains),
         domains: uniqueStrings(membershipDomains),
         reward,
         sourceUrl: entry.sourceUrl,
-        activationUrl: entry.sourceUrl,
+        activationUrl,
         terms,
         updatedAt: input.generatedAt,
       });
