@@ -19,6 +19,11 @@ type FinnkupongkoderElement = Parameters<FinnkupongkoderCheerio>[0];
 
 const CODE_KEY = "22c8254afb65e1093b1e254c7e9fee46e9ed27cf";
 
+// Domains that finnkupongkoder stores with wrong TLD
+const DOMAIN_CORRECTIONS: Record<string, string> = {
+  "scandichotels.no": "scandichotels.com",
+};
+
 export type CrawlFinnkupongkoderInput = {
   startUrl: string;
   maxRequestsPerCrawl: number;
@@ -227,7 +232,7 @@ function parseFinnkupongkoderDataModals(
       return;
     }
 
-    const domain = normalizeDomainInput(rawDomain);
+    const domain = DOMAIN_CORRECTIONS[normalizeDomainInput(rawDomain)] ?? normalizeDomainInput(rawDomain);
     const title =
       stripHtml(readString(modal["entry.title"])) ||
       stripHtml(entry.attr("data-title") ?? "");
@@ -460,7 +465,8 @@ function extractDomainFromStoreUrl(storeUrl: string): string | undefined {
     return undefined;
   }
 
-  return normalizeDomainInput(slug);
+  const domain = normalizeDomainInput(slug);
+  return DOMAIN_CORRECTIONS[domain] ?? domain;
 }
 
 function extractMerchantName(

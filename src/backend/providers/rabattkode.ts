@@ -4,6 +4,11 @@ import type { CashbackOffer } from "../../shared/cashback.js";
 const FIRESTORE_URL =
   "https://firestore.googleapis.com/v1/projects/rabattkode-784d5/databases/(default)/documents/discounts?pageSize=500";
 
+// Domains that rabattkode stores with wrong TLD
+const DOMAIN_CORRECTIONS: Record<string, string> = {
+  "scandichotels.no": "scandichotels.com",
+};
+
 interface FirestoreDoc {
   fields: {
     url_plugin?: { stringValue: string };
@@ -55,6 +60,7 @@ export async function crawlRabattkode(): Promise<CashbackOffer[]> {
     } catch {
       continue;
     }
+    domain = DOMAIN_CORRECTIONS[domain] ?? domain;
 
     const parts = domain.split(".");
     const CC_SUBDOMAINS = new Set(["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"]);
