@@ -398,12 +398,19 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .code-value {
   color: #5d6b71;
-  flex: 1;
   font-family: monospace;
   font-size: 12px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.code-copy-group {
+  align-items: center;
+  display: inline-flex;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
 }
 .code-source-badge {
   flex-shrink: 0;
@@ -421,6 +428,10 @@ a.merchant-name:hover { text-decoration: underline; }
   margin-left: auto;
   padding: 4px;
   border-radius: 4px;
+}
+.code-copy-group .code-copy-btn {
+  flex-shrink: 0;
+  margin-left: 0;
 }
 .code-copy-btn:hover { color: #166b47; }
 .code-copy-btn svg { width: 14px; height: 14px; }
@@ -1194,12 +1205,11 @@ function render(query) {
       return `<div class="code-item-row" data-net="0">
         ${codeTooltipHtml}<div class="code-item">
           <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</span>
-          <span class="code-value">${esc(code)}</span>
-          ${sourceChipHtml}
+          <span class="code-copy-group"><span class="code-value">${esc(code)}</span><button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button></span>
           <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
           <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
+          ${sourceChipHtml}
         </div>
-        <button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button>
       </div>`;
     }).join("");
     const hostname = domain ? domain.replace(/^www\./, "") : null;
@@ -1782,22 +1792,11 @@ function buildCodeRow(dbCode, hostname, ownedIds) {
     rewardEl.dataset.origReward = dbCode.reward;
   }
   rewardEl.textContent = dbCode.reward;
+  const codeGroup = document.createElement("span");
+  codeGroup.className = "code-copy-group";
   const codeEl = document.createElement("span");
   codeEl.className = "code-value";
   codeEl.textContent = dbCode.code;
-  const downBtn = document.createElement("button");
-  downBtn.className = "vote-btn"; downBtn.type = "button"; downBtn.dataset.vote = "-1";
-  const initNet = dbCode.upvotes - dbCode.downvotes;
-  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${initNet < 0 ? Math.abs(initNet) : ""}</span><span class="vote-tooltip">Koden er utgått</span>`;
-  const upBtn = document.createElement("button");
-  upBtn.className = "vote-btn"; upBtn.type = "button"; upBtn.dataset.vote = "1";
-  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${initNet > 0 ? initNet : ""}</span><span class="vote-tooltip">Koden fungerer!</span>`;
-  item.append(rewardEl, codeEl);
-  if (dbCode.id && ownedIds && ownedIds.has(dbCode.id)) {
-    const delBtn = makeDeleteBtn(dbCode.id, row, hostname);
-    item.append(delBtn);
-  }
-  item.append(downBtn, upBtn);
   const copyBtn = document.createElement("button");
   copyBtn.className = "code-copy-btn"; copyBtn.type = "button"; copyBtn.dataset.code = dbCode.code;
   copyBtn.innerHTML = `<span class="copy-tooltip">Kopier: ${esc(dbCode.code)}</span>${COPY_SVG}`;
@@ -1808,7 +1807,21 @@ function buildCodeRow(dbCode, hostname, ownedIds) {
       setTimeout(() => { copyBtn.innerHTML = origInner; }, 1500);
     });
   });
-  row.append(item, copyBtn);
+  codeGroup.append(codeEl, copyBtn);
+  const downBtn = document.createElement("button");
+  downBtn.className = "vote-btn"; downBtn.type = "button"; downBtn.dataset.vote = "-1";
+  const initNet = dbCode.upvotes - dbCode.downvotes;
+  downBtn.innerHTML = THUMBS_DOWN_SVG + `<span class="vote-count">${initNet < 0 ? Math.abs(initNet) : ""}</span><span class="vote-tooltip">Koden er utgått</span>`;
+  const upBtn = document.createElement("button");
+  upBtn.className = "vote-btn"; upBtn.type = "button"; upBtn.dataset.vote = "1";
+  upBtn.innerHTML = THUMBS_UP_SVG + `<span class="vote-count">${initNet > 0 ? initNet : ""}</span><span class="vote-tooltip">Koden fungerer!</span>`;
+  item.append(rewardEl, codeGroup);
+  if (dbCode.id && ownedIds && ownedIds.has(dbCode.id)) {
+    const delBtn = makeDeleteBtn(dbCode.id, row, hostname);
+    item.append(delBtn);
+  }
+  item.append(downBtn, upBtn);
+  row.append(item);
   return row;
 }
 

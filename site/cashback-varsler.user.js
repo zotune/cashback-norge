@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778090188
+// @version      1778090797
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1102,6 +1102,7 @@
       color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
+      flex-shrink: 0;
       padding: 4px;
       border-radius: 4px;
       position: relative;
@@ -1416,12 +1417,19 @@
     }
     .code-value {
       color: #5d6b71;
-      flex: 1;
       font-family: monospace;
       font-size: 11px;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .code-copy-group {
+      align-items: center;
+      display: inline-flex;
+      flex: 1 1 auto;
+      gap: 4px;
+      min-width: 0;
     }
     .code-source-badge {
       flex-shrink: 0;
@@ -2000,6 +2008,45 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       addCodeSubmit.disabled = true;
     };
     const parseRewardNum = (r) => parseFloat(r.replace(",", ".")) || 0;
+    const createCodeValueGroup = (code) => {
+      const group = document.createElement("span");
+      group.className = "code-copy-group";
+      const codeSpan = document.createElement("span");
+      codeSpan.className = "code-value";
+      codeSpan.textContent = code;
+      const copyBtn = document.createElement("span");
+      copyBtn.className = "copy-code-btn";
+      copyBtn.innerHTML = COPY_ICON_SVG;
+      const copyTooltip = document.createElement("div");
+      copyTooltip.className = "copy-code-tooltip";
+      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+      shadowRoot.append(copyTooltip);
+      copyBtn.addEventListener("mouseenter", () => {
+        const rect = copyBtn.getBoundingClientRect();
+        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        copyTooltip.style.top = `${rect.top - 30}px`;
+        copyTooltip.style.transform = "translateX(-50%)";
+        shadowRoot.append(copyTooltip);
+        copyTooltip.classList.add("visible");
+      });
+      copyBtn.addEventListener("mouseleave", () => {
+        copyTooltip.classList.remove("visible");
+      });
+      copyBtn.addEventListener("click", () => {
+        void navigator.clipboard.writeText(code).then(() => {
+          copyBtn.innerHTML = CHECK_ICON_SVG;
+          copyTooltip.textContent = "Kopiert!";
+          copyTooltip.classList.add("visible");
+          setTimeout(() => {
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
+            copyTooltip.classList.remove("visible");
+          }, 1500);
+        });
+      });
+      group.append(codeSpan, copyBtn);
+      return { group, codeSpan, copyBtn };
+    };
     const resortCodesList = () => {
       const rows = [...codesList.querySelectorAll(".code-item-row")];
       rows.sort((a, b) => {
@@ -2059,44 +2106,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const rewardEl = document.createElement("span");
       rewardEl.className = "code-reward";
       rewardEl.textContent = reward;
-      const codeSpan = document.createElement("span");
-      codeSpan.className = "code-value";
-      codeSpan.textContent = code;
-      const copyBtn = document.createElement("span");
-      copyBtn.className = "copy-code-btn";
-      copyBtn.innerHTML = COPY_ICON_SVG;
-      const copyTooltip1 = document.createElement("div");
-      copyTooltip1.className = "copy-code-tooltip";
-      copyTooltip1.textContent = `Kopier rabattkode: ${code}`;
-      shadowRoot.append(copyTooltip1);
-      copyBtn.addEventListener("mouseenter", () => {
-        const rect = copyBtn.getBoundingClientRect();
-        copyTooltip1.style.left = `${rect.left + rect.width / 2}px`;
-        copyTooltip1.style.top = `${rect.top - 30}px`;
-        copyTooltip1.style.transform = "translateX(-50%)";
-        copyTooltip1.classList.add("visible");
-      });
-      copyBtn.addEventListener("mouseleave", () => {
-        copyTooltip1.classList.remove("visible");
-      });
-      copyBtn.addEventListener("click", () => {
-        void navigator.clipboard.writeText(code).then(() => {
-          copyBtn.innerHTML = CHECK_ICON_SVG;
-          copyTooltip1.textContent = "Kopiert!";
-          copyTooltip1.classList.add("visible");
-          setTimeout(() => {
-            copyBtn.innerHTML = COPY_ICON_SVG;
-            copyTooltip1.textContent = `Kopier rabattkode: ${code}`;
-            copyTooltip1.classList.remove("visible");
-          }, 1500);
-        });
-      });
+      const { group: codeGroup } = createCodeValueGroup(code);
       const { upBtn: up1, downBtn: down1 } = attachVoteButtons(item);
-      item.append(rewardEl, codeSpan, down1, up1);
+      item.append(rewardEl, codeGroup, down1, up1);
       const row1 = document.createElement("div");
       row1.className = "code-item-row";
       row1.dataset.net = "0";
-      row1.append(item, copyBtn);
+      row1.append(item);
       addCodeForm.insertAdjacentElement("afterend", row1);
       resortCodesList();
     };
@@ -2326,39 +2342,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         reward.dataset.origReward = codeOffer.reward;
       }
       reward.textContent = isNumericReward ? codeOffer.reward : "?";
-      const codeSpan = document.createElement("span");
-      codeSpan.className = "code-value";
-      codeSpan.textContent = code;
-      const copyBtn = document.createElement("span");
-      copyBtn.className = "copy-code-btn";
-      copyBtn.innerHTML = COPY_ICON_SVG;
-      const copyTooltip = document.createElement("div");
-      copyTooltip.className = "copy-code-tooltip";
-      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-      shadowRoot.append(copyTooltip);
-      copyBtn.addEventListener("mouseenter", () => {
-        const rect = copyBtn.getBoundingClientRect();
-        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
-        copyTooltip.style.top = `${rect.top - 30}px`;
-        copyTooltip.style.transform = "translateX(-50%)";
-        shadowRoot.append(copyTooltip);
-        copyTooltip.classList.add("visible");
-      });
-      copyBtn.addEventListener("mouseleave", () => {
-        copyTooltip.classList.remove("visible");
-      });
-      copyBtn.addEventListener("click", () => {
-        void navigator.clipboard.writeText(code).then(() => {
-          copyBtn.innerHTML = CHECK_ICON_SVG;
-          copyTooltip.textContent = "Kopiert!";
-          copyTooltip.classList.add("visible");
-          setTimeout(() => {
-            copyBtn.innerHTML = COPY_ICON_SVG;
-            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-            copyTooltip.classList.remove("visible");
-          }, 1500);
-        });
-      });
+      const { group: codeGroup } = createCodeValueGroup(code);
       const { upBtn, downBtn } = attachVoteButtons(
         item,
         { code, reward: codeOffer.reward, hostname: CURRENT_HOST },
@@ -2372,13 +2356,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       else if (initialVote === -1) downBtn.classList.add("downvoted");
       const sourceChip = createCodeSourceChip(codeOffer);
       if (sourceChip !== void 0) {
-        item.append(reward, codeSpan, sourceChip, downBtn, upBtn);
+        item.append(reward, codeGroup, downBtn, upBtn, sourceChip);
       } else {
-        item.append(reward, codeSpan, downBtn, upBtn);
+        item.append(reward, codeGroup, downBtn, upBtn);
       }
       const row = document.createElement("div");
       row.className = "code-item-row";
-      row.append(item, copyBtn);
+      row.append(item);
       if (codeOffer.terms) {
         const termsTooltip = document.createElement("div");
         termsTooltip.className = "offer-tooltip";
@@ -2453,48 +2437,17 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
               reward.dataset.origReward = dbCode.reward;
             }
             reward.textContent = dbCode.reward;
-            const codeSpan = document.createElement("span");
-            codeSpan.className = "code-value";
-            codeSpan.textContent = dbCode.code;
-            const copyBtn = document.createElement("span");
-            copyBtn.className = "copy-code-btn";
-            copyBtn.innerHTML = COPY_ICON_SVG;
-            const copyTooltipHv = document.createElement("div");
-            copyTooltipHv.className = "copy-code-tooltip";
-            copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
-            shadowRoot.append(copyTooltipHv);
-            copyBtn.addEventListener("mouseenter", () => {
-              const rect = copyBtn.getBoundingClientRect();
-              copyTooltipHv.style.left = `${rect.left + rect.width / 2}px`;
-              copyTooltipHv.style.top = `${rect.top - 30}px`;
-              copyTooltipHv.style.transform = "translateX(-50%)";
-              copyTooltipHv.classList.add("visible");
-            });
-            copyBtn.addEventListener("mouseleave", () => {
-              copyTooltipHv.classList.remove("visible");
-            });
-            copyBtn.addEventListener("click", () => {
-              void navigator.clipboard.writeText(dbCode.code).then(() => {
-                copyBtn.innerHTML = CHECK_ICON_SVG;
-                copyTooltipHv.textContent = "Kopiert!";
-                copyTooltipHv.classList.add("visible");
-                setTimeout(() => {
-                  copyBtn.innerHTML = COPY_ICON_SVG;
-                  copyTooltipHv.textContent = `Kopier rabattkode: ${dbCode.code}`;
-                  copyTooltipHv.classList.remove("visible");
-                }, 1500);
-              });
-            });
+            const { group: codeGroup } = createCodeValueGroup(dbCode.code);
             const { upBtn, downBtn } = attachVoteButtons(item);
             const upCountEl = upBtn.querySelector(".vote-count");
             const downCountEl = downBtn.querySelector(".vote-count");
             const initNet1 = dbCode.upvotes - dbCode.downvotes;
             if (upCountEl) upCountEl.textContent = initNet1 > 0 ? String(initNet1) : "";
             if (downCountEl) downCountEl.textContent = initNet1 < 0 ? String(Math.abs(initNet1)) : "";
-            item.append(reward, codeSpan, downBtn, upBtn);
+            item.append(reward, codeGroup, downBtn, upBtn);
             const row = document.createElement("div");
             row.className = "code-item-row";
-            row.append(item, copyBtn);
+            row.append(item);
             if (initNet1 < 0) {
               item.classList.add("expired");
               expiredList.append(row);
@@ -2539,38 +2492,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
               reward.dataset.origReward = dbCode.reward;
             }
             reward.textContent = dbCode.reward;
-            const codeSpan = document.createElement("span");
-            codeSpan.className = "code-value";
-            codeSpan.textContent = dbCode.code;
-            const copyBtn = document.createElement("span");
-            copyBtn.className = "copy-code-btn";
-            copyBtn.innerHTML = COPY_ICON_SVG;
-            const copyTooltipDb = document.createElement("div");
-            copyTooltipDb.className = "copy-code-tooltip";
-            copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
-            shadowRoot.append(copyTooltipDb);
-            copyBtn.addEventListener("mouseenter", () => {
-              const rect = copyBtn.getBoundingClientRect();
-              copyTooltipDb.style.left = `${rect.left + rect.width / 2}px`;
-              copyTooltipDb.style.top = `${rect.top - 30}px`;
-              copyTooltipDb.style.transform = "translateX(-50%)";
-              copyTooltipDb.classList.add("visible");
-            });
-            copyBtn.addEventListener("mouseleave", () => {
-              copyTooltipDb.classList.remove("visible");
-            });
-            copyBtn.addEventListener("click", () => {
-              void navigator.clipboard.writeText(dbCode.code).then(() => {
-                copyBtn.innerHTML = CHECK_ICON_SVG;
-                copyTooltipDb.textContent = "Kopiert!";
-                copyTooltipDb.classList.add("visible");
-                setTimeout(() => {
-                  copyBtn.innerHTML = COPY_ICON_SVG;
-                  copyTooltipDb.textContent = `Kopier rabattkode: ${dbCode.code}`;
-                  copyTooltipDb.classList.remove("visible");
-                }, 1500);
-              });
-            });
+            const { group: codeGroup } = createCodeValueGroup(dbCode.code);
             const myVote = myVotes[dbCode.id] ?? 0;
             const { upBtn, downBtn } = attachVoteButtons(item, void 0, myVote);
             const upCountEl = upBtn.querySelector(".vote-count");
@@ -2580,7 +2502,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
             if (downCountEl) downCountEl.textContent = initNet2 < 0 ? String(Math.abs(initNet2)) : "";
             if (myVote === 1) upBtn.classList.add("voted");
             else if (myVote === -1) downBtn.classList.add("downvoted");
-            item.append(reward, codeSpan, downBtn, upBtn);
+            item.append(reward, codeGroup, downBtn, upBtn);
             const row = document.createElement("div");
             row.className = "code-item-row";
             row.dataset.net = String(dbCode.upvotes - dbCode.downvotes);
@@ -2588,7 +2510,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
               const deleteBtn = makeDeleteBtn(dbCode.id, row);
               item.insertBefore(deleteBtn, downBtn);
             }
-            row.append(item, copyBtn);
+            row.append(item);
             return row;
           } });
         }
