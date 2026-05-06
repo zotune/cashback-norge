@@ -1099,7 +1099,27 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     chipSpan.textContent = formatProviderName(offer.provider);
     sideTabText.append(rewardSpan, chipSpan);
   } else {
-    sideTabText.textContent = formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
+    const rewardSpan = document.createElement("span");
+    rewardSpan.className = "side-tab-reward";
+    rewardSpan.textContent = formatCompactRewardLabel(primaryOffer) ?? primaryOffer.reward;
+    sideTabText.append(rewardSpan);
+    const codeProvider = primaryOffer.provider !== "rabattkode"
+      ? primaryOffer.provider
+      : (() => {
+          try {
+            const h = new URL(primaryOffer.sourceUrl || primaryOffer.activationUrl).hostname.replace(/^www\./, "");
+            if (h === "bob.no" || h.endsWith(".bob.no")) return "bob";
+            if (h === "dnb.no" || h.endsWith(".dnb.no")) return "dnb";
+            if (h === "tfbank.no" || h.endsWith(".tfbank.no")) return "tfbank";
+          } catch { /* ignore */ }
+          return undefined;
+        })();
+    if (codeProvider !== undefined) {
+      const chipSpan = document.createElement("span");
+      chipSpan.className = `side-tab-chip provider-${codeProvider}`;
+      chipSpan.textContent = formatProviderName(codeProvider as CashbackOffer["provider"]);
+      sideTabText.append(chipSpan);
+    }
   }
   sideTab.append(sideTabArrow, sideTabText);
   sideTab.addEventListener("click", () => {
