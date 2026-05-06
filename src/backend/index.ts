@@ -21,6 +21,7 @@ import { crawlNorskfamilie } from "./providers/norskfamilie.js";
 import { crawlTrustdeals } from "./providers/trustdeals.js";
 import { crawlLogbuy } from "./providers/logbuy.js";
 import { crawlObos } from "./providers/obos.js";
+import { crawlBob } from "./providers/bob.js";
 import { crawlNaf } from "./providers/naf.js";
 import { crawlSparebank1 } from "./providers/sparebank1.js";
 
@@ -51,6 +52,7 @@ type CliConfig = {
   skipTrustdeals: boolean;
   skipLogbuy: boolean;
   skipObos: boolean;
+  skipBob: boolean;
   skipNaf: boolean;
   skipSparebank1: boolean;
   skipDnbSupertilbud: boolean;
@@ -63,6 +65,7 @@ type CliConfig = {
   trustdealsStartUrl: string;
   logbuyStartUrl: string;
   obosStartUrl: string;
+  bobStartUrl: string;
   nafStartUrl: string;
   sparebank1StartUrl: string;
 };
@@ -84,6 +87,7 @@ async function main(): Promise<void> {
     dnbSupertilbudOffers,
     norskfamilieOffers,
     obosOffers,
+    bobOffers,
     sparebank1Offers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
@@ -110,6 +114,9 @@ async function main(): Promise<void> {
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.obosStartUrl,
       }),
+    config.skipBob ? Promise.resolve([]) : crawlBob({
+        generatedAt, logger, overrides: providerOverrides, startUrl: config.bobStartUrl,
+      }),
     config.skipSparebank1 ? Promise.resolve([]) : crawlSparebank1({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         startUrl: config.sparebank1StartUrl,
@@ -126,6 +133,7 @@ async function main(): Promise<void> {
     ...dnbSupertilbudOffers,
     ...norskfamilieOffers,
     ...obosOffers,
+    ...bobOffers,
     ...sparebank1Offers,
     ...manualOffers,
   ]);
@@ -180,7 +188,7 @@ async function main(): Promise<void> {
       }),
   ]);
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...nafOffers, ...sparebank1Offers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...nafOffers, ...sparebank1Offers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -255,6 +263,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipTrustdeals: args.includes("--skip-trustdeals"),
     skipLogbuy: args.includes("--skip-logbuy"),
     skipObos: args.includes("--skip-obos"),
+    skipBob: args.includes("--skip-bob"),
     skipNaf: args.includes("--skip-naf"),
     skipSparebank1: args.includes("--skip-sparebank1"),
     skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
@@ -285,6 +294,9 @@ function readCliConfig(args: string[]): CliConfig {
     obosStartUrl:
       readArgumentValue(args, "--obos-start-url") ??
       "https://www.obos.no/medlem/medlemsfordeler",
+    bobStartUrl:
+      readArgumentValue(args, "--bob-start-url") ??
+      "https://bob.no/medlem-og-beboer/medlemsfordeler/",
     nafStartUrl:
       readArgumentValue(args, "--naf-start-url") ??
       "https://www.naf.no/medlemskap/medlemsfordeler",

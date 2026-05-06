@@ -207,6 +207,12 @@ h1 {
   color: #8f164f;
 }
 
+.provider-bob {
+  background: #ffffff;
+  border: 1px solid #d3e2dc;
+  color: #5b2486;
+}
+
 .copy-code-btn {
   align-items: center;
   color: #1f8f5f;

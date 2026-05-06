@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778030852
+// @version      1778089692
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -64,6 +64,7 @@
     norskfamilie: "NF",
     logbuy: "LogBuy",
     obos: "OBOS",
+    bob: "BOB",
     naf: "NAF",
     sparebank1: "SB1 Ung",
     cbn: "♥"
@@ -1070,6 +1071,11 @@
     .provider-obos {
       background: #003087;
       color: #ffffff;
+    }
+    .provider-bob {
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #5b2486;
     }
     .provider-naf {
       background: #FFD100;
@@ -3130,7 +3136,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
     if (trimmedReward.length === 0) {
-      if (provider === "obos") return "Medlemsfordel";
+      if (provider === "obos" || provider === "bob") return "Medlemsfordel";
       return "?";
     }
     if (provider === "sas") {
@@ -3144,7 +3150,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return trimmedReward;
   }
   function formatOfferTitlePrefix(offer) {
-    if (offer.provider === "obos") {
+    if (offer.provider === "obos" || offer.provider === "bob") {
       return "Medlemsfordel";
     }
     return "Cashback";

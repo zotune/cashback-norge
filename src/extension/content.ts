@@ -535,6 +535,11 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       background: #003087;
       color: #ffffff;
     }
+    .provider-bob {
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #5b2486;
+    }
     .provider-naf {
       background: #FFD100;
       color: #000000;
@@ -2753,7 +2758,7 @@ async function detectConflicts(shadowRoot: ShadowRoot, titleEl: HTMLElement): Pr
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
   if (trimmedReward.length === 0) {
-    if (provider === "obos") return "Medlemsfordel";
+    if (provider === "obos" || provider === "bob") return "Medlemsfordel";
     return "?";
   }
   // For SAS, convert to percentage-first display with ~ prefix
@@ -2769,7 +2774,7 @@ function formatRewardLabel(reward: string, provider: string): string {
   return trimmedReward;
 }
 function formatOfferTitlePrefix(offer: CashbackOffer): string {
-  if (offer.provider === "obos") {
+  if (offer.provider === "obos" || offer.provider === "bob") {
     return "Medlemsfordel";
   }
   return "Cashback";

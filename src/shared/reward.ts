@@ -2,7 +2,7 @@ const MATERIAL_WORD_AFTER_PERCENT = /^\s+(?:bomull|polyester|lin|ull|nylon|akryl
 
 export function extractPercentageValues(text: string): number[] {
   const values: number[] = [];
-  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?%(?![a-zA-ZæøåÆØÅ])/gi;
+  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?(?:%|prosent)(?![a-zA-ZæøåÆØÅ])/gi;
 
   for (const match of text.matchAll(percentPattern)) {
     const afterMatch = text.slice((match.index ?? 0) + match[0].length);
@@ -72,7 +72,7 @@ export function extractKrReward(text: string): string {
       if (n > 0) rabattValues.push(n);
     }
     // Also "X,– i rabatt" (no kr keyword)
-    const dashAmounts = clause.matchAll(/(\d[\d\s]*),–\s*(?:i\s+)?(?:rabatt|avslag)\b/gi);
+    const dashAmounts = clause.matchAll(/(\d[\d\s]*),[-–]\s*(?:i\s+)?(?:rabatt|avslag)\b/gi);
     for (const m of dashAmounts) {
       if (hasExcludedKrPrefix(clause, m.index ?? 0)) continue;
       const n = parseKrNumber(m[1] ?? "");

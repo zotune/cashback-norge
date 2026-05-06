@@ -361,7 +361,7 @@ function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
 
   if (trimmedReward.length === 0) {
-    if (provider === "obos") return "Medlemsfordel";
+    if (provider === "obos" || provider === "bob") return "Medlemsfordel";
     return "?";
   }
 
@@ -463,6 +463,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "obos") {
     return "OBOS";
+  }
+
+  if (provider === "bob") {
+    return "BOB";
   }
 
   if (provider === "logbuy") {
