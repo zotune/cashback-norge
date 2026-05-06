@@ -2456,6 +2456,13 @@ function parseRewardValue(reward: string): RewardValue {
       amount: parseLocalizedNumber(percentageMatch[1] ?? "0"),
     };
   }
+  const pointsRateMatch = reward.match(/(\d[\d\s]*)\s*poeng\s+per\s+100\s*kr/i);
+  if (pointsRateMatch !== null) {
+    return {
+      kind: "percentage",
+      amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR,
+    };
+  }
   const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
   if (unitMatch !== null) {
     return {

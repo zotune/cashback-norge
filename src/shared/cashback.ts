@@ -1,5 +1,7 @@
 import { normalizeRewardLabel } from "./reward.js";
 
+const EB_PER_TRUMF_KR = 13.5;
+
 export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "logbuy" | "naf" | "sparebank1" | "cbn";
 
 export type CashbackOffer = {
@@ -373,6 +375,15 @@ function parseRewardValue(reward: string): RewardValue {
     return {
       kind: "percentage",
       amount: parseLocalizedNumber(percentageMatch[1] ?? "0"),
+    };
+  }
+
+  const pointsRateMatch = reward.match(/(\d[\d\s]*)\s*poeng\s+per\s+100\s*kr/i);
+
+  if (pointsRateMatch !== null) {
+    return {
+      kind: "percentage",
+      amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR,
     };
   }
 
