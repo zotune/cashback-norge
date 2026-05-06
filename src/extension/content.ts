@@ -1582,6 +1582,10 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     item.dataset.codeId = "pending";
     const rewardEl = document.createElement("span");
     rewardEl.className = "code-reward";
+    if (/%/.test(reward)) {
+      rewardEl.dataset.pct = String(parseRewardNum(reward));
+      rewardEl.dataset.origReward = reward;
+    }
     rewardEl.textContent = reward;
     const { group: codeGroup } = createCodeValueGroup(code);
     const { upBtn: up1, downBtn: down1 } = attachVoteButtons(item);
