@@ -96,6 +96,7 @@ type KlarnaStore = {
       body: string;
       suffix: string;
     };
+    showUpToPrefix: boolean;
   } | null;
   otcUrl: string | null;
 };
@@ -113,10 +114,15 @@ function parseKlarnaStoreListing(
   const offers: CashbackOffer[] = [];
 
   for (const store of stores) {
-    const reward = store.cashbackDiscount?.discountLabel.body ?? "";
-    if (reward === "") {
+    const label = store.cashbackDiscount?.discountLabel;
+    const body = label?.body ?? "";
+    if (body === "") {
       continue;
     }
+    const showUpTo = store.cashbackDiscount?.showUpToPrefix === true;
+    // Fjern eventuelle mellomrom og % fra body for å unngå dobbel % og rare mellomrom
+    const cleanBody = body.replace(/\s*%\s*$/, "");
+    const reward = showUpTo ? `1-${cleanBody} %` : `${cleanBody} %`;
 
     const uuidMatch = store.storeKrn.match(/([a-f0-9-]{36})$/);
     const uuid = uuidMatch?.[1] ?? store.storeDirectUrl;

@@ -397,7 +397,7 @@ function convertSasToPercent(reward: string): string {
 }
 
 function convertTrumfToEb(reward: string): string {
-  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
   if (rangeMatch !== null) {
     const minPct = Number.parseFloat(rangeMatch[1]!.replace(",", "."));
     const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));
@@ -514,7 +514,7 @@ function calculateCashback(offer: CashbackOffer, amount: number): string {
 
   const reward = offer.reward.trim();
 
-  const rangeMatch = reward.match(/^([\d,]+)-([\d,]+)\s*%$/);
+  const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
   if (rangeMatch !== null) {
     const minPct = Number.parseFloat(rangeMatch[1]!.replace(",", "."));
     const maxPct = Number.parseFloat(rangeMatch[2]!.replace(",", "."));

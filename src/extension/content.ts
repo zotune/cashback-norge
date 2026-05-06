@@ -1463,8 +1463,8 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   addCodeCancel.textContent = "\u2715";
   const addCodeFormInner = document.createElement("div");
   addCodeFormInner.className = "add-code-form-inner";
-  addCodeFormInner.append(addRewardInput, addCodeInput, addCodeSubmit);
-  addCodeForm.append(addCodeFormInner, addCodeCancel);
+  addCodeFormInner.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
+  addCodeForm.append(addCodeFormInner);
   const updateSubmitState = (): void => {
     addCodeSubmit.disabled = addCodeInput.value.trim().length === 0 || addRewardInput.value.trim().length === 0;
   };
