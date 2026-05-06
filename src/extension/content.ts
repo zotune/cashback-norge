@@ -1852,13 +1852,15 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     return chip;
   };
 
-  const getCodeSourceProvider = (codeOffer: CashbackOffer): "bob" | "dnb" | undefined => {
+  const getCodeSourceProvider = (codeOffer: CashbackOffer): "bob" | "dnb" | "tfbank" | undefined => {
     if (codeOffer.provider === "dnb") return "dnb";
+    if (codeOffer.provider === "tfbank") return "tfbank";
 
     const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
     const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
     if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
     if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+    if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
     return undefined;
   };
 

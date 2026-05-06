@@ -1557,6 +1557,7 @@ function formatReward(o) {
 
 function getCodeSourceProvider(o) {
   if (o.provider === "dnb") return "dnb";
+  if (o.provider === "tfbank") return "tfbank";
   const sourceUrl = o.sourceUrl || o.activationUrl || "";
   let hostname = "";
   try {
@@ -1566,6 +1567,7 @@ function getCodeSourceProvider(o) {
   }
   if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
   if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+  if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
   return "";
 }
 

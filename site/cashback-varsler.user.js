@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778092589
+// @version      1778093079
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -2405,10 +2405,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     };
     const getCodeSourceProvider = (codeOffer) => {
       if (codeOffer.provider === "dnb") return "dnb";
+      if (codeOffer.provider === "tfbank") return "tfbank";
       const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
       const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
       if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
       if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+      if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
       return void 0;
     };
     codesSection.append(codesToggle, codesList, expiredSection);
