@@ -405,6 +405,12 @@ a.merchant-name:hover { text-decoration: underline; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.code-source-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  min-height: 22px;
+  text-decoration: none;
+}
 .code-copy-btn {
   align-items: center;
   background: none;
@@ -1181,10 +1187,15 @@ function render(query) {
       const tooltipText = isNumericReward ? codeTerms : (codeTerms || o.reward);
       const codeLabel = isNumericReward ? o.reward : "?";
       const codeTooltipHtml = tooltipText ? `<span class="offer-tooltip">${formatTooltipHtml(tooltipText)}</span>` : "";
+      const sourceProvider = getCodeSourceProvider(o);
+      const sourceChipHtml = sourceProvider
+        ? `<a class="badge badge-${sourceProvider} code-source-badge" href="${esc(o.sourceUrl || o.activationUrl)}" target="_blank" rel="noreferrer" title="Åpne ${esc(PROVIDER_NAMES[sourceProvider] || sourceProvider)}-tilbudet">${esc(PROVIDER_NAMES[sourceProvider] || sourceProvider)}</a>`
+        : "";
       return `<div class="code-item-row" data-net="0">
         ${codeTooltipHtml}<div class="code-item">
           <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</span>
           <span class="code-value">${esc(code)}</span>
+          ${sourceChipHtml}
           <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
           <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
         </div>
@@ -1532,6 +1543,20 @@ function formatReward(o) {
     }
   }
   return r;
+}
+
+function getCodeSourceProvider(o) {
+  if (o.provider === "dnb") return "dnb";
+  const sourceUrl = o.sourceUrl || o.activationUrl || "";
+  let hostname = "";
+  try {
+    hostname = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+  if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
+  if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+  return "";
 }
 
 function formatKr(n) {

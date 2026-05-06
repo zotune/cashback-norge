@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778089692
+// @version      1778090188
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1423,6 +1423,12 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .code-source-badge {
+      flex-shrink: 0;
+      font-size: 11px;
+      min-height: 22px;
+      text-decoration: none;
+    }
     .bonus-chip {
       align-items: center;
       background: #f0f4f2;
@@ -2307,10 +2313,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       });
       return { upBtn, downBtn };
     };
-    const buildCrawlerRow = (codeOffer, dbId, initUpvotes = 0, initDownvotes = 0) => {
+    const buildCrawlerRow = (codeOffer, dbId, initUpvotes = 0, initDownvotes = 0, initialVote = 0) => {
       const code = codeOffer.discountCode ?? "";
       const item = document.createElement("div");
       item.className = "code-item";
+      if (dbId !== void 0) item.dataset.codeId = String(dbId);
       const reward = document.createElement("span");
       reward.className = "code-reward";
       const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(codeOffer.reward.trim());
@@ -2352,12 +2359,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           }, 1500);
         });
       });
-      const { upBtn, downBtn } = attachVoteButtons(item, { code, reward: codeOffer.reward, hostname: CURRENT_HOST });
+      const { upBtn, downBtn } = attachVoteButtons(
+        item,
+        { code, reward: codeOffer.reward, hostname: CURRENT_HOST },
+        initialVote
+      );
       const upCountEl = upBtn.querySelector(".vote-count");
       const downCountEl = downBtn.querySelector(".vote-count");
       if (upCountEl && initUpvotes > 0) upCountEl.textContent = String(initUpvotes);
       if (downCountEl && initDownvotes > 0) downCountEl.textContent = String(initDownvotes);
-      item.append(reward, codeSpan, downBtn, upBtn);
+      if (initialVote === 1) upBtn.classList.add("voted");
+      else if (initialVote === -1) downBtn.classList.add("downvoted");
+      const sourceChip = createCodeSourceChip(codeOffer);
+      if (sourceChip !== void 0) {
+        item.append(reward, codeSpan, sourceChip, downBtn, upBtn);
+      } else {
+        item.append(reward, codeSpan, downBtn, upBtn);
+      }
       const row = document.createElement("div");
       row.className = "code-item-row";
       row.append(item, copyBtn);
@@ -2383,6 +2401,27 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         });
       }
       return row;
+    };
+    const createCodeSourceChip = (codeOffer) => {
+      const sourceProvider = getCodeSourceProvider(codeOffer);
+      if (sourceProvider === void 0) return void 0;
+      const sourceUrl = codeOffer.sourceUrl || codeOffer.activationUrl;
+      const chip = document.createElement("a");
+      chip.className = `provider-badge provider-${sourceProvider} code-source-badge`;
+      chip.href = sourceUrl;
+      chip.target = "_blank";
+      chip.rel = "noreferrer";
+      chip.title = `Åpne ${formatProviderName(sourceProvider)}-tilbudet`;
+      chip.textContent = formatProviderName(sourceProvider);
+      return chip;
+    };
+    const getCodeSourceProvider = (codeOffer) => {
+      if (codeOffer.provider === "dnb") return "dnb";
+      const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
+      const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
+      if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
+      if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+      return void 0;
     };
     codesSection.append(codesToggle, codesList, expiredSection);
     body.append(header, offerList, chipsSection, codesSection);
@@ -2472,7 +2511,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         const entries = [];
         for (const dbCode of dbCodes) {
           const net = dbCode.upvotes - dbCode.downvotes;
+          const matchingCrawlerOffer = crawlerByCode.get(dbCode.code.toUpperCase());
           crawlerByCode.delete(dbCode.code.toUpperCase());
+          if (matchingCrawlerOffer !== void 0) {
+            const myVote = myVotes[dbCode.id] ?? 0;
+            entries.push({
+              net,
+              reward: matchingCrawlerOffer.reward,
+              render: () => buildCrawlerRow(
+                matchingCrawlerOffer,
+                dbCode.id,
+                dbCode.upvotes,
+                dbCode.downvotes,
+                myVote
+              )
+            });
+            continue;
+          }
           entries.push({ net, reward: dbCode.reward, render: () => {
             const item = document.createElement("div");
             item.className = "code-item";

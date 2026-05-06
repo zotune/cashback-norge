@@ -186,7 +186,9 @@ export async function crawlBob(input: CrawlBobInput): Promise<CashbackOffer[]> {
       continue;
     }
 
-    const membershipDomains = selectDomainsForEntry(entry.name, allDomains);
+    const codeDomainSet = new Set(codes.flatMap((code) => selectDomainsForCode(code, allDomains)));
+    const membershipDomains = selectDomainsForEntry(entry.name, allDomains)
+      .filter((domain) => !codeDomainSet.has(domain));
     if (reward && membershipDomains.length > 0) {
       offers.push({
         provider: "bob",

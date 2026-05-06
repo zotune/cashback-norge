@@ -886,6 +886,12 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .code-source-badge {
+      flex-shrink: 0;
+      font-size: 11px;
+      min-height: 22px;
+      text-decoration: none;
+    }
     .bonus-chip {
       align-items: center;
       background: #f0f4f2;
@@ -1746,7 +1752,13 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
   };
 
   // Helper to build a row for a crawler offer
-  const buildCrawlerRow = (codeOffer: typeof codeOffers[number], dbId?: number, initUpvotes = 0, initDownvotes = 0): HTMLDivElement => {
+  const buildCrawlerRow = (
+    codeOffer: typeof codeOffers[number],
+    dbId?: number,
+    initUpvotes = 0,
+    initDownvotes = 0,
+    initialVote: 1 | -1 | 0 = 0,
+  ): HTMLDivElement => {
     const code = codeOffer.discountCode ?? "";
     const item = document.createElement("div");
     item.className = "code-item";
@@ -1790,12 +1802,23 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
         }, 1500);
       });
     });
-    const { upBtn, downBtn } = attachVoteButtons(item, { code, reward: codeOffer.reward, hostname: CURRENT_HOST });
+    const { upBtn, downBtn } = attachVoteButtons(
+      item,
+      { code, reward: codeOffer.reward, hostname: CURRENT_HOST },
+      initialVote,
+    );
     const upCountEl = upBtn.querySelector<HTMLSpanElement>(".vote-count");
     const downCountEl = downBtn.querySelector<HTMLSpanElement>(".vote-count");
     if (upCountEl && initUpvotes > 0) upCountEl.textContent = String(initUpvotes);
     if (downCountEl && initDownvotes > 0) downCountEl.textContent = String(initDownvotes);
-    item.append(reward, codeSpan, downBtn, upBtn);
+    if (initialVote === 1) upBtn.classList.add("voted");
+    else if (initialVote === -1) downBtn.classList.add("downvoted");
+    const sourceChip = createCodeSourceChip(codeOffer);
+    if (sourceChip !== undefined) {
+      item.append(reward, codeSpan, sourceChip, downBtn, upBtn);
+    } else {
+      item.append(reward, codeSpan, downBtn, upBtn);
+    }
     const row = document.createElement("div");
     row.className = "code-item-row";
     row.append(item, copyBtn);
@@ -1822,6 +1845,31 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     }
 
     return row;
+  };
+
+  const createCodeSourceChip = (codeOffer: CashbackOffer): HTMLAnchorElement | undefined => {
+    const sourceProvider = getCodeSourceProvider(codeOffer);
+    if (sourceProvider === undefined) return undefined;
+
+    const sourceUrl = codeOffer.sourceUrl || codeOffer.activationUrl;
+    const chip = document.createElement("a");
+    chip.className = `provider-badge provider-${sourceProvider} code-source-badge`;
+    chip.href = sourceUrl;
+    chip.target = "_blank";
+    chip.rel = "noreferrer";
+    chip.title = `Åpne ${formatProviderName(sourceProvider)}-tilbudet`;
+    chip.textContent = formatProviderName(sourceProvider);
+    return chip;
+  };
+
+  const getCodeSourceProvider = (codeOffer: CashbackOffer): "bob" | "dnb" | undefined => {
+    if (codeOffer.provider === "dnb") return "dnb";
+
+    const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
+    const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
+    if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
+    if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+    return undefined;
   };
 
   codesSection.append(codesToggle, codesList, expiredSection);
@@ -1927,8 +1975,26 @@ function renderNotice(offers: CashbackOffer[], initialCollapsed: boolean, initia
     // DB codes (user-submitted + previously voted static)
     for (const dbCode of dbCodes) {
       const net = dbCode.upvotes - dbCode.downvotes;
+      const matchingCrawlerOffer = crawlerByCode.get(dbCode.code.toUpperCase());
       // Remove crawler placeholder immediately so the remaining-crawler loop doesn't duplicate it
       crawlerByCode.delete(dbCode.code.toUpperCase());
+
+      if (matchingCrawlerOffer !== undefined) {
+        const myVote = myVotes[dbCode.id] ?? 0;
+        entries.push({
+          net,
+          reward: matchingCrawlerOffer.reward,
+          render: () => buildCrawlerRow(
+            matchingCrawlerOffer,
+            dbCode.id,
+            dbCode.upvotes,
+            dbCode.downvotes,
+            myVote,
+          ),
+        });
+        continue;
+      }
+
       entries.push({ net, reward: dbCode.reward, render: () => {
         const item = document.createElement("div");
         item.className = "code-item";
