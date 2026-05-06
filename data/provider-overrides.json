@@ -1107,7 +1107,11 @@
       "zalando.no"
     ]
   },
-  "obos": {},
+  "obos": {
+    "notteroy-kulturhus": [
+      "notteroykulturhus.no"
+    ]
+  },
   "logbuy": {
     "adlibris": [
       "adlibris.com"

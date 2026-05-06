@@ -395,20 +395,20 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
 
   input.logger.info(`OBOS: crawled ${slugToName.size} benefits, extracted ${slugToDomain.size} domains`);
 
-  // Apply provider-overrides for slugs without extracted domains
-  let fallbackCount = 0;
+  // Apply provider-overrides (always override extracted domain if present)
+  let overrideCount = 0;
   for (const [slug, overrideDomains] of Object.entries(input.overrides.obos)) {
     const firstOverride = overrideDomains[0];
-    if (!slugToDomain.has(slug) && firstOverride) {
+    if (firstOverride) {
       slugToDomain.set(slug, normalizeDomainInput(firstOverride));
       if (!slugToName.has(slug)) {
         slugToName.set(slug, slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
       }
-      fallbackCount++;
+      overrideCount++;
     }
   }
-  if (fallbackCount > 0) {
-    input.logger.info(`OBOS: applied ${fallbackCount} overrides`);
+  if (overrideCount > 0) {
+    input.logger.info(`OBOS: applied ${overrideCount} overrides`);
   }
 
   const offers: CashbackOffer[] = [];
