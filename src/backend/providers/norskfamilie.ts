@@ -48,7 +48,7 @@ const SLUG_TO_DOMAIN: Record<string, string> = {
   tirendo: "tirendo.no",
   "urban-pioneers": "urbanpioneers.com",
   vetzoo: "vetzoo.no",
-  "vy-buss": "vy.no",
+  "vy-buss": "vybuss.no",
 };
 
 export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
