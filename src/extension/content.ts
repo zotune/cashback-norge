@@ -264,6 +264,20 @@ function makeAdChip(): HTMLSpanElement {
   return chip;
 }
 
+function getCodeSourceProvider(codeOffer: CashbackOffer): string | undefined {
+  if (codeOffer.provider !== "rabattkode") {
+    return codeOffer.provider;
+  }
+
+  const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
+  const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
+
+  if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
+  if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+  if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
+  return undefined;
+}
+
 function createProviderBadgeWithActivation(
   offer: CashbackOffer,
   activeOfferKey: string | undefined,
@@ -1437,9 +1451,10 @@ function renderNotice(
   }
   const notice = document.createElement("section");
   notice.className = "notice";
+  const sideTabProvider = offer?.provider ?? getCodeSourceProvider(primaryOffer) ?? "rabattkode";
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
-  sideTab.className = `side-tab side-tab-${offer?.provider ?? "rabattkode"}`;
+  sideTab.className = `side-tab side-tab-${sideTabProvider}`;
   sideTab.type = "button";
   sideTab.setAttribute("aria-label", "Collapse cashback offers");
   const sideTabArrow = document.createElement("span");
@@ -1460,21 +1475,11 @@ function renderNotice(
     rewardSpan.className = "side-tab-reward";
     rewardSpan.textContent = formatCompactRewardLabel(primaryOffer) ?? primaryOffer.reward;
     sideTabText.append(rewardSpan);
-    const codeProvider = primaryOffer.provider !== "rabattkode"
-      ? primaryOffer.provider
-      : (() => {
-          try {
-            const h = new URL(primaryOffer.sourceUrl || primaryOffer.activationUrl).hostname.replace(/^www\./, "");
-            if (h === "bob.no" || h.endsWith(".bob.no")) return "bob";
-            if (h === "dnb.no" || h.endsWith(".dnb.no")) return "dnb";
-            if (h === "tfbank.no" || h.endsWith(".tfbank.no")) return "tfbank";
-          } catch { /* ignore */ }
-          return undefined;
-        })();
+    const codeProvider = getCodeSourceProvider(primaryOffer);
     if (codeProvider !== undefined) {
       const chipSpan = document.createElement("span");
       chipSpan.className = `side-tab-chip provider-${codeProvider}`;
-      chipSpan.textContent = formatProviderName(codeProvider as CashbackOffer["provider"]);
+      chipSpan.textContent = formatProviderName(codeProvider);
       sideTabText.append(chipSpan);
     }
   }
@@ -2225,18 +2230,6 @@ function renderNotice(
     chip.title = `Åpne ${formatProviderName(sourceProvider)}-tilbudet`;
     chip.textContent = formatProviderName(sourceProvider);
     return chip;
-  };
-
-  const getCodeSourceProvider = (codeOffer: CashbackOffer): "bob" | "dnb" | "tfbank" | undefined => {
-    if (codeOffer.provider === "dnb") return "dnb";
-    if (codeOffer.provider === "tfbank") return "tfbank";
-
-    const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
-    const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
-    if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
-    if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
-    if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
-    return undefined;
   };
 
   codesSection.append(codesToggle, codesList, expiredSection);

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778161805
+// @version      1778161975
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -840,6 +840,17 @@
     chip.textContent = "Ad";
     chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
     return chip;
+  }
+  function getCodeSourceProvider(codeOffer) {
+    if (codeOffer.provider !== "rabattkode") {
+      return codeOffer.provider;
+    }
+    const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
+    const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
+    if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
+    if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
+    if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
+    return void 0;
   }
   function createProviderBadgeWithActivation(offer, activeOfferKey, shadowRoot) {
     const providerWrap = document.createElement("span");
@@ -1914,8 +1925,9 @@
     }
     const notice = document.createElement("section");
     notice.className = "notice";
+    const sideTabProvider = offer?.provider ?? getCodeSourceProvider(primaryOffer) ?? "rabattkode";
     const sideTab = document.createElement("button");
-    sideTab.className = `side-tab side-tab-${offer?.provider ?? "rabattkode"}`;
+    sideTab.className = `side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
     sideTab.setAttribute("aria-label", "Collapse cashback offers");
     const sideTabArrow = document.createElement("span");
@@ -1936,16 +1948,7 @@
       rewardSpan.className = "side-tab-reward";
       rewardSpan.textContent = formatCompactRewardLabel(primaryOffer) ?? primaryOffer.reward;
       sideTabText.append(rewardSpan);
-      const codeProvider = primaryOffer.provider !== "rabattkode" ? primaryOffer.provider : (() => {
-        try {
-          const h = new URL(primaryOffer.sourceUrl || primaryOffer.activationUrl).hostname.replace(/^www\./, "");
-          if (h === "bob.no" || h.endsWith(".bob.no")) return "bob";
-          if (h === "dnb.no" || h.endsWith(".dnb.no")) return "dnb";
-          if (h === "tfbank.no" || h.endsWith(".tfbank.no")) return "tfbank";
-        } catch {
-        }
-        return void 0;
-      })();
+      const codeProvider = getCodeSourceProvider(primaryOffer);
       if (codeProvider !== void 0) {
         const chipSpan = document.createElement("span");
         chipSpan.className = `side-tab-chip provider-${codeProvider}`;
@@ -2716,16 +2719,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       chip.title = `Åpne ${formatProviderName(sourceProvider)}-tilbudet`;
       chip.textContent = formatProviderName(sourceProvider);
       return chip;
-    };
-    const getCodeSourceProvider = (codeOffer) => {
-      if (codeOffer.provider === "dnb") return "dnb";
-      if (codeOffer.provider === "tfbank") return "tfbank";
-      const parsed = parseUrl(codeOffer.sourceUrl) ?? parseUrl(codeOffer.activationUrl);
-      const hostname = parsed?.hostname.replace(/^www\./, "").toLowerCase() ?? "";
-      if (hostname === "bob.no" || hostname.endsWith(".bob.no")) return "bob";
-      if (hostname === "dnb.no" || hostname.endsWith(".dnb.no")) return "dnb";
-      if (hostname === "tfbank.no" || hostname.endsWith(".tfbank.no")) return "tfbank";
-      return void 0;
     };
     codesSection.append(codesToggle, codesList, expiredSection);
     body.append(header, offerList, chipsSection, codesSection);
