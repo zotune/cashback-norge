@@ -267,6 +267,7 @@ function makeAdChip(): HTMLSpanElement {
 function createProviderBadgeWithActivation(
   offer: CashbackOffer,
   activatedOfferKeys: ReadonlySet<string>,
+  shadowRoot: ShadowRoot,
 ): HTMLSpanElement {
   const providerWrap = document.createElement("span");
   providerWrap.className = "provider-wrap";
@@ -278,8 +279,19 @@ function createProviderBadgeWithActivation(
   if (isOfferActivated(offer, activatedOfferKeys)) {
     const activationBadge = document.createElement("span");
     activationBadge.className = "activation-badge";
-    activationBadge.title = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
+    activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
     activationBadge.innerHTML = CHECK_ICON_SVG;
+    const activationTooltip = document.createElement("div");
+    activationTooltip.className = "status-tooltip";
+    activationTooltip.textContent = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
+    shadowRoot.append(activationTooltip);
+    activationBadge.addEventListener("mouseenter", () => {
+      positionStatusTooltipAbovePanel(activationTooltip, activationBadge, shadowRoot);
+      activationTooltip.classList.add("visible");
+    });
+    activationBadge.addEventListener("mouseleave", () => {
+      activationTooltip.classList.remove("visible");
+    });
     providerWrap.append(activationBadge);
   }
   providerWrap.append(providerBadge);
@@ -1230,7 +1242,7 @@ function renderNotice(
       margin-left: 4px;
       vertical-align: middle;
     }
-    .conflict-tooltip {
+    .status-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
       color: #e0e0e0;
@@ -1246,7 +1258,7 @@ function renderNotice(
       width: max-content;
       z-index: 2147483647;
     }
-    .conflict-tooltip.visible {
+    .status-tooltip.visible {
       display: block;
     }
   `;
@@ -1361,7 +1373,7 @@ function renderNotice(
     const offerReward = document.createElement("span");
     offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
-    const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys);
+    const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys, shadowRoot);
     offerLabel.append(offerReward);
     if (currentOffer.discountCode !== undefined) {
       const code = currentOffer.discountCode;
@@ -2949,14 +2961,11 @@ async function detectConflicts(shadowRoot: ShadowRoot, titleEl: HTMLElement): Pr
   warningIcon.className = "conflict-warning";
   warningIcon.innerHTML = WARNING_ICON_SVG;
   const conflictTooltip = document.createElement("div");
-  conflictTooltip.className = "conflict-tooltip";
+  conflictTooltip.className = "status-tooltip";
   conflictTooltip.textContent = "Adblock er aktivert – kan blokkere cashback-sporing";
   shadowRoot.append(conflictTooltip);
   warningIcon.addEventListener("mouseenter", () => {
-    const rect = warningIcon.getBoundingClientRect();
-    conflictTooltip.style.left = `${rect.right + 8}px`;
-    conflictTooltip.style.top = `${rect.top + rect.height / 2}px`;
-    conflictTooltip.style.transform = "translateY(-50%)";
+    positionStatusTooltipAbovePanel(conflictTooltip, warningIcon, shadowRoot);
     shadowRoot.append(conflictTooltip);
     conflictTooltip.classList.add("visible");
   });
@@ -2964,6 +2973,34 @@ async function detectConflicts(shadowRoot: ShadowRoot, titleEl: HTMLElement): Pr
     conflictTooltip.classList.remove("visible");
   });
   titleEl.appendChild(warningIcon);
+}
+
+function positionStatusTooltipAbovePanel(
+  tooltip: HTMLElement,
+  anchor: HTMLElement,
+  shadowRoot: ShadowRoot,
+): void {
+  const panel = shadowRoot.querySelector<HTMLElement>(".panel");
+  const anchorRect = anchor.getBoundingClientRect();
+  const panelRect = panel?.getBoundingClientRect();
+
+  tooltip.style.left = "-9999px";
+  tooltip.style.top = "-9999px";
+  tooltip.style.transform = "none";
+  tooltip.classList.add("visible");
+
+  const tooltipWidth = tooltip.offsetWidth;
+  const tooltipHeight = tooltip.offsetHeight;
+  const preferredLeft = panelRect !== undefined ? panelRect.left : anchorRect.left;
+  const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - tooltipWidth - 8));
+  const preferredTop = panelRect !== undefined ? panelRect.top - tooltipHeight - 8 : anchorRect.top - tooltipHeight - 8;
+  const fallbackTop = panelRect !== undefined ? panelRect.top + 8 : anchorRect.bottom + 8;
+  const top = preferredTop >= 8
+    ? preferredTop
+    : Math.min(fallbackTop, window.innerHeight - tooltipHeight - 8);
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${Math.max(8, top)}px`;
 }
 function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();

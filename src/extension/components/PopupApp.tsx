@@ -338,8 +338,13 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
               className="provider-wrap"
             >
               {props.activated && (
-                <span className="activation-badge" title={`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span className="activation-badge-wrap">
+                  <span className="activation-badge" aria-label={`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <span className="activation-tooltip">
+                    {`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}
+                  </span>
                 </span>
               )}
               <span className={`provider-badge provider-${props.offer.provider}`}>

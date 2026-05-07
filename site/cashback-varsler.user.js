@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778159133
+// @version      1778159661
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -801,7 +801,7 @@
     chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
     return chip;
   }
-  function createProviderBadgeWithActivation(offer, activatedOfferKeys) {
+  function createProviderBadgeWithActivation(offer, activatedOfferKeys, shadowRoot) {
     const providerWrap = document.createElement("span");
     providerWrap.className = "provider-wrap";
     const providerBadge = document.createElement("span");
@@ -810,8 +810,19 @@
     if (isOfferActivated(offer, activatedOfferKeys)) {
       const activationBadge = document.createElement("span");
       activationBadge.className = "activation-badge";
-      activationBadge.title = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
+      activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
       activationBadge.innerHTML = CHECK_ICON_SVG;
+      const activationTooltip = document.createElement("div");
+      activationTooltip.className = "status-tooltip";
+      activationTooltip.textContent = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
+      shadowRoot.append(activationTooltip);
+      activationBadge.addEventListener("mouseenter", () => {
+        positionStatusTooltipAbovePanel(activationTooltip, activationBadge, shadowRoot);
+        activationTooltip.classList.add("visible");
+      });
+      activationBadge.addEventListener("mouseleave", () => {
+        activationTooltip.classList.remove("visible");
+      });
       providerWrap.append(activationBadge);
     }
     providerWrap.append(providerBadge);
@@ -1721,7 +1732,7 @@
       margin-left: 4px;
       vertical-align: middle;
     }
-    .conflict-tooltip {
+    .status-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
       color: #e0e0e0;
@@ -1737,7 +1748,7 @@
       width: max-content;
       z-index: 2147483647;
     }
-    .conflict-tooltip.visible {
+    .status-tooltip.visible {
       display: block;
     }
   `;
@@ -1847,7 +1858,7 @@
       const offerReward = document.createElement("span");
       offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
-      const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys);
+      const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys, shadowRoot);
       offerLabel.append(offerReward);
       if (currentOffer.discountCode !== void 0) {
         const code = currentOffer.discountCode;
@@ -3263,14 +3274,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     warningIcon.className = "conflict-warning";
     warningIcon.innerHTML = WARNING_ICON_SVG;
     const conflictTooltip = document.createElement("div");
-    conflictTooltip.className = "conflict-tooltip";
+    conflictTooltip.className = "status-tooltip";
     conflictTooltip.textContent = "Adblock er aktivert – kan blokkere cashback-sporing";
     shadowRoot.append(conflictTooltip);
     warningIcon.addEventListener("mouseenter", () => {
-      const rect = warningIcon.getBoundingClientRect();
-      conflictTooltip.style.left = `${rect.right + 8}px`;
-      conflictTooltip.style.top = `${rect.top + rect.height / 2}px`;
-      conflictTooltip.style.transform = "translateY(-50%)";
+      positionStatusTooltipAbovePanel(conflictTooltip, warningIcon, shadowRoot);
       shadowRoot.append(conflictTooltip);
       conflictTooltip.classList.add("visible");
     });
@@ -3278,6 +3286,24 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       conflictTooltip.classList.remove("visible");
     });
     titleEl.appendChild(warningIcon);
+  }
+  function positionStatusTooltipAbovePanel(tooltip, anchor, shadowRoot) {
+    const panel = shadowRoot.querySelector(".panel");
+    const anchorRect = anchor.getBoundingClientRect();
+    const panelRect = panel?.getBoundingClientRect();
+    tooltip.style.left = "-9999px";
+    tooltip.style.top = "-9999px";
+    tooltip.style.transform = "none";
+    tooltip.classList.add("visible");
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+    const preferredLeft = panelRect !== void 0 ? panelRect.left : anchorRect.left;
+    const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - tooltipWidth - 8));
+    const preferredTop = panelRect !== void 0 ? panelRect.top - tooltipHeight - 8 : anchorRect.top - tooltipHeight - 8;
+    const fallbackTop = panelRect !== void 0 ? panelRect.top + 8 : anchorRect.bottom + 8;
+    const top = preferredTop >= 8 ? preferredTop : Math.min(fallbackTop, window.innerHeight - tooltipHeight - 8);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${Math.max(8, top)}px`;
   }
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();

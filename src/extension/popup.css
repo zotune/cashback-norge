@@ -158,8 +158,36 @@ h1 {
   width: 18px;
 }
 
+.activation-badge-wrap {
+  display: inline-flex;
+  position: relative;
+}
+
 .activation-badge svg {
   flex-shrink: 0;
+}
+
+.activation-tooltip {
+  background: #1a1a2e;
+  border-radius: 8px;
+  bottom: calc(100% + 6px);
+  color: #e0e0e0;
+  display: none;
+  font-size: 11px;
+  font-weight: 400;
+  left: 50%;
+  line-height: 1.5;
+  max-width: 260px;
+  padding: 8px 10px;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  width: max-content;
+  z-index: 20;
+}
+
+.activation-badge-wrap:hover .activation-tooltip {
+  display: block;
 }
 
 .provider-remember {
