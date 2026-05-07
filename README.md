@@ -24,3 +24,11 @@ pnpm run build:store
 ```
 
 Kommandoen bygger extensionen og lager en opplastbar zip i `dist/` med versjonen fra `src/extension/public/manifest.json`.
+
+## License
+
+Source available for transparency. Not open source.
+
+This repository is public so users can inspect the extension and report issues.
+The code is not licensed for reuse, copying, redistribution, or commercial use.
+See [LICENSE](LICENSE).
