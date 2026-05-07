@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778158904
+// @version      1778159133
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -807,14 +807,14 @@
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${offer.provider}`;
     providerBadge.textContent = formatProviderName(offer.provider);
-    providerWrap.append(providerBadge);
     if (isOfferActivated(offer, activatedOfferKeys)) {
       const activationBadge = document.createElement("span");
       activationBadge.className = "activation-badge";
-      activationBadge.title = "Cashback aktivert";
-      activationBadge.innerHTML = `${CHECK_ICON_SVG}<span>Aktivert</span>`;
+      activationBadge.title = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
+      activationBadge.innerHTML = CHECK_ICON_SVG;
       providerWrap.append(activationBadge);
     }
+    providerWrap.append(providerBadge);
     return providerWrap;
   }
   function installOfferActivationClickTracker() {
@@ -1127,16 +1127,14 @@
       align-items: center;
       background: #eaf7ef;
       border: 1px solid #a9d9bd;
-      border-radius: 999px;
+      border-radius: 4px;
       color: #166b47;
       display: inline-flex;
-      font-size: 10px;
-      font-weight: 800;
-      gap: 3px;
+      flex-shrink: 0;
+      height: 18px;
+      justify-content: center;
       line-height: 1;
-      min-height: 18px;
-      padding: 0 6px;
-      white-space: nowrap;
+      width: 18px;
     }
     .activation-badge svg {
       flex-shrink: 0;

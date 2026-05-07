@@ -148,16 +148,14 @@ h1 {
   align-items: center;
   background: #eaf7ef;
   border: 1px solid #a9d9bd;
-  border-radius: 999px;
+  border-radius: 4px;
   color: #166b47;
   display: inline-flex;
-  font-size: 10px;
-  font-weight: 800;
-  gap: 3px;
+  flex-shrink: 0;
+  height: 18px;
+  justify-content: center;
   line-height: 1;
-  min-height: 18px;
-  padding: 0 6px;
-  white-space: nowrap;
+  width: 18px;
 }
 
 .activation-badge svg {
