@@ -920,8 +920,8 @@ function renderNotice(
       color: #5b2486;
     }
     .provider-usbl {
-      background: #f2c94c;
-      color: #1c1b1f;
+      background: #34413e;
+      color: #ffffff;
     }
     .provider-naf {
       background: #FFD100;
@@ -3022,7 +3022,7 @@ function positionStatusTooltipAbovePanel(
 }
 function formatOfferTitlePrefix(offer: CashbackOffer): string {
   if (offer.provider === "obos" || offer.provider === "bob" || offer.provider === "usbl") {
-    return "Medlemsfordel";
+    return formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
   }
   return "Cashback";
 }

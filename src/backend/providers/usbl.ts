@@ -8,7 +8,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, formatPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -130,14 +130,13 @@ export async function crawlUsbl(input: CrawlUsblInput): Promise<CashbackOffer[]>
       continue;
     }
 
-    const activationUrl = findActivationUrlForDomains(entry.externalUrls, domains) ?? entry.sourceUrl;
     offers.push({
       provider: "usbl",
       merchantName: merchantNameForEntry(entry.name, domains),
       domains: uniqueStrings(domains),
-      reward: entry.reward || extractUsblReward(entry.terms) || "Medlemsfordel",
+      reward: entry.reward || extractUsblReward(entry.terms) || "?",
       sourceUrl: entry.sourceUrl,
-      activationUrl,
+      activationUrl: entry.sourceUrl,
       terms: entry.terms,
       updatedAt: input.generatedAt,
     });
@@ -160,7 +159,10 @@ async function enrichDetails(entries: BenefitEntry[], logger: Logger): Promise<v
       const textHtml = readString(text?.html);
       const ingress = readString(header?.ingress) || entry.summary;
       const title = normalizeBenefitName(readString(header?.title) || entry.name);
-      const textLines = htmlToLines(textHtml);
+      const textLines = uniqueTextLines([
+        ...htmlToLines(textHtml),
+        ...extractRenderedArticleLines(html),
+      ]);
       const externalUrls = collectExternalUrls(props, textHtml, html);
       const domains = uniqueStrings([
         ...extractDomainsFromUrls(externalUrls),
@@ -254,7 +256,6 @@ function extractListItems(props: Record<string, unknown> | undefined, startUrl: 
 function buildTerms(summary: string, lines: string[]): string {
   const cleanedLines = trimBenefitLines(lines);
   return uniqueTextLines([
-    "Medlemsfordel",
     summary,
     ...cleanedLines,
     DEFAULT_TERMS,
@@ -267,24 +268,27 @@ function trimBenefitLines(lines: string[]): string[] {
     return /^(fordeler|som medlem får du:?|i tillegg får du også:?|om usbl strøm:?)/i.test(line);
   });
   const scopedLines = startIndex === -1 ? normalizedLines : normalizedLines.slice(startIndex);
+  const stopIndex = scopedLines.findIndex((line) => {
+    return /^(relaterte artikler|et medlemskap som gir tilbake)$/i.test(line);
+  });
+  const benefitLines = stopIndex === -1 ? scopedLines : scopedLines.slice(0, stopIndex);
 
-  return scopedLines.filter((line) => {
-    return !/^(relaterte lenker|kundesenter|våre åpningstider|e-post|følg oss på)$/i.test(line);
+  return benefitLines.filter((line) => {
+    return !/^(relaterte lenker|kundesenter|våre åpningstider|e-post|følg oss på|bli medlem(?: i dag)?(?:chat)?|chat|viktig informasjon)$/i.test(line) &&
+      !/^les mer og bestill/i.test(line);
   });
 }
 
 function extractUsblReward(text: string): string {
   if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
 
-  const percentage = extractPercentageReward(text);
+  const percentage = extractUsblPercentageReward(text);
   if (percentage) return percentage;
 
   const kr = extractKrReward(text) || extractUsblKrReward(text);
   if (kr) return kr;
 
   if (/\bgratis\b/i.test(text)) return "Gratis";
-  if (/\bmedlemspriser?\b/i.test(text)) return "Medlemspris";
-  if (/\b(?:rabatt|bonus|fordel)\b/i.test(text)) return "Medlemsfordel";
 
   return "";
 }
@@ -299,8 +303,49 @@ function rewardSpecificity(reward: string): number {
   if (/\d/.test(reward) && /%/.test(reward)) return 4;
   if (/\d/.test(reward) && /\bkr\b/i.test(reward)) return 3;
   if (/\d/.test(reward)) return 2;
-  if (/^(?:medlemsfordel|medlemspris)$/i.test(reward.trim())) return 0;
+  if (/^(?:\?|medlemsfordel|medlemspris)$/i.test(reward.trim())) return 0;
   return 1;
+}
+
+function extractUsblPercentageReward(text: string): string {
+  const values: number[] = [];
+  const percentagePattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?(?:%|prosent)(?![a-zA-ZæøåÆØÅ])/gi;
+
+  for (const clause of text.split(/[\n.;]+/).map(normalizeText)) {
+    if (!isRelevantPercentageClause(clause)) continue;
+
+    for (const match of clause.matchAll(percentagePattern)) {
+      const matchedText = match[0] ?? "";
+      const matchIndex = match.index ?? 0;
+      if (isNoisyPercentageMatch(clause, matchIndex, matchedText)) continue;
+
+      addPercentageValue(values, match[1]);
+      addPercentageValue(values, match[2]);
+    }
+  }
+
+  return formatPercentageReward(values);
+}
+
+function isRelevantPercentageClause(clause: string): boolean {
+  return /\b(?:rabatt|bonus|avslag|spar|medlem|medlemspris|medlemsrabatt|fordel)\b/i.test(clause);
+}
+
+function isNoisyPercentageMatch(clause: string, matchIndex: number, matchedText: string): boolean {
+  const afterMatch = clause.slice(matchIndex + matchedText.length);
+  const aroundMatch = clause.slice(Math.max(0, matchIndex - 24), matchIndex + matchedText.length + 48);
+  return (
+    /^\s+(?:mer\s+enn|mer\b|bomull|polyester|lin|ull|nylon|akryl|viskose|elastan|silke|modal|lyocell|tencel|fleece|lær|skinn|rayon|spandex|denim)\b/i.test(afterMatch) ||
+    /\b(?:startbonus|bonustap|egenandel|mva|merverdiavgift|standard)\b/i.test(aroundMatch)
+  );
+}
+
+function addPercentageValue(values: number[], rawValue: string | undefined): void {
+  if (rawValue === undefined) return;
+  const value = Number.parseFloat(rawValue.replace(",", "."));
+  if (Number.isFinite(value) && value > 0 && value <= 100 && !values.includes(value)) {
+    values.push(value);
+  }
 }
 
 function extractUsblKrReward(text: string): string {
@@ -387,15 +432,6 @@ function extractDomainsFromText(text: string): string[] {
   return uniqueStrings(domains);
 }
 
-function findActivationUrlForDomains(urls: string[], domains: string[]): string | undefined {
-  return urls.find((url) => {
-    const domain = extractDomainFromUrl(url);
-    return domain !== undefined && domains.some((candidate) => {
-      return domain === candidate || domain.endsWith(`.${candidate}`);
-    });
-  });
-}
-
 function lookupNamesForEntry(entry: BenefitEntry): string[] {
   const names = [
     entry.name,
@@ -433,7 +469,7 @@ function htmlToLines(value: string): string[] {
   if (!value) return [];
   const normalizedHtml = value
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(?:h[1-6]|li|p)>/gi, "\n")
+    .replace(/<\/(?:div|h[1-6]|li|p)>/gi, "\n")
     .replace(/<li[^>]*>/gi, "\n")
     .replace(/&quot;/g, "\"")
     .replace(/&ndash;|&mdash;/g, "-");
@@ -442,6 +478,20 @@ function htmlToLines(value: string): string[] {
     .split(/\n+/)
     .map(normalizeText)
     .filter(Boolean);
+}
+
+function extractRenderedArticleLines(html: string): string[] {
+  const markerIndex = html.indexOf("article-page__blocks");
+  if (markerIndex === -1) return [];
+
+  const startIndex = html.lastIndexOf("<div", markerIndex);
+  const endCandidates = [
+    html.indexOf("<footer", markerIndex),
+    html.indexOf("<script", markerIndex),
+  ].filter((index) => index > markerIndex);
+  const endIndex = endCandidates.length > 0 ? Math.min(...endCandidates) : html.length;
+  const fragment = html.slice(startIndex === -1 ? markerIndex : startIndex, endIndex);
+  return htmlToLines(fragment);
 }
 
 function walkUnknown(value: unknown, visit: (value: unknown) => void): void {
@@ -545,9 +595,11 @@ function decodeHtmlEntities(value: string): string {
     nbsp: " ",
     ndash: "-",
     oslash: "ø",
+    oacute: "ó",
     quot: "\"",
     raquo: "»",
     reg: "®",
+    uacute: "ú",
   };
 
   return value.replace(/&(#x[0-9a-f]+|#\d+|[a-zA-Z][a-zA-Z0-9]+);/g, (match, entity: string) => {

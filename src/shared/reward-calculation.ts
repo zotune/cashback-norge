@@ -1,7 +1,5 @@
 export const EB_PER_TRUMF_KR = 13.5;
 
-const MEMBERSHIP_PROVIDERS = new Set(["obos", "bob", "usbl", "naf", "norskfamilie", "logbuy"]);
-
 type RewardOffer = {
   provider: string;
   reward: string;
@@ -10,9 +8,7 @@ type RewardOffer = {
 export function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
 
-  if (trimmedReward.length === 0) {
-    return MEMBERSHIP_PROVIDERS.has(provider) ? "Medlemsfordel" : "?";
-  }
+  if (trimmedReward.length === 0 || isGenericMembershipReward(trimmedReward)) return "?";
 
   if (provider === "sas") {
     const converted = convertSasToPercent(trimmedReward);
@@ -25,6 +21,10 @@ export function formatRewardLabel(reward: string, provider: string): string {
   }
 
   return trimmedReward;
+}
+
+function isGenericMembershipReward(reward: string): boolean {
+  return /^(?:medlemsfordel|medlemstilbud|medlemspris)$/i.test(reward.trim());
 }
 
 export function formatCompactRewardLabel(offer: RewardOffer): string | undefined {

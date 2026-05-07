@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778188494
+// @version      1778188991
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -190,12 +190,9 @@
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true }
   ];
   const EB_PER_TRUMF_KR = 13.5;
-  const MEMBERSHIP_PROVIDERS = /* @__PURE__ */ new Set(["obos", "bob", "usbl", "naf", "norskfamilie", "logbuy"]);
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
-    if (trimmedReward.length === 0) {
-      return MEMBERSHIP_PROVIDERS.has(provider) ? "Medlemsfordel" : "?";
-    }
+    if (trimmedReward.length === 0 || isGenericMembershipReward(trimmedReward)) return "?";
     if (provider === "sas") {
       const converted = convertSasToPercent(trimmedReward);
       return converted !== "" ? converted : trimmedReward;
@@ -205,6 +202,9 @@
       return converted !== "" ? `${trimmedReward} (${converted})` : trimmedReward;
     }
     return trimmedReward;
+  }
+  function isGenericMembershipReward(reward) {
+    return /^(?:medlemsfordel|medlemstilbud|medlemspris)$/i.test(reward.trim());
   }
   function formatCompactRewardLabel(offer) {
     const label = formatRewardLabel(offer.reward, offer.provider);
@@ -1553,8 +1553,8 @@
       color: #5b2486;
     }
     .provider-usbl {
-      background: #f2c94c;
-      color: #1c1b1f;
+      background: #34413e;
+      color: #ffffff;
     }
     .provider-naf {
       background: #FFD100;
@@ -3529,7 +3529,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function formatOfferTitlePrefix(offer) {
     if (offer.provider === "obos" || offer.provider === "bob" || offer.provider === "usbl") {
-      return "Medlemsfordel";
+      return formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
     }
     return "Cashback";
   }
