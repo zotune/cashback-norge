@@ -790,7 +790,7 @@ function renderNotice(
     }
     .offer-list {
       display: grid;
-      gap: 2px;
+      gap: 4px;
     }
     .offer-link.offer-link--best {
       color: #3a7d55;

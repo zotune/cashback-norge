@@ -33,7 +33,7 @@ h1 {
 
 .offers {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .offer-wrapper {
