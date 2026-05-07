@@ -1,5 +1,4 @@
 import {
-  EB_PER_TRUMF_KR,
   FREE_CARDS,
   MERCHANT_ALIASES,
   PREMIUM_CARDS,
@@ -7,6 +6,16 @@ import {
   PROVIDER_TIPS,
   SUPPORT_LINKS,
 } from "../shared/provider-data";
+import {
+  calculateCashback,
+  calculateCashbackMaxKr,
+  EB_PER_TRUMF_KR,
+  formatBreakdownWithAmounts,
+  formatCompactRewardLabel,
+  formatKr,
+  formatRewardLabel,
+  getMaxRewardPercent,
+} from "../shared/reward-calculation";
 
 // Expose shared data as globals for the inline site script
 Object.assign(window, {
@@ -18,5 +27,12 @@ Object.assign(window, {
     PREMIUM_CARDS,
     SUPPORT_LINKS,
     MERCHANT_ALIASES,
+    calculateCashback,
+    calculateCashbackMaxKr,
+    formatBreakdownWithAmounts,
+    formatCompactRewardLabel,
+    formatKr,
+    formatRewardLabel,
+    getMaxRewardPercent,
   },
 });

@@ -281,6 +281,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-logbuy { background: #d81939; color: #fff; }
 .badge-obos { background: #003087; color: #fff; }
 .badge-bob { background: #fff; border: 1px solid #d3e2dc; color: #5b2486; }
+.badge-usbl { background: #f2c94c; color: #1c1b1f; }
 .badge-naf { background: #FFD100; color: #000; }
 .badge-sparebank1 { background: #005aa4; color: #fff; }
 .badge-cbn { background: #f7d7e6; color: #8f164f; }
@@ -951,19 +952,7 @@ async function init() {
 }
 
 function getMaxPct(o) {
-  if (o.provider === "cbn") return 0;
-  const r = o.reward.trim();
-  const range = r.match(/^([\d.,]+)-([\d.,]+)\s*%$/);
-  if (range) return parseFloat(range[2].replace(",", "."));
-  const pct = r.match(/([\d.,]+)\s*%/);
-  if (pct) return parseFloat(pct[1].replace(",", "."));
-  const sas = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-  if (sas) return parseInt(sas[1].replace(/\s/g, ""), 10) / EB_PER_TRUMF_KR;
-  const kr = r.match(/^([\d.,]+)-([\d.,]+)\s*kr/i);
-  if (kr) return parseFloat(kr[2].replace(",", ".")) / 1000;
-  const krSingle = r.match(/([\d.,]+)\s*kr/i);
-  if (krSingle) return parseFloat(krSingle[1].replace(",", ".")) / 1000;
-  return 0;
+  return window.SHARED.getMaxRewardPercent(o);
 }
 
 function compareOffers(a, b) {
@@ -1505,54 +1494,10 @@ function render(query) {
 }
 
 function formatCompactReward(o) {
-  const full = formatReward(o);
-  if (o.provider === "cbn") return full;
-  if (o.provider === "trumf" || o.provider === "sas") return full;
-  if (/\d+(?:[,.]\d+)?\s*kr\s*\/\s*/i.test(full) && full.includes("+")) return full.replace(/\s+/g, " ");
-  const pct = full.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
-  if (pct) return ((pct[1] || "") + pct[2]).replace(/\s+/g, " ");
-  const totalSum = full.match(/\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
-  if (totalSum) return totalSum[0].replace(/\s+/g, " ");
-  const krRange = full.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
-  if (krRange) return krRange[0].replace(/\s+/g, " ");
-  const kr = full.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
-  if (kr) return kr[0].replace(/\s+/g, " ");
-  if (/gratis\s+frakt/i.test(full)) return "Gratis frakt";
-  if (/gratis/i.test(full)) return "Gratis";
-  return full.length <= 20 ? full : full;
+  return window.SHARED.formatCompactRewardLabel(o) || formatReward(o);
 }
 function formatReward(o) {
-  const r = o.reward.trim();
-  if (!r) {
-    if (o.provider === "obos") return "Medlemsfordel";
-    return "?";
-  }
-  if (o.provider === "sas") {
-    const rate = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-    if (rate) {
-      const p = parseInt(rate[1].replace(/\s/g, ""), 10);
-      return `~${(p / EB_PER_TRUMF_KR).toFixed(1).replace(".", ",")} % (~${p} EB/100kr)`;
-    }
-    const fixed = r.match(/^([\d\s]+)\s*poeng$/i);
-    if (fixed) {
-      const p = parseInt(fixed[1].replace(/\s/g, ""), 10);
-      return `~${Math.round(p / EB_PER_TRUMF_KR)} kr (~${p.toLocaleString("nb-NO")} EB)`;
-    }
-  }
-  if (o.provider === "trumf") {
-    const range = r.match(/^([\d,]+)-([\d,]+)\s*%$/);
-    if (range) {
-      const min = parseFloat(range[1].replace(",", "."));
-      const max = parseFloat(range[2].replace(",", "."));
-      return `${r} (~${Math.round(min * EB_PER_TRUMF_KR)}-${Math.round(max * EB_PER_TRUMF_KR)} EB/100kr)`;
-    }
-    const pct = r.match(/^([\d,]+)\s*%$/);
-    if (pct) {
-      const p = parseFloat(pct[1].replace(",", "."));
-      return `${r} (~${Math.round(p * EB_PER_TRUMF_KR)} EB/100kr)`;
-    }
-  }
-  return r;
+  return window.SHARED.formatRewardLabel(o.reward || "", o.provider);
 }
 
 function getCodeSourceProvider(o) {
@@ -1572,76 +1517,15 @@ function getCodeSourceProvider(o) {
 }
 
 function formatKr(n) {
-  return n.toFixed(2).replace(".", ",").replace(/,00$/, "");
+  return window.SHARED.formatKr(n);
 }
 
 function formatBreakdownWithAmounts(terms, amount) {
-  return terms.split("\n").map(line => {
-    const m = line.match(/^([\d,]+)\s*%/);
-    if (m) {
-      const pct = parseFloat(m[1].replace(",", "."));
-      const kr = amount * pct / 100;
-      return `${line} (${formatKr(kr)} kr)`;
-    }
-    return line;
-  }).join("\n");
+  return window.SHARED.formatBreakdownWithAmounts(terms, amount);
 }
 
 function calcReward(o, amount) {
-  const r = o.reward.trim();
-  const fmt = (n) => n.toFixed(2).replace(".", ",").replace(/,00$/, "");
-  if (o.provider === "cbn") {
-    const pct = r.match(/(\d+(?:[,.]\d+)?)\s*%/);
-    if (pct) {
-      const p = parseFloat(pct[1].replace(",", "."));
-      return `${fmt(amount * p / 100)} kr til gode formål`;
-    }
-    const fixedKr = r.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
-    if (fixedKr) {
-      return `${fmt(parseFloat(fixedKr[1].replace(",", ".")))} kr til gode formål`;
-    }
-    return r;
-  }
-  // range percent
-  const range = r.match(/^([\d,]+)-([\d,]+)\s*%$/);
-  if (range) {
-    const min = parseFloat(range[1].replace(",", "."));
-    const max = parseFloat(range[2].replace(",", "."));
-    const minKr = amount * min / 100;
-    const maxKr = amount * max / 100;
-    if (o.provider === "trumf") {
-      const minEb = Math.round(amount * min * EB_PER_TRUMF_KR / 100);
-      const maxEb = Math.round(amount * max * EB_PER_TRUMF_KR / 100);
-      return `${fmt(minKr)}-${fmt(maxKr)} kr (~${minEb}-${maxEb} EB)`;
-    }
-    return `${fmt(minKr)}-${fmt(maxKr)} kr`;
-  }
-  // single percent
-  const pct = r.match(/^([\d,]+)\s*%$/);
-  if (pct) {
-    const p = parseFloat(pct[1].replace(",", "."));
-    const kr = amount * p / 100;
-    if (o.provider === "trumf") {
-      const eb = Math.round(amount * p * EB_PER_TRUMF_KR / 100);
-      return `${fmt(kr)} kr (~${eb} EB)`;
-    }
-    return `${fmt(kr)} kr`;
-  }
-  // SAS rate
-  const sas = r.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
-  if (sas) {
-    const pts = parseInt(sas[1].replace(/\s/g, ""), 10);
-    const eb = Math.round(amount * pts / 100);
-    const kr = eb / EB_PER_TRUMF_KR;
-    return `~${fmt(kr)} kr (~${eb} EB)`;
-  }
-  // SAS fixed
-  const sasFixed = r.match(/^([\d\s]+)\s*poeng$/i);
-  if (sasFixed) {
-    const pts = parseInt(sasFixed[1].replace(/\s/g, ""), 10);
-    return `~${Math.round(pts / EB_PER_TRUMF_KR)} kr (~${pts.toLocaleString("nb-NO")} EB)`;
-  }
-  return r;
+  return window.SHARED.calculateCashback(o, amount);
 }
 
 function esc(s) {

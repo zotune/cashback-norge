@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { defineConfig, type Plugin } from "vite";
+import { build as viteBuild, defineConfig, type Plugin } from "vite";
 
 function copyCashbackIndexPlugin(sourcePath: string, targetPath: string): Plugin {
   return {
@@ -14,6 +14,36 @@ function copyCashbackIndexPlugin(sourcePath: string, targetPath: string): Plugin
 }
 
 const extensionOutDir = resolve("dist/extension");
+const contentEntry = resolve("src/extension/content.ts");
+
+function buildContentScriptPlugin(outDir: string): Plugin {
+  return {
+    name: "build-content-script",
+    async closeBundle() {
+      await viteBuild({
+        build: {
+          emptyOutDir: false,
+          lib: {
+            entry: contentEntry,
+            fileName: () => "assets/content.js",
+            formats: ["iife"],
+            name: "CashbackVarslerContent",
+          },
+          minify: true,
+          outDir,
+          rollupOptions: {
+            output: {
+              inlineDynamicImports: true,
+            },
+          },
+          target: "es2022",
+        },
+        configFile: false,
+        publicDir: false,
+      });
+    },
+  };
+}
 
 export default defineConfig({
   build: {
@@ -22,7 +52,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         background: resolve("src/extension/background.ts"),
-        content: resolve("src/extension/content.ts"),
         popup: resolve("popup.html"),
       },
       output: {
@@ -37,6 +66,7 @@ export default defineConfig({
       resolve("data/cashback-index.json"),
       resolve(extensionOutDir, "cashback-index.json"),
     ),
+    buildContentScriptPlugin(extensionOutDir),
   ],
   publicDir: resolve("src/extension/public"),
 });

@@ -266,6 +266,11 @@ h1 {
   color: #5b2486;
 }
 
+.provider-usbl {
+  background: #f2c94c;
+  color: #1c1b1f;
+}
+
 .copy-code-btn {
   align-items: center;
   color: #1f8f5f;
