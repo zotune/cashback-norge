@@ -3,4 +3,5 @@ dist/
 storage/
 .env*
 .DS_Store
+data/cashback-index.json
 site/cashback-index.json
