@@ -4,6 +4,7 @@ import {
   isCashbackIndex,
   parseUrl,
 } from "../shared/cashback.js";
+import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import {
   type CashbackFoundMessage,
   type CashbackNoneMessage,
@@ -23,10 +24,16 @@ const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshIndex();
+  void clearIncognitoActivationsIfNoIncognitoWindows();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void refreshIndex();
+  void clearIncognitoActivationsIfNoIncognitoWindows();
+});
+
+chrome.windows.onRemoved.addListener(() => {
+  void clearIncognitoActivationsIfNoIncognitoWindows();
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -212,6 +219,42 @@ function setStorageValue(key: string, value: unknown): Promise<void> {
       resolveValue();
     });
   });
+}
+
+async function clearIncognitoActivationsIfNoIncognitoWindows(): Promise<void> {
+  const windows = await getAllWindows();
+  if (windows.some((windowInfo) => windowInfo.incognito === true)) {
+    return;
+  }
+
+  const stored = await getStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
+  if (!isPlainRecord(stored)) {
+    return;
+  }
+
+  const next: Record<string, unknown> = {};
+  let changed = false;
+  for (const [key, value] of Object.entries(stored)) {
+    if (key.startsWith("incognito:")) {
+      changed = true;
+      continue;
+    }
+    next[key] = value;
+  }
+
+  if (changed) {
+    await setStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, next);
+  }
+}
+
+function getAllWindows(): Promise<chrome.windows.Window[]> {
+  return new Promise((resolveValue) => {
+    chrome.windows.getAll({}, resolveValue);
+  });
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function sendTabMessage(

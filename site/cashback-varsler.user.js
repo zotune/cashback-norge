@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778160585
+// @version      1778160979
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -884,11 +884,11 @@
   }
   async function readActivatedOffers(now = Date.now()) {
     const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
-    const activations = pruneActivatedOffers(stored, now);
-    if (isRecord(stored) && Object.keys(stored).length !== Object.keys(activations).length) {
+    const { activations, changed } = pruneStoredActivatedOffers(stored, now);
+    if (isRecord(stored) && changed) {
       await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
     }
-    return activations;
+    return filterActivatedOffersForContext(activations, getCurrentActivationContext());
   }
   async function markOfferActivated(provider, rawUrl, now = Date.now()) {
     const activationKey = getProviderActivationKey(provider, rawUrl);
@@ -896,8 +896,8 @@
       return;
     }
     const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
-    const activations = pruneActivatedOffers(stored, now);
-    activations[activationKey] = now;
+    const { activations } = pruneStoredActivatedOffers(stored, now);
+    activations[getActivationStorageKey(getCurrentActivationContext(), activationKey)] = now;
     await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
   }
   function isTrumfLogOfferClickUrl(rawUrl) {
@@ -945,17 +945,58 @@
     const normalizedUrl = normalizeActivationUrl(rawUrl);
     return normalizedUrl === void 0 ? void 0 : `${provider}:${normalizedUrl}`;
   }
-  function pruneActivatedOffers(value, now) {
+  function getCurrentActivationContext() {
+    const chromeWithExtension = typeof chrome === "undefined" ? void 0 : chrome;
+    return chromeWithExtension?.extension?.inIncognitoContext === true ? "incognito" : "normal";
+  }
+  function pruneStoredActivatedOffers(value, now) {
     if (!isRecord(value)) {
-      return {};
+      return { activations: {}, changed: false };
     }
     const activations = {};
+    let changed = false;
     for (const [key, activatedAt] of Object.entries(value)) {
       if (typeof activatedAt === "number" && Number.isFinite(activatedAt) && now - activatedAt >= 0 && now - activatedAt < OFFER_ACTIVATION_TTL_MS) {
-        activations[key] = activatedAt;
+        const parsedKey = parseActivationStorageKey(key);
+        if (parsedKey === void 0) {
+          changed = true;
+          continue;
+        }
+        const storageKey = getActivationStorageKey(parsedKey.context, parsedKey.activationKey);
+        activations[storageKey] = Math.max(activations[storageKey] ?? -1, activatedAt);
+        if (storageKey !== key) {
+          changed = true;
+        }
+      } else {
+        changed = true;
       }
     }
-    return activations;
+    return { activations, changed };
+  }
+  function filterActivatedOffersForContext(activations, context) {
+    const filtered = {};
+    const prefix = `${context}:`;
+    for (const [storageKey, activatedAt] of Object.entries(activations)) {
+      if (storageKey.startsWith(prefix)) {
+        filtered[storageKey.slice(prefix.length)] = activatedAt;
+      }
+    }
+    return filtered;
+  }
+  function getActivationStorageKey(context, activationKey) {
+    return `${context}:${activationKey}`;
+  }
+  function parseActivationStorageKey(storageKey) {
+    if (storageKey.startsWith("normal:")) {
+      return { context: "normal", activationKey: storageKey.slice("normal:".length) };
+    }
+    if (storageKey.startsWith("incognito:")) {
+      return { context: "incognito", activationKey: storageKey.slice("incognito:".length) };
+    }
+    if (storageKey.includes(":")) {
+      return { context: "normal", activationKey: storageKey };
+    }
+    return void 0;
   }
   function normalizeActivationUrl(rawUrl) {
     const parsedUrl = parseUrl(rawUrl);

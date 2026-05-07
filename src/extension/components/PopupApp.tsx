@@ -5,9 +5,10 @@ import {
   isOffersForUrlResponse,
 } from "../../shared/extension-messages.js";
 import {
+  type ActivationContext,
   getLastActivatedOfferKey,
   isOfferActivated,
-  readActivatedOffers,
+  readActivatedOffersForContext,
 } from "../activation-state.js";
 
 const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
@@ -42,6 +43,7 @@ type PopupState =
   | {
       status: "ready";
       hostname: string;
+      isIncognito: boolean;
       offers: CashbackOffer[];
     }
   | {
@@ -54,18 +56,28 @@ export function PopupApp(): ReactElement {
   const [sumInput, setSumInput] = useState("");
   const [chipsCollapsed, setChipsCollapsed] = useState(false);
   const [activatedOffers, setActivatedOffers] = useState<Record<string, number>>({});
+  const activeTabContext: ActivationContext | undefined = state.status === "ready"
+    ? state.isIncognito ? "incognito" : "normal"
+    : undefined;
 
   useEffect(() => {
     loadCurrentTabOffers(setState);
-    void readActivatedOffers()
-      .catch(() => ({}))
-      .then(setActivatedOffers);
     chrome.storage.local.get("cashback-varsler-chips-collapsed", (result: Record<string, unknown>) => {
       if (result["cashback-varsler-chips-collapsed"] === true) {
         setChipsCollapsed(true);
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (activeTabContext === undefined) {
+      return;
+    }
+
+    void readActivatedOffersForContext(activeTabContext)
+      .catch(() => ({}))
+      .then(setActivatedOffers);
+  }, [activeTabContext]);
 
   const amount = sumInput.length > 0 ? Number.parseFloat(sumInput.replace(/[^0-9.,]/g, "").replace(",", ".")) || 0 : 0;
 
@@ -609,7 +621,7 @@ function loadCurrentTabOffers(
     const parsedUrl = parseUrl(activeTab.url);
 
     if (parsedUrl === undefined) {
-      setState({ status: "ready", hostname: "", offers: [] });
+      setState({ status: "ready", hostname: "", isIncognito: activeTab.incognito === true, offers: [] });
       return;
     }
 
@@ -627,6 +639,7 @@ function loadCurrentTabOffers(
       setState({
         status: "ready",
         hostname: parsedUrl.hostname,
+        isIncognito: activeTab.incognito === true,
         offers: response.offers,
       });
     });

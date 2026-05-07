@@ -377,15 +377,17 @@ function getLastActivatedOfferKey(
   return latestKey;
 }
 
+type ActivationContext = "normal" | "incognito";
+
 async function readActivatedOffers(now = Date.now()): Promise<Record<string, number>> {
   const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
-  const activations = pruneActivatedOffers(stored, now);
+  const { activations, changed } = pruneStoredActivatedOffers(stored, now);
 
-  if (isRecord(stored) && Object.keys(stored).length !== Object.keys(activations).length) {
+  if (isRecord(stored) && changed) {
     await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
   }
 
-  return activations;
+  return filterActivatedOffersForContext(activations, getCurrentActivationContext());
 }
 
 async function markOfferActivated(provider: string, rawUrl: string, now = Date.now()): Promise<void> {
@@ -395,8 +397,8 @@ async function markOfferActivated(provider: string, rawUrl: string, now = Date.n
   }
 
   const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
-  const activations = pruneActivatedOffers(stored, now);
-  activations[activationKey] = now;
+  const { activations } = pruneStoredActivatedOffers(stored, now);
+  activations[getActivationStorageKey(getCurrentActivationContext(), activationKey)] = now;
 
   await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
 }
@@ -464,12 +466,24 @@ function getProviderActivationKey(provider: string, rawUrl: string): string | un
   return normalizedUrl === undefined ? undefined : `${provider}:${normalizedUrl}`;
 }
 
-function pruneActivatedOffers(value: unknown, now: number): Record<string, number> {
+function getCurrentActivationContext(): ActivationContext {
+  const chromeWithExtension = typeof chrome === "undefined"
+    ? undefined
+    : chrome as typeof chrome & { extension?: { inIncognitoContext?: boolean } };
+
+  return chromeWithExtension?.extension?.inIncognitoContext === true ? "incognito" : "normal";
+}
+
+function pruneStoredActivatedOffers(
+  value: unknown,
+  now: number,
+): { activations: Record<string, number>; changed: boolean } {
   if (!isRecord(value)) {
-    return {};
+    return { activations: {}, changed: false };
   }
 
   const activations: Record<string, number> = {};
+  let changed = false;
   for (const [key, activatedAt] of Object.entries(value)) {
     if (
       typeof activatedAt === "number" &&
@@ -477,10 +491,61 @@ function pruneActivatedOffers(value: unknown, now: number): Record<string, numbe
       now - activatedAt >= 0 &&
       now - activatedAt < OFFER_ACTIVATION_TTL_MS
     ) {
-      activations[key] = activatedAt;
+      const parsedKey = parseActivationStorageKey(key);
+      if (parsedKey === undefined) {
+        changed = true;
+        continue;
+      }
+
+      const storageKey = getActivationStorageKey(parsedKey.context, parsedKey.activationKey);
+      activations[storageKey] = Math.max(activations[storageKey] ?? -1, activatedAt);
+      if (storageKey !== key) {
+        changed = true;
+      }
+    } else {
+      changed = true;
     }
   }
-  return activations;
+
+  return { activations, changed };
+}
+
+function filterActivatedOffersForContext(
+  activations: Readonly<Record<string, number>>,
+  context: ActivationContext,
+): Record<string, number> {
+  const filtered: Record<string, number> = {};
+  const prefix = `${context}:`;
+
+  for (const [storageKey, activatedAt] of Object.entries(activations)) {
+    if (storageKey.startsWith(prefix)) {
+      filtered[storageKey.slice(prefix.length)] = activatedAt;
+    }
+  }
+
+  return filtered;
+}
+
+function getActivationStorageKey(context: ActivationContext, activationKey: string): string {
+  return `${context}:${activationKey}`;
+}
+
+function parseActivationStorageKey(
+  storageKey: string,
+): { context: ActivationContext; activationKey: string } | undefined {
+  if (storageKey.startsWith("normal:")) {
+    return { context: "normal", activationKey: storageKey.slice("normal:".length) };
+  }
+
+  if (storageKey.startsWith("incognito:")) {
+    return { context: "incognito", activationKey: storageKey.slice("incognito:".length) };
+  }
+
+  if (storageKey.includes(":")) {
+    return { context: "normal", activationKey: storageKey };
+  }
+
+  return undefined;
 }
 
 function normalizeActivationUrl(rawUrl: string): string | undefined {
