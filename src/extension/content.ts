@@ -790,7 +790,7 @@ function renderNotice(
     }
     .offer-list {
       display: grid;
-      gap: 4px;
+      gap: 2px;
     }
     .offer-link.offer-link--best {
       color: #3a7d55;
@@ -799,12 +799,12 @@ function renderNotice(
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
-      border-radius: 6px;
+      border-radius: 5px;
       color: #172026;
       display: grid;
+      font-size: 14px;
       gap: 8px;
       grid-template-columns: minmax(0, 1fr) auto auto;
-      min-height: 32px;
       padding: 5px 9px;
       text-decoration: none;
     }
@@ -841,7 +841,7 @@ function renderNotice(
       align-items: center;
       display: flex;
       flex-wrap: wrap;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
       gap: 6px;
       line-height: 1.2;
@@ -851,11 +851,11 @@ function renderNotice(
       align-items: center;
       border-radius: 5px;
       display: inline-flex;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       line-height: 1;
-      min-height: 22px;
-      padding: 0 7px;
+      min-height: 20px;
+      padding: 0 6px;
       white-space: nowrap;
     }
     .provider-remember {
@@ -1249,13 +1249,13 @@ function renderNotice(
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
-      border-radius: 6px;
+      border-radius: 5px;
       display: flex;
       flex: 1;
       font-size: 12px;
       gap: 6px;
       min-width: 0;
-      padding: 5px 8px;
+      padding: 5px 9px;
     }
     .code-reward {
       font-weight: 700;
