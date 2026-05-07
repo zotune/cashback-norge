@@ -12,7 +12,7 @@
     "build:store": "pnpm run build:extension:store",
     "build:site": "vite build --config vite.site.config.ts",
     "check": "tsc --project tsconfig.json --noEmit",
-    "crawl": "tsx src/backend/index.ts && cp data/cashback-index.json site/cashback-index.json"
+    "crawl": "tsx src/backend/index.ts && cp data/cashback-index.json site/cashback-index.json && pnpm run build:extension && pnpm run build:site && pnpm run build:userscript"
   },
   "dependencies": {
     "crawlee": "^3.16.0",
