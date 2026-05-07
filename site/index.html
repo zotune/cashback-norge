@@ -1562,7 +1562,7 @@ function formatTooltipSectionHtml(part) {
     ? `<span class="offer-tooltip-title">${esc(firstLine)}</span>`
     : "";
   const listHtml = listLines
-    .map(line => `<span class="offer-tooltip-list-item"><span class="offer-tooltip-bullet">•</span><span>${esc(line)}</span></span>`)
+    .map(line => `<span class="offer-tooltip-list-item"><span class="offer-tooltip-bullet">•</span><span>${esc(line.replace(/^-\s+/, ""))}</span></span>`)
     .join("");
   return `<span class="offer-tooltip-section">${titleHtml}<span class="offer-tooltip-list">${listHtml}</span></span>`;
 }

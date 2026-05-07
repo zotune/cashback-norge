@@ -2595,7 +2595,7 @@ function createTooltipSection(part: string): HTMLDivElement | undefined {
   list.className = "offer-tooltip-list";
   for (const line of listLines) {
     const item = document.createElement("li");
-    item.textContent = line;
+    item.textContent = line.replace(/^-\s+/, "");
     list.append(item);
   }
   section.append(list);

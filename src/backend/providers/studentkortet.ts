@@ -43,6 +43,7 @@ type RawOffer = {
   sourceUrl: string;
   terms: string;
   redirectDomain: string;
+  detailRewardText: string;
 };
 
 export async function crawlStudentkortet(input: CrawlStudentkortetInput): Promise<CashbackOffer[]> {
@@ -61,7 +62,7 @@ export async function crawlStudentkortet(input: CrawlStudentkortetInput): Promis
   let skippedNoReward = 0;
 
   for (const raw of rawOffers) {
-    const reward = parseReward(raw.rewardText);
+    const reward = parseReward(raw.detailRewardText || raw.rewardText);
     if (!reward) {
       skippedNoReward++;
       continue;
@@ -128,6 +129,7 @@ function extractOffers(html: string): RawOffer[] {
       sourceUrl: `https://studentkortet.no/rabatter/${category}/${match[2]}/${slug}/`,
       terms: "",
       redirectDomain: "",
+      detailRewardText: "",
     });
   }
 
@@ -182,6 +184,11 @@ async function enrichDetails(offers: RawOffer[], logger: Logger): Promise<void> 
       if (terms) {
         offer.terms = terms;
       }
+      // Extract reward range from codebutton labels on detail page
+      const detailReward = extractDetailReward(html);
+      if (detailReward) {
+        offer.detailRewardText = detailReward;
+      }
       // Extract redirect URL domain from the videresending page
       const redirectUrl = extractRedirectLink(html);
       if (redirectUrl) {
@@ -207,22 +214,71 @@ async function enrichDetails(offers: RawOffer[], logger: Logger): Promise<void> 
 }
 
 function extractTerms(html: string): string {
-  const match = html.match(/class="ac-content"[^>]*>([\s\S]*?)<\/div>/i);
-  if (!match?.[1]) return "";
+  const contentMatches = [...html.matchAll(/class="ac-content"[^>]*>([\s\S]*?)<\/div>/gi)];
+  if (contentMatches.length === 0) return "";
 
-  const raw = match[1]
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .join("\n");
+  // Extract codebutton labels to use as headers for multi-tier offers
+  const buttonLabels = [...html.matchAll(/class="[^"]*codebutton[^"]*"[^>]*>([\s\S]*?)<\/button>/gi)]
+    .map((m) => {
+      const text = m[1]!.replace(/<[^>]+>/g, " ").trim();
+      return decodeHtmlEntities(text.replace(/Vis rabattkode\s*/i, "").trim());
+    })
+    // Deduplicate (buttons appear twice — mobile + desktop)
+    .filter((label, i, arr) => arr.indexOf(label) === i);
 
-  if (!raw) return "";
-  return `${raw}\nKrever Studentkortet-medlemskap.`;
+  const sections: string[] = [];
+
+  for (let i = 0; i < contentMatches.length; i++) {
+    const raw = contentMatches[i]![1]!
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .join("\n");
+
+    if (!raw) continue;
+
+    // Add codebutton label as header if there are multiple tiers
+    if (contentMatches.length > 1 && buttonLabels[i]) {
+      sections.push(`${buttonLabels[i]}:\n${raw}`);
+    } else {
+      sections.push(raw);
+    }
+  }
+
+  if (sections.length === 0) return "";
+  return `${sections.join("\n\n")}\nKrever Studentkortet-medlemskap.`;
+}
+
+function extractDetailReward(html: string): string {
+  // Extract percentage values from codebutton elements like:
+  // <button class="codebutton ...">Vis rabattkode 25% Rabatt</button>
+  const codebuttonMatches = [...html.matchAll(/class="[^"]*codebutton[^"]*"[^>]*>([\s\S]*?)<\/button>/gi)]
+    .map((m) => m[1]!.replace(/<[^>]+>/g, " ").trim());
+
+  const percentages = new Set<number>();
+
+  for (const text of codebuttonMatches) {
+    for (const m of text.matchAll(/(\d{1,3})\s*%/g)) {
+      const value = Number(m[1]);
+      if (value > 0 && value <= 100) {
+        percentages.add(value);
+      }
+    }
+  }
+
+  if (percentages.size <= 1) return "";
+
+  const sorted = [...percentages].sort((a, b) => a - b);
+  const min = sorted[0]!;
+  const max = sorted[sorted.length - 1]!;
+  if (min === max) return "";
+
+  return `Spar ${min}-${max}%`;
 }
 
 function extractRedirectLink(html: string): string {
