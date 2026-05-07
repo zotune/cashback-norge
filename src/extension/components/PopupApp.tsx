@@ -4,6 +4,10 @@ import {
   type GetOffersForUrlMessage,
   isOffersForUrlResponse,
 } from "../../shared/extension-messages.js";
+import {
+  isOfferActivated,
+  readActivatedOfferKeys,
+} from "../activation-state.js";
 
 const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
   "spotify.com": "Spotify",
@@ -48,9 +52,13 @@ export function PopupApp(): ReactElement {
   const [state, setState] = useState<PopupState>({ status: "loading" });
   const [sumInput, setSumInput] = useState("");
   const [chipsCollapsed, setChipsCollapsed] = useState(false);
+  const [activatedOfferKeys, setActivatedOfferKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadCurrentTabOffers(setState);
+    void readActivatedOfferKeys()
+      .catch(() => new Set<string>())
+      .then(setActivatedOfferKeys);
     chrome.storage.local.get("cashback-varsler-chips-collapsed", (result: Record<string, unknown>) => {
       if (result["cashback-varsler-chips-collapsed"] === true) {
         setChipsCollapsed(true);
@@ -123,6 +131,7 @@ export function PopupApp(): ReactElement {
               key={`${offer.provider}:${offer.sourceUrl}`}
               offer={offer}
               amount={amount}
+              activated={isOfferActivated(offer, activatedOfferKeys)}
             />
           );
         })}
@@ -272,7 +281,7 @@ export function PopupApp(): ReactElement {
 const CARD_ONLY_PROVIDERS = ["sparebank1", "remember"];
 const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
 
-function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement {
+function OfferRow(props: { offer: CashbackOffer; amount: number; activated: boolean }): ReactElement {
   const hasBreakdown = props.offer.provider === "cbn" ||
     props.offer.terms.length > 60 ||
     (props.offer.terms.includes("\n") && props.offer.terms.trim().length > 0);
@@ -326,9 +335,17 @@ function OfferRow(props: { offer: CashbackOffer; amount: number }): ReactElement
           <p className="merchant">
             <span>{rewardText}</span>
             <span
-              className={`provider-badge provider-${props.offer.provider}`}
+              className="provider-wrap"
             >
-              {formatProviderName(props.offer.provider)}
+              <span className={`provider-badge provider-${props.offer.provider}`}>
+                {formatProviderName(props.offer.provider)}
+              </span>
+              {props.activated && (
+                <span className="activation-badge" title="Cashback aktivert">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Aktivert</span>
+                </span>
+              )}
             </span>
             {isCardOnly && (
               <span className="offer-card-only-warn">⚠</span>

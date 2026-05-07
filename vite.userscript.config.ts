@@ -44,16 +44,18 @@ const chrome = {
     local: {
       get(keys, cb) {
         const r = {};
-        for (const k of keys) {
+        const keyList = Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys ?? {});
+        for (const k of keyList) {
           const v = localStorage.getItem(k);
           if (v !== null) try { r[k] = JSON.parse(v); } catch(_e) {}
         }
         cb(r);
       },
-      set(items) {
+      set(items, cb) {
         for (const [k, v] of Object.entries(items)) {
           try { localStorage.setItem(k, JSON.stringify(v)); } catch(_e) {}
         }
+        cb?.();
       },
     },
   },

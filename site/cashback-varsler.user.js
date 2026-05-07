@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778093079
+// @version      1778158904
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -31,7 +31,8 @@
       local: {
         get(keys, cb) {
           const r = {};
-          for (const k of keys) {
+          const keyList = Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys ?? {});
+          for (const k of keyList) {
             const v = localStorage.getItem(k);
             if (v !== null) try {
               r[k] = JSON.parse(v);
@@ -40,13 +41,14 @@
           }
           cb(r);
         },
-        set(items) {
+        set(items, cb) {
           for (const [k, v] of Object.entries(items)) {
             try {
               localStorage.setItem(k, JSON.stringify(v));
             } catch (_e) {
             }
           }
+          cb?.();
         }
       }
     }
@@ -708,7 +710,10 @@
   const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
   const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+  const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
+  const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1e3;
   const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
+  installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
     if (isCashbackFoundMessage(message)) {
       renderNoticeWithStoredState(message.offers);
@@ -742,7 +747,9 @@
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
-      renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed);
+      void readActivatedOfferKeys().catch(() => /* @__PURE__ */ new Set()).then((activatedOfferKeys) => {
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOfferKeys);
+      });
     });
   }
   function requestCurrentOffers() {
@@ -794,7 +801,120 @@
     chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
     return chip;
   }
-  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed) {
+  function createProviderBadgeWithActivation(offer, activatedOfferKeys) {
+    const providerWrap = document.createElement("span");
+    providerWrap.className = "provider-wrap";
+    const providerBadge = document.createElement("span");
+    providerBadge.className = `provider-badge provider-${offer.provider}`;
+    providerBadge.textContent = formatProviderName(offer.provider);
+    providerWrap.append(providerBadge);
+    if (isOfferActivated(offer, activatedOfferKeys)) {
+      const activationBadge = document.createElement("span");
+      activationBadge.className = "activation-badge";
+      activationBadge.title = "Cashback aktivert";
+      activationBadge.innerHTML = `${CHECK_ICON_SVG}<span>Aktivert</span>`;
+      providerWrap.append(activationBadge);
+    }
+    return providerWrap;
+  }
+  function installOfferActivationClickTracker() {
+    document.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const link = target.closest("a[href]");
+      if (link === null || !isTrumfLogOfferClickUrl(link.href)) {
+        return;
+      }
+      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      const opensSameTab = link.target === "" || link.target === "_self";
+      if (hasModifier || !opensSameTab) {
+        void markOfferActivated("trumf", link.href);
+        return;
+      }
+      event.preventDefault();
+      void markOfferActivated("trumf", link.href).finally(() => {
+        window.location.assign(link.href);
+      });
+    }, true);
+  }
+  function isOfferActivated(offer, activatedOfferKeys) {
+    const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
+    return activationKey !== void 0 && activatedOfferKeys.has(activationKey);
+  }
+  async function readActivatedOfferKeys(now = Date.now()) {
+    const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
+    const activations = pruneActivatedOffers(stored, now);
+    if (isRecord(stored) && Object.keys(stored).length !== Object.keys(activations).length) {
+      await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
+    }
+    return new Set(Object.keys(activations));
+  }
+  async function markOfferActivated(provider, rawUrl, now = Date.now()) {
+    const activationKey = getProviderActivationKey(provider, rawUrl);
+    if (activationKey === void 0) {
+      return;
+    }
+    const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
+    const activations = pruneActivatedOffers(stored, now);
+    activations[activationKey] = now;
+    await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
+  }
+  function isTrumfLogOfferClickUrl(rawUrl) {
+    const parsedUrl = parseUrl(rawUrl);
+    if (parsedUrl === void 0) {
+      return false;
+    }
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "trumfnetthandel.no" && /^\/LogOfferClick\/\d+\/\d+\/?$/.test(parsedUrl.pathname);
+  }
+  function getProviderActivationKey(provider, rawUrl) {
+    const normalizedUrl = normalizeActivationUrl(rawUrl);
+    return normalizedUrl === void 0 ? void 0 : `${provider}:${normalizedUrl}`;
+  }
+  function pruneActivatedOffers(value, now) {
+    if (!isRecord(value)) {
+      return {};
+    }
+    const activations = {};
+    for (const [key, activatedAt] of Object.entries(value)) {
+      if (typeof activatedAt === "number" && Number.isFinite(activatedAt) && now - activatedAt >= 0 && now - activatedAt < OFFER_ACTIVATION_TTL_MS) {
+        activations[key] = activatedAt;
+      }
+    }
+    return activations;
+  }
+  function normalizeActivationUrl(rawUrl) {
+    const parsedUrl = parseUrl(rawUrl);
+    if (parsedUrl === void 0 || parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return void 0;
+    }
+    const protocol = parsedUrl.protocol.toLowerCase();
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const port = parsedUrl.port.length > 0 ? `:${parsedUrl.port}` : "";
+    const pathname = parsedUrl.pathname.length > 1 && parsedUrl.pathname.endsWith("/") ? parsedUrl.pathname.slice(0, -1) : parsedUrl.pathname;
+    return `${protocol}//${hostname}${port}${pathname}${parsedUrl.search}`;
+  }
+  function getLocalStorageValue(key) {
+    return new Promise((resolveValue) => {
+      chrome.storage.local.get([key], (items) => {
+        const value = items[key];
+        resolveValue(value);
+      });
+    });
+  }
+  function setLocalStorageValue(key, value) {
+    return new Promise((resolveValue) => {
+      chrome.storage.local.set({ [key]: value }, () => {
+        resolveValue();
+      });
+    });
+  }
+  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, activatedOfferKeys) {
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
@@ -994,6 +1114,34 @@
     }
     .offer-link .provider-badge {
       grid-column: 3;
+    }
+    .provider-wrap {
+      align-items: center;
+      display: inline-flex;
+      gap: 5px;
+      grid-column: 3;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+    .activation-badge {
+      align-items: center;
+      background: #eaf7ef;
+      border: 1px solid #a9d9bd;
+      border-radius: 999px;
+      color: #166b47;
+      display: inline-flex;
+      font-size: 10px;
+      font-weight: 800;
+      gap: 3px;
+      line-height: 1;
+      min-height: 18px;
+      padding: 0 6px;
+      white-space: nowrap;
+    }
+    .activation-badge svg {
+      flex-shrink: 0;
+      height: 12px;
+      width: 12px;
     }
     .offer-label {
       align-items: center;
@@ -1635,7 +1783,26 @@
       chipSpan.textContent = formatProviderName(offer.provider);
       sideTabText.append(rewardSpan, chipSpan);
     } else {
-      sideTabText.textContent = formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
+      const rewardSpan = document.createElement("span");
+      rewardSpan.className = "side-tab-reward";
+      rewardSpan.textContent = formatCompactRewardLabel(primaryOffer) ?? primaryOffer.reward;
+      sideTabText.append(rewardSpan);
+      const codeProvider = primaryOffer.provider !== "rabattkode" ? primaryOffer.provider : (() => {
+        try {
+          const h = new URL(primaryOffer.sourceUrl || primaryOffer.activationUrl).hostname.replace(/^www\./, "");
+          if (h === "bob.no" || h.endsWith(".bob.no")) return "bob";
+          if (h === "dnb.no" || h.endsWith(".dnb.no")) return "dnb";
+          if (h === "tfbank.no" || h.endsWith(".tfbank.no")) return "tfbank";
+        } catch {
+        }
+        return void 0;
+      })();
+      if (codeProvider !== void 0) {
+        const chipSpan = document.createElement("span");
+        chipSpan.className = `side-tab-chip provider-${codeProvider}`;
+        chipSpan.textContent = formatProviderName(codeProvider);
+        sideTabText.append(chipSpan);
+      }
     }
     sideTab.append(sideTabArrow, sideTabText);
     sideTab.addEventListener("click", () => {
@@ -1682,9 +1849,7 @@
       const offerReward = document.createElement("span");
       offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
-      const providerBadge = document.createElement("span");
-      providerBadge.className = `provider-badge provider-${currentOffer.provider}`;
-      providerBadge.textContent = formatProviderName(currentOffer.provider);
+      const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys);
       offerLabel.append(offerReward);
       if (currentOffer.discountCode !== void 0) {
         const code = currentOffer.discountCode;
@@ -1719,14 +1884,14 @@
             }, 1500);
           });
         });
-        offerLink.append(offerLabel, copyBtn, providerBadge);
+        offerLink.append(offerLabel, copyBtn, providerWrap);
       } else if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
         const warnIcon = document.createElement("span");
         warnIcon.className = "card-only-warn";
         warnIcon.textContent = "⚠";
-        offerLink.append(offerLabel, warnIcon, providerBadge);
+        offerLink.append(offerLabel, warnIcon, providerWrap);
       } else {
-        offerLink.append(offerLabel, providerBadge);
+        offerLink.append(offerLabel, providerWrap);
       }
       wrapper.append(offerLink);
       offerList.append(wrapper);

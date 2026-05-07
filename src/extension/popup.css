@@ -137,6 +137,33 @@ h1 {
   white-space: nowrap;
 }
 
+.provider-wrap {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+  min-width: 0;
+}
+
+.activation-badge {
+  align-items: center;
+  background: #eaf7ef;
+  border: 1px solid #a9d9bd;
+  border-radius: 999px;
+  color: #166b47;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 3px;
+  line-height: 1;
+  min-height: 18px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.activation-badge svg {
+  flex-shrink: 0;
+}
+
 .provider-remember {
   background: #111111;
   color: #ff9900;
