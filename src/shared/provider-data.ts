@@ -16,6 +16,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   usbl: "USBL",
   naf: "NAF",
   sparebank1: "SB1 Ung",
+  studentkortet: "Studentkortet",
   cbn: "♥",
 };
 
@@ -31,6 +32,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   usbl: "USBL-tilbud.\nKrever USBL-medlemskap og eventuell Bonabo-aktivering.",
   bob: "BOB-medlemsfordel.\nKrever BOB-medlemskap og gyldig medlemsbevis i BOB-appen.",
   sparebank1: "SpareBank 1 Mastercard Ung.\n20 % rabatt på utvalgte strømmetjenester.\nSamlet inntil 500 kr per kalenderår.",
+  studentkortet: "Studentkortet.no\nGratis medlemskap for studenter i Norge.\nAktiver rabatt via studentkortet.no.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -50,6 +52,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   usbl: { bg: "#34413e", fg: "#ffffff" },
   naf: { bg: "#FFD100", fg: "#000000" },
   sparebank1: { bg: "#005aa4", fg: "#ffffff" },
+  studentkortet: { bg: "#1B2838", fg: "#ffffff" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 

@@ -991,9 +991,6 @@
     "myprotein": [
       "myprotein.no"
     ],
-    "navnelapper": [
-      "navnelapper.no"
-    ],
     "nespresso": [
       "nespresso.com"
     ],
@@ -1419,6 +1416,260 @@
     ],
     "Garmin": [
       "garmin.com"
+    ]
+  },
+  "studentkortet": {
+    "wakakuu": [
+      "wakakuu.com"
+    ],
+    "miinto": [
+      "miinto.no"
+    ],
+    "junkyard": [
+      "junkyard.no"
+    ],
+    "jlindeberg": [
+      "jlindeberg.com"
+    ],
+    "g-star-raw": [
+      "g-star.com"
+    ],
+    "metalshopno": [
+      "metalshop.no"
+    ],
+    "bjoern-borg": [
+      "bjornborg.com"
+    ],
+    "teeshoppen": [
+      "teeshoppen.no"
+    ],
+    "hunkemoeller": [
+      "hunkemoller.no"
+    ],
+    "maria-black": [
+      "mariablack.com"
+    ],
+    "safira": [
+      "safira.com"
+    ],
+    "pilgrim": [
+      "pilgrim.net"
+    ],
+    "bluebella": [
+      "bluebella.com"
+    ],
+    "lenovo": [
+      "lenovo.com"
+    ],
+    "adobe": [
+      "adobe.com"
+    ],
+    "nordvpn": [
+      "nordvpn.com"
+    ],
+    "cyberghost-vpn": [
+      "cyberghostvpn.com"
+    ],
+    "sharkgaming": [
+      "sharkgaming.no"
+    ],
+    "expressvpn": [
+      "expressvpn.com"
+    ],
+    "avast": [
+      "avast.com"
+    ],
+    "ccleaner": [
+      "ccleaner.com"
+    ],
+    "avg": [
+      "avg.com"
+    ],
+    "alice": [
+      "alice.no"
+    ],
+    "panduro": [
+      "panduro.com"
+    ],
+    "kreatima": [
+      "kreatima.no"
+    ],
+    "bergens-tidende": [
+      "bt.no"
+    ],
+    "storytel": [
+      "storytel.com"
+    ],
+    "talkpal-ai": [
+      "talkpal.ai"
+    ],
+    "hotelscom": [
+      "hotels.com"
+    ],
+    "expedia": [
+      "expedia.no"
+    ],
+    "amisol": [
+      "amisol.no"
+    ],
+    "sts-alpereiser": [
+      "alpereiser.no"
+    ],
+    "kitchentime": [
+      "kitchentime.no"
+    ],
+    "nespresso": [
+      "nespresso.com"
+    ],
+    "lampegiganten": [
+      "lampegiganten.no"
+    ],
+    "nordic-nest": [
+      "nordicnest.no"
+    ],
+    "aeg": [
+      "aeg.no"
+    ],
+    "electrolux": [
+      "electrolux.no"
+    ],
+    "lyko": [
+      "lyko.no"
+    ],
+    "blivakker": [
+      "blivakker.no"
+    ],
+    "norzen": [
+      "norzen.no"
+    ],
+    "myprotein": [
+      "myprotein.no"
+    ],
+    "gymshark": [
+      "gymshark.com"
+    ],
+    "mm-sports": [
+      "mmsports.no"
+    ],
+    "better-bodies": [
+      "betterbodies.com"
+    ],
+    "aimn": [
+      "aimn.com"
+    ],
+    "revolutionrace": [
+      "revolutionrace.no"
+    ],
+    "sinful": [
+      "sinful.no"
+    ],
+    "smartbuyglasses": [
+      "smartbuyglasses.no"
+    ],
+    "specsavers": [
+      "specsavers.no"
+    ],
+    "hellofresh": [
+      "hellofresh.no"
+    ],
+    "foodora": [
+      "foodora.no"
+    ],
+    "revolut": [
+      "revolut.com"
+    ],
+    "viaplay": [
+      "viaplay.no"
+    ],
+    "saily": [
+      "saily.com"
+    ],
+    "gymgrossisten": [
+      "gymgrossisten.no"
+    ],
+    "proteinfabrikken": [
+      "proteinfabrikken.no"
+    ],
+    "kouture": [
+      "kouture.no"
+    ],
+    "skolageret": [
+      "skolageret.no"
+    ],
+    "stiksen": [
+      "stiksen.com"
+    ],
+    "veepn": [
+      "veepn.com"
+    ],
+    "ef": [
+      "ef.no"
+    ],
+    "philips-personal-health": [
+      "philips.no"
+    ],
+    "homeheart": [
+      "homeheart.no"
+    ],
+    "vita": [
+      "vita.no"
+    ],
+    "sakserno": [
+      "sakser.no"
+    ],
+    "skinsecret": [
+      "skinsecret.no"
+    ],
+    "iciw": [
+      "iciw.com"
+    ],
+    "topsportsno": [
+      "topsports.no"
+    ],
+    "flowlife": [
+      "flowlife.com"
+    ],
+    "fiskeonline": [
+      "fiskeonline.no"
+    ],
+    "pizzabakeren": [
+      "pizzabakeren.no"
+    ],
+    "zoo": [
+      "zoo.no"
+    ],
+    "petxl": [
+      "petxl.no"
+    ],
+    "dyrekassen": [
+      "dyrekassen.no"
+    ],
+    "bergenfiber": [
+      "bergenfiber.no"
+    ],
+    "nextgentel-mobil": [
+      "nextgentel.no"
+    ],
+    "bestaattno": [
+      "bestatt.no"
+    ],
+    "smartasaker": [
+      "smartasaker.se"
+    ],
+    "gorillagames": [
+      "gorillagames.no"
+    ],
+    "taenndalen": [
+      "tanndalen.se"
+    ],
+    "rolfs-reiser": [
+      "rolfsreiser.no"
+    ],
+    "curli": [
+      "curli.com"
+    ],
+    "beauty-mall": [
+      "beautymall.no"
     ]
   }
 }

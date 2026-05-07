@@ -25,6 +25,7 @@ import { crawlBob } from "./providers/bob.js";
 import { crawlUsbl } from "./providers/usbl.js";
 import { crawlNaf } from "./providers/naf.js";
 import { crawlSparebank1 } from "./providers/sparebank1.js";
+import { crawlStudentkortet } from "./providers/studentkortet.js";
 
 type CliConfig = {
   outputPath: string;
@@ -57,6 +58,7 @@ type CliConfig = {
   skipUsbl: boolean;
   skipNaf: boolean;
   skipSparebank1: boolean;
+  skipStudentkortet: boolean;
   skipDnbSupertilbud: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -71,6 +73,7 @@ type CliConfig = {
   usblStartUrl: string;
   nafStartUrl: string;
   sparebank1StartUrl: string;
+  studentkortetStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -155,6 +158,7 @@ async function main(): Promise<void> {
     logbuyOffers,
     usblOffers,
     nafOffers,
+    studentkortetOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : crawlTrumf({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -194,9 +198,13 @@ async function main(): Promise<void> {
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.nafStartUrl,
       }),
+    config.skipStudentkortet ? Promise.resolve([]) : crawlStudentkortet({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides, startUrl: config.studentkortetStartUrl,
+      }),
   ]);
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -275,6 +283,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipUsbl: args.includes("--skip-usbl"),
     skipNaf: args.includes("--skip-naf"),
     skipSparebank1: args.includes("--skip-sparebank1"),
+    skipStudentkortet: args.includes("--skip-studentkortet"),
     skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
@@ -315,6 +324,9 @@ function readCliConfig(args: string[]): CliConfig {
     sparebank1StartUrl:
       readArgumentValue(args, "--sparebank1-start-url") ??
       "https://www.sparebank1.no/nb/bank/privat/kundeservice/kort/strommetjenester-rabatt.html",
+    studentkortetStartUrl:
+      readArgumentValue(args, "--studentkortet-start-url") ??
+      "https://studentkortet.no/rabatter",
   };
 }
 
