@@ -203,10 +203,10 @@ function renderNoticeWithStoredState(offers: CashbackOffer[]): void {
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
     const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
     const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
-    void readActivatedOfferKeys()
-      .catch(() => new Set<string>())
-      .then((activatedOfferKeys) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOfferKeys);
+    void readActivatedOffers()
+      .catch(() => ({}))
+      .then((activatedOffers) => {
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOffers);
       });
   });
 }
@@ -266,7 +266,7 @@ function makeAdChip(): HTMLSpanElement {
 
 function createProviderBadgeWithActivation(
   offer: CashbackOffer,
-  activatedOfferKeys: ReadonlySet<string>,
+  activeOfferKey: string | undefined,
   shadowRoot: ShadowRoot,
 ): HTMLSpanElement {
   const providerWrap = document.createElement("span");
@@ -276,7 +276,7 @@ function createProviderBadgeWithActivation(
   providerBadge.className = `provider-badge provider-${offer.provider}`;
   providerBadge.textContent = formatProviderName(offer.provider);
 
-  if (isOfferActivated(offer, activatedOfferKeys)) {
+  if (isOfferActivated(offer, activeOfferKey)) {
     const activationBadge = document.createElement("span");
     activationBadge.className = "activation-badge";
     activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
@@ -311,20 +311,36 @@ function installOfferActivationClickTracker(): void {
     }
 
     const link = target.closest<HTMLAnchorElement>("a[href]");
-    if (link === null || !isTrumfLogOfferClickUrl(link.href)) {
+
+    const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    const trumfActivationUrl = link !== null && isTrumfLogOfferClickUrl(link.href) ? link.href : undefined;
+    const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : undefined;
+    const provider = trumfActivationUrl !== undefined ? "trumf" : sasActivationUrl !== undefined ? "sas" : undefined;
+    const activationUrl = trumfActivationUrl ?? sasActivationUrl;
+
+    if (provider === undefined || activationUrl === undefined) {
       return;
     }
 
-    const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    const canWaitForStorageBeforeNavigation = link !== null && (
+      trumfActivationUrl !== undefined ||
+      (sasActivationUrl !== undefined && isSasOutboundActivationUrl(link.href))
+    );
+
+    if (link === null || !canWaitForStorageBeforeNavigation) {
+      void markOfferActivated(provider, activationUrl);
+      return;
+    }
+
     const opensSameTab = link.target === "" || link.target === "_self";
 
     if (hasModifier || !opensSameTab) {
-      void markOfferActivated("trumf", link.href);
+      void markOfferActivated(provider, activationUrl);
       return;
     }
 
     event.preventDefault();
-    void markOfferActivated("trumf", link.href).finally(() => {
+    void markOfferActivated(provider, activationUrl).finally(() => {
       window.location.assign(link.href);
     });
   }, true);
@@ -332,13 +348,36 @@ function installOfferActivationClickTracker(): void {
 
 function isOfferActivated(
   offer: Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl">,
-  activatedOfferKeys: ReadonlySet<string>,
+  activeOfferKey: string | undefined,
 ): boolean {
   const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
-  return activationKey !== undefined && activatedOfferKeys.has(activationKey);
+  return activationKey !== undefined && activationKey === activeOfferKey;
 }
 
-async function readActivatedOfferKeys(now = Date.now()): Promise<Set<string>> {
+function getLastActivatedOfferKey(
+  offers: readonly Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl">[],
+  activatedOffers: Readonly<Record<string, number>>,
+): string | undefined {
+  let latestKey: string | undefined;
+  let latestActivatedAt = -1;
+
+  for (const offer of offers) {
+    const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
+    if (activationKey === undefined) {
+      continue;
+    }
+
+    const activatedAt = activatedOffers[activationKey];
+    if (typeof activatedAt === "number" && activatedAt > latestActivatedAt) {
+      latestKey = activationKey;
+      latestActivatedAt = activatedAt;
+    }
+  }
+
+  return latestKey;
+}
+
+async function readActivatedOffers(now = Date.now()): Promise<Record<string, number>> {
   const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
   const activations = pruneActivatedOffers(stored, now);
 
@@ -346,7 +385,7 @@ async function readActivatedOfferKeys(now = Date.now()): Promise<Set<string>> {
     await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
   }
 
-  return new Set(Object.keys(activations));
+  return activations;
 }
 
 async function markOfferActivated(provider: string, rawUrl: string, now = Date.now()): Promise<void> {
@@ -370,6 +409,54 @@ function isTrumfLogOfferClickUrl(rawUrl: string): boolean {
 
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return hostname === "trumfnetthandel.no" && /^\/LogOfferClick\/\d+\/\d+\/?$/.test(parsedUrl.pathname);
+}
+
+function isSasActivationClick(target: Element, link: HTMLAnchorElement | null): boolean {
+  if (getCurrentSasOfferActivationUrl() === undefined) {
+    return false;
+  }
+
+  if (link !== null && isSasOutboundActivationUrl(link.href)) {
+    return true;
+  }
+
+  const clickable = target.closest<HTMLElement>("button,a,[role='button']");
+  const text = clickable?.textContent?.trim().replace(/\s+/g, " ").toLowerCase();
+  return text === "handle nå" || text === "shop now";
+}
+
+function getCurrentSasOfferActivationUrl(): string | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) {
+    return undefined;
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+  if (hostname !== "onlineshopping.flysas.com" || pathParts.length < 4 || pathParts[1]?.toLowerCase() !== "butikker") {
+    return undefined;
+  }
+
+  const port = parsedUrl.port.length > 0 ? `:${parsedUrl.port}` : "";
+  const pathname = parsedUrl.pathname.length > 1 && parsedUrl.pathname.endsWith("/")
+    ? parsedUrl.pathname.slice(0, -1)
+    : parsedUrl.pathname;
+  return `${parsedUrl.protocol}//${parsedUrl.hostname}${port}${pathname}`;
+}
+
+function isSasOutboundActivationUrl(rawUrl: string): boolean {
+  const parsedUrl = parseUrl(rawUrl);
+  if (parsedUrl === undefined) {
+    return false;
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return (
+    hostname === "go.adt246.net" ||
+    hostname.endsWith(".adt246.net") ||
+    parsedUrl.searchParams.get("utm_source")?.toLowerCase() === "adtraction" ||
+    parsedUrl.searchParams.get("utm_medium")?.toLowerCase() === "affiliate"
+  );
 }
 
 function getProviderActivationKey(provider: string, rawUrl: string): string | undefined {
@@ -434,7 +521,7 @@ function renderNotice(
   initialCollapsed: boolean,
   initialChipsCollapsed: boolean,
   initialCodesCollapsed: boolean,
-  activatedOfferKeys: ReadonlySet<string>,
+  activatedOffers: Readonly<Record<string, number>>,
 ): void {
   clearNotice();
   const host = document.createElement("div");
@@ -1263,6 +1350,7 @@ function renderNotice(
     }
   `;
   const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+  const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
   const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
@@ -1373,7 +1461,7 @@ function renderNotice(
     const offerReward = document.createElement("span");
     offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
-    const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys, shadowRoot);
+    const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
     offerLabel.append(offerReward);
     if (currentOffer.discountCode !== undefined) {
       const code = currentOffer.discountCode;

@@ -22,13 +22,36 @@ export function getProviderActivationKey(provider: string, rawUrl: string): stri
 
 export function isOfferActivated(
   offer: OfferActivationInput,
-  activatedOfferKeys: ReadonlySet<string>,
+  activeOfferKey: string | undefined,
 ): boolean {
   const activationKey = getOfferActivationKey(offer);
-  return activationKey !== undefined && activatedOfferKeys.has(activationKey);
+  return activationKey !== undefined && activationKey === activeOfferKey;
 }
 
-export async function readActivatedOfferKeys(now = Date.now()): Promise<Set<string>> {
+export function getLastActivatedOfferKey(
+  offers: readonly OfferActivationInput[],
+  activatedOffers: Readonly<ActivatedOffers>,
+): string | undefined {
+  let latestKey: string | undefined;
+  let latestActivatedAt = -1;
+
+  for (const offer of offers) {
+    const activationKey = getOfferActivationKey(offer);
+    if (activationKey === undefined) {
+      continue;
+    }
+
+    const activatedAt = activatedOffers[activationKey];
+    if (typeof activatedAt === "number" && activatedAt > latestActivatedAt) {
+      latestKey = activationKey;
+      latestActivatedAt = activatedAt;
+    }
+  }
+
+  return latestKey;
+}
+
+export async function readActivatedOffers(now = Date.now()): Promise<ActivatedOffers> {
   const stored = await getStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
   const activations = pruneActivatedOffers(stored, now);
 
@@ -36,7 +59,7 @@ export async function readActivatedOfferKeys(now = Date.now()): Promise<Set<stri
     await setStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
   }
 
-  return new Set(Object.keys(activations));
+  return activations;
 }
 
 export async function markOfferActivated(provider: string, rawUrl: string, now = Date.now()): Promise<void> {

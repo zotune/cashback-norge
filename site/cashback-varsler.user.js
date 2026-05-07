@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778159661
+// @version      1778160585
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -747,8 +747,8 @@
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
-      void readActivatedOfferKeys().catch(() => /* @__PURE__ */ new Set()).then((activatedOfferKeys) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOfferKeys);
+      void readActivatedOffers().catch(() => ({})).then((activatedOffers) => {
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOffers);
       });
     });
   }
@@ -801,13 +801,13 @@
     chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
     return chip;
   }
-  function createProviderBadgeWithActivation(offer, activatedOfferKeys, shadowRoot) {
+  function createProviderBadgeWithActivation(offer, activeOfferKey, shadowRoot) {
     const providerWrap = document.createElement("span");
     providerWrap.className = "provider-wrap";
     const providerBadge = document.createElement("span");
     providerBadge.className = `provider-badge provider-${offer.provider}`;
     providerBadge.textContent = formatProviderName(offer.provider);
-    if (isOfferActivated(offer, activatedOfferKeys)) {
+    if (isOfferActivated(offer, activeOfferKey)) {
       const activationBadge = document.createElement("span");
       activationBadge.className = "activation-badge";
       activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
@@ -838,32 +838,57 @@
         return;
       }
       const link = target.closest("a[href]");
-      if (link === null || !isTrumfLogOfferClickUrl(link.href)) {
+      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      const trumfActivationUrl = link !== null && isTrumfLogOfferClickUrl(link.href) ? link.href : void 0;
+      const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : void 0;
+      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : void 0;
+      const activationUrl = trumfActivationUrl ?? sasActivationUrl;
+      if (provider === void 0 || activationUrl === void 0) {
         return;
       }
-      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      const canWaitForStorageBeforeNavigation = link !== null && (trumfActivationUrl !== void 0 || sasActivationUrl !== void 0 && isSasOutboundActivationUrl(link.href));
+      if (link === null || !canWaitForStorageBeforeNavigation) {
+        void markOfferActivated(provider, activationUrl);
+        return;
+      }
       const opensSameTab = link.target === "" || link.target === "_self";
       if (hasModifier || !opensSameTab) {
-        void markOfferActivated("trumf", link.href);
+        void markOfferActivated(provider, activationUrl);
         return;
       }
       event.preventDefault();
-      void markOfferActivated("trumf", link.href).finally(() => {
+      void markOfferActivated(provider, activationUrl).finally(() => {
         window.location.assign(link.href);
       });
     }, true);
   }
-  function isOfferActivated(offer, activatedOfferKeys) {
+  function isOfferActivated(offer, activeOfferKey) {
     const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
-    return activationKey !== void 0 && activatedOfferKeys.has(activationKey);
+    return activationKey !== void 0 && activationKey === activeOfferKey;
   }
-  async function readActivatedOfferKeys(now = Date.now()) {
+  function getLastActivatedOfferKey(offers, activatedOffers) {
+    let latestKey;
+    let latestActivatedAt = -1;
+    for (const offer of offers) {
+      const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
+      if (activationKey === void 0) {
+        continue;
+      }
+      const activatedAt = activatedOffers[activationKey];
+      if (typeof activatedAt === "number" && activatedAt > latestActivatedAt) {
+        latestKey = activationKey;
+        latestActivatedAt = activatedAt;
+      }
+    }
+    return latestKey;
+  }
+  async function readActivatedOffers(now = Date.now()) {
     const stored = await getLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY);
     const activations = pruneActivatedOffers(stored, now);
     if (isRecord(stored) && Object.keys(stored).length !== Object.keys(activations).length) {
       await setLocalStorageValue(ACTIVATED_OFFERS_STORAGE_KEY, activations);
     }
-    return new Set(Object.keys(activations));
+    return activations;
   }
   async function markOfferActivated(provider, rawUrl, now = Date.now()) {
     const activationKey = getProviderActivationKey(provider, rawUrl);
@@ -882,6 +907,39 @@
     }
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return hostname === "trumfnetthandel.no" && /^\/LogOfferClick\/\d+\/\d+\/?$/.test(parsedUrl.pathname);
+  }
+  function isSasActivationClick(target, link) {
+    if (getCurrentSasOfferActivationUrl() === void 0) {
+      return false;
+    }
+    if (link !== null && isSasOutboundActivationUrl(link.href)) {
+      return true;
+    }
+    const clickable = target.closest("button,a,[role='button']");
+    const text = clickable?.textContent?.trim().replace(/\s+/g, " ").toLowerCase();
+    return text === "handle nå" || text === "shop now";
+  }
+  function getCurrentSasOfferActivationUrl() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) {
+      return void 0;
+    }
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+    if (hostname !== "onlineshopping.flysas.com" || pathParts.length < 4 || pathParts[1]?.toLowerCase() !== "butikker") {
+      return void 0;
+    }
+    const port = parsedUrl.port.length > 0 ? `:${parsedUrl.port}` : "";
+    const pathname = parsedUrl.pathname.length > 1 && parsedUrl.pathname.endsWith("/") ? parsedUrl.pathname.slice(0, -1) : parsedUrl.pathname;
+    return `${parsedUrl.protocol}//${parsedUrl.hostname}${port}${pathname}`;
+  }
+  function isSasOutboundActivationUrl(rawUrl) {
+    const parsedUrl = parseUrl(rawUrl);
+    if (parsedUrl === void 0) {
+      return false;
+    }
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "go.adt246.net" || hostname.endsWith(".adt246.net") || parsedUrl.searchParams.get("utm_source")?.toLowerCase() === "adtraction" || parsedUrl.searchParams.get("utm_medium")?.toLowerCase() === "affiliate";
   }
   function getProviderActivationKey(provider, rawUrl) {
     const normalizedUrl = normalizeActivationUrl(rawUrl);
@@ -925,7 +983,7 @@
       });
     });
   }
-  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, activatedOfferKeys) {
+  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, activatedOffers) {
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
@@ -1753,6 +1811,7 @@
     }
   `;
     const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+    const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
     const CRYPTO_SUBSCRIPTIONS = {
@@ -1858,7 +1917,7 @@
       const offerReward = document.createElement("span");
       offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
-      const providerWrap = createProviderBadgeWithActivation(currentOffer, activatedOfferKeys, shadowRoot);
+      const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
       offerLabel.append(offerReward);
       if (currentOffer.discountCode !== void 0) {
         const code = currentOffer.discountCode;

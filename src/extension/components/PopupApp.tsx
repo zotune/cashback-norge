@@ -5,8 +5,9 @@ import {
   isOffersForUrlResponse,
 } from "../../shared/extension-messages.js";
 import {
+  getLastActivatedOfferKey,
   isOfferActivated,
-  readActivatedOfferKeys,
+  readActivatedOffers,
 } from "../activation-state.js";
 
 const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
@@ -52,13 +53,13 @@ export function PopupApp(): ReactElement {
   const [state, setState] = useState<PopupState>({ status: "loading" });
   const [sumInput, setSumInput] = useState("");
   const [chipsCollapsed, setChipsCollapsed] = useState(false);
-  const [activatedOfferKeys, setActivatedOfferKeys] = useState<Set<string>>(new Set());
+  const [activatedOffers, setActivatedOffers] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadCurrentTabOffers(setState);
-    void readActivatedOfferKeys()
-      .catch(() => new Set<string>())
-      .then(setActivatedOfferKeys);
+    void readActivatedOffers()
+      .catch(() => ({}))
+      .then(setActivatedOffers);
     chrome.storage.local.get("cashback-varsler-chips-collapsed", (result: Record<string, unknown>) => {
       if (result["cashback-varsler-chips-collapsed"] === true) {
         setChipsCollapsed(true);
@@ -89,6 +90,7 @@ export function PopupApp(): ReactElement {
 
   const mainOffers = state.offers.filter((o) => o.provider !== "curve");
   const curveOffer = state.offers.find((o) => o.provider === "curve");
+  const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
 
   const normalizedHostname = state.hostname.replace(/^www\./, "").toLowerCase();
   const revolutSub = REVOLUT_SUBSCRIPTIONS[normalizedHostname];
@@ -131,7 +133,7 @@ export function PopupApp(): ReactElement {
               key={`${offer.provider}:${offer.sourceUrl}`}
               offer={offer}
               amount={amount}
-              activated={isOfferActivated(offer, activatedOfferKeys)}
+              activated={isOfferActivated(offer, activeOfferKey)}
             />
           );
         })}
