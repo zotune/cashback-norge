@@ -47,6 +47,17 @@ const SLUG_NAME_OVERRIDES: Record<string, string> = {
   "kjells-markiser-solskjerming": "Kjells Markiser",
   "hallmark": "Hallmark",
   "sikker-pa-mc-kurs": "Førerutvikling.no",
+  "bilforsikring": "Gjensidige",
+  "bobil-og-caravanforsikring": "Gjensidige",
+  "elbilforsikring": "Gjensidige",
+  "elsparkesykkel-forsikring": "Gjensidige",
+  "husforsikring": "Gjensidige",
+  "mc-forsikring": "Gjensidige",
+  "reiseforsikring": "Gjensidige",
+  "familieulykke": "Gjensidige",
+  "brilleland-kontaktlinser": "Brilleland",
+  "brilleland-solbriller": "Brilleland",
+  "svalbardlinjen": "Hurtigruten",
 };
 
 const INTERNAL_DOMAINS = new Set([
