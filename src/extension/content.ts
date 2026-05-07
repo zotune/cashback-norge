@@ -931,6 +931,10 @@ function renderNotice(
       background: #005aa4;
       color: #ffffff;
     }
+    .provider-studentkortet {
+      background: #1B2838;
+      color: #ffffff;
+    }
     .provider-cbn {
       background: #f7d7e6;
       color: #8f164f;
