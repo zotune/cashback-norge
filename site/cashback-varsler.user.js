@@ -1,18 +1,60 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778160979
+// @version      1778161805
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
 // @match        *://*/*
-// @grant        none
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM.getValue
+// @grant        GM.setValue
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
 // ==/UserScript==
 (function() {
   "use strict";
+  function readLocalStorageValue(key) {
+    const value = localStorage.getItem(key);
+    if (value === null) return void 0;
+    try {
+      return JSON.parse(value);
+    } catch (_e) {
+      return void 0;
+    }
+  }
+  function writeLocalStorageValue(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (_e) {
+    }
+  }
+  async function readUserscriptStorageValue(key) {
+    if (typeof GM_getValue === "function") {
+      const value = GM_getValue(key, void 0);
+      return value === void 0 ? readLocalStorageValue(key) : value;
+    }
+    if (typeof GM !== "undefined" && typeof GM.getValue === "function") {
+      const value = await GM.getValue(key, void 0);
+      return value === void 0 ? readLocalStorageValue(key) : value;
+    }
+    return readLocalStorageValue(key);
+  }
+  async function writeUserscriptStorageValue(key, value) {
+    if (typeof GM_setValue === "function") {
+      await GM_setValue(key, value);
+      writeLocalStorageValue(key, value);
+      return;
+    }
+    if (typeof GM !== "undefined" && typeof GM.setValue === "function") {
+      await GM.setValue(key, value);
+      writeLocalStorageValue(key, value);
+      return;
+    }
+    writeLocalStorageValue(key, value);
+  }
   const chrome = {
     runtime: {
       onMessage: { addListener() {
@@ -30,25 +72,23 @@
     storage: {
       local: {
         get(keys, cb) {
-          const r = {};
-          const keyList = Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys ?? {});
-          for (const k of keyList) {
-            const v = localStorage.getItem(k);
-            if (v !== null) try {
-              r[k] = JSON.parse(v);
-            } catch (_e) {
+          void (async () => {
+            const r = {};
+            const keyList = Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys ?? {});
+            for (const k of keyList) {
+              const v = await readUserscriptStorageValue(k);
+              if (v !== void 0) r[k] = v;
             }
-          }
-          cb(r);
+            cb(r);
+          })();
         },
         set(items, cb) {
-          for (const [k, v] of Object.entries(items)) {
-            try {
-              localStorage.setItem(k, JSON.stringify(v));
-            } catch (_e) {
+          void (async () => {
+            for (const [k, v] of Object.entries(items)) {
+              await writeUserscriptStorageValue(k, v);
             }
-          }
-          cb?.();
+            cb?.();
+          })();
         }
       }
     }

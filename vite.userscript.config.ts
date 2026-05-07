@@ -26,13 +26,48 @@ const USERSCRIPT_BANNER = `\
 // @author       zotune
 // @icon         ${PAGES_URL}/favicon.png
 // @match        *://*/*
-// @grant        none
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM.getValue
+// @grant        GM.setValue
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js
 // ==/UserScript==`;
 
 const CHROME_SHIM = `\
+function readLocalStorageValue(key) {
+  const value = localStorage.getItem(key);
+  if (value === null) return undefined;
+  try { return JSON.parse(value); } catch(_e) { return undefined; }
+}
+function writeLocalStorageValue(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch(_e) {}
+}
+async function readUserscriptStorageValue(key) {
+  if (typeof GM_getValue === "function") {
+    const value = GM_getValue(key, undefined);
+    return value === undefined ? readLocalStorageValue(key) : value;
+  }
+  if (typeof GM !== "undefined" && typeof GM.getValue === "function") {
+    const value = await GM.getValue(key, undefined);
+    return value === undefined ? readLocalStorageValue(key) : value;
+  }
+  return readLocalStorageValue(key);
+}
+async function writeUserscriptStorageValue(key, value) {
+  if (typeof GM_setValue === "function") {
+    await GM_setValue(key, value);
+    writeLocalStorageValue(key, value);
+    return;
+  }
+  if (typeof GM !== "undefined" && typeof GM.setValue === "function") {
+    await GM.setValue(key, value);
+    writeLocalStorageValue(key, value);
+    return;
+  }
+  writeLocalStorageValue(key, value);
+}
 const chrome = {
   runtime: {
     onMessage: { addListener() {} },
@@ -43,19 +78,23 @@ const chrome = {
   storage: {
     local: {
       get(keys, cb) {
-        const r = {};
-        const keyList = Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys ?? {});
-        for (const k of keyList) {
-          const v = localStorage.getItem(k);
-          if (v !== null) try { r[k] = JSON.parse(v); } catch(_e) {}
-        }
-        cb(r);
+        void (async () => {
+          const r = {};
+          const keyList = Array.isArray(keys) ? keys : typeof keys === "string" ? [keys] : Object.keys(keys ?? {});
+          for (const k of keyList) {
+            const v = await readUserscriptStorageValue(k);
+            if (v !== undefined) r[k] = v;
+          }
+          cb(r);
+        })();
       },
       set(items, cb) {
-        for (const [k, v] of Object.entries(items)) {
-          try { localStorage.setItem(k, JSON.stringify(v)); } catch(_e) {}
-        }
-        cb?.();
+        void (async () => {
+          for (const [k, v] of Object.entries(items)) {
+            await writeUserscriptStorageValue(k, v);
+          }
+          cb?.();
+        })();
       },
     },
   },
