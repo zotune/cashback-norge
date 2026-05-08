@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778280929
+// @version      1778281469
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1212,10 +1212,16 @@
     obs.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => obs.disconnect(), 1e4);
   }
-  if (isOnSpareborsenPartnerPage() && !rewriteSpareborsenHandleButton()) {
+  if (isOnSpareborsenPartnerPage()) {
     const sbObs = new MutationObserver(() => {
-      if (rewriteSpareborsenHandleButton()) {
-        sbObs.disconnect();
+      const buttons = document.querySelectorAll("button");
+      for (const btn of buttons) {
+        if (btn.closest("a[data-cb-rewrite]")) continue;
+        const text = btn.textContent?.trim() ?? "";
+        if (text.startsWith("Handle hos") && text.endsWith("→")) {
+          rewriteSpareborsenHandleButton();
+          break;
+        }
       }
     });
     sbObs.observe(document.body, { childList: true, subtree: true });
@@ -1246,6 +1252,7 @@
     link.target = "_blank";
     link.rel = "noreferrer";
     link.style.textDecoration = "none";
+    link.setAttribute("data-cb-rewrite", "1");
     const adLabel = document.createElement("span");
     adLabel.textContent = "Ad";
     adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
