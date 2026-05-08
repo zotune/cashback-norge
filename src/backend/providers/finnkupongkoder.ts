@@ -85,7 +85,7 @@ async function runFinnkupongkoderCrawl(
     },
     failedRequestHandler: async ({ request, error }) => {
       const message = error instanceof Error ? error.message : "Unknown error";
-      if (message.includes("403") || message.includes("blocked")) {
+      if (message.includes("403") || message.includes("blocked") || message.includes("timed out")) {
         blockedByCloudflare = true;
         return;
       }
