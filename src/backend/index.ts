@@ -166,7 +166,6 @@ async function main(): Promise<void> {
     nafOffers,
     studentkortetOffers,
     nettbonusOffers,
-    spennOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : crawlTrumf({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -214,10 +213,23 @@ async function main(): Promise<void> {
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.nettbonusStartUrl,
       }),
-    config.skipSpenn ? Promise.resolve([]) : fetchSpenn({
-        domainLookup, generatedAt, logger,
-      }),
   ]);
+
+  // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
+  const fullDomainLookup = buildDomainLookup([
+    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...dnbOffers,
+    ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
+    ...sparebank1Offers, ...manualOffers,
+    ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
+    ...usblOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
+    ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
+    ...finnkupongkoderOffers,
+  ]);
+  logger.info(`Full domain lookup: ${fullDomainLookup.size} merchant names with known domains`);
+
+  const spennOffers = config.skipSpenn ? [] : await fetchSpenn({
+    domainLookup: fullDomainLookup, generatedAt, logger,
+  });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
   const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers]);
 
