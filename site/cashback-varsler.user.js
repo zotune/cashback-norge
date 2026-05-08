@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778281469
+// @version      1778281694
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1195,8 +1195,8 @@
         clone.removeAttribute("id");
         const adLabel = document.createElement("span");
         adLabel.textContent = "Ad";
-        adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
-        clone.append(adLabel);
+        adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+        clone.prepend(adLabel);
         loginLink.replaceWith(clone);
         found = true;
       }
@@ -1255,8 +1255,8 @@
     link.setAttribute("data-cb-rewrite", "1");
     const adLabel = document.createElement("span");
     adLabel.textContent = "Ad";
-    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
-    clone.append(adLabel);
+    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+    clone.prepend(adLabel);
     link.append(clone);
     handleButton.replaceWith(link);
     return true;
