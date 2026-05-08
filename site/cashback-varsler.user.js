@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778251524
+// @version      1778254690
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -112,6 +112,7 @@
     sparebank1: "SB1 Ung",
     studentkortet: "Studentkortet",
     nettbonus: "NettBonus",
+    spenn: "Spenn",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -1631,6 +1632,10 @@
     }
     .provider-nettbonus {
       background: #5b0f8c;
+      color: #ffffff;
+    }
+    .provider-spenn {
+      background: #E51454;
       color: #ffffff;
     }
     .provider-cbn {

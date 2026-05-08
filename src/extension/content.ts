@@ -1012,6 +1012,10 @@ function renderNotice(
       background: #5b0f8c;
       color: #ffffff;
     }
+    .provider-spenn {
+      background: #E51454;
+      color: #ffffff;
+    }
     .provider-cbn {
       background: #f7d7e6;
       color: #8f164f;

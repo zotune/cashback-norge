@@ -2,7 +2,7 @@ import { normalizeRewardLabel } from "./reward.js";
 
 const EB_PER_TRUMF_KR = 13.5;
 
-export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "logbuy" | "naf" | "sparebank1" | "studentkortet" | "nettbonus" | "cbn";
+export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "logbuy" | "naf" | "sparebank1" | "studentkortet" | "nettbonus" | "spenn" | "cbn";
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -28,7 +28,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "logbuy" || value === "naf" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "cbn";
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "logbuy" || value === "naf" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "spenn" || value === "cbn";
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {
