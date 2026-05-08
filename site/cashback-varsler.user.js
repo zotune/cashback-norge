@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778254921
+// @version      1778258448
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -2049,6 +2049,20 @@
       line-height: 1;
       user-select: none;
     }
+    .app-chip {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 600;
+      color: #78909c;
+      border: 1px solid #78909c;
+      border-radius: 3px;
+      padding: 0 3px;
+      margin-right: 4px;
+      vertical-align: middle;
+      line-height: 14px;
+      white-space: nowrap;
+      cursor: help;
+    }
     .offer-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
@@ -2152,6 +2166,7 @@
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
+    const APP_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["klarna", "spenn"]);
     const CRYPTO_SUBSCRIPTIONS = {
       "spotify.com": "Spotify",
       "netflix.com": "Netflix",
@@ -2292,6 +2307,11 @@
         warnIcon.className = "card-only-warn";
         warnIcon.textContent = "⚠";
         offerLink.append(offerLabel, warnIcon, providerWrap);
+      } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
+        const appChip = document.createElement("span");
+        appChip.className = "app-chip";
+        appChip.textContent = "App";
+        offerLink.append(offerLabel, appChip, providerWrap);
       } else {
         offerLink.append(offerLabel, providerWrap);
       }
@@ -3160,8 +3180,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       const showRewardInTooltip = compact !== void 0 && fullReward !== compact;
       const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
+      const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider);
       const hasTerms = currentOffer.terms.trim().length > 0;
-      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer) continue;
+      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer) continue;
       const wrapper = wrappers[idx];
       if (wrapper === void 0) continue;
       const tooltip = document.createElement("div");
@@ -3169,6 +3190,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const tooltipParts = [];
       if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
       if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
+      if (isAppOnlyOffer) tooltipParts.push("Krever " + formatProviderName(currentOffer.provider) + "-appen for å aktivere cashback");
       setTooltipContent(tooltip, tooltipParts);
       shadowRoot.append(tooltip);
       tooltipElements.push({ element: tooltip, offer: currentOffer });

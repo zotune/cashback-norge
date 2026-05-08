@@ -1427,6 +1427,20 @@ function renderNotice(
       line-height: 1;
       user-select: none;
     }
+    .app-chip {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 600;
+      color: #78909c;
+      border: 1px solid #78909c;
+      border-radius: 3px;
+      padding: 0 3px;
+      margin-right: 4px;
+      vertical-align: middle;
+      line-height: 14px;
+      white-space: nowrap;
+      cursor: help;
+    }
     .offer-tooltip {
       background: #1a1a2e;
       border-radius: 8px;
@@ -1530,6 +1544,7 @@ function renderNotice(
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
+  const APP_ONLY_PROVIDERS = new Set(["klarna", "spenn"]);
   const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
     "spotify.com": "Spotify",
     "netflix.com": "Netflix",
@@ -1674,6 +1689,11 @@ function renderNotice(
       warnIcon.className = "card-only-warn";
       warnIcon.textContent = "⚠";
       offerLink.append(offerLabel, warnIcon, providerWrap);
+    } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
+      const appChip = document.createElement("span");
+      appChip.className = "app-chip";
+      appChip.textContent = "App";
+      offerLink.append(offerLabel, appChip, providerWrap);
     } else {
       offerLink.append(offerLabel, providerWrap);
     }
@@ -2564,8 +2584,9 @@ function renderNotice(
     const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     const showRewardInTooltip = compact !== undefined && fullReward !== compact;
     const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
+    const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider);
     const hasTerms = currentOffer.terms.trim().length > 0;
-    if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer) continue;
+    if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
     const tooltip = document.createElement("div");
@@ -2573,6 +2594,7 @@ function renderNotice(
     const tooltipParts: string[] = [];
     if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
     if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
+    if (isAppOnlyOffer) tooltipParts.push("Krever " + formatProviderName(currentOffer.provider) + "-appen for å aktivere cashback");
     setTooltipContent(tooltip, tooltipParts);
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });

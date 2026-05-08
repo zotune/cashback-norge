@@ -788,6 +788,21 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .bonus-chip:active { background: #e4ebe7; }
 .bonus-chip .badge { font-size: 9px; min-height: 16px; padding: 0 5px; }
+.app-chip {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #78909c;
+  border: 1px solid #78909c;
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-right: 4px;
+  line-height: 14px;
+  vertical-align: middle;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: help;
+}
 .ad-chip {
   display: inline-block;
   font-size: 9px;
@@ -1161,10 +1176,12 @@ function render(query) {
         : (terms || PROVIDER_TIPS[o.provider] || "");
       const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
       const cardOnly = ["sparebank1", "remember"].includes(o.provider);
+      const appOnly = ["klarna", "spenn"].includes(o.provider);
       const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
-      const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : tipText;
+      const appText = "Krever " + (PROVIDER_NAMES[o.provider] || o.provider) + "-appen for å aktivere cashback";
+      const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText;
       const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
-      const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : "";
+      const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="app-chip">App</span>` : "";
       const bestClass = idx === 0 ? " offer--best" : "";
       return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
         <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
