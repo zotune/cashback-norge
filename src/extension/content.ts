@@ -505,29 +505,32 @@ function isNettbonusActivationClick(_target: Element, link: HTMLAnchorElement | 
 
 const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
 
-function rewriteNettbonusLoginTrigger(): boolean {
-  const loginLink = document.querySelector<HTMLAnchorElement>(
+function rewriteNettbonusLoginTriggers(): boolean {
+  const loginLinks = document.querySelectorAll<HTMLAnchorElement>(
     'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
   );
-  if (loginLink && (loginLink.getAttribute("href") === "/" || loginLink.getAttribute("href") === "")) {
-    // Clone to remove nettbonus.no's click handlers that show a login modal
-    const clone = loginLink.cloneNode(true) as HTMLAnchorElement;
-    clone.href = NETTBONUS_REFERRAL_URL;
-    clone.target = "_blank";
-    clone.removeAttribute("id");
-    const adLabel = document.createElement("span");
-    adLabel.textContent = "Ad";
-    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
-    clone.append(adLabel);
-    loginLink.replaceWith(clone);
-    return true;
+  let found = false;
+  for (const loginLink of loginLinks) {
+    if (loginLink.getAttribute("href") === "/" || loginLink.getAttribute("href") === "") {
+      // Clone to remove nettbonus.no's click handlers that show a login modal
+      const clone = loginLink.cloneNode(true) as HTMLAnchorElement;
+      clone.href = NETTBONUS_REFERRAL_URL;
+      clone.target = "_blank";
+      clone.removeAttribute("id");
+      const adLabel = document.createElement("span");
+      adLabel.textContent = "Ad";
+      adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
+      clone.append(adLabel);
+      loginLink.replaceWith(clone);
+      found = true;
+    }
   }
-  return false;
+  return found;
 }
 
-if (getCurrentNettbonusOfferActivationUrl() !== undefined && !rewriteNettbonusLoginTrigger()) {
+if (getCurrentNettbonusOfferActivationUrl() !== undefined && !rewriteNettbonusLoginTriggers()) {
   const obs = new MutationObserver(() => {
-    if (rewriteNettbonusLoginTrigger()) {
+    if (rewriteNettbonusLoginTriggers()) {
       obs.disconnect();
     }
   });

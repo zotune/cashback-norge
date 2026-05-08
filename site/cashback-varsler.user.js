@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778244000
+// @version      1778245452
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1177,27 +1177,30 @@
     return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
   }
   const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
-  function rewriteNettbonusLoginTrigger() {
-    const loginLink = document.querySelector(
+  function rewriteNettbonusLoginTriggers() {
+    const loginLinks = document.querySelectorAll(
       'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
     );
-    if (loginLink && (loginLink.getAttribute("href") === "/" || loginLink.getAttribute("href") === "")) {
-      const clone = loginLink.cloneNode(true);
-      clone.href = NETTBONUS_REFERRAL_URL;
-      clone.target = "_blank";
-      clone.removeAttribute("id");
-      const adLabel = document.createElement("span");
-      adLabel.textContent = "Ad";
-      adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
-      clone.append(adLabel);
-      loginLink.replaceWith(clone);
-      return true;
+    let found = false;
+    for (const loginLink of loginLinks) {
+      if (loginLink.getAttribute("href") === "/" || loginLink.getAttribute("href") === "") {
+        const clone = loginLink.cloneNode(true);
+        clone.href = NETTBONUS_REFERRAL_URL;
+        clone.target = "_blank";
+        clone.removeAttribute("id");
+        const adLabel = document.createElement("span");
+        adLabel.textContent = "Ad";
+        adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
+        clone.append(adLabel);
+        loginLink.replaceWith(clone);
+        found = true;
+      }
     }
-    return false;
+    return found;
   }
-  if (getCurrentNettbonusOfferActivationUrl() !== void 0 && !rewriteNettbonusLoginTrigger()) {
+  if (getCurrentNettbonusOfferActivationUrl() !== void 0 && !rewriteNettbonusLoginTriggers()) {
     const obs = new MutationObserver(() => {
-      if (rewriteNettbonusLoginTrigger()) {
+      if (rewriteNettbonusLoginTriggers()) {
         obs.disconnect();
       }
     });
