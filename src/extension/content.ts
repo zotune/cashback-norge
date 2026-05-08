@@ -340,8 +340,9 @@ function installOfferActivationClickTracker(): void {
     const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : undefined;
     const nettbonusActivationUrl = isNettbonusActivationClick(target, link) ? getCurrentNettbonusOfferActivationUrl() : undefined;
     const spareborsenActivationUrl = isSpareborsenActivationClick(target) ? getCurrentSpareborsenOfferActivationUrl() : undefined;
-    const provider = trumfActivationUrl !== undefined ? "trumf" : sasActivationUrl !== undefined ? "sas" : nettbonusActivationUrl !== undefined ? "nettbonus" : spareborsenActivationUrl !== undefined ? "spareborsen" : undefined;
-    const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl ?? spareborsenActivationUrl;
+    const rabbleActivationUrl = isRabbleActivationClick(target) ? getCurrentRabbleOfferActivationUrl() : undefined;
+    const provider = trumfActivationUrl !== undefined ? "trumf" : sasActivationUrl !== undefined ? "sas" : nettbonusActivationUrl !== undefined ? "nettbonus" : spareborsenActivationUrl !== undefined ? "spareborsen" : rabbleActivationUrl !== undefined ? "rabble" : undefined;
+    const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl ?? spareborsenActivationUrl ?? rabbleActivationUrl;
 
     if (provider === undefined || activationUrl === undefined) {
       return;
@@ -640,6 +641,35 @@ function getCurrentSpareborsenOfferActivationUrl(): string | undefined {
 
   // Partner detail pages: /partnere/{slug}
   if (!/^\/partnere\/[^/]+/.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  return window.location.href;
+}
+
+function isRabbleActivationClick(target: Element): boolean {
+  if (getCurrentRabbleOfferActivationUrl() === undefined) {
+    return false;
+  }
+  const clickable = target.closest<HTMLElement>("button,a,[role='button']");
+  if (!clickable) return false;
+  return clickable.classList.contains("online-cashback-offer-cta-button") ||
+    clickable.closest(".online-cashback-offer-cta") !== null;
+}
+
+function getCurrentRabbleOfferActivationUrl(): string | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) {
+    return undefined;
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "rabble.no") {
+    return undefined;
+  }
+
+  // Detail page URLs are /online/{id}-{slug}
+  if (!/^\/online\/\d+-/.test(parsedUrl.pathname)) {
     return undefined;
   }
 
@@ -1108,6 +1138,10 @@ function renderNotice(
     .provider-spareborsen {
       background: #C9A24A;
       color: #1A1A1A;
+    }
+    .provider-rabble {
+      background: #2d2145;
+      color: #f8a6a6;
     }
     .provider-cbn {
       background: #f7d7e6;

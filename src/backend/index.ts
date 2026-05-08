@@ -30,6 +30,7 @@ import { crawlStudentkortet } from "./providers/studentkortet.js";
 import { crawlNettbonus } from "./providers/nettbonus.js";
 import { fetchSpenn } from "./providers/spenn.js";
 import { fetchSpareborsen } from "./providers/spareborsen.js";
+import { crawlRabble } from "./providers/rabble.js";
 
 type CliConfig = {
   outputPath: string;
@@ -66,6 +67,7 @@ type CliConfig = {
   skipNettbonus: boolean;
   skipSpenn: boolean;
   skipSpareborsen: boolean;
+  skipRabble: boolean;
   skipDnbSupertilbud: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -173,6 +175,7 @@ async function main(): Promise<void> {
     nafOffers,
     studentkortetOffers,
     nettbonusOffers,
+    rabbleOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : crawlTrumf({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -220,6 +223,10 @@ async function main(): Promise<void> {
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.nettbonusStartUrl,
       }),
+    config.skipRabble ? Promise.resolve([]) : crawlRabble({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
@@ -229,7 +236,7 @@ async function main(): Promise<void> {
     ...sparebank1Offers, ...spareborsenOffers, ...manualOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
-    ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
+    ...rabbleOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
   ]);
   logger.info(`Full domain lookup: ${fullDomainLookup.size} merchant names with known domains`);
@@ -238,7 +245,7 @@ async function main(): Promise<void> {
     domainLookup: fullDomainLookup, generatedAt, logger,
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -327,6 +334,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipNettbonus: args.includes("--skip-nettbonus"),
     skipSpenn: args.includes("--skip-spenn"),
     skipSpareborsen: args.includes("--skip-spareborsen"),
+    skipRabble: args.includes("--skip-rabble"),
     skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??

@@ -20,6 +20,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   nettbonus: "NettBonus",
   spenn: "Spenn",
   spareborsen: "Sparebørsen",
+  rabble: "rabble",
   cbn: "♥",
 };
 
@@ -39,6 +40,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   nettbonus: "NettBonus.no\nGratis cashback-program.\nKlikk deg via nettbonus.no til butikken for å tjene bonus.",
   spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
   spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
+  rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -62,6 +64,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   nettbonus: { bg: "#5b0f8c", fg: "#ffffff" },
   spenn: { bg: "#E51454", fg: "#ffffff" },
   spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
+  rabble: { bg: "#2d2145", fg: "#f8a6a6" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 

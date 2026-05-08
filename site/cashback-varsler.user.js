@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778281694
+// @version      1778284072
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -114,6 +114,7 @@
     nettbonus: "NettBonus",
     spenn: "Spenn",
     spareborsen: "Sparebørsen",
+    rabble: "rabble",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -1182,6 +1183,7 @@
   }
   const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
   const SPAREBORSEN_REFERRAL_URL = "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5";
+  const RABBLE_REFERRAL_URL = "https://www.rabble.com/code/98CNVFREF/redeem";
   function rewriteNettbonusLoginTriggers() {
     const loginLinks = document.querySelectorAll(
       'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
@@ -1226,6 +1228,15 @@
     });
     sbObs.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => sbObs.disconnect(), 1e4);
+  }
+  if (isOnRabbleOfferPage()) {
+    const rabbleObs = new MutationObserver(() => {
+      if (rewriteRabbleCta()) {
+        rabbleObs.disconnect();
+      }
+    });
+    rabbleObs.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => rabbleObs.disconnect(), 1e4);
   }
   function isOnSpareborsenPartnerPage() {
     const parsedUrl = parseUrl(window.location.href);
@@ -1296,6 +1307,27 @@
       return void 0;
     }
     return window.location.href;
+  }
+  function isOnRabbleOfferPage() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return false;
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "rabble.no" && /^\/online\/\d+-/.test(parsedUrl.pathname);
+  }
+  function rewriteRabbleCta() {
+    const ctaLink = document.querySelector(".online-cashback-offer-cta a");
+    if (!ctaLink || ctaLink.getAttribute("data-cb-rewrite") === "1") return false;
+    const clone = ctaLink.cloneNode(true);
+    clone.href = RABBLE_REFERRAL_URL;
+    clone.target = "_blank";
+    clone.rel = "noreferrer";
+    clone.setAttribute("data-cb-rewrite", "1");
+    const adLabel = document.createElement("span");
+    adLabel.textContent = "Ad";
+    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+    clone.prepend(adLabel);
+    ctaLink.replaceWith(clone);
+    return true;
   }
   function getProviderActivationKey(provider, rawUrl) {
     const normalizedUrl = normalizeActivationUrl(rawUrl);
@@ -1716,6 +1748,10 @@
     .provider-spareborsen {
       background: #C9A24A;
       color: #1A1A1A;
+    }
+    .provider-rabble {
+      background: #2d2145;
+      color: #f8a6a6;
     }
     .provider-cbn {
       background: #f7d7e6;
