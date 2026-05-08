@@ -561,6 +561,7 @@ function isExcluded(name: string): boolean {
 function normalizeBenefitName(value: string): string {
   return normalizeText(value)
     .replace(/^nyhet!\s*/i, "")
+    .replace(/^\d+[\s]*%\s*rabatt\s+(?:på|hos)\s+/i, "")
     .trim();
 }
 
