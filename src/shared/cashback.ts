@@ -258,6 +258,65 @@ export function buildCashbackIndex(
     } catch { /* ignore invalid domains */ }
   }
 
+  // Merge offers across known domain redirects (e.g. makeupmekka.no → makeupmekka.com)
+  const DOMAIN_REDIRECTS: Record<string, string> = {
+    "alice.no": "fruits.co",
+    "babyshop.no": "babyshop.com",
+    "batteriexperten.no": "batteriexperten.com",
+    "beckmann.no": "beckmann-norway.com",
+    "byvoks.no": "byvoks.com",
+    "cdon.com": "cdon.no",
+    "christianiaglasmagasin.no": "cg.no",
+    "climbing247.no": "addnature.no",
+    "db-journey.com": "dbjourney.com",
+    "designlite.no": "lampemesteren.no",
+    "go.makeupmekka.com": "makeupmekka.com",
+    "ecco.com": "global.ecco.com",
+    "hbonordic.com": "hbomax.com",
+    "hurtigruten.no": "hurtigruten.com",
+    "junkyard.no": "junkyard.com",
+    "kreatima.no": "kreatima.com",
+    "lekmer.no": "lekmer.com",
+    "lenson.no": "lenson.com",
+    "lopeshop.no": "loepeshop.no",
+    "lyko.no": "lyko.com",
+    "makeupmekka.no": "makeupmekka.com",
+    "match.com": "no.match.com",
+    "minifinder.no": "minifinder.com",
+    "nelly.no": "nelly.com",
+    "nextory.no": "nextory.com",
+    "no.lookfantastic.com": "lookfantastic.com",
+    "noddi.no": "noddi.co",
+    "odlo.no": "odlo.com",
+    "passionfruit.no": "lyst-lek.no",
+    "puma.com": "eu.puma.com",
+    "smaaungene.no": "xn--smungene-b0a.no",
+    "stanley.no": "stanley1913.no",
+    "startselect.no": "startselect.com",
+    "tanndalen.se": "tanndalen.com",
+    "tempur.no": "no.tempur.com",
+    "tier.app": "ridedott.com",
+    "unisport.no": "unisportstore.no",
+    "voiscooters.com": "voi.com",
+    "xplora.com": "xplora.no",
+  };
+
+  for (const [src, dst] of Object.entries(DOMAIN_REDIRECTS)) {
+    const srcOffers = domainIndex[src] ?? [];
+    const dstOffers = domainIndex[dst] ?? [];
+    // Copy src offers to dst and vice versa (both domains should show all offers)
+    for (const offer of srcOffers) {
+      if (!dstOffers.some((o) => o.provider === offer.provider && o.reward === offer.reward)) {
+        domainIndex[dst] = [...(domainIndex[dst] ?? []), offer];
+      }
+    }
+    for (const offer of dstOffers) {
+      if (!srcOffers.some((o) => o.provider === offer.provider && o.reward === offer.reward)) {
+        domainIndex[src] = [...(domainIndex[src] ?? []), offer];
+      }
+    }
+  }
+
   // Deduplicate within each domain: keep one offer per provider+reward+code
   for (const domain of Object.keys(domainIndex)) {
     const offersForDomain = domainIndex[domain];
