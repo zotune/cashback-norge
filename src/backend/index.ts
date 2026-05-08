@@ -2,6 +2,7 @@ import { copyFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buildCashbackIndex, uniqueOffers } from "../shared/cashback.js";
 import { buildDomainLookup } from "./domain-lookup.js";
+import { readDomainRedirects } from "./domain-redirects.js";
 import { writeJsonFile } from "./json-file.js";
 import { createConsoleLogger } from "./logger.js";
 import { readManualOffers } from "./manual-offers.js";
@@ -222,7 +223,13 @@ async function main(): Promise<void> {
     }
   }
 
-  const cashbackIndex = buildCashbackIndex(offers, generatedAt);
+  // Read domain redirect mappings (maintained via src/scripts/check-redirects.ts)
+  const domainRedirects = await readDomainRedirects(
+    resolve("data/domain-redirects.json"),
+  );
+  logger.info(`Domain redirects: ${Object.keys(domainRedirects).length} mappings loaded`);
+
+  const cashbackIndex = buildCashbackIndex(offers, generatedAt, domainRedirects);
 
   await writeJsonFile(config.outputPath, cashbackIndex);
   logger.info(
