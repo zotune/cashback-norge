@@ -500,6 +500,34 @@ function isNettbonusActivationClick(_target: Element, link: HTMLAnchorElement | 
   return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
 }
 
+const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
+
+function rewriteNettbonusLoginTrigger(): boolean {
+  const loginLink = document.querySelector<HTMLAnchorElement>(
+    'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
+  );
+  if (loginLink && (loginLink.getAttribute("href") === "/" || loginLink.getAttribute("href") === "")) {
+    // Clone to remove nettbonus.no's click handlers that show a login modal
+    const clone = loginLink.cloneNode(true) as HTMLAnchorElement;
+    clone.href = NETTBONUS_REFERRAL_URL;
+    clone.target = "_blank";
+    clone.removeAttribute("id");
+    loginLink.replaceWith(clone);
+    return true;
+  }
+  return false;
+}
+
+if (getCurrentNettbonusOfferActivationUrl() !== undefined && !rewriteNettbonusLoginTrigger()) {
+  const obs = new MutationObserver(() => {
+    if (rewriteNettbonusLoginTrigger()) {
+      obs.disconnect();
+    }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => obs.disconnect(), 10000);
+}
+
 function getCurrentNettbonusOfferActivationUrl(): string | undefined {
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined) {
@@ -1588,6 +1616,10 @@ function renderNotice(
     offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
     const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
+    if (currentOffer.provider === "nettbonus") {
+      const adChip = makeAdChip();
+      providerWrap.prepend(adChip);
+    }
     offerLabel.append(offerReward);
     if (currentOffer.discountCode !== undefined) {
       const code = currentOffer.discountCode;
