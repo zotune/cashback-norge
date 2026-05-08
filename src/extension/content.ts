@@ -935,6 +935,10 @@ function renderNotice(
       background: #1B2838;
       color: #ffffff;
     }
+    .provider-nettbonus {
+      background: #5b0f8c;
+      color: #ffffff;
+    }
     .provider-cbn {
       background: #f7d7e6;
       color: #8f164f;

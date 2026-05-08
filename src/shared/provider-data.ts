@@ -17,6 +17,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   naf: "NAF",
   sparebank1: "SB1 Ung",
   studentkortet: "Studentkortet",
+  nettbonus: "NettBonus",
   cbn: "♥",
 };
 
@@ -33,6 +34,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   bob: "BOB-medlemsfordel.\nKrever BOB-medlemskap og gyldig medlemsbevis i BOB-appen.",
   sparebank1: "SpareBank 1 Mastercard Ung.\n20 % rabatt på utvalgte strømmetjenester.\nSamlet inntil 500 kr per kalenderår.",
   studentkortet: "Studentkortet.no\nGratis medlemskap for studenter i Norge.\nAktiver rabatt via studentkortet.no.",
+  nettbonus: "NettBonus.no\nGratis cashback-program.\nKlikk deg via nettbonus.no til butikken for å tjene bonus.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -53,6 +55,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   naf: { bg: "#FFD100", fg: "#000000" },
   sparebank1: { bg: "#005aa4", fg: "#ffffff" },
   studentkortet: { bg: "#1B2838", fg: "#ffffff" },
+  nettbonus: { bg: "#5b0f8c", fg: "#ffffff" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 
