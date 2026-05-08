@@ -651,6 +651,10 @@ function isRabbleActivationClick(target: Element): boolean {
   if (getCurrentRabbleOfferActivationUrl() === undefined) {
     return false;
   }
+  // If the login button is visible in the nav, user is not logged in
+  if (document.querySelector('a.ph__link--login-button[href="/login"]') !== null) {
+    return false;
+  }
   const clickable = target.closest<HTMLElement>("button,a,[role='button']");
   if (!clickable) return false;
   return clickable.classList.contains("online-cashback-offer-cta-button") ||
