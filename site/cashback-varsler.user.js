@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778242468
+// @version      1778244000
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -189,7 +189,8 @@
     { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
     { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
-    { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true }
+    { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
+    { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true }
   ];
   const EB_PER_TRUMF_KR = 13.5;
   function formatRewardLabel(reward, provider) {
@@ -1170,7 +1171,38 @@
     if (link === null) {
       return false;
     }
+    if (link.href === NETTBONUS_REFERRAL_URL) {
+      return false;
+    }
     return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
+  }
+  const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
+  function rewriteNettbonusLoginTrigger() {
+    const loginLink = document.querySelector(
+      'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
+    );
+    if (loginLink && (loginLink.getAttribute("href") === "/" || loginLink.getAttribute("href") === "")) {
+      const clone = loginLink.cloneNode(true);
+      clone.href = NETTBONUS_REFERRAL_URL;
+      clone.target = "_blank";
+      clone.removeAttribute("id");
+      const adLabel = document.createElement("span");
+      adLabel.textContent = "Ad";
+      adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
+      clone.append(adLabel);
+      loginLink.replaceWith(clone);
+      return true;
+    }
+    return false;
+  }
+  if (getCurrentNettbonusOfferActivationUrl() !== void 0 && !rewriteNettbonusLoginTrigger()) {
+    const obs = new MutationObserver(() => {
+      if (rewriteNettbonusLoginTrigger()) {
+        obs.disconnect();
+      }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => obs.disconnect(), 1e4);
   }
   function getCurrentNettbonusOfferActivationUrl() {
     const parsedUrl = parseUrl(window.location.href);
@@ -2208,6 +2240,10 @@
       offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
       const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
+      if (currentOffer.provider === "nettbonus") {
+        const adChip = makeAdChip();
+        providerWrap.prepend(adChip);
+      }
       offerLabel.append(offerReward);
       if (currentOffer.discountCode !== void 0) {
         const code = currentOffer.discountCode;
