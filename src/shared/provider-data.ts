@@ -19,6 +19,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   studentkortet: "Studentkortet",
   nettbonus: "NettBonus",
   spenn: "Spenn",
+  spareborsen: "Sparebørsen",
   cbn: "♥",
 };
 
@@ -37,6 +38,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   studentkortet: "Studentkortet.no\nGratis medlemskap for studenter i Norge.\nAktiver rabatt via studentkortet.no.",
   nettbonus: "NettBonus.no\nGratis cashback-program.\nKlikk deg via nettbonus.no til butikken for å tjene bonus.",
   spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
+  spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -59,6 +61,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   studentkortet: { bg: "#1B2838", fg: "#ffffff" },
   nettbonus: { bg: "#5b0f8c", fg: "#ffffff" },
   spenn: { bg: "#E51454", fg: "#ffffff" },
+  spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 
@@ -134,6 +137,7 @@ export const SUPPORT_LINKS = [
   { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
   { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
   { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
+  { text: "Sparebørsen: Inviter en venn — dere får begge 50 kr", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
 ];
 
 export const MERCHANT_ALIASES: Record<string, string> = {

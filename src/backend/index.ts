@@ -29,6 +29,7 @@ import { crawlSparebank1 } from "./providers/sparebank1.js";
 import { crawlStudentkortet } from "./providers/studentkortet.js";
 import { crawlNettbonus } from "./providers/nettbonus.js";
 import { fetchSpenn } from "./providers/spenn.js";
+import { fetchSpareborsen } from "./providers/spareborsen.js";
 
 type CliConfig = {
   outputPath: string;
@@ -64,6 +65,7 @@ type CliConfig = {
   skipStudentkortet: boolean;
   skipNettbonus: boolean;
   skipSpenn: boolean;
+  skipSpareborsen: boolean;
   skipDnbSupertilbud: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -101,6 +103,7 @@ async function main(): Promise<void> {
     obosOffers,
     bobOffers,
     sparebank1Offers,
+    spareborsenOffers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
@@ -133,6 +136,9 @@ async function main(): Promise<void> {
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         startUrl: config.sparebank1StartUrl,
       }),
+    config.skipSpareborsen ? Promise.resolve([]) : fetchSpareborsen({
+        generatedAt, logger,
+      }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -147,6 +153,7 @@ async function main(): Promise<void> {
     ...obosOffers,
     ...bobOffers,
     ...sparebank1Offers,
+    ...spareborsenOffers,
     ...manualOffers,
   ]);
   logger.info(`Domain lookup: ${domainLookup.size} merchant names with known domains`);
@@ -219,7 +226,7 @@ async function main(): Promise<void> {
   const fullDomainLookup = buildDomainLookup([
     ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...dnbOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
-    ...sparebank1Offers, ...manualOffers,
+    ...sparebank1Offers, ...spareborsenOffers, ...manualOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
     ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
@@ -231,7 +238,7 @@ async function main(): Promise<void> {
     domainLookup: fullDomainLookup, generatedAt, logger,
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -319,6 +326,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipStudentkortet: args.includes("--skip-studentkortet"),
     skipNettbonus: args.includes("--skip-nettbonus"),
     skipSpenn: args.includes("--skip-spenn"),
+    skipSpareborsen: args.includes("--skip-spareborsen"),
     skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??

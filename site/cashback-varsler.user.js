@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778260762
+// @version      1778280929
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -113,6 +113,7 @@
     studentkortet: "Studentkortet",
     nettbonus: "NettBonus",
     spenn: "Spenn",
+    spareborsen: "Sparebørsen",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -191,7 +192,8 @@
     { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
-    { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true }
+    { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
+    { text: "Sparebørsen: Inviter en venn — dere får begge 50 kr", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
   ];
   const EB_PER_TRUMF_KR = 13.5;
   function formatRewardLabel(reward, provider) {
@@ -1065,8 +1067,9 @@
       const trumfActivationUrl = link !== null && isTrumfLogOfferClickUrl(link.href) ? link.href : void 0;
       const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : void 0;
       const nettbonusActivationUrl = isNettbonusActivationClick(target, link) ? getCurrentNettbonusOfferActivationUrl() : void 0;
-      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : nettbonusActivationUrl !== void 0 ? "nettbonus" : void 0;
-      const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl;
+      const spareborsenActivationUrl = isSpareborsenActivationClick(target) ? getCurrentSpareborsenOfferActivationUrl() : void 0;
+      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : nettbonusActivationUrl !== void 0 ? "nettbonus" : spareborsenActivationUrl !== void 0 ? "spareborsen" : void 0;
+      const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl ?? spareborsenActivationUrl;
       if (provider === void 0 || activationUrl === void 0) {
         return;
       }
@@ -1178,6 +1181,7 @@
     return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
   }
   const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
+  const SPAREBORSEN_REFERRAL_URL = "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5";
   function rewriteNettbonusLoginTriggers() {
     const loginLinks = document.querySelectorAll(
       'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
@@ -1208,6 +1212,48 @@
     obs.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => obs.disconnect(), 1e4);
   }
+  if (isOnSpareborsenPartnerPage() && !rewriteSpareborsenHandleButton()) {
+    const sbObs = new MutationObserver(() => {
+      if (rewriteSpareborsenHandleButton()) {
+        sbObs.disconnect();
+      }
+    });
+    sbObs.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => sbObs.disconnect(), 1e4);
+  }
+  function isOnSpareborsenPartnerPage() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return false;
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "spareborsen.no" && /^\/partnere\/[^/]+/.test(parsedUrl.pathname);
+  }
+  function rewriteSpareborsenHandleButton() {
+    const loginLink = document.querySelector('a[href="/auth/login"]');
+    if (!loginLink) return false;
+    const buttons = document.querySelectorAll("button");
+    let handleButton = null;
+    for (const btn of buttons) {
+      const text = btn.textContent?.trim() ?? "";
+      if (text.startsWith("Handle hos") && text.endsWith("→")) {
+        handleButton = btn;
+        break;
+      }
+    }
+    if (!handleButton) return false;
+    const clone = handleButton.cloneNode(true);
+    const link = document.createElement("a");
+    link.href = SPAREBORSEN_REFERRAL_URL;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.style.textDecoration = "none";
+    const adLabel = document.createElement("span");
+    adLabel.textContent = "Ad";
+    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
+    clone.append(adLabel);
+    link.append(clone);
+    handleButton.replaceWith(link);
+    return true;
+  }
   function getCurrentNettbonusOfferActivationUrl() {
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0) {
@@ -1218,6 +1264,28 @@
       return void 0;
     }
     if (!/^\/details\/\d+\//.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    return window.location.href;
+  }
+  function isSpareborsenActivationClick(target) {
+    if (getCurrentSpareborsenOfferActivationUrl() === void 0) {
+      return false;
+    }
+    const clickable = target.closest("button");
+    const text = clickable?.textContent?.trim() ?? "";
+    return text.startsWith("Handle hos") && text.endsWith("→");
+  }
+  function getCurrentSpareborsenOfferActivationUrl() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) {
+      return void 0;
+    }
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "spareborsen.no") {
+      return void 0;
+    }
+    if (!/^\/partnere\/[^/]+/.test(parsedUrl.pathname)) {
       return void 0;
     }
     return window.location.href;
@@ -1637,6 +1705,10 @@
     .provider-spenn {
       background: #E51454;
       color: #ffffff;
+    }
+    .provider-spareborsen {
+      background: #C9A24A;
+      color: #1A1A1A;
     }
     .provider-cbn {
       background: #f7d7e6;
@@ -2263,7 +2335,7 @@
       offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
       const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
-      if (currentOffer.provider === "nettbonus") {
+      if (currentOffer.provider === "nettbonus" || currentOffer.provider === "spareborsen") {
         const adChip = makeAdChip();
         providerWrap.prepend(adChip);
       }
