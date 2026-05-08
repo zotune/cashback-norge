@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778188991
+// @version      1778242468
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -110,6 +110,8 @@
     usbl: "USBL",
     naf: "NAF",
     sparebank1: "SB1 Ung",
+    studentkortet: "Studentkortet",
+    nettbonus: "NettBonus",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -1060,12 +1062,13 @@
       const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
       const trumfActivationUrl = link !== null && isTrumfLogOfferClickUrl(link.href) ? link.href : void 0;
       const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : void 0;
-      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : void 0;
-      const activationUrl = trumfActivationUrl ?? sasActivationUrl;
+      const nettbonusActivationUrl = isNettbonusActivationClick(target, link) ? getCurrentNettbonusOfferActivationUrl() : void 0;
+      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : nettbonusActivationUrl !== void 0 ? "nettbonus" : void 0;
+      const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl;
       if (provider === void 0 || activationUrl === void 0) {
         return;
       }
-      const canWaitForStorageBeforeNavigation = link !== null && (trumfActivationUrl !== void 0 || sasActivationUrl !== void 0 && isSasOutboundActivationUrl(link.href));
+      const canWaitForStorageBeforeNavigation = link !== null && (trumfActivationUrl !== void 0 || nettbonusActivationUrl !== void 0 || sasActivationUrl !== void 0 && isSasOutboundActivationUrl(link.href));
       if (link === null || !canWaitForStorageBeforeNavigation) {
         void markOfferActivated(provider, activationUrl);
         return;
@@ -1159,6 +1162,29 @@
     }
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return hostname === "go.adt246.net" || hostname.endsWith(".adt246.net") || parsedUrl.searchParams.get("utm_source")?.toLowerCase() === "adtraction" || parsedUrl.searchParams.get("utm_medium")?.toLowerCase() === "affiliate";
+  }
+  function isNettbonusActivationClick(_target, link) {
+    if (getCurrentNettbonusOfferActivationUrl() === void 0) {
+      return false;
+    }
+    if (link === null) {
+      return false;
+    }
+    return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
+  }
+  function getCurrentNettbonusOfferActivationUrl() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) {
+      return void 0;
+    }
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "nettbonus.no") {
+      return void 0;
+    }
+    if (!/^\/details\/\d+\//.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    return window.location.href;
   }
   function getProviderActivationKey(provider, rawUrl) {
     const normalizedUrl = normalizeActivationUrl(rawUrl);
@@ -1432,12 +1458,12 @@
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
-      border-radius: 6px;
+      border-radius: 5px;
       color: #172026;
       display: grid;
+      font-size: 14px;
       gap: 8px;
       grid-template-columns: minmax(0, 1fr) auto auto;
-      min-height: 32px;
       padding: 5px 9px;
       text-decoration: none;
     }
@@ -1474,7 +1500,7 @@
       align-items: center;
       display: flex;
       flex-wrap: wrap;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
       gap: 6px;
       line-height: 1.2;
@@ -1484,11 +1510,11 @@
       align-items: center;
       border-radius: 5px;
       display: inline-flex;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       line-height: 1;
-      min-height: 22px;
-      padding: 0 7px;
+      min-height: 20px;
+      padding: 0 6px;
       white-space: nowrap;
     }
     .provider-remember {
@@ -1562,6 +1588,14 @@
     }
     .provider-sparebank1 {
       background: #005aa4;
+      color: #ffffff;
+    }
+    .provider-studentkortet {
+      background: #1B2838;
+      color: #ffffff;
+    }
+    .provider-nettbonus {
+      background: #5b0f8c;
       color: #ffffff;
     }
     .provider-cbn {
@@ -1878,13 +1912,13 @@
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
-      border-radius: 6px;
+      border-radius: 5px;
       display: flex;
       flex: 1;
       font-size: 12px;
       gap: 6px;
       min-width: 0;
-      padding: 5px 8px;
+      padding: 5px 9px;
     }
     .code-reward {
       font-weight: 700;
@@ -3178,7 +3212,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     list.className = "offer-tooltip-list";
     for (const line of listLines) {
       const item = document.createElement("li");
-      item.textContent = line;
+      item.textContent = line.replace(/^-\s+/, "");
       list.append(item);
     }
     section.append(list);

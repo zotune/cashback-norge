@@ -338,8 +338,9 @@ function installOfferActivationClickTracker(): void {
     const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
     const trumfActivationUrl = link !== null && isTrumfLogOfferClickUrl(link.href) ? link.href : undefined;
     const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : undefined;
-    const provider = trumfActivationUrl !== undefined ? "trumf" : sasActivationUrl !== undefined ? "sas" : undefined;
-    const activationUrl = trumfActivationUrl ?? sasActivationUrl;
+    const nettbonusActivationUrl = isNettbonusActivationClick(target, link) ? getCurrentNettbonusOfferActivationUrl() : undefined;
+    const provider = trumfActivationUrl !== undefined ? "trumf" : sasActivationUrl !== undefined ? "sas" : nettbonusActivationUrl !== undefined ? "nettbonus" : undefined;
+    const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl;
 
     if (provider === undefined || activationUrl === undefined) {
       return;
@@ -347,6 +348,7 @@ function installOfferActivationClickTracker(): void {
 
     const canWaitForStorageBeforeNavigation = link !== null && (
       trumfActivationUrl !== undefined ||
+      nettbonusActivationUrl !== undefined ||
       (sasActivationUrl !== undefined && isSasOutboundActivationUrl(link.href))
     );
 
@@ -482,6 +484,39 @@ function isSasOutboundActivationUrl(rawUrl: string): boolean {
     parsedUrl.searchParams.get("utm_source")?.toLowerCase() === "adtraction" ||
     parsedUrl.searchParams.get("utm_medium")?.toLowerCase() === "affiliate"
   );
+}
+
+function isNettbonusActivationClick(_target: Element, link: HTMLAnchorElement | null): boolean {
+  if (getCurrentNettbonusOfferActivationUrl() === undefined) {
+    return false;
+  }
+
+  if (link === null) {
+    return false;
+  }
+
+  // The activation link on nettbonus detail pages has class "partnerDetailsAction"
+  // and/or id "externalLink", pointing to tradedoubler/other tracking URLs
+  return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
+}
+
+function getCurrentNettbonusOfferActivationUrl(): string | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) {
+    return undefined;
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "nettbonus.no") {
+    return undefined;
+  }
+
+  // Detail page URLs are /details/{id}/{slug}
+  if (!/^\/details\/\d+\//.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  return window.location.href;
 }
 
 function getProviderActivationKey(provider: string, rawUrl: string): string | undefined {
