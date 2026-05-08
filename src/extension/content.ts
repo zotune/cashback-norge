@@ -497,6 +497,9 @@ function isNettbonusActivationClick(_target: Element, link: HTMLAnchorElement | 
 
   // The activation link on nettbonus detail pages has class "partnerDetailsAction"
   // and/or id "externalLink", pointing to tradedoubler/other tracking URLs
+  if (link.href === NETTBONUS_REFERRAL_URL) {
+    return false;
+  }
   return link.classList.contains("partnerDetailsAction") || link.id === "externalLink";
 }
 
@@ -512,6 +515,10 @@ function rewriteNettbonusLoginTrigger(): boolean {
     clone.href = NETTBONUS_REFERRAL_URL;
     clone.target = "_blank";
     clone.removeAttribute("id");
+    const adLabel = document.createElement("span");
+    adLabel.textContent = "Ad";
+    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-left:8px;vertical-align:middle;line-height:14px;";
+    clone.append(adLabel);
     loginLink.replaceWith(clone);
     return true;
   }
