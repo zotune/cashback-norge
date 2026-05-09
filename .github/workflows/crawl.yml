@@ -3,13 +3,6 @@ name: Daily crawl
 on:
   schedule:
     - cron: "0 6 * * *"
-  push:
-    branches: [main]
-    paths:
-      - site/**
-      - src/site/**
-      - src/shared/provider-data.ts
-      - src/backend/**
   workflow_dispatch:
 
 permissions:
