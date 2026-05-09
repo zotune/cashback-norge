@@ -78,8 +78,8 @@ export async function fetchSpenn(options: {
 
   logger.info(`Spenn: fetched ${allItems.length} active offers from Contentful`);
 
-  // Pick best rate per merchant (highest max)
-  const best = new Map<string, { rate: string; maxVal: number; link: string; terms: string }>();
+  // Group Norwegian offers by store UUID (one link per store is enough)
+  const storeMap = new Map<string, { merchantName: string; link: string; desc: string }>();
 
   for (const item of allItems) {
     const name = item.merchant?.name;
@@ -89,12 +89,32 @@ export async function fetchSpenn(options: {
     if (!link.includes("refunder.com") || !link.includes(NORWAY_SITE_ID))
       continue;
 
-    const parsed = parseSpennRate(item.longDescription ?? "");
+    const storeMatch = link.match(/store=([a-f0-9-]+)/);
+    if (!storeMatch) continue;
+
+    const storeId = storeMatch[1]!;
+    if (!storeMap.has(storeId)) {
+      storeMap.set(storeId, { merchantName: name, link, desc: item.longDescription ?? "" });
+    }
+  }
+
+  // Fetch rates from refunder landing pages (more reliable than Contentful descriptions)
+  const refunderRates = await fetchRefunderRates(
+    [...storeMap.values()].map((s) => s.link),
+    logger,
+  );
+
+  // Pick best rate per merchant (highest max)
+  const best = new Map<string, { rate: string; maxVal: number; link: string; terms: string }>();
+
+  for (const [, { merchantName, link, desc }] of storeMap) {
+    // Prefer refunder page rate; fall back to Contentful description
+    const parsed = refunderRates.get(link) ?? parseSpennRate(desc);
     if (!parsed) continue;
 
-    const existing = best.get(name);
+    const existing = best.get(merchantName);
     if (!existing || parsed.maxVal > existing.maxVal) {
-      best.set(name, { rate: parsed.rate, maxVal: parsed.maxVal, link, terms: parsed.terms });
+      best.set(merchantName, { rate: parsed.rate, maxVal: parsed.maxVal, link, terms: parsed.terms });
     }
   }
 
@@ -119,13 +139,103 @@ export async function fetchSpenn(options: {
   return offers;
 }
 
+type ParsedRate = { rate: string; maxVal: number; terms: string };
+
 /**
- * Parses "X Spenn per 10 kr" from offer longDescription.
+ * Fetch rates from refunder landing pages concurrently.
+ * These pages are the source of truth and match the Spenn app.
+ */
+async function fetchRefunderRates(
+  links: string[],
+  logger: Logger,
+): Promise<Map<string, ParsedRate>> {
+  const results = new Map<string, ParsedRate>();
+  const CONCURRENCY = 5;
+
+  for (let i = 0; i < links.length; i += CONCURRENCY) {
+    const batch = links.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map(async (link) => {
+        const res = await fetch(link, {
+          headers: { "Accept-Language": "nb-NO,nb" },
+          redirect: "manual",
+        });
+        const html = await res.text();
+        const parsed = parseRefunderPage(html);
+        if (parsed) results.set(link, parsed);
+      }),
+    );
+    for (const r of settled) {
+      if (r.status === "rejected") {
+        logger.warn(`Spenn: refunder page fetch failed: ${r.reason}`);
+      }
+    }
+  }
+
+  logger.info(`Spenn: fetched rates from ${results.size}/${links.length} refunder pages`);
+  return results;
+}
+
+/**
+ * Parse rate from a refunder landing page HTML.
+ * Title format: "Tjen [opp til] X,Y Spenn per 10 kr hos MerchantName"
+ * Tiered rates appear as <li> elements: "Category: X,Y Spenn per 10 kr"
+ * Simple rate in body: "Hos X tjener du Y,Z Spenn per 10 kr."
+ */
+function parseRefunderPage(html: string): ParsedRate | undefined {
+  // Extract category-based rates from <li> elements
+  const categoryMatches = [
+    ...html.matchAll(/<li[^>]*>([^<]*?:\s*([\d,]+)\s*Spenn per 10 kr[^<]*)<\/li>/g),
+  ];
+  if (categoryMatches.length > 0) {
+    const rows = categoryMatches.map((m) => {
+      const full = (m[1] ?? "").replace(/&amp;/g, "&").trim();
+      const colonIdx = full.lastIndexOf(":");
+      const category = full.slice(0, colonIdx).trim();
+      const value = parseFloat((m[2] ?? "0").replace(",", "."));
+      return { category, value };
+    });
+    const values = rows.map((r) => r.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const rate =
+      min === max ? `${fmt(max)} %` : `${fmt(min)}-${fmt(max)} %`;
+    const terms = rows.length > 1
+      ? rows
+          .filter((r) => r.category)
+          .map((r) => `${fmt(r.value)} % – ${r.category}`)
+          .join("\n")
+      : "";
+    return { rate, maxVal: max, terms };
+  }
+
+  // Simple rate from body text: "tjener du X,Y Spenn per 10 kr"
+  const bodyMatch = html.match(/tjener du ([\d,]+)\s*Spenn per 10 kr/);
+  if (bodyMatch) {
+    const val = parseFloat((bodyMatch[1] ?? "0").replace(",", "."));
+    return { rate: `${fmt(val)} %`, maxVal: val, terms: "" };
+  }
+
+  // Fallback: parse from <title> tag
+  const titleMatch = html.match(
+    /<title>[^<]*?(?:opp til )?([\d,]+)\s*Spenn per 10 kr/,
+  );
+  if (titleMatch) {
+    const val = parseFloat((titleMatch[1] ?? "0").replace(",", "."));
+    return { rate: `${fmt(val)} %`, maxVal: val, terms: "" };
+  }
+
+  return undefined;
+}
+
+/**
+ * Parses "X Spenn per 10 kr" from Contentful offer longDescription.
+ * Used as fallback when the refunder page can't be fetched.
  * 1 Spenn = 10 øre, so X Spenn per 10 kr = X% cashback.
  */
 function parseSpennRate(
   desc: string,
-): { rate: string; maxVal: number; terms: string } | undefined {
+): ParsedRate | undefined {
   // Pattern 1: Markdown table "| Category | X,Y Spenn per 10 kr |"
   const tableMatches = [
     ...desc.matchAll(/\|\s*(.+?)\s*\|\s*([\d,]+)\s*Spenn per 10 kr\.?\s*\|/g),
