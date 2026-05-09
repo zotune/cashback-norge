@@ -205,8 +205,8 @@ async function fetchDetail(detailPath: string): Promise<RabbleDetail> {
 
   for (const m of html.matchAll(kcPattern)) {
     keyconditions.push({
-      label: m[1].trim(),
-      value: m[3].trim(),
+      label: m[1]!.trim(),
+      value: m[3]!.trim(),
       type: m[2] as RabbleKeycondition["type"],
     });
   }
