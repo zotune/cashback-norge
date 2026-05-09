@@ -1147,6 +1147,10 @@ function renderNotice(
       background: #2d2145;
       color: #f8a6a6;
     }
+    .provider-dreams {
+      background: #a389d8;
+      color: #1a1a1a;
+    }
     .provider-cbn {
       background: #f7d7e6;
       color: #8f164f;
@@ -1675,7 +1679,7 @@ function renderNotice(
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
-  const APP_ONLY_PROVIDERS = new Set(["klarna", "spenn"]);
+  const APP_ONLY_PROVIDERS = new Set(["klarna", "spenn", "dreams"]);
   const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
     "spotify.com": "Spotify",
     "netflix.com": "Netflix",

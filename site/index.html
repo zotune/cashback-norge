@@ -289,6 +289,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-spenn { background: #E51454; color: #fff; }
 .badge-spareborsen { background: #C9A24A; color: #1A1A1A; }
 .badge-rabble { background: #2d2145; color: #f8a6a6; }
+.badge-dreams { background: #a389d8; color: #1a1a1a; }
 .badge-cbn { background: #f7d7e6; color: #8f164f; }
 .empty {
   color: #8a9a92;
@@ -1178,7 +1179,7 @@ function render(query) {
         : (terms || PROVIDER_TIPS[o.provider] || "");
       const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
       const cardOnly = ["sparebank1", "remember"].includes(o.provider);
-      const appOnly = ["klarna", "spenn"].includes(o.provider);
+      const appOnly = ["klarna", "spenn", "dreams"].includes(o.provider);
       const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
       const appText = "Krever " + (PROVIDER_NAMES[o.provider] || o.provider) + "-appen for å aktivere cashback";
       const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText;

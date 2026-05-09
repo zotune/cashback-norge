@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778284072
+// @version      1778285618
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -115,6 +115,7 @@
     spenn: "Spenn",
     spareborsen: "Sparebørsen",
     rabble: "rabble",
+    dreams: "Dreams",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -1069,8 +1070,9 @@
       const sasActivationUrl = isSasActivationClick(target, link) ? getCurrentSasOfferActivationUrl() : void 0;
       const nettbonusActivationUrl = isNettbonusActivationClick(target, link) ? getCurrentNettbonusOfferActivationUrl() : void 0;
       const spareborsenActivationUrl = isSpareborsenActivationClick(target) ? getCurrentSpareborsenOfferActivationUrl() : void 0;
-      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : nettbonusActivationUrl !== void 0 ? "nettbonus" : spareborsenActivationUrl !== void 0 ? "spareborsen" : void 0;
-      const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl ?? spareborsenActivationUrl;
+      const rabbleActivationUrl = isRabbleActivationClick(target) ? getCurrentRabbleOfferActivationUrl() : void 0;
+      const provider = trumfActivationUrl !== void 0 ? "trumf" : sasActivationUrl !== void 0 ? "sas" : nettbonusActivationUrl !== void 0 ? "nettbonus" : spareborsenActivationUrl !== void 0 ? "spareborsen" : rabbleActivationUrl !== void 0 ? "rabble" : void 0;
+      const activationUrl = trumfActivationUrl ?? sasActivationUrl ?? nettbonusActivationUrl ?? spareborsenActivationUrl ?? rabbleActivationUrl;
       if (provider === void 0 || activationUrl === void 0) {
         return;
       }
@@ -1183,7 +1185,6 @@
   }
   const NETTBONUS_REFERRAL_URL = "https://nettbonus.no/r/28698";
   const SPAREBORSEN_REFERRAL_URL = "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5";
-  const RABBLE_REFERRAL_URL = "https://www.rabble.com/code/98CNVFREF/redeem";
   function rewriteNettbonusLoginTriggers() {
     const loginLinks = document.querySelectorAll(
       'a.partnerDetailsAction[id^="loginTriggerOnDetails"]'
@@ -1228,15 +1229,6 @@
     });
     sbObs.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => sbObs.disconnect(), 1e4);
-  }
-  if (isOnRabbleOfferPage()) {
-    const rabbleObs = new MutationObserver(() => {
-      if (rewriteRabbleCta()) {
-        rabbleObs.disconnect();
-      }
-    });
-    rabbleObs.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => rabbleObs.disconnect(), 1e4);
   }
   function isOnSpareborsenPartnerPage() {
     const parsedUrl = parseUrl(window.location.href);
@@ -1308,26 +1300,30 @@
     }
     return window.location.href;
   }
-  function isOnRabbleOfferPage() {
-    const parsedUrl = parseUrl(window.location.href);
-    if (parsedUrl === void 0) return false;
-    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "rabble.no" && /^\/online\/\d+-/.test(parsedUrl.pathname);
+  function isRabbleActivationClick(target) {
+    if (getCurrentRabbleOfferActivationUrl() === void 0) {
+      return false;
+    }
+    if (document.querySelector('a.ph__link--login-button[href="/login"]') !== null) {
+      return false;
+    }
+    const clickable = target.closest("button,a,[role='button']");
+    if (!clickable) return false;
+    return clickable.classList.contains("online-cashback-offer-cta-button") || clickable.closest(".online-cashback-offer-cta") !== null;
   }
-  function rewriteRabbleCta() {
-    const ctaLink = document.querySelector(".online-cashback-offer-cta a");
-    if (!ctaLink || ctaLink.getAttribute("data-cb-rewrite") === "1") return false;
-    const clone = ctaLink.cloneNode(true);
-    clone.href = RABBLE_REFERRAL_URL;
-    clone.target = "_blank";
-    clone.rel = "noreferrer";
-    clone.setAttribute("data-cb-rewrite", "1");
-    const adLabel = document.createElement("span");
-    adLabel.textContent = "Ad";
-    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
-    clone.prepend(adLabel);
-    ctaLink.replaceWith(clone);
-    return true;
+  function getCurrentRabbleOfferActivationUrl() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) {
+      return void 0;
+    }
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "rabble.no") {
+      return void 0;
+    }
+    if (!/^\/online\/\d+-/.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    return window.location.href;
   }
   function getProviderActivationKey(provider, rawUrl) {
     const normalizedUrl = normalizeActivationUrl(rawUrl);
@@ -1752,6 +1748,10 @@
     .provider-rabble {
       background: #2d2145;
       color: #f8a6a6;
+    }
+    .provider-dreams {
+      background: #a389d8;
+      color: #1a1a1a;
     }
     .provider-cbn {
       background: #f7d7e6;
@@ -2281,7 +2281,7 @@
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
-    const APP_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["klarna", "spenn"]);
+    const APP_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["klarna", "spenn", "dreams"]);
     const CRYPTO_SUBSCRIPTIONS = {
       "spotify.com": "Spotify",
       "netflix.com": "Netflix",
