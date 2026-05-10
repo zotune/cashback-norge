@@ -13,7 +13,7 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 const BASE_URL = "https://studenttorget.no";
 const LIST_URL = `${BASE_URL}/studentrabatter`;
 const DEFAULT_TERMS = "Krever registrering på studenttorget.no (gratis).";
-const DETAIL_CONCURRENCY = 8;
+const DETAIL_CONCURRENCY = 30;
 
 const SKIP_HOSTNAMES = new Set([
   "studenttorget.no",
@@ -45,6 +45,14 @@ type RawOffer = {
   sourceUrl: string;
   websiteUrl: string;
   description: string;
+  /** Rich description from the detail page (for tooltip / terms) */
+  richDescription: string;
+  /** Subtitle from the detail page */
+  subtitle: string;
+  /** Location / city */
+  location: string;
+  /** Category */
+  category: string;
 };
 
 export async function crawlStudentTorget(
@@ -61,13 +69,12 @@ export async function crawlStudentTorget(
   let lookupCount = 0;
   let overrideCount = 0;
   let directCount = 0;
-  let skippedNoReward = 0;
 
   for (const raw of rawOffers) {
-    const reward = parseReward(raw.badgeText, raw.description);
+    let reward = parseReward(raw.badgeText, raw.description, raw.richDescription);
+    // If no specific reward could be parsed, show "?"
     if (!reward) {
-      skippedNoReward++;
-      continue;
+      reward = "?";
     }
 
     const overrideDomains = input.overrides.studenttorget?.[raw.slug] ?? [];
@@ -94,9 +101,24 @@ export async function crawlStudentTorget(
     }
 
     if (domains.length === 0) {
-      input.logger.warn(`StudentTorget: no domain for "${raw.name}" (${raw.slug})`);
       continue;
     }
+
+    // Build rich terms from detail page info
+    const termsParts: string[] = [];
+    if (raw.subtitle) termsParts.push(raw.subtitle);
+    if (raw.richDescription) {
+      // Truncate to reasonable length for tooltip display
+      const desc = raw.richDescription.length > 800
+        ? raw.richDescription.slice(0, 800).replace(/\n[^\n]*$/, "") + "…"
+        : raw.richDescription;
+      termsParts.push(desc);
+    }
+    if (raw.location) termsParts.push(`📍 ${raw.location}`);
+    if (raw.category) termsParts.push(`🏷️ ${raw.category}`);
+    const terms = termsParts.length > 0
+      ? termsParts.join("\n\n")
+      : DEFAULT_TERMS;
 
     offers.push({
       provider: "studenttorget",
@@ -105,13 +127,13 @@ export async function crawlStudentTorget(
       reward,
       sourceUrl: raw.sourceUrl,
       activationUrl: raw.sourceUrl,
-      terms: DEFAULT_TERMS,
+      terms,
       updatedAt: input.generatedAt,
     });
   }
 
   input.logger.info(
-    `StudentTorget: ${directCount} via website, ${lookupCount} via lookup, ${overrideCount} via overrides, ${skippedNoReward} skipped (no reward)`,
+    `StudentTorget: ${directCount} via website, ${lookupCount} via lookup, ${overrideCount} via overrides`,
   );
   input.logger.info(`StudentTorget: produced ${offers.length} offers`);
   return uniqueOffers(offers);
@@ -126,7 +148,7 @@ async function fetchAllListingOffers(logger: Logger): Promise<RawOffer[]> {
   const allOffers = extractListingOffers(firstHtml);
 
   // Fetch remaining pages in parallel batches
-  const PAGE_CONCURRENCY = 5;
+  const PAGE_CONCURRENCY = 10;
   for (let page = 2; page <= totalPages; page += PAGE_CONCURRENCY) {
     const batch = [];
     for (let p = page; p < page + PAGE_CONCURRENCY && p <= totalPages; p++) {
@@ -138,15 +160,16 @@ async function fetchAllListingOffers(logger: Logger): Promise<RawOffer[]> {
     }
   }
 
-  // Deduplicate by slug
-  const bySlug = new Map<string, RawOffer>();
+  // Deduplicate by slug+id
+  const byKey = new Map<string, RawOffer>();
   for (const offer of allOffers) {
-    if (!bySlug.has(offer.slug)) {
-      bySlug.set(offer.slug, offer);
+    const key = `${offer.slug}/${offer.id}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, offer);
     }
   }
 
-  return [...bySlug.values()];
+  return [...byKey.values()];
 }
 
 function extractTotalPages(html: string): number {
@@ -166,39 +189,31 @@ function extractTotalPages(html: string): number {
 
 function extractListingOffers(html: string): RawOffer[] {
   const offers: RawOffer[] = [];
+  const seen = new Set<string>();
 
-  // Match each offer block: cp_vacancy_block
-  const blockPattern = /<div class="cp_vacancy_block"[\s\S]*?(?=<div class="cp_vacancy_block"|<\/div>\s*<\/div>\s*<\/div>\s*<div id=")|<div class="cp_vacancy_block"[\s\S]*?(?=<div id="pagination|$)/g;
-
-  // Simpler: parse slug+id+badge+name from each offer card
-  // Each card has: href="/studentrabatt/{slug}/{id}" and optionally a badge label
-  const cardPattern =
-    /<div class="cp_vacancy_block"[^>]*>([\s\S]*?)(?=<div class="cp_vacancy_block"|<div id="f-search-results|$)/g;
-
-  for (const cardMatch of html.matchAll(cardPattern)) {
-    const card = cardMatch[1]!;
-
-    // Extract slug and ID from href
-    const hrefMatch = card.match(/href="\/studentrabatt\/([^/]+)\/(\d+)"/);
+  // Format 1: Rich cards (cp_vacancy_block) — pages 1-10
+  const blocks = html.split(/<div class="cp_vacancy_block"/).slice(1);
+  for (const block of blocks) {
+    const hrefMatch = block.match(/href="\/studentrabatt\/([^/]+)\/(\d+)"/);
     if (!hrefMatch) continue;
     const slug = hrefMatch[1]!;
     const id = hrefMatch[2]!;
+    const key = `${slug}/${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
-    // Extract merchant name from title link
-    const nameMatch = card.match(
+    const nameMatch = block.match(
       /cp_vacancies_content_item_title[\s\S]*?<a[^>]*>([^<]+)<\/a>/,
     );
     const rawName = nameMatch?.[1]?.replace(/\s*[-–]\s*Studentrabatt\s*$/i, "").trim() ?? "";
     if (!rawName) continue;
 
-    // Extract reward badge text (inside cp_vacancy_image__label but NOT the icon-discount div)
-    const badgeMatch = card.match(
+    const badgeMatch = block.match(
       /cp_vacancy_image__label(?!__label_cnt)[^>]*>\s*([^<\s][^<]*?)\s*<\/div>/,
     );
     const badgeText = badgeMatch?.[1]?.trim() ?? "";
 
-    // Extract description snippet
-    const descMatch = card.match(
+    const descMatch = block.match(
       /cp_vacancies_content_item_description[^>]*>\s*([\s\S]*?)\s*<\/div>/,
     );
     const description = descMatch
@@ -206,13 +221,40 @@ function extractListingOffers(html: string): RawOffer[] {
       : "";
 
     offers.push({
-      slug,
-      id,
+      slug, id,
       name: decodeHtmlEntities(rawName),
       badgeText: decodeHtmlEntities(badgeText),
       sourceUrl: `${BASE_URL}/studentrabatt/${slug}/${id}`,
       websiteUrl: "",
       description: decodeHtmlEntities(description),
+      richDescription: "", subtitle: "", location: "", category: "",
+    });
+  }
+
+  // Format 2: Simple text links (discount-box-unprofiled) — pages 11+
+  const unprofiledPattern =
+    /discount-box-unprofiled[\s\S]*?href="\/studentrabatt\/([^/]+)\/(\d+)"[^>]*>\s*([\s\S]*?)\s*<\/a>/g;
+  for (const m of html.matchAll(unprofiledPattern)) {
+    const slug = m[1]!;
+    const id = m[2]!;
+    const key = `${slug}/${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const rawName = m[3]!
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s*[-–]\s*Studentrabatt\s*$/i, "")
+      .trim();
+    if (!rawName) continue;
+
+    offers.push({
+      slug, id,
+      name: decodeHtmlEntities(rawName),
+      badgeText: "",
+      sourceUrl: `${BASE_URL}/studentrabatt/${slug}/${id}`,
+      websiteUrl: "",
+      description: "",
+      richDescription: "", subtitle: "", location: "", category: "",
     });
   }
 
@@ -225,23 +267,23 @@ async function enrichDetails(offers: RawOffer[], logger: Logger): Promise<void> 
   async function enrich(offer: RawOffer): Promise<void> {
     try {
       const html = await fetchHtml(offer.sourceUrl);
-      const info = extractWebsiteInfo(html);
-      // Log all external links for debugging
-      if (info.allExternalLinks.length > 0) {
-        logger.info(`[StudentTorget] ${offer.slug}: Eksterne lenker: ` + info.allExternalLinks.map(l => `${l.url} [${l.anchor}]`).join(", "));
+      const info = extractDetailPageInfo(html);
+
+      // Set website URL: prefer globe link, then blue-button, then first external link
+      offer.websiteUrl = info.globeUrl || info.blueButtonUrl || info.fallbackUrl || "";
+
+      // Rich description for tooltip / terms
+      offer.richDescription = info.richDescription;
+      offer.subtitle = info.subtitle;
+      offer.location = info.location;
+      offer.category = info.category;
+
+      // If no badge from listing, try to extract reward from detail page
+      if (!offer.badgeText && info.subtitle) {
+        offer.description = info.subtitle;
       }
-      // Prefer mainDomain, fallback to bookingUrl
-      offer.websiteUrl = info.mainDomain || info.bookingUrl || "";
-      // Optionally: store bookingUrl separately for tooltip (not in RawOffer yet)
-      // Tooltip-data: phone, address, openingHours kan også lagres her om ønskelig
-      // Use h2 description for richer reward text if badge is empty
-      if (!offer.badgeText) {
-        const h2Match = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
-        if (h2Match) {
-          offer.description = decodeHtmlEntities(
-            h2Match[1]!.replace(/<[^>]+>/g, " ").trim(),
-          );
-        }
+      if (!offer.badgeText && !offer.description && info.richDescription) {
+        offer.description = info.richDescription;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -261,71 +303,120 @@ async function enrichDetails(offers: RawOffer[], logger: Logger): Promise<void> 
   if (offers.length > 0) process.stdout.write("\n");
 }
 
-// Extract both main domain (fa-globe) and booking/secondary (blue button) links, plus tooltip info
-export type StudentTorgetExtractedLinks = {
-  mainDomain?: string;
-  bookingUrl?: string;
-  fallbackUrl?: string;
-  allExternalLinks: { url: string; anchor: string }[];
-  phone?: string;
-  address?: string;
-  openingHours?: string;
+type DetailPageInfo = {
+  globeUrl: string;
+  blueButtonUrl: string;
+  fallbackUrl: string;
+  richDescription: string;
+  subtitle: string;
+  location: string;
+  category: string;
 };
 
-function extractWebsiteInfo(html: string): StudentTorgetExtractedLinks {
-  const IRRELEVANT_TEXTS = [
-    "les mer", "mer info", "se mer", "logg inn", "registrer", "betingelser", "kontakt", "vilkår", "personvern", "om oss", "facebook", "instagram", "twitter", "linkedin", "google", "app store", "play store", "youtube", "snapchat", "tiktok", "faq", "ofte stilte spørsmål", "support", "hjelp", "min side", "min profil", "nyhetsbrev", "abonner", "del", "share", "read more", "more info", "see more", "login", "register", "terms", "privacy", "about", "contact"
-  ];
-  function isIrrelevantText(text: string) {
-    const t = text.trim().toLowerCase();
-    return IRRELEVANT_TEXTS.some((s) => t === s || t.startsWith(s + " ") || t.endsWith(" " + s));
-  }
-  // 1. Main domain (fa-globe)
-  let mainDomain: string | undefined;
-  const globeMatch = html.match(/fa-globe[\s\S]{0,200}<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-  if (globeMatch?.[1]) {
-    const anchorText = globeMatch[2]?.replace(/<[^>]+>/g, "").trim() || "";
-    if (!isIrrelevantText(anchorText)) {
-      mainDomain = globeMatch[1].replace(/&amp;/g, "&");
-    }
-  }
-  // 2. Booking/blue button (first .blue-button)
-  let bookingUrl: string | undefined;
-  const btnMatch = html.match(/<a[^>]+class="[^"]*blue-button[^"]*"[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-  if (btnMatch?.[1]) {
-    const anchorText = btnMatch[2]?.replace(/<[^>]+>/g, "").trim() || "";
-    if (!isIrrelevantText(anchorText)) {
-      bookingUrl = btnMatch[1].replace(/&amp;/g, "&");
-    }
-  }
-  // 3. All external links (for debugging/tooltip)
-  const allExternalLinks: { url: string; anchor: string }[] = [];
-  const allLinks = [...html.matchAll(/<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
-  for (const l of allLinks) {
-    const url = l[1];
-    if (!url) continue;
-    if (/studenttorget|facebook|instagram|twitter|google|linkedin|karrierestart|studievalg|campus/i.test(url)) continue;
-    const anchorText = l[2]?.replace(/<[^>]+>/g, "").trim() || "";
-    if (isIrrelevantText(anchorText)) continue;
-    allExternalLinks.push({ url: url.replace(/&amp;/g, "&"), anchor: anchorText });
-  }
-  // 4. fallbackUrl: always present, even if undefined
-  let fallbackUrl: string | undefined = undefined;
-  // (If you want to set fallbackUrl to e.g. first valid external link, do it here)
+function extractDetailPageInfo(html: string): DetailPageInfo {
+  // 1. Extract the main content block to avoid matching cookie consent etc.
+  const mainBlock = html.match(
+    /class="job-main-info-block">([\s\S]*?)(?:<div class="cp-info-right-block"|<div class="job-related)/,
+  )?.[1] ?? "";
 
-  // 5. Phone
-  let phone: string | undefined;
-  const phoneMatch = html.match(/fa-phone[\s\S]{0,100}<span[^>]*>([\d\s\-+()]{6,})<\/span>/i);
-  if (phoneMatch?.[1]) phone = phoneMatch[1].trim();
-  // 6. Address
-  let address: string | undefined;
-  const addrMatch = html.match(/fa-map-marker[\s\S]{0,100}<span[^>]*>([\s\S]*?)<\/span>/i);
-  if (addrMatch?.[1]) address = addrMatch[1].replace(/<[^>]+>/g, "").trim();
-  // 7. Opening hours (look for Åpningstider or similar)
-  let openingHours: string | undefined;
-  const openMatch = html.match(/<strong>Åpningstider<\/strong>\s*<p>([\s\S]*?)<\/p>/i);
-  if (openMatch?.[1]) openingHours = openMatch[1].replace(/<[^>]+>/g, "").trim();
-  return { mainDomain, bookingUrl, fallbackUrl, allExternalLinks, phone, address, openingHours };
+  // 2. Blue button URL (inside the main content block only)
+  let blueButtonUrl = "";
+  const blueBtn = mainBlock.match(
+    /<a[^>]+class="[^"]*blue-button[^"]*"[^>]+href="(https?:\/\/[^"]+)"[^>]*>/i,
+  );
+  if (blueBtn?.[1]) {
+    blueButtonUrl = blueBtn[1].replace(/&amp;/g, "&");
+  }
+
+  // 3. Globe URL from the right sidebar (cp-info-right-block)
+  let globeUrl = "";
+  const rightBlock = html.match(
+    /class="cp-info-right-block">([\s\S]*?)<\/div>\s*<\/div>/,
+  )?.[1] ?? "";
+  const globeLink = rightBlock.match(
+    /fa-globe[\s\S]{0,300}<a[^>]+href="(https?:\/\/[^"]+)"/i,
+  );
+  if (globeLink?.[1]) {
+    globeUrl = globeLink[1].replace(/&amp;/g, "&");
+  }
+
+  // 4. Fallback: first external link in the main content block
+  let fallbackUrl = "";
+  const firstExternal = mainBlock.match(
+    /<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>/i,
+  );
+  if (firstExternal?.[1]) {
+    const url = firstExternal[1].replace(/&amp;/g, "&");
+    try {
+      const host = new URL(url).hostname;
+      if (!/studenttorget|facebook|instagram|twitter|google|linkedin/i.test(host)) {
+        fallbackUrl = url;
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 5. Rich description from jobad-info-block
+  let richDescription = "";
+  const infoBlock = html.match(
+    /class="jobad-info-block"[^>]*>\s*<div>([\s\S]*?)<\/div>\s*<\/div>/,
+  );
+  if (infoBlock?.[1]) {
+    richDescription = infoBlock[1]
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&aring;/g, "å")
+      .replace(/&oslash;/g, "ø")
+      .replace(/&aelig;/g, "æ")
+      .replace(/&Aring;/g, "Å")
+      .replace(/&Oslash;/g, "Ø")
+      .replace(/&Aelig;/g, "Æ")
+      .replace(/&eacute;/g, "é")
+      .replace(/&ndash;/g, "–")
+      .replace(/&mdash;/g, "—")
+      .replace(/&acute;/g, "'")
+      .replace(/&#\d+;/g, (m) => {
+        const code = Number(m.slice(2, -1));
+        return String.fromCharCode(code);
+      })
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  // 6. Subtitle
+  let subtitle = "";
+  const subtitleMatch = html.match(
+    /<h2 class="jobad-subtitle"[^>]*>\s*([\s\S]*?)\s*<\/h2>/i,
+  );
+  if (subtitleMatch?.[1]) {
+    subtitle = subtitleMatch[1].replace(/<[^>]+>/g, "").trim();
+    subtitle = decodeHtmlEntities(subtitle);
+  }
+
+  // 7. Location from facts
+  let location = "";
+  const locMatch = html.match(
+    /item-info-title">Sted<\/div>\s*<div class="item-info-content">\s*([\s\S]*?)\s*<\/div>/,
+  );
+  if (locMatch?.[1]) {
+    // Extract all location names
+    const locs = [...locMatch[1].matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]!.trim());
+    location = locs.join(", ");
+  }
+
+  // 8. Category
+  let category = "";
+  const catMatch = html.match(
+    /item-info-title">Kategori<\/div>\s*<div class="item-info-content">\s*([\s\S]*?)\s*<\/div>/,
+  );
+  if (catMatch?.[1]) {
+    const cats = [...catMatch[1].matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]!.trim());
+    category = cats.join(", ");
+  }
+
+  return { globeUrl, blueButtonUrl, fallbackUrl, richDescription, subtitle, location, category };
 }
 
 /**
@@ -344,7 +435,7 @@ function extractWebsiteInfo(html: string): StudentTorgetExtractedLinks {
  * Uses shared reward functions from src/shared/reward.ts so calculation
  * logic is not duplicated.
  */
-function parseReward(badgeText: string, description: string): string {
+function parseReward(badgeText: string, description: string, richDescription: string = ""): string {
   if (badgeText && !/^studentrabatt!?$/i.test(badgeText)) {
     const badge = badgeText.trim();
 
@@ -374,20 +465,29 @@ function parseReward(badgeText: string, description: string): string {
     }
   }
 
-  // Fall through to description text
-  if (!description) return "";
+  // Try short description first, then rich description from detail page
+  for (const text of [description, richDescription]) {
+    if (!text) continue;
 
-  const descLower = description.toLowerCase();
-  const isOpptil = descLower.includes("opptil") || descLower.includes("opp til");
+    const textLower = text.toLowerCase();
+    const isOpptil = textLower.includes("opptil") || textLower.includes("opp til");
 
-  const pct = extractPercentageReward(description);
-  if (pct) {
-    return isOpptil ? `opptil ${pct}` : pct;
+    const pct = extractPercentageReward(text);
+    if (pct) {
+      return isOpptil ? `opptil ${pct}` : pct;
+    }
+
+    // kr discount (e.g. "200 kr i rabatt")
+    const krDiscount = extractKrReward(text);
+    if (krDiscount) return krDiscount;
+
+    // Fixed price in text: "Kun 110 kr", "2690,-", "studentpris: 499,-"
+    const fixedPriceMatch = text.match(/(?:kun|studentpris|pris)[:\s]+(?:kr\.?\s*)?(\d[\d\s]*)(?:,[-–]|,-|\s*kr)\b/i);
+    if (fixedPriceMatch) {
+      const value = fixedPriceMatch[1]!.replace(/\s/g, "");
+      return `${value} kr totalsum`;
+    }
   }
-
-  // kr discount from description (e.g. "200 kr i rabatt")
-  const krDiscount = extractKrReward(description);
-  if (krDiscount) return krDiscount;
 
   return "";
 }
