@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778423546
+// @version      1778426598
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -116,7 +116,8 @@
     spareborsen: "Sparebørsen",
     rabble: "rabble",
     dreams: "Dreams",
-    utdanningibergen: "UiB",
+    utdanningibergen: "Utdanning i Bergen",
+    unidays: "UNiDAYS",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -1758,6 +1759,10 @@
       background: #ffffff;
       color: #000000;
       border: 1px solid #ccc;
+    }
+    .provider-unidays {
+      background: #00b140;
+      color: #ffffff;
     }
     .provider-cbn {
       background: #f7d7e6;
