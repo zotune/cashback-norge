@@ -143,7 +143,7 @@ export const SUPPORT_LINKS = [
   { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
   { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
   { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-  { text: "Sparebørsen: Inviter en venn — dere får begge 50 kr", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
+  { text: "Sparebørsen: 50 kr settes inn med en gang du registrerer deg", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
 ];
 
 export const MERCHANT_ALIASES: Record<string, string> = {
