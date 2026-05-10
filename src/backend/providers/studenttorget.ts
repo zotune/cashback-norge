@@ -296,8 +296,26 @@ async function enrichDetails(offers: RawOffer[], logger: Logger): Promise<void> 
     }
   }
 
+  let consecutiveMisses = 0;
+  const STOP_AFTER_MISSES = 15;
+
   for (let i = 0; i < offers.length; i += DETAIL_CONCURRENCY) {
-    await Promise.all(offers.slice(i, i + DETAIL_CONCURRENCY).map(enrich));
+    const batch = offers.slice(i, i + DETAIL_CONCURRENCY);
+    await Promise.all(batch.map(enrich));
+
+    // Check how many in this batch got a URL
+    for (const o of batch) {
+      if (o.websiteUrl) {
+        consecutiveMisses = 0;
+      } else {
+        consecutiveMisses++;
+      }
+    }
+
+    if (consecutiveMisses >= STOP_AFTER_MISSES) {
+      logger.info(`StudentTorget: stopping detail enrichment after ${STOP_AFTER_MISSES} consecutive misses (at ${completed}/${offers.length})`);
+      break;
+    }
   }
 
   if (offers.length > 0) process.stdout.write("\n");

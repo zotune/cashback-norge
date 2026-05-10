@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778433962
+// @version      1778436630
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1734,6 +1734,10 @@
     }
     .provider-studentkortet {
       background: #1B2838;
+      color: #ffffff;
+    }
+    .provider-studenttorget {
+      background: #009fe3;
       color: #ffffff;
     }
     .provider-nettbonus {

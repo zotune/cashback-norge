@@ -1131,6 +1131,10 @@ function renderNotice(
       background: #1B2838;
       color: #ffffff;
     }
+    .provider-studenttorget {
+      background: #009fe3;
+      color: #ffffff;
+    }
     .provider-nettbonus {
       background: #5b0f8c;
       color: #ffffff;
