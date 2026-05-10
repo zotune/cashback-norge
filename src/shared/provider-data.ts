@@ -22,7 +22,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   spareborsen: "Sparebørsen",
   rabble: "rabble",
   dreams: "Dreams",
-  utdanningibergen: "UiB",
+  utdanningibergen: "Utdanning i Bergen",
   unidays: "UNiDAYS",
   cbn: "♥",
 };

@@ -121,7 +121,8 @@ function buildReward(d: Discount): string {
   if (d.discount_type === "NOK" && d.discount > 0) return `${d.discount} kr`;
   if (d.discount_type === "fastpris" && d.discount === 0) return "Gratis";
   if (d.discount_type === "fastpris" && d.discount > 0) return `${d.discount} kr`;
-  return "Studentrabatt";
+  // Hvis vi ikke vet hva rabatten er, vis bare '?'
+  return "?";
 }
 
 function stripHtml(html: string): string {

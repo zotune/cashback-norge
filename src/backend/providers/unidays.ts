@@ -3,6 +3,7 @@ import {
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
+import { extractPercentageReward, extractKrReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 const PARTNERS_API = "https://api.myunidays.com/partners";
@@ -134,8 +135,11 @@ export async function fetchUnidays(
     const domains = rawDomains.flatMap((d) => normalizeDomainInput(d));
 
     for (const benefit of partner.benefits) {
-      const reward = benefit.name.trim();
-      if (!reward) continue;
+
+
+      const rewardRaw = benefit.name.trim();
+      let reward = extractPercentageReward(rewardRaw) || extractKrReward(rewardRaw);
+      if (!reward) reward = "?";
 
       offers.push({
         provider: "unidays",
