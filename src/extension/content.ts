@@ -1152,8 +1152,9 @@ function renderNotice(
       color: #1a1a1a;
     }
     .provider-utdanningibergen {
-      background: #00949b;
-      color: #ffffff;
+      background: #ffffff;
+      color: #000000;
+      border: 1px solid #ccc;
     }
     .provider-cbn {
       background: #f7d7e6;

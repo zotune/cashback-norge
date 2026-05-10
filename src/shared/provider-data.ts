@@ -22,7 +22,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   spareborsen: "Sparebørsen",
   rabble: "rabble",
   dreams: "Dreams",
-  utdanningibergen: "Stud.Bergen",
+  utdanningibergen: "UiB",
   cbn: "♥",
 };
 
@@ -70,7 +70,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
   rabble: { bg: "#2d2145", fg: "#f8a6a6" },
   dreams: { bg: "#a389d8", fg: "#1a1a1a" },
-  utdanningibergen: { bg: "#00949b", fg: "#ffffff" },
+  utdanningibergen: { bg: "#ffffff", fg: "#000000" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 
