@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778426598
+// @version      1778429103
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -118,7 +118,8 @@
     dreams: "Dreams",
     utdanningibergen: "Utdanning i Bergen",
     unidays: "UNiDAYS",
-    cbn: "♥"
+    cbn: "♥",
+    studenttorget: "StudentTorget"
   };
   const FREE_CARDS = [
     {
@@ -2299,7 +2300,7 @@
       "truthsocial.com": "Truth+"
     };
     const currentHost = window.location.hostname.replace(/^www\./, "").toLowerCase();
-    const cryptoSubEntry = Object.entries(CRYPTO_SUBSCRIPTIONS).find(([d]) => currentHost === d || currentHost.endsWith(`.${d}`));
+    const cryptoSubEntry = Object.entries(CRYPTO_SUBSCRIPTIONS).find(([d]) => currentHost === d || currentHost.endsWith(`.${d}`);
     const cryptoSub = cryptoSubEntry?.[1];
     const codeOffers = offers.filter((o) => o.provider === "rabattkode" || o.discountCode !== void 0 && o.discountCode.length > 0);
     const offer = mainOffers[0];

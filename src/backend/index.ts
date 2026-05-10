@@ -34,6 +34,7 @@ import { crawlRabble } from "./providers/rabble.js";
 import { fetchDreams } from "./providers/dreams.js";
 import { fetchUtdanningiBergen } from "./providers/utdanningibergen.js";
 import { fetchUnidays } from "./providers/unidays.js";
+import { crawlStudentTorget } from "./providers/studenttorget.js";
 
 type CliConfig = {
   outputPath: string;
@@ -75,6 +76,7 @@ type CliConfig = {
   skipUtdanningibergen: boolean;
   skipUnidays: boolean;
   skipDnbSupertilbud: boolean;
+  skipStudentTorget: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -195,6 +197,7 @@ async function main(): Promise<void> {
     studentkortetOffers,
     nettbonusOffers,
     rabbleOffers,
+    studentTorgetOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : crawlTrumf({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -246,6 +249,10 @@ async function main(): Promise<void> {
         domainLookup, generatedAt, logger,
         overrides: providerOverrides,
       }),
+    config.skipStudentTorget ? Promise.resolve([]) : crawlStudentTorget({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
@@ -264,7 +271,7 @@ async function main(): Promise<void> {
     domainLookup: fullDomainLookup, generatedAt, logger,
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...studentTorgetOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -358,6 +365,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipUtdanningibergen: args.includes("--skip-utdanningibergen"),
     skipUnidays: args.includes("--skip-unidays"),
     skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
+    skipStudentTorget: args.includes("--skip-studenttorget"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
