@@ -1156,6 +1156,10 @@ function renderNotice(
       color: #000000;
       border: 1px solid #ccc;
     }
+    .provider-unidays {
+      background: #00b140;
+      color: #ffffff;
+    }
     .provider-cbn {
       background: #f7d7e6;
       color: #8f164f;

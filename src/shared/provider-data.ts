@@ -23,6 +23,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   rabble: "rabble",
   dreams: "Dreams",
   utdanningibergen: "UiB",
+  unidays: "UNiDAYS",
   cbn: "♥",
 };
 
@@ -45,6 +46,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
   dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
   utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
+  unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -71,6 +73,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   rabble: { bg: "#2d2145", fg: "#f8a6a6" },
   dreams: { bg: "#a389d8", fg: "#1a1a1a" },
   utdanningibergen: { bg: "#ffffff", fg: "#000000" },
+  unidays: { bg: "#00b140", fg: "#ffffff" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 
