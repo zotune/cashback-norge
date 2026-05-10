@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778328266
+// @version      1778423373
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -116,6 +116,7 @@
     spareborsen: "Sparebørsen",
     rabble: "rabble",
     dreams: "Dreams",
+    utdanningibergen: "Stud.Bergen",
     cbn: "♥"
   };
   const FREE_CARDS = [
@@ -195,7 +196,7 @@
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-    { text: "Sparebørsen: Inviter en venn — dere får begge 50 kr", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
+    { text: "Sparebørsen: 50 kr settes inn med en gang du registrerer deg", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
   ];
   const EB_PER_TRUMF_KR = 13.5;
   function formatRewardLabel(reward, provider) {
@@ -1752,6 +1753,10 @@
     .provider-dreams {
       background: #a389d8;
       color: #1a1a1a;
+    }
+    .provider-utdanningibergen {
+      background: #00949b;
+      color: #ffffff;
     }
     .provider-cbn {
       background: #f7d7e6;
