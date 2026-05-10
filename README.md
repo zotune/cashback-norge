@@ -32,3 +32,7 @@ Source available for transparency. Not open source.
 This repository is public so users can inspect the extension and report issues.
 The code is not licensed for reuse, copying, redistribution, or commercial use.
 See [LICENSE](LICENSE).
+
+## Disclaimer on crawlers
+
+The crawlers only extract publicly available information. No proprietary or copyrighted content from third parties is included in this repository. Offers requiring authentication/login are not shown. If a discount code is shown, it is because it is available without login.

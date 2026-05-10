@@ -1,3 +1,5 @@
+// This file contains code to extract publicly available offer data from third-party websites.
+// No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
 import { CheerioCrawler, gotScraping, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
