@@ -542,20 +542,7 @@ if (getCurrentNettbonusOfferActivationUrl() !== undefined && !rewriteNettbonusLo
 }
 
 if (isOnSpareborsenPartnerPage()) {
-  const sbObs = new MutationObserver(() => {
-    // Find a not-yet-rewritten "Handle hos ... →" button
-    const buttons = document.querySelectorAll<HTMLButtonElement>("button");
-    for (const btn of buttons) {
-      if (btn.closest("a[data-cb-rewrite]")) continue;
-      const text = btn.textContent?.trim() ?? "";
-      if (text.startsWith("Handle hos") && text.endsWith("→")) {
-        rewriteSpareborsenHandleButton();
-        break;
-      }
-    }
-  });
-  sbObs.observe(document.body, { childList: true, subtree: true });
-  setTimeout(() => sbObs.disconnect(), 10000);
+  installSpareborsenHandleButtonRewrite();
 }
 
 function isOnSpareborsenPartnerPage(): boolean {
@@ -565,22 +552,126 @@ function isOnSpareborsenPartnerPage(): boolean {
   return hostname === "spareborsen.no" && /^\/partnere\/[^/]+/.test(parsedUrl.pathname);
 }
 
-function rewriteSpareborsenHandleButton(): boolean {
-  // Only rewrite for non-members (login link visible)
-  const loginLink = document.querySelector('a[href="/auth/login"]');
-  if (!loginLink) return false;
+function installSpareborsenHandleButtonRewrite(): void {
+  let latestRunId = 0;
 
-  // Find the "Handle hos ... →" button
-  const buttons = document.querySelectorAll<HTMLButtonElement>("button");
-  let handleButton: HTMLButtonElement | null = null;
-  for (const btn of buttons) {
-    const text = btn.textContent?.trim() ?? "";
+  const scheduleRewrite = (): void => {
+    latestRunId += 1;
+    const runId = latestRunId;
+    void rewriteSpareborsenHandleButtonWhenReady(runId, () => runId !== latestRunId);
+  };
+
+  scheduleRewrite();
+
+  const observer = new MutationObserver(() => {
+    scheduleRewrite();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 15000);
+}
+
+async function rewriteSpareborsenHandleButtonWhenReady(
+  _runId: number,
+  isStale: () => boolean,
+): Promise<void> {
+  const state = await waitForSpareborsenAuthState(isStale);
+  if (isStale() || state !== "logged-out") {
+    return;
+  }
+
+  rewriteSpareborsenHandleButton();
+}
+
+type SpareborsenAuthState = "logged-in" | "logged-out" | "unknown";
+
+async function waitForSpareborsenAuthState(isStale: () => boolean): Promise<SpareborsenAuthState> {
+  const startedAt = Date.now();
+  let lastState: SpareborsenAuthState = "unknown";
+  let stableSince = 0;
+
+  while (!isStale() && Date.now() - startedAt < 8000) {
+    const state = getSpareborsenAuthState();
+    const ready = isSpareborsenPageReady();
+
+    if (state !== "unknown" && ready) {
+      if (state !== lastState) {
+        lastState = state;
+        stableSince = Date.now();
+      }
+
+      if (Date.now() - stableSince >= 400) {
+        return state;
+      }
+    } else {
+      lastState = "unknown";
+      stableSince = 0;
+    }
+
+    await sleep(100);
+  }
+
+  return "unknown";
+}
+
+function getSpareborsenAuthState(): SpareborsenAuthState {
+  const header = document.querySelector("header");
+  if (header === null) {
+    return "unknown";
+  }
+
+  if (
+    header.querySelector('a[href="/dashboard"], a[href="/wallet"], a[href="/dashboard/settings"]') !== null ||
+    [...header.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Logg ut")
+  ) {
+    return "logged-in";
+  }
+
+  if (
+    header.querySelector('a[href="/auth/login"], a[href="/auth/register"]') !== null ||
+    [...header.querySelectorAll("button")].some((button) => {
+      const text = button.textContent?.trim();
+      return text === "Logg inn" || text === "Kom i gang";
+    })
+  ) {
+    return "logged-out";
+  }
+
+  return "unknown";
+}
+
+function isSpareborsenPageReady(): boolean {
+  const lbDot = document.querySelector<HTMLElement>("#lb-dot");
+  if (lbDot !== null && getComputedStyle(lbDot).display !== "none") {
+    return true;
+  }
+
+  return findSpareborsenHandleButton() !== null;
+}
+
+function findSpareborsenHandleButton(): HTMLButtonElement | null {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button")) {
+    const text = button.textContent?.replace(/^Ad\s*/i, "").trim() ?? "";
     if (text.startsWith("Handle hos") && text.endsWith("→")) {
-      handleButton = btn;
-      break;
+      return button;
     }
   }
-  if (!handleButton) return false;
+
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function rewriteSpareborsenHandleButton(): boolean {
+  if (getSpareborsenAuthState() !== "logged-out") {
+    return false;
+  }
+
+  const handleButton = findSpareborsenHandleButton();
+  if (handleButton === null || handleButton.closest("a[data-cb-rewrite]") !== null) {
+    return false;
+  }
 
   // Clone to strip React click handlers, wrap in referral link
   const clone = handleButton.cloneNode(true) as HTMLButtonElement;
@@ -593,7 +684,9 @@ function rewriteSpareborsenHandleButton(): boolean {
   const adLabel = document.createElement("span");
   adLabel.textContent = "Ad";
   adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
-  clone.prepend(adLabel);
+  if (!clone.textContent?.trim().startsWith("Ad")) {
+    clone.prepend(adLabel);
+  }
   link.append(clone);
   handleButton.replaceWith(link);
   return true;
