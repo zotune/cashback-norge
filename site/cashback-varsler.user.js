@@ -1816,6 +1816,11 @@
       background: #f7d7e6;
       color: #8f164f;
     }
+    .provider-unio {
+      background: #ffffff;
+      border: 1px solid #c9b896;
+      color: #6b5330;
+    }
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;

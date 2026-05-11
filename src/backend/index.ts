@@ -35,6 +35,7 @@ import { fetchDreams } from "./providers/dreams.js";
 import { fetchUtdanningiBergen } from "./providers/utdanningibergen.js";
 import { fetchUnidays } from "./providers/unidays.js";
 import { crawlStudentTorget } from "./providers/studenttorget.js";
+import { fetchUnio } from "./providers/unio.js";
 
 type CliConfig = {
   outputPath: string;
@@ -77,6 +78,7 @@ type CliConfig = {
   skipUnidays: boolean;
   skipDnbSupertilbud: boolean;
   skipStudentTorget: boolean;
+  skipUnio: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -117,6 +119,7 @@ async function main(): Promise<void> {
     dreamsOffers,
     utdanningibergenOffers,
     unidaysOffers,
+    unioOffers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
@@ -161,6 +164,9 @@ async function main(): Promise<void> {
     config.skipUnidays ? Promise.resolve([]) : fetchUnidays({
         generatedAt, logger,
       }),
+    config.skipUnio ? Promise.resolve([]) : fetchUnio({
+        generatedAt, logger,
+      }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -177,6 +183,7 @@ async function main(): Promise<void> {
     ...sparebank1Offers,
     ...spareborsenOffers,
     ...utdanningibergenOffers,
+    ...unioOffers,
     ...manualOffers,
   ]);
   logger.info(`Domain lookup: ${domainLookup.size} merchant names with known domains`);
@@ -262,7 +269,7 @@ async function main(): Promise<void> {
     ...sparebank1Offers, ...spareborsenOffers, ...manualOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
-    ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
+    ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
   ]);
   logger.info(`Full domain lookup: ${fullDomainLookup.size} merchant names with known domains`);
@@ -271,7 +278,7 @@ async function main(): Promise<void> {
     domainLookup: fullDomainLookup, generatedAt, logger,
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...studentTorgetOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...studentTorgetOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -366,6 +373,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipUnidays: args.includes("--skip-unidays"),
     skipDnbSupertilbud: args.includes("--skip-dnb-supertilbud"),
     skipStudentTorget: args.includes("--skip-studenttorget"),
+    skipUnio: args.includes("--skip-unio"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",

@@ -26,6 +26,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   utdanningibergen: "Utdanning i Bergen",
   unidays: "UNiDAYS",
   cbn: "♥",
+  unio: "Unio",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -48,6 +49,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
   utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
   unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
+  unio: "Unio medlemsfordeler.\nKrever medlemskap i et Unio-forbund.\nOppgi rabattkode eller vis medlemsbevis.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -76,6 +78,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   dreams: { bg: "#a389d8", fg: "#1a1a1a" },
   utdanningibergen: { bg: "#ffffff", fg: "#000000" },
   unidays: { bg: "#00b140", fg: "#ffffff" },
+  unio: { bg: "#ffffff", fg: "#6b5330" },
   cbn: { bg: "#f7d7e6", fg: "#8f164f" },
 };
 

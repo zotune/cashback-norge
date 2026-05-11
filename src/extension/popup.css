@@ -275,6 +275,12 @@ h1 {
   color: #8f164f;
 }
 
+.provider-unio {
+  background: #ffffff;
+  border: 1px solid #c9b896;
+  color: #6b5330;
+}
+
 .provider-bob {
   background: #ffffff;
   border: 1px solid #d3e2dc;
