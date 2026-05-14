@@ -1216,6 +1216,11 @@ function renderNotice(
       background: #FFD100;
       color: #000000;
     }
+    .provider-tekna {
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #00a3ad;
+    }
     .provider-sparebank1 {
       background: #005aa4;
       color: #ffffff;

@@ -34,7 +34,8 @@ export function isProviderOverrides(value: unknown): value is ProviderOverrides 
     !isProviderRecord(value.bob) ||
     !isProviderRecord(value.usbl) ||
     !isProviderRecord(value.logbuy) ||
-    !isProviderRecord(value.naf)
+    !isProviderRecord(value.naf) ||
+    !isProviderRecord(value.tekna)
   ) {
     return false;
   }

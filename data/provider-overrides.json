@@ -1418,6 +1418,39 @@
       "garmin.com"
     ]
   },
+  "tekna": {
+    "bilavtale-bilia-xpeng": [
+      "bilia.no",
+      "xpeng.com"
+    ],
+    "bilavtale-bmw-mini": [
+      "bmw.no",
+      "mini.no"
+    ],
+    "bilavtale-gjensidige": [
+      "gjensidige.no"
+    ],
+    "bilavtale-rebil": [
+      "rebil.no"
+    ],
+    "mobilabonnement": [
+      "chilimobil.no"
+    ],
+    "pensjonskonto": [
+      "kron.no"
+    ],
+    "slipper": [
+      "slipper.no"
+    ],
+    "teknisk-ukeblad-gir-deg-nyheter-og-kunnskap": [
+      "abonnement.tumedia.no",
+      "digi.no",
+      "tu.no"
+    ],
+    "viaplay": [
+      "viaplay.no"
+    ]
+  },
   "studentkortet": {
     "wakakuu": [
       "wakakuu.com"
