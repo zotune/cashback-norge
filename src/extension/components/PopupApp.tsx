@@ -453,6 +453,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "NAF";
   }
 
+  if (provider === "nito") {
+    return "NITO";
+  }
+
   if (provider === "norskfamilie") {
     return "Norsk Familie";
   }

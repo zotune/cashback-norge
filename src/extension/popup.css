@@ -298,6 +298,11 @@ h1 {
   color: #00a3ad;
 }
 
+.provider-nito {
+  background: #c8e6b8;
+  color: #003b00;
+}
+
 .copy-code-btn {
   align-items: center;
   color: #1f8f5f;

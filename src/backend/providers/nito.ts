@@ -15,10 +15,10 @@ import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
 type NitoCheerio = CheerioCrawlingContext["$"];
+type NitoSelection = ReturnType<NitoCheerio>;
 
 const LABEL_LIST = "list";
 const LABEL_DETAIL = "detail";
-const SITE_ORIGIN = "https://www.nito.no";
 const DEFAULT_TERMS = "Krever NITO-medlemskap.";
 
 const SKIP_HOSTNAMES = new Set([
@@ -32,6 +32,23 @@ const SKIP_HOSTNAMES = new Set([
   "visualstudio.com",
   "tiqcdn.com",
 ]);
+
+const NOISY_DETAIL_SELECTORS = [
+  "script",
+  "style",
+  "noscript",
+  "form",
+  "iframe",
+  "svg",
+  "nav",
+  "header",
+  "footer",
+  "table",
+  ".benefit-cta-block",
+  ".partner-teaser",
+  ".related-benefits-block",
+  ".article-list",
+].join(", ");
 
 export type CrawlNitoInput = {
   startUrl: string;
@@ -57,6 +74,12 @@ type NitoRawBenefit = {
   heading?: unknown;
   partnerName?: unknown;
   pageImageAltText?: unknown;
+  url?: unknown;
+};
+
+type TableTerm = {
+  label: string;
+  reward: string;
 };
 
 export async function crawlNito(input: CrawlNitoInput): Promise<CashbackOffer[]> {
@@ -78,8 +101,7 @@ export async function crawlNito(input: CrawlNitoInput): Promise<CashbackOffer[]>
 
         if (propsBenefits.length > 0) {
           for (const benefit of propsBenefits) {
-            const href = typeof benefit.contentLink === "string" ? benefit.contentLink : "";
-            const sourceUrl = absoluteNitoUrl(href, input.startUrl);
+            const sourceUrl = benefitSourceUrl(benefit, input.startUrl);
             if (!isRelevantNitoPath(sourceUrl)) continue;
 
             const slug = slugFromUrl(sourceUrl);
@@ -144,12 +166,12 @@ export async function crawlNito(input: CrawlNitoInput): Promise<CashbackOffer[]>
       const pageText = extractMainText($);
       const bulletTerms = extractBenefitBulletTerms($);
       const tableTerms = extractBenefitTableTerms($);
+      const structuredTerms = [...bulletTerms, ...tableTerms];
       const externalUrls = collectExternalUrls($);
       const detailReward = extractNitoReward([
         entry.name,
         entry.summary,
-        ...bulletTerms,
-        ...tableTerms,
+        ...structuredTerms,
         pageText,
       ].join("\n"));
 
@@ -162,7 +184,7 @@ export async function crawlNito(input: CrawlNitoInput): Promise<CashbackOffer[]>
         ...extractDomainsFromText(pageText),
       ]);
       entry.reward = bestReward(entry.reward, detailReward);
-      entry.terms = buildTerms([...bulletTerms, ...tableTerms], pageText);
+      entry.terms = buildTerms(structuredTerms, pageText);
     },
   }, config);
 
@@ -254,6 +276,25 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function benefitSourceUrl(benefit: NitoRawBenefit, baseUrl: string): string {
+  const directUrl = stringFromUnknown(benefit.contentLink) ?? stringFromUnknown(benefit.url);
+  if (directUrl !== undefined) return absoluteNitoUrl(directUrl, baseUrl);
+
+  if (isPlainObject(benefit.contentLink)) {
+    const objectUrl =
+      stringFromUnknown(benefit.contentLink.url) ??
+      stringFromUnknown(benefit.contentLink.href) ??
+      stringFromUnknown(benefit.contentLink.contentUrl);
+    if (objectUrl !== undefined) return absoluteNitoUrl(objectUrl, baseUrl);
+  }
+
+  return "";
+}
+
+function stringFromUnknown(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
 function extractBenefitBulletTerms($: NitoCheerio): string[] {
   const lines: string[] = [];
 
@@ -268,7 +309,7 @@ function extractBenefitBulletTerms($: NitoCheerio): string[] {
       return;
     }
 
-    if (heading) lines.push(heading.endsWith("?") ? heading : `${heading}?`);
+    if (heading) lines.push(/[?:]$/.test(heading) ? heading : `${heading}?`);
 
     block.find(".bulletpoint-block__list-item").each((_, item) => {
       const itemElement = $(item);
@@ -286,50 +327,123 @@ function extractBenefitBulletTerms($: NitoCheerio): string[] {
 function extractBenefitTableTerms($: NitoCheerio): string[] {
   const lines: string[] = [];
 
-  $("table").each((_, tableElement) => {
-    const table = $(tableElement);
-    if (table.closest(".related-benefits-block").length > 0) return;
+  $("table").each((_, element) => {
+    const table = $(element);
+    if (table.closest(".related-benefits-block, .partner-teaser").length > 0) return;
 
-    const heading = normalizeText(
-      table.closest(".text-block__text, .editorial, article, section")
-        .find("h2, h3")
-        .first()
-        .text(),
-    );
-    const rowLines: string[] = [];
+    const rows = extractDiscountTableRows($, table);
+    if (rows.length === 0) return;
 
-    table.find("tr").each((_, rowElement) => {
-      const cells = $(rowElement).find("th, td").toArray()
-        .map((cell) => normalizeText($(cell).text()))
-        .filter(Boolean)
-        .filter((cell) => !/^(?:modell|rabatt)$/i.test(cell));
-
-      if (cells.length < 2) return;
-
-      const valueCell = cells.find((cell) => /(?:\d+(?:[,.]\d+)?\s*%|\d[\d\s]*(?:[,.]\d+)?\s*kr\b|\bgratis\b)/i.test(cell));
-      const labelCell = cells.find((cell) => cell !== valueCell);
-      if (labelCell === undefined || valueCell === undefined) return;
-      if (labelCell.length > 60 || /rabatt\s+gjelder\s+ikke/i.test(labelCell)) return;
-
-      rowLines.push(`${labelCell}: ${valueCell}`);
-    });
-
-    if (rowLines.length === 0) return;
-    if (heading) lines.push(heading);
-    lines.push(...rowLines);
+    const heading = findTableHeading($, table) ?? "Rabattoversikt";
+    lines.push(heading.endsWith(":") ? heading : `${heading}:`);
+    for (const row of rows) {
+      lines.push(`${row.label}: ${row.reward}`);
+    }
   });
 
-  return uniqueTextLines(lines);
+  return lines;
+}
+
+function extractDiscountTableRows($: NitoCheerio, table: NitoSelection): TableTerm[] {
+  const rows: TableTerm[] = [];
+  const seen = new Set<string>();
+
+  table.find("tr").each((_, row) => {
+    const cells = $(row).find("th, td").toArray()
+      .map((cell) => normalizeText($(cell).text()))
+      .filter(Boolean);
+
+    if (cells.length < 2) return;
+
+    const valueCell = cells.at(-1) ?? "";
+    const labelCell = cells.slice(0, -1).join(" - ");
+    if (isHeaderCell(labelCell) || isHeaderCell(valueCell)) return;
+
+    const reward = extractStrictTableReward(valueCell);
+    if (reward === undefined) return;
+
+    const label = cleanTableLabel(labelCell);
+    if (label === undefined) return;
+
+    const key = `${normalizeKey(label)}:${reward}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push({ label, reward });
+  });
+
+  return rows;
+}
+
+function extractStrictTableReward(value: string): string | undefined {
+  const text = normalizeText(value);
+  if (!text || /rabatt\s+gjelder\s+ikke/i.test(text)) return undefined;
+
+  if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s*[-\u2013\u2014]\s*\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)?)?$/i.test(text)) {
+    const reward = extractPercentageReward(text);
+    return reward || undefined;
+  }
+
+  if (/^(?:kr\s*)?\d[\d\s]*(?:[,.]\d+)?\s*(?:kr|kroner)$/i.test(text)) {
+    const reward = extractKrReward(`rabatt ${text}`);
+    return reward || undefined;
+  }
+
+  if (/^gratis$/i.test(text)) {
+    return "0 kr totalsum";
+  }
+
+  return undefined;
+}
+
+function cleanTableLabel(value: string): string | undefined {
+  const label = normalizeText(value)
+    .replace(/\s*\*+$/, "")
+    .replace(/:$/, "")
+    .trim();
+  if (!label || label.length > 70) return undefined;
+  if (isHeaderCell(label)) return undefined;
+  if (/rabatt\s+gjelder\s+ikke/i.test(label)) return undefined;
+  return label;
+}
+
+function isHeaderCell(value: string): boolean {
+  const key = normalizeKey(value);
+  return key === "modell" || key === "model" || key === "rabatt" || key === "discount";
+}
+
+function findTableHeading($: NitoCheerio, table: NitoSelection): string | undefined {
+  const previousElements = table.prevAll().toArray();
+  for (const element of previousElements) {
+    const text = normalizeText($(element).text());
+    const heading = cleanTableHeading(text);
+    if (heading !== undefined) return heading;
+  }
+
+  let current = table.parent();
+  for (let depth = 0; depth < 3 && current.length > 0; depth++) {
+    const heading = current.prevAll("h2, h3, h4").toArray()
+      .map((element) => cleanTableHeading(normalizeText($(element).text())))
+      .find((value) => value !== undefined);
+    if (heading !== undefined) return heading;
+    current = current.parent();
+  }
+
+  return undefined;
+}
+
+function cleanTableHeading(value: string): string | undefined {
+  const text = normalizeText(value).replace(/\s+:/g, ":");
+  if (!text || text.length > 100) return undefined;
+  if (!/(?:rabattoversikt|oversikt|rabatt)/i.test(text)) return undefined;
+  if (/[.!?]$/.test(text) && !text.endsWith(":")) return undefined;
+  return text.replace(/:+$/, "");
 }
 
 function extractMainText($: NitoCheerio): string {
-  const article = $("main, article, .content-area").first().clone();
-  article
-    .find(
-      "script, style, noscript, form, iframe, svg, nav, header, footer, table, .benefit-cta-block, .partner-teaser, .related-benefits-block",
-    )
-    .remove();
-  const html = article.length > 0 ? article.html() ?? "" : $("body").html() ?? "";
+  const article = $("main, article, .content-area").first();
+  const root = article.length > 0 ? article.clone() : $("body").clone();
+  root.find(NOISY_DETAIL_SELECTORS).remove();
+  const html = root.html() ?? "";
   return stripHtml(html)
     .split(/\n+/)
     .map(normalizeText)
@@ -339,8 +453,11 @@ function extractMainText($: NitoCheerio): string {
 }
 
 function collectExternalUrls($: NitoCheerio): string[] {
+  const root = $("main, article, .content-area").first().clone();
+  root.find("script, style, noscript, form, iframe, svg, nav, header, footer, .related-benefits-block").remove();
+
   const urls: string[] = [];
-  $("a[href]").each((_, element) => {
+  root.find("a[href]").each((_, element) => {
     const href = $(element).attr("href") ?? "";
     const absoluteUrl = normalizeExternalUrl(href);
     if (absoluteUrl !== undefined) urls.push(absoluteUrl);
@@ -377,8 +494,8 @@ function relevantRewardText(text: string): string {
 }
 
 function isFreeAdmissionOrLiftPass(text: string): boolean {
-  return /\bgratis\s+(?:heiskort|inngang|årskort|arskort)\b/i.test(text) ||
-    /\b(?:heiskort|inngang|årskort|arskort)\b[^\n.]{0,80}\bgratis\b/i.test(text);
+  return /\bgratis\s+(?:heiskort|inngang|(?:\u00e5rskort|arskort))\b/i.test(text) ||
+    /\b(?:heiskort|inngang|(?:\u00e5rskort|arskort))\b[^\n.]{0,80}\bgratis\b/i.test(text);
 }
 
 function bestReward(existing: string, next: string): string {
@@ -390,7 +507,7 @@ function bestReward(existing: string, next: string): string {
 
 function rewardScore(reward: string): number {
   if (reward === "?" || reward === "Medlemsfordel") return 0;
-  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*[-\u2013]\s*(\d+(?:[,.]\d+)?)\s*%/);
+  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d+(?:[,.]\d+)?)\s*%/);
   const percentMatch = rangeMatch ? [null, rangeMatch[1]] : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
   if (percentMatch !== null) return 10000 + Number.parseFloat((percentMatch[1] ?? "0").replace(",", "."));
   const krMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
@@ -400,9 +517,9 @@ function rewardScore(reward: string): number {
   return 1;
 }
 
-function buildTerms(bulletTerms: string[], fallbackText: string): string {
-  const lines = bulletTerms.length > 0
-    ? [...bulletTerms, DEFAULT_TERMS]
+function buildTerms(structuredTerms: string[], fallbackText: string): string {
+  const lines = structuredTerms.length > 0
+    ? [...structuredTerms, DEFAULT_TERMS]
     : uniqueTextLines([...extractRelevantTermLines(fallbackText), DEFAULT_TERMS]);
   return lines.length > 0 ? lines.join("\n") : DEFAULT_TERMS;
 }
@@ -426,7 +543,9 @@ function extractRelevantTermLines(text: string): string[] {
     }
   }
 
-  return uniqueTextLines(lines).slice(0, 10);
+  return uniqueTextLines(lines)
+    .filter((line) => !isScriptOrPageNoise(line, normalizeKey(line)))
+    .slice(0, 10);
 }
 
 function isRelevantTermLine(line: string): boolean {
@@ -434,7 +553,7 @@ function isRelevantTermLine(line: string): boolean {
 }
 
 function isContinuationLine(line: string): boolean {
-  return /^(?:pa|på|for|hos|i|av|til|med|når|nar)\b/i.test(line) ||
+  return /^(?:pa|p\u00e5|for|hos|i|av|til|med|n\u00e5r|nar)\b/i.test(line) ||
     !/[.!?]$/.test(line);
 }
 
@@ -448,12 +567,13 @@ function lookupNamesForEntry(entry: NitoEntry): string[] {
 
 function merchantNameFromTitle(title: string): string {
   return normalizeText(title)
-    .replace(/^(?:rabattkode\s+)?(?:rabatt|kursrabatt)\s+(?:hos|pa|på)\s+/i, "")
+    .replace(/^(?:rabattkode\s+)?(?:rabatt|kursrabatt)\s+(?:hos|pa|p\u00e5)\s+/i, "")
     .replace(/^bilrabatt\s+/i, "")
     .replace(/^hotellrabatt\s+/i, "")
-    .replace(/^halv\s+pris\s+(?:pa|på)\s+/i, "")
-    .replace(/^gratis\s+(?:heiskort|inngang)\s+(?:i|pa|på)\s+/i, "")
+    .replace(/^halv\s+pris\s+(?:pa|p\u00e5)\s+/i, "")
+    .replace(/^gratis\s+(?:heiskort|inngang)\s+(?:i|pa|p\u00e5)\s+/i, "")
     .replace(/^rabatt\s+pa\s+/i, "")
+    .replace(/^rabatt\s+p\u00e5\s+/i, "")
     .trim();
 }
 
@@ -551,6 +671,7 @@ function slugFromUrl(url: string): string {
 function normalizeText(value: string): string {
   return value
     .replace(/\u00ad/g, "")
+    .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -558,11 +679,11 @@ function normalizeText(value: string): string {
 function normalizeKey(value: string): string {
   return normalizeText(value)
     .toLowerCase()
+    .replace(/\u00e6/g, "ae")
+    .replace(/\u00f8/g, "o")
+    .replace(/\u00e5/g, "a")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/æ/g, "ae")
-    .replace(/ø/g, "o")
-    .replace(/å/g, "a")
     .replace(/[^a-z0-9]+/g, "");
 }
 
@@ -584,7 +705,7 @@ function uniqueTextLines(lines: string[]): string[] {
 
 function isScriptOrPageNoise(line: string, key: string): boolean {
   return key.length === 0 ||
-    /^(?:meny|sok|søk|logginn|blimedlem|kontaktoss|forsiden|personvern|endrecookieinnstillinger)$/i.test(key) ||
+    /^(?:meny|sok|logginn|blimedlem|kontaktoss|forsiden|personvern|endrecookieinnstillinger|relatertemedlemsfordeler|andremedlemsfordeler|isamarbeidmed|tekniskukeblad)$/i.test(key) ||
     /^(?:window|document|function|const|let|var|return|if)\b/i.test(line) ||
     /^(?:org\.nr|facebook|instagram|linkedin)$/i.test(line);
 }
