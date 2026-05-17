@@ -45,7 +45,7 @@ type CliConfig = {
   providerOverridesPath: string;
   klarnaStartUrl: string;
   klarnaMaxPages: number;
-  klarnaProxyUrl: string | undefined;
+  klarnaProxyUrls: string[];
   rememberStartUrl: string;
   trumfStartUrl: string;
   sasApiUrl: string;
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
         overrides: providerOverrides, startUrl: config.klarnaStartUrl,
-        ...(config.klarnaProxyUrl ? { proxyUrl: config.klarnaProxyUrl } : {}),
+        proxyUrls: config.klarnaProxyUrls,
       }),
     config.skipRemember ? Promise.resolve([]) : crawlRemember({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -343,9 +343,7 @@ function readCliConfig(args: string[]): CliConfig {
       "--klarna-max-pages",
       5,
     ),
-    klarnaProxyUrl: process.env.SCRAPERAPI_KEY
-      ? `http://scraperapi:${process.env.SCRAPERAPI_KEY}@proxy-server.scraperapi.com:8001`
-      : undefined,
+    klarnaProxyUrls: resolveKlarnaProxyUrls(),
     rememberStartUrl:
       readArgumentValue(args, "--remember-start-url") ??
       "https://www.remember.no/reward/rabatt",
@@ -477,6 +475,41 @@ function readPositiveIntegerArgument(
   }
 
   return parsedValue;
+}
+
+function resolveKlarnaProxyUrls(): string[] {
+  if (process.env.KLARNA_PROXY_URL !== undefined && process.env.KLARNA_PROXY_URL.trim().length > 0) {
+    return [process.env.KLARNA_PROXY_URL.trim()];
+  }
+
+  const proxyUrls = [
+    buildNordVpnProxyUrl(),
+    buildScraperApiProxyUrl(),
+  ].filter((url): url is string => url !== undefined);
+
+  return Array.from(new Set(proxyUrls));
+}
+
+function buildNordVpnProxyUrl(): string | undefined {
+  const username = process.env.NORDVPN_USERNAME?.trim();
+  const password = process.env.NORDVPN_PASSWORD?.trim();
+
+  if (!username || !password) {
+    return undefined;
+  }
+
+  const host = process.env.NORDVPN_PROXY_HOST?.trim() || "no211.nordvpn.com";
+  const port = process.env.NORDVPN_PROXY_PORT?.trim() || "1080";
+  return `socks5://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}`;
+}
+
+function buildScraperApiProxyUrl(): string | undefined {
+  const key = process.env.SCRAPERAPI_KEY?.trim();
+  if (!key) {
+    return undefined;
+  }
+
+  return `http://scraperapi:${encodeURIComponent(key)}@proxy-server.scraperapi.com:8001`;
 }
 
 main().catch((error: unknown) => {

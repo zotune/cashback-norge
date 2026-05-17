@@ -33,8 +33,32 @@ jobs:
 
       - run: pnpm run build:backend
 
+      - name: Resolve NordVPN Norway proxy host
+        env:
+          NORDVPN_USERNAME: ${{ secrets.NORDVPN_USERNAME }}
+          NORDVPN_PASSWORD: ${{ secrets.NORDVPN_PASSWORD }}
+          NORDVPN_PROXY_HOST: ${{ vars.NORDVPN_PROXY_HOST }}
+        run: |
+          if [ -z "${NORDVPN_USERNAME:-}" ] || [ -z "${NORDVPN_PASSWORD:-}" ]; then
+            echo "NordVPN credentials not configured; using other proxy fallback if available"
+            exit 0
+          fi
+
+          if [ -n "${NORDVPN_PROXY_HOST:-}" ]; then
+            echo "NORDVPN_PROXY_HOST=${NORDVPN_PROXY_HOST}" >> "$GITHUB_ENV"
+            echo "Using configured NordVPN proxy host"
+            exit 0
+          fi
+
+          country_id="$(curl -fsSL 'https://api.nordvpn.com/v1/servers/countries' | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => { const countries = JSON.parse(data); const country = countries.find((item) => item.name === 'Norway'); if (!country) process.exit(1); console.log(country.id); });")"
+          host="$(curl -fsSL "https://api.nordvpn.com/v1/servers/recommendations?filters[country_id]=${country_id}&limit=1" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => { const servers = JSON.parse(data); const host = servers[0]?.hostname; if (!host) process.exit(1); console.log(host); });")"
+          echo "NORDVPN_PROXY_HOST=${host}" >> "$GITHUB_ENV"
+          echo "Using recommended NordVPN Norway proxy host"
+
       - run: pnpm run crawl
         env:
+          NORDVPN_USERNAME: ${{ secrets.NORDVPN_USERNAME }}
+          NORDVPN_PASSWORD: ${{ secrets.NORDVPN_PASSWORD }}
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
 
       - name: Commit updated index

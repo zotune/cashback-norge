@@ -19,6 +19,7 @@ export type CrawlKlarnaInput = {
   generatedAt: string;
   logger: Logger;
   proxyUrl?: string;
+  proxyUrls?: string[];
 };
 
 async function runKlarnaCrawl(
@@ -58,9 +59,25 @@ export async function crawlKlarna(
 ): Promise<CashbackOffer[]> {
   let rawOffers = await runKlarnaCrawl(input);
 
-  if (rawOffers.length === 0 && input.proxyUrl) {
+  const proxyUrls = uniqueStrings([
+    ...(input.proxyUrls ?? []),
+    ...(input.proxyUrl ? [input.proxyUrl] : []),
+  ]);
+
+  if (rawOffers.length === 0 && proxyUrls.length > 0) {
     input.logger.info("Klarna: direct crawl returned 0 offers, retrying via proxy");
-    rawOffers = await runKlarnaCrawl(input, input.proxyUrl);
+    for (const proxyUrl of proxyUrls) {
+      try {
+        rawOffers = await runKlarnaCrawl(input, proxyUrl);
+      } catch (error) {
+        input.logger.warn(`Klarna proxy retry failed: ${error}`);
+        rawOffers = [];
+      }
+
+      if (rawOffers.length > 0) {
+        break;
+      }
+    }
   }
 
   input.logger.info(
