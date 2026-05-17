@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1778436969
+// @version      1779024139
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -109,6 +109,8 @@
     bob: "BOB",
     usbl: "USBL",
     naf: "NAF",
+    tekna: "Tekna",
+    nito: "NITO",
     sparebank1: "SB1 Ung",
     studentkortet: "Studentkortet",
     studenttorget: "StudentTorget",
@@ -119,7 +121,8 @@
     dreams: "Dreams",
     utdanningibergen: "Utdanning i Bergen",
     unidays: "UNiDAYS",
-    cbn: "♥"
+    cbn: "♥",
+    unio: "Unio"
   };
   const FREE_CARDS = [
     {
@@ -1219,28 +1222,7 @@
     setTimeout(() => obs.disconnect(), 1e4);
   }
   if (isOnSpareborsenPartnerPage()) {
-    const startedAt = Date.now();
-    const syncSpareborsenButton = () => {
-      const authState = getSpareborsenAuthState();
-      if (authState === "logged-in") {
-        restoreSpareborsenHandleButtonIfRewritten();
-        return;
-      }
-      if (authState !== "logged-out") {
-        return;
-      }
-      if (!isSpareborsenReadyForRewrite(startedAt)) {
-        return;
-      }
-      rewriteSpareborsenHandleButton();
-    };
-    const sbObs = new MutationObserver(syncSpareborsenButton);
-    sbObs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "href"] });
-    syncSpareborsenButton();
-    setTimeout(syncSpareborsenButton, 250);
-    setTimeout(syncSpareborsenButton, 750);
-    setTimeout(syncSpareborsenButton, 1500);
-    setTimeout(() => sbObs.disconnect(), 15e3);
+    installSpareborsenHandleButtonRewrite();
   }
   function isOnSpareborsenPartnerPage() {
     const parsedUrl = parseUrl(window.location.href);
@@ -1248,19 +1230,93 @@
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return hostname === "spareborsen.no" && /^\/partnere\/[^/]+/.test(parsedUrl.pathname);
   }
-  function rewriteSpareborsenHandleButton() {
-    if (getSpareborsenAuthState() !== "logged-out") return false;
-    const buttons = document.querySelectorAll("button");
-    let handleButton = null;
-    for (const btn of buttons) {
-      if (btn.closest("a[data-cb-rewrite]")) continue;
-      const text = btn.textContent?.trim() ?? "";
+  function installSpareborsenHandleButtonRewrite() {
+    let latestRunId = 0;
+    const scheduleRewrite = () => {
+      latestRunId += 1;
+      const runId = latestRunId;
+      void rewriteSpareborsenHandleButtonWhenReady(runId, () => runId !== latestRunId);
+    };
+    scheduleRewrite();
+    const observer = new MutationObserver(() => {
+      scheduleRewrite();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => observer.disconnect(), 15e3);
+  }
+  async function rewriteSpareborsenHandleButtonWhenReady(_runId, isStale) {
+    const state = await waitForSpareborsenAuthState(isStale);
+    if (isStale() || state !== "logged-out") {
+      return;
+    }
+    rewriteSpareborsenHandleButton();
+  }
+  async function waitForSpareborsenAuthState(isStale) {
+    const startedAt = Date.now();
+    let lastState = "unknown";
+    let stableSince = 0;
+    while (!isStale() && Date.now() - startedAt < 8e3) {
+      const state = getSpareborsenAuthState();
+      const ready = isSpareborsenPageReady();
+      if (state !== "unknown" && ready) {
+        if (state !== lastState) {
+          lastState = state;
+          stableSince = Date.now();
+        }
+        if (Date.now() - stableSince >= 400) {
+          return state;
+        }
+      } else {
+        lastState = "unknown";
+        stableSince = 0;
+      }
+      await sleep(100);
+    }
+    return "unknown";
+  }
+  function getSpareborsenAuthState() {
+    const header = document.querySelector("header");
+    if (header === null) {
+      return "unknown";
+    }
+    if (header.querySelector('a[href="/dashboard"], a[href="/wallet"], a[href="/dashboard/settings"]') !== null || [...header.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Logg ut")) {
+      return "logged-in";
+    }
+    if (header.querySelector('a[href="/auth/login"], a[href="/auth/register"]') !== null || [...header.querySelectorAll("button")].some((button) => {
+      const text = button.textContent?.trim();
+      return text === "Logg inn" || text === "Kom i gang";
+    })) {
+      return "logged-out";
+    }
+    return "unknown";
+  }
+  function isSpareborsenPageReady() {
+    const lbDot = document.querySelector("#lb-dot");
+    if (lbDot !== null && getComputedStyle(lbDot).display !== "none") {
+      return true;
+    }
+    return findSpareborsenHandleButton() !== null;
+  }
+  function findSpareborsenHandleButton() {
+    for (const button of document.querySelectorAll("button")) {
+      const text = button.textContent?.replace(/^Ad\s*/i, "").trim() ?? "";
       if (text.startsWith("Handle hos") && text.endsWith("→")) {
-        handleButton = btn;
-        break;
+        return button;
       }
     }
-    if (!handleButton) return false;
+    return null;
+  }
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  function rewriteSpareborsenHandleButton() {
+    if (getSpareborsenAuthState() !== "logged-out") {
+      return false;
+    }
+    const handleButton = findSpareborsenHandleButton();
+    if (handleButton === null || handleButton.closest("a[data-cb-rewrite]") !== null) {
+      return false;
+    }
     const clone = handleButton.cloneNode(true);
     const link = document.createElement("a");
     link.href = SPAREBORSEN_REFERRAL_URL;
@@ -1270,45 +1326,13 @@
     link.setAttribute("data-cb-rewrite", "1");
     const adLabel = document.createElement("span");
     adLabel.textContent = "Ad";
-    adLabel.setAttribute("data-cb-ad-label", "1");
     adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
-    clone.prepend(adLabel);
+    if (!clone.textContent?.trim().startsWith("Ad")) {
+      clone.prepend(adLabel);
+    }
     link.append(clone);
     handleButton.replaceWith(link);
     return true;
-  }
-
-  function getSpareborsenAuthState() {
-    const header = document.querySelector("header");
-    if (header === null) return "unknown";
-    const headerText = header.textContent?.replace(/\s+/g, " ").trim().toLowerCase() ?? "";
-    const headerLinks = Array.from(header.querySelectorAll("a[href]")).map((link) => link.getAttribute("href") ?? "");
-    const hasLoggedInNav = headerLinks.some((href) => href === "/dashboard" || href === "/wallet" || href === "/dashboard/settings") || /(?:^|\s)logg ut(?:\s|$)/.test(headerText);
-    if (hasLoggedInNav) return "logged-in";
-    const hasLoggedOutNav = headerLinks.includes("/auth/login") || headerLinks.includes("/auth/register") || /(?:^|\s)logg inn(?:\s|$)/.test(headerText);
-    if (hasLoggedOutNav) return "logged-out";
-    return "unknown";
-  }
-  function isSpareborsenReadyForRewrite(startedAt) {
-    const loadingDot = document.getElementById("lb-dot");
-    if (loadingDot !== null) {
-      const style = window.getComputedStyle(loadingDot);
-      return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
-    }
-    return Date.now() - startedAt > 2500;
-  }
-  function restoreSpareborsenHandleButtonIfRewritten() {
-    const rewrittenLinks = document.querySelectorAll('a[data-cb-rewrite="1"]');
-    let restored = false;
-    for (const link of rewrittenLinks) {
-      const button = link.querySelector("button");
-      if (button === null) continue;
-      const clone = button.cloneNode(true);
-      clone.querySelector('[data-cb-ad-label="1"]')?.remove();
-      link.replaceWith(clone);
-      restored = true;
-    }
-    return restored;
   }
   function getCurrentNettbonusOfferActivationUrl() {
     const parsedUrl = parseUrl(window.location.href);
@@ -1770,6 +1794,15 @@
     .provider-naf {
       background: #FFD100;
       color: #000000;
+    }
+    .provider-tekna {
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #00a3ad;
+    }
+    .provider-nito {
+      background: #c8e6b8;
+      color: #003b00;
     }
     .provider-sparebank1 {
       background: #005aa4;

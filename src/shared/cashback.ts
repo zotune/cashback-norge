@@ -2,7 +2,7 @@ import { normalizeRewardLabel } from "./reward.js";
 
 const EB_PER_TRUMF_KR = 13.5;
 
-export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "logbuy" | "naf" | "tekna" | "sparebank1" | "studentkortet" | "nettbonus" | "spenn" | "spareborsen" | "rabble" | "dreams" | "utdanningibergen" | "unidays" | "cbn" | "studenttorget" | "unio";
+export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "logbuy" | "naf" | "tekna" | "nito" | "sparebank1" | "studentkortet" | "nettbonus" | "spenn" | "spareborsen" | "rabble" | "dreams" | "utdanningibergen" | "unidays" | "cbn" | "studenttorget" | "unio";
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -28,7 +28,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "logbuy" || value === "naf" || value === "tekna" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "spenn" || value === "spareborsen" || value === "rabble" || value === "dreams" || value === "utdanningibergen" || value === "unidays" || value === "cbn" || value === "studenttorget" || value === "unio";
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "logbuy" || value === "naf" || value === "tekna" || value === "nito" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "spenn" || value === "spareborsen" || value === "rabble" || value === "dreams" || value === "utdanningibergen" || value === "unidays" || value === "cbn" || value === "studenttorget" || value === "unio";
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {
@@ -330,19 +330,44 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
   return sortOffers([...byKey.values()]);
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  aring: "\u00e5",
+  aelig: "\u00e6",
+  copy: "\u00a9",
+  eacute: "\u00e9",
+  gt: ">",
+  laquo: "\u00ab",
+  lt: "<",
+  nbsp: " ",
+  ndash: "\u2013",
+  oslash: "\u00f8",
+  quot: "\"",
+  raquo: "\u00bb",
+};
+
 export function stripHtml(html: string): string {
   return html
+    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/li>/gi, "\n")
-    .replace(/<li>/gi, "• ")
+    .replace(/<li>/gi, "- ")
     .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_match, value: string) => decodeNumericHtmlEntity(value, 10))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, value: string) => decodeNumericHtmlEntity(value, 16))
+    .replace(/&([a-z]+);/gi, (_match, entity: string) => HTML_ENTITIES[entity.toLowerCase()] ?? `&${entity};`)
     .replace(/\n{2,}/g, "\n\n")
     .trim();
+}
+
+function decodeNumericHtmlEntity(value: string, radix: number): string {
+  const codePoint = Number.parseInt(value, radix);
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
+    return "";
+  }
+  return String.fromCodePoint(codePoint);
 }
 
 export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {

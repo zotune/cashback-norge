@@ -1221,6 +1221,10 @@ function renderNotice(
       border: 1px solid #d3e2dc;
       color: #00a3ad;
     }
+    .provider-nito {
+      background: #c8e6b8;
+      color: #003b00;
+    }
     .provider-sparebank1 {
       background: #005aa4;
       color: #ffffff;
