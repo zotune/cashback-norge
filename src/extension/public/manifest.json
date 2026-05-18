@@ -4,6 +4,7 @@
   "description": "Shows cashback offers for supported stores.",
   "version": "0.1.9",
   "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://browser-extension-backend.cloud.pji.nu/*"],
   "background": {
     "service_worker": "assets/background.js",
     "type": "module"

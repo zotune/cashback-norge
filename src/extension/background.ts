@@ -8,9 +8,13 @@ import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import {
   type CashbackFoundMessage,
   type CashbackNoneMessage,
+  type GetPriceMatchForProductMessage,
   type GetOffersForUrlMessage,
   type OffersForUrlResponse,
+  type PriceMatchForProductResponse,
+  type PriceMatchOffer,
   isGetOffersForUrlMessage,
+  isGetPriceMatchForProductMessage,
 } from "../shared/extension-messages.js";
 
 type CachedIndex = {
@@ -57,15 +61,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function handleRuntimeMessage(
   message: unknown,
-  sendResponse: (response: OffersForUrlResponse) => void,
+  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse) => void,
 ): Promise<void> {
-  if (!isGetOffersForUrlMessage(message)) {
-    sendResponse({ ok: false, reason: "Unsupported message" });
+  if (isGetOffersForUrlMessage(message)) {
+    const response = await findOffersForUrl(message);
+    sendResponse(response);
     return;
   }
 
-  const response = await findOffersForUrl(message);
-  sendResponse(response);
+  if (isGetPriceMatchForProductMessage(message)) {
+    const response = await findPriceMatchForProduct(message);
+    sendResponse(response);
+    return;
+  }
+
+  sendResponse({ ok: false, reason: "Unsupported message" });
 }
 
 async function findOffersForUrl(
@@ -82,6 +92,130 @@ async function findOffersForUrl(
     ok: true,
     offers: findOffersForHostname(cashbackIndex, parsedUrl.hostname),
   };
+}
+
+async function findPriceMatchForProduct(
+  message: GetPriceMatchForProductMessage,
+): Promise<PriceMatchForProductResponse> {
+  if (!message.productPageClue && message.searchTerm.trim().length < 8) {
+    return { ok: true };
+  }
+
+  const identifyOffer = await fetchPrisjaktIdentify(message);
+  if (identifyOffer !== undefined) {
+    return { ok: true, offer: identifyOffer };
+  }
+
+  const searchOffer = await fetchPrisjaktSearch(message.searchTerm);
+  return { ok: true, ...(searchOffer !== undefined ? { offer: searchOffer } : {}) };
+}
+
+async function fetchPrisjaktIdentify(
+  message: GetPriceMatchForProductMessage,
+): Promise<PriceMatchOffer | undefined> {
+  const params = new URLSearchParams();
+  params.set("url", message.url);
+  params.set("market", "NO");
+  params.set("searchTerm", message.searchTerm);
+  if (message.productPageClue !== undefined) params.set("productPageClue", String(message.productPageClue));
+  if (message.price !== undefined) params.set("price", String(message.price));
+  if (message.currency !== undefined) params.set("currency", message.currency);
+  if (message.productUrl !== undefined) params.set("productUrl", message.productUrl);
+  if (message.organizationName !== undefined) params.set("organizationName", message.organizationName);
+  if (message.codes !== undefined && message.codes.length > 0) params.set("codes", message.codes.join(","));
+
+  try {
+    const response = await fetch(`https://browser-extension-backend.cloud.pji.nu/v1/identify?${params.toString()}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) return undefined;
+    const value: unknown = await response.json();
+    return readBestPrisjaktOffer(value);
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchPrisjaktSearch(searchTerm: string): Promise<PriceMatchOffer | undefined> {
+  const normalizedSearchTerm = searchTerm.trim();
+  if (normalizedSearchTerm.length < 4) return undefined;
+
+  const params = new URLSearchParams({
+    term: normalizedSearchTerm,
+    market: "NO",
+    includePromotionDetails: "true",
+  });
+
+  try {
+    const response = await fetch(`https://browser-extension-backend.cloud.pji.nu/v1/search?${params.toString()}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) return undefined;
+    const value: unknown = await response.json();
+    return readBestPrisjaktOffer(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function readBestPrisjaktOffer(value: unknown): PriceMatchOffer | undefined {
+  if (!isPlainRecord(value)) return undefined;
+  const details = Array.isArray(value.details) ? value.details : [];
+  const directProduct = isPlainRecord(value.product) ? value.product : undefined;
+  const detail = details.find((entry) => {
+    return isPlainRecord(entry) && Array.isArray(entry.offers) && entry.offers.length > 0;
+  });
+  const product = isPlainRecord(detail) && isPlainRecord(detail.product) ? detail.product : directProduct;
+  const offers = isPlainRecord(detail) && Array.isArray(detail.offers)
+    ? detail.offers
+    : Array.isArray(value.offers)
+      ? value.offers
+      : [];
+  if (!isPlainRecord(product) || offers.length === 0) return undefined;
+
+  const productName = typeof product.name === "string" ? product.name : "Prisjakt-produkt";
+  const productId = typeof product.id === "number" || typeof product.id === "string" ? String(product.id) : undefined;
+  const parsedOffers = offers.map(readPrisjaktOffer).filter((offer): offer is Omit<PriceMatchOffer, "productName" | "productUrl"> => offer !== undefined);
+  parsedOffers.sort((first, second) => first.amount - second.amount);
+  const best = parsedOffers[0];
+  if (best === undefined) return undefined;
+
+  return {
+    ...best,
+    productName,
+    productUrl: productId !== undefined ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`,
+  };
+}
+
+function readPrisjaktOffer(value: unknown): Omit<PriceMatchOffer, "productName" | "productUrl"> | undefined {
+  if (!isPlainRecord(value)) return undefined;
+  const shop = isPlainRecord(value.shop) ? value.shop : undefined;
+  const price = isPlainRecord(value.price) && isPlainRecord(value.price.price) ? value.price.price : undefined;
+  const scaledAmount = typeof price?.scaledAmount === "number" ? price.scaledAmount : undefined;
+  const currency = typeof price?.currency === "string" ? price.currency : undefined;
+  const shopName = typeof shop?.name === "string" ? shop.name : undefined;
+  if (scaledAmount === undefined || currency === undefined || shopName === undefined) return undefined;
+  const amount = scaledAmount / 100;
+  const formatted = formatPrisjaktPrice(amount, currency);
+  const url = typeof value.url === "string" && value.url.length > 0
+    ? value.url
+    : typeof value.externalUrl === "string" && value.externalUrl.length > 0
+      ? value.externalUrl
+      : undefined;
+  return {
+    shopName,
+    amount,
+    currency,
+    price: formatted,
+    ...(url !== undefined ? { offerUrl: url } : {}),
+  };
+}
+
+function formatPrisjaktPrice(amount: number, currency: string): string {
+  const formatted = new Intl.NumberFormat("nb-NO", {
+    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  }).format(amount);
+  return `${formatted} ${currency}`;
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {

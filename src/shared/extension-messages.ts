@@ -18,6 +18,18 @@ export type GetOffersForUrlMessage = {
   url: string;
 };
 
+export type GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product";
+  url: string;
+  searchTerm: string;
+  price?: number;
+  currency?: string;
+  productUrl?: string;
+  codes?: string[];
+  productPageClue?: boolean;
+  organizationName?: string;
+};
+
 export type ToggleNoticeMessage = {
   type: "toggle-notice";
 };
@@ -26,6 +38,26 @@ export type OffersForUrlResponse =
   | {
       ok: true;
       offers: CashbackOffer[];
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
+export type PriceMatchOffer = {
+  shopName: string;
+  price: string;
+  amount: number;
+  currency: string;
+  productName: string;
+  productUrl: string;
+  offerUrl?: string;
+};
+
+export type PriceMatchForProductResponse =
+  | {
+      ok: true;
+      offer?: PriceMatchOffer;
     }
   | {
       ok: false;
@@ -56,6 +88,23 @@ export function isGetOffersForUrlMessage(
     isRecord(value) &&
     value.type === "get-offers-for-url" &&
     typeof value.url === "string"
+  );
+}
+
+export function isGetPriceMatchForProductMessage(
+  value: unknown,
+): value is GetPriceMatchForProductMessage {
+  return (
+    isRecord(value) &&
+    value.type === "get-price-match-for-product" &&
+    typeof value.url === "string" &&
+    typeof value.searchTerm === "string" &&
+    (value.price === undefined || typeof value.price === "number") &&
+    (value.currency === undefined || typeof value.currency === "string") &&
+    (value.productUrl === undefined || typeof value.productUrl === "string") &&
+    (value.codes === undefined || (Array.isArray(value.codes) && value.codes.every((code) => typeof code === "string"))) &&
+    (value.productPageClue === undefined || typeof value.productPageClue === "boolean") &&
+    (value.organizationName === undefined || typeof value.organizationName === "string")
   );
 }
 

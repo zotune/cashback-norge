@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779024139
+// @version      1779093132
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -961,7 +961,7 @@
     }
   });
   requestCurrentOffers();
-  function renderNoticeWithStoredState(offers) {
+  function renderNoticeWithStoredState(offers, priceMatch) {
     const isUserscript = chrome.runtime.id === void 0;
     chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
       const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
@@ -970,52 +970,196 @@
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
       void readActivatedOffers().catch(() => ({})).then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOffers);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOffers, priceMatch);
       });
     });
   }
   function requestCurrentOffers() {
+    void renderCurrentContext();
+  }
+  async function renderCurrentContext() {
+    const [offers, priceMatch] = await Promise.all([
+      getCurrentOffers(),
+      getPriceMatchForCurrentPage()
+    ]);
+    if (offers.length > 0 || priceMatch !== void 0) {
+      renderNoticeWithStoredState(offers, priceMatch);
+      return;
+    }
+    clearNotice();
+  }
+  async function getCurrentOffers() {
     const message = {
       type: "get-offers-for-url",
       url: window.location.href
     };
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError !== void 0) {
-        void renderBundledOffersForCurrentUrl();
-        return;
-      }
-      if (!isOffersForUrlResponse(response) || !response.ok) {
-        void renderBundledOffersForCurrentUrl();
-        return;
-      }
-      if (response.offers.length > 0) {
-        renderNoticeWithStoredState(response.offers);
-        return;
-      }
-      void renderBundledOffersForCurrentUrl();
-    });
+    const response = await sendRuntimeMessage(message);
+    if (response !== void 0 && isOffersForUrlResponse(response) && response.ok) {
+      if (response.offers.length > 0) return response.offers;
+    }
+    return readBundledOffersForCurrentUrl();
   }
-  async function renderBundledOffersForCurrentUrl() {
+  async function readBundledOffersForCurrentUrl() {
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0 || parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-      clearNotice();
-      return;
+      return [];
     }
     try {
       const response = await fetch(chrome.runtime.getURL("cashback-index.json"));
       const value = await response.json();
       if (!isCashbackIndex(value)) {
-        clearNotice();
-        return;
+        return [];
       }
-      const offers = findOffersForHostname(value, parsedUrl.hostname);
-      if (offers.length > 0) {
-        renderNoticeWithStoredState(offers);
-        return;
-      }
+      return findOffersForHostname(value, parsedUrl.hostname);
     } catch {
+      return [];
     }
-    clearNotice();
+  }
+  async function getPriceMatchForCurrentPage() {
+    const productMeta = extractProductPageMeta();
+    if (productMeta === void 0) return void 0;
+    const message = {
+      type: "get-price-match-for-product",
+      ...productMeta
+    };
+    const response = await sendRuntimeMessage(message);
+    if (response !== void 0 && isPriceMatchForProductResponse(response) && response.ok) {
+      return response.offer;
+    }
+    return void 0;
+  }
+  function sendRuntimeMessage(message) {
+    return new Promise((resolveValue) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError !== void 0) {
+          resolveValue(void 0);
+          return;
+        }
+        resolveValue(response);
+      });
+    });
+  }
+  function extractProductPageMeta() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0 || parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return void 0;
+    }
+    const productLdJson = findProductLdJson();
+    const titleMeta = document.querySelector('meta[name="title"]')?.content.trim();
+    const ogTitle = document.querySelector('meta[property="og:title"]')?.content.trim();
+    const h1 = document.querySelector("h1")?.textContent?.trim();
+    const productPageClue = productLdJson !== void 0 || document.querySelector('meta[property="og:type"][content="product"]') !== null || /\b(product|produkt)\b/i.test(parsedUrl.pathname) || [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin)\b/i.test(key));
+    const productName = readStringValue(productLdJson?.name);
+    const brandName = readBrandName(productLdJson?.brand);
+    const searchTerm = productName !== void 0 ? brandName !== void 0 && !productName.toLowerCase().includes(brandName.toLowerCase()) ? `${brandName} ${productName}` : productName : h1 ?? titleMeta ?? ogTitle ?? document.title;
+    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+    if (!productPageClue && normalizedSearchTerm.length < 8) {
+      return void 0;
+    }
+    const offer = readFirstOffer(productLdJson?.offers);
+    const price = readNumberValue(offer?.price);
+    const currency = readStringValue(offer?.priceCurrency);
+    const productUrl = readUrlValue(productLdJson?.url);
+    const codes = collectProductCodes(productLdJson);
+    const organizationName = findOrganizationName();
+    return {
+      url: window.location.href,
+      searchTerm: normalizedSearchTerm,
+      productPageClue,
+      ...price !== void 0 ? { price } : {},
+      ...currency !== void 0 ? { currency } : {},
+      ...productUrl !== void 0 ? { productUrl } : {},
+      ...codes.length > 0 ? { codes } : {},
+      ...organizationName !== void 0 ? { organizationName } : {}
+    };
+  }
+  function findProductLdJson() {
+    for (const entry of readLdJsonEntries()) {
+      const product = findTypedLdJson(entry, "Product");
+      if (product !== void 0) return product;
+    }
+    return void 0;
+  }
+  function findOrganizationName() {
+    for (const entry of readLdJsonEntries()) {
+      const organization = findTypedLdJson(entry, "Organization") ?? findTypedLdJson(entry, "WebSite");
+      const name = readStringValue(organization?.name);
+      if (name !== void 0) return name;
+      const offer = findTypedLdJson(entry, "Offer");
+      const sellerName = readBrandName(offer?.seller);
+      if (sellerName !== void 0) return sellerName;
+    }
+    return void 0;
+  }
+  function readLdJsonEntries() {
+    const entries = [];
+    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try {
+        entries.push(JSON.parse(script.textContent ?? ""));
+      } catch {
+      }
+    }
+    return entries;
+  }
+  function findTypedLdJson(value, type) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findTypedLdJson(item, type);
+        if (found !== void 0) return found;
+      }
+      return void 0;
+    }
+    if (!isRecord(value)) return void 0;
+    const graph = value["@graph"];
+    if (Array.isArray(graph)) {
+      for (const item of graph) {
+        const found = findTypedLdJson(item, type);
+        if (found !== void 0) return found;
+      }
+    }
+    const rawType = value["@type"];
+    const types = Array.isArray(rawType) ? rawType : [rawType];
+    return types.some((item) => item === type) ? value : void 0;
+  }
+  function readFirstOffer(value) {
+    if (Array.isArray(value)) {
+      return value.find(isRecord);
+    }
+    return isRecord(value) ? value : void 0;
+  }
+  function readBrandName(value) {
+    if (typeof value === "string") return value.trim() || void 0;
+    return isRecord(value) ? readStringValue(value.name) : void 0;
+  }
+  function readStringValue(value) {
+    if (typeof value !== "string") return void 0;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberValue(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function readUrlValue(value) {
+    const url = readStringValue(value);
+    return url !== void 0 && parseUrlWithBase(url, window.location.href) !== void 0 ? parseUrlWithBase(url, window.location.href)?.toString() : void 0;
+  }
+  function collectProductCodes(product) {
+    if (product === void 0) return [];
+    const codes = /* @__PURE__ */ new Set();
+    for (const [key, value] of Object.entries(product)) {
+      if (!/^(gtin|sku|mpn)/i.test(key)) continue;
+      const values = Array.isArray(value) ? value : [value];
+      for (const item of values) {
+        if (typeof item === "string" || typeof item === "number") {
+          const code = String(item).trim();
+          if (code.length > 0) codes.add(code);
+        }
+      }
+    }
+    return [...codes];
   }
   function makeAdChip() {
     const chip = document.createElement("span");
@@ -1478,7 +1622,7 @@
       });
     });
   }
-  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, activatedOffers) {
+  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, activatedOffers, priceMatch) {
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
@@ -1803,6 +1947,10 @@
     .provider-nito {
       background: #c8e6b8;
       color: #003b00;
+    }
+    .provider-prisjakt {
+      background: #ff8a00;
+      color: #ffffff;
     }
     .provider-sparebank1 {
       background: #005aa4;
@@ -2150,6 +2298,76 @@
     .codes-section.collapsed .codes-toggle-arrow {
       transform: rotate(-90deg);
     }
+    .price-match-section {
+      margin-top: -4px;
+      padding: 6px 0 4px;
+    }
+    .price-match-toggle {
+      align-items: center;
+      appearance: none;
+      background: none;
+      border: none;
+      color: #8a9a92;
+      cursor: pointer;
+      display: flex;
+      font: inherit;
+      font-size: 11px;
+      gap: 4px;
+      line-height: 1;
+      margin-bottom: 5px;
+      padding: 0;
+      width: 100%;
+    }
+    .price-match-toggle:hover {
+      color: #4f5f66;
+    }
+    .price-match-toggle-arrow {
+      display: inline-block;
+      font-size: 10px;
+      transition: transform 0.15s;
+    }
+    .price-match-section.collapsed .price-match-card {
+      display: none;
+    }
+    .price-match-section.collapsed .price-match-toggle-arrow {
+      transform: rotate(-90deg);
+    }
+    .price-match-card {
+      align-items: center;
+      background: #fffaf2;
+      border: 1px solid #ffd09a;
+      border-radius: 5px;
+      color: #172026;
+      display: grid;
+      font-size: 12px;
+      gap: 8px;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      padding: 6px 9px;
+      text-decoration: none;
+    }
+    .price-match-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .price-match-product {
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .price-match-shop {
+      color: #5d6b71;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .price-match-price {
+      color: #172026;
+      font-weight: 800;
+      white-space: nowrap;
+    }
     .codes-list {
       display: flex;
       flex-direction: column;
@@ -2389,16 +2607,16 @@
     const cryptoSub = cryptoSubEntry?.[1];
     const codeOffers = offers.filter((o) => o.provider === "rabattkode" || o.discountCode !== void 0 && o.discountCode.length > 0);
     const offer = mainOffers[0];
-    if (offer === void 0 && codeOffers.length === 0) {
+    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0) {
       return;
     }
     const primaryOffer = offer ?? codeOffers[0];
-    if (primaryOffer === void 0) {
+    if (primaryOffer === void 0 && priceMatch === void 0) {
       return;
     }
     const notice = document.createElement("section");
     notice.className = "notice";
-    const sideTabProvider = offer?.provider ?? getCodeSourceProvider(primaryOffer) ?? "rabattkode";
+    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? "prisjakt" : "rabattkode");
     const sideTab = document.createElement("button");
     sideTab.className = `side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
@@ -2416,7 +2634,7 @@
       chipSpan.className = `side-tab-chip provider-${offer.provider}`;
       chipSpan.textContent = formatProviderName(offer.provider);
       sideTabText.append(rewardSpan, chipSpan);
-    } else {
+    } else if (primaryOffer !== void 0) {
       const rewardSpan = document.createElement("span");
       rewardSpan.className = "side-tab-reward";
       rewardSpan.textContent = formatCompactRewardLabel(primaryOffer) ?? primaryOffer.reward;
@@ -2428,6 +2646,14 @@
         chipSpan.textContent = formatProviderName(codeProvider);
         sideTabText.append(chipSpan);
       }
+    } else if (priceMatch !== void 0) {
+      const rewardSpan = document.createElement("span");
+      rewardSpan.className = "side-tab-reward";
+      rewardSpan.textContent = priceMatch.price;
+      const chipSpan = document.createElement("span");
+      chipSpan.className = "side-tab-chip provider-prisjakt";
+      chipSpan.textContent = "Prisjakt";
+      sideTabText.append(rewardSpan, chipSpan);
     }
     sideTab.append(sideTabArrow, sideTabText);
     sideTab.addEventListener("click", () => {
@@ -2445,7 +2671,7 @@
     const siteIcon = createSiteIcon();
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : `Rabattkode hos ${primaryOffer.merchantName}`;
+    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : `Prismatch hos ${priceMatch?.shopName ?? "Prisjakt"}`;
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
     sumInput.className = "sum-input";
@@ -3203,7 +3429,47 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return chip;
     };
     codesSection.append(codesToggle, codesList, expiredSection);
-    body.append(header, offerList, chipsSection, codesSection);
+    const priceMatchSection = document.createElement("div");
+    priceMatchSection.className = "price-match-section";
+    if (priceMatch !== void 0) {
+      const priceMatchToggle = document.createElement("button");
+      priceMatchToggle.className = "price-match-toggle";
+      priceMatchToggle.type = "button";
+      const priceMatchToggleArrow = document.createElement("span");
+      priceMatchToggleArrow.className = "price-match-toggle-arrow";
+      priceMatchToggleArrow.textContent = "▼";
+      const priceMatchToggleText = document.createElement("span");
+      priceMatchToggleText.textContent = "Prismatch";
+      priceMatchToggle.append(priceMatchToggleArrow, priceMatchToggleText);
+      priceMatchToggle.addEventListener("click", () => {
+        priceMatchSection.classList.toggle("collapsed");
+      });
+      const priceMatchCard = document.createElement("a");
+      priceMatchCard.className = "price-match-card";
+      priceMatchCard.href = priceMatch.offerUrl ?? priceMatch.productUrl;
+      priceMatchCard.target = "_blank";
+      priceMatchCard.rel = "noreferrer";
+      const priceMatchTitle = document.createElement("span");
+      priceMatchTitle.className = "price-match-title";
+      const priceMatchProduct = document.createElement("span");
+      priceMatchProduct.className = "price-match-product";
+      priceMatchProduct.textContent = priceMatch.productName;
+      const priceMatchShop = document.createElement("span");
+      priceMatchShop.className = "price-match-shop";
+      priceMatchShop.textContent = priceMatch.shopName;
+      priceMatchTitle.append(priceMatchProduct, priceMatchShop);
+      const priceMatchPrice = document.createElement("span");
+      priceMatchPrice.className = "price-match-price";
+      priceMatchPrice.textContent = priceMatch.price;
+      const priceMatchBadge = document.createElement("span");
+      priceMatchBadge.className = "provider-badge provider-prisjakt";
+      priceMatchBadge.textContent = "Prisjakt";
+      priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
+      priceMatchSection.append(priceMatchToggle, priceMatchCard);
+    }
+    body.append(header, offerList);
+    if (priceMatch !== void 0) body.append(priceMatchSection);
+    if (offers.length > 0) body.append(chipsSection, codesSection);
     let userHasVoted = false;
     [...codeOffers].sort((a, b) => parseRewardNum(b.reward) - parseRewardNum(a.reward)).forEach((codeOffer, i) => {
       const row = buildCrawlerRow(codeOffer);
@@ -3544,6 +3810,18 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return Array.isArray(value.offers) && value.offers.every(isCashbackOffer);
     }
     return typeof value.reason === "string";
+  }
+  function isPriceMatchForProductResponse(value) {
+    if (!isRecord(value) || typeof value.ok !== "boolean") {
+      return false;
+    }
+    if (value.ok) {
+      return value.offer === void 0 || isPriceMatchOffer(value.offer);
+    }
+    return typeof value.reason === "string";
+  }
+  function isPriceMatchOffer(value) {
+    return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string");
   }
   function isCashbackIndex(value) {
     if (!isRecord(value) || typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord(value.domainIndex)) {
