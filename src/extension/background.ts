@@ -25,6 +25,43 @@ type CachedIndex = {
 const STORAGE_KEY = "cashback-index";
 const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
+const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
+const PRISJAKT_NATIVE_AUTHORIZATION = "Bearer JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmY";
+
+const PRISJAKT_PRODUCT_BY_OFFER_URL_QUERY = `
+query SearchProductsByOfferURL($offerUrl: String!) {
+  productsByOfferUrl(offerUrl: $offerUrl) {
+    id
+    name
+    webUri
+  }
+}
+`;
+
+const PRISJAKT_OFFER_LIST_QUERY = `
+query OfferList($productId: Int!) {
+  product(id: $productId) {
+    id
+    name
+    webUri
+    offers {
+      externalUri
+      shop {
+        name
+        currency
+      }
+      price {
+        exclShipping
+      }
+      shipping {
+        cheapest {
+          shippingCost
+        }
+      }
+    }
+  }
+}
+`;
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshIndex();
@@ -101,6 +138,11 @@ async function findPriceMatchForProduct(
     return { ok: true };
   }
 
+  const nativeOffer = await fetchNativePrisjaktPriceMatch(message);
+  if (nativeOffer !== undefined) {
+    return { ok: true, offer: nativeOffer };
+  }
+
   const identifyOffer = await fetchPrisjaktIdentify(message);
   if (identifyOffer !== undefined) {
     return { ok: true, offer: identifyOffer };
@@ -108,6 +150,132 @@ async function findPriceMatchForProduct(
 
   const searchOffer = await fetchPrisjaktSearch(message.searchTerm);
   return { ok: true, ...(searchOffer !== undefined ? { offer: searchOffer } : {}) };
+}
+
+async function fetchNativePrisjaktPriceMatch(
+  message: GetPriceMatchForProductMessage,
+): Promise<PriceMatchOffer | undefined> {
+  try {
+    const product = await fetchNativePrisjaktProductByOfferUrl(message.url);
+    if (product === undefined) return undefined;
+
+    const offers = await fetchNativePrisjaktOffers(product.id);
+    if (offers.length === 0) return undefined;
+
+    const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
+    const bestOffer = sortedOffers[0];
+    if (bestOffer === undefined) return undefined;
+
+    return {
+      shopName: bestOffer.shopName,
+      amount: bestOffer.amount,
+      currency: bestOffer.currency,
+      price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
+      productName: product.name,
+      productUrl: product.productUrl,
+      ...(bestOffer.offerUrl !== undefined ? { offerUrl: bestOffer.offerUrl } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+type NativePrisjaktProduct = {
+  id: number;
+  name: string;
+  productUrl: string;
+};
+
+type NativePrisjaktOffer = {
+  shopName: string;
+  amount: number;
+  sortAmount: number;
+  currency: string;
+  offerUrl?: string;
+};
+
+async function fetchNativePrisjaktProductByOfferUrl(
+  offerUrl: string,
+): Promise<NativePrisjaktProduct | undefined> {
+  const value = await fetchNativePrisjaktGraphql({
+    operationName: "SearchProductsByOfferURL",
+    query: PRISJAKT_PRODUCT_BY_OFFER_URL_QUERY,
+    variables: { offerUrl },
+  });
+  if (!isPlainRecord(value) || !isPlainRecord(value.data) || !Array.isArray(value.data.productsByOfferUrl)) {
+    return undefined;
+  }
+
+  for (const product of value.data.productsByOfferUrl) {
+    if (!isPlainRecord(product)) continue;
+    const id = readNumberLike(product.id);
+    const name = typeof product.name === "string" ? product.name : undefined;
+    const productUrl = typeof product.webUri === "string" ? product.webUri : undefined;
+    if (id !== undefined && name !== undefined && productUrl !== undefined) {
+      return { id, name, productUrl };
+    }
+  }
+
+  return undefined;
+}
+
+async function fetchNativePrisjaktOffers(productId: number): Promise<NativePrisjaktOffer[]> {
+  const value = await fetchNativePrisjaktGraphql({
+    operationName: "OfferList",
+    query: PRISJAKT_OFFER_LIST_QUERY,
+    variables: { productId },
+  });
+  if (!isPlainRecord(value) || !isPlainRecord(value.data) || !isPlainRecord(value.data.product) || !Array.isArray(value.data.product.offers)) {
+    return [];
+  }
+
+  return value.data.product.offers
+    .map(readNativePrisjaktOffer)
+    .filter((offer): offer is NativePrisjaktOffer => offer !== undefined);
+}
+
+async function fetchNativePrisjaktGraphql(body: {
+  operationName: string;
+  query: string;
+  variables: Record<string, unknown>;
+}): Promise<unknown> {
+  const response = await fetch(PRISJAKT_NATIVE_GRAPHQL_URL, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Authorization": PRISJAKT_NATIVE_AUTHORIZATION,
+      "Content-Type": "application/json",
+      "Market": "no",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) return undefined;
+  return response.json();
+}
+
+function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefined {
+  if (!isPlainRecord(value)) return undefined;
+  const shop = isPlainRecord(value.shop) ? value.shop : undefined;
+  const price = isPlainRecord(value.price) ? value.price : undefined;
+  const shipping = isPlainRecord(value.shipping) ? value.shipping : undefined;
+  const cheapestShipping = isPlainRecord(shipping?.cheapest) ? shipping.cheapest : undefined;
+  const shopName = typeof shop?.name === "string" ? shop.name : undefined;
+  const currency = typeof shop?.currency === "string" ? shop.currency : undefined;
+  const amount = typeof price?.exclShipping === "number" ? price.exclShipping : undefined;
+  const shippingAmount = typeof cheapestShipping?.shippingCost === "number" ? cheapestShipping.shippingCost : 0;
+  if (shopName === undefined || currency === undefined || amount === undefined) return undefined;
+
+  const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0
+    ? value.externalUri
+    : undefined;
+
+  return {
+    shopName,
+    amount,
+    sortAmount: amount + shippingAmount,
+    currency,
+    ...(offerUrl !== undefined ? { offerUrl } : {}),
+  };
 }
 
 async function fetchPrisjaktIdentify(
@@ -215,7 +383,14 @@ function formatPrisjaktPrice(amount: number, currency: string): string {
   const formatted = new Intl.NumberFormat("nb-NO", {
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
   }).format(amount);
-  return `${formatted} ${currency}`;
+  return `${formatted} ${currency === "NOK" ? "kr" : currency}`;
+}
+
+function readNumberLike(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {
