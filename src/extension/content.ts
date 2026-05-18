@@ -2918,7 +2918,7 @@ function renderNotice(
 
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "price-match-card";
-    priceMatchCard.href = priceMatch.offerUrl ?? priceMatch.productUrl;
+    priceMatchCard.href = priceMatch.productUrl;
     priceMatchCard.target = "_blank";
     priceMatchCard.rel = "noreferrer";
     const priceMatchTitle = document.createElement("span");
