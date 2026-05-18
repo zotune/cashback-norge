@@ -36,6 +36,7 @@ jobs:
       - run: pnpm run crawl
         env:
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
+          SCRAPERAPI_KEY2: ${{ secrets.SCRAPERAPI_KEY2 }}
 
       - name: Commit updated index
         run: |

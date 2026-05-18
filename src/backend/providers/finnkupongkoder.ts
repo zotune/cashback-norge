@@ -32,6 +32,7 @@ export type CrawlFinnkupongkoderInput = {
   generatedAt: string;
   logger: Logger;
   proxyUrl?: string;
+  proxyUrls?: string[];
 };
 
 type ParseResult = {
@@ -106,10 +107,25 @@ export async function crawlFinnkupongkoder(
   input: CrawlFinnkupongkoderInput,
 ): Promise<CashbackOffer[]> {
   let result = await runFinnkupongkoderCrawl(input);
+  const proxyUrls = [
+    ...(input.proxyUrls ?? []),
+    ...(input.proxyUrl ? [input.proxyUrl] : []),
+  ];
 
-  if (result.blocked && input.proxyUrl) {
+  if (result.blocked && proxyUrls.length > 0) {
     input.logger.info("FinnKupongkoder: blocked, retrying via proxy");
-    result = await runFinnkupongkoderCrawl(input, input.proxyUrl);
+    for (const [index, proxyUrl] of proxyUrls.entries()) {
+      result = await runFinnkupongkoderCrawl(input, proxyUrl);
+      const hasContent =
+        result.offers.length > 0 ||
+        result.visibleOfferCount > 0 ||
+        result.maskedCodeCount > 0;
+      if (!result.blocked && hasContent) {
+        input.logger.info(`FinnKupongkoder: proxy ${index + 1}/${proxyUrls.length} succeeded`);
+        break;
+      }
+      input.logger.warn(`FinnKupongkoder: proxy ${index + 1}/${proxyUrls.length} returned no usable content`);
+    }
   }
 
   if (result.blocked) {

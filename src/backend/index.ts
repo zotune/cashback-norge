@@ -45,7 +45,7 @@ type CliConfig = {
   providerOverridesPath: string;
   klarnaStartUrl: string;
   klarnaMaxPages: number;
-  klarnaProxyUrl: string | undefined;
+  klarnaProxyUrls: string[];
   rememberStartUrl: string;
   trumfStartUrl: string;
   sasApiUrl: string;
@@ -87,7 +87,7 @@ type CliConfig = {
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
   finnkupongkoderStartUrl: string;
-  finnkupongkoderProxyUrl: string | undefined;
+  finnkupongkoderProxyUrls: string[];
   kickbackStartUrl: string;
   trustdealsStartUrl: string;
   logbuyStartUrl: string;
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
         overrides: providerOverrides, startUrl: config.klarnaStartUrl,
-        ...(config.klarnaProxyUrl ? { proxyUrl: config.klarnaProxyUrl } : {}),
+        proxyUrls: config.klarnaProxyUrls,
       }),
     config.skipRemember ? Promise.resolve([]) : crawlRemember({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
     config.skipFinnkupongkoder ? Promise.resolve([]) : crawlFinnkupongkoder({
         generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl, startUrl: config.finnkupongkoderStartUrl,
-        ...(config.finnkupongkoderProxyUrl ? { proxyUrl: config.finnkupongkoderProxyUrl } : {}),
+        proxyUrls: config.finnkupongkoderProxyUrls,
       }),
     config.skipLogbuy ? Promise.resolve([]) : crawlLogbuy({
         domainLookup, generatedAt, logger,
@@ -343,9 +343,7 @@ function readCliConfig(args: string[]): CliConfig {
       "--klarna-max-pages",
       5,
     ),
-    klarnaProxyUrl: process.env.SCRAPERAPI_KEY
-      ? `http://scraperapi:${process.env.SCRAPERAPI_KEY}@proxy-server.scraperapi.com:8001`
-      : undefined,
+    klarnaProxyUrls: buildScraperApiProxyUrls(),
     rememberStartUrl:
       readArgumentValue(args, "--remember-start-url") ??
       "https://www.remember.no/reward/rabatt",
@@ -407,9 +405,7 @@ function readCliConfig(args: string[]): CliConfig {
     finnkupongkoderStartUrl:
       readArgumentValue(args, "--finnkupongkoder-start-url") ??
       "https://www.finnkupongkoder.no/top",
-    finnkupongkoderProxyUrl: process.env.SCRAPERAPI_KEY
-      ? `http://scraperapi:${process.env.SCRAPERAPI_KEY}@proxy-server.scraperapi.com:8001`
-      : undefined,
+    finnkupongkoderProxyUrls: buildScraperApiProxyUrls(),
     kickbackStartUrl:
       readArgumentValue(args, "--kickback-start-url") ??
       "https://kickback.no/",
@@ -477,6 +473,20 @@ function readPositiveIntegerArgument(
   }
 
   return parsedValue;
+}
+
+function buildScraperApiProxyUrls(): string[] {
+  return [
+    process.env.SCRAPERAPI_KEY,
+    process.env.SCRAPERAPI_KEY2,
+  ].flatMap((key) => {
+    const trimmedKey = key?.trim();
+    if (!trimmedKey) {
+      return [];
+    }
+
+    return [`http://scraperapi:${encodeURIComponent(trimmedKey)}@proxy-server.scraperapi.com:8001`];
+  });
 }
 
 main().catch((error: unknown) => {
