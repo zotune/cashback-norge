@@ -5,7 +5,7 @@ import {
   parseUrl,
 } from "../shared/cashback.js";
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
-import { findPriceMatch } from "../shared/price-match.js";
+import { findPriceMatches } from "../shared/price-match.js";
 import {
   type CashbackFoundMessage,
   type CashbackNoneMessage,
@@ -97,8 +97,8 @@ async function findOffersForUrl(
 async function findPriceMatchForProduct(
   message: GetPriceMatchForProductMessage,
 ): Promise<PriceMatchForProductResponse> {
-  const offer = await findPriceMatch(message);
-  return { ok: true, ...(offer !== undefined ? { offer } : {}) };
+  const offers = await findPriceMatches(message);
+  return { ok: true, ...(offers[0] !== undefined ? { offer: offers[0], offers } : {}) };
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {

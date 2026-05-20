@@ -17,11 +17,11 @@ type TextRequest = (
   },
 ) => Promise<string | undefined>;
 
-export async function findPriceMatch(
+export async function findPriceMatches(
   message: GetPriceMatchForProductMessage,
   requestJson?: JsonRequest,
   requestText?: TextRequest,
-): Promise<PriceMatchOffer | undefined> {
+): Promise<PriceMatchOffer[]> {
   const [prisjaktOffer, godprisOffer] = await Promise.all([
     findPrisjaktPriceMatch(message, requestJson),
     findGodprisPriceMatch(message, requestJson, requestText),
@@ -33,7 +33,15 @@ export async function findPriceMatch(
       const amountDifference = first.amount - second.amount;
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
-    })[0];
+    });
+}
+
+export async function findPriceMatch(
+  message: GetPriceMatchForProductMessage,
+  requestJson?: JsonRequest,
+  requestText?: TextRequest,
+): Promise<PriceMatchOffer | undefined> {
+  return (await findPriceMatches(message, requestJson, requestText))[0];
 }
 
 function sourceRank(offer: PriceMatchOffer): number {

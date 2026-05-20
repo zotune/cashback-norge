@@ -60,6 +60,7 @@ export type PriceMatchForProductResponse =
   | {
       ok: true;
       offer?: PriceMatchOffer;
+      offers?: PriceMatchOffer[];
     }
   | {
       ok: false;

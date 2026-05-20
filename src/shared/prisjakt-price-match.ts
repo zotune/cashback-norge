@@ -89,28 +89,35 @@ async function fetchNativePrisjaktPriceMatch(
     const product = await fetchNativePrisjaktProductByOfferUrls([message.url, message.productUrl], requestJson);
     if (product === undefined) return undefined;
 
-    const offers = (await fetchNativePrisjaktOffers(product.id, requestJson))
-      .filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
-    if (offers.length === 0) return undefined;
-
-    const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
-    const bestOffer = sortedOffers[0];
-    if (bestOffer === undefined) return undefined;
-
-    return {
-      source: "prisjakt",
-      sourceName: "Prisjakt",
-      shopName: bestOffer.shopName,
-      amount: bestOffer.amount,
-      currency: bestOffer.currency,
-      price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
-      productName: product.name,
-      productUrl: product.productUrl,
-      ...(bestOffer.offerUrl !== undefined ? { offerUrl: bestOffer.offerUrl } : {}),
-    };
+    return fetchBestNativePrisjaktOffer(product, requestJson);
   } catch {
     return undefined;
   }
+}
+
+async function fetchBestNativePrisjaktOffer(
+  product: NativePrisjaktProduct,
+  requestJson: JsonRequest,
+): Promise<PriceMatchOffer | undefined> {
+  const offers = (await fetchNativePrisjaktOffers(product.id, requestJson))
+    .filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
+  if (offers.length === 0) return undefined;
+
+  const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
+  const bestOffer = sortedOffers[0];
+  if (bestOffer === undefined) return undefined;
+
+  return {
+    source: "prisjakt",
+    sourceName: "Prisjakt",
+    shopName: bestOffer.shopName,
+    amount: bestOffer.amount,
+    currency: bestOffer.currency,
+    price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
+    productName: product.name,
+    productUrl: product.productUrl,
+    ...(bestOffer.offerUrl !== undefined ? { offerUrl: bestOffer.offerUrl } : {}),
+  };
 }
 
 type NativePrisjaktProduct = {
@@ -279,7 +286,29 @@ async function fetchPrisjaktSearch(
   const value = await requestJson(`https://browser-extension-backend.cloud.pji.nu/v1/search?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
   });
-  return readBestPrisjaktOffer(value);
+  const offer = readBestPrisjaktOffer(value);
+  if (offer !== undefined) return offer;
+
+  const product = readFirstPrisjaktSearchProduct(value);
+  return product !== undefined ? fetchBestNativePrisjaktOffer(product, requestJson) : undefined;
+}
+
+function readFirstPrisjaktSearchProduct(value: unknown): NativePrisjaktProduct | undefined {
+  if (!isPlainRecord(value)) return undefined;
+  const details = Array.isArray(value.details) ? value.details : [];
+  for (const detail of details) {
+    if (!isPlainRecord(detail) || !isPlainRecord(detail.product)) continue;
+    const id = readNumberLike(detail.product.id);
+    const name = typeof detail.product.name === "string" ? detail.product.name : undefined;
+    if (id !== undefined && name !== undefined) {
+      return {
+        id,
+        name,
+        productUrl: `https://www.prisjakt.no/product.php?p=${encodeURIComponent(String(id))}`,
+      };
+    }
+  }
+  return undefined;
 }
 
 function readBestPrisjaktOffer(value: unknown): PriceMatchOffer | undefined {

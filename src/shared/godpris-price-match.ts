@@ -31,7 +31,7 @@ export async function findGodprisPriceMatch(
   }
 
   const searchQueries = uniqueStrings([
-    ...(message.codes ?? []).filter((code) => code.trim().length >= 5),
+    ...(message.codes ?? []).filter(isLikelyGtin),
     message.searchTerm,
   ]);
 
@@ -177,6 +177,11 @@ function readNumberLike(value: unknown): number | undefined {
 
 function uniqueStrings(values: Array<string | undefined>): string[] {
   return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => value !== undefined && value.length > 0))];
+}
+
+function isLikelyGtin(value: string): boolean {
+  const normalized = value.trim();
+  return /^(?:\d{8}|\d{12,14})$/.test(normalized);
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779272371
+// @version      1779298480
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -14,6 +14,7 @@
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
 // @connect      browser-extension-backend.cloud.pji.nu
+// @connect      godpris.no
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
@@ -374,6 +375,140 @@
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
+  const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
+  const BAD_AVAILABILITY_STATUSES$1 = /* @__PURE__ */ new Set([
+    "discontinued",
+    "not_available",
+    "not_in_stock",
+    "out_of_stock"
+  ]);
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$1, requestText = fetchText) {
+    if (!message.productPageClue && message.searchTerm.trim().length < 8) {
+      return void 0;
+    }
+    const searchQueries = uniqueStrings$1([
+      ...(message.codes ?? []).filter(isLikelyGtin),
+      message.searchTerm
+    ]);
+    for (const query of searchQueries) {
+      const productId = await fetchGodprisProductId(query, requestJson);
+      if (productId === void 0) continue;
+      const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
+        headers: { "Accept": "text/html,application/xhtml+xml" }
+      });
+      const offer = html !== void 0 ? readGodprisProductPage(html, productId) : void 0;
+      if (offer !== void 0) return offer;
+    }
+    return void 0;
+  }
+  async function fetchGodprisProductId(query, requestJson) {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 4) return void 0;
+    const params = new URLSearchParams({ q: normalizedQuery });
+    const value = await requestJson(`https://godpris.no/api/product/search?${params.toString()}`, {
+      headers: { "Accept": "application/json" }
+    });
+    if (!isPlainRecord$1(value) || !Array.isArray(value.results)) return void 0;
+    for (const result of value.results) {
+      if (!isPlainRecord$1(result)) continue;
+      const id = readStringLike(result.id);
+      if (id !== void 0) return id;
+    }
+    return void 0;
+  }
+  function readGodprisProductPage(html, fallbackProductId) {
+    const page = readGodprisDataPage(html);
+    const props = isPlainRecord$1(page?.props) ? page.props : void 0;
+    const product = isPlainRecord$1(props?.product) ? props.product : void 0;
+    const prices = Array.isArray(props?.prices) ? props.prices : [];
+    if (product === void 0 || prices.length === 0) return void 0;
+    const productId = readStringLike(product.id) ?? fallbackProductId;
+    const productName = readStringLike(product.title) ?? readStringLike(product.name) ?? "Godpris-produkt";
+    const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
+    const best = offers[0];
+    if (best === void 0) return void 0;
+    return {
+      ...best,
+      source: "godpris",
+      sourceName: "Godpris",
+      productName,
+      productUrl: `${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`
+    };
+  }
+  function readGodprisDataPage(html) {
+    const match = html.match(/<div id="app" data-page="([^"]*)"/);
+    if (match?.[1] === void 0) return void 0;
+    try {
+      return JSON.parse(decodeHtmlAttribute(match[1]));
+    } catch {
+      return void 0;
+    }
+  }
+  function readGodprisOffer(value) {
+    if (!isPlainRecord$1(value)) return void 0;
+    const shop = isPlainRecord$1(value.shop) ? value.shop : void 0;
+    const amount = readNumberLike$1(value.price);
+    const shopName = readStringLike(shop?.title) ?? readStringLike(value.shop_title);
+    const availability = readStringLike(value.availability)?.toLowerCase();
+    if (amount === void 0 || amount <= 0 || shopName === void 0) return void 0;
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$1.has(availability)) return void 0;
+    const offerUrl = readStringLike(value.click_url) ?? readStringLike(value.url);
+    return {
+      shopName,
+      amount,
+      currency: "NOK",
+      price: formatNokPrice(amount),
+      ...offerUrl !== void 0 ? { offerUrl } : {}
+    };
+  }
+  async function fetchJson$1(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchText(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  function formatNokPrice(amount) {
+    const formatted = new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
+    }).format(amount);
+    return `${formatted} kr`;
+  }
+  function decodeHtmlAttribute(value) {
+    return value.replace(/&quot;/g, '"').replace(/&#039;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  }
+  function readStringLike(value) {
+    if (typeof value !== "string" && typeof value !== "number") return void 0;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberLike$1(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function uniqueStrings$1(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function isLikelyGtin(value) {
+    const normalized = value.trim();
+    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
+  }
+  function isPlainRecord$1(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
   const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
   const PRISJAKT_NATIVE_AUTHORIZATION = "Bearer JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmY";
   const PRISJAKT_PRODUCT_BY_OFFER_URL_QUERY = `
@@ -435,23 +570,28 @@ query OfferList($productId: Int!) {
     try {
       const product = await fetchNativePrisjaktProductByOfferUrls([message.url, message.productUrl], requestJson);
       if (product === void 0) return void 0;
-      const offers = (await fetchNativePrisjaktOffers(product.id, requestJson)).filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
-      if (offers.length === 0) return void 0;
-      const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
-      const bestOffer = sortedOffers[0];
-      if (bestOffer === void 0) return void 0;
-      return {
-        shopName: bestOffer.shopName,
-        amount: bestOffer.amount,
-        currency: bestOffer.currency,
-        price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
-        productName: product.name,
-        productUrl: product.productUrl,
-        ...bestOffer.offerUrl !== void 0 ? { offerUrl: bestOffer.offerUrl } : {}
-      };
+      return fetchBestNativePrisjaktOffer(product, requestJson);
     } catch {
       return void 0;
     }
+  }
+  async function fetchBestNativePrisjaktOffer(product, requestJson) {
+    const offers = (await fetchNativePrisjaktOffers(product.id, requestJson)).filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
+    if (offers.length === 0) return void 0;
+    const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
+    const bestOffer = sortedOffers[0];
+    if (bestOffer === void 0) return void 0;
+    return {
+      source: "prisjakt",
+      sourceName: "Prisjakt",
+      shopName: bestOffer.shopName,
+      amount: bestOffer.amount,
+      currency: bestOffer.currency,
+      price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
+      productName: product.name,
+      productUrl: product.productUrl,
+      ...bestOffer.offerUrl !== void 0 ? { offerUrl: bestOffer.offerUrl } : {}
+    };
   }
   async function fetchNativePrisjaktProductByOfferUrls(offerUrls, requestJson) {
     const candidateUrls = uniqueStrings([
@@ -570,7 +710,27 @@ query OfferList($productId: Int!) {
     const value = await requestJson(`https://browser-extension-backend.cloud.pji.nu/v1/search?${params.toString()}`, {
       headers: { "Content-Type": "application/json" }
     });
-    return readBestPrisjaktOffer(value);
+    const offer = readBestPrisjaktOffer(value);
+    if (offer !== void 0) return offer;
+    const product = readFirstPrisjaktSearchProduct(value);
+    return product !== void 0 ? fetchBestNativePrisjaktOffer(product, requestJson) : void 0;
+  }
+  function readFirstPrisjaktSearchProduct(value) {
+    if (!isPlainRecord(value)) return void 0;
+    const details = Array.isArray(value.details) ? value.details : [];
+    for (const detail of details) {
+      if (!isPlainRecord(detail) || !isPlainRecord(detail.product)) continue;
+      const id = readNumberLike(detail.product.id);
+      const name = typeof detail.product.name === "string" ? detail.product.name : void 0;
+      if (id !== void 0 && name !== void 0) {
+        return {
+          id,
+          name,
+          productUrl: `https://www.prisjakt.no/product.php?p=${encodeURIComponent(String(id))}`
+        };
+      }
+    }
+    return void 0;
   }
   function readBestPrisjaktOffer(value) {
     if (!isPlainRecord(value)) return void 0;
@@ -590,6 +750,8 @@ query OfferList($productId: Int!) {
     if (best === void 0) return void 0;
     return {
       ...best,
+      source: "prisjakt",
+      sourceName: "Prisjakt",
       productName,
       productUrl: productId !== void 0 ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`
     };
@@ -658,6 +820,22 @@ query OfferList($productId: Int!) {
   }
   function isPlainRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  async function findPriceMatches(message, requestJson, requestText) {
+    const [prisjaktOffer, godprisOffer] = await Promise.all([
+      findPrisjaktPriceMatch(message, requestJson),
+      findGodprisPriceMatch(message, requestJson, requestText)
+    ]);
+    return [prisjaktOffer, godprisOffer].filter((offer) => offer !== void 0).sort((first, second) => {
+      const amountDifference = first.amount - second.amount;
+      if (amountDifference !== 0) return amountDifference;
+      return sourceRank(first) - sourceRank(second);
+    });
+  }
+  function sourceRank(offer) {
+    if (offer.source === "prisjakt") return 0;
+    if (offer.source === "godpris") return 1;
+    return 2;
   }
   const noWords = [
     "asshole",
@@ -1225,7 +1403,7 @@ query OfferList($productId: Int!) {
   const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
   const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1e3;
   const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
-  const NOTICE_BLOCKED_HOSTS = /* @__PURE__ */ new Set([
+  const PRICE_MATCH_SOURCE_HOSTS = /* @__PURE__ */ new Set([
     "prisjakt.no",
     "prisjakt.nu",
     "prisjakt.se",
@@ -1233,20 +1411,17 @@ query OfferList($productId: Int!) {
     "pricespy.co.uk",
     "pricespy.co.nz",
     "hintaopas.fi",
-    "ledenicheur.fr"
+    "ledenicheur.fr",
+    "godpris.no"
   ]);
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
-    if (isNoticeBlockedHost(CURRENT_HOST)) {
-      clearNotice();
-      return;
-    }
     if (isCashbackFoundMessage(message)) {
-      renderNoticeWithStoredState(message.offers);
+      requestCurrentOffers();
       return;
     }
     if (isCashbackNoneMessage(message)) {
-      clearNotice();
+      requestCurrentOffers();
       return;
     }
     if (isRecord(message) && message.type === "toggle-notice") {
@@ -1265,11 +1440,7 @@ query OfferList($productId: Int!) {
     }
   });
   requestCurrentOffers();
-  function renderNoticeWithStoredState(offers, priceMatch) {
-    if (isNoticeBlockedHost(CURRENT_HOST)) {
-      clearNotice();
-      return;
-    }
+  function renderNoticeWithStoredState(offers, priceMatches = []) {
     const isUserscript = chrome.runtime.id === void 0;
     chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
       const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
@@ -1279,27 +1450,23 @@ query OfferList($productId: Int!) {
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
       const priceMatchCollapsed = result[PRICE_MATCH_COLLAPSED_KEY] === true;
       void readActivatedOffers().catch(() => ({})).then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatch);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatches);
       });
     });
   }
   function requestCurrentOffers() {
-    if (isNoticeBlockedHost(CURRENT_HOST)) {
-      clearNotice();
-      return;
-    }
     void renderCurrentContext();
   }
-  function isNoticeBlockedHost(hostname) {
-    return NOTICE_BLOCKED_HOSTS.has(hostname);
+  function hasBlockedHostname(blockedHosts, hostname) {
+    return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
   }
   async function renderCurrentContext() {
-    const [offers, priceMatch] = await Promise.all([
+    const [offers, priceMatches] = await Promise.all([
       getCurrentOffers(),
-      getPriceMatchForCurrentPage()
+      getPriceMatchesForCurrentPage()
     ]);
-    if (offers.length > 0 || priceMatch !== void 0) {
-      renderNoticeWithStoredState(offers, priceMatch);
+    if (offers.length > 0 || priceMatches.length > 0) {
+      renderNoticeWithStoredState(offers, priceMatches);
       return;
     }
     clearNotice();
@@ -1331,21 +1498,21 @@ query OfferList($productId: Int!) {
       return [];
     }
   }
-  async function getPriceMatchForCurrentPage() {
+  async function getPriceMatchesForCurrentPage() {
     const productMeta = extractProductPageMeta();
-    if (productMeta === void 0) return void 0;
+    if (productMeta === void 0) return [];
     const message = {
       type: "get-price-match-for-product",
       ...productMeta
     };
     if (isUserscriptRuntime()) {
-      return findPrisjaktPriceMatch(message, userscriptJsonRequest);
+      return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
     }
     const response = await sendRuntimeMessage(message);
     if (response !== void 0 && isPriceMatchForProductResponse(response) && response.ok) {
-      return response.offer;
+      return response.offers ?? (response.offer !== void 0 ? [response.offer] : []);
     }
-    return void 0;
+    return [];
   }
   function isUserscriptRuntime() {
     return chrome.runtime.id === void 0;
@@ -1380,6 +1547,36 @@ query OfferList($productId: Int!) {
       return void 0;
     }
   }
+  async function userscriptTextRequest(url, init) {
+    const gmRequest = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : void 0;
+    if (gmRequest !== void 0) {
+      return new Promise((resolveValue) => {
+        const requestOptions = {
+          method: init?.method ?? "GET",
+          url,
+          timeout: 15e3,
+          onload: (response) => {
+            resolveValue(readUserscriptTextResponse(response));
+          },
+          onerror: () => resolveValue(void 0),
+          ontimeout: () => resolveValue(void 0)
+        };
+        if (init?.headers !== void 0) requestOptions.headers = init.headers;
+        if (init?.body !== void 0) requestOptions.data = init.body;
+        const maybePromise = gmRequest(requestOptions);
+        if (isPromiseLike(maybePromise)) {
+          maybePromise.then((response) => resolveValue(readUserscriptTextResponse(response))).catch(() => resolveValue(void 0));
+        }
+      });
+    }
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
   function parseUserscriptJsonResponse(response) {
     if (!isRecord(response)) return void 0;
     const status = typeof response.status === "number" ? response.status : 200;
@@ -1391,6 +1588,13 @@ query OfferList($productId: Int!) {
     } catch {
       return void 0;
     }
+  }
+  function readUserscriptTextResponse(response) {
+    if (!isRecord(response)) return void 0;
+    const status = typeof response.status === "number" ? response.status : 200;
+    if (status < 200 || status >= 300) return void 0;
+    const body = response.response ?? response.responseText;
+    return typeof body === "string" ? body : void 0;
   }
   function isPromiseLike(value) {
     return isRecord(value) && typeof value.then === "function";
@@ -1411,23 +1615,26 @@ query OfferList($productId: Int!) {
     if (parsedUrl === void 0 || parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
       return void 0;
     }
+    if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, parsedUrl.hostname.replace(/^www\./, "").toLowerCase())) {
+      return void 0;
+    }
     const productLdJson = findProductLdJson();
+    const offer = readFirstOffer(productLdJson?.offers);
     const titleMeta = document.querySelector('meta[name="title"]')?.content.trim();
     const ogTitle = document.querySelector('meta[property="og:title"]')?.content.trim();
     const h1 = document.querySelector("h1")?.textContent?.trim();
-    const productPageClue = productLdJson !== void 0 || document.querySelector('meta[property="og:type"][content="product"]') !== null || /\b(product|produkt)\b/i.test(parsedUrl.pathname) || [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin)\b/i.test(key));
+    const codes = collectProductCodes(productLdJson);
+    const productPageClue = hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
     const productName = readStringValue(productLdJson?.name);
     const brandName = readBrandName(productLdJson?.brand);
     const searchTerm = productName !== void 0 ? brandName !== void 0 && !productName.toLowerCase().includes(brandName.toLowerCase()) ? `${brandName} ${productName}` : productName : h1 ?? titleMeta ?? ogTitle ?? document.title;
     const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
-    if (!productPageClue && normalizedSearchTerm.length < 8) {
+    if (!productPageClue || normalizedSearchTerm.length < 8) {
       return void 0;
     }
-    const offer = readFirstOffer(productLdJson?.offers);
     const price = readNumberValue(offer?.price);
     const currency = readStringValue(offer?.priceCurrency);
     const productUrl = readUrlValue(productLdJson?.url);
-    const codes = collectProductCodes(productLdJson);
     const organizationName = findOrganizationName();
     return {
       url: window.location.href,
@@ -1439,6 +1646,41 @@ query OfferList($productId: Int!) {
       ...codes.length > 0 ? { codes } : {},
       ...organizationName !== void 0 ? { organizationName } : {}
     };
+  }
+  function hasProductStructuredDataSignal(product, offer, codes) {
+    if (product === void 0) return false;
+    const productName = readStringValue(product.name);
+    if (productName === void 0) return false;
+    if (codes.length > 0) return true;
+    if (readNumberValue(offer?.price) !== void 0 || readStringValue(offer?.priceCurrency) !== void 0) return true;
+    return hasVisiblePriceSignal() && hasCommerceActionSignal();
+  }
+  function isLikelyCommerceProductPage(parsedUrl) {
+    const productishPath = /\b(product|produkt|produkter|p|i|item|shop|varer|sku)\b/i.test(parsedUrl.pathname) || [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin|ean)\b/i.test(key));
+    if (!productishPath) return false;
+    return hasVisiblePriceSignal() && hasCommerceActionSignal();
+  }
+  function hasVisiblePriceSignal() {
+    if (document.querySelector('[itemprop="price"], meta[property="product:price:amount"], meta[property="og:price:amount"]') !== null) {
+      return true;
+    }
+    const bodyText = document.body?.innerText.slice(0, 8e3) ?? "";
+    return /\b(?:kr|NOK)\s?\d|\d[\d\s]*(?:,\d{2})?\s?(?:kr|NOK)\b/i.test(bodyText);
+  }
+  function hasCommerceActionSignal() {
+    const commerceText = [
+      "legg i handlekurv",
+      "legg til handlekurv",
+      "kjøp",
+      "kjop",
+      "add to cart",
+      "add to basket"
+    ];
+    for (const element of document.querySelectorAll("button, a, input")) {
+      const text = `${element.textContent ?? ""} ${element.value ?? ""} ${element.getAttribute("aria-label") ?? ""}`.trim().toLowerCase();
+      if (commerceText.some((needle) => text.includes(needle))) return true;
+    }
+    return false;
   }
   function findProductLdJson() {
     for (const entry of readLdJsonEntries()) {
@@ -1989,7 +2231,7 @@ query OfferList($productId: Int!) {
       });
     });
   }
-  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, initialPriceMatchCollapsed, activatedOffers, priceMatch) {
+  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, initialPriceMatchCollapsed, activatedOffers, priceMatches = []) {
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
@@ -2320,7 +2562,11 @@ query OfferList($productId: Int!) {
       color: #003b00;
     }
     .provider-prisjakt {
-      background: #ff8a00;
+      background: #00a9ce;
+      color: #ffffff;
+    }
+    .provider-godpris {
+      background: #21003f;
       color: #ffffff;
     }
     .provider-sparebank1 {
@@ -2705,8 +2951,8 @@ query OfferList($productId: Int!) {
     }
     .price-match-card {
       align-items: center;
-      background: #fffaf2;
-      border: 1px solid #ffd09a;
+      background: #f7faf8;
+      border: 1px solid #d8e3de;
       border-radius: 5px;
       color: #172026;
       display: grid;
@@ -2715,6 +2961,9 @@ query OfferList($productId: Int!) {
       grid-template-columns: minmax(0, 1fr) auto auto;
       padding: 6px 9px;
       text-decoration: none;
+    }
+    .price-match-card + .price-match-card {
+      margin-top: 4px;
     }
     .price-match-title {
       display: flex;
@@ -2965,6 +3214,7 @@ query OfferList($productId: Int!) {
   `;
     const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
+    const priceMatch = priceMatches[0];
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
     const APP_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["klarna", "spenn", "dreams"]);
@@ -2987,7 +3237,7 @@ query OfferList($productId: Int!) {
     }
     const notice = document.createElement("section");
     notice.className = "notice";
-    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? "prisjakt" : "rabattkode");
+    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : "rabattkode");
     const sideTab = document.createElement("button");
     sideTab.className = `side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
@@ -3022,8 +3272,8 @@ query OfferList($productId: Int!) {
       rewardSpan.className = "side-tab-reward";
       rewardSpan.textContent = priceMatch.price;
       const chipSpan = document.createElement("span");
-      chipSpan.className = "side-tab-chip provider-prisjakt";
-      chipSpan.textContent = "Prisjakt";
+      chipSpan.className = `side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
+      chipSpan.textContent = getPriceMatchSourceName(priceMatch);
       sideTabText.append(rewardSpan, chipSpan);
     }
     sideTab.append(sideTabArrow, sideTabText);
@@ -3042,7 +3292,7 @@ query OfferList($productId: Int!) {
     const siteIcon = createSiteIcon();
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : `Prismatch hos ${priceMatch?.shopName ?? "Prisjakt"}`;
+    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Prismatch";
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
     sumInput.className = "sum-input";
@@ -3802,7 +4052,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     codesSection.append(codesToggle, codesList, expiredSection);
     const priceMatchSection = document.createElement("div");
     priceMatchSection.className = "price-match-section";
-    if (priceMatch !== void 0) {
+    if (priceMatches.length > 0) {
       if (initialPriceMatchCollapsed) {
         priceMatchSection.classList.add("collapsed");
       }
@@ -3819,31 +4069,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         const isCollapsed = priceMatchSection.classList.toggle("collapsed");
         chrome.storage.local.set({ [PRICE_MATCH_COLLAPSED_KEY]: isCollapsed });
       });
-      const priceMatchCard = document.createElement("a");
-      priceMatchCard.className = "price-match-card";
-      priceMatchCard.href = priceMatch.productUrl;
-      priceMatchCard.target = "_blank";
-      priceMatchCard.rel = "noreferrer";
-      const priceMatchTitle = document.createElement("span");
-      priceMatchTitle.className = "price-match-title";
-      const priceMatchProduct = document.createElement("span");
-      priceMatchProduct.className = "price-match-product";
-      priceMatchProduct.textContent = priceMatch.productName;
-      const priceMatchShop = document.createElement("span");
-      priceMatchShop.className = "price-match-shop";
-      priceMatchShop.textContent = priceMatch.shopName;
-      priceMatchTitle.append(priceMatchProduct, priceMatchShop);
-      const priceMatchPrice = document.createElement("span");
-      priceMatchPrice.className = "price-match-price";
-      priceMatchPrice.textContent = priceMatch.price;
-      const priceMatchBadge = document.createElement("span");
-      priceMatchBadge.className = "provider-badge provider-prisjakt";
-      priceMatchBadge.textContent = "Prisjakt";
-      priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
-      priceMatchSection.append(priceMatchToggle, priceMatchCard);
+      priceMatchSection.append(priceMatchToggle, ...priceMatches.map(buildPriceMatchCard));
     }
     body.append(header, offerList);
-    if (priceMatch !== void 0) body.append(priceMatchSection);
+    if (priceMatches.length > 0) body.append(priceMatchSection);
     if (offers.length > 0) body.append(chipsSection, codesSection);
     let userHasVoted = false;
     [...codeOffers].sort((a, b) => parseRewardNum(b.reward) - parseRewardNum(a.reward)).forEach((codeOffer, i) => {
@@ -4203,12 +4432,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return false;
     }
     if (value.ok) {
-      return value.offer === void 0 || isPriceMatchOffer(value.offer);
+      return (value.offer === void 0 || isPriceMatchOffer(value.offer)) && (value.offers === void 0 || Array.isArray(value.offers) && value.offers.every(isPriceMatchOffer));
     }
     return typeof value.reason === "string";
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string");
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris") && (value.sourceName === void 0 || typeof value.sourceName === "string") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string");
   }
   function isCashbackIndex(value) {
     if (!isRecord(value) || typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord(value.domainIndex)) {
@@ -4391,6 +4620,36 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (kind === "unit") return 2;
     if (kind === "points") return 1;
     return 0;
+  }
+  function buildPriceMatchCard(priceMatch) {
+    const priceMatchCard = document.createElement("a");
+    priceMatchCard.className = "price-match-card";
+    priceMatchCard.href = priceMatch.productUrl;
+    priceMatchCard.target = "_blank";
+    priceMatchCard.rel = "noreferrer";
+    const priceMatchTitle = document.createElement("span");
+    priceMatchTitle.className = "price-match-title";
+    const priceMatchProduct = document.createElement("span");
+    priceMatchProduct.className = "price-match-product";
+    priceMatchProduct.textContent = priceMatch.productName;
+    const priceMatchShop = document.createElement("span");
+    priceMatchShop.className = "price-match-shop";
+    priceMatchShop.textContent = priceMatch.shopName;
+    priceMatchTitle.append(priceMatchProduct, priceMatchShop);
+    const priceMatchPrice = document.createElement("span");
+    priceMatchPrice.className = "price-match-price";
+    priceMatchPrice.textContent = priceMatch.price;
+    const priceMatchBadge = document.createElement("span");
+    priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
+    priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
+    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
+    return priceMatchCard;
+  }
+  function getPriceMatchProviderClass(priceMatch) {
+    return priceMatch.source === "godpris" ? "godpris" : "prisjakt";
+  }
+  function getPriceMatchSourceName(priceMatch) {
+    return priceMatch.sourceName ?? (priceMatch.source === "godpris" ? "Godpris" : "Prisjakt");
   }
   function formatProviderName(provider) {
     return PROVIDER_NAMES[provider] ?? provider;

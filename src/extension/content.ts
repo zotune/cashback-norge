@@ -8,7 +8,7 @@ import {
   formatRewardLabel,
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
-import { findPrisjaktPriceMatch } from "../shared/prisjakt-price-match";
+import { findPriceMatches } from "../shared/price-match";
 import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
 
@@ -205,6 +205,8 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
+  source?: "prisjakt" | "godpris";
+  sourceName?: string;
   shopName: string;
   price: string;
   amount: number;
@@ -217,6 +219,7 @@ type PriceMatchForProductResponse =
   | {
       ok: true;
       offer?: PriceMatchOffer;
+      offers?: PriceMatchOffer[];
     }
   | {
       ok: false;
@@ -232,7 +235,7 @@ const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
 const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1000;
 const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
-const NOTICE_BLOCKED_HOSTS = new Set([
+const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "prisjakt.no",
   "prisjakt.nu",
   "prisjakt.se",
@@ -241,6 +244,7 @@ const NOTICE_BLOCKED_HOSTS = new Set([
   "pricespy.co.nz",
   "hintaopas.fi",
   "ledenicheur.fr",
+  "godpris.no",
 ]);
 installOfferActivationClickTracker();
 chrome.runtime.onMessage.addListener((message) => {
@@ -250,11 +254,11 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (isCashbackFoundMessage(message)) {
-    renderNoticeWithStoredState(message.offers);
+    requestCurrentOffers();
     return;
   }
   if (isCashbackNoneMessage(message)) {
-    clearNotice();
+    requestCurrentOffers();
     return;
   }
   if (isRecord(message) && message.type === "toggle-notice") {
@@ -273,7 +277,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 requestCurrentOffers();
-function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatch?: PriceMatchOffer): void {
+function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatches: PriceMatchOffer[] = []): void {
   if (isNoticeBlockedHost(CURRENT_HOST)) {
     clearNotice();
     return;
@@ -290,7 +294,7 @@ function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatch?: Price
     void readActivatedOffers()
       .catch(() => ({}))
       .then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatch);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatches);
       });
   });
 }
@@ -304,16 +308,20 @@ function requestCurrentOffers(): void {
 }
 
 function isNoticeBlockedHost(hostname: string): boolean {
-  return NOTICE_BLOCKED_HOSTS.has(hostname);
+  return false;
+}
+
+function hasBlockedHostname(blockedHosts: ReadonlySet<string>, hostname: string): boolean {
+  return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
 }
 
 async function renderCurrentContext(): Promise<void> {
-  const [offers, priceMatch] = await Promise.all([
+  const [offers, priceMatches] = await Promise.all([
     getCurrentOffers(),
-    getPriceMatchForCurrentPage(),
+    getPriceMatchesForCurrentPage(),
   ]);
-  if (offers.length > 0 || priceMatch !== undefined) {
-    renderNoticeWithStoredState(offers, priceMatch);
+  if (offers.length > 0 || priceMatches.length > 0) {
+    renderNoticeWithStoredState(offers, priceMatches);
     return;
   }
   clearNotice();
@@ -350,22 +358,22 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
   }
 }
 
-async function getPriceMatchForCurrentPage(): Promise<PriceMatchOffer | undefined> {
+async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
   const productMeta = extractProductPageMeta();
-  if (productMeta === undefined) return undefined;
+  if (productMeta === undefined) return [];
   const message: GetPriceMatchForProductMessage = {
     type: "get-price-match-for-product",
     ...productMeta,
   };
   if (isUserscriptRuntime()) {
-    return findPrisjaktPriceMatch(message, userscriptJsonRequest);
+    return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
   }
 
   const response = await sendRuntimeMessage<PriceMatchForProductResponse>(message);
   if (response !== undefined && isPriceMatchForProductResponse(response) && response.ok) {
-    return response.offer;
+    return response.offers ?? (response.offer !== undefined ? [response.offer] : []);
   }
-  return undefined;
+  return [];
 }
 
 function isUserscriptRuntime(): boolean {
@@ -419,6 +427,53 @@ async function userscriptJsonRequest(
   }
 }
 
+async function userscriptTextRequest(
+  url: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+): Promise<string | undefined> {
+  const gmRequest = typeof GM_xmlhttpRequest === "function"
+    ? GM_xmlhttpRequest
+    : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function"
+      ? GM.xmlHttpRequest
+      : undefined;
+
+  if (gmRequest !== undefined) {
+    return new Promise((resolveValue) => {
+      const requestOptions: UserscriptHttpRequestOptions = {
+        method: init?.method ?? "GET",
+        url,
+        timeout: 15000,
+        onload: (response) => {
+          resolveValue(readUserscriptTextResponse(response));
+        },
+        onerror: () => resolveValue(undefined),
+        ontimeout: () => resolveValue(undefined),
+      };
+      if (init?.headers !== undefined) requestOptions.headers = init.headers;
+      if (init?.body !== undefined) requestOptions.data = init.body;
+
+      const maybePromise = gmRequest(requestOptions);
+      if (isPromiseLike(maybePromise)) {
+        maybePromise
+          .then((response) => resolveValue(readUserscriptTextResponse(response)))
+          .catch(() => resolveValue(undefined));
+      }
+    });
+  }
+
+  try {
+    const response = await fetch(url, init);
+    if (!response.ok) return undefined;
+    return response.text();
+  } catch {
+    return undefined;
+  }
+}
+
 function parseUserscriptJsonResponse(response: unknown): unknown | undefined {
   if (!isRecord(response)) return undefined;
   const status = typeof response.status === "number" ? response.status : 200;
@@ -430,6 +485,14 @@ function parseUserscriptJsonResponse(response: unknown): unknown | undefined {
   } catch {
     return undefined;
   }
+}
+
+function readUserscriptTextResponse(response: unknown): string | undefined {
+  if (!isRecord(response)) return undefined;
+  const status = typeof response.status === "number" ? response.status : 200;
+  if (status < 200 || status >= 300) return undefined;
+  const body = response.response ?? response.responseText;
+  return typeof body === "string" ? body : undefined;
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -453,16 +516,21 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   if (parsedUrl === undefined || (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:")) {
     return undefined;
   }
+  if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, parsedUrl.hostname.replace(/^www\./, "").toLowerCase())) {
+    return undefined;
+  }
 
   const productLdJson = findProductLdJson();
+  const offer = readFirstOffer(productLdJson?.offers);
   const titleMeta = document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content.trim();
   const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
   const h1 = document.querySelector("h1")?.textContent?.trim();
+  const codes = collectProductCodes(productLdJson);
   const productPageClue =
-    productLdJson !== undefined ||
-    document.querySelector('meta[property="og:type"][content="product"]') !== null ||
-    /\b(product|produkt)\b/i.test(parsedUrl.pathname) ||
-    [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin)\b/i.test(key));
+    hasProductStructuredDataSignal(productLdJson, offer, codes) ||
+    (document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal())) ||
+    codes.length > 0 ||
+    isLikelyCommerceProductPage(parsedUrl);
 
   const productName = readStringValue(productLdJson?.name);
   const brandName = readBrandName(productLdJson?.brand);
@@ -474,15 +542,13 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
       : h1 ?? titleMeta ?? ogTitle ?? document.title;
   const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
 
-  if (!productPageClue && normalizedSearchTerm.length < 8) {
+  if (!productPageClue || normalizedSearchTerm.length < 8) {
     return undefined;
   }
 
-  const offer = readFirstOffer(productLdJson?.offers);
   const price = readNumberValue(offer?.price);
   const currency = readStringValue(offer?.priceCurrency);
   const productUrl = readUrlValue(productLdJson?.url);
-  const codes = collectProductCodes(productLdJson);
   const organizationName = findOrganizationName();
 
   return {
@@ -495,6 +561,55 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     ...(codes.length > 0 ? { codes } : {}),
     ...(organizationName !== undefined ? { organizationName } : {}),
   };
+}
+
+function hasProductStructuredDataSignal(
+  product: Record<string, unknown> | undefined,
+  offer: Record<string, unknown> | undefined,
+  codes: string[],
+): boolean {
+  if (product === undefined) return false;
+  const productName = readStringValue(product.name);
+  if (productName === undefined) return false;
+  if (codes.length > 0) return true;
+  if (readNumberValue(offer?.price) !== undefined || readStringValue(offer?.priceCurrency) !== undefined) return true;
+  return hasVisiblePriceSignal() && hasCommerceActionSignal();
+}
+
+function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
+  const productishPath =
+    /\b(product|produkt|produkter|p|i|item|shop|varer|sku)\b/i.test(parsedUrl.pathname) ||
+    [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin|ean)\b/i.test(key));
+  if (!productishPath) return false;
+
+  return hasVisiblePriceSignal() && hasCommerceActionSignal();
+}
+
+function hasVisiblePriceSignal(): boolean {
+  if (document.querySelector('[itemprop="price"], meta[property="product:price:amount"], meta[property="og:price:amount"]') !== null) {
+    return true;
+  }
+
+  const bodyText = document.body?.innerText.slice(0, 8000) ?? "";
+  return /\b(?:kr|NOK)\s?\d|\d[\d\s]*(?:,\d{2})?\s?(?:kr|NOK)\b/i.test(bodyText);
+}
+
+function hasCommerceActionSignal(): boolean {
+  const commerceText = [
+    "legg i handlekurv",
+    "legg til handlekurv",
+    "kjøp",
+    "kjop",
+    "add to cart",
+    "add to basket",
+  ];
+
+  for (const element of document.querySelectorAll("button, a, input")) {
+    const text = `${element.textContent ?? ""} ${(element as HTMLInputElement).value ?? ""} ${element.getAttribute("aria-label") ?? ""}`.trim().toLowerCase();
+    if (commerceText.some((needle) => text.includes(needle))) return true;
+  }
+
+  return false;
 }
 
 function findProductLdJson(): Record<string, unknown> | undefined {
@@ -1231,7 +1346,7 @@ function renderNotice(
   initialCodesCollapsed: boolean,
   initialPriceMatchCollapsed: boolean,
   activatedOffers: Readonly<Record<string, number>>,
-  priceMatch?: PriceMatchOffer,
+  priceMatches: PriceMatchOffer[] = [],
 ): void {
   clearNotice();
   const host = document.createElement("div");
@@ -1563,7 +1678,11 @@ function renderNotice(
       color: #003b00;
     }
     .provider-prisjakt {
-      background: #ff8a00;
+      background: #00a9ce;
+      color: #ffffff;
+    }
+    .provider-godpris {
+      background: #21003f;
       color: #ffffff;
     }
     .provider-sparebank1 {
@@ -1948,8 +2067,8 @@ function renderNotice(
     }
     .price-match-card {
       align-items: center;
-      background: #fffaf2;
-      border: 1px solid #ffd09a;
+      background: #f7faf8;
+      border: 1px solid #d8e3de;
       border-radius: 5px;
       color: #172026;
       display: grid;
@@ -1958,6 +2077,9 @@ function renderNotice(
       grid-template-columns: minmax(0, 1fr) auto auto;
       padding: 6px 9px;
       text-decoration: none;
+    }
+    .price-match-card + .price-match-card {
+      margin-top: 4px;
     }
     .price-match-title {
       display: flex;
@@ -2208,6 +2330,7 @@ function renderNotice(
   `;
   const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
+  const priceMatch = priceMatches[0];
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
   const APP_ONLY_PROVIDERS = new Set(["klarna", "spenn", "dreams"]);
@@ -2230,7 +2353,7 @@ function renderNotice(
   }
   const notice = document.createElement("section");
   notice.className = "notice";
-  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? "prisjakt" : "rabattkode");
+  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "rabattkode");
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
   sideTab.className = `side-tab side-tab-${sideTabProvider}`;
@@ -2266,8 +2389,8 @@ function renderNotice(
     rewardSpan.className = "side-tab-reward";
     rewardSpan.textContent = priceMatch.price;
     const chipSpan = document.createElement("span");
-    chipSpan.className = "side-tab-chip provider-prisjakt";
-    chipSpan.textContent = "Prisjakt";
+    chipSpan.className = `side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
+    chipSpan.textContent = getPriceMatchSourceName(priceMatch);
     sideTabText.append(rewardSpan, chipSpan);
   }
   sideTab.append(sideTabArrow, sideTabText);
@@ -2289,9 +2412,11 @@ function renderNotice(
   title.className = "title";
   title.textContent = offer !== undefined
     ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}`
-    : primaryOffer !== undefined
-      ? `Rabattkode hos ${primaryOffer.merchantName}`
-      : `Prismatch hos ${priceMatch?.shopName ?? "Prisjakt"}`;
+      : primaryOffer !== undefined
+        ? `Rabattkode hos ${primaryOffer.merchantName}`
+      : priceMatch !== undefined
+        ? `Prismatch hos ${priceMatch.shopName}`
+        : "Prismatch";
   header.append(siteIcon, title);
   const sumInput = document.createElement("input");
   sumInput.className = "sum-input";
@@ -3033,7 +3158,7 @@ function renderNotice(
   codesSection.append(codesToggle, codesList, expiredSection);
   const priceMatchSection = document.createElement("div");
   priceMatchSection.className = "price-match-section";
-  if (priceMatch !== undefined) {
+  if (priceMatches.length > 0) {
     if (initialPriceMatchCollapsed) {
       priceMatchSection.classList.add("collapsed");
     }
@@ -3052,32 +3177,11 @@ function renderNotice(
       chrome.storage.local.set({ [PRICE_MATCH_COLLAPSED_KEY]: isCollapsed });
     });
 
-    const priceMatchCard = document.createElement("a");
-    priceMatchCard.className = "price-match-card";
-    priceMatchCard.href = priceMatch.productUrl;
-    priceMatchCard.target = "_blank";
-    priceMatchCard.rel = "noreferrer";
-    const priceMatchTitle = document.createElement("span");
-    priceMatchTitle.className = "price-match-title";
-    const priceMatchProduct = document.createElement("span");
-    priceMatchProduct.className = "price-match-product";
-    priceMatchProduct.textContent = priceMatch.productName;
-    const priceMatchShop = document.createElement("span");
-    priceMatchShop.className = "price-match-shop";
-    priceMatchShop.textContent = priceMatch.shopName;
-    priceMatchTitle.append(priceMatchProduct, priceMatchShop);
-    const priceMatchPrice = document.createElement("span");
-    priceMatchPrice.className = "price-match-price";
-    priceMatchPrice.textContent = priceMatch.price;
-    const priceMatchBadge = document.createElement("span");
-    priceMatchBadge.className = "provider-badge provider-prisjakt";
-    priceMatchBadge.textContent = "Prisjakt";
-    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
-    priceMatchSection.append(priceMatchToggle, priceMatchCard);
+    priceMatchSection.append(priceMatchToggle, ...priceMatches.map(buildPriceMatchCard));
   }
 
   body.append(header, offerList);
-  if (priceMatch !== undefined) body.append(priceMatchSection);
+  if (priceMatches.length > 0) body.append(priceMatchSection);
   if (offers.length > 0) body.append(chipsSection, codesSection);
 
   let userHasVoted = false;
@@ -3510,13 +3614,18 @@ function isPriceMatchForProductResponse(value: unknown): value is PriceMatchForP
     return false;
   }
   if (value.ok) {
-    return value.offer === undefined || isPriceMatchOffer(value.offer);
+    return (
+      (value.offer === undefined || isPriceMatchOffer(value.offer)) &&
+      (value.offers === undefined || (Array.isArray(value.offers) && value.offers.every(isPriceMatchOffer)))
+    );
   }
   return typeof value.reason === "string";
 }
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris") &&
+    (value.sourceName === undefined || typeof value.sourceName === "string") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
     typeof value.amount === "number" &&
@@ -3761,6 +3870,36 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "unit") return 2;
   if (kind === "points") return 1;
   return 0;
+}
+function buildPriceMatchCard(priceMatch: PriceMatchOffer): HTMLAnchorElement {
+  const priceMatchCard = document.createElement("a");
+  priceMatchCard.className = "price-match-card";
+  priceMatchCard.href = priceMatch.productUrl;
+  priceMatchCard.target = "_blank";
+  priceMatchCard.rel = "noreferrer";
+  const priceMatchTitle = document.createElement("span");
+  priceMatchTitle.className = "price-match-title";
+  const priceMatchProduct = document.createElement("span");
+  priceMatchProduct.className = "price-match-product";
+  priceMatchProduct.textContent = priceMatch.productName;
+  const priceMatchShop = document.createElement("span");
+  priceMatchShop.className = "price-match-shop";
+  priceMatchShop.textContent = priceMatch.shopName;
+  priceMatchTitle.append(priceMatchProduct, priceMatchShop);
+  const priceMatchPrice = document.createElement("span");
+  priceMatchPrice.className = "price-match-price";
+  priceMatchPrice.textContent = priceMatch.price;
+  const priceMatchBadge = document.createElement("span");
+  priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
+  priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
+  priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
+  return priceMatchCard;
+}
+function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
+  return priceMatch.source === "godpris" ? "godpris" : "prisjakt";
+}
+function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
+  return priceMatch.sourceName ?? (priceMatch.source === "godpris" ? "Godpris" : "Prisjakt");
 }
 function formatProviderName(provider: CashbackOffer["provider"]): string {
   return PROVIDER_NAMES[provider] ?? provider;
