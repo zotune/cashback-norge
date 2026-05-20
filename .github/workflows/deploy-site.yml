@@ -1,18 +1,6 @@
 name: Deploy site
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/deploy-site.yml"
-      - "data/cashback-index.json"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "site/**"
-      - "src/**"
-      - "vite.site.config.ts"
-      - "vite.userscript.config.ts"
   workflow_dispatch:
 
 permissions:
