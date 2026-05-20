@@ -30,6 +30,10 @@ const USERSCRIPT_BANNER = `\
 // @grant        GM_setValue
 // @grant        GM.getValue
 // @grant        GM.setValue
+// @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
+// @connect      native-backend.cloud.pji.nu
+// @connect      browser-extension-backend.cloud.pji.nu
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779093132
+// @version      1779269702
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -10,6 +10,10 @@
 // @grant        GM_setValue
 // @grant        GM.getValue
 // @grant        GM.setValue
+// @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
+// @connect      native-backend.cloud.pji.nu
+// @connect      browser-extension-backend.cloud.pji.nu
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
@@ -369,6 +373,277 @@
   }
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
+  }
+  const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
+  const PRISJAKT_NATIVE_AUTHORIZATION = "Bearer JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmY";
+  const PRISJAKT_PRODUCT_BY_OFFER_URL_QUERY = `
+query SearchProductsByOfferURL($offerUrl: String!) {
+  productsByOfferUrl(offerUrl: $offerUrl) {
+    id
+    name
+    webUri
+  }
+}
+`;
+  const PRISJAKT_OFFER_LIST_QUERY = `
+query OfferList($productId: Int!) {
+  product(id: $productId) {
+    id
+    name
+    webUri
+    offers {
+      externalUri
+      condition
+      shop {
+        name
+        currency
+      }
+      price {
+        exclShipping
+      }
+      shipping {
+        cheapest {
+          shippingCost
+        }
+      }
+    }
+  }
+}
+`;
+  async function findPrisjaktPriceMatch(message, requestJson = fetchJson) {
+    if (!message.productPageClue && message.searchTerm.trim().length < 8) {
+      return void 0;
+    }
+    const nativeOffer = await fetchNativePrisjaktPriceMatch(message, requestJson);
+    if (nativeOffer !== void 0 && isNorwegianPriceMatchOffer(nativeOffer)) {
+      return nativeOffer;
+    }
+    const identifyOffer = await fetchPrisjaktIdentify(message, requestJson);
+    if (identifyOffer !== void 0 && isNorwegianPriceMatchOffer(identifyOffer)) {
+      return identifyOffer;
+    }
+    const searchOffer = await fetchPrisjaktSearch(message.searchTerm, requestJson);
+    return searchOffer !== void 0 && isNorwegianPriceMatchOffer(searchOffer) ? searchOffer : void 0;
+  }
+  async function fetchNativePrisjaktPriceMatch(message, requestJson) {
+    try {
+      const product = await fetchNativePrisjaktProductByOfferUrls([message.url, message.productUrl], requestJson);
+      if (product === void 0) return void 0;
+      const offers = (await fetchNativePrisjaktOffers(product.id, requestJson)).filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
+      if (offers.length === 0) return void 0;
+      const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
+      const bestOffer = sortedOffers[0];
+      if (bestOffer === void 0) return void 0;
+      return {
+        shopName: bestOffer.shopName,
+        amount: bestOffer.amount,
+        currency: bestOffer.currency,
+        price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
+        productName: product.name,
+        productUrl: product.productUrl,
+        ...bestOffer.offerUrl !== void 0 ? { offerUrl: bestOffer.offerUrl } : {}
+      };
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchNativePrisjaktProductByOfferUrls(offerUrls, requestJson) {
+    const candidateUrls = uniqueStrings([
+      ...offerUrls,
+      ...offerUrls.map((url) => url !== void 0 ? toCanonicalProductPageUrl(url) : void 0)
+    ]);
+    for (const candidateUrl of candidateUrls) {
+      const product = await fetchNativePrisjaktProductBySingleOfferUrl(candidateUrl, requestJson);
+      if (product !== void 0) return product;
+    }
+    return void 0;
+  }
+  async function fetchNativePrisjaktProductBySingleOfferUrl(offerUrl, requestJson) {
+    const value = await requestJson(PRISJAKT_NATIVE_GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Authorization": PRISJAKT_NATIVE_AUTHORIZATION,
+        "Content-Type": "application/json",
+        "Market": "no"
+      },
+      body: JSON.stringify({
+        operationName: "SearchProductsByOfferURL",
+        query: PRISJAKT_PRODUCT_BY_OFFER_URL_QUERY,
+        variables: { offerUrl }
+      })
+    });
+    if (!isPlainRecord(value) || !isPlainRecord(value.data) || !Array.isArray(value.data.productsByOfferUrl)) {
+      return void 0;
+    }
+    for (const product of value.data.productsByOfferUrl) {
+      if (!isPlainRecord(product)) continue;
+      const id = readNumberLike(product.id);
+      const name = typeof product.name === "string" ? product.name : void 0;
+      const productUrl = typeof product.webUri === "string" ? product.webUri : void 0;
+      if (id !== void 0 && name !== void 0 && productUrl !== void 0) {
+        return { id, name, productUrl };
+      }
+    }
+    return void 0;
+  }
+  async function fetchNativePrisjaktOffers(productId, requestJson) {
+    const value = await requestJson(PRISJAKT_NATIVE_GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Authorization": PRISJAKT_NATIVE_AUTHORIZATION,
+        "Content-Type": "application/json",
+        "Market": "no"
+      },
+      body: JSON.stringify({
+        operationName: "OfferList",
+        query: PRISJAKT_OFFER_LIST_QUERY,
+        variables: { productId }
+      })
+    });
+    if (!isPlainRecord(value) || !isPlainRecord(value.data) || !isPlainRecord(value.data.product) || !Array.isArray(value.data.product.offers)) {
+      return [];
+    }
+    return value.data.product.offers.map(readNativePrisjaktOffer).filter((offer) => offer !== void 0);
+  }
+  function readNativePrisjaktOffer(value) {
+    if (!isPlainRecord(value)) return void 0;
+    const shop = isPlainRecord(value.shop) ? value.shop : void 0;
+    const price = isPlainRecord(value.price) ? value.price : void 0;
+    const shipping = isPlainRecord(value.shipping) ? value.shipping : void 0;
+    const cheapestShipping = isPlainRecord(shipping?.cheapest) ? shipping.cheapest : void 0;
+    const shopName = typeof shop?.name === "string" ? shop.name : void 0;
+    const currency = typeof shop?.currency === "string" ? shop.currency : void 0;
+    const amount = typeof price?.exclShipping === "number" ? price.exclShipping : void 0;
+    const shippingAmount = typeof cheapestShipping?.shippingCost === "number" ? cheapestShipping.shippingCost : 0;
+    const condition = typeof value.condition === "string" ? value.condition : void 0;
+    if (shopName === void 0 || currency === void 0 || amount === void 0) return void 0;
+    if (condition !== void 0 && condition.toUpperCase() !== "NEW") return void 0;
+    const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0 ? value.externalUri : void 0;
+    return {
+      shopName,
+      amount,
+      sortAmount: amount + shippingAmount,
+      currency,
+      ...offerUrl !== void 0 ? { offerUrl } : {}
+    };
+  }
+  async function fetchPrisjaktIdentify(message, requestJson) {
+    const params = new URLSearchParams();
+    params.set("url", message.url);
+    params.set("market", "NO");
+    params.set("searchTerm", message.searchTerm);
+    if (message.productPageClue !== void 0) params.set("productPageClue", String(message.productPageClue));
+    if (message.price !== void 0) params.set("price", String(message.price));
+    if (message.currency !== void 0) params.set("currency", message.currency);
+    if (message.productUrl !== void 0) params.set("productUrl", message.productUrl);
+    if (message.organizationName !== void 0) params.set("organizationName", message.organizationName);
+    if (message.codes !== void 0 && message.codes.length > 0) params.set("codes", message.codes.join(","));
+    const value = await requestJson(`https://browser-extension-backend.cloud.pji.nu/v1/identify?${params.toString()}`, {
+      headers: { "Content-Type": "application/json" }
+    });
+    return readBestPrisjaktOffer(value);
+  }
+  async function fetchPrisjaktSearch(searchTerm, requestJson) {
+    const normalizedSearchTerm = searchTerm.trim();
+    if (normalizedSearchTerm.length < 4) return void 0;
+    const params = new URLSearchParams({
+      term: normalizedSearchTerm,
+      market: "NO",
+      includePromotionDetails: "true"
+    });
+    const value = await requestJson(`https://browser-extension-backend.cloud.pji.nu/v1/search?${params.toString()}`, {
+      headers: { "Content-Type": "application/json" }
+    });
+    return readBestPrisjaktOffer(value);
+  }
+  function readBestPrisjaktOffer(value) {
+    if (!isPlainRecord(value)) return void 0;
+    const details = Array.isArray(value.details) ? value.details : [];
+    const directProduct = isPlainRecord(value.product) ? value.product : void 0;
+    const detail = details.find((entry) => {
+      return isPlainRecord(entry) && Array.isArray(entry.offers) && entry.offers.length > 0;
+    });
+    const product = isPlainRecord(detail) && isPlainRecord(detail.product) ? detail.product : directProduct;
+    const offers = isPlainRecord(detail) && Array.isArray(detail.offers) ? detail.offers : Array.isArray(value.offers) ? value.offers : [];
+    if (!isPlainRecord(product) || offers.length === 0) return void 0;
+    const productName = typeof product.name === "string" ? product.name : "Prisjakt-produkt";
+    const productId = typeof product.id === "number" || typeof product.id === "string" ? String(product.id) : void 0;
+    const parsedOffers = offers.map(readPrisjaktOffer).filter((offer) => offer !== void 0 && isNorwegianPriceMatchCurrency(offer.currency));
+    parsedOffers.sort((first, second) => first.amount - second.amount);
+    const best = parsedOffers[0];
+    if (best === void 0) return void 0;
+    return {
+      ...best,
+      productName,
+      productUrl: productId !== void 0 ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`
+    };
+  }
+  function readPrisjaktOffer(value) {
+    if (!isPlainRecord(value)) return void 0;
+    const shop = isPlainRecord(value.shop) ? value.shop : void 0;
+    const price = isPlainRecord(value.price) && isPlainRecord(value.price.price) ? value.price.price : void 0;
+    const scaledAmount = typeof price?.scaledAmount === "number" ? price.scaledAmount : void 0;
+    const currency = typeof price?.currency === "string" ? price.currency : void 0;
+    const shopName = typeof shop?.name === "string" ? shop.name : void 0;
+    if (scaledAmount === void 0 || currency === void 0 || shopName === void 0) return void 0;
+    const amount = scaledAmount / 100;
+    const formatted = formatPrisjaktPrice(amount, currency);
+    const url = typeof value.url === "string" && value.url.length > 0 ? value.url : typeof value.externalUrl === "string" && value.externalUrl.length > 0 ? value.externalUrl : void 0;
+    return {
+      shopName,
+      amount,
+      currency,
+      price: formatted,
+      ...url !== void 0 ? { offerUrl: url } : {}
+    };
+  }
+  async function fetchJson(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function isNorwegianPriceMatchOffer(offer) {
+    return isNorwegianPriceMatchCurrency(offer.currency);
+  }
+  function isNorwegianPriceMatchCurrency(currency) {
+    return currency.trim().toUpperCase() === "NOK";
+  }
+  function formatPrisjaktPrice(amount, currency) {
+    const formatted = new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
+    }).format(amount);
+    return `${formatted} ${currency === "NOK" ? "kr" : currency}`;
+  }
+  function readNumberLike(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function toCanonicalProductPageUrl(rawUrl) {
+    const parsedUrl = parseHttpUrl(rawUrl);
+    if (parsedUrl === void 0) return void 0;
+    return `${parsedUrl.origin}${parsedUrl.pathname}`;
+  }
+  function parseHttpUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:" ? parsedUrl : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function uniqueStrings(values) {
+    return [...new Set(values.filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function isPlainRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const noWords = [
     "asshole",
@@ -931,12 +1206,27 @@
   const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
   const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
   const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
+  const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
   const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
   const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1e3;
   const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
+  const NOTICE_BLOCKED_HOSTS = /* @__PURE__ */ new Set([
+    "prisjakt.no",
+    "prisjakt.nu",
+    "prisjakt.se",
+    "prisjagt.dk",
+    "pricespy.co.uk",
+    "pricespy.co.nz",
+    "hintaopas.fi",
+    "ledenicheur.fr"
+  ]);
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
+    if (isNoticeBlockedHost(CURRENT_HOST)) {
+      clearNotice();
+      return;
+    }
     if (isCashbackFoundMessage(message)) {
       renderNoticeWithStoredState(message.offers);
       return;
@@ -962,20 +1252,32 @@
   });
   requestCurrentOffers();
   function renderNoticeWithStoredState(offers, priceMatch) {
+    if (isNoticeBlockedHost(CURRENT_HOST)) {
+      clearNotice();
+      return;
+    }
     const isUserscript = chrome.runtime.id === void 0;
-    chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
+    chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
       const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
       if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
+      const priceMatchCollapsed = result[PRICE_MATCH_COLLAPSED_KEY] === true;
       void readActivatedOffers().catch(() => ({})).then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOffers, priceMatch);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatch);
       });
     });
   }
   function requestCurrentOffers() {
+    if (isNoticeBlockedHost(CURRENT_HOST)) {
+      clearNotice();
+      return;
+    }
     void renderCurrentContext();
+  }
+  function isNoticeBlockedHost(hostname) {
+    return NOTICE_BLOCKED_HOSTS.has(hostname);
   }
   async function renderCurrentContext() {
     const [offers, priceMatch] = await Promise.all([
@@ -1022,11 +1324,50 @@
       type: "get-price-match-for-product",
       ...productMeta
     };
+    if (isUserscriptRuntime()) {
+      return findPrisjaktPriceMatch(message, userscriptJsonRequest);
+    }
     const response = await sendRuntimeMessage(message);
     if (response !== void 0 && isPriceMatchForProductResponse(response) && response.ok) {
       return response.offer;
     }
     return void 0;
+  }
+  function isUserscriptRuntime() {
+    return chrome.runtime.id === void 0;
+  }
+  async function userscriptJsonRequest(url, init) {
+    const gmRequest = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : void 0;
+    if (gmRequest !== void 0) {
+      return new Promise((resolveValue) => {
+        gmRequest({
+          method: init?.method ?? "GET",
+          url,
+          headers: init?.headers,
+          data: init?.body,
+          onload: (response) => {
+            if (response.status < 200 || response.status >= 300) {
+              resolveValue(void 0);
+              return;
+            }
+            try {
+              resolveValue(JSON.parse(response.responseText));
+            } catch {
+              resolveValue(void 0);
+            }
+          },
+          onerror: () => resolveValue(void 0),
+          ontimeout: () => resolveValue(void 0)
+        });
+      });
+    }
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
   }
   function sendRuntimeMessage(message) {
     return new Promise((resolveValue) => {
@@ -1622,7 +1963,7 @@
       });
     });
   }
-  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, activatedOffers, priceMatch) {
+  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, initialPriceMatchCollapsed, activatedOffers, priceMatch) {
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
@@ -3432,6 +3773,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const priceMatchSection = document.createElement("div");
     priceMatchSection.className = "price-match-section";
     if (priceMatch !== void 0) {
+      if (initialPriceMatchCollapsed) {
+        priceMatchSection.classList.add("collapsed");
+      }
       const priceMatchToggle = document.createElement("button");
       priceMatchToggle.className = "price-match-toggle";
       priceMatchToggle.type = "button";
@@ -3442,11 +3786,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       priceMatchToggleText.textContent = "Prismatch";
       priceMatchToggle.append(priceMatchToggleArrow, priceMatchToggleText);
       priceMatchToggle.addEventListener("click", () => {
-        priceMatchSection.classList.toggle("collapsed");
+        const isCollapsed = priceMatchSection.classList.toggle("collapsed");
+        chrome.storage.local.set({ [PRICE_MATCH_COLLAPSED_KEY]: isCollapsed });
       });
       const priceMatchCard = document.createElement("a");
       priceMatchCard.className = "price-match-card";
-      priceMatchCard.href = priceMatch.offerUrl ?? priceMatch.productUrl;
+      priceMatchCard.href = priceMatch.productUrl;
       priceMatchCard.target = "_blank";
       priceMatchCard.rel = "noreferrer";
       const priceMatchTitle = document.createElement("span");

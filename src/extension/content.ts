@@ -8,8 +8,24 @@ import {
   formatRewardLabel,
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
+import { findPrisjaktPriceMatch } from "../shared/prisjakt-price-match";
 import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
+
+type UserscriptHttpRequestOptions = {
+  method?: string;
+  url: string;
+  headers?: Record<string, string>;
+  data?: string;
+  onload?: (response: { status: number; responseText: string }) => void;
+  onerror?: () => void;
+  ontimeout?: () => void;
+};
+
+declare const GM_xmlhttpRequest: undefined | ((options: UserscriptHttpRequestOptions) => unknown);
+declare const GM: undefined | {
+  xmlHttpRequest?: (options: UserscriptHttpRequestOptions) => unknown;
+};
 
 const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
 
@@ -334,11 +350,66 @@ async function getPriceMatchForCurrentPage(): Promise<PriceMatchOffer | undefine
     type: "get-price-match-for-product",
     ...productMeta,
   };
+  if (isUserscriptRuntime()) {
+    return findPrisjaktPriceMatch(message, userscriptJsonRequest);
+  }
+
   const response = await sendRuntimeMessage<PriceMatchForProductResponse>(message);
   if (response !== undefined && isPriceMatchForProductResponse(response) && response.ok) {
     return response.offer;
   }
   return undefined;
+}
+
+function isUserscriptRuntime(): boolean {
+  return (chrome.runtime as { id?: string }).id === undefined;
+}
+
+async function userscriptJsonRequest(
+  url: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+): Promise<unknown | undefined> {
+  const gmRequest = typeof GM_xmlhttpRequest === "function"
+    ? GM_xmlhttpRequest
+    : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function"
+      ? GM.xmlHttpRequest
+      : undefined;
+
+  if (gmRequest !== undefined) {
+    return new Promise((resolveValue) => {
+      gmRequest({
+        method: init?.method ?? "GET",
+        url,
+        headers: init?.headers,
+        data: init?.body,
+        onload: (response) => {
+          if (response.status < 200 || response.status >= 300) {
+            resolveValue(undefined);
+            return;
+          }
+          try {
+            resolveValue(JSON.parse(response.responseText) as unknown);
+          } catch {
+            resolveValue(undefined);
+          }
+        },
+        onerror: () => resolveValue(undefined),
+        ontimeout: () => resolveValue(undefined),
+      });
+    });
+  }
+
+  try {
+    const response = await fetch(url, init);
+    if (!response.ok) return undefined;
+    return response.json();
+  } catch {
+    return undefined;
+  }
 }
 
 function sendRuntimeMessage<T>(message: unknown): Promise<T | undefined> {
