@@ -34,6 +34,12 @@ query OfferList($productId: Int!) {
     offers {
       externalUri
       condition
+      availability {
+        status
+      }
+      stock {
+        status
+      }
       shop {
         name
         currency
@@ -203,14 +209,20 @@ function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefine
   const shop = isPlainRecord(value.shop) ? value.shop : undefined;
   const price = isPlainRecord(value.price) ? value.price : undefined;
   const shipping = isPlainRecord(value.shipping) ? value.shipping : undefined;
+  const availability = isPlainRecord(value.availability) ? value.availability : undefined;
+  const stock = isPlainRecord(value.stock) ? value.stock : undefined;
   const cheapestShipping = isPlainRecord(shipping?.cheapest) ? shipping.cheapest : undefined;
   const shopName = typeof shop?.name === "string" ? shop.name : undefined;
   const currency = typeof shop?.currency === "string" ? shop.currency : undefined;
   const amount = typeof price?.exclShipping === "number" ? price.exclShipping : undefined;
   const shippingAmount = typeof cheapestShipping?.shippingCost === "number" ? cheapestShipping.shippingCost : 0;
   const condition = typeof value.condition === "string" ? value.condition : undefined;
+  const availabilityStatus = typeof availability?.status === "string" ? availability.status : undefined;
+  const stockStatus = typeof stock?.status === "string" ? stock.status : undefined;
   if (shopName === undefined || currency === undefined || amount === undefined) return undefined;
   if (condition !== undefined && condition.toUpperCase() !== "NEW") return undefined;
+  if (availabilityStatus !== undefined && BAD_AVAILABILITY_STATUSES.has(availabilityStatus.toUpperCase())) return undefined;
+  if (stockStatus !== undefined && BAD_STOCK_STATUSES.has(stockStatus.toLowerCase())) return undefined;
 
   const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0
     ? value.externalUri
@@ -224,6 +236,9 @@ function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefine
     ...(offerUrl !== undefined ? { offerUrl } : {}),
   };
 }
+
+const BAD_AVAILABILITY_STATUSES = new Set(["NOT_AVAILABLE_FOR_ORDER"]);
+const BAD_STOCK_STATUSES = new Set(["out_of_stock", "not_in_stock"]);
 
 async function fetchPrisjaktIdentify(
   message: GetPriceMatchForProductMessage,

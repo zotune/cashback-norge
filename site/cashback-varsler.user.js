@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779270626
+// @version      1779272371
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -394,6 +394,12 @@ query OfferList($productId: Int!) {
     offers {
       externalUri
       condition
+      availability {
+        status
+      }
+      stock {
+        status
+      }
       shop {
         name
         currency
@@ -512,14 +518,20 @@ query OfferList($productId: Int!) {
     const shop = isPlainRecord(value.shop) ? value.shop : void 0;
     const price = isPlainRecord(value.price) ? value.price : void 0;
     const shipping = isPlainRecord(value.shipping) ? value.shipping : void 0;
+    const availability = isPlainRecord(value.availability) ? value.availability : void 0;
+    const stock = isPlainRecord(value.stock) ? value.stock : void 0;
     const cheapestShipping = isPlainRecord(shipping?.cheapest) ? shipping.cheapest : void 0;
     const shopName = typeof shop?.name === "string" ? shop.name : void 0;
     const currency = typeof shop?.currency === "string" ? shop.currency : void 0;
     const amount = typeof price?.exclShipping === "number" ? price.exclShipping : void 0;
     const shippingAmount = typeof cheapestShipping?.shippingCost === "number" ? cheapestShipping.shippingCost : 0;
     const condition = typeof value.condition === "string" ? value.condition : void 0;
+    const availabilityStatus = typeof availability?.status === "string" ? availability.status : void 0;
+    const stockStatus = typeof stock?.status === "string" ? stock.status : void 0;
     if (shopName === void 0 || currency === void 0 || amount === void 0) return void 0;
     if (condition !== void 0 && condition.toUpperCase() !== "NEW") return void 0;
+    if (availabilityStatus !== void 0 && BAD_AVAILABILITY_STATUSES.has(availabilityStatus.toUpperCase())) return void 0;
+    if (stockStatus !== void 0 && BAD_STOCK_STATUSES.has(stockStatus.toLowerCase())) return void 0;
     const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0 ? value.externalUri : void 0;
     return {
       shopName,
@@ -529,6 +541,8 @@ query OfferList($productId: Int!) {
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
+  const BAD_AVAILABILITY_STATUSES = /* @__PURE__ */ new Set(["NOT_AVAILABLE_FOR_ORDER"]);
+  const BAD_STOCK_STATUSES = /* @__PURE__ */ new Set(["out_of_stock", "not_in_stock"]);
   async function fetchPrisjaktIdentify(message, requestJson) {
     const params = new URLSearchParams();
     params.set("url", message.url);
