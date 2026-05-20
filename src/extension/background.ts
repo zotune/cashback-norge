@@ -46,6 +46,7 @@ query OfferList($productId: Int!) {
     webUri
     offers {
       externalUri
+      condition
       shop {
         name
         currency
@@ -156,7 +157,7 @@ async function fetchNativePrisjaktPriceMatch(
   message: GetPriceMatchForProductMessage,
 ): Promise<PriceMatchOffer | undefined> {
   try {
-    const product = await fetchNativePrisjaktProductByOfferUrl(message.url);
+    const product = await fetchNativePrisjaktProductByOfferUrls([message.url, message.productUrl]);
     if (product === undefined) return undefined;
 
     const offers = (await fetchNativePrisjaktOffers(product.id))
@@ -195,7 +196,23 @@ type NativePrisjaktOffer = {
   offerUrl?: string;
 };
 
-async function fetchNativePrisjaktProductByOfferUrl(
+async function fetchNativePrisjaktProductByOfferUrls(
+  offerUrls: Array<string | undefined>,
+): Promise<NativePrisjaktProduct | undefined> {
+  const candidateUrls = uniqueStrings([
+    ...offerUrls,
+    ...offerUrls.map((url) => url !== undefined ? toCanonicalProductPageUrl(url) : undefined),
+  ]);
+
+  for (const candidateUrl of candidateUrls) {
+    const product = await fetchNativePrisjaktProductBySingleOfferUrl(candidateUrl);
+    if (product !== undefined) return product;
+  }
+
+  return undefined;
+}
+
+async function fetchNativePrisjaktProductBySingleOfferUrl(
   offerUrl: string,
 ): Promise<NativePrisjaktProduct | undefined> {
   const value = await fetchNativePrisjaktGraphql({
@@ -264,7 +281,9 @@ function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefine
   const currency = typeof shop?.currency === "string" ? shop.currency : undefined;
   const amount = typeof price?.exclShipping === "number" ? price.exclShipping : undefined;
   const shippingAmount = typeof cheapestShipping?.shippingCost === "number" ? cheapestShipping.shippingCost : 0;
+  const condition = typeof value.condition === "string" ? value.condition : undefined;
   if (shopName === undefined || currency === undefined || amount === undefined) return undefined;
+  if (condition !== undefined && condition.toUpperCase() !== "NEW") return undefined;
 
   const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0
     ? value.externalUri
@@ -402,6 +421,16 @@ function readNumberLike(value: unknown): number | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toCanonicalProductPageUrl(rawUrl: string): string | undefined {
+  const parsedUrl = parseHttpUrl(rawUrl);
+  if (parsedUrl === undefined) return undefined;
+  return `${parsedUrl.origin}${parsedUrl.pathname}`;
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return [...new Set(values.filter((value): value is string => value !== undefined && value.length > 0))];
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {
