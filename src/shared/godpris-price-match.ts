@@ -93,6 +93,12 @@ function readGodprisProductPage(html: string, fallbackProductId: string): PriceM
     sourceName: "Godpris",
     productName,
     productUrl: `${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`,
+    alternatives: offers.slice(0, 8).map((offer) => ({
+      shopName: offer.shopName,
+      amount: offer.amount,
+      currency: offer.currency,
+      price: offer.price,
+    })),
   };
 }
 

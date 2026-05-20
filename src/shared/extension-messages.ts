@@ -45,15 +45,27 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris";
+  source?: "prisjakt" | "godpris" | "klarna";
   sourceName?: string;
   shopName: string;
   price: string;
   amount: number;
+  sortAmount?: number;
   currency: string;
   productName: string;
   productUrl: string;
   offerUrl?: string;
+  alternatives?: PriceMatchAlternative[];
+};
+
+export type PriceMatchAlternative = {
+  shopName: string;
+  price: string;
+  amount: number;
+  sortAmount?: number;
+  currency: string;
+  shippingPrice?: string;
+  totalPrice?: string;
 };
 
 export type PriceMatchForProductResponse =

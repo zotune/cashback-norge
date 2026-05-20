@@ -7,7 +7,8 @@
   "host_permissions": [
     "https://browser-extension-backend.cloud.pji.nu/*",
     "https://native-backend.cloud.pji.nu/*",
-    "https://godpris.no/*"
+    "https://godpris.no/*",
+    "https://www.klarna.com/*"
   ],
   "background": {
     "service_worker": "assets/background.js",

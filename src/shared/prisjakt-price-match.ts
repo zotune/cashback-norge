@@ -112,11 +112,21 @@ async function fetchBestNativePrisjaktOffer(
     sourceName: "Prisjakt",
     shopName: bestOffer.shopName,
     amount: bestOffer.amount,
+    sortAmount: bestOffer.sortAmount,
     currency: bestOffer.currency,
     price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
     productName: product.name,
     productUrl: product.productUrl,
     ...(bestOffer.offerUrl !== undefined ? { offerUrl: bestOffer.offerUrl } : {}),
+    alternatives: sortedOffers.slice(0, 8).map((offer) => ({
+      shopName: offer.shopName,
+      amount: offer.amount,
+      sortAmount: offer.sortAmount,
+      currency: offer.currency,
+      price: formatPrisjaktPrice(offer.amount, offer.currency),
+      shippingPrice: formatShippingPrice(offer.shippingAmount, offer.currency),
+      ...(offer.shippingAmount > 0 ? { totalPrice: formatPrisjaktPrice(offer.sortAmount, offer.currency) } : {}),
+    })),
   };
 }
 
@@ -130,6 +140,7 @@ type NativePrisjaktOffer = {
   shopName: string;
   amount: number;
   sortAmount: number;
+  shippingAmount: number;
   currency: string;
   offerUrl?: string;
 };
@@ -241,6 +252,7 @@ function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefine
     shopName,
     amount,
     sortAmount: amount + shippingAmount,
+    shippingAmount,
     currency,
     ...(offerUrl !== undefined ? { offerUrl } : {}),
   };
@@ -341,6 +353,12 @@ function readBestPrisjaktOffer(value: unknown): PriceMatchOffer | undefined {
     sourceName: "Prisjakt",
     productName,
     productUrl: productId !== undefined ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`,
+    alternatives: parsedOffers.slice(0, 8).map((offer) => ({
+      shopName: offer.shopName,
+      amount: offer.amount,
+      currency: offer.currency,
+      price: offer.price,
+    })),
   };
 }
 
@@ -391,6 +409,10 @@ function formatPrisjaktPrice(amount: number, currency: string): string {
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
   }).format(amount);
   return `${formatted} ${currency === "NOK" ? "kr" : currency}`;
+}
+
+function formatShippingPrice(amount: number, currency: string): string {
+  return amount <= 0 ? "fri frakt" : `frakt ${formatPrisjaktPrice(amount, currency)}`;
 }
 
 function readNumberLike(value: unknown): number | undefined {

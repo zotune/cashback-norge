@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779298480
+// @version      1779300550
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -15,6 +15,7 @@
 // @connect      native-backend.cloud.pji.nu
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
+// @connect      www.klarna.com
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
@@ -376,18 +377,18 @@
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
-  const BAD_AVAILABILITY_STATUSES$1 = /* @__PURE__ */ new Set([
+  const BAD_AVAILABILITY_STATUSES$2 = /* @__PURE__ */ new Set([
     "discontinued",
     "not_available",
     "not_in_stock",
     "out_of_stock"
   ]);
-  async function findGodprisPriceMatch(message, requestJson = fetchJson$1, requestText = fetchText) {
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$2, requestText = fetchText) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
-    const searchQueries = uniqueStrings$1([
-      ...(message.codes ?? []).filter(isLikelyGtin),
+    const searchQueries = uniqueStrings$2([
+      ...(message.codes ?? []).filter(isLikelyGtin$1),
       message.searchTerm
     ]);
     for (const query of searchQueries) {
@@ -408,22 +409,22 @@
     const value = await requestJson(`https://godpris.no/api/product/search?${params.toString()}`, {
       headers: { "Accept": "application/json" }
     });
-    if (!isPlainRecord$1(value) || !Array.isArray(value.results)) return void 0;
+    if (!isPlainRecord$2(value) || !Array.isArray(value.results)) return void 0;
     for (const result of value.results) {
-      if (!isPlainRecord$1(result)) continue;
-      const id = readStringLike(result.id);
+      if (!isPlainRecord$2(result)) continue;
+      const id = readStringLike$1(result.id);
       if (id !== void 0) return id;
     }
     return void 0;
   }
   function readGodprisProductPage(html, fallbackProductId) {
     const page = readGodprisDataPage(html);
-    const props = isPlainRecord$1(page?.props) ? page.props : void 0;
-    const product = isPlainRecord$1(props?.product) ? props.product : void 0;
+    const props = isPlainRecord$2(page?.props) ? page.props : void 0;
+    const product = isPlainRecord$2(props?.product) ? props.product : void 0;
     const prices = Array.isArray(props?.prices) ? props.prices : [];
     if (product === void 0 || prices.length === 0) return void 0;
-    const productId = readStringLike(product.id) ?? fallbackProductId;
-    const productName = readStringLike(product.title) ?? readStringLike(product.name) ?? "Godpris-produkt";
+    const productId = readStringLike$1(product.id) ?? fallbackProductId;
+    const productName = readStringLike$1(product.title) ?? readStringLike$1(product.name) ?? "Godpris-produkt";
     const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
     const best = offers[0];
     if (best === void 0) return void 0;
@@ -432,7 +433,13 @@
       source: "godpris",
       sourceName: "Godpris",
       productName,
-      productUrl: `${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`
+      productUrl: `${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`,
+      alternatives: offers.slice(0, 8).map((offer) => ({
+        shopName: offer.shopName,
+        amount: offer.amount,
+        currency: offer.currency,
+        price: offer.price
+      }))
     };
   }
   function readGodprisDataPage(html) {
@@ -445,23 +452,23 @@
     }
   }
   function readGodprisOffer(value) {
-    if (!isPlainRecord$1(value)) return void 0;
-    const shop = isPlainRecord$1(value.shop) ? value.shop : void 0;
-    const amount = readNumberLike$1(value.price);
-    const shopName = readStringLike(shop?.title) ?? readStringLike(value.shop_title);
-    const availability = readStringLike(value.availability)?.toLowerCase();
+    if (!isPlainRecord$2(value)) return void 0;
+    const shop = isPlainRecord$2(value.shop) ? value.shop : void 0;
+    const amount = readNumberLike$2(value.price);
+    const shopName = readStringLike$1(shop?.title) ?? readStringLike$1(value.shop_title);
+    const availability = readStringLike$1(value.availability)?.toLowerCase();
     if (amount === void 0 || amount <= 0 || shopName === void 0) return void 0;
-    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$1.has(availability)) return void 0;
-    const offerUrl = readStringLike(value.click_url) ?? readStringLike(value.url);
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$2.has(availability)) return void 0;
+    const offerUrl = readStringLike$1(value.click_url) ?? readStringLike$1(value.url);
     return {
       shopName,
       amount,
       currency: "NOK",
-      price: formatNokPrice(amount),
+      price: formatNokPrice$1(amount),
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
-  async function fetchJson$1(url, init) {
+  async function fetchJson$2(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -479,7 +486,7 @@
       return void 0;
     }
   }
-  function formatNokPrice(amount) {
+  function formatNokPrice$1(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
@@ -487,6 +494,181 @@
   }
   function decodeHtmlAttribute(value) {
     return value.replace(/&quot;/g, '"').replace(/&#039;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  }
+  function readStringLike$1(value) {
+    if (typeof value !== "string" && typeof value !== "number") return void 0;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberLike$2(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function uniqueStrings$2(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function isLikelyGtin$1(value) {
+    const normalized = value.trim();
+    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
+  }
+  function isPlainRecord$2(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
+  const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
+  const KLARNA_OFFERS_URL = "https://www.klarna.com/no/api/product-detail-edge-rest/public/product-detail/v0/offers/NO";
+  const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/cl\d+\/(\d+)\//;
+  const BAD_AVAILABILITY_STATUSES$1 = /* @__PURE__ */ new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST"]);
+  const BAD_STOCK_STATUSES$1 = /* @__PURE__ */ new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
+  async function findKlarnaPriceMatch(message, requestJson = fetchJson$1) {
+    if (!message.productPageClue && message.searchTerm.trim().length < 8) {
+      return void 0;
+    }
+    const directProductId = readKlarnaProductIdFromUrl(message.url) ?? readKlarnaProductIdFromUrl(message.productUrl);
+    if (directProductId !== void 0) {
+      const directOffer = await fetchKlarnaOfferForProduct({
+        id: directProductId,
+        name: message.searchTerm,
+        productUrl: `${KLARNA_PRODUCT_URL}/pl/${directProductId}/`
+      }, requestJson);
+      if (directOffer !== void 0) return directOffer;
+    }
+    const searchQueries = uniqueStrings$1([
+      ...(message.codes ?? []).filter(isLikelyGtin),
+      message.searchTerm
+    ]);
+    for (const query of searchQueries) {
+      const product = await fetchKlarnaProduct(query, requestJson);
+      if (product === void 0) continue;
+      const offer = await fetchKlarnaOfferForProduct(product, requestJson);
+      if (offer !== void 0) return offer;
+    }
+    return void 0;
+  }
+  async function fetchKlarnaProduct(query, requestJson) {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 4 || normalizedQuery.length > 100) return void 0;
+    const params = new URLSearchParams({ q: normalizedQuery });
+    const value = await requestJson(`${KLARNA_SEARCH_URL}?${params.toString()}`, {
+      headers: { "Accept": "application/json" }
+    });
+    if (!isPlainRecord$1(value) || !Array.isArray(value.products)) return void 0;
+    for (const product of value.products) {
+      if (!isPlainRecord$1(product)) continue;
+      const id = readStringLike(product.id);
+      const name = readStringLike(product.name);
+      const path = readStringLike(product.url);
+      const lowestPrice = isPlainRecord$1(product.lowestPrice) ? product.lowestPrice : void 0;
+      const currency = readStringLike(lowestPrice?.currency);
+      const outOfStock = product.outOfStock === true;
+      if (id !== void 0 && name !== void 0 && path !== void 0 && currency === "NOK" && !outOfStock) {
+        return {
+          id,
+          name,
+          productUrl: `${KLARNA_PRODUCT_URL}${path}`
+        };
+      }
+    }
+    return void 0;
+  }
+  async function fetchKlarnaOfferForProduct(product, requestJson) {
+    const params = new URLSearchParams({
+      af_ORIGIN: "NATIONAL",
+      af_ITEM_CONDITION: "NEW,UNKNOWN",
+      sortByPreset: "PRICE"
+    });
+    const value = await requestJson(`${KLARNA_OFFERS_URL}/${encodeURIComponent(product.id)}?${params.toString()}`, {
+      headers: { "Accept": "application/json" }
+    });
+    if (!isPlainRecord$1(value) || !Array.isArray(value.offers)) return void 0;
+    const merchants = isPlainRecord$1(value.merchants) ? value.merchants : {};
+    const offers = value.offers.map((offer) => readKlarnaOffer(offer, merchants)).filter((offer) => offer !== void 0).sort((first, second) => first.sortAmount - second.sortAmount);
+    const best = offers[0];
+    if (best === void 0) return void 0;
+    return {
+      source: "klarna",
+      sourceName: "Klarna",
+      shopName: best.shopName,
+      amount: best.amount,
+      sortAmount: best.sortAmount,
+      currency: best.currency,
+      price: best.price,
+      productName: product.name,
+      productUrl: product.productUrl,
+      ...best.offerUrl !== void 0 ? { offerUrl: best.offerUrl } : {},
+      alternatives: offers.slice(0, 8).map((offer) => ({
+        shopName: offer.shopName,
+        amount: offer.amount,
+        sortAmount: offer.sortAmount,
+        currency: offer.currency,
+        price: offer.price,
+        shippingPrice: formatShippingPrice$1(offer.shippingAmount),
+        ...offer.shippingAmount > 0 ? { totalPrice: formatNokPrice(offer.sortAmount) } : {}
+      }))
+    };
+  }
+  function readKlarnaOffer(value, merchants) {
+    if (!isPlainRecord$1(value)) return void 0;
+    const price = isPlainRecord$1(value.price) ? value.price : void 0;
+    const shippingCost = isPlainRecord$1(value.shippingCost) ? value.shippingCost : void 0;
+    const amount = readNumberLike$1(price?.amount);
+    const shippingAmount = readNumberLike$1(shippingCost?.amount) ?? 0;
+    const currency = readStringLike(price?.currency);
+    const merchantId = readStringLike(value.merchantId);
+    const merchant = merchantId !== void 0 && isPlainRecord$1(merchants[merchantId]) ? merchants[merchantId] : void 0;
+    const shopName = readStringLike(merchant?.name);
+    const availability = readStringLike(value.availability)?.toUpperCase();
+    const stockStatus = readStringLike(value.stockStatus)?.toUpperCase();
+    if (amount === void 0 || amount <= 0 || currency !== "NOK" || shopName === void 0) return void 0;
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$1.has(availability)) return void 0;
+    if (stockStatus !== void 0 && BAD_STOCK_STATUSES$1.has(stockStatus)) return void 0;
+    const offerUrl = toAbsoluteKlarnaUrl(readStringLike(value.url));
+    return {
+      shopName,
+      amount,
+      sortAmount: amount + shippingAmount,
+      shippingAmount,
+      currency,
+      price: formatNokPrice(amount),
+      ...offerUrl !== void 0 ? { offerUrl } : {}
+    };
+  }
+  async function fetchJson$1(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function readKlarnaProductIdFromUrl(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      return url.hostname.endsWith("klarna.com") ? url.pathname.match(KLARNA_PRODUCT_PATH_PATTERN)?.[1] : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function toAbsoluteKlarnaUrl(value) {
+    if (value === void 0) return void 0;
+    try {
+      return new URL(value, "https://www.klarna.com").toString();
+    } catch {
+      return void 0;
+    }
+  }
+  function formatNokPrice(amount) {
+    const formatted = new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
+    }).format(amount);
+    return `${formatted} kr`;
+  }
+  function formatShippingPrice$1(amount) {
+    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice(amount)}`;
   }
   function readStringLike(value) {
     if (typeof value !== "string" && typeof value !== "number") return void 0;
@@ -499,12 +681,12 @@
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function uniqueStrings$1(values) {
-    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
-  }
   function isLikelyGtin(value) {
     const normalized = value.trim();
     return /^(?:\d{8}|\d{12,14})$/.test(normalized);
+  }
+  function uniqueStrings$1(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function isPlainRecord$1(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -586,11 +768,21 @@ query OfferList($productId: Int!) {
       sourceName: "Prisjakt",
       shopName: bestOffer.shopName,
       amount: bestOffer.amount,
+      sortAmount: bestOffer.sortAmount,
       currency: bestOffer.currency,
       price: formatPrisjaktPrice(bestOffer.amount, bestOffer.currency),
       productName: product.name,
       productUrl: product.productUrl,
-      ...bestOffer.offerUrl !== void 0 ? { offerUrl: bestOffer.offerUrl } : {}
+      ...bestOffer.offerUrl !== void 0 ? { offerUrl: bestOffer.offerUrl } : {},
+      alternatives: sortedOffers.slice(0, 8).map((offer) => ({
+        shopName: offer.shopName,
+        amount: offer.amount,
+        sortAmount: offer.sortAmount,
+        currency: offer.currency,
+        price: formatPrisjaktPrice(offer.amount, offer.currency),
+        shippingPrice: formatShippingPrice(offer.shippingAmount, offer.currency),
+        ...offer.shippingAmount > 0 ? { totalPrice: formatPrisjaktPrice(offer.sortAmount, offer.currency) } : {}
+      }))
     };
   }
   async function fetchNativePrisjaktProductByOfferUrls(offerUrls, requestJson) {
@@ -677,6 +869,7 @@ query OfferList($productId: Int!) {
       shopName,
       amount,
       sortAmount: amount + shippingAmount,
+      shippingAmount,
       currency,
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
@@ -753,7 +946,13 @@ query OfferList($productId: Int!) {
       source: "prisjakt",
       sourceName: "Prisjakt",
       productName,
-      productUrl: productId !== void 0 ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`
+      productUrl: productId !== void 0 ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`,
+      alternatives: parsedOffers.slice(0, 8).map((offer) => ({
+        shopName: offer.shopName,
+        amount: offer.amount,
+        currency: offer.currency,
+        price: offer.price
+      }))
     };
   }
   function readPrisjaktOffer(value) {
@@ -796,6 +995,9 @@ query OfferList($productId: Int!) {
     }).format(amount);
     return `${formatted} ${currency === "NOK" ? "kr" : currency}`;
   }
+  function formatShippingPrice(amount, currency) {
+    return amount <= 0 ? "fri frakt" : `frakt ${formatPrisjaktPrice(amount, currency)}`;
+  }
   function readNumberLike(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
@@ -822,12 +1024,13 @@ query OfferList($productId: Int!) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   async function findPriceMatches(message, requestJson, requestText) {
-    const [prisjaktOffer, godprisOffer] = await Promise.all([
+    const [prisjaktOffer, godprisOffer, klarnaOffer] = await Promise.all([
       findPrisjaktPriceMatch(message, requestJson),
-      findGodprisPriceMatch(message, requestJson, requestText)
+      findGodprisPriceMatch(message, requestJson, requestText),
+      findKlarnaPriceMatch(message, requestJson)
     ]);
-    return [prisjaktOffer, godprisOffer].filter((offer) => offer !== void 0).sort((first, second) => {
-      const amountDifference = first.amount - second.amount;
+    return [prisjaktOffer, godprisOffer, klarnaOffer].filter((offer) => offer !== void 0).sort((first, second) => {
+      const amountDifference = (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount);
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
     });
@@ -835,7 +1038,8 @@ query OfferList($productId: Int!) {
   function sourceRank(offer) {
     if (offer.source === "prisjakt") return 0;
     if (offer.source === "godpris") return 1;
-    return 2;
+    if (offer.source === "klarna") return 2;
+    return 3;
   }
   const noWords = [
     "asshole",
@@ -1412,7 +1616,8 @@ query OfferList($productId: Int!) {
     "pricespy.co.nz",
     "hintaopas.fi",
     "ledenicheur.fr",
-    "godpris.no"
+    "godpris.no",
+    "klarna.com"
   ]);
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
@@ -1625,6 +1830,9 @@ query OfferList($productId: Int!) {
     const h1 = document.querySelector("h1")?.textContent?.trim();
     const codes = collectProductCodes(productLdJson);
     const productPageClue = hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
+    if (isLikelyProductListingPage(parsedUrl) && document.querySelector('meta[property="og:type"][content="product"]') === null && !isLikelyCommerceProductPage(parsedUrl)) {
+      return void 0;
+    }
     const productName = readStringValue(productLdJson?.name);
     const brandName = readBrandName(productLdJson?.brand);
     const searchTerm = productName !== void 0 ? brandName !== void 0 && !productName.toLowerCase().includes(brandName.toLowerCase()) ? `${brandName} ${productName}` : productName : h1 ?? titleMeta ?? ogTitle ?? document.title;
@@ -1654,6 +1862,26 @@ query OfferList($productId: Int!) {
     if (codes.length > 0) return true;
     if (readNumberValue(offer?.price) !== void 0 || readStringValue(offer?.priceCurrency) !== void 0) return true;
     return hasVisiblePriceSignal() && hasCommerceActionSignal();
+  }
+  function isLikelyProductListingPage(parsedUrl) {
+    const pathname = parsedUrl.pathname.toLowerCase();
+    const listingPath = /(?:^|\/)(?:search|sok|søk|resultat|results|kategori|category|categories|c|collections?|collections|list|listing)(?:\/|$)/i.test(pathname);
+    const listingQuery = [...parsedUrl.searchParams.keys()].some((key) => /^(?:q|query|search|sok|søk|keyword|term|category|filter|sort|page)$/i.test(key));
+    if (!listingPath && !listingQuery) return false;
+    const productCardCount = document.querySelectorAll(
+      [
+        "[data-product-id]",
+        "[data-productid]",
+        "[data-product]",
+        ".product-card",
+        ".product-tile",
+        ".product-item",
+        ".product-list-item",
+        "article"
+      ].join(",")
+    ).length;
+    const visiblePriceCount = (document.body?.innerText.match(/\b(?:kr|NOK)\s?\d|\d[\d\s]*(?:,\d{2})?\s?(?:kr|NOK)\b/gi) ?? []).length;
+    return productCardCount >= 2 || visiblePriceCount >= 3;
   }
   function isLikelyCommerceProductPage(parsedUrl) {
     const productishPath = /\b(product|produkt|produkter|p|i|item|shop|varer|sku)\b/i.test(parsedUrl.pathname) || [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin|ean)\b/i.test(key));
@@ -4254,6 +4482,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const mountTarget = document.body ?? document.documentElement;
     mountTarget.append(host);
     void detectConflicts(shadowRoot, title);
+    attachPriceMatchTooltips(shadowRoot, priceMatches);
     const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
     for (let idx = 0; idx < mainOffers.length; idx++) {
       const currentOffer = mainOffers[idx];
@@ -4322,6 +4551,25 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function clearNotice() {
     document.getElementById(HOST_ID)?.remove();
   }
+  function attachPriceMatchTooltips(shadowRoot, priceMatches) {
+    if (priceMatches.length === 0) return;
+    const cards = shadowRoot.querySelectorAll(".price-match-card");
+    for (let index = 0; index < priceMatches.length; index++) {
+      const card = cards[index];
+      const priceMatch = priceMatches[index];
+      if (card === void 0 || priceMatch === void 0) continue;
+      const tooltip = document.createElement("div");
+      tooltip.className = "offer-tooltip";
+      setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+      shadowRoot.append(tooltip);
+      card.addEventListener("mouseenter", () => {
+        positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+      });
+      card.addEventListener("mouseleave", () => {
+        tooltip.classList.remove("visible");
+      });
+    }
+  }
   function setTooltipContent(tooltip, parts) {
     const sections = parts.flatMap((part) => part.split(/\n{2,}/)).map(createTooltipSection).filter((section) => section !== void 0);
     tooltip.replaceChildren(...sections);
@@ -4349,7 +4597,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return section;
     }
     const firstLine = lines[0] ?? "";
-    const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) ? lines.slice(1) : lines;
+    const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) ? lines.slice(1) : lines;
     if (listLines.length !== lines.length) {
       const title = document.createElement("span");
       title.className = "offer-tooltip-title";
@@ -4437,7 +4685,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return typeof value.reason === "string";
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris") && (value.sourceName === void 0 || typeof value.sourceName === "string") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string");
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna") && (value.sourceName === void 0 || typeof value.sourceName === "string") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+  }
+  function isPriceMatchAlternative(value) {
+    return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
   }
   function isCashbackIndex(value) {
     if (!isRecord(value) || typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord(value.domainIndex)) {
@@ -4646,10 +4897,26 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return priceMatchCard;
   }
   function getPriceMatchProviderClass(priceMatch) {
-    return priceMatch.source === "godpris" ? "godpris" : "prisjakt";
+    if (priceMatch.source === "godpris") return "godpris";
+    if (priceMatch.source === "klarna") return "klarna";
+    return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
-    return priceMatch.sourceName ?? (priceMatch.source === "godpris" ? "Godpris" : "Prisjakt");
+    if (priceMatch.sourceName !== void 0) return priceMatch.sourceName;
+    if (priceMatch.source === "godpris") return "Godpris";
+    if (priceMatch.source === "klarna") return "Klarna";
+    return "Prisjakt";
+  }
+  function buildPriceMatchTooltip(priceMatch) {
+    const alternatives = priceMatch.alternatives?.length ? priceMatch.alternatives : [{ shopName: priceMatch.shopName, price: priceMatch.price }];
+    return [
+      `${getPriceMatchSourceName(priceMatch)} tilbud`,
+      ...alternatives.map(formatPriceMatchTooltipOffer)
+    ].join("\n");
+  }
+  function formatPriceMatchTooltipOffer(offer) {
+    const shippingSuffix = offer.totalPrice !== void 0 ? ` (${offer.shippingPrice ?? "frakt"}, totalt ${offer.totalPrice})` : offer.shippingPrice !== void 0 ? ` (${offer.shippingPrice})` : "";
+    return `- ${offer.shopName} ${offer.price}${shippingSuffix}`;
   }
   function formatProviderName(provider) {
     return PROVIDER_NAMES[provider] ?? provider;
@@ -4762,6 +5029,26 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const top = preferredTop >= 8 ? preferredTop : Math.min(fallbackTop, window.innerHeight - tooltipHeight - 8);
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${Math.max(8, top)}px`;
+  }
+  function positionTooltipRightOfPanel(tooltip, anchor, shadowRoot) {
+    const panelEl = shadowRoot.querySelector(".panel");
+    const panelRect = panelEl?.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    tooltip.style.left = "-9999px";
+    tooltip.style.top = "-9999px";
+    tooltip.style.transform = "none";
+    tooltip.classList.add("visible");
+    const tooltipHeight = tooltip.offsetHeight;
+    const tooltipWidth = tooltip.offsetWidth;
+    const rightEdge = panelRect ? panelRect.right + 6 : anchorRect.right + 6;
+    const fallbackLeft = anchorRect.left + anchorRect.width / 2 - tooltipWidth / 2;
+    const left = rightEdge + tooltipWidth > window.innerWidth - 8 ? Math.max(8, Math.min(fallbackLeft, window.innerWidth - tooltipWidth - 8)) : rightEdge;
+    const top = Math.max(
+      8,
+      Math.min(anchorRect.top + anchorRect.height / 2 - tooltipHeight / 2, window.innerHeight - tooltipHeight - 8)
+    );
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
   }
   function formatOfferTitlePrefix(offer) {
     if (offer.provider === "obos" || offer.provider === "bob" || offer.provider === "usbl") {

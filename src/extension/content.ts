@@ -205,15 +205,26 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris";
+  source?: "prisjakt" | "godpris" | "klarna";
   sourceName?: string;
   shopName: string;
   price: string;
   amount: number;
+  sortAmount?: number;
   currency: string;
   productName: string;
   productUrl: string;
   offerUrl?: string;
+  alternatives?: PriceMatchAlternative[];
+};
+type PriceMatchAlternative = {
+  shopName: string;
+  price: string;
+  amount: number;
+  sortAmount?: number;
+  currency: string;
+  shippingPrice?: string;
+  totalPrice?: string;
 };
 type PriceMatchForProductResponse =
   | {
@@ -245,6 +256,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "hintaopas.fi",
   "ledenicheur.fr",
   "godpris.no",
+  "klarna.com",
 ]);
 installOfferActivationClickTracker();
 chrome.runtime.onMessage.addListener((message) => {
@@ -531,6 +543,13 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     (document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal())) ||
     codes.length > 0 ||
     isLikelyCommerceProductPage(parsedUrl);
+  if (
+    isLikelyProductListingPage(parsedUrl) &&
+    document.querySelector('meta[property="og:type"][content="product"]') === null &&
+    !isLikelyCommerceProductPage(parsedUrl)
+  ) {
+    return undefined;
+  }
 
   const productName = readStringValue(productLdJson?.name);
   const brandName = readBrandName(productLdJson?.brand);
@@ -574,6 +593,28 @@ function hasProductStructuredDataSignal(
   if (codes.length > 0) return true;
   if (readNumberValue(offer?.price) !== undefined || readStringValue(offer?.priceCurrency) !== undefined) return true;
   return hasVisiblePriceSignal() && hasCommerceActionSignal();
+}
+
+function isLikelyProductListingPage(parsedUrl: URL): boolean {
+  const pathname = parsedUrl.pathname.toLowerCase();
+  const listingPath = /(?:^|\/)(?:search|sok|søk|resultat|results|kategori|category|categories|c|collections?|collections|list|listing)(?:\/|$)/i.test(pathname);
+  const listingQuery = [...parsedUrl.searchParams.keys()].some((key) => /^(?:q|query|search|sok|søk|keyword|term|category|filter|sort|page)$/i.test(key));
+  if (!listingPath && !listingQuery) return false;
+
+  const productCardCount = document.querySelectorAll(
+    [
+      "[data-product-id]",
+      "[data-productid]",
+      "[data-product]",
+      ".product-card",
+      ".product-tile",
+      ".product-item",
+      ".product-list-item",
+      "article",
+    ].join(","),
+  ).length;
+  const visiblePriceCount = (document.body?.innerText.match(/\b(?:kr|NOK)\s?\d|\d[\d\s]*(?:,\d{2})?\s?(?:kr|NOK)\b/gi) ?? []).length;
+  return productCardCount >= 2 || visiblePriceCount >= 3;
 }
 
 function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
@@ -3402,6 +3443,7 @@ function renderNotice(
   const mountTarget = document.body ?? document.documentElement;
   mountTarget.append(host);
   void detectConflicts(shadowRoot, title);
+  attachPriceMatchTooltips(shadowRoot, priceMatches);
   // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
   const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
   for (let idx = 0; idx < mainOffers.length; idx++) {
@@ -3478,6 +3520,29 @@ function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
 }
 
+function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMatchOffer[]): void {
+  if (priceMatches.length === 0) return;
+
+  const cards = shadowRoot.querySelectorAll<HTMLElement>(".price-match-card");
+  for (let index = 0; index < priceMatches.length; index++) {
+    const card = cards[index];
+    const priceMatch = priceMatches[index];
+    if (card === undefined || priceMatch === undefined) continue;
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "offer-tooltip";
+    setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+    shadowRoot.append(tooltip);
+
+    card.addEventListener("mouseenter", () => {
+      positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+    });
+    card.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("visible");
+    });
+  }
+}
+
 function setTooltipContent(tooltip: HTMLElement, parts: string[]): void {
   const sections = parts
     .flatMap((part) => part.split(/\n{2,}/))
@@ -3516,7 +3581,7 @@ function createTooltipSection(part: string): HTMLDivElement | undefined {
   }
 
   const firstLine = lines[0] ?? "";
-  const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) ? lines.slice(1) : lines;
+  const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) ? lines.slice(1) : lines;
 
   if (listLines.length !== lines.length) {
     const title = document.createElement("span");
@@ -3624,15 +3689,29 @@ function isPriceMatchForProductResponse(value: unknown): value is PriceMatchForP
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
     typeof value.amount === "number" &&
+    (value.sortAmount === undefined || typeof value.sortAmount === "number") &&
     typeof value.currency === "string" &&
     typeof value.productName === "string" &&
     typeof value.productUrl === "string" &&
-    (value.offerUrl === undefined || typeof value.offerUrl === "string")
+    (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
+    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)))
+  );
+}
+function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative {
+  return (
+    isRecord(value) &&
+    typeof value.shopName === "string" &&
+    typeof value.price === "string" &&
+    typeof value.amount === "number" &&
+    (value.sortAmount === undefined || typeof value.sortAmount === "number") &&
+    typeof value.currency === "string" &&
+    (value.shippingPrice === undefined || typeof value.shippingPrice === "string") &&
+    (value.totalPrice === undefined || typeof value.totalPrice === "string")
   );
 }
 function isCashbackIndex(value: unknown): value is CashbackIndex {
@@ -3896,10 +3975,32 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer): HTMLAnchorElement {
   return priceMatchCard;
 }
 function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
-  return priceMatch.source === "godpris" ? "godpris" : "prisjakt";
+  if (priceMatch.source === "godpris") return "godpris";
+  if (priceMatch.source === "klarna") return "klarna";
+  return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
-  return priceMatch.sourceName ?? (priceMatch.source === "godpris" ? "Godpris" : "Prisjakt");
+  if (priceMatch.sourceName !== undefined) return priceMatch.sourceName;
+  if (priceMatch.source === "godpris") return "Godpris";
+  if (priceMatch.source === "klarna") return "Klarna";
+  return "Prisjakt";
+}
+function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
+  const alternatives = priceMatch.alternatives?.length
+    ? priceMatch.alternatives
+    : [{ shopName: priceMatch.shopName, price: priceMatch.price }];
+  return [
+    `${getPriceMatchSourceName(priceMatch)} tilbud`,
+    ...alternatives.map(formatPriceMatchTooltipOffer),
+  ].join("\n");
+}
+function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "shippingPrice" | "totalPrice">): string {
+  const shippingSuffix = offer.totalPrice !== undefined
+    ? ` (${offer.shippingPrice ?? "frakt"}, totalt ${offer.totalPrice})`
+    : offer.shippingPrice !== undefined
+      ? ` (${offer.shippingPrice})`
+      : "";
+  return `- ${offer.shopName} ${offer.price}${shippingSuffix}`;
 }
 function formatProviderName(provider: CashbackOffer["provider"]): string {
   return PROVIDER_NAMES[provider] ?? provider;
@@ -4027,6 +4128,35 @@ function positionStatusTooltipAbovePanel(
 
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${Math.max(8, top)}px`;
+}
+function positionTooltipRightOfPanel(
+  tooltip: HTMLElement,
+  anchor: HTMLElement,
+  shadowRoot: ShadowRoot,
+): void {
+  const panelEl = shadowRoot.querySelector(".panel");
+  const panelRect = panelEl?.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+
+  tooltip.style.left = "-9999px";
+  tooltip.style.top = "-9999px";
+  tooltip.style.transform = "none";
+  tooltip.classList.add("visible");
+
+  const tooltipHeight = tooltip.offsetHeight;
+  const tooltipWidth = tooltip.offsetWidth;
+  const rightEdge = panelRect ? panelRect.right + 6 : anchorRect.right + 6;
+  const fallbackLeft = anchorRect.left + anchorRect.width / 2 - tooltipWidth / 2;
+  const left = rightEdge + tooltipWidth > window.innerWidth - 8
+    ? Math.max(8, Math.min(fallbackLeft, window.innerWidth - tooltipWidth - 8))
+    : rightEdge;
+  const top = Math.max(
+    8,
+    Math.min(anchorRect.top + anchorRect.height / 2 - tooltipHeight / 2, window.innerHeight - tooltipHeight - 8),
+  );
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
 }
 function formatOfferTitlePrefix(offer: CashbackOffer): string {
   if (offer.provider === "obos" || offer.provider === "bob" || offer.provider === "usbl") {
