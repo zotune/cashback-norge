@@ -208,8 +208,23 @@ const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
 const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1000;
 const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
+const NOTICE_BLOCKED_HOSTS = new Set([
+  "prisjakt.no",
+  "prisjakt.nu",
+  "prisjakt.se",
+  "prisjagt.dk",
+  "pricespy.co.uk",
+  "pricespy.co.nz",
+  "hintaopas.fi",
+  "ledenicheur.fr",
+]);
 installOfferActivationClickTracker();
 chrome.runtime.onMessage.addListener((message) => {
+  if (isNoticeBlockedHost(CURRENT_HOST)) {
+    clearNotice();
+    return;
+  }
+
   if (isCashbackFoundMessage(message)) {
     renderNoticeWithStoredState(message.offers);
     return;
@@ -235,6 +250,11 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 requestCurrentOffers();
 function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatch?: PriceMatchOffer): void {
+  if (isNoticeBlockedHost(CURRENT_HOST)) {
+    clearNotice();
+    return;
+  }
+
   const isUserscript = (chrome.runtime as { id?: string }).id === undefined;
   chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
     const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
@@ -250,7 +270,16 @@ function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatch?: Price
   });
 }
 function requestCurrentOffers(): void {
+  if (isNoticeBlockedHost(CURRENT_HOST)) {
+    clearNotice();
+    return;
+  }
+
   void renderCurrentContext();
+}
+
+function isNoticeBlockedHost(hostname: string): boolean {
+  return NOTICE_BLOCKED_HOSTS.has(hostname);
 }
 
 async function renderCurrentContext(): Promise<void> {
