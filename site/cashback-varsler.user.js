@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779269702
+// @version      1779270626
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1340,25 +1340,22 @@ query OfferList($productId: Int!) {
     const gmRequest = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : void 0;
     if (gmRequest !== void 0) {
       return new Promise((resolveValue) => {
-        gmRequest({
+        const requestOptions = {
           method: init?.method ?? "GET",
           url,
-          headers: init?.headers,
-          data: init?.body,
+          timeout: 15e3,
           onload: (response) => {
-            if (response.status < 200 || response.status >= 300) {
-              resolveValue(void 0);
-              return;
-            }
-            try {
-              resolveValue(JSON.parse(response.responseText));
-            } catch {
-              resolveValue(void 0);
-            }
+            resolveValue(parseUserscriptJsonResponse(response));
           },
           onerror: () => resolveValue(void 0),
           ontimeout: () => resolveValue(void 0)
-        });
+        };
+        if (init?.headers !== void 0) requestOptions.headers = init.headers;
+        if (init?.body !== void 0) requestOptions.data = init.body;
+        const maybePromise = gmRequest(requestOptions);
+        if (isPromiseLike(maybePromise)) {
+          maybePromise.then((response) => resolveValue(parseUserscriptJsonResponse(response))).catch(() => resolveValue(void 0));
+        }
       });
     }
     try {
@@ -1368,6 +1365,21 @@ query OfferList($productId: Int!) {
     } catch {
       return void 0;
     }
+  }
+  function parseUserscriptJsonResponse(response) {
+    if (!isRecord(response)) return void 0;
+    const status = typeof response.status === "number" ? response.status : 200;
+    if (status < 200 || status >= 300) return void 0;
+    const body = response.response ?? response.responseText;
+    if (typeof body !== "string") return body;
+    try {
+      return JSON.parse(body);
+    } catch {
+      return void 0;
+    }
+  }
+  function isPromiseLike(value) {
+    return isRecord(value) && typeof value.then === "function";
   }
   function sendRuntimeMessage(message) {
     return new Promise((resolveValue) => {
@@ -2068,12 +2080,14 @@ query OfferList($productId: Int!) {
     }
     .panel {
       width: min(400px, calc(100vw - 70px));
+      max-height: min(80vh, 760px);
       color: #172026;
       background: #ffffff;
       border: 1px solid #c9d7cf;
       border-radius: 8px;
       box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
-      overflow: hidden;
+      overflow: hidden auto;
+      overscroll-behavior: contain;
       margin-left: 4px;
       transform: translateZ(0);
       transition: width 0.25s ease, opacity 0.25s ease, margin-left 0.25s ease, border-width 0.25s ease;
@@ -2095,6 +2109,7 @@ query OfferList($productId: Int!) {
     }
     .body {
       display: grid;
+      align-content: start;
       gap: 10px;
       padding: 14px 14px 0 14px;
     }
@@ -2143,6 +2158,7 @@ query OfferList($productId: Int!) {
     }
     .offer-list {
       display: grid;
+      align-content: start;
       gap: 4px;
     }
     .offer-link.offer-link--best {
@@ -4140,6 +4156,18 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       collapsed ? "Expand cashback offers" : "Collapse cashback offers"
     );
     chrome.storage.local.set({ [COLLAPSED_STORAGE_KEY]: collapsed });
+    if (!collapsed) {
+      resetExpandedPanelLayout(notice);
+    }
+  }
+  function resetExpandedPanelLayout(notice) {
+    const panel = notice.querySelector(".panel");
+    if (panel === null) return;
+    requestAnimationFrame(() => {
+      panel.style.height = "auto";
+      panel.style.minHeight = "0";
+      void panel.offsetHeight;
+    });
   }
   function isCashbackFoundMessage(value) {
     return isRecord(value) && value.type === "cashback-found" && Array.isArray(value.offers) && value.offers.every(isCashbackOffer);

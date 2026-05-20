@@ -17,9 +17,16 @@ type UserscriptHttpRequestOptions = {
   url: string;
   headers?: Record<string, string>;
   data?: string;
-  onload?: (response: { status: number; responseText: string }) => void;
+  timeout?: number;
+  onload?: (response: UserscriptHttpResponse) => void;
   onerror?: () => void;
   ontimeout?: () => void;
+};
+
+type UserscriptHttpResponse = {
+  status?: number;
+  response?: unknown;
+  responseText?: string;
 };
 
 declare const GM_xmlhttpRequest: undefined | ((options: UserscriptHttpRequestOptions) => unknown);
@@ -381,25 +388,25 @@ async function userscriptJsonRequest(
 
   if (gmRequest !== undefined) {
     return new Promise((resolveValue) => {
-      gmRequest({
+      const requestOptions: UserscriptHttpRequestOptions = {
         method: init?.method ?? "GET",
         url,
-        headers: init?.headers,
-        data: init?.body,
+        timeout: 15000,
         onload: (response) => {
-          if (response.status < 200 || response.status >= 300) {
-            resolveValue(undefined);
-            return;
-          }
-          try {
-            resolveValue(JSON.parse(response.responseText) as unknown);
-          } catch {
-            resolveValue(undefined);
-          }
+          resolveValue(parseUserscriptJsonResponse(response));
         },
         onerror: () => resolveValue(undefined),
         ontimeout: () => resolveValue(undefined),
-      });
+      };
+      if (init?.headers !== undefined) requestOptions.headers = init.headers;
+      if (init?.body !== undefined) requestOptions.data = init.body;
+
+      const maybePromise = gmRequest(requestOptions);
+      if (isPromiseLike(maybePromise)) {
+        maybePromise
+          .then((response) => resolveValue(parseUserscriptJsonResponse(response)))
+          .catch(() => resolveValue(undefined));
+      }
     });
   }
 
@@ -410,6 +417,23 @@ async function userscriptJsonRequest(
   } catch {
     return undefined;
   }
+}
+
+function parseUserscriptJsonResponse(response: unknown): unknown | undefined {
+  if (!isRecord(response)) return undefined;
+  const status = typeof response.status === "number" ? response.status : 200;
+  if (status < 200 || status >= 300) return undefined;
+  const body = response.response ?? response.responseText;
+  if (typeof body !== "string") return body;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return isRecord(value) && typeof value.then === "function";
 }
 
 function sendRuntimeMessage<T>(message: unknown): Promise<T | undefined> {
@@ -1313,12 +1337,14 @@ function renderNotice(
     }
     .panel {
       width: min(400px, calc(100vw - 70px));
+      max-height: min(80vh, 760px);
       color: #172026;
       background: #ffffff;
       border: 1px solid #c9d7cf;
       border-radius: 8px;
       box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
-      overflow: hidden;
+      overflow: hidden auto;
+      overscroll-behavior: contain;
       margin-left: 4px;
       transform: translateZ(0);
       transition: width 0.25s ease, opacity 0.25s ease, margin-left 0.25s ease, border-width 0.25s ease;
@@ -1340,6 +1366,7 @@ function renderNotice(
     }
     .body {
       display: grid;
+      align-content: start;
       gap: 10px;
       padding: 14px 14px 0 14px;
     }
@@ -1388,6 +1415,7 @@ function renderNotice(
     }
     .offer-list {
       display: grid;
+      align-content: start;
       gap: 4px;
     }
     .offer-link.offer-link--best {
@@ -3442,7 +3470,21 @@ function setCollapsed(
     collapsed ? "Expand cashback offers" : "Collapse cashback offers",
   );
   chrome.storage.local.set({ [COLLAPSED_STORAGE_KEY]: collapsed });
+  if (!collapsed) {
+    resetExpandedPanelLayout(notice);
+  }
 }
+
+function resetExpandedPanelLayout(notice: HTMLElement): void {
+  const panel = notice.querySelector<HTMLElement>(".panel");
+  if (panel === null) return;
+  requestAnimationFrame(() => {
+    panel.style.height = "auto";
+    panel.style.minHeight = "0";
+    void panel.offsetHeight;
+  });
+}
+
 function isCashbackFoundMessage(value: unknown): value is CashbackFoundMessage {
   return (
     isRecord(value) &&
