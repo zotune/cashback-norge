@@ -204,6 +204,7 @@ const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
 const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
+const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
 const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -256,16 +257,17 @@ function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatch?: Price
   }
 
   const isUserscript = (chrome.runtime as { id?: string }).id === undefined;
-  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
+  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
     const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
     if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
     const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
     const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
+    const priceMatchCollapsed = result[PRICE_MATCH_COLLAPSED_KEY] === true;
     void readActivatedOffers()
       .catch(() => ({}))
       .then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, activatedOffers, priceMatch);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatch);
       });
   });
 }
@@ -1132,6 +1134,7 @@ function renderNotice(
   initialCollapsed: boolean,
   initialChipsCollapsed: boolean,
   initialCodesCollapsed: boolean,
+  initialPriceMatchCollapsed: boolean,
   activatedOffers: Readonly<Record<string, number>>,
   priceMatch?: PriceMatchOffer,
 ): void {
@@ -2932,6 +2935,10 @@ function renderNotice(
   const priceMatchSection = document.createElement("div");
   priceMatchSection.className = "price-match-section";
   if (priceMatch !== undefined) {
+    if (initialPriceMatchCollapsed) {
+      priceMatchSection.classList.add("collapsed");
+    }
+
     const priceMatchToggle = document.createElement("button");
     priceMatchToggle.className = "price-match-toggle";
     priceMatchToggle.type = "button";
@@ -2942,7 +2949,8 @@ function renderNotice(
     priceMatchToggleText.textContent = "Prismatch";
     priceMatchToggle.append(priceMatchToggleArrow, priceMatchToggleText);
     priceMatchToggle.addEventListener("click", () => {
-      priceMatchSection.classList.toggle("collapsed");
+      const isCollapsed = priceMatchSection.classList.toggle("collapsed");
+      chrome.storage.local.set({ [PRICE_MATCH_COLLAPSED_KEY]: isCollapsed });
     });
 
     const priceMatchCard = document.createElement("a");
