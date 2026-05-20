@@ -1,4 +1,4 @@
-# Cashback Varsler
+# [Cashback Norge](https://cashbacknorge.no)
 
 Viser cashback-tilbud automatisk når du handler på nett i Norge.
 
