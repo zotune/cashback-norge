@@ -5,7 +5,7 @@ import {
   parseUrl,
 } from "../shared/cashback.js";
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
-import { findPrisjaktPriceMatch } from "../shared/prisjakt-price-match.js";
+import { findPriceMatch } from "../shared/price-match.js";
 import {
   type CashbackFoundMessage,
   type CashbackNoneMessage,
@@ -97,7 +97,7 @@ async function findOffersForUrl(
 async function findPriceMatchForProduct(
   message: GetPriceMatchForProductMessage,
 ): Promise<PriceMatchForProductResponse> {
-  const offer = await findPrisjaktPriceMatch(message);
+  const offer = await findPriceMatch(message);
   return { ok: true, ...(offer !== undefined ? { offer } : {}) };
 }
 

@@ -3,7 +3,7 @@ import type {
   PriceMatchOffer,
 } from "./extension-messages.js";
 
-type JsonRequest = (
+export type JsonRequest = (
   url: string,
   init?: {
     method?: string;
@@ -98,6 +98,8 @@ async function fetchNativePrisjaktPriceMatch(
     if (bestOffer === undefined) return undefined;
 
     return {
+      source: "prisjakt",
+      sourceName: "Prisjakt",
       shopName: bestOffer.shopName,
       amount: bestOffer.amount,
       currency: bestOffer.currency,
@@ -306,6 +308,8 @@ function readBestPrisjaktOffer(value: unknown): PriceMatchOffer | undefined {
 
   return {
     ...best,
+    source: "prisjakt",
+    sourceName: "Prisjakt",
     productName,
     productUrl: productId !== undefined ? `https://www.prisjakt.no/product.php?p=${encodeURIComponent(productId)}` : `https://www.prisjakt.no/search?query=${encodeURIComponent(productName)}`,
   };

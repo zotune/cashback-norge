@@ -6,7 +6,8 @@
   "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://browser-extension-backend.cloud.pji.nu/*",
-    "https://native-backend.cloud.pji.nu/*"
+    "https://native-backend.cloud.pji.nu/*",
+    "https://godpris.no/*"
   ],
   "background": {
     "service_worker": "assets/background.js",

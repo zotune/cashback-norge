@@ -45,6 +45,8 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
+  source?: "prisjakt" | "godpris";
+  sourceName?: string;
   shopName: string;
   price: string;
   amount: number;

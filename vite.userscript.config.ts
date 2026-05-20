@@ -34,6 +34,7 @@ const USERSCRIPT_BANNER = `\
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
 // @connect      browser-extension-backend.cloud.pji.nu
+// @connect      godpris.no
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js
