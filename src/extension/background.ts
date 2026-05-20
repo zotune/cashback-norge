@@ -139,17 +139,17 @@ async function findPriceMatchForProduct(
   }
 
   const nativeOffer = await fetchNativePrisjaktPriceMatch(message);
-  if (nativeOffer !== undefined) {
+  if (nativeOffer !== undefined && isNorwegianPriceMatchOffer(nativeOffer)) {
     return { ok: true, offer: nativeOffer };
   }
 
   const identifyOffer = await fetchPrisjaktIdentify(message);
-  if (identifyOffer !== undefined) {
+  if (identifyOffer !== undefined && isNorwegianPriceMatchOffer(identifyOffer)) {
     return { ok: true, offer: identifyOffer };
   }
 
   const searchOffer = await fetchPrisjaktSearch(message.searchTerm);
-  return { ok: true, ...(searchOffer !== undefined ? { offer: searchOffer } : {}) };
+  return { ok: true, ...(searchOffer !== undefined && isNorwegianPriceMatchOffer(searchOffer) ? { offer: searchOffer } : {}) };
 }
 
 async function fetchNativePrisjaktPriceMatch(
@@ -159,7 +159,8 @@ async function fetchNativePrisjaktPriceMatch(
     const product = await fetchNativePrisjaktProductByOfferUrl(message.url);
     if (product === undefined) return undefined;
 
-    const offers = await fetchNativePrisjaktOffers(product.id);
+    const offers = (await fetchNativePrisjaktOffers(product.id))
+      .filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
     if (offers.length === 0) return undefined;
 
     const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
@@ -343,7 +344,9 @@ function readBestPrisjaktOffer(value: unknown): PriceMatchOffer | undefined {
 
   const productName = typeof product.name === "string" ? product.name : "Prisjakt-produkt";
   const productId = typeof product.id === "number" || typeof product.id === "string" ? String(product.id) : undefined;
-  const parsedOffers = offers.map(readPrisjaktOffer).filter((offer): offer is Omit<PriceMatchOffer, "productName" | "productUrl"> => offer !== undefined);
+  const parsedOffers = offers
+    .map(readPrisjaktOffer)
+    .filter((offer): offer is Omit<PriceMatchOffer, "productName" | "productUrl"> => offer !== undefined && isNorwegianPriceMatchCurrency(offer.currency));
   parsedOffers.sort((first, second) => first.amount - second.amount);
   const best = parsedOffers[0];
   if (best === undefined) return undefined;
@@ -377,6 +380,14 @@ function readPrisjaktOffer(value: unknown): Omit<PriceMatchOffer, "productName" 
     price: formatted,
     ...(url !== undefined ? { offerUrl: url } : {}),
   };
+}
+
+function isNorwegianPriceMatchOffer(offer: PriceMatchOffer): boolean {
+  return isNorwegianPriceMatchCurrency(offer.currency);
+}
+
+function isNorwegianPriceMatchCurrency(currency: string): boolean {
+  return currency.trim().toUpperCase() === "NOK";
 }
 
 function formatPrisjaktPrice(amount: number, currency: string): string {
