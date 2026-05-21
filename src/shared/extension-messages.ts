@@ -45,7 +45,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar";
   sourceName?: string;
   shopName: string;
   price: string;

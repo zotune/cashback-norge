@@ -205,7 +205,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar";
   sourceName?: string;
   shopName: string;
   price: string;
@@ -257,6 +257,8 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "ledenicheur.fr",
   "godpris.no",
   "klarna.com",
+  "kelkoo.no",
+  "prisradar.no",
 ]);
 installOfferActivationClickTracker();
 chrome.runtime.onMessage.addListener((message) => {
@@ -528,7 +530,8 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   if (parsedUrl === undefined || (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:")) {
     return undefined;
   }
-  if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, parsedUrl.hostname.replace(/^www\./, "").toLowerCase())) {
+  const normalizedHostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, normalizedHostname) && !isKnownPriceMatchSourceProductPage(parsedUrl)) {
     return undefined;
   }
 
@@ -615,6 +618,42 @@ function isLikelyProductListingPage(parsedUrl: URL): boolean {
   ).length;
   const visiblePriceCount = (document.body?.innerText.match(/\b(?:kr|NOK)\s?\d|\d[\d\s]*(?:,\d{2})?\s?(?:kr|NOK)\b/gi) ?? []).length;
   return productCardCount >= 2 || visiblePriceCount >= 3;
+}
+
+function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  const pathname = parsedUrl.pathname.toLowerCase();
+
+  if (
+    hostname.endsWith("prisjakt.no") ||
+    hostname.endsWith("prisjakt.nu") ||
+    hostname.endsWith("prisjakt.se") ||
+    hostname.endsWith("prisjagt.dk") ||
+    hostname.endsWith("pricespy.co.uk") ||
+    hostname.endsWith("pricespy.co.nz") ||
+    hostname.endsWith("hintaopas.fi") ||
+    hostname.endsWith("ledenicheur.fr")
+  ) {
+    return (pathname === "/product.php" && parsedUrl.searchParams.has("p")) || /^\/produkt(?:er)?\//.test(pathname);
+  }
+
+  if (hostname.endsWith("godpris.no")) {
+    return /^\/produkt\/[^/]+\/?$/.test(pathname);
+  }
+
+  if (hostname.endsWith("klarna.com")) {
+    return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+  }
+
+  if (hostname.endsWith("kelkoo.no")) {
+    return /^\/gtin\/\d+\/?$/.test(pathname);
+  }
+
+  if (hostname.endsWith("prisradar.no")) {
+    return /^\/produkter\/[^/]+\/?$/.test(pathname);
+  }
+
+  return false;
 }
 
 function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
@@ -1724,6 +1763,10 @@ function renderNotice(
     }
     .provider-godpris {
       background: #21003f;
+      color: #ffffff;
+    }
+    .provider-prisradar {
+      background: #ff2048;
       color: #ffffff;
     }
     .provider-sparebank1 {
@@ -3689,7 +3732,7 @@ function isPriceMatchForProductResponse(value: unknown): value is PriceMatchForP
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
@@ -3977,12 +4020,14 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer): HTMLAnchorElement {
 function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "godpris") return "godpris";
   if (priceMatch.source === "klarna") return "klarna";
+  if (priceMatch.source === "prisradar") return "prisradar";
   return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.sourceName !== undefined) return priceMatch.sourceName;
   if (priceMatch.source === "godpris") return "Godpris";
   if (priceMatch.source === "klarna") return "Klarna";
+  if (priceMatch.source === "prisradar") return "Prisradar";
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {

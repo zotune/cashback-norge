@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779300550
+// @version      1779359130
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -16,6 +16,8 @@
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      www.klarna.com
+// @connect      gql.prisradar.no
+// @connect      prisradar.no
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
@@ -377,18 +379,18 @@
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
-  const BAD_AVAILABILITY_STATUSES$2 = /* @__PURE__ */ new Set([
+  const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
     "discontinued",
     "not_available",
     "not_in_stock",
     "out_of_stock"
   ]);
-  async function findGodprisPriceMatch(message, requestJson = fetchJson$2, requestText = fetchText) {
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$3, requestText = fetchText$1) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
-    const searchQueries = uniqueStrings$2([
-      ...(message.codes ?? []).filter(isLikelyGtin$1),
+    const searchQueries = uniqueStrings$3([
+      ...(message.codes ?? []).filter(isLikelyGtin$2),
       message.searchTerm
     ]);
     for (const query of searchQueries) {
@@ -409,22 +411,22 @@
     const value = await requestJson(`https://godpris.no/api/product/search?${params.toString()}`, {
       headers: { "Accept": "application/json" }
     });
-    if (!isPlainRecord$2(value) || !Array.isArray(value.results)) return void 0;
+    if (!isPlainRecord$3(value) || !Array.isArray(value.results)) return void 0;
     for (const result of value.results) {
-      if (!isPlainRecord$2(result)) continue;
-      const id = readStringLike$1(result.id);
+      if (!isPlainRecord$3(result)) continue;
+      const id = readStringLike$2(result.id);
       if (id !== void 0) return id;
     }
     return void 0;
   }
   function readGodprisProductPage(html, fallbackProductId) {
     const page = readGodprisDataPage(html);
-    const props = isPlainRecord$2(page?.props) ? page.props : void 0;
-    const product = isPlainRecord$2(props?.product) ? props.product : void 0;
+    const props = isPlainRecord$3(page?.props) ? page.props : void 0;
+    const product = isPlainRecord$3(props?.product) ? props.product : void 0;
     const prices = Array.isArray(props?.prices) ? props.prices : [];
     if (product === void 0 || prices.length === 0) return void 0;
-    const productId = readStringLike$1(product.id) ?? fallbackProductId;
-    const productName = readStringLike$1(product.title) ?? readStringLike$1(product.name) ?? "Godpris-produkt";
+    const productId = readStringLike$2(product.id) ?? fallbackProductId;
+    const productName = readStringLike$2(product.title) ?? readStringLike$2(product.name) ?? "Godpris-produkt";
     const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
     const best = offers[0];
     if (best === void 0) return void 0;
@@ -452,23 +454,23 @@
     }
   }
   function readGodprisOffer(value) {
-    if (!isPlainRecord$2(value)) return void 0;
-    const shop = isPlainRecord$2(value.shop) ? value.shop : void 0;
-    const amount = readNumberLike$2(value.price);
-    const shopName = readStringLike$1(shop?.title) ?? readStringLike$1(value.shop_title);
-    const availability = readStringLike$1(value.availability)?.toLowerCase();
+    if (!isPlainRecord$3(value)) return void 0;
+    const shop = isPlainRecord$3(value.shop) ? value.shop : void 0;
+    const amount = readNumberLike$3(value.price);
+    const shopName = readStringLike$2(shop?.title) ?? readStringLike$2(value.shop_title);
+    const availability = readStringLike$2(value.availability)?.toLowerCase();
     if (amount === void 0 || amount <= 0 || shopName === void 0) return void 0;
-    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$2.has(availability)) return void 0;
-    const offerUrl = readStringLike$1(value.click_url) ?? readStringLike$1(value.url);
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$3.has(availability)) return void 0;
+    const offerUrl = readStringLike$2(value.click_url) ?? readStringLike$2(value.url);
     return {
       shopName,
       amount,
       currency: "NOK",
-      price: formatNokPrice$1(amount),
+      price: formatNokPrice$2(amount),
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
-  async function fetchJson$2(url, init) {
+  async function fetchJson$3(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -477,7 +479,7 @@
       return void 0;
     }
   }
-  async function fetchText(url, init) {
+  async function fetchText$1(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -486,7 +488,7 @@
       return void 0;
     }
   }
-  function formatNokPrice$1(amount) {
+  function formatNokPrice$2(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
@@ -495,34 +497,34 @@
   function decodeHtmlAttribute(value) {
     return value.replace(/&quot;/g, '"').replace(/&#039;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
-  function readStringLike$1(value) {
+  function readStringLike$2(value) {
     if (typeof value !== "string" && typeof value !== "number") return void 0;
     const trimmed = String(value).trim();
     return trimmed.length > 0 ? trimmed : void 0;
   }
-  function readNumberLike$2(value) {
+  function readNumberLike$3(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function uniqueStrings$2(values) {
+  function uniqueStrings$3(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
-  function isLikelyGtin$1(value) {
+  function isLikelyGtin$2(value) {
     const normalized = value.trim();
     return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
-  function isPlainRecord$2(value) {
+  function isPlainRecord$3(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
   const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
   const KLARNA_OFFERS_URL = "https://www.klarna.com/no/api/product-detail-edge-rest/public/product-detail/v0/offers/NO";
   const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/cl\d+\/(\d+)\//;
-  const BAD_AVAILABILITY_STATUSES$1 = /* @__PURE__ */ new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST"]);
+  const BAD_AVAILABILITY_STATUSES$2 = /* @__PURE__ */ new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST"]);
   const BAD_STOCK_STATUSES$1 = /* @__PURE__ */ new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
-  async function findKlarnaPriceMatch(message, requestJson = fetchJson$1) {
+  async function findKlarnaPriceMatch(message, requestJson = fetchJson$2) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -535,8 +537,8 @@
       }, requestJson);
       if (directOffer !== void 0) return directOffer;
     }
-    const searchQueries = uniqueStrings$1([
-      ...(message.codes ?? []).filter(isLikelyGtin),
+    const searchQueries = uniqueStrings$2([
+      ...(message.codes ?? []).filter(isLikelyGtin$1),
       message.searchTerm
     ]);
     for (const query of searchQueries) {
@@ -554,14 +556,14 @@
     const value = await requestJson(`${KLARNA_SEARCH_URL}?${params.toString()}`, {
       headers: { "Accept": "application/json" }
     });
-    if (!isPlainRecord$1(value) || !Array.isArray(value.products)) return void 0;
+    if (!isPlainRecord$2(value) || !Array.isArray(value.products)) return void 0;
     for (const product of value.products) {
-      if (!isPlainRecord$1(product)) continue;
-      const id = readStringLike(product.id);
-      const name = readStringLike(product.name);
-      const path = readStringLike(product.url);
-      const lowestPrice = isPlainRecord$1(product.lowestPrice) ? product.lowestPrice : void 0;
-      const currency = readStringLike(lowestPrice?.currency);
+      if (!isPlainRecord$2(product)) continue;
+      const id = readStringLike$1(product.id);
+      const name = readStringLike$1(product.name);
+      const path = readStringLike$1(product.url);
+      const lowestPrice = isPlainRecord$2(product.lowestPrice) ? product.lowestPrice : void 0;
+      const currency = readStringLike$1(lowestPrice?.currency);
       const outOfStock = product.outOfStock === true;
       if (id !== void 0 && name !== void 0 && path !== void 0 && currency === "NOK" && !outOfStock) {
         return {
@@ -582,8 +584,8 @@
     const value = await requestJson(`${KLARNA_OFFERS_URL}/${encodeURIComponent(product.id)}?${params.toString()}`, {
       headers: { "Accept": "application/json" }
     });
-    if (!isPlainRecord$1(value) || !Array.isArray(value.offers)) return void 0;
-    const merchants = isPlainRecord$1(value.merchants) ? value.merchants : {};
+    if (!isPlainRecord$2(value) || !Array.isArray(value.offers)) return void 0;
+    const merchants = isPlainRecord$2(value.merchants) ? value.merchants : {};
     const offers = value.offers.map((offer) => readKlarnaOffer(offer, merchants)).filter((offer) => offer !== void 0).sort((first, second) => first.sortAmount - second.sortAmount);
     const best = offers[0];
     if (best === void 0) return void 0;
@@ -604,38 +606,38 @@
         sortAmount: offer.sortAmount,
         currency: offer.currency,
         price: offer.price,
-        shippingPrice: formatShippingPrice$1(offer.shippingAmount),
-        ...offer.shippingAmount > 0 ? { totalPrice: formatNokPrice(offer.sortAmount) } : {}
+        shippingPrice: formatShippingPrice$2(offer.shippingAmount),
+        ...offer.shippingAmount > 0 ? { totalPrice: formatNokPrice$1(offer.sortAmount) } : {}
       }))
     };
   }
   function readKlarnaOffer(value, merchants) {
-    if (!isPlainRecord$1(value)) return void 0;
-    const price = isPlainRecord$1(value.price) ? value.price : void 0;
-    const shippingCost = isPlainRecord$1(value.shippingCost) ? value.shippingCost : void 0;
-    const amount = readNumberLike$1(price?.amount);
-    const shippingAmount = readNumberLike$1(shippingCost?.amount) ?? 0;
-    const currency = readStringLike(price?.currency);
-    const merchantId = readStringLike(value.merchantId);
-    const merchant = merchantId !== void 0 && isPlainRecord$1(merchants[merchantId]) ? merchants[merchantId] : void 0;
-    const shopName = readStringLike(merchant?.name);
-    const availability = readStringLike(value.availability)?.toUpperCase();
-    const stockStatus = readStringLike(value.stockStatus)?.toUpperCase();
+    if (!isPlainRecord$2(value)) return void 0;
+    const price = isPlainRecord$2(value.price) ? value.price : void 0;
+    const shippingCost = isPlainRecord$2(value.shippingCost) ? value.shippingCost : void 0;
+    const amount = readNumberLike$2(price?.amount);
+    const shippingAmount = readNumberLike$2(shippingCost?.amount) ?? 0;
+    const currency = readStringLike$1(price?.currency);
+    const merchantId = readStringLike$1(value.merchantId);
+    const merchant = merchantId !== void 0 && isPlainRecord$2(merchants[merchantId]) ? merchants[merchantId] : void 0;
+    const shopName = readStringLike$1(merchant?.name);
+    const availability = readStringLike$1(value.availability)?.toUpperCase();
+    const stockStatus = readStringLike$1(value.stockStatus)?.toUpperCase();
     if (amount === void 0 || amount <= 0 || currency !== "NOK" || shopName === void 0) return void 0;
-    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$1.has(availability)) return void 0;
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$2.has(availability)) return void 0;
     if (stockStatus !== void 0 && BAD_STOCK_STATUSES$1.has(stockStatus)) return void 0;
-    const offerUrl = toAbsoluteKlarnaUrl(readStringLike(value.url));
+    const offerUrl = toAbsoluteKlarnaUrl(readStringLike$1(value.url));
     return {
       shopName,
       amount,
       sortAmount: amount + shippingAmount,
       shippingAmount,
       currency,
-      price: formatNokPrice(amount),
+      price: formatNokPrice$1(amount),
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
-  async function fetchJson$1(url, init) {
+  async function fetchJson$2(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -661,34 +663,34 @@
       return void 0;
     }
   }
-  function formatNokPrice(amount) {
+  function formatNokPrice$1(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
     return `${formatted} kr`;
   }
-  function formatShippingPrice$1(amount) {
-    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice(amount)}`;
+  function formatShippingPrice$2(amount) {
+    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice$1(amount)}`;
   }
-  function readStringLike(value) {
+  function readStringLike$1(value) {
     if (typeof value !== "string" && typeof value !== "number") return void 0;
     const trimmed = String(value).trim();
     return trimmed.length > 0 ? trimmed : void 0;
   }
-  function readNumberLike$1(value) {
+  function readNumberLike$2(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function isLikelyGtin(value) {
+  function isLikelyGtin$1(value) {
     const normalized = value.trim();
     return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
-  function uniqueStrings$1(values) {
+  function uniqueStrings$2(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
-  function isPlainRecord$1(value) {
+  function isPlainRecord$2(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
@@ -733,7 +735,7 @@ query OfferList($productId: Int!) {
   }
 }
 `;
-  async function findPrisjaktPriceMatch(message, requestJson = fetchJson) {
+  async function findPrisjaktPriceMatch(message, requestJson = fetchJson$1) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -780,13 +782,13 @@ query OfferList($productId: Int!) {
         sortAmount: offer.sortAmount,
         currency: offer.currency,
         price: formatPrisjaktPrice(offer.amount, offer.currency),
-        shippingPrice: formatShippingPrice(offer.shippingAmount, offer.currency),
+        shippingPrice: formatShippingPrice$1(offer.shippingAmount, offer.currency),
         ...offer.shippingAmount > 0 ? { totalPrice: formatPrisjaktPrice(offer.sortAmount, offer.currency) } : {}
       }))
     };
   }
   async function fetchNativePrisjaktProductByOfferUrls(offerUrls, requestJson) {
-    const candidateUrls = uniqueStrings([
+    const candidateUrls = uniqueStrings$1([
       ...offerUrls,
       ...offerUrls.map((url) => url !== void 0 ? toCanonicalProductPageUrl(url) : void 0)
     ]);
@@ -811,12 +813,12 @@ query OfferList($productId: Int!) {
         variables: { offerUrl }
       })
     });
-    if (!isPlainRecord(value) || !isPlainRecord(value.data) || !Array.isArray(value.data.productsByOfferUrl)) {
+    if (!isPlainRecord$1(value) || !isPlainRecord$1(value.data) || !Array.isArray(value.data.productsByOfferUrl)) {
       return void 0;
     }
     for (const product of value.data.productsByOfferUrl) {
-      if (!isPlainRecord(product)) continue;
-      const id = readNumberLike(product.id);
+      if (!isPlainRecord$1(product)) continue;
+      const id = readNumberLike$1(product.id);
       const name = typeof product.name === "string" ? product.name : void 0;
       const productUrl = typeof product.webUri === "string" ? product.webUri : void 0;
       if (id !== void 0 && name !== void 0 && productUrl !== void 0) {
@@ -840,19 +842,19 @@ query OfferList($productId: Int!) {
         variables: { productId }
       })
     });
-    if (!isPlainRecord(value) || !isPlainRecord(value.data) || !isPlainRecord(value.data.product) || !Array.isArray(value.data.product.offers)) {
+    if (!isPlainRecord$1(value) || !isPlainRecord$1(value.data) || !isPlainRecord$1(value.data.product) || !Array.isArray(value.data.product.offers)) {
       return [];
     }
     return value.data.product.offers.map(readNativePrisjaktOffer).filter((offer) => offer !== void 0);
   }
   function readNativePrisjaktOffer(value) {
-    if (!isPlainRecord(value)) return void 0;
-    const shop = isPlainRecord(value.shop) ? value.shop : void 0;
-    const price = isPlainRecord(value.price) ? value.price : void 0;
-    const shipping = isPlainRecord(value.shipping) ? value.shipping : void 0;
-    const availability = isPlainRecord(value.availability) ? value.availability : void 0;
-    const stock = isPlainRecord(value.stock) ? value.stock : void 0;
-    const cheapestShipping = isPlainRecord(shipping?.cheapest) ? shipping.cheapest : void 0;
+    if (!isPlainRecord$1(value)) return void 0;
+    const shop = isPlainRecord$1(value.shop) ? value.shop : void 0;
+    const price = isPlainRecord$1(value.price) ? value.price : void 0;
+    const shipping = isPlainRecord$1(value.shipping) ? value.shipping : void 0;
+    const availability = isPlainRecord$1(value.availability) ? value.availability : void 0;
+    const stock = isPlainRecord$1(value.stock) ? value.stock : void 0;
+    const cheapestShipping = isPlainRecord$1(shipping?.cheapest) ? shipping.cheapest : void 0;
     const shopName = typeof shop?.name === "string" ? shop.name : void 0;
     const currency = typeof shop?.currency === "string" ? shop.currency : void 0;
     const amount = typeof price?.exclShipping === "number" ? price.exclShipping : void 0;
@@ -862,7 +864,7 @@ query OfferList($productId: Int!) {
     const stockStatus = typeof stock?.status === "string" ? stock.status : void 0;
     if (shopName === void 0 || currency === void 0 || amount === void 0) return void 0;
     if (condition !== void 0 && condition.toUpperCase() !== "NEW") return void 0;
-    if (availabilityStatus !== void 0 && BAD_AVAILABILITY_STATUSES.has(availabilityStatus.toUpperCase())) return void 0;
+    if (availabilityStatus !== void 0 && BAD_AVAILABILITY_STATUSES$1.has(availabilityStatus.toUpperCase())) return void 0;
     if (stockStatus !== void 0 && BAD_STOCK_STATUSES.has(stockStatus.toLowerCase())) return void 0;
     const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0 ? value.externalUri : void 0;
     return {
@@ -874,7 +876,7 @@ query OfferList($productId: Int!) {
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
-  const BAD_AVAILABILITY_STATUSES = /* @__PURE__ */ new Set(["NOT_AVAILABLE_FOR_ORDER"]);
+  const BAD_AVAILABILITY_STATUSES$1 = /* @__PURE__ */ new Set(["NOT_AVAILABLE_FOR_ORDER"]);
   const BAD_STOCK_STATUSES = /* @__PURE__ */ new Set(["out_of_stock", "not_in_stock"]);
   async function fetchPrisjaktIdentify(message, requestJson) {
     const params = new URLSearchParams();
@@ -909,11 +911,11 @@ query OfferList($productId: Int!) {
     return product !== void 0 ? fetchBestNativePrisjaktOffer(product, requestJson) : void 0;
   }
   function readFirstPrisjaktSearchProduct(value) {
-    if (!isPlainRecord(value)) return void 0;
+    if (!isPlainRecord$1(value)) return void 0;
     const details = Array.isArray(value.details) ? value.details : [];
     for (const detail of details) {
-      if (!isPlainRecord(detail) || !isPlainRecord(detail.product)) continue;
-      const id = readNumberLike(detail.product.id);
+      if (!isPlainRecord$1(detail) || !isPlainRecord$1(detail.product)) continue;
+      const id = readNumberLike$1(detail.product.id);
       const name = typeof detail.product.name === "string" ? detail.product.name : void 0;
       if (id !== void 0 && name !== void 0) {
         return {
@@ -926,15 +928,15 @@ query OfferList($productId: Int!) {
     return void 0;
   }
   function readBestPrisjaktOffer(value) {
-    if (!isPlainRecord(value)) return void 0;
+    if (!isPlainRecord$1(value)) return void 0;
     const details = Array.isArray(value.details) ? value.details : [];
-    const directProduct = isPlainRecord(value.product) ? value.product : void 0;
+    const directProduct = isPlainRecord$1(value.product) ? value.product : void 0;
     const detail = details.find((entry) => {
-      return isPlainRecord(entry) && Array.isArray(entry.offers) && entry.offers.length > 0;
+      return isPlainRecord$1(entry) && Array.isArray(entry.offers) && entry.offers.length > 0;
     });
-    const product = isPlainRecord(detail) && isPlainRecord(detail.product) ? detail.product : directProduct;
-    const offers = isPlainRecord(detail) && Array.isArray(detail.offers) ? detail.offers : Array.isArray(value.offers) ? value.offers : [];
-    if (!isPlainRecord(product) || offers.length === 0) return void 0;
+    const product = isPlainRecord$1(detail) && isPlainRecord$1(detail.product) ? detail.product : directProduct;
+    const offers = isPlainRecord$1(detail) && Array.isArray(detail.offers) ? detail.offers : Array.isArray(value.offers) ? value.offers : [];
+    if (!isPlainRecord$1(product) || offers.length === 0) return void 0;
     const productName = typeof product.name === "string" ? product.name : "Prisjakt-produkt";
     const productId = typeof product.id === "number" || typeof product.id === "string" ? String(product.id) : void 0;
     const parsedOffers = offers.map(readPrisjaktOffer).filter((offer) => offer !== void 0 && isNorwegianPriceMatchCurrency(offer.currency));
@@ -956,9 +958,9 @@ query OfferList($productId: Int!) {
     };
   }
   function readPrisjaktOffer(value) {
-    if (!isPlainRecord(value)) return void 0;
-    const shop = isPlainRecord(value.shop) ? value.shop : void 0;
-    const price = isPlainRecord(value.price) && isPlainRecord(value.price.price) ? value.price.price : void 0;
+    if (!isPlainRecord$1(value)) return void 0;
+    const shop = isPlainRecord$1(value.shop) ? value.shop : void 0;
+    const price = isPlainRecord$1(value.price) && isPlainRecord$1(value.price.price) ? value.price.price : void 0;
     const scaledAmount = typeof price?.scaledAmount === "number" ? price.scaledAmount : void 0;
     const currency = typeof price?.currency === "string" ? price.currency : void 0;
     const shopName = typeof shop?.name === "string" ? shop.name : void 0;
@@ -974,7 +976,7 @@ query OfferList($productId: Int!) {
       ...url !== void 0 ? { offerUrl: url } : {}
     };
   }
-  async function fetchJson(url, init) {
+  async function fetchJson$1(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -995,10 +997,10 @@ query OfferList($productId: Int!) {
     }).format(amount);
     return `${formatted} ${currency === "NOK" ? "kr" : currency}`;
   }
-  function formatShippingPrice(amount, currency) {
+  function formatShippingPrice$1(amount, currency) {
     return amount <= 0 ? "fri frakt" : `frakt ${formatPrisjaktPrice(amount, currency)}`;
   }
-  function readNumberLike(value) {
+  function readNumberLike$1(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
     const parsed = Number.parseInt(value, 10);
@@ -1017,19 +1019,273 @@ query OfferList($productId: Int!) {
       return void 0;
     }
   }
-  function uniqueStrings(values) {
+  function uniqueStrings$1(values) {
     return [...new Set(values.filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function isPlainRecord$1(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const PRISRADAR_GRAPHQL_URL = "https://gql.prisradar.no";
+  const PRISRADAR_PRODUCT_URL = "https://prisradar.no/produkter/";
+  const PRISRADAR_PRODUCT_PATH_PATTERN = /^\/produkter\/[^/?#]+\/?$/;
+  const BAD_AVAILABILITY_STATUSES = /* @__PURE__ */ new Set([
+    "discontinued",
+    "not_available",
+    "not_in_stock",
+    "out_of_stock"
+  ]);
+  const SEARCH_SUGGESTIONS_QUERY = `
+query SearchSuggestions($query: String!, $category: Int) {
+  suggestions: SearchSuggestions(query: $query, category: $category) {
+    products {
+      id
+      title
+      price
+      oldPrice
+      slug
+      image
+    }
+  }
+}
+`;
+  async function findPrisradarPriceMatch(message, requestJson = fetchJson, requestText = fetchText) {
+    if (!message.productPageClue && message.searchTerm.trim().length < 8) {
+      return void 0;
+    }
+    const directProductUrl = readPrisradarProductUrl(message.url) ?? readPrisradarProductUrl(message.productUrl);
+    if (directProductUrl !== void 0) {
+      const directOffer = await fetchPrisradarOfferForUrl(directProductUrl, requestText);
+      if (directOffer !== void 0) return directOffer;
+    }
+    const searchQueries = uniqueStrings([
+      ...(message.codes ?? []).filter(isLikelyGtin),
+      message.searchTerm
+    ]);
+    for (const query of searchQueries) {
+      const products = await fetchPrisradarProducts(query, requestJson);
+      for (const product of products.slice(0, 3)) {
+        const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
+        if (offer !== void 0) return offer;
+      }
+    }
+    return void 0;
+  }
+  async function fetchPrisradarProducts(query, requestJson) {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 4 || normalizedQuery.length > 120) return [];
+    const value = await requestJson(PRISRADAR_GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        operationName: "SearchSuggestions",
+        query: SEARCH_SUGGESTIONS_QUERY,
+        variables: { query: normalizedQuery }
+      })
+    });
+    const suggestions = isPlainRecord(value) && isPlainRecord(value.data) && isPlainRecord(value.data.suggestions) ? value.data.suggestions : void 0;
+    if (!Array.isArray(suggestions?.products)) return [];
+    return suggestions.products.map(readPrisradarProduct).filter((product) => product !== void 0);
+  }
+  function readPrisradarProduct(value) {
+    if (!isPlainRecord(value)) return void 0;
+    const slug = readStringLike(value.slug);
+    if (slug === void 0) return void 0;
+    return {
+      productUrl: `${PRISRADAR_PRODUCT_URL}${encodeURIComponent(slug)}`
+    };
+  }
+  async function fetchPrisradarOfferForUrl(productUrl, requestText) {
+    const html = await requestText(productUrl, {
+      headers: { "Accept": "text/html,application/xhtml+xml" }
+    });
+    return html !== void 0 ? readPrisradarProductPage(html, productUrl) : void 0;
+  }
+  function readPrisradarProductPage(html, fallbackProductUrl) {
+    const product = readPrisradarProductFromNextFlight(html);
+    if (!isPlainRecord(product)) return void 0;
+    const productName = readStringLike(product.title) ?? readStringLike(product.name) ?? "Prisradar-produkt";
+    const productUrl = readStringLike(product.url) ?? fallbackProductUrl;
+    const rawOffers = Array.isArray(product.offers) ? product.offers : [];
+    const offers = rawOffers.map(readPrisradarOffer).filter((offer) => offer !== void 0).sort((first, second) => (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount));
+    const best = offers[0];
+    if (best === void 0) return void 0;
+    return {
+      source: "prisradar",
+      sourceName: "Prisradar",
+      shopName: best.shopName,
+      amount: best.amount,
+      ...best.sortAmount !== void 0 ? { sortAmount: best.sortAmount } : {},
+      currency: best.currency,
+      price: best.price,
+      productName,
+      productUrl,
+      alternatives: offers.slice(0, 8).map((offer) => ({
+        shopName: offer.shopName,
+        amount: offer.amount,
+        ...offer.sortAmount !== void 0 ? { sortAmount: offer.sortAmount } : {},
+        currency: offer.currency,
+        price: offer.price,
+        ...offer.shippingPrice !== void 0 ? { shippingPrice: offer.shippingPrice } : {},
+        ...offer.totalPrice !== void 0 ? { totalPrice: offer.totalPrice } : {}
+      }))
+    };
+  }
+  function readPrisradarProductFromNextFlight(html) {
+    const scripts = html.matchAll(/<script[^>]*>self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)<\/script>/g);
+    for (const match of scripts) {
+      const encodedPayload = match[1];
+      if (encodedPayload === void 0 || !encodedPayload.includes('\\"product\\":')) continue;
+      const payload = decodeNextFlightString(encodedPayload);
+      if (payload === void 0) continue;
+      const productJson = extractJsonObjectAfter(payload, '"product":');
+      if (productJson === void 0) continue;
+      try {
+        const product = JSON.parse(productJson.replace(/"\$undefined"/g, "null"));
+        if (isPlainRecord(product)) return product;
+      } catch {
+        continue;
+      }
+    }
+    return void 0;
+  }
+  function readPrisradarOffer(value) {
+    if (!isPlainRecord(value)) return void 0;
+    const shop = isPlainRecord(value.shop) ? value.shop : void 0;
+    const amount = readNumberLike(value.price);
+    const shopName = readStringLike(shop?.title) ?? readStringLike(value.shopTitle);
+    const availability = readStringLike(value.availability)?.toLowerCase();
+    const isUsed = value.isUsed === true;
+    if (amount === void 0 || amount <= 0 || shopName === void 0 || isUsed) return void 0;
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES.has(availability)) return void 0;
+    const shippingAmount = readShippingAmount(value);
+    const sortAmount = shippingAmount !== void 0 ? amount + shippingAmount : void 0;
+    return {
+      shopName,
+      amount,
+      ...sortAmount !== void 0 ? { sortAmount } : {},
+      currency: "NOK",
+      price: formatNokPrice(amount),
+      ...shippingAmount !== void 0 ? { shippingPrice: formatShippingPrice(shippingAmount) } : {},
+      ...shippingAmount !== void 0 && shippingAmount > 0 ? { totalPrice: formatNokPrice(amount + shippingAmount) } : {}
+    };
+  }
+  function readShippingAmount(value) {
+    if (value.isFreeShipping === true) return 0;
+    const amount = readNumberLike(value.shippingPrice);
+    return amount !== void 0 && amount >= 0 ? amount : void 0;
+  }
+  async function fetchJson(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchText(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  function readPrisradarProductUrl(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      if (!url.hostname.replace(/^www\./, "").toLowerCase().endsWith("prisradar.no")) return void 0;
+      return PRISRADAR_PRODUCT_PATH_PATTERN.test(url.pathname) ? `${url.origin}${url.pathname}` : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function decodeNextFlightString(value) {
+    try {
+      return JSON.parse(`"${value}"`);
+    } catch {
+      return void 0;
+    }
+  }
+  function extractJsonObjectAfter(value, marker) {
+    const markerIndex = value.indexOf(marker);
+    if (markerIndex < 0) return void 0;
+    const objectStart = value.indexOf("{", markerIndex + marker.length);
+    if (objectStart < 0) return void 0;
+    let depth = 0;
+    let escaped = false;
+    let inString = false;
+    for (let index = objectStart; index < value.length; index += 1) {
+      const character = value[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (character === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (character === "{") {
+        depth += 1;
+        continue;
+      }
+      if (character === "}") {
+        depth -= 1;
+        if (depth === 0) return value.slice(objectStart, index + 1);
+      }
+    }
+    return void 0;
+  }
+  function formatNokPrice(amount) {
+    const formatted = new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
+    }).format(amount);
+    return `${formatted} kr`;
+  }
+  function formatShippingPrice(amount) {
+    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice(amount)}`;
+  }
+  function readStringLike(value) {
+    if (typeof value !== "string" && typeof value !== "number") return void 0;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberLike(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const normalized = value.replace(/\s/g, "").replace(",", ".");
+    if (normalized === "$undefined") return void 0;
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function isLikelyGtin(value) {
+    const normalized = value.trim();
+    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
+  }
+  function uniqueStrings(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function isPlainRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   async function findPriceMatches(message, requestJson, requestText) {
-    const [prisjaktOffer, godprisOffer, klarnaOffer] = await Promise.all([
+    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer] = await Promise.all([
       findPrisjaktPriceMatch(message, requestJson),
       findGodprisPriceMatch(message, requestJson, requestText),
-      findKlarnaPriceMatch(message, requestJson)
+      findKlarnaPriceMatch(message, requestJson),
+      findPrisradarPriceMatch(message, requestJson, requestText)
     ]);
-    return [prisjaktOffer, godprisOffer, klarnaOffer].filter((offer) => offer !== void 0).sort((first, second) => {
+    return [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer].filter((offer) => offer !== void 0).sort((first, second) => {
       const amountDifference = (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount);
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
@@ -1039,7 +1295,8 @@ query OfferList($productId: Int!) {
     if (offer.source === "prisjakt") return 0;
     if (offer.source === "godpris") return 1;
     if (offer.source === "klarna") return 2;
-    return 3;
+    if (offer.source === "prisradar") return 3;
+    return 4;
   }
   const noWords = [
     "asshole",
@@ -1617,7 +1874,9 @@ query OfferList($productId: Int!) {
     "hintaopas.fi",
     "ledenicheur.fr",
     "godpris.no",
-    "klarna.com"
+    "klarna.com",
+    "kelkoo.no",
+    "prisradar.no"
   ]);
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
@@ -1820,7 +2079,8 @@ query OfferList($productId: Int!) {
     if (parsedUrl === void 0 || parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
       return void 0;
     }
-    if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, parsedUrl.hostname.replace(/^www\./, "").toLowerCase())) {
+    const normalizedHostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, normalizedHostname) && !isKnownPriceMatchSourceProductPage(parsedUrl)) {
       return void 0;
     }
     const productLdJson = findProductLdJson();
@@ -1882,6 +2142,26 @@ query OfferList($productId: Int!) {
     ).length;
     const visiblePriceCount = (document.body?.innerText.match(/\b(?:kr|NOK)\s?\d|\d[\d\s]*(?:,\d{2})?\s?(?:kr|NOK)\b/gi) ?? []).length;
     return productCardCount >= 2 || visiblePriceCount >= 3;
+  }
+  function isKnownPriceMatchSourceProductPage(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    const pathname = parsedUrl.pathname.toLowerCase();
+    if (hostname.endsWith("prisjakt.no") || hostname.endsWith("prisjakt.nu") || hostname.endsWith("prisjakt.se") || hostname.endsWith("prisjagt.dk") || hostname.endsWith("pricespy.co.uk") || hostname.endsWith("pricespy.co.nz") || hostname.endsWith("hintaopas.fi") || hostname.endsWith("ledenicheur.fr")) {
+      return pathname === "/product.php" && parsedUrl.searchParams.has("p") || /^\/produkt(?:er)?\//.test(pathname);
+    }
+    if (hostname.endsWith("godpris.no")) {
+      return /^\/produkt\/[^/]+\/?$/.test(pathname);
+    }
+    if (hostname.endsWith("klarna.com")) {
+      return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+    }
+    if (hostname.endsWith("kelkoo.no")) {
+      return /^\/gtin\/\d+\/?$/.test(pathname);
+    }
+    if (hostname.endsWith("prisradar.no")) {
+      return /^\/produkter\/[^/]+\/?$/.test(pathname);
+    }
+    return false;
   }
   function isLikelyCommerceProductPage(parsedUrl) {
     const productishPath = /\b(product|produkt|produkter|p|i|item|shop|varer|sku)\b/i.test(parsedUrl.pathname) || [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin|ean)\b/i.test(key));
@@ -2795,6 +3075,10 @@ query OfferList($productId: Int!) {
     }
     .provider-godpris {
       background: #21003f;
+      color: #ffffff;
+    }
+    .provider-prisradar {
+      background: #ff2048;
       color: #ffffff;
     }
     .provider-sparebank1 {
@@ -4685,7 +4969,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return typeof value.reason === "string";
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna") && (value.sourceName === void 0 || typeof value.sourceName === "string") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") && (value.sourceName === void 0 || typeof value.sourceName === "string") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -4899,12 +5183,14 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function getPriceMatchProviderClass(priceMatch) {
     if (priceMatch.source === "godpris") return "godpris";
     if (priceMatch.source === "klarna") return "klarna";
+    if (priceMatch.source === "prisradar") return "prisradar";
     return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
     if (priceMatch.sourceName !== void 0) return priceMatch.sourceName;
     if (priceMatch.source === "godpris") return "Godpris";
     if (priceMatch.source === "klarna") return "Klarna";
+    if (priceMatch.source === "prisradar") return "Prisradar";
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {

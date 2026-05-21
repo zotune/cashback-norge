@@ -8,7 +8,9 @@
     "https://browser-extension-backend.cloud.pji.nu/*",
     "https://native-backend.cloud.pji.nu/*",
     "https://godpris.no/*",
-    "https://www.klarna.com/*"
+    "https://www.klarna.com/*",
+    "https://gql.prisradar.no/*",
+    "https://prisradar.no/*"
   ],
   "background": {
     "service_worker": "assets/background.js",

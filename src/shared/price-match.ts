@@ -8,6 +8,7 @@ import {
   findPrisjaktPriceMatch,
   type JsonRequest,
 } from "./prisjakt-price-match.js";
+import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
 
 type TextRequest = (
   url: string,
@@ -23,13 +24,14 @@ export async function findPriceMatches(
   requestJson?: JsonRequest,
   requestText?: TextRequest,
 ): Promise<PriceMatchOffer[]> {
-  const [prisjaktOffer, godprisOffer, klarnaOffer] = await Promise.all([
+  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer] = await Promise.all([
     findPrisjaktPriceMatch(message, requestJson),
     findGodprisPriceMatch(message, requestJson, requestText),
     findKlarnaPriceMatch(message, requestJson),
+    findPrisradarPriceMatch(message, requestJson, requestText),
   ]);
 
-  return [prisjaktOffer, godprisOffer, klarnaOffer]
+  return [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined)
     .sort((first, second) => {
       const amountDifference = (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount);
@@ -50,5 +52,6 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "prisjakt") return 0;
   if (offer.source === "godpris") return 1;
   if (offer.source === "klarna") return 2;
-  return 3;
+  if (offer.source === "prisradar") return 3;
+  return 4;
 }
