@@ -2078,6 +2078,16 @@ function renderNotice(
     .bonus-chips-section.collapsed .bonus-chips {
       display: none;
     }
+    .bonus-chips-section.collapsed,
+    .codes-section.collapsed,
+    .price-match-section.collapsed {
+      padding-bottom: 0;
+    }
+    .bonus-chips-section.collapsed .bonus-chips-toggle,
+    .codes-section.collapsed .codes-toggle,
+    .price-match-section.collapsed .price-match-toggle {
+      margin-bottom: 0;
+    }
     .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
       transform: rotate(-90deg);
     }

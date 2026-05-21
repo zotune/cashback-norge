@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779360640
+// @version      1779361028
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -3510,6 +3510,16 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .bonus-chips-section.collapsed .bonus-chips {
       display: none;
+    }
+    .bonus-chips-section.collapsed,
+    .codes-section.collapsed,
+    .price-match-section.collapsed {
+      padding-bottom: 0;
+    }
+    .bonus-chips-section.collapsed .bonus-chips-toggle,
+    .codes-section.collapsed .codes-toggle,
+    .price-match-section.collapsed .price-match-toggle {
+      margin-bottom: 0;
     }
     .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
       transform: rotate(-90deg);
