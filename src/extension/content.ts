@@ -425,9 +425,10 @@ async function userscriptJsonRequest(
 
       const maybePromise = gmRequest(requestOptions);
       if (isPromiseLike(maybePromise)) {
-        maybePromise
-          .then((response) => resolveValue(parseUserscriptJsonResponse(response)))
-          .catch(() => resolveValue(undefined));
+        maybePromise.then(
+          (response) => resolveValue(parseUserscriptJsonResponse(response)),
+          () => resolveValue(undefined),
+        );
       }
     });
   }
@@ -472,9 +473,10 @@ async function userscriptTextRequest(
 
       const maybePromise = gmRequest(requestOptions);
       if (isPromiseLike(maybePromise)) {
-        maybePromise
-          .then((response) => resolveValue(readUserscriptTextResponse(response)))
-          .catch(() => resolveValue(undefined));
+        maybePromise.then(
+          (response) => resolveValue(readUserscriptTextResponse(response)),
+          () => resolveValue(undefined),
+        );
       }
     });
   }
@@ -1766,8 +1768,9 @@ function renderNotice(
       color: #ffffff;
     }
     .provider-prisradar {
-      background: #ff2048;
-      color: #ffffff;
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #0c4598;
     }
     .provider-sparebank1 {
       background: #005aa4;

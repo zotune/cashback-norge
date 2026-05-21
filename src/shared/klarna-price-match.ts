@@ -109,10 +109,10 @@ async function fetchKlarnaOfferForProduct(
   if (!isPlainRecord(value) || !Array.isArray(value.offers)) return undefined;
 
   const merchants = isPlainRecord(value.merchants) ? value.merchants : {};
-  const offers = value.offers
+  const offers = dedupeKlarnaOffersByShop(value.offers
     .map((offer) => readKlarnaOffer(offer, merchants))
     .filter((offer): offer is KlarnaOffer => offer !== undefined)
-    .sort((first, second) => first.sortAmount - second.sortAmount);
+    .sort((first, second) => first.sortAmount - second.sortAmount));
   const best = offers[0];
   if (best === undefined) return undefined;
 
@@ -137,6 +137,27 @@ async function fetchKlarnaOfferForProduct(
       ...(offer.shippingAmount > 0 ? { totalPrice: formatNokPrice(offer.sortAmount) } : {}),
     })),
   };
+}
+
+function dedupeKlarnaOffersByShop(offers: KlarnaOffer[]): KlarnaOffer[] {
+  const bestByShopName = new Map<string, KlarnaOffer>();
+  for (const offer of offers) {
+    const key = normalizeShopName(offer.shopName);
+    const existing = bestByShopName.get(key);
+    if (
+      existing === undefined ||
+      offer.sortAmount < existing.sortAmount ||
+      (offer.sortAmount === existing.sortAmount && offer.amount < existing.amount)
+    ) {
+      bestByShopName.set(key, offer);
+    }
+  }
+
+  return [...bestByShopName.values()].sort((first, second) => first.sortAmount - second.sortAmount);
+}
+
+function normalizeShopName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function readKlarnaOffer(value: unknown, merchants: Record<string, unknown>): KlarnaOffer | undefined {

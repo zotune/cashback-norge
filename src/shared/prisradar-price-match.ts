@@ -22,6 +22,36 @@ const BAD_AVAILABILITY_STATUSES = new Set([
   "not_in_stock",
   "out_of_stock",
 ]);
+const MIN_PRODUCT_MATCH_SCORE = 0.45;
+const COLOR_TOKENS = new Set([
+  "beige",
+  "black",
+  "bla",
+  "blue",
+  "brun",
+  "chroma",
+  "cosmic",
+  "gra",
+  "gray",
+  "green",
+  "grey",
+  "gronn",
+  "gul",
+  "hvit",
+  "indigo",
+  "lilla",
+  "orange",
+  "pearl",
+  "pink",
+  "purple",
+  "red",
+  "rod",
+  "rosa",
+  "silver",
+  "sort",
+  "sterling",
+  "white",
+]);
 
 const SEARCH_SUGGESTIONS_QUERY = `
 query SearchSuggestions($query: String!, $category: Int) {
@@ -56,14 +86,27 @@ export async function findPrisradarPriceMatch(
   const searchQueries = uniqueStrings([
     ...(message.codes ?? []).filter(isLikelyGtin),
     message.searchTerm,
+    buildSearchAlias(message.searchTerm),
+    buildDualSenseSearchAlias(message.searchTerm),
   ]);
+  const candidates = new Map<string, PrisradarProduct>();
 
   for (const query of searchQueries) {
-    const products = await fetchPrisradarProducts(query, requestJson);
-    for (const product of products.slice(0, 3)) {
-      const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
-      if (offer !== undefined) return offer;
+    const products = await fetchPrisradarProducts(query, message.searchTerm, requestJson);
+    for (const product of products) {
+      const existing = candidates.get(product.productUrl);
+      if (existing === undefined || product.matchScore > existing.matchScore) {
+        candidates.set(product.productUrl, product);
+      }
     }
+  }
+
+  const rankedProducts = [...candidates.values()]
+    .sort((first, second) => second.matchScore - first.matchScore)
+    .slice(0, 5);
+  for (const product of rankedProducts) {
+    const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
+    if (offer !== undefined) return offer;
   }
 
   return undefined;
@@ -71,6 +114,8 @@ export async function findPrisradarPriceMatch(
 
 type PrisradarProduct = {
   productUrl: string;
+  title: string;
+  matchScore: number;
 };
 
 type PrisradarOffer = {
@@ -85,10 +130,12 @@ type PrisradarOffer = {
 
 async function fetchPrisradarProducts(
   query: string,
+  searchTerm: string,
   requestJson: JsonRequest,
 ): Promise<PrisradarProduct[]> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 4 || normalizedQuery.length > 120) return [];
+  const isIdentifierQuery = isLikelyGtin(normalizedQuery);
 
   const value = await requestJson(PRISRADAR_GRAPHQL_URL, {
     method: "POST",
@@ -108,17 +155,27 @@ async function fetchPrisradarProducts(
   if (!Array.isArray(suggestions?.products)) return [];
 
   return suggestions.products
-    .map(readPrisradarProduct)
-    .filter((product): product is PrisradarProduct => product !== undefined);
+    .map((product) => readPrisradarProduct(product, normalizedQuery, searchTerm, isIdentifierQuery))
+    .filter((product): product is PrisradarProduct => product !== undefined)
+    .filter((product) => isIdentifierQuery || product.matchScore >= MIN_PRODUCT_MATCH_SCORE)
+    .sort((first, second) => second.matchScore - first.matchScore);
 }
 
-function readPrisradarProduct(value: unknown): PrisradarProduct | undefined {
+function readPrisradarProduct(
+  value: unknown,
+  query: string,
+  searchTerm: string,
+  isIdentifierQuery: boolean,
+): PrisradarProduct | undefined {
   if (!isPlainRecord(value)) return undefined;
   const slug = readStringLike(value.slug);
-  if (slug === undefined) return undefined;
+  const title = readStringLike(value.title);
+  if (slug === undefined || title === undefined) return undefined;
 
   return {
     productUrl: `${PRISRADAR_PRODUCT_URL}${encodeURIComponent(slug)}`,
+    title,
+    matchScore: isIdentifierQuery ? 1 : scoreProductTitle(title, query, searchTerm),
   };
 }
 
@@ -139,10 +196,10 @@ function readPrisradarProductPage(html: string, fallbackProductUrl: string): Pri
   const productName = readStringLike(product.title) ?? readStringLike(product.name) ?? "Prisradar-produkt";
   const productUrl = readStringLike(product.url) ?? fallbackProductUrl;
   const rawOffers = Array.isArray(product.offers) ? product.offers : [];
-  const offers = rawOffers
+  const offers = dedupePrisradarOffersByShop(rawOffers
     .map(readPrisradarOffer)
     .filter((offer): offer is PrisradarOffer => offer !== undefined)
-    .sort((first, second) => (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount));
+    .sort((first, second) => (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount)));
   const best = offers[0];
   if (best === undefined) return undefined;
 
@@ -166,6 +223,30 @@ function readPrisradarProductPage(html: string, fallbackProductUrl: string): Pri
       ...(offer.totalPrice !== undefined ? { totalPrice: offer.totalPrice } : {}),
     })),
   };
+}
+
+function dedupePrisradarOffersByShop(offers: PrisradarOffer[]): PrisradarOffer[] {
+  const bestByShopName = new Map<string, PrisradarOffer>();
+  for (const offer of offers) {
+    const key = normalizeShopName(offer.shopName);
+    const existing = bestByShopName.get(key);
+    const sortAmount = offer.sortAmount ?? offer.amount;
+    const existingSortAmount = existing !== undefined ? existing.sortAmount ?? existing.amount : undefined;
+    if (
+      existing === undefined ||
+      existingSortAmount === undefined ||
+      sortAmount < existingSortAmount ||
+      (sortAmount === existingSortAmount && offer.amount < existing.amount)
+    ) {
+      bestByShopName.set(key, offer);
+    }
+  }
+
+  return [...bestByShopName.values()].sort((first, second) => (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount));
+}
+
+function normalizeShopName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function readPrisradarProductFromNextFlight(html: string): Record<string, unknown> | undefined {
@@ -220,6 +301,74 @@ function readShippingAmount(value: Record<string, unknown>): number | undefined 
 
   const amount = readNumberLike(value.shippingPrice);
   return amount !== undefined && amount >= 0 ? amount : undefined;
+}
+
+function buildSearchAlias(value: string): string | undefined {
+  const alias = value
+    .replace(/\bplaystation\s*5\b/gi, "PS5")
+    .replace(/\btr[åa]dl[øo]s(?:t|e)?\b/gi, "wireless")
+    .replace(/\bh[åa]ndkontroll(?:eren|ere|er|en)?\b/gi, "controller")
+    .replace(/\bspillkontroll(?:eren|ere|er|en)?\b/gi, "controller")
+    .replace(/\bkontroll(?:eren|ere|er|en)?\b/gi, "controller")
+    .replace(/\s+/g, " ")
+    .trim();
+  return alias !== value.trim() && alias.length >= 4 ? alias : undefined;
+}
+
+function buildDualSenseSearchAlias(value: string): string | undefined {
+  if (!/\bdualsense\b/i.test(value)) return undefined;
+  if (!/(?:\bps5\b|\bplaystation\s*5\b)/i.test(value)) return undefined;
+  return "PS5 DualSense wireless controller";
+}
+
+function scoreProductTitle(title: string, query: string, searchTerm: string): number {
+  return Math.max(
+    scoreTokenMatch(title, query),
+    scoreTokenMatch(title, searchTerm),
+  );
+}
+
+function scoreTokenMatch(title: string, query: string): number {
+  const titleTokens = tokenizeProductText(title);
+  const queryTokens = tokenizeProductText(query);
+  if (titleTokens.size === 0 || queryTokens.size === 0) return 0;
+
+  let matchingTokens = 0;
+  for (const token of queryTokens) {
+    if (titleTokens.has(token)) matchingTokens += 1;
+  }
+
+  if (matchingTokens === 0) return 0;
+  const recall = matchingTokens / queryTokens.size;
+  const precision = matchingTokens / titleTokens.size;
+  const f1 = (2 * precision * recall) / (precision + recall);
+  const missingColorPenalty = countMissingColorTokens(titleTokens, queryTokens) * 0.12;
+  return Math.max(0, f1 - missingColorPenalty);
+}
+
+function countMissingColorTokens(titleTokens: Set<string>, queryTokens: Set<string>): number {
+  let count = 0;
+  for (const token of titleTokens) {
+    if (COLOR_TOKENS.has(token) && !queryTokens.has(token)) count += 1;
+  }
+  return count;
+}
+
+function tokenizeProductText(value: string): Set<string> {
+  const normalized = value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\bplaystation\s*5\b/g, "ps5")
+    .replace(/\btr[aå]dl[oø]s(?:t|e)?\b/g, "wireless")
+    .replace(/\bh[aå]ndkontroll(?:eren|ere|er|en)?\b/g, "controller")
+    .replace(/\bspillkontroll(?:eren|ere|er|en)?\b/g, "controller")
+    .replace(/\bkontroll(?:eren|ere|er|en)?\b/g, "controller");
+  return new Set(
+    normalized
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length >= 2),
+  );
 }
 
 async function fetchJson(url: string, init?: Parameters<JsonRequest>[1]): Promise<unknown | undefined> {
