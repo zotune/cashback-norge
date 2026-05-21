@@ -60,7 +60,14 @@ if (result.error !== undefined || result.status !== 0) {
     throw result.error ?? new Error("Failed to create extension store zip.");
   }
 
-  const powershellEntries = entries
+  const fallbackEntries = unique([
+    "manifest.json",
+    "popup.html",
+    "cashback-index.json",
+    "assets",
+    ...[...iconPaths].map((iconPath) => iconPath.split(/[\\/]/)[0]).filter(Boolean),
+  ]);
+  const powershellEntries = fallbackEntries
     .map((entry) => `'${entry.replace(/'/g, "''")}'`)
     .join(",");
   const fallback = spawnSync(
@@ -95,3 +102,7 @@ if (result.error !== undefined || result.status !== 0) {
 
 process.stdout.write(result.stdout);
 console.log(`Created ${outputPath}`);
+
+function unique(values) {
+  return [...new Set(values)];
+}
