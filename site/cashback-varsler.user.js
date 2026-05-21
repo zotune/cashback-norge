@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779361028
+// @version      1779367056
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -628,10 +628,13 @@
   function readKlarnaOffer(value, merchants) {
     if (!isPlainRecord$2(value)) return void 0;
     const price = isPlainRecord$2(value.price) ? value.price : void 0;
+    const campaignPrice = isPlainRecord$2(value.campaignPrice) ? value.campaignPrice : void 0;
+    const campaignPriceValue = isPlainRecord$2(campaignPrice?.price) && isActiveKlarnaCampaignPrice(campaignPrice) ? campaignPrice.price : void 0;
+    const effectivePrice = campaignPriceValue ?? price;
     const shippingCost = isPlainRecord$2(value.shippingCost) ? value.shippingCost : void 0;
-    const amount = readNumberLike$2(price?.amount);
+    const amount = readNumberLike$2(effectivePrice?.amount);
     const shippingAmount = readNumberLike$2(shippingCost?.amount) ?? 0;
-    const currency = readStringLike$1(price?.currency);
+    const currency = readStringLike$1(effectivePrice?.currency);
     const merchantId = readStringLike$1(value.merchantId);
     const merchant = merchantId !== void 0 && isPlainRecord$2(merchants[merchantId]) ? merchants[merchantId] : void 0;
     const shopName = readStringLike$1(merchant?.name);
@@ -650,6 +653,20 @@
       price: formatNokPrice$1(amount),
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
+  }
+  function isActiveKlarnaCampaignPrice(campaignPrice) {
+    const effectiveDate = isPlainRecord$2(campaignPrice.salePriceEffectiveDate) ? campaignPrice.salePriceEffectiveDate : void 0;
+    const startTime = readTimeValue(effectiveDate?.start);
+    const endTime = readTimeValue(effectiveDate?.end);
+    const now = Date.now();
+    if (startTime !== void 0 && now < startTime) return false;
+    if (endTime !== void 0 && now > endTime) return false;
+    return true;
+  }
+  function readTimeValue(value) {
+    if (typeof value !== "string") return void 0;
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? time : void 0;
   }
   async function fetchJson$2(url, init) {
     try {

@@ -163,10 +163,15 @@ function normalizeShopName(value: string): string {
 function readKlarnaOffer(value: unknown, merchants: Record<string, unknown>): KlarnaOffer | undefined {
   if (!isPlainRecord(value)) return undefined;
   const price = isPlainRecord(value.price) ? value.price : undefined;
+  const campaignPrice = isPlainRecord(value.campaignPrice) ? value.campaignPrice : undefined;
+  const campaignPriceValue = isPlainRecord(campaignPrice?.price) && isActiveKlarnaCampaignPrice(campaignPrice)
+    ? campaignPrice.price
+    : undefined;
+  const effectivePrice = campaignPriceValue ?? price;
   const shippingCost = isPlainRecord(value.shippingCost) ? value.shippingCost : undefined;
-  const amount = readNumberLike(price?.amount);
+  const amount = readNumberLike(effectivePrice?.amount);
   const shippingAmount = readNumberLike(shippingCost?.amount) ?? 0;
-  const currency = readStringLike(price?.currency);
+  const currency = readStringLike(effectivePrice?.currency);
   const merchantId = readStringLike(value.merchantId);
   const merchant = merchantId !== undefined && isPlainRecord(merchants[merchantId]) ? merchants[merchantId] : undefined;
   const shopName = readStringLike(merchant?.name);
@@ -186,6 +191,24 @@ function readKlarnaOffer(value: unknown, merchants: Record<string, unknown>): Kl
     price: formatNokPrice(amount),
     ...(offerUrl !== undefined ? { offerUrl } : {}),
   };
+}
+
+function isActiveKlarnaCampaignPrice(campaignPrice: Record<string, unknown>): boolean {
+  const effectiveDate = isPlainRecord(campaignPrice.salePriceEffectiveDate)
+    ? campaignPrice.salePriceEffectiveDate
+    : undefined;
+  const startTime = readTimeValue(effectiveDate?.start);
+  const endTime = readTimeValue(effectiveDate?.end);
+  const now = Date.now();
+  if (startTime !== undefined && now < startTime) return false;
+  if (endTime !== undefined && now > endTime) return false;
+  return true;
+}
+
+function readTimeValue(value: unknown): number | undefined {
+  if (typeof value !== "string") return undefined;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : undefined;
 }
 
 async function fetchJson(url: string, init?: Parameters<JsonRequest>[1]): Promise<unknown | undefined> {
