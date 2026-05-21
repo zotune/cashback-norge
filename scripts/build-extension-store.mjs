@@ -53,10 +53,44 @@ const result = spawnSync(
   },
 );
 
-if (result.status !== 0) {
-  process.stderr.write(result.stderr);
-  process.stdout.write(result.stdout);
-  throw new Error("Failed to create extension store zip.");
+if (result.error !== undefined || result.status !== 0) {
+  if (process.platform !== "win32") {
+    if (result.stderr !== undefined) process.stderr.write(result.stderr);
+    if (result.stdout !== undefined) process.stdout.write(result.stdout);
+    throw result.error ?? new Error("Failed to create extension store zip.");
+  }
+
+  const powershellEntries = entries
+    .map((entry) => `'${entry.replace(/'/g, "''")}'`)
+    .join(",");
+  const fallback = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      [
+        "$ErrorActionPreference = 'Stop'",
+        `Compress-Archive -Path @(${powershellEntries}) -DestinationPath '..\\${outputName}' -CompressionLevel Optimal -Force`,
+      ].join("; "),
+    ],
+    {
+      cwd: extensionDir,
+      encoding: "utf8",
+      stdio: "pipe",
+    },
+  );
+
+  if (fallback.status !== 0) {
+    if (fallback.stderr !== undefined) process.stderr.write(fallback.stderr);
+    if (fallback.stdout !== undefined) process.stdout.write(fallback.stdout);
+    throw fallback.error ?? new Error("Failed to create extension store zip.");
+  }
+
+  process.stdout.write(fallback.stdout);
+  console.log(`Created ${outputPath}`);
+  process.exit(0);
 }
 
 process.stdout.write(result.stdout);
