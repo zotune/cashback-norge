@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779785341
+// @version      1779785959
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1121,9 +1121,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
       if (offer === void 0) continue;
       if (message === void 0) return offer;
-      const merchantPriceDistance = getMerchantPriceDistance(offer, merchantKeys, message.price);
+      const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
+      const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
       if (merchantPriceDistance !== void 0) {
-        matchedOffers.push({ offer, product, merchantPriceDistance });
+        matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
       }
     }
     matchedOffers.sort(comparePrisradarMatchedOffers);
@@ -1166,13 +1167,17 @@ query SearchSuggestions($query: String!, $category: Int) {
     const cleanedWithoutSize = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(withoutSize));
     const cleanedWithoutStandaloneNumbers = removeStandaloneNumberTokens(cleanedSearchTerm);
     const cleanedWithoutSizeOrStandaloneNumbers = removeStandaloneNumberTokens(cleanedWithoutSize);
+    const compactSearchTerm = removeSearchNoiseTokens(cleanedWithoutStandaloneNumbers);
+    const compactWithoutSize = removeSearchNoiseTokens(cleanedWithoutSizeOrStandaloneNumbers);
     return uniqueStrings([
       normalizedSearchTerm,
       cleanedSearchTerm,
       withoutSize !== normalizedSearchTerm ? withoutSize : void 0,
       cleanedWithoutSize !== cleanedSearchTerm ? cleanedWithoutSize : void 0,
       cleanedWithoutStandaloneNumbers !== cleanedSearchTerm ? cleanedWithoutStandaloneNumbers : void 0,
-      cleanedWithoutSizeOrStandaloneNumbers !== cleanedWithoutSize ? cleanedWithoutSizeOrStandaloneNumbers : void 0
+      cleanedWithoutSizeOrStandaloneNumbers !== cleanedWithoutSize ? cleanedWithoutSizeOrStandaloneNumbers : void 0,
+      compactSearchTerm !== cleanedWithoutStandaloneNumbers ? compactSearchTerm : void 0,
+      compactWithoutSize !== cleanedWithoutSizeOrStandaloneNumbers ? compactWithoutSize : void 0
     ]);
   }
   function cleanPrisradarSearchQuery(value) {
@@ -1193,6 +1198,12 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function removeStandaloneNumberTokens(value) {
     return value.split(/\s+/).filter((token) => !/^\d{1,2}$/.test(token)).join(" ").replace(/\s+/g, " ").trim();
+  }
+  function removeSearchNoiseTokens(value) {
+    return value.split(/\s+/).filter((token) => {
+      const normalizedToken = normalizeMatchToken(token);
+      return normalizedToken !== void 0 && !SEARCH_NOISE_TOKENS.has(canonicalizeMatchToken(normalizedToken));
+    }).join(" ").replace(/\s+/g, " ").trim();
   }
   function isDerivedAcronymToken(token, previousParts) {
     const letters = token.replace(/\d/g, "");
@@ -1232,6 +1243,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return CONDITION_VARIANT_TOKENS.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
   }
   const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+  const SEARCH_NOISE_TOKENS = /* @__PURE__ */ new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
   function tokenizeMatchText(value) {
     return uniqueStrings(splitTokenParts(value).map(canonicalizeMatchToken).filter((token) => token.length >= 2));
   }
@@ -1321,6 +1333,21 @@ query SearchSuggestions($query: String!, $category: Int) {
     const scoreDifference = second.product.matchScore - first.product.matchScore;
     if (scoreDifference !== 0) return scoreDifference;
     return first.offer.amount - second.offer.amount;
+  }
+  function preferCurrentMerchantWhenTiedForBest(offer, merchantKeys) {
+    if (merchantKeys.length === 0 || offer.alternatives === void 0) return offer;
+    const currentMerchantAlternative = offer.alternatives.find(
+      (alternative) => isCurrentMerchantName(alternative.shopName, merchantKeys) && Math.abs(alternative.amount - offer.amount) < 0.01 && Math.abs((alternative.sortAmount ?? alternative.amount) - (offer.sortAmount ?? offer.amount)) < 0.01
+    );
+    if (currentMerchantAlternative === void 0) return offer;
+    return {
+      ...offer,
+      shopName: currentMerchantAlternative.shopName,
+      amount: currentMerchantAlternative.amount,
+      ...currentMerchantAlternative.sortAmount !== void 0 ? { sortAmount: currentMerchantAlternative.sortAmount } : {},
+      currency: currentMerchantAlternative.currency,
+      price: currentMerchantAlternative.price
+    };
   }
   function getMerchantPriceDistance(offer, merchantKeys, currentPrice) {
     if (merchantKeys.length === 0) return void 0;

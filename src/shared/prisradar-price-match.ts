@@ -96,9 +96,10 @@ async function fetchPrisradarOfferForQueries(
     if (offer === undefined) continue;
     if (message === undefined) return offer;
 
-    const merchantPriceDistance = getMerchantPriceDistance(offer, merchantKeys, message.price);
+    const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
+    const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
     if (merchantPriceDistance !== undefined) {
-      matchedOffers.push({ offer, product, merchantPriceDistance });
+      matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
     }
   }
 
@@ -181,6 +182,8 @@ function buildPrisradarTextQueries(searchTerm: string): string[] {
   const cleanedWithoutSize = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(withoutSize));
   const cleanedWithoutStandaloneNumbers = removeStandaloneNumberTokens(cleanedSearchTerm);
   const cleanedWithoutSizeOrStandaloneNumbers = removeStandaloneNumberTokens(cleanedWithoutSize);
+  const compactSearchTerm = removeSearchNoiseTokens(cleanedWithoutStandaloneNumbers);
+  const compactWithoutSize = removeSearchNoiseTokens(cleanedWithoutSizeOrStandaloneNumbers);
 
   return uniqueStrings([
     normalizedSearchTerm,
@@ -189,6 +192,8 @@ function buildPrisradarTextQueries(searchTerm: string): string[] {
     cleanedWithoutSize !== cleanedSearchTerm ? cleanedWithoutSize : undefined,
     cleanedWithoutStandaloneNumbers !== cleanedSearchTerm ? cleanedWithoutStandaloneNumbers : undefined,
     cleanedWithoutSizeOrStandaloneNumbers !== cleanedWithoutSize ? cleanedWithoutSizeOrStandaloneNumbers : undefined,
+    compactSearchTerm !== cleanedWithoutStandaloneNumbers ? compactSearchTerm : undefined,
+    compactWithoutSize !== cleanedWithoutSizeOrStandaloneNumbers ? compactWithoutSize : undefined,
   ]);
 }
 
@@ -222,6 +227,18 @@ function removeStandaloneNumberTokens(value: string): string {
   return value
     .split(/\s+/)
     .filter((token) => !/^\d{1,2}$/.test(token))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function removeSearchNoiseTokens(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter((token) => {
+      const normalizedToken = normalizeMatchToken(token);
+      return normalizedToken !== undefined && !SEARCH_NOISE_TOKENS.has(canonicalizeMatchToken(normalizedToken));
+    })
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
@@ -281,6 +298,7 @@ function hasUnrequestedConditionVariant(queryTokens: string[], titleTokens: Set<
 }
 
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+const SEARCH_NOISE_TOKENS = new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
 
 function tokenizeMatchText(value: string): string[] {
   return uniqueStrings(splitTokenParts(value)
@@ -401,6 +419,28 @@ function comparePrisradarMatchedOffers(first: PrisradarMatchedOffer, second: Pri
   if (scoreDifference !== 0) return scoreDifference;
 
   return first.offer.amount - second.offer.amount;
+}
+
+function preferCurrentMerchantWhenTiedForBest(
+  offer: PriceMatchOffer,
+  merchantKeys: string[],
+): PriceMatchOffer {
+  if (merchantKeys.length === 0 || offer.alternatives === undefined) return offer;
+  const currentMerchantAlternative = offer.alternatives.find((alternative) =>
+    isCurrentMerchantName(alternative.shopName, merchantKeys) &&
+    Math.abs(alternative.amount - offer.amount) < 0.01 &&
+    Math.abs((alternative.sortAmount ?? alternative.amount) - (offer.sortAmount ?? offer.amount)) < 0.01
+  );
+  if (currentMerchantAlternative === undefined) return offer;
+
+  return {
+    ...offer,
+    shopName: currentMerchantAlternative.shopName,
+    amount: currentMerchantAlternative.amount,
+    ...(currentMerchantAlternative.sortAmount !== undefined ? { sortAmount: currentMerchantAlternative.sortAmount } : {}),
+    currency: currentMerchantAlternative.currency,
+    price: currentMerchantAlternative.price,
+  };
 }
 
 function getMerchantPriceDistance(
