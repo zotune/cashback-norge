@@ -6,3 +6,4 @@ storage/
 data/cashback-index.json
 site/cashback-index.json
 *tmp*
+*.log*
