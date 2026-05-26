@@ -112,7 +112,7 @@ async function fetchKlarnaOfferForProduct(
   const offers = dedupeKlarnaOffersByShop(value.offers
     .map((offer) => readKlarnaOffer(offer, merchants))
     .filter((offer): offer is KlarnaOffer => offer !== undefined)
-    .sort((first, second) => first.sortAmount - second.sortAmount));
+    .sort(compareKlarnaOffersByPrice));
   const best = offers[0];
   if (best === undefined) return undefined;
 
@@ -146,14 +146,19 @@ function dedupeKlarnaOffersByShop(offers: KlarnaOffer[]): KlarnaOffer[] {
     const existing = bestByShopName.get(key);
     if (
       existing === undefined ||
-      offer.sortAmount < existing.sortAmount ||
-      (offer.sortAmount === existing.sortAmount && offer.amount < existing.amount)
+      offer.amount < existing.amount ||
+      (offer.amount === existing.amount && offer.sortAmount < existing.sortAmount)
     ) {
       bestByShopName.set(key, offer);
     }
   }
 
-  return [...bestByShopName.values()].sort((first, second) => first.sortAmount - second.sortAmount);
+  return [...bestByShopName.values()].sort(compareKlarnaOffersByPrice);
+}
+
+function compareKlarnaOffersByPrice(first: KlarnaOffer, second: KlarnaOffer): number {
+  const priceDifference = first.amount - second.amount;
+  return priceDifference !== 0 ? priceDifference : first.sortAmount - second.sortAmount;
 }
 
 function normalizeShopName(value: string): string {

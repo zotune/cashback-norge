@@ -34,7 +34,7 @@ export async function findPriceMatches(
   return [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined)
     .sort((first, second) => {
-      const amountDifference = (first.sortAmount ?? first.amount) - (second.sortAmount ?? second.amount);
+      const amountDifference = first.amount - second.amount;
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
     });

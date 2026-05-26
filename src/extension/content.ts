@@ -783,7 +783,7 @@ function collectProductCodes(product: Record<string, unknown> | undefined): stri
   if (product === undefined) return [];
   const codes = new Set<string>();
   for (const [key, value] of Object.entries(product)) {
-    if (!/^(gtin|sku|mpn)/i.test(key)) continue;
+    if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) continue;
     const values = Array.isArray(value) ? value : [value];
     for (const item of values) {
       if (typeof item === "string" || typeof item === "number") {
@@ -2175,6 +2175,10 @@ function renderNotice(
       padding: 6px 9px;
       text-decoration: none;
     }
+    .price-match-card.price-match-card--best .price-match-product,
+    .price-match-card.price-match-card--best .price-match-price {
+      color: #3a7d55;
+    }
     .price-match-card + .price-match-card {
       margin-top: 4px;
     }
@@ -3274,7 +3278,10 @@ function renderNotice(
       chrome.storage.local.set({ [PRICE_MATCH_COLLAPSED_KEY]: isCollapsed });
     });
 
-    priceMatchSection.append(priceMatchToggle, ...priceMatches.map(buildPriceMatchCard));
+    priceMatchSection.append(
+      priceMatchToggle,
+      ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0)),
+    );
   }
 
   body.append(header, offerList);
@@ -4006,9 +4013,10 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "points") return 1;
   return 0;
 }
-function buildPriceMatchCard(priceMatch: PriceMatchOffer): HTMLAnchorElement {
+function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
   priceMatchCard.className = "price-match-card";
+  if (isBest) priceMatchCard.classList.add("price-match-card--best");
   priceMatchCard.href = priceMatch.productUrl;
   priceMatchCard.target = "_blank";
   priceMatchCard.rel = "noreferrer";

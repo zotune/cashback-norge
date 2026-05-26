@@ -70,15 +70,12 @@ export async function findPrisjaktPriceMatch(
     return nativeOffer;
   }
 
-  const identifyOffer = await fetchPrisjaktIdentify(message, requestJson);
-  if (identifyOffer !== undefined && isNorwegianPriceMatchOffer(identifyOffer)) {
-    return identifyOffer;
+  const codeSearchOffer = await fetchPrisjaktSearchByCodes(message.codes, requestJson);
+  if (codeSearchOffer !== undefined && isNorwegianPriceMatchOffer(codeSearchOffer)) {
+    return codeSearchOffer;
   }
 
-  const searchOffer = await fetchPrisjaktSearch(message.searchTerm, requestJson);
-  return searchOffer !== undefined && isNorwegianPriceMatchOffer(searchOffer)
-    ? searchOffer
-    : undefined;
+  return undefined;
 }
 
 async function fetchNativePrisjaktPriceMatch(
@@ -103,7 +100,7 @@ async function fetchBestNativePrisjaktOffer(
     .filter((offer) => isNorwegianPriceMatchCurrency(offer.currency));
   if (offers.length === 0) return undefined;
 
-  const sortedOffers = [...offers].sort((first, second) => first.sortAmount - second.sortAmount);
+  const sortedOffers = [...offers].sort(compareNativePrisjaktOffersByPrice);
   const bestOffer = sortedOffers[0];
   if (bestOffer === undefined) return undefined;
 
@@ -261,25 +258,9 @@ function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefine
 const BAD_AVAILABILITY_STATUSES = new Set(["NOT_AVAILABLE_FOR_ORDER"]);
 const BAD_STOCK_STATUSES = new Set(["out_of_stock", "not_in_stock"]);
 
-async function fetchPrisjaktIdentify(
-  message: GetPriceMatchForProductMessage,
-  requestJson: JsonRequest,
-): Promise<PriceMatchOffer | undefined> {
-  const params = new URLSearchParams();
-  params.set("url", message.url);
-  params.set("market", "NO");
-  params.set("searchTerm", message.searchTerm);
-  if (message.productPageClue !== undefined) params.set("productPageClue", String(message.productPageClue));
-  if (message.price !== undefined) params.set("price", String(message.price));
-  if (message.currency !== undefined) params.set("currency", message.currency);
-  if (message.productUrl !== undefined) params.set("productUrl", message.productUrl);
-  if (message.organizationName !== undefined) params.set("organizationName", message.organizationName);
-  if (message.codes !== undefined && message.codes.length > 0) params.set("codes", message.codes.join(","));
-
-  const value = await requestJson(`https://browser-extension-backend.cloud.pji.nu/v1/identify?${params.toString()}`, {
-    headers: { "Content-Type": "application/json" },
-  });
-  return readBestPrisjaktOffer(value);
+function compareNativePrisjaktOffersByPrice(first: NativePrisjaktOffer, second: NativePrisjaktOffer): number {
+  const priceDifference = first.amount - second.amount;
+  return priceDifference !== 0 ? priceDifference : first.sortAmount - second.sortAmount;
 }
 
 async function fetchPrisjaktSearch(
@@ -303,6 +284,18 @@ async function fetchPrisjaktSearch(
 
   const product = readFirstPrisjaktSearchProduct(value);
   return product !== undefined ? fetchBestNativePrisjaktOffer(product, requestJson) : undefined;
+}
+
+async function fetchPrisjaktSearchByCodes(
+  codes: string[] | undefined,
+  requestJson: JsonRequest,
+): Promise<PriceMatchOffer | undefined> {
+  for (const code of uniqueStrings((codes ?? []).filter(isLikelyGtin))) {
+    const offer = await fetchPrisjaktSearch(code, requestJson);
+    if (offer !== undefined) return offer;
+  }
+
+  return undefined;
 }
 
 function readFirstPrisjaktSearchProduct(value: unknown): NativePrisjaktProduct | undefined {
@@ -439,6 +432,11 @@ function parseHttpUrl(url: string): URL | undefined {
 
 function uniqueStrings(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((value): value is string => value !== undefined && value.length > 0))];
+}
+
+function isLikelyGtin(value: string): boolean {
+  const normalized = value.trim();
+  return /^(?:\d{8}|\d{12,14})$/.test(normalized);
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
