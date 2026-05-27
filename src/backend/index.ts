@@ -24,6 +24,7 @@ import { crawlLogbuy } from "./providers/logbuy.js";
 import { crawlObos } from "./providers/obos.js";
 import { crawlBob } from "./providers/bob.js";
 import { crawlUsbl } from "./providers/usbl.js";
+import { crawlBate } from "./providers/bate.js";
 import { crawlNaf } from "./providers/naf.js";
 import { crawlTekna } from "./providers/tekna.js";
 import { crawlNito } from "./providers/nito.js";
@@ -68,6 +69,7 @@ type CliConfig = {
   skipObos: boolean;
   skipBob: boolean;
   skipUsbl: boolean;
+  skipBate: boolean;
   skipNaf: boolean;
   skipTekna: boolean;
   skipNito: boolean;
@@ -94,6 +96,7 @@ type CliConfig = {
   obosStartUrl: string;
   bobStartUrl: string;
   usblStartUrl: string;
+  bateStartUrl: string;
   nafStartUrl: string;
   teknaStartUrl: string;
   nitoStartUrl: string;
@@ -206,6 +209,7 @@ async function main(): Promise<void> {
     finnkupongkoderOffers,
     logbuyOffers,
     usblOffers,
+    bateOffers,
     nafOffers,
     teknaOffers,
     nitoOffers,
@@ -248,6 +252,11 @@ async function main(): Promise<void> {
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.usblStartUrl,
       }),
+    config.skipBate ? Promise.resolve([]) : crawlBate({
+        domainLookup, generatedAt, logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides, startUrl: config.bateStartUrl,
+      }),
     config.skipNaf ? Promise.resolve([]) : crawlNaf({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.nafStartUrl,
@@ -286,7 +295,7 @@ async function main(): Promise<void> {
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
     ...sparebank1Offers, ...spareborsenOffers, ...manualOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
-    ...usblOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
+    ...usblOffers, ...bateOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
     ...teknaOffers, ...nitoOffers,
     ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
@@ -297,7 +306,7 @@ async function main(): Promise<void> {
     domainLookup: fullDomainLookup, generatedAt, logger,
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...studentTorgetOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...studentTorgetOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -378,6 +387,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipObos: args.includes("--skip-obos"),
     skipBob: args.includes("--skip-bob"),
     skipUsbl: args.includes("--skip-usbl"),
+    skipBate: args.includes("--skip-bate"),
     skipNaf: args.includes("--skip-naf"),
     skipTekna: args.includes("--skip-tekna"),
     skipNito: args.includes("--skip-nito"),
@@ -424,6 +434,9 @@ function readCliConfig(args: string[]): CliConfig {
     usblStartUrl:
       readArgumentValue(args, "--usbl-start-url") ??
       "https://www.usbl.no/medlemskap/medlemsfordeler",
+    bateStartUrl:
+      readArgumentValue(args, "--bate-start-url") ??
+      "https://bate.no/fordeler",
     nafStartUrl:
       readArgumentValue(args, "--naf-start-url") ??
       "https://www.naf.no/medlemskap/medlemsfordeler",

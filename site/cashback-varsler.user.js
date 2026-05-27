@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779785959
+// @version      1779867610
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -116,6 +116,7 @@
     obos: "OBOS",
     bob: "BOB",
     usbl: "USBL",
+    bate: "Bate",
     naf: "NAF",
     tekna: "Tekna",
     nito: "NITO",
@@ -3316,6 +3317,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     .provider-usbl {
       background: #34413e;
       color: #ffffff;
+    }
+    .provider-bate {
+      background: #ffffff;
+      border: 1px solid #ef1c24;
+      color: #ef1c24;
     }
     .provider-naf {
       background: #FFD100;

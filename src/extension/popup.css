@@ -292,6 +292,12 @@ h1 {
   color: #ffffff;
 }
 
+.provider-bate {
+  background: #ffffff;
+  border: 1px solid #ef1c24;
+  color: #ef1c24;
+}
+
 .provider-tekna {
   background: #ffffff;
   border: 1px solid #d3e2dc;

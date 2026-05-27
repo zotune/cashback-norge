@@ -1746,6 +1746,11 @@ function renderNotice(
       background: #34413e;
       color: #ffffff;
     }
+    .provider-bate {
+      background: #ffffff;
+      border: 1px solid #ef1c24;
+      color: #ef1c24;
+    }
     .provider-naf {
       background: #FFD100;
       color: #000000;
