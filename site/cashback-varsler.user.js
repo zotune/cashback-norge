@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779869491
+// @version      1779870797
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1098,6 +1098,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       requestText
     );
     if (codeOffer !== void 0) return codeOffer;
+    const slugOffer = await fetchPrisradarOfferForSlugCandidates(
+      buildPrisradarSlugCandidates(message.searchTerm),
+      requestText,
+      message
+    );
+    if (slugOffer !== void 0) return slugOffer;
     return fetchPrisradarOfferForQueries(
       buildPrisradarTextQueries(message.searchTerm),
       requestJson,
@@ -1123,6 +1129,27 @@ query SearchSuggestions($query: String!, $category: Int) {
       const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
       if (offer === void 0) continue;
       if (message === void 0) return offer;
+      const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
+      const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
+      if (merchantPriceDistance !== void 0) {
+        matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
+      }
+    }
+    matchedOffers.sort(comparePrisradarMatchedOffers);
+    return matchedOffers[0]?.offer;
+  }
+  async function fetchPrisradarOfferForSlugCandidates(slugs, requestText, message) {
+    const merchantKeys = getCurrentMerchantKeys(message);
+    const matchedOffers = [];
+    for (const slug of slugs.slice(0, 6)) {
+      const offer = await fetchPrisradarOfferForUrl(`${PRISRADAR_PRODUCT_URL}${encodeURIComponent(slug)}`, requestText);
+      if (offer === void 0) continue;
+      const product = {
+        productUrl: offer.productUrl,
+        title: offer.productName,
+        matchScore: scorePrisradarProductMatch(message.searchTerm, offer.productName)
+      };
+      if (product.matchScore < (message.price !== void 0 ? 0.15 : 0.45)) continue;
       const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
       const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
       if (merchantPriceDistance !== void 0) {
@@ -1181,6 +1208,23 @@ query SearchSuggestions($query: String!, $category: Int) {
       compactSearchTerm !== cleanedWithoutStandaloneNumbers ? compactSearchTerm : void 0,
       compactWithoutSize !== cleanedWithoutSizeOrStandaloneNumbers ? compactWithoutSize : void 0
     ]);
+  }
+  function buildPrisradarSlugCandidates(searchTerm) {
+    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+    const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
+    const withoutSize = normalizedSearchTerm.replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ").replace(/\s+/g, " ").trim();
+    const cleanedWithoutSize = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(withoutSize));
+    return uniqueStrings([
+      slugifyPrisradarTitle(normalizedSearchTerm),
+      slugifyPrisradarTitle(cleanedSearchTerm),
+      withoutSize !== normalizedSearchTerm ? slugifyPrisradarTitle(withoutSize) : void 0,
+      cleanedWithoutSize !== cleanedSearchTerm ? slugifyPrisradarTitle(cleanedWithoutSize) : void 0,
+      slugifyPrisradarTitle(removeSearchNoiseTokens(cleanedSearchTerm))
+    ]);
+  }
+  function slugifyPrisradarTitle(value) {
+    const slug = transliterateNorwegianCharacters(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return slug.length >= 4 ? slug : void 0;
   }
   function cleanPrisradarSearchQuery(value) {
     return value.replace(/[()[\]{}]/g, " ").replace(/\s+[-–—:|/]\s+/g, " ").replace(/\s+/g, " ").trim();

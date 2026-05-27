@@ -59,6 +59,13 @@ export async function findPrisradarPriceMatch(
   );
   if (codeOffer !== undefined) return codeOffer;
 
+  const slugOffer = await fetchPrisradarOfferForSlugCandidates(
+    buildPrisradarSlugCandidates(message.searchTerm),
+    requestText,
+    message,
+  );
+  if (slugOffer !== undefined) return slugOffer;
+
   return fetchPrisradarOfferForQueries(
     buildPrisradarTextQueries(message.searchTerm),
     requestJson,
@@ -95,6 +102,36 @@ async function fetchPrisradarOfferForQueries(
     const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
     if (offer === undefined) continue;
     if (message === undefined) return offer;
+
+    const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
+    const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
+    if (merchantPriceDistance !== undefined) {
+      matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
+    }
+  }
+
+  matchedOffers.sort(comparePrisradarMatchedOffers);
+  return matchedOffers[0]?.offer;
+}
+
+async function fetchPrisradarOfferForSlugCandidates(
+  slugs: string[],
+  requestText: TextRequest,
+  message: GetPriceMatchForProductMessage,
+): Promise<PriceMatchOffer | undefined> {
+  const merchantKeys = getCurrentMerchantKeys(message);
+  const matchedOffers: PrisradarMatchedOffer[] = [];
+
+  for (const slug of slugs.slice(0, 6)) {
+    const offer = await fetchPrisradarOfferForUrl(`${PRISRADAR_PRODUCT_URL}${encodeURIComponent(slug)}`, requestText);
+    if (offer === undefined) continue;
+
+    const product = {
+      productUrl: offer.productUrl,
+      title: offer.productName,
+      matchScore: scorePrisradarProductMatch(message.searchTerm, offer.productName),
+    };
+    if (product.matchScore < (message.price !== undefined ? 0.15 : 0.45)) continue;
 
     const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
     const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
@@ -195,6 +232,35 @@ function buildPrisradarTextQueries(searchTerm: string): string[] {
     compactSearchTerm !== cleanedWithoutStandaloneNumbers ? compactSearchTerm : undefined,
     compactWithoutSize !== cleanedWithoutSizeOrStandaloneNumbers ? compactWithoutSize : undefined,
   ]);
+}
+
+function buildPrisradarSlugCandidates(searchTerm: string): string[] {
+  const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+  const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
+  const withoutSize = normalizedSearchTerm
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const cleanedWithoutSize = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(withoutSize));
+
+  return uniqueStrings([
+    slugifyPrisradarTitle(normalizedSearchTerm),
+    slugifyPrisradarTitle(cleanedSearchTerm),
+    withoutSize !== normalizedSearchTerm ? slugifyPrisradarTitle(withoutSize) : undefined,
+    cleanedWithoutSize !== cleanedSearchTerm ? slugifyPrisradarTitle(cleanedWithoutSize) : undefined,
+    slugifyPrisradarTitle(removeSearchNoiseTokens(cleanedSearchTerm)),
+  ]);
+}
+
+function slugifyPrisradarTitle(value: string): string | undefined {
+  const slug = transliterateNorwegianCharacters(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug.length >= 4 ? slug : undefined;
 }
 
 function cleanPrisradarSearchQuery(value: string): string {
