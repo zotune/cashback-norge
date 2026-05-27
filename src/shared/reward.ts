@@ -209,7 +209,13 @@ function formatOreAsKr(ore: number): string {
 }
 
 function parseKrNumber(value: string): number {
-  return Number.parseInt(value.replace(/[,–\s]+$/, "").replace(/\s+/g, ""), 10);
+  return Number.parseInt(
+    value
+      .replace(/[,–\s]+$/, "")
+      .replace(/\.(?=\d{3}\b)/g, "")
+      .replace(/\s+/g, ""),
+    10,
+  );
 }
 
 export function formatRewardNumber(value: number): string {

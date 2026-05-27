@@ -596,10 +596,7 @@ function extractRewardFromText(text: string): string {
   // Strip sentences containing insurance bonus terms before % parsing
   const cleaned = text.split(/[.\n]/).filter(s => !INSURANCE_NOISE_PATTERN.test(s)).join(". ");
 
-  const percentageReward = extractPercentageReward(
-    cleaned,
-    /\bbonus\b/i.test(cleaned) ? " bonus" : "",
-  );
+  const percentageReward = extractPercentageReward(cleaned);
 
   if (percentageReward !== "") return percentageReward;
 

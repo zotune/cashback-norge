@@ -1751,6 +1751,10 @@ function renderNotice(
       border: 1px solid #ef1c24;
       color: #ef1c24;
     }
+    .provider-tobb {
+      background: #00466b;
+      color: #ffffff;
+    }
     .provider-naf {
       background: #FFD100;
       color: #000000;
