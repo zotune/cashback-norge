@@ -645,7 +645,7 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
   }
 
   if (hostname.endsWith("klarna.com")) {
-    return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+    return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
   }
 
   if (hostname.endsWith("kelkoo.no")) {

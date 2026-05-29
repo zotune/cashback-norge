@@ -13,6 +13,11 @@ type TextRequest = (
   },
 ) => Promise<string | undefined>;
 
+type PrisradarPriceMatchOptions = {
+  allowLooseTextSearch?: boolean;
+  anchorSearchTerms?: string[];
+};
+
 const PRISRADAR_GRAPHQL_URL = "https://gql.prisradar.no";
 const PRISRADAR_PRODUCT_URL = "https://prisradar.no/produkter/";
 const PRISRADAR_PRODUCT_PATH_PATTERN = /^\/produkter\/[^/?#]+\/?$/;
@@ -41,6 +46,7 @@ export async function findPrisradarPriceMatch(
   message: GetPriceMatchForProductMessage,
   requestJson: JsonRequest = fetchJson,
   requestText: TextRequest = fetchText,
+  options: PrisradarPriceMatchOptions = {},
 ): Promise<PriceMatchOffer | undefined> {
   if (!message.productPageClue && message.searchTerm.trim().length < 8) {
     return undefined;
@@ -66,11 +72,21 @@ export async function findPrisradarPriceMatch(
   );
   if (slugOffer !== undefined) return slugOffer;
 
-  return fetchPrisradarOfferForQueries(
+  const strictTextOffer = await fetchPrisradarOfferForQueries(
     buildPrisradarTextQueries(message.searchTerm),
     requestJson,
     requestText,
     message,
+  );
+  if (strictTextOffer !== undefined) return strictTextOffer;
+
+  if (options.allowLooseTextSearch !== true) return undefined;
+
+  return fetchLoosePrisradarOfferForQueries(
+    buildLoosePrisradarTextQueries(message.searchTerm, options.anchorSearchTerms ?? []),
+    requestJson,
+    requestText,
+    uniqueStrings([message.searchTerm, ...(options.anchorSearchTerms ?? [])]),
   );
 }
 
@@ -95,6 +111,7 @@ async function fetchPrisradarOfferForQueries(
   const rankedProducts = [...candidates.values()]
     .sort((first, second) => second.matchScore - first.matchScore)
     .filter((product) => message === undefined || product.matchScore >= (message.price !== undefined ? 0.15 : 0.45))
+    .filter((product) => message === undefined || isCompatiblePrisradarProductVariant(product.title, [message.searchTerm]))
     .slice(0, 8);
   const merchantKeys = message !== undefined ? getCurrentMerchantKeys(message) : [];
   const matchedOffers: PrisradarMatchedOffer[] = [];
@@ -112,6 +129,38 @@ async function fetchPrisradarOfferForQueries(
 
   matchedOffers.sort(comparePrisradarMatchedOffers);
   return matchedOffers[0]?.offer;
+}
+
+async function fetchLoosePrisradarOfferForQueries(
+  queries: string[],
+  requestJson: JsonRequest,
+  requestText: TextRequest,
+  anchorTerms: string[],
+): Promise<PriceMatchOffer | undefined> {
+  const candidates = new Map<string, PrisradarProduct>();
+
+  for (const query of queries) {
+    const products = await fetchPrisradarProducts(query, requestJson);
+    for (const product of products) {
+      const existing = candidates.get(product.productUrl);
+      if (existing === undefined || product.matchScore > existing.matchScore) {
+        candidates.set(product.productUrl, product);
+      }
+    }
+  }
+
+  const rankedProducts = [...candidates.values()]
+    .sort((first, second) => second.matchScore - first.matchScore)
+    .filter((product) => product.matchScore >= 0.3)
+    .filter((product) => isCompatiblePrisradarProductVariant(product.title, anchorTerms))
+    .slice(0, 8);
+
+  for (const product of rankedProducts) {
+    const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
+    if (offer !== undefined) return offer;
+  }
+
+  return undefined;
 }
 
 async function fetchPrisradarOfferForSlugCandidates(
@@ -132,6 +181,7 @@ async function fetchPrisradarOfferForSlugCandidates(
       matchScore: scorePrisradarProductAgainstSlugAndSearchTerms(slug, message.searchTerm, offer.productName),
     };
     if (product.matchScore < (message.price !== undefined ? 0.15 : 0.45)) continue;
+    if (!isCompatiblePrisradarProductVariant(product.title, [message.searchTerm])) continue;
 
     const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
     const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
@@ -213,6 +263,16 @@ function buildPrisradarTextQueries(searchTerm: string): string[] {
   return uniqueStrings(
     buildSearchTermBaseCandidates(searchTerm).flatMap(buildPrisradarTextQueriesForSingleTerm),
   ).slice(0, 24);
+}
+
+function buildLoosePrisradarTextQueries(searchTerm: string, anchorTerms: string[]): string[] {
+  return uniqueStrings([searchTerm, ...anchorTerms]
+    .flatMap((term) => [
+      ...buildPrisradarTextQueries(term),
+      removeStandaloneNumberTokens(cleanPrisradarSearchQuery(normalizeProductPlatformAliases(term))),
+      removeSearchNoiseTokens(removeStandaloneNumberTokens(cleanPrisradarSearchQuery(normalizeProductPlatformAliases(term)))),
+    ]))
+    .slice(0, 36);
 }
 
 function buildPrisradarTextQueriesForSingleTerm(searchTerm: string): string[] {
@@ -443,7 +503,70 @@ function hasUnrequestedConditionVariant(queryTokens: string[], titleTokens: Set<
   return CONDITION_VARIANT_TOKENS.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
 }
 
+function isCompatiblePrisradarProductVariant(title: string, anchorTerms: string[]): boolean {
+  const titleVariant = extractHardVariantGroups(title);
+  return anchorTerms.every((anchorTerm) => !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant));
+}
+
+type HardVariantGroups = {
+  durations: Set<string>;
+  sizes: Set<string>;
+  multipacks: Set<string>;
+  platforms: Set<string>;
+  colors: Set<string>;
+};
+
+function hasConflictingHardVariant(anchor: HardVariantGroups, title: HardVariantGroups): boolean {
+  return (
+    setsConflict(anchor.durations, title.durations) ||
+    setsConflict(anchor.sizes, title.sizes) ||
+    hasMultipackConflict(anchor.multipacks, title.multipacks) ||
+    setsConflict(anchor.platforms, title.platforms) ||
+    setsConflict(anchor.colors, title.colors)
+  );
+}
+
+function setsConflict(first: Set<string>, second: Set<string>): boolean {
+  return first.size > 0 && second.size > 0 && ![...first].some((value) => second.has(value));
+}
+
+function hasMultipackConflict(first: Set<string>, second: Set<string>): boolean {
+  if (first.size === 0 && second.size === 0) return false;
+  if (first.size === 0 || second.size === 0) return true;
+  return ![...first].some((value) => second.has(value));
+}
+
+function extractHardVariantGroups(value: string): HardVariantGroups {
+  const normalizedValue = normalizeProductPlatformAliases(value).toLowerCase().replace(/,/g, ".");
+  const tokens = new Set(tokenizeMatchText(normalizedValue));
+  return {
+    durations: new Set([...normalizedValue.matchAll(/\b(\d{1,3})\s*(?:h|hr|hrs|hour|hours|time|timer)\b/g)].map((match) => `${match[1]}h`)),
+    sizes: new Set([...normalizedValue.matchAll(/\b(\d+(?:\.\d+)?)\s*(ml|cl|l|g|kg|mg|tb|gb|mb|cm|mm)\b/g)].map((match) => `${match[1]}${match[2]}`)),
+    multipacks: extractMultipackVariants(normalizedValue, tokens),
+    platforms: new Set([...normalizedValue.matchAll(/\bps[345]\b/g)].map((match) => match[0])),
+    colors: new Set([...tokens].filter((token) => COLOR_VARIANT_TOKENS.has(token))),
+  };
+}
+
+function extractMultipackVariants(normalizedValue: string, tokens: Set<string>): Set<string> {
+  const multipacks = new Set<string>();
+
+  for (const match of normalizedValue.matchAll(/\b([2-9]\d?)\s*x\s*\d+(?:\.\d+)?\s*[- ]?\s*(?:ml|cl|l|g|kg|mg|stk|pcs|pk|pack)?\b/g)) {
+    multipacks.add(`${match[1]}x`);
+  }
+
+  for (const match of normalizedValue.matchAll(/\b([2-9]\d?)\s*(?:pack|pakning|pakninger|pakke|pk|stk|stykker)\b/g)) {
+    multipacks.add(`${match[1]}x`);
+  }
+
+  if (tokens.has("duo")) multipacks.add("2x");
+  if (tokens.has("trio")) multipacks.add("3x");
+
+  return multipacks;
+}
+
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+const COLOR_VARIANT_TOKENS = new Set(["hvit", "svart", "rod", "bla", "gronn", "gul", "rosa", "lilla", "solv", "gull", "gra", "brun", "oransje"]);
 const SEARCH_NOISE_TOKENS = new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
 const GENERIC_PATH_SEGMENTS = new Set([
   "art",
@@ -494,6 +617,7 @@ const CANONICAL_MATCH_TOKENS = new Map<string, string>([
   ["console", "konsoll"],
   ["white", "hvit"],
   ["black", "svart"],
+  ["sort", "svart"],
   ["red", "rod"],
   ["blue", "bla"],
   ["green", "gronn"],

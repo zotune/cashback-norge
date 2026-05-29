@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780041973
+// @version      1780042997
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1128,7 +1128,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
 }
 `;
-  async function findPrisradarPriceMatch(message, requestJson = fetchJson, requestText = fetchText) {
+  async function findPrisradarPriceMatch(message, requestJson = fetchJson, requestText = fetchText, options = {}) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -1149,11 +1149,19 @@ query SearchSuggestions($query: String!, $category: Int) {
       message
     );
     if (slugOffer !== void 0) return slugOffer;
-    return fetchPrisradarOfferForQueries(
+    const strictTextOffer = await fetchPrisradarOfferForQueries(
       buildPrisradarTextQueries(message.searchTerm),
       requestJson,
       requestText,
       message
+    );
+    if (strictTextOffer !== void 0) return strictTextOffer;
+    if (options.allowLooseTextSearch !== true) return void 0;
+    return fetchLoosePrisradarOfferForQueries(
+      buildLoosePrisradarTextQueries(message.searchTerm, options.anchorSearchTerms ?? []),
+      requestJson,
+      requestText,
+      uniqueStrings$1([message.searchTerm, ...options.anchorSearchTerms ?? []])
     );
   }
   async function fetchPrisradarOfferForQueries(queries, requestJson, requestText, message) {
@@ -1167,7 +1175,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         }
       }
     }
-    const rankedProducts = [...candidates.values()].sort((first, second) => second.matchScore - first.matchScore).filter((product) => message === void 0 || product.matchScore >= (message.price !== void 0 ? 0.15 : 0.45)).slice(0, 8);
+    const rankedProducts = [...candidates.values()].sort((first, second) => second.matchScore - first.matchScore).filter((product) => message === void 0 || product.matchScore >= (message.price !== void 0 ? 0.15 : 0.45)).filter((product) => message === void 0 || isCompatiblePrisradarProductVariant(product.title, [message.searchTerm])).slice(0, 8);
     const merchantKeys = message !== void 0 ? getCurrentMerchantKeys$1(message) : [];
     const matchedOffers = [];
     for (const product of rankedProducts) {
@@ -1183,6 +1191,24 @@ query SearchSuggestions($query: String!, $category: Int) {
     matchedOffers.sort(comparePrisradarMatchedOffers);
     return matchedOffers[0]?.offer;
   }
+  async function fetchLoosePrisradarOfferForQueries(queries, requestJson, requestText, anchorTerms) {
+    const candidates = /* @__PURE__ */ new Map();
+    for (const query of queries) {
+      const products = await fetchPrisradarProducts(query, requestJson);
+      for (const product of products) {
+        const existing = candidates.get(product.productUrl);
+        if (existing === void 0 || product.matchScore > existing.matchScore) {
+          candidates.set(product.productUrl, product);
+        }
+      }
+    }
+    const rankedProducts = [...candidates.values()].sort((first, second) => second.matchScore - first.matchScore).filter((product) => product.matchScore >= 0.3).filter((product) => isCompatiblePrisradarProductVariant(product.title, anchorTerms)).slice(0, 8);
+    for (const product of rankedProducts) {
+      const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
+      if (offer !== void 0) return offer;
+    }
+    return void 0;
+  }
   async function fetchPrisradarOfferForSlugCandidates(slugs, requestText, message) {
     const merchantKeys = getCurrentMerchantKeys$1(message);
     const matchedOffers = [];
@@ -1195,6 +1221,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         matchScore: scorePrisradarProductAgainstSlugAndSearchTerms(slug, message.searchTerm, offer.productName)
       };
       if (product.matchScore < (message.price !== void 0 ? 0.15 : 0.45)) continue;
+      if (!isCompatiblePrisradarProductVariant(product.title, [message.searchTerm])) continue;
       const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
       const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
       if (merchantPriceDistance !== void 0) {
@@ -1238,6 +1265,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     return uniqueStrings$1(
       buildSearchTermBaseCandidates(searchTerm).flatMap(buildPrisradarTextQueriesForSingleTerm)
     ).slice(0, 24);
+  }
+  function buildLoosePrisradarTextQueries(searchTerm, anchorTerms) {
+    return uniqueStrings$1([searchTerm, ...anchorTerms].flatMap((term) => [
+      ...buildPrisradarTextQueries(term),
+      removeStandaloneNumberTokens(cleanPrisradarSearchQuery(normalizeProductPlatformAliases(term))),
+      removeSearchNoiseTokens(removeStandaloneNumberTokens(cleanPrisradarSearchQuery(normalizeProductPlatformAliases(term))))
+    ])).slice(0, 36);
   }
   function buildPrisradarTextQueriesForSingleTerm(searchTerm) {
     const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
@@ -1397,7 +1431,28 @@ query SearchSuggestions($query: String!, $category: Int) {
   function hasUnrequestedConditionVariant(queryTokens, titleTokens) {
     return CONDITION_VARIANT_TOKENS.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
   }
+  function isCompatiblePrisradarProductVariant(title, anchorTerms) {
+    const titleVariant = extractHardVariantGroups(title);
+    return anchorTerms.every((anchorTerm) => !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant));
+  }
+  function hasConflictingHardVariant(anchor, title) {
+    return setsConflict(anchor.durations, title.durations) || setsConflict(anchor.sizes, title.sizes) || setsConflict(anchor.platforms, title.platforms) || setsConflict(anchor.colors, title.colors);
+  }
+  function setsConflict(first, second) {
+    return first.size > 0 && second.size > 0 && ![...first].some((value) => second.has(value));
+  }
+  function extractHardVariantGroups(value) {
+    const normalizedValue = normalizeProductPlatformAliases(value).toLowerCase().replace(/,/g, ".");
+    const tokens = new Set(tokenizeMatchText(normalizedValue));
+    return {
+      durations: new Set([...normalizedValue.matchAll(/\b(\d{1,3})\s*(?:h|hr|hrs|hour|hours|time|timer)\b/g)].map((match) => `${match[1]}h`)),
+      sizes: new Set([...normalizedValue.matchAll(/\b(\d+(?:\.\d+)?)\s*(ml|cl|l|g|kg|mg|tb|gb|mb|cm|mm)\b/g)].map((match) => `${match[1]}${match[2]}`)),
+      platforms: new Set([...normalizedValue.matchAll(/\bps[345]\b/g)].map((match) => match[0])),
+      colors: new Set([...tokens].filter((token) => COLOR_VARIANT_TOKENS.has(token)))
+    };
+  }
   const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+  const COLOR_VARIANT_TOKENS = /* @__PURE__ */ new Set(["hvit", "svart", "rod", "bla", "gronn", "gul", "rosa", "lilla", "solv", "gull", "gra", "brun", "oransje"]);
   const SEARCH_NOISE_TOKENS = /* @__PURE__ */ new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
   const GENERIC_PATH_SEGMENTS = /* @__PURE__ */ new Set([
     "art",
@@ -1435,6 +1490,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     ["console", "konsoll"],
     ["white", "hvit"],
     ["black", "svart"],
+    ["sort", "svart"],
     ["red", "rod"],
     ["blue", "bla"],
     ["green", "gronn"],
@@ -1715,7 +1771,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       findKlarnaPriceMatch(message, requestJson),
       findPrisradarPriceMatch(message, requestJson, requestText)
     ]);
-    const offers = [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer].filter((offer) => offer !== void 0);
+    const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer].filter((offer) => offer !== void 0);
+    const relaxedPrisradarOffer = prisradarOffer === void 0 && isPriceMatchAllowedForCurrentPage(trustedOffers, message) ? await findPrisradarPriceMatch(message, requestJson, requestText, {
+      allowLooseTextSearch: true,
+      anchorSearchTerms: trustedOffers.map((offer) => offer.productName)
+    }) : void 0;
+    const offers = [...trustedOffers, prisradarOffer ?? relaxedPrisradarOffer].filter((offer) => offer !== void 0);
     if (!isPriceMatchAllowedForCurrentPage(offers, message)) {
       return [];
     }
@@ -1758,7 +1819,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         return pathname === "/product.php" && url.searchParams.has("p") || /^\/produkt(?:er)?\//.test(pathname);
       }
       if (hostname.endsWith("godpris.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
-      if (hostname.endsWith("klarna.com")) return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+      if (hostname.endsWith("klarna.com")) return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
       if (hostname.endsWith("kelkoo.no")) return /^\/gtin\/\d+\/?$/.test(pathname);
       if (hostname.endsWith("prisradar.no")) return /^\/produkter\/[^/]+\/?$/.test(pathname);
       return false;
@@ -2657,7 +2718,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return /^\/produkt\/[^/]+\/?$/.test(pathname);
     }
     if (hostname.endsWith("klarna.com")) {
-      return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+      return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
     }
     if (hostname.endsWith("kelkoo.no")) {
       return /^\/gtin\/\d+\/?$/.test(pathname);

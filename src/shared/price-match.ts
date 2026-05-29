@@ -31,7 +31,15 @@ export async function findPriceMatches(
     findPrisradarPriceMatch(message, requestJson, requestText),
   ]);
 
-  const offers = [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer]
+  const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer]
+    .filter((offer): offer is PriceMatchOffer => offer !== undefined);
+  const relaxedPrisradarOffer = prisradarOffer === undefined && isPriceMatchAllowedForCurrentPage(trustedOffers, message)
+    ? await findPrisradarPriceMatch(message, requestJson, requestText, {
+      allowLooseTextSearch: true,
+      anchorSearchTerms: trustedOffers.map((offer) => offer.productName),
+    })
+    : undefined;
+  const offers = [...trustedOffers, prisradarOffer ?? relaxedPrisradarOffer]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
 
   if (!isPriceMatchAllowedForCurrentPage(offers, message)) {
@@ -108,7 +116,7 @@ function isKnownPriceMatchSourceProductUrl(rawUrl: string | undefined): boolean 
     }
 
     if (hostname.endsWith("godpris.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
-    if (hostname.endsWith("klarna.com")) return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+    if (hostname.endsWith("klarna.com")) return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
     if (hostname.endsWith("kelkoo.no")) return /^\/gtin\/\d+\/?$/.test(pathname);
     if (hostname.endsWith("prisradar.no")) return /^\/produkter\/[^/]+\/?$/.test(pathname);
     return false;
