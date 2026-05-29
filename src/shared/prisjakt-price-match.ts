@@ -86,7 +86,8 @@ async function fetchNativePrisjaktPriceMatch(
     const product = await fetchNativePrisjaktProductByOfferUrls([message.url, message.productUrl], requestJson);
     if (product === undefined) return undefined;
 
-    return fetchBestNativePrisjaktOffer(product, requestJson);
+    const offer = await fetchBestNativePrisjaktOffer(product, requestJson);
+    return offer !== undefined ? { ...offer, matchedCurrentMerchant: true } : undefined;
   } catch {
     return undefined;
   }

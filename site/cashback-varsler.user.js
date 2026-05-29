@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1779870797
+// @version      1780040931
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -381,6 +381,7 @@
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
+  const MIN_PRODUCT_TITLE_MATCH_SCORE = 0.45;
   const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
     "discontinued",
     "not_available",
@@ -391,7 +392,7 @@
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
-    const searchQueries = uniqueStrings$3([
+    const searchQueries = uniqueStrings$4([
       ...(message.codes ?? []).filter(isLikelyGtin$3),
       message.searchTerm
     ]);
@@ -414,12 +415,26 @@
       headers: { "Accept": "application/json" }
     });
     if (!isPlainRecord$3(value) || !Array.isArray(value.results)) return void 0;
+    const isCodeQuery = isLikelyGtin$3(normalizedQuery);
+    let bestMatch;
     for (const result of value.results) {
       if (!isPlainRecord$3(result)) continue;
       const id = readStringLike$2(result.id);
-      if (id !== void 0) return id;
+      if (id === void 0) continue;
+      if (isCodeQuery) return id;
+      const title = readStringLike$2(result.title);
+      const groupTitle = readStringLike$2(result.group_title);
+      const brand = readStringLike$2(result.brand);
+      const score = Math.max(
+        scoreProductTitleMatch(normalizedQuery, uniqueStrings$4([brand, title]).join(" ")),
+        scoreProductTitleMatch(normalizedQuery, title ?? ""),
+        scoreProductTitleMatch(normalizedQuery, groupTitle ?? "")
+      );
+      if (bestMatch === void 0 || score > bestMatch.score) {
+        bestMatch = { id, score };
+      }
     }
-    return void 0;
+    return bestMatch !== void 0 && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE ? bestMatch.id : void 0;
   }
   function readGodprisProductPage(html, fallbackProductId) {
     const page = readGodprisDataPage(html);
@@ -510,7 +525,36 @@
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function uniqueStrings$3(values) {
+  function scoreProductTitleMatch(query, title) {
+    const queryTokens = tokenizeMatchText$1(query);
+    const titleTokens = new Set(tokenizeMatchText$1(title));
+    if (queryTokens.length === 0 || titleTokens.size === 0) return 0;
+    let matchedWeight = 0;
+    let totalWeight = 0;
+    for (const token of queryTokens) {
+      const weight = token.length >= 6 ? 2 : token.length >= 4 ? 1.5 : 1;
+      totalWeight += weight;
+      if (titleTokens.has(token)) {
+        matchedWeight += weight;
+        continue;
+      }
+      if ([...titleTokens].some((titleToken) => titleToken.length >= 4 && (titleToken.startsWith(token) || token.startsWith(titleToken)))) {
+        matchedWeight += weight * 0.5;
+      }
+    }
+    return totalWeight > 0 ? matchedWeight / totalWeight : 0;
+  }
+  function tokenizeMatchText$1(value) {
+    return uniqueStrings$4(value.split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2));
+  }
+  function normalizeMatchToken$1(value) {
+    const normalized = transliterateNorwegianCharacters$2(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    return normalized.length > 0 ? normalized : void 0;
+  }
+  function transliterateNorwegianCharacters$2(value) {
+    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
+  }
+  function uniqueStrings$4(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function isLikelyGtin$3(value) {
@@ -539,7 +583,7 @@
       }, requestJson);
       if (directOffer !== void 0) return directOffer;
     }
-    const searchQueries = uniqueStrings$2([
+    const searchQueries = uniqueStrings$3([
       ...(message.codes ?? []).filter(isLikelyGtin$2),
       message.searchTerm
     ]);
@@ -724,7 +768,7 @@
     const normalized = value.trim();
     return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
-  function uniqueStrings$2(values) {
+  function uniqueStrings$3(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function isPlainRecord$2(value) {
@@ -790,7 +834,8 @@ query OfferList($productId: Int!) {
     try {
       const product = await fetchNativePrisjaktProductByOfferUrls([message.url, message.productUrl], requestJson);
       if (product === void 0) return void 0;
-      return fetchBestNativePrisjaktOffer(product, requestJson);
+      const offer = await fetchBestNativePrisjaktOffer(product, requestJson);
+      return offer !== void 0 ? { ...offer, matchedCurrentMerchant: true } : void 0;
     } catch {
       return void 0;
     }
@@ -824,7 +869,7 @@ query OfferList($productId: Int!) {
     };
   }
   async function fetchNativePrisjaktProductByOfferUrls(offerUrls, requestJson) {
-    const candidateUrls = uniqueStrings$1([
+    const candidateUrls = uniqueStrings$2([
       ...offerUrls,
       ...offerUrls.map((url) => url !== void 0 ? toCanonicalProductPageUrl(url) : void 0)
     ]);
@@ -935,7 +980,7 @@ query OfferList($productId: Int!) {
     return product !== void 0 ? fetchBestNativePrisjaktOffer(product, requestJson) : void 0;
   }
   async function fetchPrisjaktSearchByCodes(codes, requestJson) {
-    for (const code of uniqueStrings$1((codes ?? []).filter(isLikelyGtin$1))) {
+    for (const code of uniqueStrings$2((codes ?? []).filter(isLikelyGtin$1))) {
       const offer = await fetchPrisjaktSearch(code, requestJson);
       if (offer !== void 0) return offer;
     }
@@ -1050,7 +1095,7 @@ query OfferList($productId: Int!) {
       return void 0;
     }
   }
-  function uniqueStrings$1(values) {
+  function uniqueStrings$2(values) {
     return [...new Set(values.filter((value) => value !== void 0 && value.length > 0))];
   }
   function isLikelyGtin$1(value) {
@@ -1093,13 +1138,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (directOffer !== void 0) return directOffer;
     }
     const codeOffer = await fetchPrisradarOfferForQueries(
-      uniqueStrings([...(message.codes ?? []).filter(isLikelyGtin)]),
+      uniqueStrings$1([...(message.codes ?? []).filter(isLikelyGtin)]),
       requestJson,
       requestText
     );
     if (codeOffer !== void 0) return codeOffer;
     const slugOffer = await fetchPrisradarOfferForSlugCandidates(
-      buildPrisradarSlugCandidates(message.searchTerm),
+      buildPrisradarSlugCandidates(message),
       requestText,
       message
     );
@@ -1123,7 +1168,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     }
     const rankedProducts = [...candidates.values()].sort((first, second) => second.matchScore - first.matchScore).filter((product) => message === void 0 || product.matchScore >= (message.price !== void 0 ? 0.15 : 0.45)).slice(0, 8);
-    const merchantKeys = message !== void 0 ? getCurrentMerchantKeys(message) : [];
+    const merchantKeys = message !== void 0 ? getCurrentMerchantKeys$1(message) : [];
     const matchedOffers = [];
     for (const product of rankedProducts) {
       const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
@@ -1132,14 +1177,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
       const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
       if (merchantPriceDistance !== void 0) {
-        matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
+        matchedOffers.push({ offer: { ...displayOffer, matchedCurrentMerchant: true }, product, merchantPriceDistance });
       }
     }
     matchedOffers.sort(comparePrisradarMatchedOffers);
     return matchedOffers[0]?.offer;
   }
   async function fetchPrisradarOfferForSlugCandidates(slugs, requestText, message) {
-    const merchantKeys = getCurrentMerchantKeys(message);
+    const merchantKeys = getCurrentMerchantKeys$1(message);
     const matchedOffers = [];
     for (const slug of slugs.slice(0, 6)) {
       const offer = await fetchPrisradarOfferForUrl(`${PRISRADAR_PRODUCT_URL}${encodeURIComponent(slug)}`, requestText);
@@ -1147,13 +1192,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       const product = {
         productUrl: offer.productUrl,
         title: offer.productName,
-        matchScore: scorePrisradarProductMatch(message.searchTerm, offer.productName)
+        matchScore: scorePrisradarProductAgainstSlugAndSearchTerms(slug, message.searchTerm, offer.productName)
       };
       if (product.matchScore < (message.price !== void 0 ? 0.15 : 0.45)) continue;
       const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
       const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
       if (merchantPriceDistance !== void 0) {
-        matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
+        matchedOffers.push({ offer: { ...displayOffer, matchedCurrentMerchant: true }, product, merchantPriceDistance });
       }
     }
     matchedOffers.sort(comparePrisradarMatchedOffers);
@@ -1190,7 +1235,12 @@ query SearchSuggestions($query: String!, $category: Int) {
     };
   }
   function buildPrisradarTextQueries(searchTerm) {
-    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+    return uniqueStrings$1(
+      buildSearchTermBaseCandidates(searchTerm).flatMap(buildPrisradarTextQueriesForSingleTerm)
+    ).slice(0, 24);
+  }
+  function buildPrisradarTextQueriesForSingleTerm(searchTerm) {
+    const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
     const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
     const withoutSize = normalizedSearchTerm.replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ").replace(/\s+/g, " ").trim();
     const cleanedWithoutSize = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(withoutSize));
@@ -1198,7 +1248,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const cleanedWithoutSizeOrStandaloneNumbers = removeStandaloneNumberTokens(cleanedWithoutSize);
     const compactSearchTerm = removeSearchNoiseTokens(cleanedWithoutStandaloneNumbers);
     const compactWithoutSize = removeSearchNoiseTokens(cleanedWithoutSizeOrStandaloneNumbers);
-    return uniqueStrings([
+    return uniqueStrings$1([
       normalizedSearchTerm,
       cleanedSearchTerm,
       withoutSize !== normalizedSearchTerm ? withoutSize : void 0,
@@ -1209,12 +1259,21 @@ query SearchSuggestions($query: String!, $category: Int) {
       compactWithoutSize !== cleanedWithoutSizeOrStandaloneNumbers ? compactWithoutSize : void 0
     ]);
   }
-  function buildPrisradarSlugCandidates(searchTerm) {
-    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+  function buildPrisradarSlugCandidates(message) {
+    return uniqueStrings$1(
+      [
+        ...buildSearchTermBaseCandidates(message.searchTerm).flatMap(buildPrisradarSlugCandidatesForSingleTerm),
+        ...buildPrisradarSlugCandidatesFromUrl(message.url),
+        ...buildPrisradarSlugCandidatesFromUrl(message.productUrl)
+      ]
+    ).slice(0, 12);
+  }
+  function buildPrisradarSlugCandidatesForSingleTerm(searchTerm) {
+    const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
     const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
     const withoutSize = normalizedSearchTerm.replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ").replace(/\s+/g, " ").trim();
     const cleanedWithoutSize = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(withoutSize));
-    return uniqueStrings([
+    return uniqueStrings$1([
       slugifyPrisradarTitle(normalizedSearchTerm),
       slugifyPrisradarTitle(cleanedSearchTerm),
       withoutSize !== normalizedSearchTerm ? slugifyPrisradarTitle(withoutSize) : void 0,
@@ -1222,12 +1281,53 @@ query SearchSuggestions($query: String!, $category: Int) {
       slugifyPrisradarTitle(removeSearchNoiseTokens(cleanedSearchTerm))
     ]);
   }
+  function buildPrisradarSlugCandidatesFromUrl(rawUrl) {
+    if (rawUrl === void 0) return [];
+    try {
+      const url = new URL(rawUrl);
+      const segments = url.pathname.split("/").map((segment) => decodeURIComponent(segment).trim()).filter((segment) => {
+        const normalized = segment.toLowerCase();
+        return normalized.length >= 4 && !/^\d+$/.test(normalized) && !GENERIC_PATH_SEGMENTS.has(normalized);
+      });
+      return uniqueStrings$1(segments.reverse().flatMap((segment) => [
+        slugifyPrisradarTitle(normalizeProductPlatformAliases(segment.replace(/-/g, " "))),
+        slugifyPrisradarTitle(segment)
+      ]));
+    } catch {
+      return [];
+    }
+  }
+  function buildSearchTermBaseCandidates(searchTerm) {
+    const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
+    const separatorPrefixCandidates = [
+      normalizedSearchTerm.split(/\s+\|\s+/)[0],
+      normalizedSearchTerm.split(/\s+•\s+/)[0],
+      normalizedSearchTerm.split(/\s+[–—]\s+/)[0]
+    ];
+    const hyphenPrefixCandidates = separatorPrefixCandidates.flatMap((candidate) => {
+      if (candidate === void 0) return [];
+      const parts = candidate.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean);
+      if (parts.length < 2) return [];
+      return [
+        parts[0],
+        parts.slice(0, 2).join(" "),
+        parts.slice(0, 3).join(" ")
+      ];
+    });
+    const buyTitleMatch = normalizedSearchTerm.match(/^(?:kjøp|kjop|buy)\s+(.+?)\s+(?:hos|at)\s+.+$/i);
+    return uniqueStrings$1([
+      normalizedSearchTerm,
+      ...separatorPrefixCandidates,
+      ...hyphenPrefixCandidates,
+      buyTitleMatch?.[1]
+    ]).filter((candidate) => candidate.length >= 4);
+  }
   function slugifyPrisradarTitle(value) {
-    const slug = transliterateNorwegianCharacters(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const slug = transliterateNorwegianCharacters$1(normalizeProductPlatformAliases(value)).normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     return slug.length >= 4 ? slug : void 0;
   }
   function cleanPrisradarSearchQuery(value) {
-    return value.replace(/[()[\]{}]/g, " ").replace(/\s+[-–—:|/]\s+/g, " ").replace(/\s+/g, " ").trim();
+    return normalizeProductPlatformAliases(value).replace(/[()[\]{}]/g, " ").replace(/\s+[-–—:|/]\s+/g, " ").replace(/\s+/g, " ").trim();
   }
   function removeDerivedAcronymTokens(value) {
     const keptTokens = [];
@@ -1263,7 +1363,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return [...digits].every((digit) => previousDigits.includes(digit));
   }
   function splitTokenParts(value) {
-    return value.replace(/([a-zæøå])([A-ZÆØÅ])/g, "$1 $2").split(/[^A-Za-z0-9ÆØÅæøå]+/).map(normalizeMatchToken).filter((part) => part !== void 0);
+    return normalizeProductPlatformAliases(value).replace(/([a-zæøå])([A-ZÆØÅ])/g, "$1 $2").split(/[^A-Za-z0-9ÆØÅæøå]+/).map(normalizeMatchToken).filter((part) => part !== void 0);
   }
   function scorePrisradarProductMatch(query, title) {
     const queryTokens = tokenizeMatchText(query);
@@ -1285,17 +1385,46 @@ query SearchSuggestions($query: String!, $category: Int) {
     const score = totalWeight > 0 ? matchedWeight / totalWeight : 0;
     return hasUnrequestedConditionVariant(queryTokens, titleTokens) ? score * 0.2 : score;
   }
+  function scorePrisradarProductAgainstSearchTerms(searchTerm, title) {
+    return Math.max(...buildSearchTermBaseCandidates(searchTerm).map((candidate) => scorePrisradarProductMatch(candidate, title)));
+  }
+  function scorePrisradarProductAgainstSlugAndSearchTerms(slug, searchTerm, title) {
+    return Math.max(
+      scorePrisradarProductAgainstSearchTerms(searchTerm, title),
+      scorePrisradarProductMatch(slug.replace(/-/g, " "), title)
+    );
+  }
   function hasUnrequestedConditionVariant(queryTokens, titleTokens) {
     return CONDITION_VARIANT_TOKENS.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
   }
   const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
   const SEARCH_NOISE_TOKENS = /* @__PURE__ */ new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
+  const GENERIC_PATH_SEGMENTS = /* @__PURE__ */ new Set([
+    "art",
+    "category",
+    "c",
+    "gaming",
+    "item",
+    "kjop",
+    "kjøp",
+    "mus",
+    "p",
+    "produkt",
+    "produkter",
+    "product",
+    "shop",
+    "spill",
+    "varer"
+  ]);
   function tokenizeMatchText(value) {
-    return uniqueStrings(splitTokenParts(value).map(canonicalizeMatchToken).filter((token) => token.length >= 2));
+    return uniqueStrings$1(splitTokenParts(value).map(canonicalizeMatchToken).filter((token) => token.length >= 2));
   }
   function normalizeMatchToken(value) {
-    const normalized = transliterateNorwegianCharacters(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    const normalized = transliterateNorwegianCharacters$1(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
     return normalized.length > 0 ? normalized : void 0;
+  }
+  function normalizeProductPlatformAliases(value) {
+    return value.replace(/\bplaystation\s*([345])\b/gi, "ps$1").replace(/\bps\s+([345])\b/gi, "ps$1");
   }
   function canonicalizeMatchToken(token) {
     return CANONICAL_MATCH_TOKENS.get(token) ?? token;
@@ -1383,7 +1512,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function preferCurrentMerchantWhenTiedForBest(offer, merchantKeys) {
     if (merchantKeys.length === 0 || offer.alternatives === void 0) return offer;
     const currentMerchantAlternative = offer.alternatives.find(
-      (alternative) => isCurrentMerchantName(alternative.shopName, merchantKeys) && Math.abs(alternative.amount - offer.amount) < 0.01 && Math.abs((alternative.sortAmount ?? alternative.amount) - (offer.sortAmount ?? offer.amount)) < 0.01
+      (alternative) => isCurrentMerchantName$1(alternative.shopName, merchantKeys) && Math.abs(alternative.amount - offer.amount) < 0.01
     );
     if (currentMerchantAlternative === void 0) return offer;
     return {
@@ -1400,40 +1529,40 @@ query SearchSuggestions($query: String!, $category: Int) {
     const merchantAmounts = [
       { shopName: offer.shopName, amount: offer.amount },
       ...offer.alternatives?.map((alternative) => ({ shopName: alternative.shopName, amount: alternative.amount })) ?? []
-    ].filter((alternative) => isCurrentMerchantName(alternative.shopName, merchantKeys)).map((alternative) => alternative.amount);
+    ].filter((alternative) => isCurrentMerchantName$1(alternative.shopName, merchantKeys)).map((alternative) => alternative.amount);
     if (merchantAmounts.length === 0) return void 0;
     if (currentPrice === void 0 || currentPrice <= 0) return 0;
     return Math.min(...merchantAmounts.map((amount) => Math.abs(amount - currentPrice) / currentPrice));
   }
-  function isCurrentMerchantName(shopName, merchantKeys) {
-    const normalizedShopName = normalizeMerchantKey(shopName);
+  function isCurrentMerchantName$1(shopName, merchantKeys) {
+    const normalizedShopName = normalizeMerchantKey$1(shopName);
     if (normalizedShopName.length < 3) return false;
     return merchantKeys.some((merchantKey) => {
       return normalizedShopName.includes(merchantKey) || merchantKey.includes(normalizedShopName);
     });
   }
-  function getCurrentMerchantKeys(message) {
-    const hostKey = readMerchantKeyFromUrl(message.url);
-    const organizationKey = message.organizationName !== void 0 ? normalizeMerchantKey(message.organizationName) : void 0;
-    return uniqueStrings([hostKey, organizationKey]).filter((key) => key.length >= 3 && !GENERIC_MERCHANT_KEYS.has(key));
+  function getCurrentMerchantKeys$1(message) {
+    const hostKey = readMerchantKeyFromUrl$1(message.url);
+    const organizationKey = message.organizationName !== void 0 ? normalizeMerchantKey$1(message.organizationName) : void 0;
+    return uniqueStrings$1([hostKey, organizationKey]).filter((key) => key.length >= 3 && !GENERIC_MERCHANT_KEYS$1.has(key));
   }
-  function readMerchantKeyFromUrl(rawUrl) {
+  function readMerchantKeyFromUrl$1(rawUrl) {
     try {
       const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
       const labels = hostname.split(".").filter((label2) => label2.length > 0);
       const label = labels.length >= 2 ? labels[labels.length - 2] : labels[0];
-      return label !== void 0 ? normalizeMerchantKey(label) : void 0;
+      return label !== void 0 ? normalizeMerchantKey$1(label) : void 0;
     } catch {
       return void 0;
     }
   }
-  function normalizeMerchantKey(value) {
-    return transliterateNorwegianCharacters(value).toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+  function normalizeMerchantKey$1(value) {
+    return transliterateNorwegianCharacters$1(value).toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
   }
-  function transliterateNorwegianCharacters(value) {
+  function transliterateNorwegianCharacters$1(value) {
     return value.replace(/[Ææ]/g, "ae").replace(/[Øø]/g, "o").replace(/[Åå]/g, "a");
   }
-  const GENERIC_MERCHANT_KEYS = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
+  const GENERIC_MERCHANT_KEYS$1 = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
   function readPrisradarProductFromNextFlight(html) {
     const scripts = html.matchAll(/<script[^>]*>self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)<\/script>/g);
     for (const match of scripts) {
@@ -1573,7 +1702,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const normalized = value.trim();
     return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
-  function uniqueStrings(values) {
+  function uniqueStrings$1(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function isPlainRecord(value) {
@@ -1586,7 +1715,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       findKlarnaPriceMatch(message, requestJson),
       findPrisradarPriceMatch(message, requestJson, requestText)
     ]);
-    return [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer].filter((offer) => offer !== void 0).sort((first, second) => {
+    const offers = [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer].filter((offer) => offer !== void 0);
+    if (!isPriceMatchAllowedForCurrentPage(offers, message)) {
+      return [];
+    }
+    return offers.sort((first, second) => {
       const amountDifference = first.amount - second.amount;
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
@@ -1599,6 +1732,70 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (offer.source === "prisradar") return 3;
     return 4;
   }
+  function isPriceMatchAllowedForCurrentPage(offers, message) {
+    if (isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl)) {
+      return true;
+    }
+    return offers.some((offer) => {
+      return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message);
+    });
+  }
+  function hasCurrentMerchantOffer(offer, message) {
+    const merchantKeys = getCurrentMerchantKeys(message);
+    if (merchantKeys.length === 0) return false;
+    return [
+      { shopName: offer.shopName, amount: offer.amount },
+      ...offer.alternatives?.map((alternative) => ({ shopName: alternative.shopName, amount: alternative.amount })) ?? []
+    ].some((alternative) => isCurrentMerchantName(alternative.shopName, merchantKeys));
+  }
+  function isKnownPriceMatchSourceProductUrl(rawUrl) {
+    if (rawUrl === void 0) return false;
+    try {
+      const url = new URL(rawUrl);
+      const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+      const pathname = url.pathname.toLowerCase();
+      if (hostname.endsWith("prisjakt.no") || hostname.endsWith("prisjakt.nu") || hostname.endsWith("prisjakt.se") || hostname.endsWith("prisjagt.dk") || hostname.endsWith("pricespy.co.uk") || hostname.endsWith("pricespy.co.nz") || hostname.endsWith("hintaopas.fi") || hostname.endsWith("ledenicheur.fr")) {
+        return pathname === "/product.php" && url.searchParams.has("p") || /^\/produkt(?:er)?\//.test(pathname);
+      }
+      if (hostname.endsWith("godpris.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
+      if (hostname.endsWith("klarna.com")) return /\/shopping\/pl\/cl\d+\/\d+\//.test(pathname);
+      if (hostname.endsWith("kelkoo.no")) return /^\/gtin\/\d+\/?$/.test(pathname);
+      if (hostname.endsWith("prisradar.no")) return /^\/produkter\/[^/]+\/?$/.test(pathname);
+      return false;
+    } catch {
+      return false;
+    }
+  }
+  function isCurrentMerchantName(shopName, merchantKeys) {
+    const normalizedShopName = normalizeMerchantKey(shopName);
+    if (normalizedShopName.length < 3) return false;
+    return merchantKeys.some((merchantKey) => normalizedShopName.includes(merchantKey) || merchantKey.includes(normalizedShopName));
+  }
+  function getCurrentMerchantKeys(message) {
+    const hostKey = readMerchantKeyFromUrl(message.url);
+    const organizationKey = message.organizationName !== void 0 ? normalizeMerchantKey(message.organizationName) : void 0;
+    return uniqueStrings([hostKey, organizationKey]).filter((key) => key.length >= 3 && !GENERIC_MERCHANT_KEYS.has(key));
+  }
+  function readMerchantKeyFromUrl(rawUrl) {
+    try {
+      const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
+      const labels = hostname.split(".").filter((label2) => label2.length > 0);
+      const label = labels.length >= 2 ? labels[labels.length - 2] : labels[0];
+      return label !== void 0 ? normalizeMerchantKey(label) : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function normalizeMerchantKey(value) {
+    return transliterateNorwegianCharacters(value).toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+  }
+  function transliterateNorwegianCharacters(value) {
+    return value.replace(/[Ææ]/g, "ae").replace(/[Øø]/g, "o").replace(/[Åå]/g, "a");
+  }
+  function uniqueStrings(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  const GENERIC_MERCHANT_KEYS = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
   const noWords = [
     "asshole",
     "dritt",
@@ -2471,6 +2668,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     return false;
   }
   function isLikelyCommerceProductPage(parsedUrl) {
+    const strongProductishPath = /(?:^|\/)(?:product|produkt|produkter)\/[^/]+/i.test(parsedUrl.pathname) || /^\/(?:i|p)\/\d+\/[-\w%]+\/?$/i.test(parsedUrl.pathname);
+    if (strongProductishPath && (hasVisiblePriceSignal() || hasCommerceActionSignal())) {
+      return true;
+    }
     const productishPath = /\b(product|produkt|produkter|p|i|item|shop|varer|sku)\b/i.test(parsedUrl.pathname) || [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin|ean)\b/i.test(key));
     if (!productishPath) return false;
     return hasVisiblePriceSignal() && hasCommerceActionSignal();
@@ -5303,7 +5504,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return typeof value.reason === "string";
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") && (value.sourceName === void 0 || typeof value.sourceName === "string") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");

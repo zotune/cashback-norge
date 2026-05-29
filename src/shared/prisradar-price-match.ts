@@ -60,7 +60,7 @@ export async function findPrisradarPriceMatch(
   if (codeOffer !== undefined) return codeOffer;
 
   const slugOffer = await fetchPrisradarOfferForSlugCandidates(
-    buildPrisradarSlugCandidates(message.searchTerm),
+    buildPrisradarSlugCandidates(message),
     requestText,
     message,
   );
@@ -106,7 +106,7 @@ async function fetchPrisradarOfferForQueries(
     const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
     const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
     if (merchantPriceDistance !== undefined) {
-      matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
+      matchedOffers.push({ offer: { ...displayOffer, matchedCurrentMerchant: true }, product, merchantPriceDistance });
     }
   }
 
@@ -129,14 +129,14 @@ async function fetchPrisradarOfferForSlugCandidates(
     const product = {
       productUrl: offer.productUrl,
       title: offer.productName,
-      matchScore: scorePrisradarProductMatch(message.searchTerm, offer.productName),
+      matchScore: scorePrisradarProductAgainstSlugAndSearchTerms(slug, message.searchTerm, offer.productName),
     };
     if (product.matchScore < (message.price !== undefined ? 0.15 : 0.45)) continue;
 
     const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
     const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
     if (merchantPriceDistance !== undefined) {
-      matchedOffers.push({ offer: displayOffer, product, merchantPriceDistance });
+      matchedOffers.push({ offer: { ...displayOffer, matchedCurrentMerchant: true }, product, merchantPriceDistance });
     }
   }
 
@@ -210,7 +210,13 @@ function readPrisradarProduct(value: unknown, query: string): PrisradarProduct |
 }
 
 function buildPrisradarTextQueries(searchTerm: string): string[] {
-  const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+  return uniqueStrings(
+    buildSearchTermBaseCandidates(searchTerm).flatMap(buildPrisradarTextQueriesForSingleTerm),
+  ).slice(0, 24);
+}
+
+function buildPrisradarTextQueriesForSingleTerm(searchTerm: string): string[] {
+  const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
   const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
   const withoutSize = normalizedSearchTerm
     .replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ")
@@ -234,8 +240,18 @@ function buildPrisradarTextQueries(searchTerm: string): string[] {
   ]);
 }
 
-function buildPrisradarSlugCandidates(searchTerm: string): string[] {
-  const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+function buildPrisradarSlugCandidates(message: GetPriceMatchForProductMessage): string[] {
+  return uniqueStrings(
+    [
+      ...buildSearchTermBaseCandidates(message.searchTerm).flatMap(buildPrisradarSlugCandidatesForSingleTerm),
+      ...buildPrisradarSlugCandidatesFromUrl(message.url),
+      ...buildPrisradarSlugCandidatesFromUrl(message.productUrl),
+    ],
+  ).slice(0, 12);
+}
+
+function buildPrisradarSlugCandidatesForSingleTerm(searchTerm: string): string[] {
+  const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
   const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
   const withoutSize = normalizedSearchTerm
     .replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ")
@@ -252,8 +268,61 @@ function buildPrisradarSlugCandidates(searchTerm: string): string[] {
   ]);
 }
 
+function buildPrisradarSlugCandidatesFromUrl(rawUrl: string | undefined): string[] {
+  if (rawUrl === undefined) return [];
+  try {
+    const url = new URL(rawUrl);
+    const segments = url.pathname
+      .split("/")
+      .map((segment) => decodeURIComponent(segment).trim())
+      .filter((segment) => {
+        const normalized = segment.toLowerCase();
+        return (
+          normalized.length >= 4 &&
+          !/^\d+$/.test(normalized) &&
+          !GENERIC_PATH_SEGMENTS.has(normalized)
+        );
+      });
+    return uniqueStrings(segments
+      .reverse()
+      .flatMap((segment) => [
+        slugifyPrisradarTitle(normalizeProductPlatformAliases(segment.replace(/-/g, " "))),
+        slugifyPrisradarTitle(segment),
+      ]));
+  } catch {
+    return [];
+  }
+}
+
+function buildSearchTermBaseCandidates(searchTerm: string): string[] {
+  const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
+  const separatorPrefixCandidates = [
+    normalizedSearchTerm.split(/\s+\|\s+/)[0],
+    normalizedSearchTerm.split(/\s+•\s+/)[0],
+    normalizedSearchTerm.split(/\s+[–—]\s+/)[0],
+  ];
+  const hyphenPrefixCandidates = separatorPrefixCandidates.flatMap((candidate) => {
+    if (candidate === undefined) return [];
+    const parts = candidate.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean);
+    if (parts.length < 2) return [];
+    return [
+      parts[0],
+      parts.slice(0, 2).join(" "),
+      parts.slice(0, 3).join(" "),
+    ];
+  });
+  const buyTitleMatch = normalizedSearchTerm.match(/^(?:kjøp|kjop|buy)\s+(.+?)\s+(?:hos|at)\s+.+$/i);
+
+  return uniqueStrings([
+    normalizedSearchTerm,
+    ...separatorPrefixCandidates,
+    ...hyphenPrefixCandidates,
+    buyTitleMatch?.[1],
+  ]).filter((candidate) => candidate.length >= 4);
+}
+
 function slugifyPrisradarTitle(value: string): string | undefined {
-  const slug = transliterateNorwegianCharacters(value)
+  const slug = transliterateNorwegianCharacters(normalizeProductPlatformAliases(value))
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
@@ -264,7 +333,7 @@ function slugifyPrisradarTitle(value: string): string | undefined {
 }
 
 function cleanPrisradarSearchQuery(value: string): string {
-  return value
+  return normalizeProductPlatformAliases(value)
     .replace(/[()[\]{}]/g, " ")
     .replace(/\s+[-–—:|/]\s+/g, " ")
     .replace(/\s+/g, " ")
@@ -328,7 +397,7 @@ function isDerivedAcronymToken(token: string, previousParts: string[]): boolean 
 }
 
 function splitTokenParts(value: string): string[] {
-  return value
+  return normalizeProductPlatformAliases(value)
     .replace(/([a-zæøå])([A-ZÆØÅ])/g, "$1 $2")
     .split(/[^A-Za-z0-9ÆØÅæøå]+/)
     .map(normalizeMatchToken)
@@ -359,12 +428,40 @@ function scorePrisradarProductMatch(query: string, title: string): number {
   return hasUnrequestedConditionVariant(queryTokens, titleTokens) ? score * 0.2 : score;
 }
 
+function scorePrisradarProductAgainstSearchTerms(searchTerm: string, title: string): number {
+  return Math.max(...buildSearchTermBaseCandidates(searchTerm).map((candidate) => scorePrisradarProductMatch(candidate, title)));
+}
+
+function scorePrisradarProductAgainstSlugAndSearchTerms(slug: string, searchTerm: string, title: string): number {
+  return Math.max(
+    scorePrisradarProductAgainstSearchTerms(searchTerm, title),
+    scorePrisradarProductMatch(slug.replace(/-/g, " "), title),
+  );
+}
+
 function hasUnrequestedConditionVariant(queryTokens: string[], titleTokens: Set<string>): boolean {
   return CONDITION_VARIANT_TOKENS.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
 }
 
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
 const SEARCH_NOISE_TOKENS = new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
+const GENERIC_PATH_SEGMENTS = new Set([
+  "art",
+  "category",
+  "c",
+  "gaming",
+  "item",
+  "kjop",
+  "kjøp",
+  "mus",
+  "p",
+  "produkt",
+  "produkter",
+  "product",
+  "shop",
+  "spill",
+  "varer",
+]);
 
 function tokenizeMatchText(value: string): string[] {
   return uniqueStrings(splitTokenParts(value)
@@ -379,6 +476,12 @@ function normalizeMatchToken(value: string): string | undefined {
     .replace(/[^A-Za-z0-9]/g, "")
     .toLowerCase();
   return normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeProductPlatformAliases(value: string): string {
+  return value
+    .replace(/\bplaystation\s*([345])\b/gi, "ps$1")
+    .replace(/\bps\s+([345])\b/gi, "ps$1");
 }
 
 function canonicalizeMatchToken(token: string): string {
@@ -494,8 +597,7 @@ function preferCurrentMerchantWhenTiedForBest(
   if (merchantKeys.length === 0 || offer.alternatives === undefined) return offer;
   const currentMerchantAlternative = offer.alternatives.find((alternative) =>
     isCurrentMerchantName(alternative.shopName, merchantKeys) &&
-    Math.abs(alternative.amount - offer.amount) < 0.01 &&
-    Math.abs((alternative.sortAmount ?? alternative.amount) - (offer.sortAmount ?? offer.amount)) < 0.01
+    Math.abs(alternative.amount - offer.amount) < 0.01
   );
   if (currentMerchantAlternative === undefined) return offer;
 

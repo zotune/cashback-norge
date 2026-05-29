@@ -207,6 +207,7 @@ type OffersForUrlResponse =
 type PriceMatchOffer = {
   source?: "prisjakt" | "godpris" | "klarna" | "prisradar";
   sourceName?: string;
+  matchedCurrentMerchant?: boolean;
   shopName: string;
   price: string;
   amount: number;
@@ -659,6 +660,13 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
 }
 
 function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
+  const strongProductishPath =
+    /(?:^|\/)(?:product|produkt|produkter)\/[^/]+/i.test(parsedUrl.pathname) ||
+    /^\/(?:i|p)\/\d+\/[-\w%]+\/?$/i.test(parsedUrl.pathname);
+  if (strongProductishPath && (hasVisiblePriceSignal() || hasCommerceActionSignal())) {
+    return true;
+  }
+
   const productishPath =
     /\b(product|produkt|produkter|p|i|item|shop|varer|sku)\b/i.test(parsedUrl.pathname) ||
     [...parsedUrl.searchParams.keys()].some((key) => /\b(product|produkt|sku|mpn|gtin|ean)\b/i.test(key));
@@ -3763,6 +3771,7 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     isRecord(value) &&
     (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
+    (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
     typeof value.amount === "number" &&

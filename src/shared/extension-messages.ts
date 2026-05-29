@@ -47,6 +47,7 @@ export type OffersForUrlResponse =
 export type PriceMatchOffer = {
   source?: "prisjakt" | "godpris" | "klarna" | "prisradar";
   sourceName?: string;
+  matchedCurrentMerchant?: boolean;
   shopName: string;
   price: string;
   amount: number;

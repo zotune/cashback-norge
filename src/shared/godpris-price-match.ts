@@ -14,6 +14,7 @@ type TextRequest = (
 ) => Promise<string | undefined>;
 
 const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
+const MIN_PRODUCT_TITLE_MATCH_SCORE = 0.45;
 const BAD_AVAILABILITY_STATUSES = new Set([
   "discontinued",
   "not_available",
@@ -62,13 +63,30 @@ async function fetchGodprisProductId(
   });
   if (!isPlainRecord(value) || !Array.isArray(value.results)) return undefined;
 
+  const isCodeQuery = isLikelyGtin(normalizedQuery);
+  let bestMatch: { id: string; score: number } | undefined;
   for (const result of value.results) {
     if (!isPlainRecord(result)) continue;
     const id = readStringLike(result.id);
-    if (id !== undefined) return id;
+    if (id === undefined) continue;
+    if (isCodeQuery) return id;
+
+    const title = readStringLike(result.title);
+    const groupTitle = readStringLike(result.group_title);
+    const brand = readStringLike(result.brand);
+    const score = Math.max(
+      scoreProductTitleMatch(normalizedQuery, uniqueStrings([brand, title]).join(" ")),
+      scoreProductTitleMatch(normalizedQuery, title ?? ""),
+      scoreProductTitleMatch(normalizedQuery, groupTitle ?? ""),
+    );
+    if (bestMatch === undefined || score > bestMatch.score) {
+      bestMatch = { id, score };
+    }
   }
 
-  return undefined;
+  return bestMatch !== undefined && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE
+    ? bestMatch.id
+    : undefined;
 }
 
 function readGodprisProductPage(html: string, fallbackProductId: string): PriceMatchOffer | undefined {
@@ -179,6 +197,52 @@ function readNumberLike(value: unknown): number | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function scoreProductTitleMatch(query: string, title: string): number {
+  const queryTokens = tokenizeMatchText(query);
+  const titleTokens = new Set(tokenizeMatchText(title));
+  if (queryTokens.length === 0 || titleTokens.size === 0) return 0;
+
+  let matchedWeight = 0;
+  let totalWeight = 0;
+  for (const token of queryTokens) {
+    const weight = token.length >= 6 ? 2 : token.length >= 4 ? 1.5 : 1;
+    totalWeight += weight;
+    if (titleTokens.has(token)) {
+      matchedWeight += weight;
+      continue;
+    }
+
+    if ([...titleTokens].some((titleToken) => titleToken.length >= 4 && (titleToken.startsWith(token) || token.startsWith(titleToken)))) {
+      matchedWeight += weight * 0.5;
+    }
+  }
+
+  return totalWeight > 0 ? matchedWeight / totalWeight : 0;
+}
+
+function tokenizeMatchText(value: string): string[] {
+  return uniqueStrings(value
+    .split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/)
+    .map(normalizeMatchToken)
+    .filter((token): token is string => token !== undefined && token.length >= 2));
+}
+
+function normalizeMatchToken(value: string): string | undefined {
+  const normalized = transliterateNorwegianCharacters(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function transliterateNorwegianCharacters(value: string): string {
+  return value
+    .replace(/[\u00C6\u00E6]/g, "ae")
+    .replace(/[\u00D8\u00F8]/g, "o")
+    .replace(/[\u00C5\u00E5]/g, "a");
 }
 
 function uniqueStrings(values: Array<string | undefined>): string[] {
