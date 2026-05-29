@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780042997
+// @version      1780043790
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1436,10 +1436,15 @@ query SearchSuggestions($query: String!, $category: Int) {
     return anchorTerms.every((anchorTerm) => !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant));
   }
   function hasConflictingHardVariant(anchor, title) {
-    return setsConflict(anchor.durations, title.durations) || setsConflict(anchor.sizes, title.sizes) || setsConflict(anchor.platforms, title.platforms) || setsConflict(anchor.colors, title.colors);
+    return setsConflict(anchor.durations, title.durations) || setsConflict(anchor.sizes, title.sizes) || hasMultipackConflict(anchor.multipacks, title.multipacks) || setsConflict(anchor.platforms, title.platforms) || setsConflict(anchor.colors, title.colors);
   }
   function setsConflict(first, second) {
     return first.size > 0 && second.size > 0 && ![...first].some((value) => second.has(value));
+  }
+  function hasMultipackConflict(first, second) {
+    if (first.size === 0 && second.size === 0) return false;
+    if (first.size === 0 || second.size === 0) return true;
+    return ![...first].some((value) => second.has(value));
   }
   function extractHardVariantGroups(value) {
     const normalizedValue = normalizeProductPlatformAliases(value).toLowerCase().replace(/,/g, ".");
@@ -1447,9 +1452,22 @@ query SearchSuggestions($query: String!, $category: Int) {
     return {
       durations: new Set([...normalizedValue.matchAll(/\b(\d{1,3})\s*(?:h|hr|hrs|hour|hours|time|timer)\b/g)].map((match) => `${match[1]}h`)),
       sizes: new Set([...normalizedValue.matchAll(/\b(\d+(?:\.\d+)?)\s*(ml|cl|l|g|kg|mg|tb|gb|mb|cm|mm)\b/g)].map((match) => `${match[1]}${match[2]}`)),
+      multipacks: extractMultipackVariants(normalizedValue, tokens),
       platforms: new Set([...normalizedValue.matchAll(/\bps[345]\b/g)].map((match) => match[0])),
       colors: new Set([...tokens].filter((token) => COLOR_VARIANT_TOKENS.has(token)))
     };
+  }
+  function extractMultipackVariants(normalizedValue, tokens) {
+    const multipacks = /* @__PURE__ */ new Set();
+    for (const match of normalizedValue.matchAll(/\b([2-9]\d?)\s*x\s*\d+(?:\.\d+)?\s*[- ]?\s*(?:ml|cl|l|g|kg|mg|stk|pcs|pk|pack)?\b/g)) {
+      multipacks.add(`${match[1]}x`);
+    }
+    for (const match of normalizedValue.matchAll(/\b([2-9]\d?)\s*(?:pack|pakning|pakninger|pakke|pk|stk|stykker)\b/g)) {
+      multipacks.add(`${match[1]}x`);
+    }
+    if (tokens.has("duo")) multipacks.add("2x");
+    if (tokens.has("trio")) multipacks.add("3x");
+    return multipacks;
   }
   const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
   const COLOR_VARIANT_TOKENS = /* @__PURE__ */ new Set(["hvit", "svart", "rod", "bla", "gronn", "gul", "rosa", "lilla", "solv", "gull", "gra", "brun", "oransje"]);
