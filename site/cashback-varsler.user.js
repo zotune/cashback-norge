@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780040931
+// @version      1780041973
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -567,8 +567,8 @@
   const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
   const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
   const KLARNA_OFFERS_URL = "https://www.klarna.com/no/api/product-detail-edge-rest/public/product-detail/v0/offers/NO";
-  const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/cl\d+\/(\d+)\//;
-  const BAD_AVAILABILITY_STATUSES$2 = /* @__PURE__ */ new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST"]);
+  const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
+  const BAD_AVAILABILITY_STATUSES$2 = /* @__PURE__ */ new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST", "TEMPORARILY_UNAVAILABLE"]);
   const BAD_STOCK_STATUSES$1 = /* @__PURE__ */ new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
   async function findKlarnaPriceMatch(message, requestJson = fetchJson$2) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {

@@ -7,8 +7,8 @@ import type { JsonRequest } from "./prisjakt-price-match.js";
 const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
 const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
 const KLARNA_OFFERS_URL = "https://www.klarna.com/no/api/product-detail-edge-rest/public/product-detail/v0/offers/NO";
-const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/cl\d+\/(\d+)\//;
-const BAD_AVAILABILITY_STATUSES = new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST"]);
+const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
+const BAD_AVAILABILITY_STATUSES = new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST", "TEMPORARILY_UNAVAILABLE"]);
 const BAD_STOCK_STATUSES = new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
 
 export async function findKlarnaPriceMatch(
