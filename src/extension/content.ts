@@ -4074,7 +4074,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
     ? priceMatch.alternatives
     : [{ shopName: priceMatch.shopName, price: priceMatch.price }];
   return [
-    `${getPriceMatchSourceName(priceMatch)} tilbud`,
+    `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
     ...alternatives.map(formatPriceMatchTooltipOffer),
   ].join("\n");
 }

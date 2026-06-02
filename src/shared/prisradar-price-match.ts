@@ -277,7 +277,9 @@ function buildLoosePrisradarTextQueries(searchTerm: string, anchorTerms: string[
 
 function buildPrisradarTextQueriesForSingleTerm(searchTerm: string): string[] {
   const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
+  const compactUnitSearchTerm = compactMeasurementUnitSpacing(normalizedSearchTerm);
   const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
+  const cleanedCompactUnitSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(compactUnitSearchTerm));
   const withoutSize = normalizedSearchTerm
     .replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ")
     .replace(/\s+/g, " ")
@@ -290,7 +292,9 @@ function buildPrisradarTextQueriesForSingleTerm(searchTerm: string): string[] {
 
   return uniqueStrings([
     normalizedSearchTerm,
+    compactUnitSearchTerm !== normalizedSearchTerm ? compactUnitSearchTerm : undefined,
     cleanedSearchTerm,
+    cleanedCompactUnitSearchTerm !== cleanedSearchTerm ? cleanedCompactUnitSearchTerm : undefined,
     withoutSize !== normalizedSearchTerm ? withoutSize : undefined,
     cleanedWithoutSize !== cleanedSearchTerm ? cleanedWithoutSize : undefined,
     cleanedWithoutStandaloneNumbers !== cleanedSearchTerm ? cleanedWithoutStandaloneNumbers : undefined,
@@ -312,7 +316,9 @@ function buildPrisradarSlugCandidates(message: GetPriceMatchForProductMessage): 
 
 function buildPrisradarSlugCandidatesForSingleTerm(searchTerm: string): string[] {
   const normalizedSearchTerm = normalizeProductPlatformAliases(searchTerm).trim().replace(/\s+/g, " ");
+  const compactUnitSearchTerm = compactMeasurementUnitSpacing(normalizedSearchTerm);
   const cleanedSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(normalizedSearchTerm));
+  const cleanedCompactUnitSearchTerm = removeDerivedAcronymTokens(cleanPrisradarSearchQuery(compactUnitSearchTerm));
   const withoutSize = normalizedSearchTerm
     .replace(/\b\d+(?:[.,]\d+)?\s*(?:ml|cl|l|g|kg|stk|pk|pack)\b/gi, " ")
     .replace(/\s+/g, " ")
@@ -321,7 +327,9 @@ function buildPrisradarSlugCandidatesForSingleTerm(searchTerm: string): string[]
 
   return uniqueStrings([
     slugifyPrisradarTitle(normalizedSearchTerm),
+    compactUnitSearchTerm !== normalizedSearchTerm ? slugifyPrisradarTitle(compactUnitSearchTerm) : undefined,
     slugifyPrisradarTitle(cleanedSearchTerm),
+    cleanedCompactUnitSearchTerm !== cleanedSearchTerm ? slugifyPrisradarTitle(cleanedCompactUnitSearchTerm) : undefined,
     withoutSize !== normalizedSearchTerm ? slugifyPrisradarTitle(withoutSize) : undefined,
     cleanedWithoutSize !== cleanedSearchTerm ? slugifyPrisradarTitle(cleanedWithoutSize) : undefined,
     slugifyPrisradarTitle(removeSearchNoiseTokens(cleanedSearchTerm)),
@@ -398,6 +406,10 @@ function cleanPrisradarSearchQuery(value: string): string {
     .replace(/\s+[-–—:|/]\s+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function compactMeasurementUnitSpacing(value: string): string {
+  return value.replace(/\b(\d+(?:[.,]\d+)?)\s+(ml|cl|l|g|kg|mg|tb|gb|mb|cm|mm)\b/gi, "$1$2");
 }
 
 function removeDerivedAcronymTokens(value: string): string {
@@ -514,15 +526,18 @@ type HardVariantGroups = {
   multipacks: Set<string>;
   platforms: Set<string>;
   colors: Set<string>;
+  storageAccessories: Set<string>;
 };
 
 function hasConflictingHardVariant(anchor: HardVariantGroups, title: HardVariantGroups): boolean {
   return (
     setsConflict(anchor.durations, title.durations) ||
     setsConflict(anchor.sizes, title.sizes) ||
+    hasMissingRequiredSizeConflict(anchor.sizes, title.sizes) ||
     hasMultipackConflict(anchor.multipacks, title.multipacks) ||
     setsConflict(anchor.platforms, title.platforms) ||
-    setsConflict(anchor.colors, title.colors)
+    setsConflict(anchor.colors, title.colors) ||
+    hasUnrequestedStorageAccessoryConflict(anchor, title)
   );
 }
 
@@ -536,6 +551,18 @@ function hasMultipackConflict(first: Set<string>, second: Set<string>): boolean 
   return ![...first].some((value) => second.has(value));
 }
 
+function hasMissingRequiredSizeConflict(anchorSizes: Set<string>, titleSizes: Set<string>): boolean {
+  return hasConsumableSize(anchorSizes) && !hasConsumableSize(titleSizes);
+}
+
+function hasConsumableSize(sizes: Set<string>): boolean {
+  return [...sizes].some((size) => /\d(?:ml|cl|l|g|kg|mg)$/.test(size));
+}
+
+function hasUnrequestedStorageAccessoryConflict(anchor: HardVariantGroups, title: HardVariantGroups): boolean {
+  return anchor.platforms.size > 0 && anchor.storageAccessories.size === 0 && title.storageAccessories.size > 0;
+}
+
 function extractHardVariantGroups(value: string): HardVariantGroups {
   const normalizedValue = normalizeProductPlatformAliases(value).toLowerCase().replace(/,/g, ".");
   const tokens = new Set(tokenizeMatchText(normalizedValue));
@@ -545,6 +572,7 @@ function extractHardVariantGroups(value: string): HardVariantGroups {
     multipacks: extractMultipackVariants(normalizedValue, tokens),
     platforms: new Set([...normalizedValue.matchAll(/\bps[345]\b/g)].map((match) => match[0])),
     colors: new Set([...tokens].filter((token) => COLOR_VARIANT_TOKENS.has(token))),
+    storageAccessories: new Set([...tokens].filter((token) => STORAGE_ACCESSORY_TOKENS.has(token))),
   };
 }
 
@@ -567,6 +595,7 @@ function extractMultipackVariants(normalizedValue: string, tokens: Set<string>):
 
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
 const COLOR_VARIANT_TOKENS = new Set(["hvit", "svart", "rod", "bla", "gronn", "gul", "rosa", "lilla", "solv", "gull", "gra", "brun", "oransje"]);
+const STORAGE_ACCESSORY_TOKENS = new Set(["ssd", "nvme", "pcie", "heatsink", "harddisk", "lagring", "storage", "memory", "minne"]);
 const SEARCH_NOISE_TOKENS = new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
 const GENERIC_PATH_SEGMENTS = new Set([
   "art",

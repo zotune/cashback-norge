@@ -4,6 +4,7 @@ import type {
 } from "./extension-messages.js";
 import { findGodprisPriceMatch } from "./godpris-price-match.js";
 import { findKlarnaPriceMatch } from "./klarna-price-match.js";
+import { scoreProductTitleAgainstSearchTerm } from "./product-title-match.js";
 import {
   findPrisjaktPriceMatch,
   type JsonRequest,
@@ -19,6 +20,8 @@ type TextRequest = (
   },
 ) => Promise<string | undefined>;
 
+const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
+
 export async function findPriceMatches(
   message: GetPriceMatchForProductMessage,
   requestJson?: JsonRequest,
@@ -33,24 +36,45 @@ export async function findPriceMatches(
 
   const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
-  const relaxedPrisradarOffer = prisradarOffer === undefined && isPriceMatchAllowedForCurrentPage(trustedOffers, message)
+  const trustedOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(trustedOffers, message);
+  const canUsePrisradarOffer =
+    trustedOffersMatchCurrentPage ||
+    isKnownPriceMatchSourceProductUrl(message.url) ||
+    isKnownPriceMatchSourceProductUrl(message.productUrl);
+  const relaxedPrisradarOffer = prisradarOffer === undefined && trustedOffersMatchCurrentPage
     ? await findPrisradarPriceMatch(message, requestJson, requestText, {
       allowLooseTextSearch: true,
       anchorSearchTerms: trustedOffers.map((offer) => offer.productName),
     })
     : undefined;
-  const offers = [...trustedOffers, prisradarOffer ?? relaxedPrisradarOffer]
+  const offers = [...trustedOffers, canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : undefined]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
+  const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
 
-  if (!isPriceMatchAllowedForCurrentPage(offers, message)) {
+  if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
     return [];
   }
 
-  return offers.sort((first, second) => {
+  return allowedOffers.sort((first, second) => {
       const amountDifference = first.amount - second.amount;
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
     });
+}
+
+function isPriceMatchOfferAllowedForCurrentPage(
+  offer: PriceMatchOffer,
+  message: GetPriceMatchForProductMessage,
+): boolean {
+  if (isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl)) {
+    return true;
+  }
+
+  if (offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message)) {
+    return true;
+  }
+
+  return scoreProductTitleAgainstSearchTerm(message.searchTerm, offer.productName) >= MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE;
 }
 
 export async function findPriceMatch(
