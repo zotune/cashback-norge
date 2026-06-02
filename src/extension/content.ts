@@ -4075,8 +4075,8 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
     : [{ shopName: priceMatch.shopName, price: priceMatch.price }];
   return [
     `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
-    ...alternatives.map(formatPriceMatchTooltipOffer),
-  ].join("\n");
+    alternatives.map(formatPriceMatchTooltipOffer).join("\n"),
+  ].join("\n\n");
 }
 function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "shippingPrice" | "totalPrice">): string {
   const shippingSuffix = offer.totalPrice !== undefined
