@@ -2086,6 +2086,12 @@ function renderNotice(
       background: #341083;
       color: #ffffff;
     }
+    .provider-psprices {
+      background: #2b2927;
+      color: #ffffff;
+      font-variant-caps: all-small-caps;
+      text-transform: lowercase;
+    }
     .provider-taxfree {
       background: #e3000f;
       color: #ffffff;
@@ -4534,12 +4540,12 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
 }
 function getRegionPriceSecondaryLink(
   regionPrice: PlayStationRegionPrice,
-): { label: string; provider: "gcdeals" | "region"; title: string; url: string } | undefined {
+): { label: string; provider: "gcdeals" | "psprices"; title: string; url: string } | undefined {
   if (regionPrice.region === "NO") {
     if (regionPrice.priceHistoryUrl === undefined) return undefined;
     return {
-      label: "PSPrices",
-      provider: "region",
+      label: "psprices",
+      provider: "psprices",
       title: "Åpne norsk prishistorikk hos PSPrices",
       url: regionPrice.priceHistoryUrl,
     };
