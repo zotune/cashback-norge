@@ -37,6 +37,9 @@ async function runKlarnaCrawl(
     : undefined;
 
   const crawler = new CheerioCrawler({
+    // Klarna often returns a 403 block page to direct requests. Let the handler
+    // parse it as an empty page so the caller can move on to proxy/app fallbacks.
+    useSessionPool: false,
     maxRequestsPerCrawl: input.maxPages,
     ...(proxyConfiguration ? { proxyConfiguration } : {}),
     requestHandler: async ({ $, request }) => {

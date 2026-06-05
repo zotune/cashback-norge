@@ -1,10 +1,16 @@
 import { copyFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildCashbackIndex, uniqueOffers } from "../shared/cashback.js";
+import {
+  buildCashbackIndex,
+  type CashbackOffer,
+  type CashbackProvider,
+  isCashbackIndex,
+  uniqueOffers,
+} from "../shared/cashback.js";
 import { buildDomainLookup } from "./domain-lookup.js";
 import { readDomainRedirects } from "./domain-redirects.js";
-import { writeJsonFile } from "./json-file.js";
-import { createConsoleLogger } from "./logger.js";
+import { readJsonFile, writeJsonFile } from "./json-file.js";
+import { createConsoleLogger, type Logger } from "./logger.js";
 import { readManualOffers } from "./manual-offers.js";
 import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
@@ -40,6 +46,8 @@ import { fetchUtdanningiBergen } from "./providers/utdanningibergen.js";
 import { fetchUnidays } from "./providers/unidays.js";
 import { crawlStudentTorget } from "./providers/studenttorget.js";
 import { fetchUnio } from "./providers/unio.js";
+
+const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
 type CliConfig = {
   outputPath: string;
@@ -112,6 +120,22 @@ async function main(): Promise<void> {
   const logger = createConsoleLogger();
   const config = readCliConfig(process.argv.slice(2));
   const generatedAt = new Date().toISOString();
+  const previousOffersByProvider = await readPreviousOffersByProvider(
+    config.outputPath,
+    logger,
+  );
+  const collectOffers = (
+    options: Omit<
+      CollectProviderOffersOptions,
+      "logger" | "previousOffersByProvider"
+    >,
+  ) => {
+    return collectProviderOffers({
+      ...options,
+      logger,
+      previousOffersByProvider,
+    });
+  };
   const manualOffers = await readManualOffers(config.manualOffersPath);
   const providerOverrides = await readProviderOverrides(
     config.providerOverridesPath,
@@ -133,52 +157,113 @@ async function main(): Promise<void> {
     unidaysOffers,
     unioOffers,
   ] = await Promise.all([
-    config.skipKlarna ? Promise.resolve([]) : crawlKlarna({
+    config.skipKlarna ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Klarna",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "klarna",
+      reusePreviousOnFailure: true,
+      run: () => crawlKlarna({
         generatedAt, logger, maxPages: config.klarnaMaxPages,
         overrides: providerOverrides, startUrl: config.klarnaStartUrl,
         proxyUrls: config.klarnaProxyUrls,
       }),
-    config.skipRemember ? Promise.resolve([]) : crawlRemember({
+    }),
+    config.skipRemember ? Promise.resolve([]) : collectOffers({
+      label: "re:member",
+      provider: "remember",
+      run: () => crawlRemember({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.rememberStartUrl,
       }),
-    config.skipTfBank ? Promise.resolve([]) : fetchTfBank({
+    }),
+    config.skipTfBank ? Promise.resolve([]) : collectOffers({
+      label: "TF Bank",
+      provider: "tfbank",
+      run: () => fetchTfBank({
         generatedAt, logger, apiUrl: config.tfBankApiUrl,
         overrides: providerOverrides,
       }),
-    config.skipDnb ? Promise.resolve([]) : fetchDnb({
+    }),
+    config.skipDnb ? Promise.resolve([]) : collectOffers({
+      label: "DNB",
+      provider: "dnb",
+      run: () => fetchDnb({
         generatedAt, logger, pageDataUrl: config.dnbPageDataUrl,
       }),
-    config.skipDnbSupertilbud ? Promise.resolve([]) : fetchDnbSupertilbud({
+    }),
+    config.skipDnbSupertilbud ? Promise.resolve([]) : collectOffers({
+      label: "DNB Supertilbud",
+      run: () => fetchDnbSupertilbud({
         generatedAt, logger, pageDataUrl: config.dnbSupertilbudPageDataUrl,
       }),
-    config.skipNorskfamilie ? Promise.resolve([]) : crawlNorskfamilie(),
-    config.skipObos ? Promise.resolve([]) : crawlObos({
+    }),
+    config.skipNorskfamilie ? Promise.resolve([]) : collectOffers({
+      label: "Norskfamilie",
+      provider: "norskfamilie",
+      run: () => crawlNorskfamilie(),
+    }),
+    config.skipObos ? Promise.resolve([]) : collectOffers({
+      label: "OBOS",
+      provider: "obos",
+      run: () => crawlObos({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.obosStartUrl,
       }),
-    config.skipBob ? Promise.resolve([]) : crawlBob({
+    }),
+    config.skipBob ? Promise.resolve([]) : collectOffers({
+      label: "BOB",
+      provider: "bob",
+      run: () => crawlBob({
         generatedAt, logger, overrides: providerOverrides, startUrl: config.bobStartUrl,
       }),
-    config.skipSparebank1 ? Promise.resolve([]) : crawlSparebank1({
+    }),
+    config.skipSparebank1 ? Promise.resolve([]) : collectOffers({
+      label: "SpareBank 1",
+      provider: "sparebank1",
+      run: () => crawlSparebank1({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         startUrl: config.sparebank1StartUrl,
       }),
-    config.skipSpareborsen ? Promise.resolve([]) : fetchSpareborsen({
+    }),
+    config.skipSpareborsen ? Promise.resolve([]) : collectOffers({
+      label: "Sparebørsen",
+      provider: "spareborsen",
+      run: () => fetchSpareborsen({
         generatedAt, logger,
       }),
-    config.skipDreams ? Promise.resolve([]) : fetchDreams({
+    }),
+    config.skipDreams ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Dreams",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "dreams",
+      reusePreviousOnFailure: true,
+      run: () => fetchDreams({
         generatedAt, logger,
       }),
-    config.skipUtdanningibergen ? Promise.resolve([]) : fetchUtdanningiBergen({
+    }),
+    config.skipUtdanningibergen ? Promise.resolve([]) : collectOffers({
+      label: "Utdanning i Bergen",
+      provider: "utdanningibergen",
+      run: () => fetchUtdanningiBergen({
         generatedAt, logger,
       }),
-    config.skipUnidays ? Promise.resolve([]) : fetchUnidays({
+    }),
+    config.skipUnidays ? Promise.resolve([]) : collectOffers({
+      label: "UNiDAYS",
+      provider: "unidays",
+      run: () => fetchUnidays({
         generatedAt, logger,
       }),
-    config.skipUnio ? Promise.resolve([]) : fetchUnio({
+    }),
+    config.skipUnio ? Promise.resolve([]) : collectOffers({
+      label: "Unio",
+      provider: "unio",
+      run: () => fetchUnio({
         generatedAt, logger,
       }),
+    }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -222,80 +307,151 @@ async function main(): Promise<void> {
     rabbleOffers,
     studentTorgetOffers,
   ] = await Promise.all([
-    config.skipTrumf ? Promise.resolve([]) : crawlTrumf({
+    config.skipTrumf ? Promise.resolve([]) : collectOffers({
+      label: "Trumf",
+      provider: "trumf",
+      run: () => crawlTrumf({
         generatedAt, logger, maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.trumfStartUrl, domainLookup,
       }),
-    config.skipSas ? Promise.resolve([]) : fetchSas({
+    }),
+    config.skipSas ? Promise.resolve([]) : collectOffers({
+      label: "SAS",
+      provider: "sas",
+      run: () => fetchSas({
         generatedAt, logger, overrides: providerOverrides,
         apiUrl: config.sasApiUrl, domainLookup,
       }),
-    Promise.resolve(config.skipCurve ? [] : fetchCurve({ generatedAt, logger })),
-    config.skipRabattkode ? Promise.resolve([]) : crawlRabattkode(),
-    config.skipCuponation ? Promise.resolve([]) : crawlCuponation({
+    }),
+    config.skipCurve ? Promise.resolve([]) : collectOffers({
+      label: "Curve",
+      provider: "curve",
+      run: () => fetchCurve({ generatedAt, logger }),
+    }),
+    config.skipRabattkode ? Promise.resolve([]) : collectOffers({
+      label: "Rabattkode",
+      run: () => crawlRabattkode(),
+    }),
+    config.skipCuponation ? Promise.resolve([]) : collectOffers({
+      label: "CupoNation",
+      run: () => crawlCuponation({
         generatedAt, logger, startUrl: config.cuponationStartUrl,
       }),
-    config.skipTrustdeals ? Promise.resolve([]) : crawlTrustdeals({
+    }),
+    config.skipTrustdeals ? Promise.resolve([]) : collectOffers({
+      label: "TrustDeals",
+      run: () => crawlTrustdeals({
         generatedAt, logger, startUrl: config.trustdealsStartUrl,
       }),
-    config.skipKickback ? Promise.resolve([]) : crawlKickback({
+    }),
+    config.skipKickback ? Promise.resolve([]) : collectOffers({
+      label: "Kickback",
+      run: () => crawlKickback({
         domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl, startUrl: config.kickbackStartUrl,
       }),
-    config.skipFinnkupongkoder ? Promise.resolve([]) : crawlFinnkupongkoder({
+    }),
+    config.skipFinnkupongkoder ? Promise.resolve([]) : collectOffers({
+      label: "FinnKupongkoder",
+      run: () => crawlFinnkupongkoder({
         generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl, startUrl: config.finnkupongkoderStartUrl,
         proxyUrls: config.finnkupongkoderProxyUrls,
       }),
-    config.skipLogbuy ? Promise.resolve([]) : crawlLogbuy({
+    }),
+    config.skipLogbuy ? Promise.resolve([]) : collectOffers({
+      label: "LogBuy",
+      provider: "logbuy",
+      run: () => crawlLogbuy({
         domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.logbuyStartUrl,
       }),
-    config.skipUsbl ? Promise.resolve([]) : crawlUsbl({
+    }),
+    config.skipUsbl ? Promise.resolve([]) : collectOffers({
+      label: "USBL",
+      provider: "usbl",
+      run: () => crawlUsbl({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.usblStartUrl,
       }),
-    config.skipBate ? Promise.resolve([]) : crawlBate({
+    }),
+    config.skipBate ? Promise.resolve([]) : collectOffers({
+      label: "Bate",
+      provider: "bate",
+      run: () => crawlBate({
         domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.bateStartUrl,
       }),
-    config.skipTobb ? Promise.resolve([]) : crawlTobb({
+    }),
+    config.skipTobb ? Promise.resolve([]) : collectOffers({
+      label: "TOBB",
+      provider: "tobb",
+      run: () => crawlTobb({
         domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.tobbStartUrl,
       }),
-    config.skipNaf ? Promise.resolve([]) : crawlNaf({
+    }),
+    config.skipNaf ? Promise.resolve([]) : collectOffers({
+      label: "NAF",
+      provider: "naf",
+      run: () => crawlNaf({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.nafStartUrl,
       }),
-    config.skipTekna ? Promise.resolve([]) : crawlTekna({
+    }),
+    config.skipTekna ? Promise.resolve([]) : collectOffers({
+      label: "Tekna",
+      provider: "tekna",
+      run: () => crawlTekna({
         domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.teknaStartUrl,
       }),
-    config.skipNito ? Promise.resolve([]) : crawlNito({
+    }),
+    config.skipNito ? Promise.resolve([]) : collectOffers({
+      label: "NITO",
+      provider: "nito",
+      run: () => crawlNito({
         domainLookup, generatedAt, logger,
         maxRequestsPerCrawl: config.maxRequestsPerCrawl,
         overrides: providerOverrides, startUrl: config.nitoStartUrl,
       }),
-    config.skipStudentkortet ? Promise.resolve([]) : crawlStudentkortet({
+    }),
+    config.skipStudentkortet ? Promise.resolve([]) : collectOffers({
+      label: "Studentkortet",
+      provider: "studentkortet",
+      run: () => crawlStudentkortet({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.studentkortetStartUrl,
       }),
-    config.skipNettbonus ? Promise.resolve([]) : crawlNettbonus({
+    }),
+    config.skipNettbonus ? Promise.resolve([]) : collectOffers({
+      label: "Nettbonus",
+      provider: "nettbonus",
+      run: () => crawlNettbonus({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.nettbonusStartUrl,
       }),
-    config.skipRabble ? Promise.resolve([]) : crawlRabble({
+    }),
+    config.skipRabble ? Promise.resolve([]) : collectOffers({
+      label: "Rabble",
+      provider: "rabble",
+      run: () => crawlRabble({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides,
       }),
-    config.skipStudentTorget ? Promise.resolve([]) : crawlStudentTorget({
+    }),
+    config.skipStudentTorget ? Promise.resolve([]) : collectOffers({
+      label: "StudentTorget",
+      provider: "studenttorget",
+      run: () => crawlStudentTorget({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides,
       }),
+    }),
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
@@ -311,8 +467,12 @@ async function main(): Promise<void> {
   ]);
   logger.info(`Full domain lookup: ${fullDomainLookup.size} merchant names with known domains`);
 
-  const spennOffers = config.skipSpenn ? [] : await fetchSpenn({
-    domainLookup: fullDomainLookup, generatedAt, logger,
+  const spennOffers = config.skipSpenn ? [] : await collectOffers({
+    label: "Spenn",
+    provider: "spenn",
+    run: () => fetchSpenn({
+      domainLookup: fullDomainLookup, generatedAt, logger,
+    }),
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
   const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...studentTorgetOffers]);
@@ -521,3 +681,157 @@ main().catch((error: unknown) => {
   logger.error(message);
   process.exitCode = 1;
 });
+
+type CollectProviderOffersOptions = {
+  fallbackWhenEmpty?: boolean;
+  label: string;
+  logger: Logger;
+  maxPreviousOfferAgeDays?: number;
+  previousOffersByProvider: ReadonlyMap<CashbackProvider, CashbackOffer[]>;
+  provider?: CashbackProvider;
+  reusePreviousOnFailure?: boolean;
+  run: () => CashbackOffer[] | Promise<CashbackOffer[]>;
+};
+
+async function collectProviderOffers(
+  options: CollectProviderOffersOptions,
+): Promise<CashbackOffer[]> {
+  let offers: CashbackOffer[];
+
+  try {
+    offers = await options.run();
+  } catch (error) {
+    const message = formatError(error);
+    const previousOffers = getReusablePreviousOffers(
+      options,
+      `failed (${message})`,
+    );
+    if (previousOffers !== undefined) {
+      return previousOffers;
+    }
+
+    throw new Error(`${options.label}: failed (${message})`);
+  }
+
+  if (
+    offers.length === 0 &&
+    options.fallbackWhenEmpty === true &&
+    options.provider !== undefined
+  ) {
+    const previousOffers = getReusablePreviousOffers(
+      options,
+      "produced no offers",
+    );
+    if (previousOffers !== undefined) {
+      return previousOffers;
+    }
+  }
+
+  return offers;
+}
+
+function getReusablePreviousOffers(
+  options: CollectProviderOffersOptions,
+  reason: string,
+): CashbackOffer[] | undefined {
+  if (
+    options.reusePreviousOnFailure !== true ||
+    options.provider === undefined
+  ) {
+    return undefined;
+  }
+
+  const previousOffers =
+    options.previousOffersByProvider.get(options.provider) ?? [];
+  if (previousOffers.length === 0) {
+    throw new Error(
+      `${options.label}: ${reason}; no previous offers available for fallback`,
+    );
+  }
+
+  const newestUpdatedAt = readNewestUpdatedAt(previousOffers);
+  if (newestUpdatedAt === undefined) {
+    throw new Error(
+      `${options.label}: ${reason}; previous offers have no valid updatedAt for fallback`,
+    );
+  }
+
+  const ageMs = Date.now() - newestUpdatedAt.getTime();
+  const maxAgeDays = options.maxPreviousOfferAgeDays;
+  if (
+    maxAgeDays !== undefined &&
+    ageMs > maxAgeDays * 24 * 60 * 60 * 1000
+  ) {
+    throw new Error(
+      `${options.label}: ${reason}; previous offers are ${formatAge(ageMs)} old, above the ${maxAgeDays} day fallback limit`,
+    );
+  }
+
+  options.logger.warn(
+    `${options.label}: ${reason}; keeping ${previousOffers.length} offers from previous index (${formatAge(ageMs)} old)`,
+  );
+  return previousOffers;
+}
+
+async function readPreviousOffersByProvider(
+  filePath: string,
+  logger: Logger,
+): Promise<Map<CashbackProvider, CashbackOffer[]>> {
+  try {
+    const value = await readJsonFile(filePath);
+    if (!isCashbackIndex(value)) {
+      logger.warn(`Previous cashback index is invalid; provider fallback disabled for ${filePath}`);
+      return new Map();
+    }
+
+    const offersByProvider = new Map<CashbackProvider, CashbackOffer[]>();
+    for (const offer of value.offers) {
+      const existingOffers = offersByProvider.get(offer.provider) ?? [];
+      offersByProvider.set(offer.provider, [...existingOffers, offer]);
+    }
+
+    logger.info(
+      `Loaded previous cashback index fallback data for ${offersByProvider.size} providers`,
+    );
+    return offersByProvider;
+  } catch (error) {
+    logger.warn(
+      `Previous cashback index unavailable; provider fallback disabled for ${filePath}: ${formatError(error)}`,
+    );
+    return new Map();
+  }
+}
+
+function readNewestUpdatedAt(offers: CashbackOffer[]): Date | undefined {
+  let newestTime = Number.NEGATIVE_INFINITY;
+
+  for (const offer of offers) {
+    const time = Date.parse(offer.updatedAt);
+    if (Number.isFinite(time) && time > newestTime) {
+      newestTime = time;
+    }
+  }
+
+  return newestTime === Number.NEGATIVE_INFINITY
+    ? undefined
+    : new Date(newestTime);
+}
+
+function formatAge(ageMs: number): string {
+  if (ageMs < 0) {
+    return "0 days";
+  }
+
+  const ageDays = ageMs / (24 * 60 * 60 * 1000);
+  if (ageDays < 1) {
+    const ageHours = Math.max(1, Math.round(ageMs / (60 * 60 * 1000)));
+    return `${ageHours} hour${ageHours === 1 ? "" : "s"}`;
+  }
+
+  const roundedDays = Math.round(ageDays * 10) / 10;
+  return `${roundedDays} day${roundedDays === 1 ? "" : "s"}`;
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
