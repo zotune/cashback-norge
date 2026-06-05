@@ -31,6 +31,23 @@ type PlayStationRegionPriceEntry = PlayStationRegionPrice & {
   productName?: string;
 };
 
+type PlayStationProductResolution = {
+  productId: string;
+  conceptId?: string;
+};
+
+type PlayStationOffer = {
+  name?: string;
+  price: number;
+  currency: string;
+};
+
+type PlayStationResolvedRegionOffer = {
+  productId: string;
+  productUrl: string;
+  offer: PlayStationOffer;
+};
+
 type TextRequest = (url: string) => Promise<string | undefined>;
 type JsonRequest = (url: string) => Promise<unknown | undefined>;
 
@@ -126,8 +143,8 @@ export async function findPlayStationRegionPrices(
   textRequest: TextRequest = defaultTextRequest,
   jsonRequest: JsonRequest = defaultJsonRequest,
 ): Promise<PlayStationRegionPriceResult | undefined> {
-  const productId = await resolvePlayStationProductId(productUrl, textRequest);
-  if (productId === undefined) {
+  const product = await resolvePlayStationProduct(productUrl, textRequest);
+  if (product === undefined) {
     return undefined;
   }
 
@@ -138,17 +155,12 @@ export async function findPlayStationRegionPrices(
   }
 
   const entries = await mapWithConcurrency(PLAYSTATION_REGIONS, 5, async (region) => {
-    const localizedUrl = `https://store.playstation.com/${region.locale}/product/${encodeURIComponent(productId)}`;
-    const html = await textRequest(localizedUrl);
-    if (html === undefined) {
+    const regionOffer = await resolvePlayStationRegionOffer(product, region, textRequest);
+    if (regionOffer === undefined) {
       return undefined;
     }
 
-    const offer = extractPlayStationOffer(html);
-    if (offer === undefined) {
-      return undefined;
-    }
-
+    const { offer } = regionOffer;
     const nokRate = offer.currency === "NOK" ? 1 : rates.rates[offer.currency];
     if (typeof nokRate !== "number" || nokRate <= 0) {
       return undefined;
@@ -165,7 +177,7 @@ export async function findPlayStationRegionPrices(
       formattedPrice: formatCurrency(offer.price, offer.currency, region.locale),
       nokAmount,
       formattedNok: formatCurrency(nokAmount, "NOK", "nb-NO"),
-      productUrl: localizedUrl,
+      productUrl: regionOffer.productUrl,
     };
     if (offer.name !== undefined) {
       entry.productName = offer.name;
@@ -189,7 +201,7 @@ export async function findPlayStationRegionPrices(
   }
 
   const result: PlayStationRegionPriceResult = {
-    productId,
+    productId: product.productId,
     fetchedAt: new Date().toISOString(),
     ...(rates.updatedAt !== undefined ? { ratesUpdatedAt: rates.updatedAt } : {}),
     prices,
@@ -222,25 +234,108 @@ function buildPsPricesNorwaySearchUrl(productName: string): string {
   return `https://psprices.com/region-no/games/?q=${encodeURIComponent(productName)}`;
 }
 
-async function resolvePlayStationProductId(
+async function resolvePlayStationProduct(
   productUrl: string,
   textRequest: TextRequest,
-): Promise<string | undefined> {
-  const productId = parsePlayStationProductId(productUrl);
-  if (productId !== undefined) {
-    return productId;
-  }
+): Promise<PlayStationProductResolution | undefined> {
+  const directProductId = parsePlayStationProductId(productUrl);
+  const conceptIdFromUrl = parsePlayStationConceptId(productUrl);
 
-  if (parsePlayStationConceptId(productUrl) === undefined && !isPlayStationWebGamePageUrl(productUrl)) {
+  if (directProductId === undefined && conceptIdFromUrl === undefined && !isPlayStationWebGamePageUrl(productUrl)) {
     return undefined;
   }
 
   const html = await textRequest(productUrl);
+  if (directProductId !== undefined && html === undefined) {
+    return { productId: directProductId };
+  }
   if (html === undefined) {
     return undefined;
   }
 
-  return extractPlayStationProductIdFromDataProductInfo(html) ?? extractPlayStationSku(html) ?? extractFirstProductIdFromHtml(html);
+  const productId =
+    directProductId ??
+    extractPlayStationProductIdFromDataProductInfo(html) ??
+    extractPlayStationSku(html) ??
+    extractFirstProductIdFromHtml(html);
+  if (productId === undefined) {
+    return undefined;
+  }
+
+  const conceptId =
+    conceptIdFromUrl ??
+    extractPlayStationConceptIdFromDataProductInfo(html) ??
+    extractPlayStationConceptIdFromHtml(html);
+
+  return {
+    productId,
+    ...(conceptId !== undefined ? { conceptId } : {}),
+  };
+}
+
+async function resolvePlayStationRegionOffer(
+  product: PlayStationProductResolution,
+  region: PlayStationRegion,
+  textRequest: TextRequest,
+): Promise<PlayStationResolvedRegionOffer | undefined> {
+  const localizedProductUrl = buildPlayStationProductUrl(region.locale, product.productId);
+  const localizedHtml = await textRequest(localizedProductUrl);
+  const localizedOffer = localizedHtml !== undefined ? extractPlayStationOffer(localizedHtml) : undefined;
+  if (localizedOffer !== undefined) {
+    return {
+      productId: product.productId,
+      productUrl: localizedProductUrl,
+      offer: localizedOffer,
+    };
+  }
+
+  if (product.conceptId === undefined) {
+    return undefined;
+  }
+
+  const localizedConceptUrl = buildPlayStationConceptUrl(region.locale, product.conceptId);
+  const conceptHtml = await textRequest(localizedConceptUrl);
+  if (conceptHtml === undefined) {
+    return undefined;
+  }
+
+  const regionalProductId =
+    extractPlayStationSku(conceptHtml) ??
+    extractPlayStationProductIdFromDataProductInfo(conceptHtml) ??
+    extractFirstProductIdFromHtml(conceptHtml);
+  if (regionalProductId === undefined) {
+    return undefined;
+  }
+
+  const regionalProductUrl = buildPlayStationProductUrl(region.locale, regionalProductId);
+  const conceptOffer = extractPlayStationOffer(conceptHtml);
+  if (conceptOffer !== undefined) {
+    return {
+      productId: regionalProductId,
+      productUrl: regionalProductUrl,
+      offer: conceptOffer,
+    };
+  }
+
+  const regionalHtml = regionalProductId === product.productId ? localizedHtml : await textRequest(regionalProductUrl);
+  const regionalOffer = regionalHtml !== undefined ? extractPlayStationOffer(regionalHtml) : undefined;
+  if (regionalOffer === undefined) {
+    return undefined;
+  }
+
+  return {
+    productId: regionalProductId,
+    productUrl: regionalProductUrl,
+    offer: regionalOffer,
+  };
+}
+
+function buildPlayStationProductUrl(locale: string, productId: string): string {
+  return `https://store.playstation.com/${locale}/product/${encodeURIComponent(productId)}`;
+}
+
+function buildPlayStationConceptUrl(locale: string, conceptId: string): string {
+  return `https://store.playstation.com/${locale}/concept/${encodeURIComponent(conceptId)}`;
 }
 
 function extractPlayStationProductIdFromDataProductInfo(html: string): string | undefined {
@@ -255,6 +350,24 @@ function extractPlayStationProductIdFromDataProductInfo(html: string): string | 
     const productId = readProductId(parsed);
     if (productId !== undefined) {
       return productId;
+    }
+  }
+
+  return undefined;
+}
+
+function extractPlayStationConceptIdFromDataProductInfo(html: string): string | undefined {
+  const productInfoMatches = html.matchAll(/\bdata-product-info=(["'])([\s\S]*?)\1/gi);
+  for (const match of productInfoMatches) {
+    const rawValue = match[2];
+    if (rawValue === undefined || rawValue.length === 0) {
+      continue;
+    }
+
+    const parsed = parseJson(decodeHtmlAttribute(rawValue));
+    const conceptId = readConceptId(parsed);
+    if (conceptId !== undefined) {
+      return conceptId;
     }
   }
 
@@ -279,6 +392,37 @@ function readProductId(value: unknown): string | undefined {
   }
 
   return readProductId(value.skus);
+}
+
+function readConceptId(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const conceptId = readConceptId(entry);
+      if (conceptId !== undefined) return conceptId;
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const rawConceptId = value.conceptId;
+  if (typeof rawConceptId === "string" && /^\d+$/.test(rawConceptId)) {
+    return rawConceptId;
+  }
+  if (typeof rawConceptId === "number" && Number.isInteger(rawConceptId) && rawConceptId > 0) {
+    return String(rawConceptId);
+  }
+
+  for (const nestedValue of Object.values(value)) {
+    const conceptId = readConceptId(nestedValue);
+    if (conceptId !== undefined) {
+      return conceptId;
+    }
+  }
+
+  return undefined;
 }
 
 function extractPlayStationSku(html: string): string | undefined {
@@ -321,7 +465,12 @@ function extractFirstProductIdFromHtml(html: string): string | undefined {
   return productMatch?.[1];
 }
 
-function extractPlayStationOffer(html: string): { name?: string; price: number; currency: string } | undefined {
+function extractPlayStationConceptIdFromHtml(html: string): string | undefined {
+  const conceptMatch = html.match(/\\?["']?conceptId\\?["']?\s*:\s*\\?["']?(\d{4,})/i);
+  return conceptMatch?.[1];
+}
+
+function extractPlayStationOffer(html: string): PlayStationOffer | undefined {
   const jsonScripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
   for (const script of jsonScripts) {
     const bodyMatch = script.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
@@ -348,7 +497,7 @@ function extractPlayStationOffer(html: string): { name?: string; price: number; 
   return undefined;
 }
 
-function readProductOffer(value: unknown): { name?: string; price: number; currency: string } | undefined {
+function readProductOffer(value: unknown): PlayStationOffer | undefined {
   if (Array.isArray(value)) {
     for (const entry of value) {
       const offer = readProductOffer(entry);

@@ -34,7 +34,7 @@ type CachedIndex = {
 const STORAGE_KEY = "cashback-index";
 const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
-const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v2";
+const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v3";
 const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 chrome.runtime.onInstalled.addListener(() => {
