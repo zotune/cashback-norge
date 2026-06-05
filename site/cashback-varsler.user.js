@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780671818
+// @version      1780687002
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -217,6 +217,8 @@
     { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
     { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
+    { text: "JujuKrypto: 100 kr gratis i NOK", emoji: "₿", url: "https://jujukrypto.no/referral/L1BsViuhUjJhvngHiroC", affiliate: true },
+    { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
     { text: "Sparebørsen: 50 kr settes inn med en gang du registrerer deg", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
@@ -5652,6 +5654,16 @@ query SearchSuggestions($query: String!, $category: Int) {
       background: #2d2f42;
       color: #ffffff;
     }
+    .provider-gcdeals {
+      background: #341083;
+      color: #ffffff;
+    }
+    .provider-psprices {
+      background: #2b2927;
+      color: #ffffff;
+      font-variant-caps: normal;
+      text-transform: none;
+    }
     .provider-taxfree {
       background: #e3000f;
       color: #ffffff;
@@ -6079,6 +6091,19 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .region-price-card {
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .region-price-card-with-action {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+    .region-price-main {
+      color: inherit;
+      display: contents;
+      text-decoration: none;
+    }
+    .region-price-action {
+      justify-self: end;
+      text-decoration: none;
+      white-space: nowrap;
     }
     .price-match-card.price-match-card--best .price-match-product,
     .price-match-card.price-match-card--best .price-match-price,
@@ -7869,12 +7894,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return priceMatchCard;
   }
   function buildRegionPriceCard(regionPrice, isBest = false) {
-    const regionPriceCard = document.createElement("a");
+    const regionPriceCard = document.createElement("div");
     regionPriceCard.className = "region-price-card";
     if (isBest) regionPriceCard.classList.add("region-price-card--best");
-    regionPriceCard.href = getRegionPriceLink(regionPrice);
-    regionPriceCard.target = "_blank";
-    regionPriceCard.rel = "noreferrer";
+    const regionPriceMain = document.createElement("a");
+    regionPriceMain.className = "region-price-main";
+    regionPriceMain.href = regionPrice.productUrl;
+    regionPriceMain.target = "_blank";
+    regionPriceMain.rel = "noreferrer";
+    regionPriceMain.title = `Åpne ${regionPrice.countryName} i PlayStation Store`;
     const regionPriceTitle = document.createElement("span");
     regionPriceTitle.className = "region-price-title";
     const regionPriceCountry = document.createElement("span");
@@ -7887,14 +7915,38 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const regionPriceNok = document.createElement("span");
     regionPriceNok.className = "region-price-nok";
     regionPriceNok.textContent = regionPrice.formattedNok;
-    regionPriceCard.append(regionPriceTitle, regionPriceNok);
+    regionPriceMain.append(regionPriceTitle, regionPriceNok);
+    regionPriceCard.append(regionPriceMain);
+    const secondaryLink = getRegionPriceSecondaryLink(regionPrice);
+    if (secondaryLink !== void 0) {
+      regionPriceCard.classList.add("region-price-card-with-action");
+      const regionPriceAction = document.createElement("a");
+      regionPriceAction.className = `provider-badge provider-${secondaryLink.provider} region-price-action`;
+      regionPriceAction.href = secondaryLink.url;
+      regionPriceAction.target = "_blank";
+      regionPriceAction.rel = "noreferrer";
+      regionPriceAction.title = secondaryLink.title;
+      regionPriceAction.textContent = secondaryLink.label;
+      regionPriceCard.append(regionPriceAction);
+    }
     return regionPriceCard;
   }
-  function getRegionPriceLink(regionPrice) {
+  function getRegionPriceSecondaryLink(regionPrice) {
     if (regionPrice.region === "NO") {
-      return regionPrice.priceHistoryUrl ?? regionPrice.productUrl;
+      if (regionPrice.priceHistoryUrl === void 0) return void 0;
+      return {
+        label: "psprices",
+        provider: "psprices",
+        title: "Åpne norsk prishistorikk hos PSPrices",
+        url: regionPrice.priceHistoryUrl
+      };
     }
-    return PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL;
+    return {
+      label: "GC Deals",
+      provider: "gcdeals",
+      title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GC Deals`,
+      url: PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL
+    };
   }
   function buildRegionPricesTooltip(regionPrices) {
     const rateLine = regionPrices.ratesUpdatedAt !== void 0 ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
@@ -7902,8 +7954,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
       "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
       "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
-      "Norge-raden åpner PSPrices for norsk prishistorikk.",
-      "Ikke-norske rader åpner GCDeals for PSN-gavekort i valgt region når vi har direkte lenke.",
+      "Regionraden åpner spillet i regional PlayStation Store.",
+      "GC Deals-chipen åpner PSN-gavekort i valgt region.",
+      "PSPrices-chipen åpner norsk prishistorikk.",
       rateLine
     ].join("\n");
   }
