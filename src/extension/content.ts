@@ -218,7 +218,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   shopName: string;
@@ -308,6 +308,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "hintaopas.fi",
   "ledenicheur.fr",
   "godpris.no",
+  "tax-free.no",
   "klarna.com",
   "kelkoo.no",
   "prisradar.no",
@@ -381,7 +382,7 @@ function requestCurrentOffers(): void {
 
 function installDynamicProductPageRefresh(): void {
   const parsedUrl = parseUrl(window.location.href);
-  if (parsedUrl === undefined || parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "vinmonopolet.no") {
+  if (parsedUrl === undefined || !isDynamicPriceMatchHost(parsedUrl)) {
     return;
   }
 
@@ -400,7 +401,7 @@ function installDynamicProductPageRefresh(): void {
 
     timerId = window.setTimeout(() => {
       const currentUrl = parseUrl(window.location.href);
-      if (currentUrl === undefined || !isVinmonopoletProductPage(currentUrl)) {
+      if (currentUrl === undefined || !isDynamicPriceMatchProductPage(currentUrl)) {
         latestMetaKey = "";
         return;
       }
@@ -708,6 +709,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   const codes = collectProductCodes(productLdJson);
   const productPageClue =
     isVinmonopoletProductPage(parsedUrl) ||
+    isTaxfreeProductPage(parsedUrl) ||
     hasProductStructuredDataSignal(productLdJson, offer, codes) ||
     (document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal())) ||
     codes.length > 0 ||
@@ -816,6 +818,10 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
     return /^\/produkt\/[^/]+\/?$/.test(pathname);
   }
 
+  if (hostname.endsWith("tax-free.no")) {
+    return /^\/(?:no\/)?product\d+(?:\/|$)/.test(pathname);
+  }
+
   if (hostname.endsWith("klarna.com")) {
     return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
   }
@@ -840,6 +846,20 @@ function isVinmonopoletProductPage(parsedUrl: URL): boolean {
   return hostname === "vinmonopolet.no" && /\/p\/\d+(?:\/|$)/i.test(parsedUrl.pathname);
 }
 
+function isTaxfreeProductPage(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(parsedUrl.pathname);
+}
+
+function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
+  return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl);
+}
+
+function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return hostname === "vinmonopolet.no" || hostname === "tax-free.no";
+}
+
 function readVinmonopoletProductName(parsedUrl: URL, h1: string | undefined): string | undefined {
   if (!isVinmonopoletProductPage(parsedUrl)) return undefined;
   if (h1 !== undefined && h1.length >= 3 && h1.length <= 80) return h1;
@@ -859,6 +879,10 @@ function readVinmonopoletProductName(parsedUrl: URL, h1: string | undefined): st
 }
 
 function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
+  if (isTaxfreeProductPage(parsedUrl)) {
+    return true;
+  }
+
   if (isSteamAppProductUrl(parsedUrl.toString())) {
     return true;
   }
@@ -2061,6 +2085,10 @@ function renderNotice(
     .provider-taxfree {
       background: #e3000f;
       color: #ffffff;
+    }
+    .provider-vinmonopolet {
+      background: #dff4eb;
+      color: #092f33;
     }
     .provider-region {
       background: #eaf7ef;
@@ -4157,7 +4185,7 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     typeof value.shopName === "string" &&
@@ -4492,6 +4520,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "prisradar") return "prisradar";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   if (priceMatch.source === "taxfree") return "taxfree";
+  if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
   return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
@@ -4501,6 +4530,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "prisradar") return "Prisradar";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   if (priceMatch.source === "taxfree") return "Tax Free";
+  if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {

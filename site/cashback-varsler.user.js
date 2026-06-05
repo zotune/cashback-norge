@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780669230
+// @version      1780671818
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -2273,8 +2273,10 @@ query SearchSuggestions($query: String!, $category: Int) {
   const VINMONOPOLET_ORIGIN = "https://www.vinmonopolet.no";
   const TAXFREE_IDENTIFIER_LOOKUP_LIMIT = 4;
   const VINMONOPOLET_BARCODE_LOOKUP_LIMIT = 12;
+  const VINMONOPOLET_SEARCH_LOOKUP_LIMIT = 20;
   const MIN_TAXFREE_TITLE_MATCH_SCORE = 0.7;
   const MIN_TAXFREE_SAME_VOLUME_TITLE_MATCH_SCORE = 0.55;
+  const MIN_VINMONOPOLET_TITLE_MATCH_SCORE = 0.65;
   async function findTaxfreePriceMatch(message, requestJson = fetchJson) {
     if (!isVinmonopoletProductUrl(message.url)) {
       return void 0;
@@ -2326,12 +2328,33 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: best.productUrl
     };
   }
+  async function findVinmonopoletPriceMatch(message, requestJson = fetchJson) {
+    if (!isTaxfreeProductUrl(message.url)) {
+      return void 0;
+    }
+    const currentTaxfreeCandidate = await findCurrentTaxfreeCandidate(message, requestJson);
+    if (currentTaxfreeCandidate === void 0) {
+      return void 0;
+    }
+    const vinmonopoletOffer = await findVinmonopoletOfferForTaxfreeCandidate(currentTaxfreeCandidate, requestJson);
+    return vinmonopoletOffer !== void 0 ? buildVinmonopoletPriceMatchOffer(vinmonopoletOffer) : void 0;
+  }
   function isVinmonopoletProductUrl(rawUrl) {
     if (rawUrl === void 0) return false;
     try {
       const url = new URL(rawUrl);
       const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
       return hostname === "vinmonopolet.no" && /\/p\/\d+(?:\/|$)/i.test(url.pathname);
+    } catch {
+      return false;
+    }
+  }
+  function isTaxfreeProductUrl(rawUrl) {
+    if (rawUrl === void 0) return false;
+    try {
+      const url = new URL(rawUrl);
+      const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+      return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(url.pathname);
     } catch {
       return false;
     }
@@ -2355,6 +2378,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (message.volumeMl !== void 0 && volumeMl !== void 0 && !hasMatchingVolume) {
       return void 0;
     }
+    const vintageYear = readVintageYear(readLocalizedString(value.year) ?? readString(value.year));
+    const messageVintageYear = readVintageYear(cleanTaxfreeSearchTerm(message.searchTerm)) ?? readVintageYear(readVinmonopoletProductSlugSearchTerm(message.url));
+    if (!hasCompatibleVintage(messageVintageYear, vintageYear)) {
+      return void 0;
+    }
     const title = withLeadingBrand(productName, brandName);
     const matchTerms = buildTaxfreeMatchTerms(message);
     const score = Math.max(
@@ -2372,6 +2400,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (message.alcoholPercent !== void 0 && alcoholPercent !== void 0 && Math.abs(message.alcoholPercent - alcoholPercent) > 0.5) {
       return void 0;
     }
+    const productCode = readTaxfreeProductCode(productUrl);
     return {
       amount,
       ...alcoholPercent !== void 0 ? { alcoholPercent } : {},
@@ -2379,11 +2408,110 @@ query SearchSuggestions($query: String!, $category: Int) {
       identifiers,
       identifierMatch,
       productName,
+      ...productCode !== void 0 ? { productCode } : {},
       productUrl,
       score: identifierMatch ? Math.max(score, 1) : score,
       titlePass,
+      ...vintageYear !== void 0 ? { vintageYear } : {},
       ...volumeMl !== void 0 ? { volumeMl } : {}
     };
+  }
+  async function findCurrentTaxfreeCandidate(message, requestJson) {
+    const queries = buildCurrentTaxfreeProductQueries(message);
+    if (queries.length === 0) {
+      return void 0;
+    }
+    const response = await requestJson(TAXFREE_ALGOLIA_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Algolia-API-Key": TAXFREE_ALGOLIA_API_KEY,
+        "X-Algolia-Application-Id": TAXFREE_ALGOLIA_APP_ID
+      },
+      body: JSON.stringify({
+        requests: queries.map((query) => ({
+          indexName: TAXFREE_PRODUCT_INDEX,
+          query,
+          params: new URLSearchParams({ hitsPerPage: String(TAXFREE_MAX_HITS) }).toString()
+        }))
+      })
+    });
+    const taxfreeProductCode = readTaxfreeProductCode(message.url) ?? readTaxfreeProductCode(message.productUrl);
+    const candidates = readTaxfreeHits(response).map((hit) => readTaxfreeCandidate(hit, message)).filter((candidate) => candidate !== void 0).sort((first, second) => {
+      const rankDifference = getCurrentTaxfreeCandidateRank(first, taxfreeProductCode, message) - getCurrentTaxfreeCandidateRank(second, taxfreeProductCode, message);
+      if (rankDifference !== 0) return rankDifference;
+      return second.score - first.score;
+    });
+    return candidates[0];
+  }
+  async function findVinmonopoletOfferForTaxfreeCandidate(candidate, requestJson) {
+    for (const identifier of candidate.identifiers.slice(0, VINMONOPOLET_BARCODE_LOOKUP_LIMIT)) {
+      const barcodeResponse = await fetchVinmonopoletProductForBarcode(identifier, requestJson);
+      const barcodeOffer = readVinmonopoletProductOffer(barcodeResponse);
+      if (barcodeOffer !== void 0 && hasCompatibleTaxfreeOffer(candidate, barcodeOffer)) {
+        return barcodeOffer;
+      }
+      const productCode = readVinmonopoletProductCodeFromResponse(barcodeResponse);
+      if (productCode === void 0) continue;
+      const productResponse = await fetchVinmonopoletProductByCode(productCode, requestJson);
+      const productOffer = readVinmonopoletProductOffer(productResponse);
+      if (productOffer !== void 0 && hasCompatibleTaxfreeOffer(candidate, productOffer)) {
+        return productOffer;
+      }
+    }
+    return findVinmonopoletOfferBySearch(candidate, requestJson);
+  }
+  function hasCompatibleTaxfreeOffer(candidate, offer) {
+    return hasCompatibleTaxfreeVolume(candidate, offer) && hasCompatibleVintage(candidate.vintageYear, offer.vintageYear);
+  }
+  function hasCompatibleTaxfreeVolume(candidate, offer) {
+    return candidate.volumeMl === void 0 || offer.volumeMl === void 0 || hasSameVolume(candidate.volumeMl, offer.volumeMl);
+  }
+  function hasCompatibleVintage(firstYear, secondYear) {
+    return firstYear === void 0 || firstYear === secondYear;
+  }
+  async function findVinmonopoletOfferBySearch(candidate, requestJson) {
+    const queries = buildVinmonopoletSearchQueries(candidate);
+    if (queries.length === 0) return void 0;
+    const offers = [];
+    for (const query of queries) {
+      const response = await fetchVinmonopoletProductsBySearchTerm(query, requestJson);
+      offers.push(
+        ...readVinmonopoletSearchOffers(response).map((offer) => scoreVinmonopoletSearchOffer(candidate, offer)).filter((offer) => offer !== void 0)
+      );
+    }
+    return offers.sort(compareVinmonopoletSearchOffers)[0];
+  }
+  function scoreVinmonopoletSearchOffer(candidate, offer) {
+    if (candidate.volumeMl !== void 0 && offer.volumeMl !== void 0 && !hasSameVolume(candidate.volumeMl, offer.volumeMl)) {
+      return void 0;
+    }
+    if (candidate.volumeMl !== void 0 && offer.volumeMl === void 0) {
+      return void 0;
+    }
+    if (candidate.alcoholPercent !== void 0 && offer.alcoholPercent !== void 0 && Math.abs(candidate.alcoholPercent - offer.alcoholPercent) > 0.5) {
+      return void 0;
+    }
+    if (!hasCompatibleVintage(candidate.vintageYear, offer.vintageYear)) {
+      return void 0;
+    }
+    const title = withLeadingBrand(candidate.productName, candidate.brandName);
+    const score = Math.max(
+      scoreProductTitleAgainstSearchTerm(title, offer.productName),
+      scoreProductTitleAgainstSearchTerm(candidate.productName, offer.productName),
+      ...buildVinmonopoletSearchQueries(candidate).map((query) => scoreProductTitleAgainstSearchTerm(query, offer.productName))
+    );
+    if (score < MIN_VINMONOPOLET_TITLE_MATCH_SCORE) {
+      return void 0;
+    }
+    return {
+      ...offer,
+      score
+    };
+  }
+  function compareVinmonopoletSearchOffers(first, second) {
+    return (second.score ?? 0) - (first.score ?? 0);
   }
   async function validateTaxfreeCandidatesAgainstVinmonopolet(candidates, message, requestJson) {
     const vinmonopoletProductCode = readVinmonopoletProductCode(message.url);
@@ -2444,6 +2572,33 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (candidate.identifierMatch) return 1;
     return 2;
   }
+  function buildVinmonopoletPriceMatchOffer(offer) {
+    return {
+      source: "vinmonopolet",
+      sourceName: "Vinmonopolet",
+      shopName: "Vinmonopolet",
+      amount: offer.amount,
+      sortAmount: offer.amount,
+      currency: "NOK",
+      price: formatNokPrice(offer.amount),
+      productName: formatVinmonopoletProductName(offer),
+      productUrl: offer.productUrl
+    };
+  }
+  function formatVinmonopoletProductName(offer) {
+    const size = offer.volumeMl !== void 0 ? formatVolume(offer.volumeMl) : void 0;
+    return size !== void 0 ? `${offer.productName} (${size})` : offer.productName;
+  }
+  function getCurrentTaxfreeCandidateRank(candidate, taxfreeProductCode, message) {
+    if (taxfreeProductCode !== void 0 && candidate.productCode !== void 0 && candidate.productCode === taxfreeProductCode) {
+      return 0;
+    }
+    if (candidate.identifierMatch) return 1;
+    if (message.volumeMl !== void 0 && candidate.volumeMl !== void 0 && hasSameVolume(message.volumeMl, candidate.volumeMl)) {
+      return 2;
+    }
+    return 3;
+  }
   async function fetchVinmonopoletProductCodeForBarcode(identifier, requestJson) {
     const value = await requestJson(
       `${VINMONOPOLET_ORIGIN}/vmpws/v2/vmp/products/barCodeSearch/${encodeURIComponent(identifier)}`,
@@ -2458,12 +2613,164 @@ query SearchSuggestions($query: String!, $category: Int) {
     );
     return readVinmonopoletProductCodeFromResponse(value);
   }
+  async function fetchVinmonopoletProductForBarcode(identifier, requestJson) {
+    return requestJson(
+      `${VINMONOPOLET_ORIGIN}/vmpws/v2/vmp/products/barCodeSearch/${encodeURIComponent(identifier)}`,
+      {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "include"
+      }
+    );
+  }
+  async function fetchVinmonopoletProductByCode(productCode, requestJson) {
+    return requestJson(
+      `${VINMONOPOLET_ORIGIN}/vmpws/v3/vmp/products/${encodeURIComponent(productCode)}?fields=FULL`,
+      {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "include"
+      }
+    );
+  }
+  async function fetchVinmonopoletProductsBySearchTerm(searchTerm, requestJson) {
+    const params = new URLSearchParams({
+      query: searchTerm,
+      currentPage: "0",
+      pageSize: String(VINMONOPOLET_SEARCH_LOOKUP_LIMIT),
+      fields: "FULL"
+    });
+    return requestJson(
+      `${VINMONOPOLET_ORIGIN}/vmpws/v2/vmp/products/search?${params.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "include"
+      }
+    );
+  }
   function readVinmonopoletProductCodeFromResponse(value) {
     if (!isRecord$2(value)) return void 0;
     const directCode = normalizeVinmonopoletProductCode(readString(value.code));
     if (directCode !== void 0) return directCode;
     const product = isRecord$2(value.product) ? value.product : void 0;
     return normalizeVinmonopoletProductCode(readString(product?.code));
+  }
+  function readVinmonopoletProductOffer(value) {
+    const product = readVinmonopoletProductRecord(value);
+    if (product === void 0) return void 0;
+    const amount = readVinmonopoletProductPrice(product);
+    const productName = readLocalizedString(product.name) ?? readString(product.name);
+    const productUrl = readVinmonopoletProductUrlFromRecord(product);
+    if (amount === void 0 || productName === void 0 || productUrl === void 0) {
+      return void 0;
+    }
+    const volumeMl = readVinmonopoletProductVolumeMl(product);
+    const alcoholPercent = readVinmonopoletAlcoholPercent$1(product);
+    const vintageYear = readVinmonopoletVintageYear(product, productName);
+    return {
+      amount,
+      ...alcoholPercent !== void 0 ? { alcoholPercent } : {},
+      productName,
+      productUrl,
+      ...vintageYear !== void 0 ? { vintageYear } : {},
+      ...volumeMl !== void 0 ? { volumeMl } : {}
+    };
+  }
+  function readVinmonopoletProductRecord(value) {
+    if (!isRecord$2(value)) return void 0;
+    if (isRecord$2(value.product)) return value.product;
+    if (isRecord$2(value.data)) return value.data;
+    return value;
+  }
+  function readVinmonopoletSearchOffers(value) {
+    if (!isRecord$2(value) || !Array.isArray(value.products)) return [];
+    return value.products.map(readVinmonopoletProductOffer).filter((offer) => offer !== void 0);
+  }
+  function readVinmonopoletProductPrice(product) {
+    return [
+      product.price,
+      product.currentPrice,
+      product.salesPrice,
+      product.basicPrice
+    ].map(readVinmonopoletPriceValue).find((amount) => amount !== void 0);
+  }
+  function readVinmonopoletPriceValue(value) {
+    if (isRecord$2(value)) {
+      return readNumber(value.value) ?? readNumber(value.amount) ?? readNumber(value.price) ?? readNumber(value.formattedValue);
+    }
+    return readNumber(value);
+  }
+  function readVinmonopoletProductUrlFromRecord(product) {
+    const directUrl = readString(product.url) ?? readString(product.productUrl);
+    if (directUrl !== void 0) {
+      return new URL(directUrl, VINMONOPOLET_ORIGIN).toString();
+    }
+    const code = readVinmonopoletProductCodeFromResponse(product);
+    return code !== void 0 ? new URL(`/p/${encodeURIComponent(code)}`, VINMONOPOLET_ORIGIN).toString() : void 0;
+  }
+  function readVinmonopoletProductVolumeMl(product) {
+    const stringVolume = [
+      readFormattedValue(product.volume),
+      product.volume,
+      product.volumeFormatted,
+      product.volumeString,
+      product.productVolume,
+      product.bottleVolume
+    ].map(readString).find((value) => value !== void 0);
+    const parsedStringVolume = readVolumeMl$1(stringVolume);
+    if (parsedStringVolume !== void 0) return parsedStringVolume;
+    const volumeRecordValue = readValueFromRecord(product.volume);
+    if (volumeRecordValue !== void 0 && volumeRecordValue > 0) {
+      return volumeRecordValue * 10;
+    }
+    const numericLiterVolume = [
+      product.volumeInLiters,
+      product.literVolume
+    ].map(readNumber).find((value) => value !== void 0 && value > 0);
+    if (numericLiterVolume !== void 0) return numericLiterVolume * 1e3;
+    const numericVolume = [
+      product.volumeValue,
+      product.bottleVolume,
+      product.volume
+    ].map(readNumber).find((value) => value !== void 0 && value > 0);
+    if (numericVolume === void 0) return void 0;
+    return numericVolume <= 20 ? numericVolume * 1e3 : numericVolume;
+  }
+  function readVinmonopoletAlcoholPercent$1(product) {
+    return [
+      readValueFromRecord(product.alcohol),
+      readNumber(product.alcohol),
+      readNumber(product.alcoholPercent),
+      readNumber(product.alcoholPercentage),
+      readNumber(product.alcoholByVolume)
+    ].find((value) => value !== void 0);
+  }
+  function readVinmonopoletVintageYear(product, productName) {
+    return [
+      product.vintage,
+      product.vintageYear,
+      product.year,
+      product.harvestYear,
+      productName
+    ].map(readString).map(readVintageYear).find((year) => year !== void 0);
+  }
+  function readFormattedValue(value) {
+    if (!isRecord$2(value)) return void 0;
+    return readString(value.formattedValue) ?? readString(value.readableValue);
+  }
+  function readValueFromRecord(value) {
+    if (!isRecord$2(value)) return void 0;
+    return readNumber(value.value);
   }
   function readTaxfreeHits(value) {
     if (!isRecord$2(value) || !Array.isArray(value.results)) return [];
@@ -2529,17 +2836,54 @@ query SearchSuggestions($query: String!, $category: Int) {
     return value.replace(/\s+\|\s+.*$/g, "").replace(/\s+-\s+Vinmonopolet$/i, "").trim().replace(/\s+/g, " ");
   }
   function buildTaxfreeSearchQueries(message) {
+    const cleanSearchTerm = cleanTaxfreeSearchTerm(message.searchTerm);
     return uniqueValues([
-      cleanTaxfreeSearchTerm(message.searchTerm),
+      cleanSearchTerm,
+      stripWineVintage(cleanSearchTerm),
       readVinmonopoletProductSlugSearchTerm(message.url),
       ...message.codes?.map(normalizeProductIdentifier) ?? []
     ]).filter((query) => query.length >= 4);
   }
-  function buildTaxfreeMatchTerms(message) {
+  function buildCurrentTaxfreeProductQueries(message) {
+    const cleanSearchTerm = cleanTaxfreeSearchTerm(message.searchTerm);
     return uniqueValues([
-      cleanTaxfreeSearchTerm(message.searchTerm),
+      readTaxfreeProductCode(message.url),
+      readTaxfreeProductCode(message.productUrl),
+      cleanSearchTerm,
+      stripWineVintage(cleanSearchTerm),
+      readTaxfreeProductSlugSearchTerm(message.url),
+      ...message.codes?.map(normalizeProductIdentifier) ?? []
+    ]).filter((query) => query.length >= 4);
+  }
+  function buildTaxfreeMatchTerms(message) {
+    const cleanSearchTerm = cleanTaxfreeSearchTerm(message.searchTerm);
+    return uniqueValues([
+      cleanSearchTerm,
+      stripWineVintage(cleanSearchTerm),
       readVinmonopoletProductSlugSearchTerm(message.url)
     ]).filter((query) => query.length >= 4);
+  }
+  function buildVinmonopoletSearchQueries(candidate) {
+    const title = withLeadingBrand(candidate.productName, candidate.brandName);
+    return uniqueValues([
+      title,
+      stripWineVintage(title),
+      candidate.productName,
+      stripWineVintage(candidate.productName),
+      candidate.brandName
+    ]).filter((query) => query.length >= 4);
+  }
+  function stripWineVintage(value) {
+    if (value === void 0) return void 0;
+    const withoutVintage = value.replace(/\b(?:19|20)\d{2}\b/g, " ").trim().replace(/\s+/g, " ");
+    return withoutVintage.length > 0 && withoutVintage !== value ? withoutVintage : void 0;
+  }
+  function readVintageYear(value) {
+    if (value === void 0) return void 0;
+    const match = value.match(/\b((?:19|20)\d{2})\b/);
+    if (match === null) return void 0;
+    const year = Number.parseInt(match[1] ?? "", 10);
+    return year >= 1900 && year <= 2099 ? year : void 0;
   }
   function readVinmonopoletProductSlugSearchTerm(rawUrl) {
     if (rawUrl === void 0) return void 0;
@@ -2549,6 +2893,19 @@ query SearchSuggestions($query: String!, $category: Int) {
       const productIndex = segments.findIndex((segment) => segment.toLowerCase() === "p");
       if (productIndex <= 0) return void 0;
       return decodeURIComponent(segments[productIndex - 1] ?? "").replace(/[-_]+/g, " ").trim().replace(/\s+/g, " ");
+    } catch {
+      return void 0;
+    }
+  }
+  function readTaxfreeProductSlugSearchTerm(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl, TAXFREE_ORIGIN);
+      const segments = url.pathname.split("/").filter(Boolean);
+      const productSegment = segments.find((segment) => /^product\d+/i.test(segment));
+      if (productSegment === void 0) return void 0;
+      const slug = segments[segments.indexOf(productSegment) + 1];
+      return slug !== void 0 ? decodeURIComponent(slug).replace(/[-_]+/g, " ").trim().replace(/\s+/g, " ") : void 0;
     } catch {
       return void 0;
     }
@@ -2563,7 +2920,22 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
+  function readTaxfreeProductCode(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl, TAXFREE_ORIGIN);
+      const match = url.pathname.match(/\/(?:no\/)?product(\d+)(?:\/|$)/i);
+      return normalizeTaxfreeProductCode(match?.[1]);
+    } catch {
+      return void 0;
+    }
+  }
   function normalizeVinmonopoletProductCode(value) {
+    if (value === void 0) return void 0;
+    const digits = value.replace(/\D/g, "");
+    return digits.length > 0 ? digits : void 0;
+  }
+  function normalizeTaxfreeProductCode(value) {
     if (value === void 0) return void 0;
     const digits = value.replace(/\D/g, "");
     return digits.length > 0 ? digits : void 0;
@@ -2575,9 +2947,18 @@ query SearchSuggestions($query: String!, $category: Int) {
     return `${brandName} ${productName}`;
   }
   function formatTaxfreeProductName(candidate) {
-    const title = withLeadingBrand(candidate.productName, candidate.brandName);
+    const title = appendVintageYear(
+      withLeadingBrand(candidate.productName, candidate.brandName),
+      candidate.vintageYear
+    );
     const size = candidate.volumeMl !== void 0 ? formatVolume(candidate.volumeMl) : void 0;
     return size !== void 0 ? `${title} (${size})` : title;
+  }
+  function appendVintageYear(title, vintageYear) {
+    if (vintageYear === void 0 || new RegExp(`\\b${vintageYear}\\b`).test(title)) {
+      return title;
+    }
+    return `${title} ${vintageYear}`;
   }
   function formatVolume(volumeMl) {
     if (volumeMl >= 1e3 && volumeMl % 1e3 === 0) {
@@ -2624,6 +3005,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function formatNumber(amount) {
     return new Intl.NumberFormat("nb-NO", {
+      minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
   }
@@ -2644,6 +3026,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (isVinmonopoletProductUrl(message.url)) {
       const taxfreeOffer2 = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
       return taxfreeOffer2 !== void 0 ? [taxfreeOffer2] : [];
+    }
+    if (isTaxfreeProductUrl(message.url)) {
+      const vinmonopoletOffer = await ignorePriceMatchFailure(findVinmonopoletPriceMatch(message, requestJson));
+      return vinmonopoletOffer !== void 0 ? [vinmonopoletOffer] : [];
     }
     if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
       const isthereanydealOffer2 = await ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText));
@@ -2691,6 +3077,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (isVinmonopoletProductUrl(message.url)) {
       return isContextualTaxfreeOffer(offer, message);
     }
+    if (isTaxfreeProductUrl(message.url)) {
+      return isContextualVinmonopoletOffer(offer, message);
+    }
     if (isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl)) {
       return true;
     }
@@ -2698,6 +3087,9 @@ query SearchSuggestions($query: String!, $category: Int) {
       return true;
     }
     if (isContextualTaxfreeOffer(offer, message)) {
+      return true;
+    }
+    if (isContextualVinmonopoletOffer(offer, message)) {
       return true;
     }
     return scoreProductTitleAgainstSearchTerm(message.searchTerm, offer.productName) >= MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE;
@@ -2709,6 +3101,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (offer.source === "prisradar") return 3;
     if (offer.source === "isthereanydeal") return 4;
     if (offer.source === "taxfree") return 5;
+    if (offer.source === "vinmonopolet") return 5;
     return 4;
   }
   function isPriceMatchAllowedForCurrentPage(offers, message) {
@@ -2716,11 +3109,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       return true;
     }
     return offers.some((offer) => {
-      return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message) || isContextualTaxfreeOffer(offer, message);
+      return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message) || isContextualTaxfreeOffer(offer, message) || isContextualVinmonopoletOffer(offer, message);
     });
   }
   function isContextualTaxfreeOffer(offer, message) {
     return offer.source === "taxfree" && isVinmonopoletProductUrl(message.url);
+  }
+  function isContextualVinmonopoletOffer(offer, message) {
+    return offer.source === "vinmonopolet" && isTaxfreeProductUrl(message.url);
   }
   function hasCurrentMerchantOffer(offer, message) {
     const merchantKeys = getCurrentMerchantKeys(message);
@@ -2740,6 +3136,8 @@ query SearchSuggestions($query: String!, $category: Int) {
         return pathname === "/product.php" && url.searchParams.has("p") || /^\/produkt(?:er)?\//.test(pathname);
       }
       if (hostname.endsWith("godpris.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
+      if (hostname.endsWith("tax-free.no")) return /^\/(?:no\/)?product\d+(?:\/|$)/.test(pathname);
+      if (hostname.endsWith("vinmonopolet.no")) return /\/p\/\d+(?:\/|$)/.test(pathname);
       if (hostname.endsWith("klarna.com")) return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
       if (hostname.endsWith("kelkoo.no")) return /^\/gtin\/\d+\/?$/.test(pathname);
       if (hostname.endsWith("prisradar.no")) return /^\/produkter\/[^/]+\/?$/.test(pathname);
@@ -3846,6 +4244,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     "hintaopas.fi",
     "ledenicheur.fr",
     "godpris.no",
+    "tax-free.no",
     "klarna.com",
     "kelkoo.no",
     "prisradar.no"
@@ -3897,7 +4296,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function installDynamicProductPageRefresh() {
     const parsedUrl = parseUrl(window.location.href);
-    if (parsedUrl === void 0 || parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "vinmonopolet.no") {
+    if (parsedUrl === void 0 || !isDynamicPriceMatchHost(parsedUrl)) {
       return;
     }
     if (document.body === null) {
@@ -3913,7 +4312,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       timerId = window.setTimeout(() => {
         const currentUrl = parseUrl(window.location.href);
-        if (currentUrl === void 0 || !isVinmonopoletProductPage(currentUrl)) {
+        if (currentUrl === void 0 || !isDynamicPriceMatchProductPage(currentUrl)) {
           latestMetaKey = "";
           return;
         }
@@ -4155,7 +4554,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const ogTitle = document.querySelector('meta[property="og:title"]')?.content.trim();
     const h1 = document.querySelector("h1")?.textContent?.trim();
     const codes = collectProductCodes(productLdJson);
-    const productPageClue = isVinmonopoletProductPage(parsedUrl) || hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
+    const productPageClue = isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
     if (isLikelyProductListingPage(parsedUrl) && document.querySelector('meta[property="og:type"][content="product"]') === null && !isLikelyCommerceProductPage(parsedUrl)) {
       return void 0;
     }
@@ -4224,6 +4623,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (hostname.endsWith("godpris.no")) {
       return /^\/produkt\/[^/]+\/?$/.test(pathname);
     }
+    if (hostname.endsWith("tax-free.no")) {
+      return /^\/(?:no\/)?product\d+(?:\/|$)/.test(pathname);
+    }
     if (hostname.endsWith("klarna.com")) {
       return /\/shopping\/pl\/(?:cl\d+\/)?\d+\//.test(pathname);
     }
@@ -4242,6 +4644,17 @@ query SearchSuggestions($query: String!, $category: Int) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return hostname === "vinmonopolet.no" && /\/p\/\d+(?:\/|$)/i.test(parsedUrl.pathname);
   }
+  function isTaxfreeProductPage(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(parsedUrl.pathname);
+  }
+  function isDynamicPriceMatchProductPage(parsedUrl) {
+    return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl);
+  }
+  function isDynamicPriceMatchHost(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "vinmonopolet.no" || hostname === "tax-free.no";
+  }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
     if (h1 !== void 0 && h1.length >= 3 && h1.length <= 80) return h1;
@@ -4255,6 +4668,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   }
   function isLikelyCommerceProductPage(parsedUrl) {
+    if (isTaxfreeProductPage(parsedUrl)) {
+      return true;
+    }
     if (isSteamAppProductUrl(parsedUrl.toString())) {
       return true;
     }
@@ -5239,6 +5655,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     .provider-taxfree {
       background: #e3000f;
       color: #ffffff;
+    }
+    .provider-vinmonopolet {
+      background: #dff4eb;
+      color: #092f33;
     }
     .provider-region {
       background: #eaf7ef;
@@ -7236,7 +7656,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -7493,6 +7913,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "prisradar") return "prisradar";
     if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
     if (priceMatch.source === "taxfree") return "taxfree";
+    if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
     return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
@@ -7502,6 +7923,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "prisradar") return "Prisradar";
     if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
     if (priceMatch.source === "taxfree") return "Tax Free";
+    if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {
