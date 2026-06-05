@@ -2082,6 +2082,10 @@ function renderNotice(
       background: #2d2f42;
       color: #ffffff;
     }
+    .provider-gcdeals {
+      background: #341083;
+      color: #ffffff;
+    }
     .provider-taxfree {
       background: #e3000f;
       color: #ffffff;
@@ -2509,6 +2513,19 @@ function renderNotice(
     }
     .region-price-card {
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .region-price-card-with-action {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+    .region-price-main {
+      color: inherit;
+      display: contents;
+      text-decoration: none;
+    }
+    .region-price-action {
+      justify-self: end;
+      text-decoration: none;
+      white-space: nowrap;
     }
     .price-match-card.price-match-card--best .price-match-product,
     .price-match-card.price-match-card--best .price-match-price,
@@ -4472,13 +4489,17 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
   return priceMatchCard;
 }
-function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = false): HTMLAnchorElement {
-  const regionPriceCard = document.createElement("a");
+function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = false): HTMLDivElement {
+  const regionPriceCard = document.createElement("div");
   regionPriceCard.className = "region-price-card";
   if (isBest) regionPriceCard.classList.add("region-price-card--best");
-  regionPriceCard.href = getRegionPriceLink(regionPrice);
-  regionPriceCard.target = "_blank";
-  regionPriceCard.rel = "noreferrer";
+
+  const regionPriceMain = document.createElement("a");
+  regionPriceMain.className = "region-price-main";
+  regionPriceMain.href = regionPrice.productUrl;
+  regionPriceMain.target = "_blank";
+  regionPriceMain.rel = "noreferrer";
+  regionPriceMain.title = `Åpne ${regionPrice.countryName} i PlayStation Store`;
 
   const regionPriceTitle = document.createElement("span");
   regionPriceTitle.className = "region-price-title";
@@ -4494,14 +4515,41 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
   regionPriceNok.className = "region-price-nok";
   regionPriceNok.textContent = regionPrice.formattedNok;
 
-  regionPriceCard.append(regionPriceTitle, regionPriceNok);
+  regionPriceMain.append(regionPriceTitle, regionPriceNok);
+  regionPriceCard.append(regionPriceMain);
+
+  const secondaryLink = getRegionPriceSecondaryLink(regionPrice);
+  if (secondaryLink !== undefined) {
+    regionPriceCard.classList.add("region-price-card-with-action");
+    const regionPriceAction = document.createElement("a");
+    regionPriceAction.className = `provider-badge provider-${secondaryLink.provider} region-price-action`;
+    regionPriceAction.href = secondaryLink.url;
+    regionPriceAction.target = "_blank";
+    regionPriceAction.rel = "noreferrer";
+    regionPriceAction.title = secondaryLink.title;
+    regionPriceAction.textContent = secondaryLink.label;
+    regionPriceCard.append(regionPriceAction);
+  }
   return regionPriceCard;
 }
-function getRegionPriceLink(regionPrice: PlayStationRegionPrice): string {
+function getRegionPriceSecondaryLink(
+  regionPrice: PlayStationRegionPrice,
+): { label: string; provider: "gcdeals" | "region"; title: string; url: string } | undefined {
   if (regionPrice.region === "NO") {
-    return regionPrice.priceHistoryUrl ?? regionPrice.productUrl;
+    if (regionPrice.priceHistoryUrl === undefined) return undefined;
+    return {
+      label: "PSPrices",
+      provider: "region",
+      title: "Åpne norsk prishistorikk hos PSPrices",
+      url: regionPrice.priceHistoryUrl,
+    };
   }
-  return PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL;
+  return {
+    label: "GC Deals",
+    provider: "gcdeals",
+    title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GC Deals`,
+    url: PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL,
+  };
 }
 function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): string {
   const rateLine = regionPrices.ratesUpdatedAt !== undefined ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
@@ -4509,8 +4557,9 @@ function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): s
     "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
     "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
     "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
-    "Norge-raden åpner PSPrices for norsk prishistorikk.",
-    "Ikke-norske rader åpner GCDeals for PSN-gavekort i valgt region når vi har direkte lenke.",
+    "Regionraden åpner spillet i regional PlayStation Store.",
+    "GC Deals-chipen åpner PSN-gavekort i valgt region.",
+    "PSPrices-chipen åpner norsk prishistorikk.",
     rateLine,
   ].join("\n");
 }
