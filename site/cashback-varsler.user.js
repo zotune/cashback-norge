@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780385868
+// @version      1780656377
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -16,6 +16,8 @@
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      www.klarna.com
+// @connect      store.playstation.com
+// @connect      open.er-api.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no
 // @run-at       document-idle
@@ -1989,6 +1991,258 @@ query SearchSuggestions($query: String!, $category: Int) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   const GENERIC_MERCHANT_KEYS = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
+  const PLAYSTATION_REGIONS = [
+    { region: "NO", countryName: "Norge", flag: "🇳🇴", locale: "no-no" },
+    { region: "US", countryName: "USA", flag: "🇺🇸", locale: "en-us" },
+    { region: "GB", countryName: "UK", flag: "🇬🇧", locale: "en-gb" },
+    { region: "IN", countryName: "India", flag: "🇮🇳", locale: "en-in" },
+    { region: "TR", countryName: "Tyrkia", flag: "🇹🇷", locale: "tr-tr" },
+    { region: "UA", countryName: "Ukraina", flag: "🇺🇦", locale: "uk-ua" },
+    { region: "JP", countryName: "Japan", flag: "🇯🇵", locale: "ja-jp" },
+    { region: "CA", countryName: "Canada", flag: "🇨🇦", locale: "en-ca" },
+    { region: "AU", countryName: "Australia", flag: "🇦🇺", locale: "en-au" },
+    { region: "NZ", countryName: "New Zealand", flag: "🇳🇿", locale: "en-nz" },
+    { region: "DE", countryName: "Tyskland", flag: "🇩🇪", locale: "de-de" },
+    { region: "FR", countryName: "Frankrike", flag: "🇫🇷", locale: "fr-fr" },
+    { region: "ES", countryName: "Spania", flag: "🇪🇸", locale: "es-es" },
+    { region: "IT", countryName: "Italia", flag: "🇮🇹", locale: "it-it" },
+    { region: "PL", countryName: "Polen", flag: "🇵🇱", locale: "pl-pl" },
+    { region: "SE", countryName: "Sverige", flag: "🇸🇪", locale: "sv-se" },
+    { region: "DK", countryName: "Danmark", flag: "🇩🇰", locale: "da-dk" },
+    { region: "FI", countryName: "Finland", flag: "🇫🇮", locale: "fi-fi" },
+    { region: "CH", countryName: "Sveits", flag: "🇨🇭", locale: "de-ch" },
+    { region: "BR", countryName: "Brasil", flag: "🇧🇷", locale: "pt-br" },
+    { region: "MX", countryName: "Mexico", flag: "🇲🇽", locale: "es-mx" },
+    { region: "KR", countryName: "Sør-Korea", flag: "🇰🇷", locale: "ko-kr" },
+    { region: "HK", countryName: "Hongkong", flag: "🇭🇰", locale: "en-hk" },
+    { region: "SG", countryName: "Singapore", flag: "🇸🇬", locale: "en-sg" },
+    { region: "ZA", countryName: "Sør-Afrika", flag: "🇿🇦", locale: "en-za" }
+  ];
+  const MAIN_REGION_ORDER = /* @__PURE__ */ new Map([
+    ["NO", 0],
+    ["US", 1],
+    ["GB", 2]
+  ]);
+  function isPlayStationProductUrl(url) {
+    return parsePlayStationProductId(url) !== void 0;
+  }
+  function parsePlayStationProductId(url) {
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+      if (hostname !== "store.playstation.com") {
+        return void 0;
+      }
+      const productMatch = parsedUrl.pathname.match(/\/product\/([^/?#]+)/i);
+      const productId = productMatch?.[1];
+      return productId !== void 0 && productId.length > 0 ? decodeURIComponent(productId) : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  async function findPlayStationRegionPrices(productUrl, textRequest = defaultTextRequest, jsonRequest = defaultJsonRequest) {
+    const productId = parsePlayStationProductId(productUrl);
+    if (productId === void 0) {
+      return void 0;
+    }
+    const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
+    const rates = readNokBaseRates(ratesResponse);
+    if (rates === void 0) {
+      return void 0;
+    }
+    const entries = await mapWithConcurrency(PLAYSTATION_REGIONS, 5, async (region) => {
+      const localizedUrl = `https://store.playstation.com/${region.locale}/product/${encodeURIComponent(productId)}`;
+      const html = await textRequest(localizedUrl);
+      if (html === void 0) {
+        return void 0;
+      }
+      const offer = extractPlayStationOffer(html);
+      if (offer === void 0) {
+        return void 0;
+      }
+      const nokRate = offer.currency === "NOK" ? 1 : rates.rates[offer.currency];
+      if (typeof nokRate !== "number" || nokRate <= 0) {
+        return void 0;
+      }
+      const nokAmount = offer.price / nokRate;
+      const entry = {
+        region: region.region,
+        countryName: region.countryName,
+        flag: region.flag,
+        locale: region.locale,
+        currency: offer.currency,
+        price: offer.price,
+        formattedPrice: formatCurrency(offer.price, offer.currency, region.locale),
+        nokAmount,
+        formattedNok: formatCurrency(nokAmount, "NOK", "nb-NO"),
+        productUrl: localizedUrl
+      };
+      if (offer.name !== void 0) {
+        entry.productName = offer.name;
+      }
+      return entry;
+    });
+    const prices = entries.filter((entry) => entry !== void 0).sort((a, b) => a.nokAmount - b.nokAmount).map(({ productName: _productName, ...price }) => price);
+    if (prices.length === 0) {
+      return void 0;
+    }
+    const productName = entries.find((entry) => entry?.productName !== void 0)?.productName;
+    const result = {
+      productId,
+      fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      ...rates.updatedAt !== void 0 ? { ratesUpdatedAt: rates.updatedAt } : {},
+      prices
+    };
+    if (productName !== void 0) {
+      result.productName = productName;
+    }
+    return result;
+  }
+  function pickDisplayedPlayStationRegionPrices(prices, limit = 10) {
+    const byRegion = new Map(prices.map((price) => [price.region, price]));
+    const selected = /* @__PURE__ */ new Map();
+    for (const price of prices.slice(0, limit)) {
+      selected.set(price.region, price);
+    }
+    for (const region of MAIN_REGION_ORDER.keys()) {
+      const price = byRegion.get(region);
+      if (price !== void 0) {
+        selected.set(region, price);
+      }
+    }
+    return [...selected.values()].sort((a, b) => a.nokAmount - b.nokAmount);
+  }
+  function extractPlayStationOffer(html) {
+    const jsonScripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+    for (const script of jsonScripts) {
+      const bodyMatch = script.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      const body = bodyMatch?.[1]?.trim();
+      if (body === void 0 || body.length === 0) {
+        continue;
+      }
+      const parsed = parseJson(body);
+      const offer = readProductOffer(parsed);
+      if (offer !== void 0) {
+        return offer;
+      }
+    }
+    const priceMeta = html.match(/<meta[^>]+(?:property|name)=["'](?:product:price:amount|price)["'][^>]+content=["']([^"']+)["'][^>]*>/i);
+    const currencyMeta = html.match(/<meta[^>]+(?:property|name)=["'](?:product:price:currency|priceCurrency|currency)["'][^>]+content=["']([^"']+)["'][^>]*>/i);
+    const price = priceMeta?.[1] !== void 0 ? Number.parseFloat(priceMeta[1].replace(",", ".")) : Number.NaN;
+    const currency = currencyMeta?.[1]?.toUpperCase();
+    if (Number.isFinite(price) && currency !== void 0) {
+      return { price, currency };
+    }
+    return void 0;
+  }
+  function readProductOffer(value) {
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const offer2 = readProductOffer(entry);
+        if (offer2 !== void 0) return offer2;
+      }
+      return void 0;
+    }
+    if (!isRecord$1(value)) {
+      return void 0;
+    }
+    const offer = readFirstOffer$1(value.offers);
+    if (offer === void 0) {
+      return void 0;
+    }
+    return {
+      ...typeof value.name === "string" ? { name: value.name } : {},
+      ...offer
+    };
+  }
+  function readFirstOffer$1(value) {
+    const offer = Array.isArray(value) ? value[0] : value;
+    if (!isRecord$1(offer)) {
+      return void 0;
+    }
+    const rawPrice = typeof offer.price === "number" ? offer.price : typeof offer.price === "string" ? Number.parseFloat(offer.price.replace(",", ".")) : Number.NaN;
+    const currency = typeof offer.priceCurrency === "string" ? offer.priceCurrency.toUpperCase() : void 0;
+    if (!Number.isFinite(rawPrice) || currency === void 0) {
+      return void 0;
+    }
+    return { price: rawPrice, currency };
+  }
+  function readNokBaseRates(value) {
+    if (!isRecord$1(value) || value.result !== "success" || !isRecord$1(value.rates)) {
+      return void 0;
+    }
+    const rates = {};
+    for (const [currency, rate] of Object.entries(value.rates)) {
+      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+        rates[currency.toUpperCase()] = rate;
+      }
+    }
+    if (Object.keys(rates).length === 0) {
+      return void 0;
+    }
+    return {
+      rates,
+      ...typeof value.time_last_update_utc === "string" ? { updatedAt: value.time_last_update_utc } : {}
+    };
+  }
+  async function mapWithConcurrency(items, concurrency, mapper) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    async function worker() {
+      for (; ; ) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= items.length) {
+          return;
+        }
+        results[index] = await mapper(items[index]);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+    return results;
+  }
+  async function defaultTextRequest(url) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return void 0;
+      return await response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  async function defaultJsonRequest(url) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return void 0;
+      return await response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function parseJson(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return void 0;
+    }
+  }
+  function formatCurrency(amount, currency, locale) {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency,
+        maximumFractionDigits: currencyUsesMinorUnits(currency) ? 2 : 0
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(currencyUsesMinorUnits(currency) ? 2 : 0)} ${currency}`;
+    }
+  }
+  function currencyUsesMinorUnits(currency) {
+    return !(/* @__PURE__ */ new Set(["JPY", "KRW", "CLP", "VND"])).has(currency.toUpperCase());
+  }
+  function isRecord$1(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
   const noWords = [
     "asshole",
     "dritt",
@@ -2551,7 +2805,36 @@ query SearchSuggestions($query: String!, $category: Int) {
   const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
   const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
   const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
+  const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+  const PSN_GIFT_CARD_DEALS_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
+  const PSN_GIFT_CARD_REGION_URLS = {
+    AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
+    BR: "https://gcdeals.net/no/group/15/playstation-network-cards-brl-brazil",
+    CA: "https://gcdeals.net/no/group/16/playstation-network-cards-cad-canada",
+    CH: "https://gcdeals.net/no/group/10/playstation-network-cards-chf-switzerland",
+    DE: "https://gcdeals.net/no/group/3/playstation-network-cards-eur-germany",
+    DK: "https://gcdeals.net/no/group/515/playstation-network-gift-cards-dkk-denmark",
+    ES: "https://gcdeals.net/no/group/11/playstation-network-cards-eur-spain",
+    FI: "https://gcdeals.net/no/group/5/playstation-network-cards-eur-finland",
+    FR: "https://gcdeals.net/no/group/8/playstation-network-cards-eur-france",
+    GB: "https://gcdeals.net/no/group/2/playstation-network-cards-gbp-united-kingdom",
+    HK: "https://gcdeals.net/no/group/22/playstation-network-cards-hkd-hong-kong",
+    IN: "https://gcdeals.net/no/group/518/playstation-network-gift-cards-inr-india",
+    IT: "https://gcdeals.net/no/group/6/playstation-network-cards-eur-italy",
+    JP: "https://gcdeals.net/no/group/28/playstation-network-cards-jpy-japan",
+    KR: "https://gcdeals.net/no/group/1021/playstation-network-gift-cards-nok-south-korea",
+    MX: "https://gcdeals.net/no/group/32/playstation-network-cards-usd-mexico",
+    NO: "https://gcdeals.net/no/group/9/playstation-network-cards-nok-norway",
+    NZ: "https://gcdeals.net/no/group/34/playstation-network-cards-nzd-new-zealand",
+    PL: "https://gcdeals.net/no/group/4/playstation-network-cards-pln-poland",
+    SE: "https://gcdeals.net/no/group/522/playstation-network-gift-cards-sek-sweden",
+    SG: "https://gcdeals.net/no/group/41/playstation-network-cards-sgd-singapore",
+    US: "https://gcdeals.net/no/group/1/playstation-network-cards-usd-united-states",
+    TR: "https://gcdeals.net/no/group/1050/playstation-network-gift-cards-try-turkey",
+    UA: "https://gcdeals.net/no/group/1078/playstation-network-gift-cards-uah-ukraine",
+    ZA: "https://gcdeals.net/no/group/43/playstation-network-cards-zar-south-africa"
+  };
   const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
   const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1e3;
   const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
@@ -2595,17 +2878,18 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   });
   requestCurrentOffers();
-  function renderNoticeWithStoredState(offers, priceMatches = []) {
+  function renderNoticeWithStoredState(offers, priceMatches = [], regionPrices) {
     const isUserscript = chrome.runtime.id === void 0;
-    chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
+    chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, REGION_PRICES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
       const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
       if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
       const priceMatchCollapsed = result[PRICE_MATCH_COLLAPSED_KEY] === true;
+      const regionPricesCollapsed = result[REGION_PRICES_COLLAPSED_KEY] === true;
       void readActivatedOffers().catch(() => ({})).then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatches);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, regionPricesCollapsed, activatedOffers, priceMatches, regionPrices);
       });
     });
   }
@@ -2616,12 +2900,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
   }
   async function renderCurrentContext() {
-    const [offers, priceMatches] = await Promise.all([
+    const [offers, priceMatches, regionPrices] = await Promise.all([
       getCurrentOffers(),
-      getPriceMatchesForCurrentPage()
+      getPriceMatchesForCurrentPage(),
+      getPlayStationRegionPricesForCurrentPage()
     ]);
-    if (offers.length > 0 || priceMatches.length > 0) {
-      renderNoticeWithStoredState(offers, priceMatches);
+    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
+      renderNoticeWithStoredState(offers, priceMatches, regionPrices);
       return;
     }
     clearNotice();
@@ -2668,6 +2953,27 @@ query SearchSuggestions($query: String!, $category: Int) {
       return response.offers ?? (response.offer !== void 0 ? [response.offer] : []);
     }
     return [];
+  }
+  async function getPlayStationRegionPricesForCurrentPage() {
+    if (!isPlayStationProductUrl(window.location.href)) {
+      return void 0;
+    }
+    const message = {
+      type: "get-playstation-region-prices",
+      url: window.location.href
+    };
+    if (isUserscriptRuntime()) {
+      return findPlayStationRegionPrices(
+        window.location.href,
+        (url) => userscriptTextRequest(url),
+        (url) => userscriptJsonRequest(url)
+      );
+    }
+    const response = await sendRuntimeMessage(message);
+    if (response !== void 0 && isPlayStationRegionPricesResponse(response) && response.ok) {
+      return response.result;
+    }
+    return void 0;
   }
   function isUserscriptRuntime() {
     return chrome.runtime.id === void 0;
@@ -3440,7 +3746,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       });
     });
   }
-  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, initialPriceMatchCollapsed, activatedOffers, priceMatches = []) {
+  function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, initialPriceMatchCollapsed, initialRegionPricesCollapsed, activatedOffers, priceMatches = [], regionPrices) {
     clearNotice();
     const host = document.createElement("div");
     host.id = HOST_ID;
@@ -3792,6 +4098,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       border: 1px solid #d3e2dc;
       color: #0c4598;
     }
+    .provider-region {
+      background: #eaf7ef;
+      color: #166b47;
+    }
     .provider-sparebank1 {
       background: #005aa4;
       color: #ffffff;
@@ -4105,7 +4415,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .bonus-chips-section.collapsed .bonus-chips-toggle,
     .codes-section.collapsed .codes-toggle,
-    .price-match-section.collapsed .price-match-toggle {
+    .price-match-section.collapsed .price-match-toggle,
+    .region-prices-section.collapsed .region-prices-toggle {
       margin-bottom: 0;
     }
     .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
@@ -4148,11 +4459,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     .codes-section.collapsed .codes-toggle-arrow {
       transform: rotate(-90deg);
     }
-    .price-match-section {
+    .price-match-section,
+    .region-prices-section {
       margin-top: -4px;
       padding: 6px 0 4px;
     }
-    .price-match-toggle {
+    .price-match-toggle,
+    .region-prices-toggle {
       align-items: center;
       appearance: none;
       background: none;
@@ -4168,10 +4481,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 0;
       width: 100%;
     }
-    .price-match-toggle:hover {
+    .price-match-toggle:hover,
+    .region-prices-toggle:hover {
       color: #4f5f66;
     }
-    .price-match-toggle-arrow {
+    .price-match-toggle-arrow,
+    .region-prices-toggle-arrow {
       display: inline-block;
       font-size: 10px;
       transition: transform 0.15s;
@@ -4179,10 +4494,15 @@ query SearchSuggestions($query: String!, $category: Int) {
     .price-match-section.collapsed .price-match-card {
       display: none;
     }
-    .price-match-section.collapsed .price-match-toggle-arrow {
+    .region-prices-section.collapsed .region-price-card {
+      display: none;
+    }
+    .price-match-section.collapsed .price-match-toggle-arrow,
+    .region-prices-section.collapsed .region-prices-toggle-arrow {
       transform: rotate(-90deg);
     }
-    .price-match-card {
+    .price-match-card,
+    .region-price-card {
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
@@ -4195,32 +4515,42 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 6px 9px;
       text-decoration: none;
     }
+    .region-price-card {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
     .price-match-card.price-match-card--best .price-match-product,
-    .price-match-card.price-match-card--best .price-match-price {
+    .price-match-card.price-match-card--best .price-match-price,
+    .region-price-card.region-price-card--best .region-price-country,
+    .region-price-card.region-price-card--best .region-price-nok {
       color: #3a7d55;
     }
-    .price-match-card + .price-match-card {
+    .price-match-card + .price-match-card,
+    .region-price-card + .region-price-card {
       margin-top: 4px;
     }
-    .price-match-title {
+    .price-match-title,
+    .region-price-title {
       display: flex;
       flex-direction: column;
       gap: 2px;
       min-width: 0;
     }
-    .price-match-product {
+    .price-match-product,
+    .region-price-country {
       font-weight: 700;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .price-match-shop {
+    .price-match-shop,
+    .region-price-native {
       color: #5d6b71;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .price-match-price {
+    .price-match-price,
+    .region-price-nok {
       color: #172026;
       font-weight: 800;
       white-space: nowrap;
@@ -4452,6 +4782,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const priceMatch = priceMatches[0];
+    const bestRegionPrice = regionPrices?.prices[0];
     const curveOffer = offers.find((o) => o.provider === "curve");
     const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
     const APP_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["klarna", "spenn", "dreams"]);
@@ -4465,16 +4796,16 @@ query SearchSuggestions($query: String!, $category: Int) {
     const cryptoSub = cryptoSubEntry?.[1];
     const codeOffers = offers.filter((o) => o.provider === "rabattkode" || o.discountCode !== void 0 && o.discountCode.length > 0);
     const offer = mainOffers[0];
-    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0) {
+    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0 && bestRegionPrice === void 0) {
       return;
     }
     const primaryOffer = offer ?? codeOffers[0];
-    if (primaryOffer === void 0 && priceMatch === void 0) {
+    if (primaryOffer === void 0 && priceMatch === void 0 && bestRegionPrice === void 0) {
       return;
     }
     const notice = document.createElement("section");
     notice.className = "notice";
-    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : "rabattkode");
+    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : "region");
     const sideTab = document.createElement("button");
     sideTab.className = `side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
@@ -4512,6 +4843,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       chipSpan.className = `side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
       chipSpan.textContent = getPriceMatchSourceName(priceMatch);
       sideTabText.append(rewardSpan, chipSpan);
+    } else if (bestRegionPrice !== void 0) {
+      const rewardSpan = document.createElement("span");
+      rewardSpan.className = "side-tab-reward";
+      rewardSpan.textContent = bestRegionPrice.formattedNok;
+      const chipSpan = document.createElement("span");
+      chipSpan.className = "side-tab-chip provider-region";
+      chipSpan.textContent = "Region";
+      sideTabText.append(rewardSpan, chipSpan);
     }
     sideTab.append(sideTabArrow, sideTabText);
     sideTab.addEventListener("click", () => {
@@ -4529,7 +4868,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const siteIcon = createSiteIcon();
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Prismatch";
+    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Regionpriser";
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
     sumInput.className = "sum-input";
@@ -4539,7 +4878,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     sumInput.addEventListener("keydown", (e) => {
       if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
     });
-    header.append(sumInput);
+    if (mainOffers.length > 0) {
+      header.append(sumInput);
+    }
     const rewardLabels = [];
     const tooltipElements = [];
     const offerList = document.createElement("div");
@@ -5287,6 +5628,45 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return chip;
     };
     codesSection.append(codesToggle, codesList, expiredSection);
+    const regionPricesSection = document.createElement("div");
+    regionPricesSection.className = "region-prices-section";
+    if (regionPrices !== void 0 && regionPrices.prices.length > 0) {
+      if (initialRegionPricesCollapsed) {
+        regionPricesSection.classList.add("collapsed");
+      }
+      const displayedRegionPrices = pickDisplayedPlayStationRegionPrices(regionPrices.prices, 10);
+      const regionPricesToggle = document.createElement("button");
+      regionPricesToggle.className = "region-prices-toggle";
+      regionPricesToggle.type = "button";
+      const regionPricesToggleArrow = document.createElement("span");
+      regionPricesToggleArrow.className = "region-prices-toggle-arrow";
+      regionPricesToggleArrow.textContent = "▼";
+      const regionPricesToggleText = document.createElement("span");
+      regionPricesToggleText.textContent = "Region ⚠";
+      regionPricesToggle.append(regionPricesToggleArrow, regionPricesToggleText);
+      regionPricesToggle.addEventListener("click", () => {
+        const isCollapsed = regionPricesSection.classList.toggle("collapsed");
+        chrome.storage.local.set({ [REGION_PRICES_COLLAPSED_KEY]: isCollapsed });
+      });
+      const regionPriceCards = displayedRegionPrices.map((regionPrice) => {
+        const card = buildRegionPriceCard(regionPrice, regionPrice.region === regionPrices.prices[0]?.region);
+        const tooltip = document.createElement("div");
+        tooltip.className = "offer-tooltip";
+        setTooltipContent(tooltip, [buildRegionPricesTooltip(regionPrices)]);
+        shadowRoot.append(tooltip);
+        card.addEventListener("mouseenter", () => {
+          positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+        });
+        card.addEventListener("mouseleave", () => {
+          tooltip.classList.remove("visible");
+        });
+        return card;
+      });
+      regionPricesSection.append(
+        regionPricesToggle,
+        ...regionPriceCards
+      );
+    }
     const priceMatchSection = document.createElement("div");
     priceMatchSection.className = "price-match-section";
     if (priceMatches.length > 0) {
@@ -5311,7 +5691,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
       );
     }
-    body.append(header, offerList);
+    body.append(header);
+    if (mainOffers.length > 0) body.append(offerList);
+    if (regionPrices !== void 0 && regionPrices.prices.length > 0) body.append(regionPricesSection);
     if (priceMatches.length > 0) body.append(priceMatchSection);
     if (offers.length > 0) body.append(chipsSection, codesSection);
     let userHasVoted = false;
@@ -5696,6 +6078,21 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     }
     return typeof value.reason === "string";
   }
+  function isPlayStationRegionPricesResponse(value) {
+    if (!isRecord(value) || typeof value.ok !== "boolean") {
+      return false;
+    }
+    if (value.ok) {
+      return value.result === void 0 || isPlayStationRegionPriceResult(value.result);
+    }
+    return typeof value.reason === "string";
+  }
+  function isPlayStationRegionPriceResult(value) {
+    return isRecord(value) && typeof value.productId === "string" && typeof value.fetchedAt === "string" && (value.productName === void 0 || typeof value.productName === "string") && (value.ratesUpdatedAt === void 0 || typeof value.ratesUpdatedAt === "string") && Array.isArray(value.prices) && value.prices.every(isPlayStationRegionPrice);
+  }
+  function isPlayStationRegionPrice(value) {
+    return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string";
+  }
   function isPriceMatchOffer(value) {
     return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
@@ -5908,6 +6305,48 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
     priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
     return priceMatchCard;
+  }
+  function buildRegionPriceCard(regionPrice, isBest = false) {
+    const regionPriceCard = document.createElement("a");
+    regionPriceCard.className = "region-price-card";
+    if (isBest) regionPriceCard.classList.add("region-price-card--best");
+    regionPriceCard.href = getRegionPriceLink(regionPrice);
+    regionPriceCard.target = "_blank";
+    regionPriceCard.rel = "noreferrer";
+    const regionPriceTitle = document.createElement("span");
+    regionPriceTitle.className = "region-price-title";
+    const regionPriceCountry = document.createElement("span");
+    regionPriceCountry.className = "region-price-country";
+    regionPriceCountry.textContent = `${regionPrice.flag} ${regionPrice.countryName}`;
+    const regionPriceNative = document.createElement("span");
+    regionPriceNative.className = "region-price-native";
+    regionPriceNative.textContent = regionPrice.formattedPrice;
+    regionPriceTitle.append(regionPriceCountry, regionPriceNative);
+    const regionPriceNok = document.createElement("span");
+    regionPriceNok.className = "region-price-nok";
+    regionPriceNok.textContent = regionPrice.formattedNok;
+    regionPriceCard.append(regionPriceTitle, regionPriceNok);
+    return regionPriceCard;
+  }
+  function getRegionPriceLink(regionPrice) {
+    if (regionPrice.region === "NO") {
+      return regionPrice.productUrl;
+    }
+    return PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL;
+  }
+  function buildRegionPricesTooltip(regionPrices) {
+    const lines = regionPrices.prices.map(
+      (regionPrice) => `${regionPrice.flag} ${regionPrice.countryName}: ${regionPrice.formattedPrice} (${regionPrice.formattedNok})`
+    );
+    const rateLine = regionPrices.ratesUpdatedAt !== void 0 ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
+    return [
+      "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
+      "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
+      "Ikke-norske rader åpner GCDeals for PSN-gavekort i valgt region når vi har direkte lenke.",
+      "Alle regioner",
+      ...lines,
+      rateLine
+    ].join("\n");
   }
   function getPriceMatchProviderClass(priceMatch) {
     if (priceMatch.source === "godpris") return "godpris";

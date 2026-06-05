@@ -9,6 +9,13 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import {
+  findPlayStationRegionPrices,
+  isPlayStationProductUrl,
+  pickDisplayedPlayStationRegionPrices,
+  type PlayStationRegionPrice,
+  type PlayStationRegionPriceResult,
+} from "../shared/playstation-region-prices";
 import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
 
@@ -195,6 +202,10 @@ type GetPriceMatchForProductMessage = {
   productPageClue?: boolean;
   organizationName?: string;
 };
+type GetPlayStationRegionPricesMessage = {
+  type: "get-playstation-region-prices";
+  url: string;
+};
 type OffersForUrlResponse =
   | {
       ok: true;
@@ -237,13 +248,51 @@ type PriceMatchForProductResponse =
       ok: false;
       reason: string;
     };
+type PlayStationRegionPricesResponse =
+  | {
+      ok: true;
+      result?: PlayStationRegionPriceResult;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
 type ProductPageMeta = Omit<GetPriceMatchForProductMessage, "type">;
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
 const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
 const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
+const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+const PSN_GIFT_CARD_DEALS_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
+const PSN_GIFT_CARD_REGION_URLS: Record<string, string> = {
+  AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
+  BR: "https://gcdeals.net/no/group/15/playstation-network-cards-brl-brazil",
+  CA: "https://gcdeals.net/no/group/16/playstation-network-cards-cad-canada",
+  CH: "https://gcdeals.net/no/group/10/playstation-network-cards-chf-switzerland",
+  DE: "https://gcdeals.net/no/group/3/playstation-network-cards-eur-germany",
+  DK: "https://gcdeals.net/no/group/515/playstation-network-gift-cards-dkk-denmark",
+  ES: "https://gcdeals.net/no/group/11/playstation-network-cards-eur-spain",
+  FI: "https://gcdeals.net/no/group/5/playstation-network-cards-eur-finland",
+  FR: "https://gcdeals.net/no/group/8/playstation-network-cards-eur-france",
+  GB: "https://gcdeals.net/no/group/2/playstation-network-cards-gbp-united-kingdom",
+  HK: "https://gcdeals.net/no/group/22/playstation-network-cards-hkd-hong-kong",
+  IN: "https://gcdeals.net/no/group/518/playstation-network-gift-cards-inr-india",
+  IT: "https://gcdeals.net/no/group/6/playstation-network-cards-eur-italy",
+  JP: "https://gcdeals.net/no/group/28/playstation-network-cards-jpy-japan",
+  KR: "https://gcdeals.net/no/group/1021/playstation-network-gift-cards-nok-south-korea",
+  MX: "https://gcdeals.net/no/group/32/playstation-network-cards-usd-mexico",
+  NO: "https://gcdeals.net/no/group/9/playstation-network-cards-nok-norway",
+  NZ: "https://gcdeals.net/no/group/34/playstation-network-cards-nzd-new-zealand",
+  PL: "https://gcdeals.net/no/group/4/playstation-network-cards-pln-poland",
+  SE: "https://gcdeals.net/no/group/522/playstation-network-gift-cards-sek-sweden",
+  SG: "https://gcdeals.net/no/group/41/playstation-network-cards-sgd-singapore",
+  US: "https://gcdeals.net/no/group/1/playstation-network-cards-usd-united-states",
+  TR: "https://gcdeals.net/no/group/1050/playstation-network-gift-cards-try-turkey",
+  UA: "https://gcdeals.net/no/group/1078/playstation-network-gift-cards-uah-ukraine",
+  ZA: "https://gcdeals.net/no/group/43/playstation-network-cards-zar-south-africa",
+};
 const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
 const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1000;
 const CURRENT_HOST = window.location.hostname.replace(/^www\./, "").toLowerCase();
@@ -292,24 +341,29 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 requestCurrentOffers();
-function renderNoticeWithStoredState(offers: CashbackOffer[], priceMatches: PriceMatchOffer[] = []): void {
+function renderNoticeWithStoredState(
+  offers: CashbackOffer[],
+  priceMatches: PriceMatchOffer[] = [],
+  regionPrices?: PlayStationRegionPriceResult,
+): void {
   if (isNoticeBlockedHost(CURRENT_HOST)) {
     clearNotice();
     return;
   }
 
   const isUserscript = (chrome.runtime as { id?: string }).id === undefined;
-  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
+  chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, REGION_PRICES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
     const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
     if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
     const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
     const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
     const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
     const priceMatchCollapsed = result[PRICE_MATCH_COLLAPSED_KEY] === true;
+    const regionPricesCollapsed = result[REGION_PRICES_COLLAPSED_KEY] === true;
     void readActivatedOffers()
       .catch(() => ({}))
       .then((activatedOffers) => {
-        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, activatedOffers, priceMatches);
+        renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, regionPricesCollapsed, activatedOffers, priceMatches, regionPrices);
       });
   });
 }
@@ -331,12 +385,13 @@ function hasBlockedHostname(blockedHosts: ReadonlySet<string>, hostname: string)
 }
 
 async function renderCurrentContext(): Promise<void> {
-  const [offers, priceMatches] = await Promise.all([
+  const [offers, priceMatches, regionPrices] = await Promise.all([
     getCurrentOffers(),
     getPriceMatchesForCurrentPage(),
+    getPlayStationRegionPricesForCurrentPage(),
   ]);
-  if (offers.length > 0 || priceMatches.length > 0) {
-    renderNoticeWithStoredState(offers, priceMatches);
+  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
+    renderNoticeWithStoredState(offers, priceMatches, regionPrices);
     return;
   }
   clearNotice();
@@ -389,6 +444,31 @@ async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
     return response.offers ?? (response.offer !== undefined ? [response.offer] : []);
   }
   return [];
+}
+
+async function getPlayStationRegionPricesForCurrentPage(): Promise<PlayStationRegionPriceResult | undefined> {
+  if (!isPlayStationProductUrl(window.location.href)) {
+    return undefined;
+  }
+
+  const message: GetPlayStationRegionPricesMessage = {
+    type: "get-playstation-region-prices",
+    url: window.location.href,
+  };
+
+  if (isUserscriptRuntime()) {
+    return findPlayStationRegionPrices(
+      window.location.href,
+      (url) => userscriptTextRequest(url),
+      (url) => userscriptJsonRequest(url),
+    );
+  }
+
+  const response = await sendRuntimeMessage<PlayStationRegionPricesResponse>(message);
+  if (response !== undefined && isPlayStationRegionPricesResponse(response) && response.ok) {
+    return response.result;
+  }
+  return undefined;
 }
 
 function isUserscriptRuntime(): boolean {
@@ -1435,8 +1515,10 @@ function renderNotice(
   initialChipsCollapsed: boolean,
   initialCodesCollapsed: boolean,
   initialPriceMatchCollapsed: boolean,
+  initialRegionPricesCollapsed: boolean,
   activatedOffers: Readonly<Record<string, number>>,
   priceMatches: PriceMatchOffer[] = [],
+  regionPrices?: PlayStationRegionPriceResult,
 ): void {
   clearNotice();
   const host = document.createElement("div");
@@ -1789,6 +1871,10 @@ function renderNotice(
       border: 1px solid #d3e2dc;
       color: #0c4598;
     }
+    .provider-region {
+      background: #eaf7ef;
+      color: #166b47;
+    }
     .provider-sparebank1 {
       background: #005aa4;
       color: #ffffff;
@@ -2102,7 +2188,8 @@ function renderNotice(
     }
     .bonus-chips-section.collapsed .bonus-chips-toggle,
     .codes-section.collapsed .codes-toggle,
-    .price-match-section.collapsed .price-match-toggle {
+    .price-match-section.collapsed .price-match-toggle,
+    .region-prices-section.collapsed .region-prices-toggle {
       margin-bottom: 0;
     }
     .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
@@ -2145,11 +2232,13 @@ function renderNotice(
     .codes-section.collapsed .codes-toggle-arrow {
       transform: rotate(-90deg);
     }
-    .price-match-section {
+    .price-match-section,
+    .region-prices-section {
       margin-top: -4px;
       padding: 6px 0 4px;
     }
-    .price-match-toggle {
+    .price-match-toggle,
+    .region-prices-toggle {
       align-items: center;
       appearance: none;
       background: none;
@@ -2165,10 +2254,12 @@ function renderNotice(
       padding: 0;
       width: 100%;
     }
-    .price-match-toggle:hover {
+    .price-match-toggle:hover,
+    .region-prices-toggle:hover {
       color: #4f5f66;
     }
-    .price-match-toggle-arrow {
+    .price-match-toggle-arrow,
+    .region-prices-toggle-arrow {
       display: inline-block;
       font-size: 10px;
       transition: transform 0.15s;
@@ -2176,10 +2267,15 @@ function renderNotice(
     .price-match-section.collapsed .price-match-card {
       display: none;
     }
-    .price-match-section.collapsed .price-match-toggle-arrow {
+    .region-prices-section.collapsed .region-price-card {
+      display: none;
+    }
+    .price-match-section.collapsed .price-match-toggle-arrow,
+    .region-prices-section.collapsed .region-prices-toggle-arrow {
       transform: rotate(-90deg);
     }
-    .price-match-card {
+    .price-match-card,
+    .region-price-card {
       align-items: center;
       background: #f7faf8;
       border: 1px solid #d8e3de;
@@ -2192,32 +2288,42 @@ function renderNotice(
       padding: 6px 9px;
       text-decoration: none;
     }
+    .region-price-card {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
     .price-match-card.price-match-card--best .price-match-product,
-    .price-match-card.price-match-card--best .price-match-price {
+    .price-match-card.price-match-card--best .price-match-price,
+    .region-price-card.region-price-card--best .region-price-country,
+    .region-price-card.region-price-card--best .region-price-nok {
       color: #3a7d55;
     }
-    .price-match-card + .price-match-card {
+    .price-match-card + .price-match-card,
+    .region-price-card + .region-price-card {
       margin-top: 4px;
     }
-    .price-match-title {
+    .price-match-title,
+    .region-price-title {
       display: flex;
       flex-direction: column;
       gap: 2px;
       min-width: 0;
     }
-    .price-match-product {
+    .price-match-product,
+    .region-price-country {
       font-weight: 700;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .price-match-shop {
+    .price-match-shop,
+    .region-price-native {
       color: #5d6b71;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .price-match-price {
+    .price-match-price,
+    .region-price-nok {
       color: #172026;
       font-weight: 800;
       white-space: nowrap;
@@ -2449,6 +2555,7 @@ function renderNotice(
   const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const priceMatch = priceMatches[0];
+  const bestRegionPrice = regionPrices?.prices[0];
   const curveOffer = offers.find((o) => o.provider === "curve");
   const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
   const APP_ONLY_PROVIDERS = new Set(["klarna", "spenn", "dreams"]);
@@ -2462,16 +2569,16 @@ function renderNotice(
   const cryptoSub = cryptoSubEntry?.[1];
   const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
   const offer = mainOffers[0];
-  if (offer === undefined && codeOffers.length === 0 && priceMatch === undefined) {
+  if (offer === undefined && codeOffers.length === 0 && priceMatch === undefined && bestRegionPrice === undefined) {
     return;
   }
   const primaryOffer = offer ?? codeOffers[0];
-  if (primaryOffer === undefined && priceMatch === undefined) {
+  if (primaryOffer === undefined && priceMatch === undefined && bestRegionPrice === undefined) {
     return;
   }
   const notice = document.createElement("section");
   notice.className = "notice";
-  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "rabattkode");
+  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "region");
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
   sideTab.className = `side-tab side-tab-${sideTabProvider}`;
@@ -2510,6 +2617,14 @@ function renderNotice(
     chipSpan.className = `side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
     chipSpan.textContent = getPriceMatchSourceName(priceMatch);
     sideTabText.append(rewardSpan, chipSpan);
+  } else if (bestRegionPrice !== undefined) {
+    const rewardSpan = document.createElement("span");
+    rewardSpan.className = "side-tab-reward";
+    rewardSpan.textContent = bestRegionPrice.formattedNok;
+    const chipSpan = document.createElement("span");
+    chipSpan.className = "side-tab-chip provider-region";
+    chipSpan.textContent = "Region";
+    sideTabText.append(rewardSpan, chipSpan);
   }
   sideTab.append(sideTabArrow, sideTabText);
   sideTab.addEventListener("click", () => {
@@ -2534,7 +2649,7 @@ function renderNotice(
         ? `Rabattkode hos ${primaryOffer.merchantName}`
       : priceMatch !== undefined
         ? `Prismatch hos ${priceMatch.shopName}`
-        : "Prismatch";
+        : "Regionpriser";
   header.append(siteIcon, title);
   const sumInput = document.createElement("input");
   sumInput.className = "sum-input";
@@ -2544,7 +2659,9 @@ function renderNotice(
   sumInput.addEventListener("keydown", (e) => {
     if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
   });
-  header.append(sumInput);
+  if (mainOffers.length > 0) {
+    header.append(sumInput);
+  }
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
   const offerList = document.createElement("div");
@@ -3274,6 +3391,48 @@ function renderNotice(
   };
 
   codesSection.append(codesToggle, codesList, expiredSection);
+  const regionPricesSection = document.createElement("div");
+  regionPricesSection.className = "region-prices-section";
+  if (regionPrices !== undefined && regionPrices.prices.length > 0) {
+    if (initialRegionPricesCollapsed) {
+      regionPricesSection.classList.add("collapsed");
+    }
+
+    const displayedRegionPrices = pickDisplayedPlayStationRegionPrices(regionPrices.prices, 10);
+    const regionPricesToggle = document.createElement("button");
+    regionPricesToggle.className = "region-prices-toggle";
+    regionPricesToggle.type = "button";
+    const regionPricesToggleArrow = document.createElement("span");
+    regionPricesToggleArrow.className = "region-prices-toggle-arrow";
+    regionPricesToggleArrow.textContent = "\u25BC";
+    const regionPricesToggleText = document.createElement("span");
+    regionPricesToggleText.textContent = "Region ⚠";
+    regionPricesToggle.append(regionPricesToggleArrow, regionPricesToggleText);
+    regionPricesToggle.addEventListener("click", () => {
+      const isCollapsed = regionPricesSection.classList.toggle("collapsed");
+      chrome.storage.local.set({ [REGION_PRICES_COLLAPSED_KEY]: isCollapsed });
+    });
+    const regionPriceCards = displayedRegionPrices.map((regionPrice) => {
+      const card = buildRegionPriceCard(regionPrice, regionPrice.region === regionPrices.prices[0]?.region);
+      const tooltip = document.createElement("div");
+      tooltip.className = "offer-tooltip";
+      setTooltipContent(tooltip, [buildRegionPricesTooltip(regionPrices)]);
+      shadowRoot.append(tooltip);
+      card.addEventListener("mouseenter", () => {
+        positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+      });
+      card.addEventListener("mouseleave", () => {
+        tooltip.classList.remove("visible");
+      });
+      return card;
+    });
+
+    regionPricesSection.append(
+      regionPricesToggle,
+      ...regionPriceCards,
+    );
+  }
+
   const priceMatchSection = document.createElement("div");
   priceMatchSection.className = "price-match-section";
   if (priceMatches.length > 0) {
@@ -3301,7 +3460,9 @@ function renderNotice(
     );
   }
 
-  body.append(header, offerList);
+  body.append(header);
+  if (mainOffers.length > 0) body.append(offerList);
+  if (regionPrices !== undefined && regionPrices.prices.length > 0) body.append(regionPricesSection);
   if (priceMatches.length > 0) body.append(priceMatchSection);
   if (offers.length > 0) body.append(chipsSection, codesSection);
 
@@ -3766,6 +3927,41 @@ function isPriceMatchForProductResponse(value: unknown): value is PriceMatchForP
   }
   return typeof value.reason === "string";
 }
+function isPlayStationRegionPricesResponse(value: unknown): value is PlayStationRegionPricesResponse {
+  if (!isRecord(value) || typeof value.ok !== "boolean") {
+    return false;
+  }
+  if (value.ok) {
+    return value.result === undefined || isPlayStationRegionPriceResult(value.result);
+  }
+  return typeof value.reason === "string";
+}
+function isPlayStationRegionPriceResult(value: unknown): value is PlayStationRegionPriceResult {
+  return (
+    isRecord(value) &&
+    typeof value.productId === "string" &&
+    typeof value.fetchedAt === "string" &&
+    (value.productName === undefined || typeof value.productName === "string") &&
+    (value.ratesUpdatedAt === undefined || typeof value.ratesUpdatedAt === "string") &&
+    Array.isArray(value.prices) &&
+    value.prices.every(isPlayStationRegionPrice)
+  );
+}
+function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPrice {
+  return (
+    isRecord(value) &&
+    typeof value.region === "string" &&
+    typeof value.countryName === "string" &&
+    typeof value.flag === "string" &&
+    typeof value.locale === "string" &&
+    typeof value.currency === "string" &&
+    typeof value.price === "number" &&
+    typeof value.formattedPrice === "string" &&
+    typeof value.nokAmount === "number" &&
+    typeof value.formattedNok === "string" &&
+    typeof value.productUrl === "string"
+  );
+}
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
@@ -4055,6 +4251,51 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
   priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
   return priceMatchCard;
+}
+function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = false): HTMLAnchorElement {
+  const regionPriceCard = document.createElement("a");
+  regionPriceCard.className = "region-price-card";
+  if (isBest) regionPriceCard.classList.add("region-price-card--best");
+  regionPriceCard.href = getRegionPriceLink(regionPrice);
+  regionPriceCard.target = "_blank";
+  regionPriceCard.rel = "noreferrer";
+
+  const regionPriceTitle = document.createElement("span");
+  regionPriceTitle.className = "region-price-title";
+  const regionPriceCountry = document.createElement("span");
+  regionPriceCountry.className = "region-price-country";
+  regionPriceCountry.textContent = `${regionPrice.flag} ${regionPrice.countryName}`;
+  const regionPriceNative = document.createElement("span");
+  regionPriceNative.className = "region-price-native";
+  regionPriceNative.textContent = regionPrice.formattedPrice;
+  regionPriceTitle.append(regionPriceCountry, regionPriceNative);
+
+  const regionPriceNok = document.createElement("span");
+  regionPriceNok.className = "region-price-nok";
+  regionPriceNok.textContent = regionPrice.formattedNok;
+
+  regionPriceCard.append(regionPriceTitle, regionPriceNok);
+  return regionPriceCard;
+}
+function getRegionPriceLink(regionPrice: PlayStationRegionPrice): string {
+  if (regionPrice.region === "NO") {
+    return regionPrice.productUrl;
+  }
+  return PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL;
+}
+function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): string {
+  const lines = regionPrices.prices.map((regionPrice) =>
+    `${regionPrice.flag} ${regionPrice.countryName}: ${regionPrice.formattedPrice} (${regionPrice.formattedNok})`
+  );
+  const rateLine = regionPrices.ratesUpdatedAt !== undefined ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
+  return [
+    "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
+    "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
+    "Ikke-norske rader åpner GCDeals for PSN-gavekort i valgt region når vi har direkte lenke.",
+    "Alle regioner",
+    ...lines,
+    rateLine,
+  ].join("\n");
 }
 function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "godpris") return "godpris";

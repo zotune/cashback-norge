@@ -36,6 +36,8 @@ const USERSCRIPT_BANNER = `\
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      www.klarna.com
+// @connect      store.playstation.com
+// @connect      open.er-api.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no
 // @run-at       document-idle

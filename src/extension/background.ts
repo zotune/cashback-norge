@@ -7,12 +7,21 @@ import {
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import { findPriceMatches } from "../shared/price-match.js";
 import {
+  findPlayStationRegionPrices,
+  isPlayStationProductUrl,
+  parsePlayStationProductId,
+  type PlayStationRegionPriceResult,
+} from "../shared/playstation-region-prices.js";
+import {
   type CashbackFoundMessage,
   type CashbackNoneMessage,
+  type GetPlayStationRegionPricesMessage,
   type GetPriceMatchForProductMessage,
   type GetOffersForUrlMessage,
   type OffersForUrlResponse,
+  type PlayStationRegionPricesResponse,
   type PriceMatchForProductResponse,
+  isGetPlayStationRegionPricesMessage,
   isGetOffersForUrlMessage,
   isGetPriceMatchForProductMessage,
 } from "../shared/extension-messages.js";
@@ -25,6 +34,8 @@ type CachedIndex = {
 const STORAGE_KEY = "cashback-index";
 const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
+const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v2";
+const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshIndex();
@@ -61,7 +72,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function handleRuntimeMessage(
   message: unknown,
-  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse) => void,
+  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse) => void,
 ): Promise<void> {
   if (isGetOffersForUrlMessage(message)) {
     const response = await findOffersForUrl(message);
@@ -71,6 +82,12 @@ async function handleRuntimeMessage(
 
   if (isGetPriceMatchForProductMessage(message)) {
     const response = await findPriceMatchForProduct(message);
+    sendResponse(response);
+    return;
+  }
+
+  if (isGetPlayStationRegionPricesMessage(message)) {
+    const response = await getPlayStationRegionPrices(message);
     sendResponse(response);
     return;
   }
@@ -99,6 +116,27 @@ async function findPriceMatchForProduct(
 ): Promise<PriceMatchForProductResponse> {
   const offers = await findPriceMatches(message);
   return { ok: true, ...(offers[0] !== undefined ? { offer: offers[0], offers } : {}) };
+}
+
+async function getPlayStationRegionPrices(
+  message: GetPlayStationRegionPricesMessage,
+): Promise<PlayStationRegionPricesResponse> {
+  if (!isPlayStationProductUrl(message.url)) {
+    return { ok: true };
+  }
+
+  const cached = await readCachedPlayStationRegionPrices(message.url);
+  if (cached !== undefined) {
+    return { ok: true, result: cached };
+  }
+
+  const result = await findPlayStationRegionPrices(message.url);
+  if (result === undefined) {
+    return { ok: true };
+  }
+
+  await cachePlayStationRegionPrices(result);
+  return { ok: true, result };
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {
@@ -167,6 +205,32 @@ async function fetchRemoteIndex(): Promise<void> {
   }
 }
 
+async function readCachedPlayStationRegionPrices(url: string): Promise<PlayStationRegionPriceResult | undefined> {
+  const productId = parsePlayStationProductId(url);
+  if (productId === undefined) {
+    return undefined;
+  }
+
+  const cache = await getStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY);
+  if (!isPlainRecord(cache)) {
+    return undefined;
+  }
+
+  const cached = cache[productId];
+  if (!isPlayStationRegionPriceResult(cached) || !isFreshWithin(cached.fetchedAt, PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS)) {
+    return undefined;
+  }
+
+  return cached;
+}
+
+async function cachePlayStationRegionPrices(result: PlayStationRegionPriceResult): Promise<void> {
+  const cache = await getStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY);
+  const next = isPlainRecord(cache) ? { ...cache } : {};
+  next[result.productId] = result;
+  await setStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY, next);
+}
+
 async function readBundledIndex(): Promise<CashbackIndex> {
   const response = await fetch(chrome.runtime.getURL("cashback-index.json"));
   const value: unknown = await response.json();
@@ -200,13 +264,17 @@ function isCachedIndex(value: unknown): value is CachedIndex {
 }
 
 function isFresh(downloadedAt: string): boolean {
+  return isFreshWithin(downloadedAt, INDEX_MAX_AGE_MS);
+}
+
+function isFreshWithin(downloadedAt: string, maxAgeMs: number): boolean {
   const downloadedAtMs = Date.parse(downloadedAt);
 
   if (!Number.isFinite(downloadedAtMs)) {
     return false;
   }
 
-  return Date.now() - downloadedAtMs < INDEX_MAX_AGE_MS;
+  return Date.now() - downloadedAtMs < maxAgeMs;
 }
 
 function parseHttpUrl(url: string): URL | undefined {
@@ -272,6 +340,34 @@ function getAllWindows(): Promise<chrome.windows.Window[]> {
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPlayStationRegionPriceResult(value: unknown): value is PlayStationRegionPriceResult {
+  return (
+    isPlainRecord(value) &&
+    typeof value.productId === "string" &&
+    typeof value.fetchedAt === "string" &&
+    (value.productName === undefined || typeof value.productName === "string") &&
+    (value.ratesUpdatedAt === undefined || typeof value.ratesUpdatedAt === "string") &&
+    Array.isArray(value.prices) &&
+    value.prices.every(isPlayStationRegionPrice)
+  );
+}
+
+function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPriceResult["prices"][number] {
+  return (
+    isPlainRecord(value) &&
+    typeof value.region === "string" &&
+    typeof value.countryName === "string" &&
+    typeof value.flag === "string" &&
+    typeof value.locale === "string" &&
+    typeof value.currency === "string" &&
+    typeof value.price === "number" &&
+    typeof value.formattedPrice === "string" &&
+    typeof value.nokAmount === "number" &&
+    typeof value.formattedNok === "string" &&
+    typeof value.productUrl === "string"
+  );
 }
 
 function sendTabMessage(

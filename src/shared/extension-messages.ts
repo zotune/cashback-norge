@@ -3,6 +3,9 @@ import {
   isCashbackOffer,
   isRecord,
 } from "./cashback.js";
+import type {
+  PlayStationRegionPriceResult,
+} from "./playstation-region-prices.js";
 
 export type CashbackFoundMessage = {
   type: "cashback-found";
@@ -28,6 +31,11 @@ export type GetPriceMatchForProductMessage = {
   codes?: string[];
   productPageClue?: boolean;
   organizationName?: string;
+};
+
+export type GetPlayStationRegionPricesMessage = {
+  type: "get-playstation-region-prices";
+  url: string;
 };
 
 export type ToggleNoticeMessage = {
@@ -80,6 +88,16 @@ export type PriceMatchForProductResponse =
       reason: string;
     };
 
+export type PlayStationRegionPricesResponse =
+  | {
+      ok: true;
+      result?: PlayStationRegionPriceResult;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
 export function isCashbackFoundMessage(
   value: unknown,
 ): value is CashbackFoundMessage {
@@ -121,6 +139,16 @@ export function isGetPriceMatchForProductMessage(
     (value.codes === undefined || (Array.isArray(value.codes) && value.codes.every((code) => typeof code === "string"))) &&
     (value.productPageClue === undefined || typeof value.productPageClue === "boolean") &&
     (value.organizationName === undefined || typeof value.organizationName === "string")
+  );
+}
+
+export function isGetPlayStationRegionPricesMessage(
+  value: unknown,
+): value is GetPlayStationRegionPricesMessage {
+  return (
+    isRecord(value) &&
+    value.type === "get-playstation-region-prices" &&
+    typeof value.url === "string"
   );
 }
 
