@@ -19,6 +19,11 @@ type AugmentedSteamAppInfo = {
   infoUrl?: string;
 };
 
+type AugmentedSteamTarget = {
+  type: "app" | "sub" | "bundle";
+  id: number;
+};
+
 type ItadPageContext = {
   gameId: string;
   infoUrl: string;
@@ -49,6 +54,7 @@ const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
 const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
 const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
 const MAX_ITAD_ALTERNATIVES = 8;
+const MAX_STEAM_PURCHASE_TARGETS = 8;
 const STEAM_SHOP_ID = 61;
 const FALLBACK_ITAD_SHOP_IDS = [
   19, 2, 4, 13, 15, 52, 16, 67, 6, 17, 75, 20, 24, 25, 27, 28, 26, 29, 76,
@@ -63,10 +69,18 @@ export async function findIsthereanydealPriceMatch(
   const appId = parseSteamAppId(message.url) ?? parseSteamAppId(message.productUrl);
   if (appId === undefined) return undefined;
 
-  const appInfo = readAugmentedSteamAppInfo(
-    await fetchAugmentedSteamPrices(appId, requestJson),
-    appId,
+  const appTarget: AugmentedSteamTarget = { type: "app", id: appId };
+  let appInfo = readAugmentedSteamAppInfo(
+    await fetchAugmentedSteamPrices([appTarget], requestJson),
+    [appTarget],
   );
+  if (appInfo?.infoUrl === undefined) {
+    const purchaseTargets = await fetchSteamPurchaseTargets(message, requestText);
+    appInfo = readAugmentedSteamAppInfo(
+      await fetchAugmentedSteamPrices(purchaseTargets, requestJson),
+      purchaseTargets,
+    );
+  }
   if (appInfo?.infoUrl === undefined) return undefined;
 
   const pageContext = await fetchItadPageContext(appInfo.infoUrl, requestText);
@@ -118,9 +132,11 @@ export function parseSteamAppId(rawUrl: string | undefined): number | undefined 
 }
 
 async function fetchAugmentedSteamPrices(
-  appId: number,
+  targets: AugmentedSteamTarget[],
   requestJson: JsonRequest,
 ): Promise<unknown | undefined> {
+  if (targets.length === 0) return undefined;
+
   return requestJson(AUGMENTED_STEAM_PRICES_URL, {
     method: "POST",
     headers: {
@@ -129,25 +145,84 @@ async function fetchAugmentedSteamPrices(
     },
     body: JSON.stringify({
       country: "NO",
-      apps: [appId],
-      subs: [],
-      bundles: [],
+      apps: targets.filter((target) => target.type === "app").map((target) => target.id),
+      subs: targets.filter((target) => target.type === "sub").map((target) => target.id),
+      bundles: targets.filter((target) => target.type === "bundle").map((target) => target.id),
       voucher: true,
       shops: FALLBACK_ITAD_SHOP_IDS,
     }),
   });
 }
 
-function readAugmentedSteamAppInfo(value: unknown, appId: number): AugmentedSteamAppInfo | undefined {
+function readAugmentedSteamAppInfo(
+  value: unknown,
+  targets: AugmentedSteamTarget[],
+): AugmentedSteamAppInfo | undefined {
   if (!isRecord(value) || !isRecord(value.prices)) return undefined;
-  const appPrices = value.prices[`app/${appId}`];
-  if (!isRecord(appPrices)) return undefined;
 
-  const urls = isRecord(appPrices.urls) ? appPrices.urls : undefined;
-  const infoUrl = typeof urls?.info === "string" && urls.info.length > 0
-    ? urls.info
-    : undefined;
-  return infoUrl !== undefined ? { infoUrl } : undefined;
+  for (const target of targets) {
+    const targetPrices = value.prices[`${target.type}/${target.id}`];
+    if (!isRecord(targetPrices)) continue;
+
+    const urls = isRecord(targetPrices.urls) ? targetPrices.urls : undefined;
+    const infoUrl = typeof urls?.info === "string" && urls.info.length > 0
+      ? urls.info
+      : undefined;
+    if (infoUrl !== undefined) return { infoUrl };
+  }
+
+  return undefined;
+}
+
+async function fetchSteamPurchaseTargets(
+  message: GetPriceMatchForProductMessage,
+  requestText: TextRequest,
+): Promise<AugmentedSteamTarget[]> {
+  const steamUrl = readSteamAppUrl(message.url) ?? readSteamAppUrl(message.productUrl);
+  if (steamUrl === undefined) return [];
+
+  const html = await requestText(steamUrl, {
+    headers: { "Accept": "text/html" },
+  });
+  if (html === undefined) return [];
+
+  return readSteamPurchaseTargets(html);
+}
+
+function readSteamAppUrl(rawUrl: string | undefined): string | undefined {
+  if (parseSteamAppId(rawUrl) === undefined || rawUrl === undefined) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    url.searchParams.set("cc", "no");
+    url.searchParams.set("l", "english");
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function readSteamPurchaseTargets(html: string): AugmentedSteamTarget[] {
+  const targets: AugmentedSteamTarget[] = [];
+  const seen = new Set<string>();
+  const patterns: Array<{ type: AugmentedSteamTarget["type"]; pattern: RegExp }> = [
+    { type: "sub", pattern: /\bname=["']subid["'][^>]*\bvalue=["'](\d+)["']/gi },
+    { type: "bundle", pattern: /\bname=["']bundleid["'][^>]*\bvalue=["'](\d+)["']/gi },
+    { type: "sub", pattern: /\/sub\/(\d+)(?:\/|["'?#])/gi },
+    { type: "bundle", pattern: /\/bundle\/(\d+)(?:\/|["'?#])/gi },
+  ];
+
+  for (const { type, pattern } of patterns) {
+    for (const match of html.matchAll(pattern)) {
+      const id = Number.parseInt(match[1] ?? "", 10);
+      const key = `${type}/${id}`;
+      if (!Number.isInteger(id) || id <= 0 || seen.has(key)) continue;
+      targets.push({ type, id });
+      seen.add(key);
+      if (targets.length >= MAX_STEAM_PURCHASE_TARGETS) return targets;
+    }
+  }
+
+  return targets;
 }
 
 async function fetchItadPageContext(
