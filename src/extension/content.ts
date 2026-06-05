@@ -2089,8 +2089,8 @@ function renderNotice(
     .provider-psprices {
       background: #2b2927;
       color: #ffffff;
-      font-variant-caps: all-small-caps;
-      text-transform: lowercase;
+      font-variant-caps: normal;
+      text-transform: none;
     }
     .provider-taxfree {
       background: #e3000f;
