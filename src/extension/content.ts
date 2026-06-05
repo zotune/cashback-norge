@@ -9,10 +9,10 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import { isSteamAppProductUrl } from "../shared/isthereanydeal-price-match";
 import {
   findPlayStationRegionPrices,
   isPlayStationProductUrl,
-  pickDisplayedPlayStationRegionPrices,
   type PlayStationRegionPrice,
   type PlayStationRegionPriceResult,
 } from "../shared/playstation-region-prices";
@@ -216,7 +216,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   shopName: string;
@@ -481,6 +481,7 @@ async function userscriptJsonRequest(
     method?: string;
     headers?: Record<string, string>;
     body?: string;
+    credentials?: RequestCredentials;
   },
 ): Promise<unknown | undefined> {
   const gmRequest = typeof GM_xmlhttpRequest === "function"
@@ -529,6 +530,7 @@ async function userscriptTextRequest(
     method?: string;
     headers?: Record<string, string>;
     body?: string;
+    credentials?: RequestCredentials;
   },
 ): Promise<string | undefined> {
   const gmRequest = typeof GM_xmlhttpRequest === "function"
@@ -736,10 +738,18 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
     return /^\/produkter\/[^/]+\/?$/.test(pathname);
   }
 
+  if (hostname.endsWith("store.steampowered.com")) {
+    return /^\/app\/\d+(?:\/|$)/.test(pathname);
+  }
+
   return false;
 }
 
 function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
+  if (isSteamAppProductUrl(parsedUrl.toString())) {
+    return true;
+  }
+
   const strongProductishPath =
     /(?:^|\/)(?:product|produkt|produkter)\/[^/]+/i.test(parsedUrl.pathname) ||
     /^\/(?:i|p)\/\d+\/[-\w%]+\/?$/i.test(parsedUrl.pathname);
@@ -1871,6 +1881,10 @@ function renderNotice(
       border: 1px solid #d3e2dc;
       color: #0c4598;
     }
+    .provider-isthereanydeal {
+      background: #2d2f42;
+      color: #ffffff;
+    }
     .provider-region {
       background: #eaf7ef;
       color: #166b47;
@@ -2623,7 +2637,7 @@ function renderNotice(
     rewardSpan.textContent = bestRegionPrice.formattedNok;
     const chipSpan = document.createElement("span");
     chipSpan.className = "side-tab-chip provider-region";
-    chipSpan.textContent = "Region";
+    chipSpan.textContent = `${bestRegionPrice.flag} Region`;
     sideTabText.append(rewardSpan, chipSpan);
   }
   sideTab.append(sideTabArrow, sideTabText);
@@ -3398,7 +3412,7 @@ function renderNotice(
       regionPricesSection.classList.add("collapsed");
     }
 
-    const displayedRegionPrices = pickDisplayedPlayStationRegionPrices(regionPrices.prices, 10);
+    const displayedRegionPrices = regionPrices.prices;
     const regionPricesToggle = document.createElement("button");
     regionPricesToggle.className = "region-prices-toggle";
     regionPricesToggle.type = "button";
@@ -3959,13 +3973,14 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
     typeof value.formattedPrice === "string" &&
     typeof value.nokAmount === "number" &&
     typeof value.formattedNok === "string" &&
-    typeof value.productUrl === "string"
+    typeof value.productUrl === "string" &&
+    (value.priceHistoryUrl === undefined || typeof value.priceHistoryUrl === "string")
   );
 }
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     typeof value.shopName === "string" &&
@@ -4279,21 +4294,18 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
 }
 function getRegionPriceLink(regionPrice: PlayStationRegionPrice): string {
   if (regionPrice.region === "NO") {
-    return regionPrice.productUrl;
+    return regionPrice.priceHistoryUrl ?? regionPrice.productUrl;
   }
   return PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL;
 }
 function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): string {
-  const lines = regionPrices.prices.map((regionPrice) =>
-    `${regionPrice.flag} ${regionPrice.countryName}: ${regionPrice.formattedPrice} (${regionPrice.formattedNok})`
-  );
   const rateLine = regionPrices.ratesUpdatedAt !== undefined ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
   return [
     "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
     "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
+    "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
+    "Norge-raden åpner PSPrices for norsk prishistorikk.",
     "Ikke-norske rader åpner GCDeals for PSN-gavekort i valgt region når vi har direkte lenke.",
-    "Alle regioner",
-    ...lines,
     rateLine,
   ].join("\n");
 }
@@ -4301,6 +4313,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "godpris") return "godpris";
   if (priceMatch.source === "klarna") return "klarna";
   if (priceMatch.source === "prisradar") return "prisradar";
+  if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
@@ -4308,6 +4321,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "godpris") return "Godpris";
   if (priceMatch.source === "klarna") return "Klarna";
   if (priceMatch.source === "prisradar") return "Prisradar";
+  if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {

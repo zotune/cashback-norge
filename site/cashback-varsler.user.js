@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780656377
+// @version      1780663745
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -15,7 +15,10 @@
 // @connect      native-backend.cloud.pji.nu
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
+// @connect      api.augmentedsteam.com
+// @connect      isthereanydeal.com
 // @connect      www.klarna.com
+// @connect      www.playstation.com
 // @connect      store.playstation.com
 // @connect      open.er-api.com
 // @connect      gql.prisradar.no
@@ -471,7 +474,7 @@
     ["samsung"],
     ["sony", "playstation"]
   ];
-  async function findGodprisPriceMatch(message, requestJson = fetchJson$3, requestText = fetchText$1) {
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$4, requestText = fetchText$2) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -563,7 +566,7 @@
     const match = html.match(/<div id="app" data-page="([^"]*)"/);
     if (match?.[1] === void 0) return void 0;
     try {
-      return JSON.parse(decodeHtmlAttribute(match[1]));
+      return JSON.parse(decodeHtmlAttribute$1(match[1]));
     } catch {
       return void 0;
     }
@@ -590,7 +593,7 @@
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
-  async function fetchJson$3(url, init) {
+  async function fetchJson$4(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -599,7 +602,7 @@
       return void 0;
     }
   }
-  async function fetchText$1(url, init) {
+  async function fetchText$2(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -614,7 +617,7 @@
     }).format(amount);
     return `${formatted} kr`;
   }
-  function decodeHtmlAttribute(value) {
+  function decodeHtmlAttribute$1(value) {
     return value.replace(/&quot;/g, '"').replace(/&#039;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
   function readStringLike$2(value) {
@@ -643,6 +646,324 @@
     return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
   function isPlainRecord$3(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
+  const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
+  const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
+  const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
+  const MAX_ITAD_ALTERNATIVES = 8;
+  const STEAM_SHOP_ID = 61;
+  const FALLBACK_ITAD_SHOP_IDS = [
+    19,
+    2,
+    4,
+    13,
+    15,
+    52,
+    16,
+    67,
+    6,
+    17,
+    75,
+    20,
+    24,
+    25,
+    27,
+    28,
+    26,
+    29,
+    76,
+    35,
+    36,
+    37,
+    42,
+    65,
+    47,
+    48,
+    49,
+    50,
+    73,
+    70,
+    STEAM_SHOP_ID,
+    62,
+    64,
+    72
+  ];
+  async function findIsthereanydealPriceMatch(message, requestJson = fetchJson$3, requestText = fetchText$1) {
+    const appId = parseSteamAppId(message.url) ?? parseSteamAppId(message.productUrl);
+    if (appId === void 0) return void 0;
+    const appInfo = readAugmentedSteamAppInfo(
+      await fetchAugmentedSteamPrices(appId, requestJson),
+      appId
+    );
+    if (appInfo?.infoUrl === void 0) return void 0;
+    const pageContext = await fetchItadPageContext(appInfo.infoUrl, requestText);
+    if (pageContext === void 0) return void 0;
+    const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
+    const deals = readItadDeals(gameInfo, pageContext.shops).filter((deal) => deal.currency === "NOK").sort((first, second) => first.amount - second.amount);
+    const bestDeal = deals[0];
+    if (bestDeal === void 0) return void 0;
+    const productName = pageContext.title ?? readSteamProductName(message) ?? "Steam-spill";
+    const productUrl = pageContext.slug !== void 0 ? `${ISTHEREANYDEAL_ORIGIN}/game/${pageContext.slug}/info/` : pageContext.infoUrl;
+    return {
+      source: "isthereanydeal",
+      sourceName: "IsThereAnyDeal",
+      matchedCurrentMerchant: deals.some((deal) => deal.shopId === STEAM_SHOP_ID),
+      shopName: bestDeal.shopName,
+      amount: bestDeal.amount,
+      sortAmount: bestDeal.amount,
+      currency: bestDeal.currency,
+      price: bestDeal.price,
+      productName,
+      productUrl,
+      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative)
+    };
+  }
+  function isSteamAppProductUrl(rawUrl) {
+    return parseSteamAppId(rawUrl) !== void 0;
+  }
+  function parseSteamAppId(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+      if (hostname !== "store.steampowered.com") return void 0;
+      const appId = Number.parseInt(url.pathname.match(/^\/app\/(\d+)(?:\/|$)/i)?.[1] ?? "", 10);
+      return Number.isInteger(appId) && appId > 0 ? appId : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchAugmentedSteamPrices(appId, requestJson) {
+    return requestJson(AUGMENTED_STEAM_PRICES_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        country: "NO",
+        apps: [appId],
+        subs: [],
+        bundles: [],
+        voucher: true,
+        shops: FALLBACK_ITAD_SHOP_IDS
+      })
+    });
+  }
+  function readAugmentedSteamAppInfo(value, appId) {
+    if (!isRecord$2(value) || !isRecord$2(value.prices)) return void 0;
+    const appPrices = value.prices[`app/${appId}`];
+    if (!isRecord$2(appPrices)) return void 0;
+    const urls = isRecord$2(appPrices.urls) ? appPrices.urls : void 0;
+    const infoUrl = typeof urls?.info === "string" && urls.info.length > 0 ? urls.info : void 0;
+    return infoUrl !== void 0 ? { infoUrl } : void 0;
+  }
+  async function fetchItadPageContext(infoUrl, requestText) {
+    const html = await requestText(infoUrl, {
+      headers: { "Accept": "text/html" },
+      credentials: "include"
+    });
+    if (html === void 0) return void 0;
+    const globalState = parseScriptJson(html, /var g = (\{[\s\S]*?\});\s*var page = /);
+    const pageState = parseScriptJson(html, /var page = (\[[\s\S]*?\]);\s*var /);
+    if (!isRecord$2(globalState) || !Array.isArray(pageState)) return void 0;
+    const user = isRecord$2(globalState.user) ? globalState.user : void 0;
+    const token = typeof user?.token === "string" && user.token.length > 0 ? user.token : void 0;
+    const visitorId = typeof user?.id === "string" && user.id.length > 0 ? user.id : void 0;
+    const shops = readItadShops(globalState.shops);
+    const pageProps = isRecord$2(pageState[1]) ? pageState[1] : void 0;
+    const game = isRecord$2(pageProps?.game) ? pageProps.game : void 0;
+    const gameId = typeof game?.id === "string" && game.id.length > 0 ? game.id : void 0;
+    if (token === void 0 || gameId === void 0 || shops.size === 0) return void 0;
+    const slug = typeof game?.slug === "string" && game.slug.length > 0 ? game.slug : void 0;
+    const title = typeof game?.title === "string" && game.title.length > 0 ? game.title : void 0;
+    return {
+      gameId,
+      infoUrl,
+      ...slug !== void 0 ? { slug } : {},
+      ...title !== void 0 ? { title } : {},
+      token,
+      ...visitorId !== void 0 ? { visitorId } : {},
+      shops
+    };
+  }
+  async function fetchItadGameInfoWithNok(pageContext, requestJson) {
+    await setItadNokGeo(pageContext.token, requestJson);
+    const gameInfo = await fetchItadGameInfo(pageContext.gameId, pageContext.token, requestJson);
+    if (hasNokDeal(gameInfo)) return gameInfo;
+    const cookie = buildItadCookieHeader(pageContext);
+    if (cookie === void 0) return gameInfo;
+    return fetchItadGameInfo(pageContext.gameId, pageContext.token, requestJson, cookie);
+  }
+  async function setItadNokGeo(token, requestJson) {
+    await requestJson(ISTHEREANYDEAL_GEO_URL, {
+      method: "POST",
+      headers: itadJsonHeaders(token),
+      body: JSON.stringify({ country: "NO", currency: "NOK" }),
+      credentials: "include"
+    });
+  }
+  async function fetchItadGameInfo(gameId, token, requestJson, cookie) {
+    return requestJson(ISTHEREANYDEAL_GAME_INFO_URL, {
+      method: "POST",
+      headers: {
+        ...itadJsonHeaders(token),
+        ...cookie !== void 0 ? { "Cookie": cookie } : {}
+      },
+      body: JSON.stringify({ gid: gameId }),
+      credentials: "include"
+    });
+  }
+  function itadJsonHeaders(token) {
+    return {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "ITAD-SessionToken": token
+    };
+  }
+  function buildItadCookieHeader(pageContext) {
+    if (pageContext.visitorId === void 0) return void 0;
+    return [
+      `sess2=${pageContext.token}`,
+      `visitor=${pageContext.visitorId}`,
+      "country=NO",
+      "currency=NOK"
+    ].join("; ");
+  }
+  function readItadShops(value) {
+    const shops = /* @__PURE__ */ new Map();
+    if (!isRecord$2(value)) return shops;
+    for (const [rawId, rawShop] of Object.entries(value)) {
+      const id = Number.parseInt(rawId, 10);
+      const name = Array.isArray(rawShop) && typeof rawShop[0] === "string" ? rawShop[0] : void 0;
+      if (Number.isInteger(id) && id > 0 && name !== void 0) {
+        shops.set(id, name);
+      }
+    }
+    return shops;
+  }
+  function readItadDeals(value, shops) {
+    if (!isRecord$2(value) || !Array.isArray(value.deals)) return [];
+    return value.deals.map((deal) => readItadDeal(deal, shops)).filter((deal) => deal !== void 0);
+  }
+  function hasNokDeal(value) {
+    if (!isRecord$2(value) || !Array.isArray(value.deals)) return false;
+    return value.deals.some((deal) => {
+      if (!isRecord$2(deal)) return false;
+      const price = readItadPrice(deal.priceNew);
+      return price?.currency === "NOK";
+    });
+  }
+  function readItadDeal(value, shops) {
+    if (!isRecord$2(value)) return void 0;
+    const shopId = readNumber(value.shop);
+    const price = readItadPrice(value.priceNew);
+    if (shopId === void 0 || price === void 0 || price.amount <= 0) return void 0;
+    const shopName = shops.get(shopId);
+    if (shopName === void 0) return void 0;
+    const url = typeof value.url === "string" && value.url.length > 0 ? value.url : void 0;
+    const voucher = typeof value.voucher === "string" && value.voucher.trim().length > 0 ? value.voucher.trim() : void 0;
+    return {
+      shopId,
+      shopName,
+      amount: price.amount,
+      currency: price.currency,
+      price: formatCurrency$1(price.amount, price.currency),
+      ...url !== void 0 ? { url } : {},
+      ...voucher !== void 0 ? { voucher } : {}
+    };
+  }
+  function readItadPrice(value) {
+    if (!Array.isArray(value) || value.length < 2) return void 0;
+    const amountMinor = readNumber(value[0]);
+    const currency = typeof value[1] === "string" ? value[1].toUpperCase() : void 0;
+    if (amountMinor === void 0 || currency === void 0) return void 0;
+    const scale = currencyScale(currency);
+    return {
+      amount: amountMinor / Math.pow(10, scale),
+      currency
+    };
+  }
+  function toPriceMatchAlternative(deal) {
+    return {
+      shopName: deal.shopName,
+      amount: deal.amount,
+      sortAmount: deal.amount,
+      currency: deal.currency,
+      price: deal.price,
+      ...deal.voucher !== void 0 ? { shippingPrice: `kode ${deal.voucher}` } : {}
+    };
+  }
+  function readSteamProductName(message) {
+    const slugName = readSteamProductNameFromUrl(message.url) ?? readSteamProductNameFromUrl(message.productUrl);
+    if (slugName !== void 0) return slugName;
+    const cleaned = message.searchTerm.replace(/^spar\s+\d+\s*%\s+på\s+/i, "").replace(/\s+i\s+steam$/i, "").trim();
+    return cleaned.length > 0 ? cleaned : void 0;
+  }
+  function readSteamProductNameFromUrl(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      const match = url.pathname.match(/^\/app\/\d+\/([^/?#]+)/i);
+      const slug = match?.[1];
+      if (slug === void 0) return void 0;
+      const name = decodeURIComponent(slug).replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+      return name.length > 0 ? name : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function parseScriptJson(html, pattern) {
+    const json = html.match(pattern)?.[1];
+    if (json === void 0) return void 0;
+    try {
+      return JSON.parse(json);
+    } catch {
+      return void 0;
+    }
+  }
+  function formatCurrency$1(amount, currency) {
+    try {
+      return new Intl.NumberFormat("nb-NO", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: currencyScale(currency)
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(currencyScale(currency))} ${currency}`;
+    }
+  }
+  function currencyScale(currency) {
+    if ((/* @__PURE__ */ new Set(["JPY", "KRW", "CLP", "VND", "IDR"])).has(currency.toUpperCase())) return 0;
+    if ((/* @__PURE__ */ new Set(["BHD", "KWD", "OMR"])).has(currency.toUpperCase())) return 3;
+    return 2;
+  }
+  async function fetchJson$3(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      const text = await response.text();
+      return text.length > 0 ? JSON.parse(text) : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchText$1(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  function readNumber(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
+    return value;
+  }
+  function isRecord$2(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
@@ -1887,11 +2208,16 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
   async function findPriceMatches(message, requestJson, requestText) {
-    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer] = await Promise.all([
+    if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
+      const isthereanydealOffer2 = await findIsthereanydealPriceMatch(message, requestJson, requestText);
+      return isthereanydealOffer2 !== void 0 ? [isthereanydealOffer2] : [];
+    }
+    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer] = await Promise.all([
       findPrisjaktPriceMatch(message, requestJson),
       findGodprisPriceMatch(message, requestJson, requestText),
       findKlarnaPriceMatch(message, requestJson),
-      findPrisradarPriceMatch(message, requestJson, requestText)
+      findPrisradarPriceMatch(message, requestJson, requestText),
+      findIsthereanydealPriceMatch(message, requestJson, requestText)
     ]);
     const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer].filter((offer) => offer !== void 0);
     const trustedOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(trustedOffers, message);
@@ -1900,7 +2226,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       allowLooseTextSearch: true,
       anchorSearchTerms: trustedOffers.map((offer) => offer.productName)
     }) : void 0;
-    const offers = [...trustedOffers, canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : void 0].filter((offer) => offer !== void 0);
+    const offers = [
+      ...trustedOffers,
+      canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : void 0,
+      isthereanydealOffer
+    ].filter((offer) => offer !== void 0);
     const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
@@ -1925,6 +2255,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (offer.source === "godpris") return 1;
     if (offer.source === "klarna") return 2;
     if (offer.source === "prisradar") return 3;
+    if (offer.source === "isthereanydeal") return 4;
     return 4;
   }
   function isPriceMatchAllowedForCurrentPage(offers, message) {
@@ -2018,13 +2349,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     { region: "SG", countryName: "Singapore", flag: "🇸🇬", locale: "en-sg" },
     { region: "ZA", countryName: "Sør-Afrika", flag: "🇿🇦", locale: "en-za" }
   ];
-  const MAIN_REGION_ORDER = /* @__PURE__ */ new Map([
-    ["NO", 0],
-    ["US", 1],
-    ["GB", 2]
-  ]);
   function isPlayStationProductUrl(url) {
-    return parsePlayStationProductId(url) !== void 0;
+    return parsePlayStationProductId(url) !== void 0 || parsePlayStationConceptId(url) !== void 0 || isPlayStationWebGamePageUrl(url);
   }
   function parsePlayStationProductId(url) {
     try {
@@ -2040,8 +2366,33 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
+  function parsePlayStationConceptId(url) {
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+      if (hostname !== "store.playstation.com") {
+        return void 0;
+      }
+      const conceptMatch = parsedUrl.pathname.match(/\/concept\/(\d+)/i);
+      return conceptMatch?.[1];
+    } catch {
+      return void 0;
+    }
+  }
+  function isPlayStationWebGamePageUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+      if (hostname !== "playstation.com") {
+        return false;
+      }
+      return /^\/[a-z]{2}(?:-[a-z]{2,4}){1,2}\/games\/[^/]+\/?$/i.test(parsedUrl.pathname);
+    } catch {
+      return false;
+    }
+  }
   async function findPlayStationRegionPrices(productUrl, textRequest = defaultTextRequest, jsonRequest = defaultJsonRequest) {
-    const productId = parsePlayStationProductId(productUrl);
+    const productId = await resolvePlayStationProductId(productUrl, textRequest);
     if (productId === void 0) {
       return void 0;
     }
@@ -2082,11 +2433,16 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       return entry;
     });
-    const prices = entries.filter((entry) => entry !== void 0).sort((a, b) => a.nokAmount - b.nokAmount).map(({ productName: _productName, ...price }) => price);
+    const validEntries = entries.filter((entry) => entry !== void 0);
+    const productName = validEntries.find((entry) => entry.productName !== void 0)?.productName;
+    const psPricesUrl = productName !== void 0 ? buildPsPricesNorwaySearchUrl(productName) : void 0;
+    const prices = validEntries.sort((a, b) => a.nokAmount - b.nokAmount).map(({ productName: _productName, ...price }) => ({
+      ...price,
+      ...price.region === "NO" && psPricesUrl !== void 0 ? { priceHistoryUrl: psPricesUrl } : {}
+    }));
     if (prices.length === 0) {
       return void 0;
     }
-    const productName = entries.find((entry) => entry?.productName !== void 0)?.productName;
     const result = {
       productId,
       fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -2098,19 +2454,86 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return result;
   }
-  function pickDisplayedPlayStationRegionPrices(prices, limit = 10) {
-    const byRegion = new Map(prices.map((price) => [price.region, price]));
-    const selected = /* @__PURE__ */ new Map();
-    for (const price of prices.slice(0, limit)) {
-      selected.set(price.region, price);
+  function buildPsPricesNorwaySearchUrl(productName) {
+    return `https://psprices.com/region-no/games/?q=${encodeURIComponent(productName)}`;
+  }
+  async function resolvePlayStationProductId(productUrl, textRequest) {
+    const productId = parsePlayStationProductId(productUrl);
+    if (productId !== void 0) {
+      return productId;
     }
-    for (const region of MAIN_REGION_ORDER.keys()) {
-      const price = byRegion.get(region);
-      if (price !== void 0) {
-        selected.set(region, price);
+    if (parsePlayStationConceptId(productUrl) === void 0 && !isPlayStationWebGamePageUrl(productUrl)) {
+      return void 0;
+    }
+    const html = await textRequest(productUrl);
+    if (html === void 0) {
+      return void 0;
+    }
+    return extractPlayStationProductIdFromDataProductInfo(html) ?? extractPlayStationSku(html) ?? extractFirstProductIdFromHtml(html);
+  }
+  function extractPlayStationProductIdFromDataProductInfo(html) {
+    const productInfoMatches = html.matchAll(/\bdata-product-info=(["'])([\s\S]*?)\1/gi);
+    for (const match of productInfoMatches) {
+      const rawValue = match[2];
+      if (rawValue === void 0 || rawValue.length === 0) {
+        continue;
+      }
+      const parsed = parseJson(decodeHtmlAttribute(rawValue));
+      const productId = readProductId(parsed);
+      if (productId !== void 0) {
+        return productId;
       }
     }
-    return [...selected.values()].sort((a, b) => a.nokAmount - b.nokAmount);
+    return void 0;
+  }
+  function readProductId(value) {
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const productId = readProductId(entry);
+        if (productId !== void 0) return productId;
+      }
+      return void 0;
+    }
+    if (!isRecord$1(value)) {
+      return void 0;
+    }
+    if (typeof value.productId === "string" && value.productId.length > 0) {
+      return value.productId;
+    }
+    return readProductId(value.skus);
+  }
+  function extractPlayStationSku(html) {
+    const jsonScripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+    for (const script of jsonScripts) {
+      const bodyMatch = script.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      const body = bodyMatch?.[1]?.trim();
+      if (body === void 0 || body.length === 0) {
+        continue;
+      }
+      const parsed = parseJson(body);
+      const sku = readSku(parsed);
+      if (sku !== void 0) {
+        return sku;
+      }
+    }
+    return void 0;
+  }
+  function readSku(value) {
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const sku = readSku(entry);
+        if (sku !== void 0) return sku;
+      }
+      return void 0;
+    }
+    if (!isRecord$1(value) || typeof value.sku !== "string" || value.sku.length === 0) {
+      return void 0;
+    }
+    return value.sku;
+  }
+  function extractFirstProductIdFromHtml(html) {
+    const productMatch = html.match(/\/[a-z]{2}-[a-z]{2}\/product\/([A-Z0-9_-]+)/i);
+    return productMatch?.[1];
   }
   function extractPlayStationOffer(html) {
     const jsonScripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
@@ -2225,6 +2648,26 @@ query SearchSuggestions($query: String!, $category: Int) {
     } catch {
       return void 0;
     }
+  }
+  function decodeHtmlAttribute(value) {
+    const namedEntities = {
+      amp: "&",
+      apos: "'",
+      gt: ">",
+      lt: "<",
+      quot: '"'
+    };
+    return value.replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (entity, body) => {
+      if (body.startsWith("#x") || body.startsWith("#X")) {
+        const codePoint = Number.parseInt(body.slice(2), 16);
+        return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+      }
+      if (body.startsWith("#")) {
+        const codePoint = Number.parseInt(body.slice(1), 10);
+        return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+      }
+      return namedEntities[body.toLowerCase()] ?? entity;
+    });
   }
   function formatCurrency(amount, currency, locale) {
     try {
@@ -3164,9 +3607,15 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (hostname.endsWith("prisradar.no")) {
       return /^\/produkter\/[^/]+\/?$/.test(pathname);
     }
+    if (hostname.endsWith("store.steampowered.com")) {
+      return /^\/app\/\d+(?:\/|$)/.test(pathname);
+    }
     return false;
   }
   function isLikelyCommerceProductPage(parsedUrl) {
+    if (isSteamAppProductUrl(parsedUrl.toString())) {
+      return true;
+    }
     const strongProductishPath = /(?:^|\/)(?:product|produkt|produkter)\/[^/]+/i.test(parsedUrl.pathname) || /^\/(?:i|p)\/\d+\/[-\w%]+\/?$/i.test(parsedUrl.pathname);
     if (strongProductishPath && (hasVisiblePriceSignal() || hasCommerceActionSignal())) {
       return true;
@@ -4098,6 +4547,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       border: 1px solid #d3e2dc;
       color: #0c4598;
     }
+    .provider-isthereanydeal {
+      background: #2d2f42;
+      color: #ffffff;
+    }
     .provider-region {
       background: #eaf7ef;
       color: #166b47;
@@ -4849,7 +5302,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       rewardSpan.textContent = bestRegionPrice.formattedNok;
       const chipSpan = document.createElement("span");
       chipSpan.className = "side-tab-chip provider-region";
-      chipSpan.textContent = "Region";
+      chipSpan.textContent = `${bestRegionPrice.flag} Region`;
       sideTabText.append(rewardSpan, chipSpan);
     }
     sideTab.append(sideTabArrow, sideTabText);
@@ -5634,7 +6087,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       if (initialRegionPricesCollapsed) {
         regionPricesSection.classList.add("collapsed");
       }
-      const displayedRegionPrices = pickDisplayedPlayStationRegionPrices(regionPrices.prices, 10);
+      const displayedRegionPrices = regionPrices.prices;
       const regionPricesToggle = document.createElement("button");
       regionPricesToggle.className = "region-prices-toggle";
       regionPricesToggle.type = "button";
@@ -6091,10 +6544,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.productId === "string" && typeof value.fetchedAt === "string" && (value.productName === void 0 || typeof value.productName === "string") && (value.ratesUpdatedAt === void 0 || typeof value.ratesUpdatedAt === "string") && Array.isArray(value.prices) && value.prices.every(isPlayStationRegionPrice);
   }
   function isPlayStationRegionPrice(value) {
-    return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string";
+    return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -6330,21 +6783,18 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function getRegionPriceLink(regionPrice) {
     if (regionPrice.region === "NO") {
-      return regionPrice.productUrl;
+      return regionPrice.priceHistoryUrl ?? regionPrice.productUrl;
     }
     return PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL;
   }
   function buildRegionPricesTooltip(regionPrices) {
-    const lines = regionPrices.prices.map(
-      (regionPrice) => `${regionPrice.flag} ${regionPrice.countryName}: ${regionPrice.formattedPrice} (${regionPrice.formattedNok})`
-    );
     const rateLine = regionPrices.ratesUpdatedAt !== void 0 ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
     return [
       "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
       "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
+      "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
+      "Norge-raden åpner PSPrices for norsk prishistorikk.",
       "Ikke-norske rader åpner GCDeals for PSN-gavekort i valgt region når vi har direkte lenke.",
-      "Alle regioner",
-      ...lines,
       rateLine
     ].join("\n");
   }
@@ -6352,6 +6802,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "godpris") return "godpris";
     if (priceMatch.source === "klarna") return "klarna";
     if (priceMatch.source === "prisradar") return "prisradar";
+    if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
     return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
@@ -6359,6 +6810,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "godpris") return "Godpris";
     if (priceMatch.source === "klarna") return "Klarna";
     if (priceMatch.source === "prisradar") return "Prisradar";
+    if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {

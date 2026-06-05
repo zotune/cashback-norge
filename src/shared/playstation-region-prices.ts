@@ -9,6 +9,7 @@ export type PlayStationRegionPrice = {
   nokAmount: number;
   formattedNok: string;
   productUrl: string;
+  priceHistoryUrl?: string;
 };
 
 export type PlayStationRegionPriceResult = {
@@ -68,7 +69,11 @@ const MAIN_REGION_ORDER = new Map([
 ]);
 
 export function isPlayStationProductUrl(url: string): boolean {
-  return parsePlayStationProductId(url) !== undefined;
+  return (
+    parsePlayStationProductId(url) !== undefined ||
+    parsePlayStationConceptId(url) !== undefined ||
+    isPlayStationWebGamePageUrl(url)
+  );
 }
 
 export function parsePlayStationProductId(url: string): string | undefined {
@@ -87,12 +92,41 @@ export function parsePlayStationProductId(url: string): string | undefined {
   }
 }
 
+function parsePlayStationConceptId(url: string): string | undefined {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "store.playstation.com") {
+      return undefined;
+    }
+
+    const conceptMatch = parsedUrl.pathname.match(/\/concept\/(\d+)/i);
+    return conceptMatch?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+function isPlayStationWebGamePageUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "playstation.com") {
+      return false;
+    }
+
+    return /^\/[a-z]{2}(?:-[a-z]{2,4}){1,2}\/games\/[^/]+\/?$/i.test(parsedUrl.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export async function findPlayStationRegionPrices(
   productUrl: string,
   textRequest: TextRequest = defaultTextRequest,
   jsonRequest: JsonRequest = defaultJsonRequest,
 ): Promise<PlayStationRegionPriceResult | undefined> {
-  const productId = parsePlayStationProductId(productUrl);
+  const productId = await resolvePlayStationProductId(productUrl, textRequest);
   if (productId === undefined) {
     return undefined;
   }
@@ -139,16 +173,21 @@ export async function findPlayStationRegionPrices(
     return entry;
   });
 
-  const prices = entries
-    .filter((entry): entry is PlayStationRegionPriceEntry => entry !== undefined)
+  const validEntries = entries
+    .filter((entry): entry is PlayStationRegionPriceEntry => entry !== undefined);
+  const productName = validEntries.find((entry) => entry.productName !== undefined)?.productName;
+  const psPricesUrl = productName !== undefined ? buildPsPricesNorwaySearchUrl(productName) : undefined;
+  const prices = validEntries
     .sort((a, b) => a.nokAmount - b.nokAmount)
-    .map(({ productName: _productName, ...price }) => price);
+    .map(({ productName: _productName, ...price }) => ({
+      ...price,
+      ...(price.region === "NO" && psPricesUrl !== undefined ? { priceHistoryUrl: psPricesUrl } : {}),
+    }));
 
   if (prices.length === 0) {
     return undefined;
   }
 
-  const productName = entries.find((entry) => entry?.productName !== undefined)?.productName;
   const result: PlayStationRegionPriceResult = {
     productId,
     fetchedAt: new Date().toISOString(),
@@ -177,6 +216,109 @@ export function pickDisplayedPlayStationRegionPrices(
     }
   }
   return [...selected.values()].sort((a, b) => a.nokAmount - b.nokAmount);
+}
+
+function buildPsPricesNorwaySearchUrl(productName: string): string {
+  return `https://psprices.com/region-no/games/?q=${encodeURIComponent(productName)}`;
+}
+
+async function resolvePlayStationProductId(
+  productUrl: string,
+  textRequest: TextRequest,
+): Promise<string | undefined> {
+  const productId = parsePlayStationProductId(productUrl);
+  if (productId !== undefined) {
+    return productId;
+  }
+
+  if (parsePlayStationConceptId(productUrl) === undefined && !isPlayStationWebGamePageUrl(productUrl)) {
+    return undefined;
+  }
+
+  const html = await textRequest(productUrl);
+  if (html === undefined) {
+    return undefined;
+  }
+
+  return extractPlayStationProductIdFromDataProductInfo(html) ?? extractPlayStationSku(html) ?? extractFirstProductIdFromHtml(html);
+}
+
+function extractPlayStationProductIdFromDataProductInfo(html: string): string | undefined {
+  const productInfoMatches = html.matchAll(/\bdata-product-info=(["'])([\s\S]*?)\1/gi);
+  for (const match of productInfoMatches) {
+    const rawValue = match[2];
+    if (rawValue === undefined || rawValue.length === 0) {
+      continue;
+    }
+
+    const parsed = parseJson(decodeHtmlAttribute(rawValue));
+    const productId = readProductId(parsed);
+    if (productId !== undefined) {
+      return productId;
+    }
+  }
+
+  return undefined;
+}
+
+function readProductId(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const productId = readProductId(entry);
+      if (productId !== undefined) return productId;
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (typeof value.productId === "string" && value.productId.length > 0) {
+    return value.productId;
+  }
+
+  return readProductId(value.skus);
+}
+
+function extractPlayStationSku(html: string): string | undefined {
+  const jsonScripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  for (const script of jsonScripts) {
+    const bodyMatch = script.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+    const body = bodyMatch?.[1]?.trim();
+    if (body === undefined || body.length === 0) {
+      continue;
+    }
+
+    const parsed = parseJson(body);
+    const sku = readSku(parsed);
+    if (sku !== undefined) {
+      return sku;
+    }
+  }
+
+  return undefined;
+}
+
+function readSku(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const sku = readSku(entry);
+      if (sku !== undefined) return sku;
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value) || typeof value.sku !== "string" || value.sku.length === 0) {
+    return undefined;
+  }
+
+  return value.sku;
+}
+
+function extractFirstProductIdFromHtml(html: string): string | undefined {
+  const productMatch = html.match(/\/[a-z]{2}-[a-z]{2}\/product\/([A-Z0-9_-]+)/i);
+  return productMatch?.[1];
 }
 
 function extractPlayStationOffer(html: string): { name?: string; price: number; currency: string } | undefined {
@@ -316,6 +458,28 @@ function parseJson(value: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function decodeHtmlAttribute(value: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    quot: "\"",
+  };
+
+  return value.replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (entity, body: string) => {
+    if (body.startsWith("#x") || body.startsWith("#X")) {
+      const codePoint = Number.parseInt(body.slice(2), 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+    if (body.startsWith("#")) {
+      const codePoint = Number.parseInt(body.slice(1), 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+    return namedEntities[body.toLowerCase()] ?? entity;
+  });
 }
 
 function formatCurrency(amount: number, currency: string, locale: string): string {

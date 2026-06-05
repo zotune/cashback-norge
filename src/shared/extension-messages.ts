@@ -53,7 +53,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   shopName: string;

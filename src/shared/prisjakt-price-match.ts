@@ -9,6 +9,7 @@ export type JsonRequest = (
     method?: string;
     headers?: Record<string, string>;
     body?: string;
+    credentials?: RequestCredentials;
   },
 ) => Promise<unknown | undefined>;
 

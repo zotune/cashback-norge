@@ -366,7 +366,8 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
     typeof value.formattedPrice === "string" &&
     typeof value.nokAmount === "number" &&
     typeof value.formattedNok === "string" &&
-    typeof value.productUrl === "string"
+    typeof value.productUrl === "string" &&
+    (value.priceHistoryUrl === undefined || typeof value.priceHistoryUrl === "string")
   );
 }
 

@@ -3,6 +3,10 @@ import type {
   PriceMatchOffer,
 } from "./extension-messages.js";
 import { findGodprisPriceMatch } from "./godpris-price-match.js";
+import {
+  findIsthereanydealPriceMatch,
+  isSteamAppProductUrl,
+} from "./isthereanydeal-price-match.js";
 import { findKlarnaPriceMatch } from "./klarna-price-match.js";
 import { scoreProductTitleAgainstSearchTerm } from "./product-title-match.js";
 import {
@@ -17,6 +21,7 @@ type TextRequest = (
     method?: string;
     headers?: Record<string, string>;
     body?: string;
+    credentials?: RequestCredentials;
   },
 ) => Promise<string | undefined>;
 
@@ -27,11 +32,17 @@ export async function findPriceMatches(
   requestJson?: JsonRequest,
   requestText?: TextRequest,
 ): Promise<PriceMatchOffer[]> {
-  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer] = await Promise.all([
+  if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
+    const isthereanydealOffer = await findIsthereanydealPriceMatch(message, requestJson, requestText);
+    return isthereanydealOffer !== undefined ? [isthereanydealOffer] : [];
+  }
+
+  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer] = await Promise.all([
     findPrisjaktPriceMatch(message, requestJson),
     findGodprisPriceMatch(message, requestJson, requestText),
     findKlarnaPriceMatch(message, requestJson),
     findPrisradarPriceMatch(message, requestJson, requestText),
+    findIsthereanydealPriceMatch(message, requestJson, requestText),
   ]);
 
   const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer]
@@ -47,7 +58,11 @@ export async function findPriceMatches(
       anchorSearchTerms: trustedOffers.map((offer) => offer.productName),
     })
     : undefined;
-  const offers = [...trustedOffers, canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : undefined]
+  const offers = [
+    ...trustedOffers,
+    canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : undefined,
+    isthereanydealOffer,
+  ]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
 
@@ -90,6 +105,7 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "godpris") return 1;
   if (offer.source === "klarna") return 2;
   if (offer.source === "prisradar") return 3;
+  if (offer.source === "isthereanydeal") return 4;
   return 4;
 }
 
