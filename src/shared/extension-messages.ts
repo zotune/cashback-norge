@@ -31,6 +31,8 @@ export type GetPriceMatchForProductMessage = {
   codes?: string[];
   productPageClue?: boolean;
   organizationName?: string;
+  volumeMl?: number;
+  alcoholPercent?: number;
 };
 
 export type GetPlayStationRegionPricesMessage = {
@@ -53,7 +55,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   shopName: string;
@@ -138,7 +140,9 @@ export function isGetPriceMatchForProductMessage(
     (value.productUrl === undefined || typeof value.productUrl === "string") &&
     (value.codes === undefined || (Array.isArray(value.codes) && value.codes.every((code) => typeof code === "string"))) &&
     (value.productPageClue === undefined || typeof value.productPageClue === "boolean") &&
-    (value.organizationName === undefined || typeof value.organizationName === "string")
+    (value.organizationName === undefined || typeof value.organizationName === "string") &&
+    (value.volumeMl === undefined || typeof value.volumeMl === "number") &&
+    (value.alcoholPercent === undefined || typeof value.alcoholPercent === "number")
   );
 }
 

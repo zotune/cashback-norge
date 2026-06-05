@@ -36,10 +36,13 @@ const USERSCRIPT_BANNER = `\
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      api.augmentedsteam.com
+// @connect      namx6ho175-dsn.algolia.net
 // @connect      isthereanydeal.com
 // @connect      www.klarna.com
 // @connect      www.playstation.com
 // @connect      store.playstation.com
+// @connect      www.vinmonopolet.no
+// @connect      vinmonopolet.no
 // @connect      open.er-api.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no

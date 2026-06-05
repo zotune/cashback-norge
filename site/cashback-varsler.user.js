@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780664939
+// @version      1780669230
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -16,10 +16,13 @@
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      api.augmentedsteam.com
+// @connect      namx6ho175-dsn.algolia.net
 // @connect      isthereanydeal.com
 // @connect      www.klarna.com
 // @connect      www.playstation.com
 // @connect      store.playstation.com
+// @connect      www.vinmonopolet.no
+// @connect      vinmonopolet.no
 // @connect      open.er-api.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no
@@ -440,7 +443,8 @@
     ]).filter((candidate) => candidate.length >= 4);
   }
   function tokenizeMatchText$1(value) {
-    return uniqueStrings$5(value.split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
+    const normalizedValue = transliterateNorwegianCharacters$2(value).normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    return uniqueStrings$5(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
   }
   function normalizeMatchToken$1(value) {
     const normalized = transliterateNorwegianCharacters$2(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
@@ -474,7 +478,7 @@
     ["samsung"],
     ["sony", "playstation"]
   ];
-  async function findGodprisPriceMatch(message, requestJson = fetchJson$4, requestText = fetchText$2) {
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$5, requestText = fetchText$2) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -544,7 +548,7 @@
     const productId = readStringLike$2(product.id) ?? fallbackProductId;
     const rawProductName = readStringLike$2(product.title) ?? readStringLike$2(product.name);
     const productBrand = readStringLike$2(product.brand);
-    const productName = withLeadingBrand(rawProductName, productBrand) ?? "Godpris-produkt";
+    const productName = withLeadingBrand$1(rawProductName, productBrand) ?? "Godpris-produkt";
     const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
     const best = offers[0];
     if (best === void 0) return void 0;
@@ -571,7 +575,7 @@
       return void 0;
     }
   }
-  function withLeadingBrand(productName, brandName) {
+  function withLeadingBrand$1(productName, brandName) {
     if (productName === void 0) return void 0;
     if (brandName === void 0 || productName.toLowerCase().includes(brandName.toLowerCase())) return productName;
     return `${brandName} ${productName}`;
@@ -589,11 +593,11 @@
       shopName,
       amount,
       currency: "NOK",
-      price: formatNokPrice$2(amount),
+      price: formatNokPrice$3(amount),
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
-  async function fetchJson$4(url, init) {
+  async function fetchJson$5(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -611,7 +615,7 @@
       return void 0;
     }
   }
-  function formatNokPrice$2(amount) {
+  function formatNokPrice$3(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
@@ -691,7 +695,7 @@
     64,
     72
   ];
-  async function findIsthereanydealPriceMatch(message, requestJson = fetchJson$3, requestText = fetchText$1) {
+  async function findIsthereanydealPriceMatch(message, requestJson = fetchJson$4, requestText = fetchText$1) {
     const appId = parseSteamAppId(message.url) ?? parseSteamAppId(message.productUrl);
     if (appId === void 0) return void 0;
     const appTarget = { type: "app", id: appId };
@@ -763,11 +767,11 @@
     });
   }
   function readAugmentedSteamAppInfo(value, targets) {
-    if (!isRecord$2(value) || !isRecord$2(value.prices)) return void 0;
+    if (!isRecord$3(value) || !isRecord$3(value.prices)) return void 0;
     for (const target of targets) {
       const targetPrices = value.prices[`${target.type}/${target.id}`];
-      if (!isRecord$2(targetPrices)) continue;
-      const urls = isRecord$2(targetPrices.urls) ? targetPrices.urls : void 0;
+      if (!isRecord$3(targetPrices)) continue;
+      const urls = isRecord$3(targetPrices.urls) ? targetPrices.urls : void 0;
       const infoUrl = typeof urls?.info === "string" && urls.info.length > 0 ? urls.info : void 0;
       if (infoUrl !== void 0) return { infoUrl };
     }
@@ -822,13 +826,13 @@
     if (html === void 0) return void 0;
     const globalState = parseScriptJson(html, /var g = (\{[\s\S]*?\});\s*var page = /);
     const pageState = parseScriptJson(html, /var page = (\[[\s\S]*?\]);\s*var /);
-    if (!isRecord$2(globalState) || !Array.isArray(pageState)) return void 0;
-    const user = isRecord$2(globalState.user) ? globalState.user : void 0;
+    if (!isRecord$3(globalState) || !Array.isArray(pageState)) return void 0;
+    const user = isRecord$3(globalState.user) ? globalState.user : void 0;
     const token = typeof user?.token === "string" && user.token.length > 0 ? user.token : void 0;
     const visitorId = typeof user?.id === "string" && user.id.length > 0 ? user.id : void 0;
     const shops = readItadShops(globalState.shops);
-    const pageProps = isRecord$2(pageState[1]) ? pageState[1] : void 0;
-    const game = isRecord$2(pageProps?.game) ? pageProps.game : void 0;
+    const pageProps = isRecord$3(pageState[1]) ? pageState[1] : void 0;
+    const game = isRecord$3(pageProps?.game) ? pageProps.game : void 0;
     const gameId = typeof game?.id === "string" && game.id.length > 0 ? game.id : void 0;
     if (token === void 0 || gameId === void 0 || shops.size === 0) return void 0;
     const slug = typeof game?.slug === "string" && game.slug.length > 0 ? game.slug : void 0;
@@ -888,7 +892,7 @@
   }
   function readItadShops(value) {
     const shops = /* @__PURE__ */ new Map();
-    if (!isRecord$2(value)) return shops;
+    if (!isRecord$3(value)) return shops;
     for (const [rawId, rawShop] of Object.entries(value)) {
       const id = Number.parseInt(rawId, 10);
       const name = Array.isArray(rawShop) && typeof rawShop[0] === "string" ? rawShop[0] : void 0;
@@ -899,20 +903,20 @@
     return shops;
   }
   function readItadDeals(value, shops) {
-    if (!isRecord$2(value) || !Array.isArray(value.deals)) return [];
+    if (!isRecord$3(value) || !Array.isArray(value.deals)) return [];
     return value.deals.map((deal) => readItadDeal(deal, shops)).filter((deal) => deal !== void 0);
   }
   function hasNokDeal(value) {
-    if (!isRecord$2(value) || !Array.isArray(value.deals)) return false;
+    if (!isRecord$3(value) || !Array.isArray(value.deals)) return false;
     return value.deals.some((deal) => {
-      if (!isRecord$2(deal)) return false;
+      if (!isRecord$3(deal)) return false;
       const price = readItadPrice(deal.priceNew);
       return price?.currency === "NOK";
     });
   }
   function readItadDeal(value, shops) {
-    if (!isRecord$2(value)) return void 0;
-    const shopId = readNumber(value.shop);
+    if (!isRecord$3(value)) return void 0;
+    const shopId = readNumber$1(value.shop);
     const price = readItadPrice(value.priceNew);
     if (shopId === void 0 || price === void 0 || price.amount <= 0) return void 0;
     const shopName = shops.get(shopId);
@@ -931,7 +935,7 @@
   }
   function readItadPrice(value) {
     if (!Array.isArray(value) || value.length < 2) return void 0;
-    const amountMinor = readNumber(value[0]);
+    const amountMinor = readNumber$1(value[0]);
     const currency = typeof value[1] === "string" ? value[1].toUpperCase() : void 0;
     if (amountMinor === void 0 || currency === void 0) return void 0;
     const scale = currencyScale(currency);
@@ -994,7 +998,7 @@
     if ((/* @__PURE__ */ new Set(["BHD", "KWD", "OMR"])).has(currency.toUpperCase())) return 3;
     return 2;
   }
-  async function fetchJson$3(url, init) {
+  async function fetchJson$4(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -1013,11 +1017,11 @@
       return void 0;
     }
   }
-  function readNumber(value) {
+  function readNumber$1(value) {
     if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
     return value;
   }
-  function isRecord$2(value) {
+  function isRecord$3(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
@@ -1026,7 +1030,7 @@
   const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
   const BAD_AVAILABILITY_STATUSES$2 = /* @__PURE__ */ new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST", "TEMPORARILY_UNAVAILABLE"]);
   const BAD_STOCK_STATUSES$1 = /* @__PURE__ */ new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
-  async function findKlarnaPriceMatch(message, requestJson = fetchJson$2) {
+  async function findKlarnaPriceMatch(message, requestJson = fetchJson$3) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -1109,7 +1113,7 @@
         currency: offer.currency,
         price: offer.price,
         shippingPrice: formatShippingPrice$2(offer.shippingAmount),
-        ...offer.shippingAmount > 0 ? { totalPrice: formatNokPrice$1(offer.sortAmount) } : {}
+        ...offer.shippingAmount > 0 ? { totalPrice: formatNokPrice$2(offer.sortAmount) } : {}
       }))
     };
   }
@@ -1156,7 +1160,7 @@
       sortAmount: amount + shippingAmount,
       shippingAmount,
       currency,
-      price: formatNokPrice$1(amount),
+      price: formatNokPrice$2(amount),
       ...offerUrl !== void 0 ? { offerUrl } : {}
     };
   }
@@ -1174,7 +1178,7 @@
     const time = Date.parse(value);
     return Number.isFinite(time) ? time : void 0;
   }
-  async function fetchJson$2(url, init) {
+  async function fetchJson$3(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -1200,14 +1204,14 @@
       return void 0;
     }
   }
-  function formatNokPrice$1(amount) {
+  function formatNokPrice$2(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
     return `${formatted} kr`;
   }
   function formatShippingPrice$2(amount) {
-    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice$1(amount)}`;
+    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice$2(amount)}`;
   }
   function readStringLike$1(value) {
     if (typeof value !== "string" && typeof value !== "number") return void 0;
@@ -1272,7 +1276,7 @@ query OfferList($productId: Int!) {
   }
 }
 `;
-  async function findPrisjaktPriceMatch(message, requestJson = fetchJson$1) {
+  async function findPrisjaktPriceMatch(message, requestJson = fetchJson$2) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -1508,7 +1512,7 @@ query OfferList($productId: Int!) {
       ...url !== void 0 ? { offerUrl: url } : {}
     };
   }
-  async function fetchJson$1(url, init) {
+  async function fetchJson$2(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -1584,7 +1588,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
 }
 `;
-  async function findPrisradarPriceMatch(message, requestJson = fetchJson, requestText = fetchText, options = {}) {
+  async function findPrisradarPriceMatch(message, requestJson = fetchJson$1, requestText = fetchText, options = {}) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -2149,9 +2153,9 @@ query SearchSuggestions($query: String!, $category: Int) {
       amount,
       ...sortAmount !== void 0 ? { sortAmount } : {},
       currency: "NOK",
-      price: formatNokPrice(amount),
+      price: formatNokPrice$1(amount),
       ...shippingAmount !== void 0 ? { shippingPrice: formatShippingPrice(shippingAmount) } : {},
-      ...shippingAmount !== void 0 && shippingAmount > 0 ? { totalPrice: formatNokPrice(amount + shippingAmount) } : {}
+      ...shippingAmount !== void 0 && shippingAmount > 0 ? { totalPrice: formatNokPrice$1(amount + shippingAmount) } : {}
     };
   }
   function readShippingAmount(value) {
@@ -2159,7 +2163,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const amount = readNumberLike(value.shippingPrice);
     return amount !== void 0 && amount >= 0 ? amount : void 0;
   }
-  async function fetchJson(url, init) {
+  async function fetchJson$1(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
@@ -2228,14 +2232,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return void 0;
   }
-  function formatNokPrice(amount) {
+  function formatNokPrice$1(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2
     }).format(amount);
     return `${formatted} kr`;
   }
   function formatShippingPrice(amount) {
-    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice(amount)}`;
+    return amount <= 0 ? "fri frakt" : `frakt ${formatNokPrice$1(amount)}`;
   }
   function readStringLike(value) {
     if (typeof value !== "string" && typeof value !== "number") return void 0;
@@ -2260,18 +2264,398 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isPlainRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
+  const TAXFREE_ORIGIN = "https://www.tax-free.no";
+  const TAXFREE_ALGOLIA_URL = "https://namx6ho175-dsn.algolia.net/1/indexes/*/queries";
+  const TAXFREE_ALGOLIA_APP_ID = "NAMX6HO175";
+  const TAXFREE_ALGOLIA_API_KEY = "55252987cc07b733b24f13fc4754f42e";
+  const TAXFREE_PRODUCT_INDEX = "prod_products";
+  const TAXFREE_MAX_HITS = 8;
+  const VINMONOPOLET_ORIGIN = "https://www.vinmonopolet.no";
+  const TAXFREE_IDENTIFIER_LOOKUP_LIMIT = 4;
+  const VINMONOPOLET_BARCODE_LOOKUP_LIMIT = 12;
+  const MIN_TAXFREE_TITLE_MATCH_SCORE = 0.7;
+  const MIN_TAXFREE_SAME_VOLUME_TITLE_MATCH_SCORE = 0.55;
+  async function findTaxfreePriceMatch(message, requestJson = fetchJson) {
+    if (!isVinmonopoletProductUrl(message.url)) {
+      return void 0;
+    }
+    if (message.price === void 0 || message.volumeMl === void 0) {
+      return void 0;
+    }
+    const queries = buildTaxfreeSearchQueries(message);
+    if (queries.length === 0) {
+      return void 0;
+    }
+    const response = await requestJson(TAXFREE_ALGOLIA_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Algolia-API-Key": TAXFREE_ALGOLIA_API_KEY,
+        "X-Algolia-Application-Id": TAXFREE_ALGOLIA_APP_ID
+      },
+      body: JSON.stringify({
+        requests: queries.map((query) => ({
+          indexName: TAXFREE_PRODUCT_INDEX,
+          query,
+          params: new URLSearchParams({ hitsPerPage: String(TAXFREE_MAX_HITS) }).toString()
+        }))
+      })
+    });
+    const candidates = (await validateTaxfreeCandidatesAgainstVinmonopolet(
+      readTaxfreeHits(response).map((hit) => readTaxfreeCandidate(hit, message)).filter((candidate) => candidate !== void 0),
+      message,
+      requestJson
+    )).filter(isAllowedTaxfreeCandidate).sort(compareTaxfreeCandidates);
+    const best = candidates[0];
+    if (best === void 0) {
+      return void 0;
+    }
+    if (message.currency === "NOK" && message.price !== void 0 && best.amount >= message.price) {
+      return void 0;
+    }
+    return {
+      source: "taxfree",
+      sourceName: "Tax Free",
+      shopName: "Tax Free Norway",
+      amount: best.amount,
+      sortAmount: best.amount,
+      currency: "NOK",
+      price: formatNokPrice(best.amount),
+      productName: formatTaxfreeProductName(best),
+      productUrl: best.productUrl
+    };
+  }
+  function isVinmonopoletProductUrl(rawUrl) {
+    if (rawUrl === void 0) return false;
+    try {
+      const url = new URL(rawUrl);
+      const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+      return hostname === "vinmonopolet.no" && /\/p\/\d+(?:\/|$)/i.test(url.pathname);
+    } catch {
+      return false;
+    }
+  }
+  function readTaxfreeCandidate(value, message) {
+    if (!isRecord$2(value)) return void 0;
+    const productType = readString(value.type);
+    if (productType !== void 0 && productType !== "ALCOHOL") return void 0;
+    if (!hasTaxfreeStock(value)) return void 0;
+    const amount = readNokPrice(value.price);
+    const productName = readLocalizedString(value.name) ?? readString(value.name);
+    const brandName = readLocalizedString(value.brandName) ?? readString(value.brandName);
+    const productUrl = readTaxfreeProductUrl(value);
+    const identifiers = readTaxfreeProductIdentifiers(value);
+    const identifierMatch = hasSharedProductIdentifier(message.codes, identifiers);
+    if (amount === void 0 || productName === void 0 || productUrl === void 0) {
+      return void 0;
+    }
+    const volumeMl = readVolumeMl$1(readString(value.sizeName) ?? readString(value.size));
+    const hasMatchingVolume = message.volumeMl !== void 0 && volumeMl !== void 0 && hasSameVolume(message.volumeMl, volumeMl);
+    if (message.volumeMl !== void 0 && volumeMl !== void 0 && !hasMatchingVolume) {
+      return void 0;
+    }
+    const title = withLeadingBrand(productName, brandName);
+    const matchTerms = buildTaxfreeMatchTerms(message);
+    const score = Math.max(
+      ...matchTerms.flatMap((term) => [
+        scoreProductTitleAgainstSearchTerm(term, title),
+        scoreProductTitleAgainstSearchTerm(term, productName)
+      ])
+    );
+    const minTitleScore = hasMatchingVolume ? MIN_TAXFREE_SAME_VOLUME_TITLE_MATCH_SCORE : MIN_TAXFREE_TITLE_MATCH_SCORE;
+    const titlePass = score >= minTitleScore;
+    if (!identifierMatch && !titlePass && identifiers.length === 0) {
+      return void 0;
+    }
+    const alcoholPercent = readNumber(value.alcoholByVolume);
+    if (message.alcoholPercent !== void 0 && alcoholPercent !== void 0 && Math.abs(message.alcoholPercent - alcoholPercent) > 0.5) {
+      return void 0;
+    }
+    return {
+      amount,
+      ...alcoholPercent !== void 0 ? { alcoholPercent } : {},
+      ...brandName !== void 0 ? { brandName } : {},
+      identifiers,
+      identifierMatch,
+      productName,
+      productUrl,
+      score: identifierMatch ? Math.max(score, 1) : score,
+      titlePass,
+      ...volumeMl !== void 0 ? { volumeMl } : {}
+    };
+  }
+  async function validateTaxfreeCandidatesAgainstVinmonopolet(candidates, message, requestJson) {
+    const vinmonopoletProductCode = readVinmonopoletProductCode(message.url);
+    if (vinmonopoletProductCode === void 0) {
+      return candidates;
+    }
+    const lookupCache = /* @__PURE__ */ new Map();
+    let lookupCount = 0;
+    const validatedCandidates = [];
+    for (const candidate of candidates) {
+      let matchedCandidate;
+      let sawBarcodeMismatch = false;
+      for (const identifier of candidate.identifiers.slice(0, TAXFREE_IDENTIFIER_LOOKUP_LIMIT)) {
+        if (lookupCount >= VINMONOPOLET_BARCODE_LOOKUP_LIMIT) break;
+        let matchedProductCode = lookupCache.get(identifier);
+        if (!lookupCache.has(identifier)) {
+          lookupCount += 1;
+          matchedProductCode = await fetchVinmonopoletProductCodeForBarcode(identifier, requestJson);
+          lookupCache.set(identifier, matchedProductCode);
+        }
+        if (matchedProductCode === void 0) continue;
+        if (matchedProductCode === vinmonopoletProductCode) {
+          matchedCandidate = {
+            ...candidate,
+            score: Math.max(candidate.score, 1),
+            vinmonopoletBarcodeMatch: true
+          };
+          sawBarcodeMismatch = false;
+          break;
+        }
+        sawBarcodeMismatch = true;
+      }
+      if (matchedCandidate !== void 0) {
+        validatedCandidates.push(matchedCandidate);
+        continue;
+      }
+      validatedCandidates.push({
+        ...candidate,
+        ...sawBarcodeMismatch ? { vinmonopoletBarcodeMismatch: true } : {}
+      });
+    }
+    return validatedCandidates;
+  }
+  function isAllowedTaxfreeCandidate(candidate) {
+    if (candidate.vinmonopoletBarcodeMatch === true) return true;
+    if (candidate.vinmonopoletBarcodeMismatch === true) return false;
+    return candidate.identifierMatch || candidate.titlePass;
+  }
+  function compareTaxfreeCandidates(first, second) {
+    const rankDifference = getTaxfreeCandidateRank(first) - getTaxfreeCandidateRank(second);
+    if (rankDifference !== 0) return rankDifference;
+    const amountDifference = first.amount - second.amount;
+    if (amountDifference !== 0) return amountDifference;
+    return second.score - first.score;
+  }
+  function getTaxfreeCandidateRank(candidate) {
+    if (candidate.vinmonopoletBarcodeMatch === true) return 0;
+    if (candidate.identifierMatch) return 1;
+    return 2;
+  }
+  async function fetchVinmonopoletProductCodeForBarcode(identifier, requestJson) {
+    const value = await requestJson(
+      `${VINMONOPOLET_ORIGIN}/vmpws/v2/vmp/products/barCodeSearch/${encodeURIComponent(identifier)}`,
+      {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "include"
+      }
+    );
+    return readVinmonopoletProductCodeFromResponse(value);
+  }
+  function readVinmonopoletProductCodeFromResponse(value) {
+    if (!isRecord$2(value)) return void 0;
+    const directCode = normalizeVinmonopoletProductCode(readString(value.code));
+    if (directCode !== void 0) return directCode;
+    const product = isRecord$2(value.product) ? value.product : void 0;
+    return normalizeVinmonopoletProductCode(readString(product?.code));
+  }
+  function readTaxfreeHits(value) {
+    if (!isRecord$2(value) || !Array.isArray(value.results)) return [];
+    return value.results.filter(isRecord$2).flatMap((result) => Array.isArray(result.hits) ? result.hits : []);
+  }
+  function readTaxfreeProductUrl(value) {
+    const localizedUrls = isRecord$2(value.localizedUrls) ? value.localizedUrls : void 0;
+    const url = readString(localizedUrls?.no) ?? readString(value.url);
+    if (url !== void 0) {
+      return new URL(withNorwegianPathPrefix(url), TAXFREE_ORIGIN).toString();
+    }
+    const code = readString(value.code);
+    return code !== void 0 ? new URL(`/no/product${encodeURIComponent(code)}`, TAXFREE_ORIGIN).toString() : void 0;
+  }
+  function withNorwegianPathPrefix(path) {
+    if (/^https?:\/\//i.test(path)) {
+      const url = new URL(path);
+      url.pathname = withNorwegianPathPrefix(url.pathname);
+      return url.toString();
+    }
+    return /^\/no(?:\/|$)/i.test(path) ? path : `/no${path.startsWith("/") ? "" : "/"}${path}`;
+  }
+  function readNokPrice(value) {
+    if (!isRecord$2(value)) return void 0;
+    return readNumber(value.NOK);
+  }
+  function readLocalizedString(value) {
+    if (!isRecord$2(value)) return void 0;
+    return readString(value.no) ?? readString(value.en);
+  }
+  function readTaxfreeProductIdentifiers(value) {
+    return uniqueValues([
+      normalizeProductIdentifier(readString(value.ean)),
+      ...Array.isArray(value.eanAliases) ? value.eanAliases.map((identifier) => normalizeProductIdentifier(readString(identifier))) : []
+    ]);
+  }
+  function hasSharedProductIdentifier(sourceIdentifiers, candidateIdentifiers) {
+    if (sourceIdentifiers === void 0 || candidateIdentifiers.length === 0) return false;
+    const normalizedSourceIdentifiers = new Set(
+      sourceIdentifiers.map((identifier) => normalizeProductIdentifier(identifier)).filter((identifier) => identifier !== void 0)
+    );
+    return candidateIdentifiers.some((identifier) => normalizedSourceIdentifiers.has(identifier));
+  }
+  function normalizeProductIdentifier(value) {
+    if (value === void 0) return void 0;
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 8 && digits.length <= 14 ? digits : void 0;
+  }
+  function uniqueValues(values) {
+    return [...new Set(values.filter((value) => value !== void 0))];
+  }
+  function hasTaxfreeStock(value) {
+    const stockLists = [
+      value.inOnlineStockIn,
+      value.inStockIn,
+      value.availableIn,
+      value.availableInCodes,
+      value.availableInAirportCodes
+    ].filter(Array.isArray);
+    return stockLists.length === 0 || stockLists.some((stockList) => stockList.length > 0);
+  }
+  function cleanTaxfreeSearchTerm(value) {
+    return value.replace(/\s+\|\s+.*$/g, "").replace(/\s+-\s+Vinmonopolet$/i, "").trim().replace(/\s+/g, " ");
+  }
+  function buildTaxfreeSearchQueries(message) {
+    return uniqueValues([
+      cleanTaxfreeSearchTerm(message.searchTerm),
+      readVinmonopoletProductSlugSearchTerm(message.url),
+      ...message.codes?.map(normalizeProductIdentifier) ?? []
+    ]).filter((query) => query.length >= 4);
+  }
+  function buildTaxfreeMatchTerms(message) {
+    return uniqueValues([
+      cleanTaxfreeSearchTerm(message.searchTerm),
+      readVinmonopoletProductSlugSearchTerm(message.url)
+    ]).filter((query) => query.length >= 4);
+  }
+  function readVinmonopoletProductSlugSearchTerm(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      const segments = url.pathname.split("/").filter(Boolean);
+      const productIndex = segments.findIndex((segment) => segment.toLowerCase() === "p");
+      if (productIndex <= 0) return void 0;
+      return decodeURIComponent(segments[productIndex - 1] ?? "").replace(/[-_]+/g, " ").trim().replace(/\s+/g, " ");
+    } catch {
+      return void 0;
+    }
+  }
+  function readVinmonopoletProductCode(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      const match = url.pathname.match(/\/p\/(\d+)(?:\/|$)/i);
+      return normalizeVinmonopoletProductCode(match?.[1]);
+    } catch {
+      return void 0;
+    }
+  }
+  function normalizeVinmonopoletProductCode(value) {
+    if (value === void 0) return void 0;
+    const digits = value.replace(/\D/g, "");
+    return digits.length > 0 ? digits : void 0;
+  }
+  function withLeadingBrand(productName, brandName) {
+    if (brandName === void 0 || productName.toLowerCase().includes(brandName.toLowerCase())) {
+      return productName;
+    }
+    return `${brandName} ${productName}`;
+  }
+  function formatTaxfreeProductName(candidate) {
+    const title = withLeadingBrand(candidate.productName, candidate.brandName);
+    const size = candidate.volumeMl !== void 0 ? formatVolume(candidate.volumeMl) : void 0;
+    return size !== void 0 ? `${title} (${size})` : title;
+  }
+  function formatVolume(volumeMl) {
+    if (volumeMl >= 1e3 && volumeMl % 1e3 === 0) {
+      return `${volumeMl / 1e3} l`;
+    }
+    if (volumeMl >= 1e3) {
+      return `${formatNumber(volumeMl / 1e3)} l`;
+    }
+    if (volumeMl % 10 === 0) {
+      return `${volumeMl / 10} cl`;
+    }
+    return `${formatNumber(volumeMl)} ml`;
+  }
+  function readVolumeMl$1(value) {
+    if (value === void 0) return void 0;
+    const match = value.match(/\b(\d+(?:[,.]\d+)?)\s*(ml|cl|l)\b/i);
+    if (match === null) return void 0;
+    const amount = parseLocalizedNumber$1(match[1] ?? "");
+    const unit = match[2]?.toLowerCase();
+    if (!Number.isFinite(amount) || amount <= 0 || unit === void 0) return void 0;
+    if (unit === "ml") return amount;
+    if (unit === "cl") return amount * 10;
+    return amount * 1e3;
+  }
+  function hasSameVolume(firstMl, secondMl) {
+    return Math.abs(firstMl - secondMl) <= Math.max(5, Math.min(firstMl, secondMl) * 0.03);
+  }
+  function readString(value) {
+    if (typeof value !== "string" && typeof value !== "number") return void 0;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumber(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = parseLocalizedNumber$1(value);
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function parseLocalizedNumber$1(value) {
+    return Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+  }
+  function formatNokPrice(amount) {
+    return `${formatNumber(amount)} kr`;
+  }
+  function formatNumber(amount) {
+    return new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
+    }).format(amount);
+  }
+  async function fetchJson(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function isRecord$2(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
   const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
   async function findPriceMatches(message, requestJson, requestText) {
+    if (isVinmonopoletProductUrl(message.url)) {
+      const taxfreeOffer2 = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
+      return taxfreeOffer2 !== void 0 ? [taxfreeOffer2] : [];
+    }
     if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
-      const isthereanydealOffer2 = await findIsthereanydealPriceMatch(message, requestJson, requestText);
+      const isthereanydealOffer2 = await ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText));
       return isthereanydealOffer2 !== void 0 ? [isthereanydealOffer2] : [];
     }
-    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer] = await Promise.all([
-      findPrisjaktPriceMatch(message, requestJson),
-      findGodprisPriceMatch(message, requestJson, requestText),
-      findKlarnaPriceMatch(message, requestJson),
-      findPrisradarPriceMatch(message, requestJson, requestText),
-      findIsthereanydealPriceMatch(message, requestJson, requestText)
+    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer] = await Promise.all([
+      ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
+      ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText)),
+      ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson)),
+      ignorePriceMatchFailure(findPrisradarPriceMatch(message, requestJson, requestText)),
+      ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText)),
+      ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson))
     ]);
     const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer].filter((offer) => offer !== void 0);
     const trustedOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(trustedOffers, message);
@@ -2283,7 +2667,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     const offers = [
       ...trustedOffers,
       canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : void 0,
-      isthereanydealOffer
+      isthereanydealOffer,
+      taxfreeOffer
     ].filter((offer) => offer !== void 0);
     const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
@@ -2295,11 +2680,24 @@ query SearchSuggestions($query: String!, $category: Int) {
       return sourceRank(first) - sourceRank(second);
     });
   }
+  async function ignorePriceMatchFailure(promise) {
+    try {
+      return await promise;
+    } catch {
+      return void 0;
+    }
+  }
   function isPriceMatchOfferAllowedForCurrentPage(offer, message) {
+    if (isVinmonopoletProductUrl(message.url)) {
+      return isContextualTaxfreeOffer(offer, message);
+    }
     if (isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl)) {
       return true;
     }
     if (offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message)) {
+      return true;
+    }
+    if (isContextualTaxfreeOffer(offer, message)) {
       return true;
     }
     return scoreProductTitleAgainstSearchTerm(message.searchTerm, offer.productName) >= MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE;
@@ -2310,6 +2708,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (offer.source === "klarna") return 2;
     if (offer.source === "prisradar") return 3;
     if (offer.source === "isthereanydeal") return 4;
+    if (offer.source === "taxfree") return 5;
     return 4;
   }
   function isPriceMatchAllowedForCurrentPage(offers, message) {
@@ -2317,8 +2716,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       return true;
     }
     return offers.some((offer) => {
-      return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message);
+      return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message) || isContextualTaxfreeOffer(offer, message);
     });
+  }
+  function isContextualTaxfreeOffer(offer, message) {
+    return offer.source === "taxfree" && isVinmonopoletProductUrl(message.url);
   }
   function hasCurrentMerchantOffer(offer, message) {
     const merchantKeys = getCurrentMerchantKeys(message);
@@ -3474,6 +3876,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   });
   requestCurrentOffers();
+  installDynamicProductPageRefresh();
   function renderNoticeWithStoredState(offers, priceMatches = [], regionPrices) {
     const isUserscript = chrome.runtime.id === void 0;
     chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, REGION_PRICES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
@@ -3491,6 +3894,69 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function requestCurrentOffers() {
     void renderCurrentContext();
+  }
+  function installDynamicProductPageRefresh() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0 || parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "vinmonopolet.no") {
+      return;
+    }
+    if (document.body === null) {
+      window.addEventListener("DOMContentLoaded", installDynamicProductPageRefresh, { once: true });
+      return;
+    }
+    let timerId;
+    let latestMetaKey = "";
+    let latestUrl = window.location.href;
+    const scheduleRefresh = () => {
+      if (timerId !== void 0) {
+        window.clearTimeout(timerId);
+      }
+      timerId = window.setTimeout(() => {
+        const currentUrl = parseUrl(window.location.href);
+        if (currentUrl === void 0 || !isVinmonopoletProductPage(currentUrl)) {
+          latestMetaKey = "";
+          return;
+        }
+        const meta = extractProductPageMeta();
+        const metaKey = meta === void 0 ? "" : [meta.searchTerm, meta.price, meta.currency, meta.volumeMl, meta.alcoholPercent].join("|");
+        if (metaKey.length > 0 && metaKey !== latestMetaKey) {
+          latestMetaKey = metaKey;
+          requestCurrentOffers();
+        }
+      }, 250);
+    };
+    const scheduleLocationRefresh = () => {
+      if (window.location.href !== latestUrl) {
+        latestUrl = window.location.href;
+        latestMetaKey = "";
+      }
+      scheduleRefresh();
+    };
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function pushState(...args) {
+      const result = originalPushState.apply(this, args);
+      scheduleLocationRefresh();
+      return result;
+    };
+    history.replaceState = function replaceState(...args) {
+      const result = originalReplaceState.apply(this, args);
+      scheduleLocationRefresh();
+      return result;
+    };
+    window.addEventListener("popstate", scheduleLocationRefresh);
+    window.addEventListener("hashchange", scheduleLocationRefresh);
+    const observer = new MutationObserver((mutations) => {
+      const hasExternalMutation = mutations.some((mutation) => {
+        const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
+        return target === null || target.closest(`#${HOST_ID}`) === null;
+      });
+      if (hasExternalMutation) {
+        scheduleRefresh();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    scheduleRefresh();
   }
   function hasBlockedHostname(blockedHosts, hostname) {
     return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
@@ -3682,27 +4148,32 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, normalizedHostname) && !isKnownPriceMatchSourceProductPage(parsedUrl)) {
       return void 0;
     }
+    const vinmonopoletText = normalizedHostname === "vinmonopolet.no" ? document.body?.innerText.slice(0, 12e3) ?? "" : "";
     const productLdJson = findProductLdJson();
     const offer = readFirstOffer(productLdJson?.offers);
     const titleMeta = document.querySelector('meta[name="title"]')?.content.trim();
     const ogTitle = document.querySelector('meta[property="og:title"]')?.content.trim();
     const h1 = document.querySelector("h1")?.textContent?.trim();
     const codes = collectProductCodes(productLdJson);
-    const productPageClue = hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
+    const productPageClue = isVinmonopoletProductPage(parsedUrl) || hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
     if (isLikelyProductListingPage(parsedUrl) && document.querySelector('meta[property="og:type"][content="product"]') === null && !isLikelyCommerceProductPage(parsedUrl)) {
       return void 0;
     }
     const productName = readStringValue(productLdJson?.name);
     const brandName = readBrandName(productLdJson?.brand);
-    const searchTerm = productName !== void 0 ? brandName !== void 0 && !productName.toLowerCase().includes(brandName.toLowerCase()) ? `${brandName} ${productName}` : productName : h1 ?? titleMeta ?? ogTitle ?? document.title;
+    const vinmonopoletProductName = normalizedHostname === "vinmonopolet.no" ? readVinmonopoletProductName(parsedUrl, h1) : void 0;
+    const searchTerm = vinmonopoletProductName ?? (productName !== void 0 ? brandName !== void 0 && !productName.toLowerCase().includes(brandName.toLowerCase()) ? `${brandName} ${productName}` : productName : h1 ?? titleMeta ?? ogTitle ?? document.title);
     const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
     if (!productPageClue || normalizedSearchTerm.length < 8) {
       return void 0;
     }
-    const price = readNumberValue(offer?.price);
-    const currency = readStringValue(offer?.priceCurrency);
+    const visibleVinmonopoletPrice = vinmonopoletText.length > 0 ? readVinmonopoletPrice(vinmonopoletText) : void 0;
+    const price = readNumberValue(offer?.price) ?? visibleVinmonopoletPrice;
+    const currency = readStringValue(offer?.priceCurrency) ?? (visibleVinmonopoletPrice !== void 0 ? "NOK" : void 0);
     const productUrl = readUrlValue(productLdJson?.url);
     const organizationName = findOrganizationName();
+    const volumeMl = vinmonopoletText.length > 0 ? readVinmonopoletVolumeMl(vinmonopoletText, price) : void 0;
+    const alcoholPercent = vinmonopoletText.length > 0 ? readVinmonopoletAlcoholPercent(vinmonopoletText) : void 0;
     return {
       url: window.location.href,
       searchTerm: normalizedSearchTerm,
@@ -3711,7 +4182,9 @@ query SearchSuggestions($query: String!, $category: Int) {
       ...currency !== void 0 ? { currency } : {},
       ...productUrl !== void 0 ? { productUrl } : {},
       ...codes.length > 0 ? { codes } : {},
-      ...organizationName !== void 0 ? { organizationName } : {}
+      ...organizationName !== void 0 ? { organizationName } : {},
+      ...volumeMl !== void 0 ? { volumeMl } : {},
+      ...alcoholPercent !== void 0 ? { alcoholPercent } : {}
     };
   }
   function hasProductStructuredDataSignal(product, offer, codes) {
@@ -3764,6 +4237,22 @@ query SearchSuggestions($query: String!, $category: Int) {
       return /^\/app\/\d+(?:\/|$)/.test(pathname);
     }
     return false;
+  }
+  function isVinmonopoletProductPage(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "vinmonopolet.no" && /\/p\/\d+(?:\/|$)/i.test(parsedUrl.pathname);
+  }
+  function readVinmonopoletProductName(parsedUrl, h1) {
+    if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
+    if (h1 !== void 0 && h1.length >= 3 && h1.length <= 80) return h1;
+    const segments = parsedUrl.pathname.split("/").filter(Boolean);
+    const productIndex = segments.findIndex((segment) => segment.toLowerCase() === "p");
+    if (productIndex <= 0) return void 0;
+    try {
+      return decodeURIComponent(segments[productIndex - 1] ?? "").replace(/[-_]+/g, " ").trim().replace(/\s+/g, " ") || void 0;
+    } catch {
+      return void 0;
+    }
   }
   function isLikelyCommerceProductPage(parsedUrl) {
     if (isSteamAppProductUrl(parsedUrl.toString())) {
@@ -3886,6 +4375,49 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     }
     return [...codes];
+  }
+  function readVinmonopoletPrice(text) {
+    const match = text.match(/\bKr\s+(\d[\d\s]*(?:,\d{1,2})?)/i);
+    if (match?.[1] === void 0) return void 0;
+    const amount = parseLocalizedNumber(match[1].replace(/\s/g, ""));
+    return Number.isFinite(amount) && amount > 0 ? amount : void 0;
+  }
+  function readVinmonopoletVolumeMl(text, price) {
+    const priceLine = text.match(/\bKr\s+\d[\d\s]*(?:,\d{1,2})?[\s\S]{0,80}/i)?.[0];
+    return readVolumeMl(priceLine) ?? readVolumeMl(text) ?? readVolumeMlFromLiterPrice(text, price);
+  }
+  function readVinmonopoletAlcoholPercent(text) {
+    const match = text.match(/\bAlkohol\s+(\d+(?:[,.]\d+)?)\s*%/i);
+    if (match?.[1] === void 0) return void 0;
+    const amount = parseLocalizedNumber(match[1]);
+    return Number.isFinite(amount) && amount > 0 ? amount : void 0;
+  }
+  function readVolumeMl(text) {
+    if (text === void 0) return void 0;
+    const match = text.match(/\b(\d+(?:[,.]\d+)?)\s*(ml|cl|l)(?=$|[^A-Za-z])/i);
+    if (match === null) return void 0;
+    const amount = parseLocalizedNumber(match[1] ?? "");
+    const unit = match[2]?.toLowerCase();
+    if (!Number.isFinite(amount) || amount <= 0 || unit === void 0) return void 0;
+    if (unit === "ml") return amount;
+    if (unit === "cl") return amount * 10;
+    return amount * 1e3;
+  }
+  function readVolumeMlFromLiterPrice(text, price) {
+    if (price === void 0 || price <= 0) return void 0;
+    const unitPrice = readVinmonopoletUnitPricePerLiter(text);
+    if (unitPrice === void 0 || unitPrice <= 0) return void 0;
+    const volumeMl = Math.round(price / unitPrice * 1e3);
+    if (!Number.isFinite(volumeMl) || volumeMl < 20 || volumeMl > 5e3) return void 0;
+    const commonVolumeMl = [40, 50, 100, 187, 200, 250, 330, 350, 375, 500, 700, 750, 1e3, 1500, 1750, 2e3, 3e3];
+    const closest = commonVolumeMl.reduce((best, candidate) => Math.abs(candidate - volumeMl) < Math.abs(best - volumeMl) ? candidate : best, commonVolumeMl[0] ?? volumeMl);
+    return Math.abs(closest - volumeMl) <= Math.max(5, closest * 0.03) ? closest : volumeMl;
+  }
+  function readVinmonopoletUnitPricePerLiter(text) {
+    const match = text.match(/\b(\d[\d\s]*(?:,\d{1,2})?)\s*kr\s*\/\s*l\b/i);
+    if (match?.[1] === void 0) return void 0;
+    const amount = parseLocalizedNumber(match[1].replace(/\s/g, ""));
+    return Number.isFinite(amount) && amount > 0 ? amount : void 0;
   }
   function makeAdChip() {
     const chip = document.createElement("span");
@@ -4702,6 +5234,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-isthereanydeal {
       background: #2d2f42;
+      color: #ffffff;
+    }
+    .provider-taxfree {
+      background: #e3000f;
       color: #ffffff;
     }
     .provider-region {
@@ -6700,7 +7236,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -6956,6 +7492,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "klarna") return "klarna";
     if (priceMatch.source === "prisradar") return "prisradar";
     if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
+    if (priceMatch.source === "taxfree") return "taxfree";
     return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
@@ -6964,6 +7501,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "klarna") return "Klarna";
     if (priceMatch.source === "prisradar") return "Prisradar";
     if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
+    if (priceMatch.source === "taxfree") return "Tax Free";
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {

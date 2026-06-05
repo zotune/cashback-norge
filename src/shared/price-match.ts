@@ -14,6 +14,10 @@ import {
   type JsonRequest,
 } from "./prisjakt-price-match.js";
 import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
+import {
+  findTaxfreePriceMatch,
+  isVinmonopoletProductUrl,
+} from "./taxfree-price-match.js";
 
 type TextRequest = (
   url: string,
@@ -32,17 +36,23 @@ export async function findPriceMatches(
   requestJson?: JsonRequest,
   requestText?: TextRequest,
 ): Promise<PriceMatchOffer[]> {
+  if (isVinmonopoletProductUrl(message.url)) {
+    const taxfreeOffer = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
+    return taxfreeOffer !== undefined ? [taxfreeOffer] : [];
+  }
+
   if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
-    const isthereanydealOffer = await findIsthereanydealPriceMatch(message, requestJson, requestText);
+    const isthereanydealOffer = await ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText));
     return isthereanydealOffer !== undefined ? [isthereanydealOffer] : [];
   }
 
-  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer] = await Promise.all([
-    findPrisjaktPriceMatch(message, requestJson),
-    findGodprisPriceMatch(message, requestJson, requestText),
-    findKlarnaPriceMatch(message, requestJson),
-    findPrisradarPriceMatch(message, requestJson, requestText),
-    findIsthereanydealPriceMatch(message, requestJson, requestText),
+  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer] = await Promise.all([
+    ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
+    ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText)),
+    ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson)),
+    ignorePriceMatchFailure(findPrisradarPriceMatch(message, requestJson, requestText)),
+    ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText)),
+    ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson)),
   ]);
 
   const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer]
@@ -62,6 +72,7 @@ export async function findPriceMatches(
     ...trustedOffers,
     canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : undefined,
     isthereanydealOffer,
+    taxfreeOffer,
   ]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
@@ -74,18 +85,36 @@ export async function findPriceMatches(
       const amountDifference = first.amount - second.amount;
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
-    });
+  });
+}
+
+async function ignorePriceMatchFailure(
+  promise: Promise<PriceMatchOffer | undefined>,
+): Promise<PriceMatchOffer | undefined> {
+  try {
+    return await promise;
+  } catch {
+    return undefined;
+  }
 }
 
 function isPriceMatchOfferAllowedForCurrentPage(
   offer: PriceMatchOffer,
   message: GetPriceMatchForProductMessage,
 ): boolean {
+  if (isVinmonopoletProductUrl(message.url)) {
+    return isContextualTaxfreeOffer(offer, message);
+  }
+
   if (isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl)) {
     return true;
   }
 
   if (offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message)) {
+    return true;
+  }
+
+  if (isContextualTaxfreeOffer(offer, message)) {
     return true;
   }
 
@@ -106,6 +135,7 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "klarna") return 2;
   if (offer.source === "prisradar") return 3;
   if (offer.source === "isthereanydeal") return 4;
+  if (offer.source === "taxfree") return 5;
   return 4;
 }
 
@@ -118,8 +148,15 @@ function isPriceMatchAllowedForCurrentPage(
   }
 
   return offers.some((offer) => {
-    return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message);
+    return offer.matchedCurrentMerchant === true || hasCurrentMerchantOffer(offer, message) || isContextualTaxfreeOffer(offer, message);
   });
+}
+
+function isContextualTaxfreeOffer(
+  offer: PriceMatchOffer,
+  message: GetPriceMatchForProductMessage,
+): boolean {
+  return offer.source === "taxfree" && isVinmonopoletProductUrl(message.url);
 }
 
 function hasCurrentMerchantOffer(

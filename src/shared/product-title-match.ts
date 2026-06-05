@@ -63,8 +63,11 @@ function buildProductTitleBaseCandidates(searchTerm: string): string[] {
 }
 
 function tokenizeMatchText(value: string): string[] {
-  return uniqueStrings(value
-    .split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/)
+  const normalizedValue = transliterateNorwegianCharacters(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+  return uniqueStrings(normalizedValue
+    .split(/[^A-Za-z0-9]+/)
     .map(normalizeMatchToken)
     .filter((token): token is string => token !== undefined && token.length >= 2)
     .map(canonicalizeMatchToken));
