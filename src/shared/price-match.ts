@@ -8,7 +8,10 @@ import {
   isSteamAppProductUrl,
 } from "./isthereanydeal-price-match.js";
 import { findKlarnaPriceMatch } from "./klarna-price-match.js";
-import { scoreProductTitleAgainstSearchTerm } from "./product-title-match.js";
+import {
+  isLikelySameProductTitle,
+  scoreProductTitleAgainstSearchTerm,
+} from "./product-title-match.js";
 import {
   findPrisjaktPriceMatch,
   type JsonRequest,
@@ -62,27 +65,34 @@ export async function findPriceMatches(
     ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson)),
   ]);
 
-  const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer]
+  const anchorOffers = [prisjaktOffer, klarnaOffer]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
-  const trustedOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(trustedOffers, message);
+  const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
   const canUsePrisradarOffer =
-    trustedOffersMatchCurrentPage ||
+    anchorOffersMatchCurrentPage ||
     isKnownPriceMatchSourceProductUrl(message.url) ||
     isKnownPriceMatchSourceProductUrl(message.productUrl);
-  const relaxedPrisradarOffer = prisradarOffer === undefined && trustedOffersMatchCurrentPage
+  const relaxedPrisradarOffer = prisradarOffer === undefined && anchorOffersMatchCurrentPage
     ? await findPrisradarPriceMatch(message, requestJson, requestText, {
       allowLooseTextSearch: true,
-      anchorSearchTerms: trustedOffers.map((offer) => offer.productName),
+      anchorSearchTerms: anchorOffers.map((offer) => offer.productName),
     })
     : undefined;
   const offers = [
-    ...trustedOffers,
+    ...anchorOffers,
+    godprisOffer,
     canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : undefined,
     isthereanydealOffer,
     taxfreeOffer,
   ]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
-  const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
+  const productAnchorTerms = uniqueStrings([
+    message.searchTerm,
+    ...anchorOffers.map((offer) => offer.productName),
+  ]);
+  const allowedOffers = offers
+    .filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms))
+    .filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
 
   if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
     return [];
@@ -93,6 +103,14 @@ export async function findPriceMatches(
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
   });
+}
+
+function isSupplementalPriceMatchOfferAligned(
+  offer: PriceMatchOffer,
+  productAnchorTerms: string[],
+): boolean {
+  if (offer.source !== "godpris" && offer.source !== "prisradar") return true;
+  return productAnchorTerms.some((anchorTerm) => isLikelySameProductTitle(anchorTerm, offer.productName));
 }
 
 async function ignorePriceMatchFailure(

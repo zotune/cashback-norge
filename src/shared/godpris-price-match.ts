@@ -2,7 +2,10 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
-import { scoreProductTitleAgainstSearchTerm } from "./product-title-match.js";
+import {
+  isLikelySameProductTitle,
+  scoreProductTitleAgainstSearchTerm,
+} from "./product-title-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 
 type TextRequest = (
@@ -100,6 +103,8 @@ async function fetchGodprisProductId(
 }
 
 function scoreGodprisProductMatch(query: string, title: string, brand: string | undefined): number {
+  if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
+
   const score = scoreProductTitleAgainstSearchTerm(query, title);
   return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
 }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780687002
+// @version      1780789421
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -408,11 +408,29 @@
     ["white", "hvit"]
   ]);
   const CONDITION_VARIANT_TOKENS$1 = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+  const GENERIC_PRODUCT_SIGNAL_TOKENS = /* @__PURE__ */ new Set([
+    "antibacterial",
+    "ansiktskrem",
+    "cleansing",
+    "hydrating",
+    "intensive",
+    "moisturising",
+    "moisturizing",
+    "protective",
+    "repairing",
+    "sensitive",
+    "soothing"
+  ]);
   function scoreProductTitleAgainstSearchTerm(searchTerm, title) {
     return Math.max(
       0,
       ...buildProductTitleBaseCandidates(searchTerm).map((candidate) => scoreProductTitleMatch(candidate, title))
     );
+  }
+  function isLikelySameProductTitle(searchTerm, title, minimumScore = 0.45) {
+    return buildProductTitleBaseCandidates(searchTerm).some((candidate) => {
+      return scoreProductTitleMatch(candidate, title) >= minimumScore && hasProductTitleSignalOverlap(candidate, title);
+    });
   }
   function scoreProductTitleMatch(query, title) {
     const queryTokens = tokenizeMatchText$1(query);
@@ -433,6 +451,20 @@
     }
     const score = totalWeight > 0 ? matchedWeight / totalWeight : 0;
     return hasUnrequestedConditionVariant$1(queryTokens, titleTokens) ? score * 0.2 : score;
+  }
+  function hasProductTitleSignalOverlap(query, title) {
+    const querySignals = tokenizeMatchText$1(query).filter(isProductSignalToken);
+    if (querySignals.length === 0) return true;
+    const titleTokens = tokenizeMatchText$1(title);
+    if (titleTokens.length === 0) return false;
+    return querySignals.some((queryToken) => {
+      return titleTokens.some((titleToken) => {
+        return titleToken === queryToken || titleToken.length >= 4 && (titleToken.startsWith(queryToken) || queryToken.startsWith(titleToken));
+      });
+    });
+  }
+  function isProductSignalToken(token) {
+    return token.length >= 6 && /[a-z]/.test(token) && !/\d/.test(token) && !GENERIC_PRODUCT_SIGNAL_TOKENS.has(token);
   }
   function buildProductTitleBaseCandidates(searchTerm) {
     const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
@@ -529,6 +561,7 @@
     return bestMatch !== void 0 && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE ? bestMatch.id : void 0;
   }
   function scoreGodprisProductMatch(query, title, brand) {
+    if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
     const score = scoreProductTitleAgainstSearchTerm(query, title);
     return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
   }
@@ -3045,20 +3078,25 @@ query SearchSuggestions($query: String!, $category: Int) {
       ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText)),
       ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson))
     ]);
-    const trustedOffers = [prisjaktOffer, godprisOffer, klarnaOffer].filter((offer) => offer !== void 0);
-    const trustedOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(trustedOffers, message);
-    const canUsePrisradarOffer = trustedOffersMatchCurrentPage || isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl);
-    const relaxedPrisradarOffer = prisradarOffer === void 0 && trustedOffersMatchCurrentPage ? await findPrisradarPriceMatch(message, requestJson, requestText, {
+    const anchorOffers = [prisjaktOffer, klarnaOffer].filter((offer) => offer !== void 0);
+    const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
+    const canUsePrisradarOffer = anchorOffersMatchCurrentPage || isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl);
+    const relaxedPrisradarOffer = prisradarOffer === void 0 && anchorOffersMatchCurrentPage ? await findPrisradarPriceMatch(message, requestJson, requestText, {
       allowLooseTextSearch: true,
-      anchorSearchTerms: trustedOffers.map((offer) => offer.productName)
+      anchorSearchTerms: anchorOffers.map((offer) => offer.productName)
     }) : void 0;
     const offers = [
-      ...trustedOffers,
+      ...anchorOffers,
+      godprisOffer,
       canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : void 0,
       isthereanydealOffer,
       taxfreeOffer
     ].filter((offer) => offer !== void 0);
-    const allowedOffers = offers.filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
+    const productAnchorTerms = uniqueStrings([
+      message.searchTerm,
+      ...anchorOffers.map((offer) => offer.productName)
+    ]);
+    const allowedOffers = offers.filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms)).filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
@@ -3067,6 +3105,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (amountDifference !== 0) return amountDifference;
       return sourceRank(first) - sourceRank(second);
     });
+  }
+  function isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms) {
+    if (offer.source !== "godpris" && offer.source !== "prisradar") return true;
+    return productAnchorTerms.some((anchorTerm) => isLikelySameProductTitle(anchorTerm, offer.productName));
   }
   async function ignorePriceMatchFailure(promise) {
     try {
@@ -7442,7 +7484,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       else supportLink.style.cssText = "flex:1;text-align:center;";
       support.append(supportLink, logoLink);
       const disclosure = document.createElement("p");
-      disclosure.textContent = "Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
+      disclosure.textContent = "Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
       disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
       panel.append(topLine, body, support, disclosure);
     } else {

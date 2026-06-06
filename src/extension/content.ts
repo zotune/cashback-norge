@@ -3903,7 +3903,7 @@ function renderNotice(
     else supportLink.style.cssText = "flex:1;text-align:center;";
     support.append(supportLink, logoLink);
     const disclosure = document.createElement("p");
-    disclosure.textContent = "Lenker merket Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
+    disclosure.textContent = "Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
     disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
     panel.append(topLine, body, support, disclosure);
   } else {

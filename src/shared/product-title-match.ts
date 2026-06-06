@@ -18,12 +18,31 @@ const CANONICAL_MATCH_TOKENS = new Map<string, string>([
 ]);
 
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+const GENERIC_PRODUCT_SIGNAL_TOKENS = new Set([
+  "antibacterial",
+  "ansiktskrem",
+  "cleansing",
+  "hydrating",
+  "intensive",
+  "moisturising",
+  "moisturizing",
+  "protective",
+  "repairing",
+  "sensitive",
+  "soothing",
+]);
 
 export function scoreProductTitleAgainstSearchTerm(searchTerm: string, title: string): number {
   return Math.max(
     0,
     ...buildProductTitleBaseCandidates(searchTerm).map((candidate) => scoreProductTitleMatch(candidate, title)),
   );
+}
+
+export function isLikelySameProductTitle(searchTerm: string, title: string, minimumScore = 0.45): boolean {
+  return buildProductTitleBaseCandidates(searchTerm).some((candidate) => {
+    return scoreProductTitleMatch(candidate, title) >= minimumScore && hasProductTitleSignalOverlap(candidate, title);
+  });
 }
 
 export function scoreProductTitleMatch(query: string, title: string): number {
@@ -48,6 +67,28 @@ export function scoreProductTitleMatch(query: string, title: string): number {
 
   const score = totalWeight > 0 ? matchedWeight / totalWeight : 0;
   return hasUnrequestedConditionVariant(queryTokens, titleTokens) ? score * 0.2 : score;
+}
+
+function hasProductTitleSignalOverlap(query: string, title: string): boolean {
+  const querySignals = tokenizeMatchText(query).filter(isProductSignalToken);
+  if (querySignals.length === 0) return true;
+
+  const titleTokens = tokenizeMatchText(title);
+  if (titleTokens.length === 0) return false;
+
+  return querySignals.some((queryToken) => {
+    return titleTokens.some((titleToken) => {
+      return titleToken === queryToken ||
+        (titleToken.length >= 4 && (titleToken.startsWith(queryToken) || queryToken.startsWith(titleToken)));
+    });
+  });
+}
+
+function isProductSignalToken(token: string): boolean {
+  return token.length >= 6 &&
+    /[a-z]/.test(token) &&
+    !/\d/.test(token) &&
+    !GENERIC_PRODUCT_SIGNAL_TOKENS.has(token);
 }
 
 function buildProductTitleBaseCandidates(searchTerm: string): string[] {
