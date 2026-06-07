@@ -3,6 +3,11 @@ import type {
   PriceMatchOffer,
 } from "./extension-messages.js";
 import {
+  isSamePackageQuantity,
+  readPackageQuantityFromText,
+  type ProductPackageQuantity,
+} from "./grocery-price-match-utils.js";
+import {
   isLikelySameProductTitle,
   scoreProductTitleAgainstSearchTerm,
 } from "./product-title-match.js";
@@ -47,15 +52,16 @@ export async function findGodprisPriceMatch(
     ...(message.codes ?? []).filter(isLikelyGtin),
     message.searchTerm,
   ]);
+  const packageQuantity = getMessagePackageQuantity(message);
 
   for (const query of searchQueries) {
-    const productId = await fetchGodprisProductId(query, requestJson, message.searchTerm);
+    const productId = await fetchGodprisProductId(query, requestJson, message.searchTerm, packageQuantity);
     if (productId === undefined) continue;
 
     const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
       headers: { "Accept": "text/html,application/xhtml+xml" },
     });
-    const offer = html !== undefined ? readGodprisProductPage(html, productId) : undefined;
+    const offer = html !== undefined ? readGodprisProductPage(html, productId, packageQuantity) : undefined;
     if (offer !== undefined) return offer;
   }
 
@@ -66,6 +72,7 @@ async function fetchGodprisProductId(
   query: string,
   requestJson: JsonRequest,
   titleHint?: string,
+  packageQuantity?: ProductPackageQuantity,
 ): Promise<string | undefined> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 4) return undefined;
@@ -88,9 +95,9 @@ async function fetchGodprisProductId(
     const brand = readStringLike(result.brand);
     const matchQuery = isCodeQuery && titleHint !== undefined ? titleHint : normalizedQuery;
     const score = Math.max(
-      scoreGodprisProductMatch(matchQuery, uniqueStrings([brand, title]).join(" "), brand),
-      scoreGodprisProductMatch(matchQuery, title ?? "", brand),
-      scoreGodprisProductMatch(matchQuery, groupTitle ?? "", brand),
+      scoreGodprisProductMatch(matchQuery, uniqueStrings([brand, title]).join(" "), brand, packageQuantity),
+      scoreGodprisProductMatch(matchQuery, title ?? "", brand, packageQuantity),
+      scoreGodprisProductMatch(matchQuery, groupTitle ?? "", brand, packageQuantity),
     );
     if (bestMatch === undefined || score > bestMatch.score) {
       bestMatch = { id, score };
@@ -102,8 +109,14 @@ async function fetchGodprisProductId(
     : undefined;
 }
 
-function scoreGodprisProductMatch(query: string, title: string, brand: string | undefined): number {
+function scoreGodprisProductMatch(
+  query: string,
+  title: string,
+  brand: string | undefined,
+  packageQuantity: ProductPackageQuantity | undefined,
+): number {
   if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
+  if (!isGodprisPackageQuantityCompatible(packageQuantity, title)) return 0;
 
   const score = scoreProductTitleAgainstSearchTerm(query, title);
   return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
@@ -121,7 +134,11 @@ function hasGodprisBrandConflict(query: string, brand: string | undefined): bool
   return !queryBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
 }
 
-function readGodprisProductPage(html: string, fallbackProductId: string): PriceMatchOffer | undefined {
+function readGodprisProductPage(
+  html: string,
+  fallbackProductId: string,
+  packageQuantity: ProductPackageQuantity | undefined,
+): PriceMatchOffer | undefined {
   const page = readGodprisDataPage(html);
   const props = isPlainRecord(page?.props) ? page.props : undefined;
   const product = isPlainRecord(props?.product) ? props.product : undefined;
@@ -132,6 +149,8 @@ function readGodprisProductPage(html: string, fallbackProductId: string): PriceM
   const rawProductName = readStringLike(product.title) ?? readStringLike(product.name);
   const productBrand = readStringLike(product.brand);
   const productName = withLeadingBrand(rawProductName, productBrand) ?? "Godpris-produkt";
+  if (!isGodprisPackageQuantityCompatible(packageQuantity, productName)) return undefined;
+
   const offers = prices
     .map(readGodprisOffer)
     .filter((offer): offer is Omit<PriceMatchOffer, "productName" | "productUrl" | "source" | "sourceName"> => offer !== undefined)
@@ -152,6 +171,21 @@ function readGodprisProductPage(html: string, fallbackProductId: string): PriceM
       price: offer.price,
     })),
   };
+}
+
+function getMessagePackageQuantity(message: GetPriceMatchForProductMessage): ProductPackageQuantity | undefined {
+  return message.packageAmount !== undefined && message.packageUnit !== undefined
+    ? { amount: message.packageAmount, unit: message.packageUnit }
+    : undefined;
+}
+
+function isGodprisPackageQuantityCompatible(
+  expectedQuantity: ProductPackageQuantity | undefined,
+  productName: string,
+): boolean {
+  if (expectedQuantity === undefined) return true;
+  const productQuantity = readPackageQuantityFromText(productName);
+  return productQuantity === undefined || isSamePackageQuantity(expectedQuantity, productQuantity);
 }
 
 function readGodprisDataPage(html: string): Record<string, unknown> | undefined {

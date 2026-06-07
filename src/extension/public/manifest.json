@@ -18,7 +18,11 @@
     "https://vinmonopolet.no/*",
     "https://open.er-api.com/*",
     "https://gql.prisradar.no/*",
-    "https://prisradar.no/*"
+    "https://prisradar.no/*",
+    "https://www.sesum.no/*",
+    "https://sesum.no/*",
+    "https://enhver.no/*",
+    "https://api.enhver.no/*"
   ],
   "background": {
     "service_worker": "assets/background.js",

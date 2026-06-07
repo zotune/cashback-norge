@@ -9,6 +9,12 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import {
+  readPackageQuantityFromText,
+  readPackageQuantityFromValue,
+  type ProductPackageQuantity,
+  type ProductPackageUnit,
+} from "../shared/grocery-price-match-utils";
 import { isSteamAppProductUrl } from "../shared/isthereanydeal-price-match";
 import {
   findPlayStationRegionPrices,
@@ -199,8 +205,12 @@ type GetPriceMatchForProductMessage = {
   currency?: string;
   productUrl?: string;
   codes?: string[];
+  productTitleCandidates?: string[];
   productPageClue?: boolean;
   organizationName?: string;
+  productBrand?: string;
+  packageAmount?: number;
+  packageUnit?: ProductPackageUnit;
   volumeMl?: number;
   alcoholPercent?: number;
 };
@@ -218,9 +228,10 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet" | "sesum" | "enhver";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
+  matchedExactProduct?: boolean;
   shopName: string;
   price: string;
   amount: number;
@@ -312,6 +323,8 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "klarna.com",
   "kelkoo.no",
   "prisradar.no",
+  "sesum.no",
+  "enhver.no",
 ]);
 installOfferActivationClickTracker();
 chrome.runtime.onMessage.addListener((message) => {
@@ -409,7 +422,7 @@ function installDynamicProductPageRefresh(): void {
       const meta = extractProductPageMeta();
       const metaKey = meta === undefined
         ? ""
-        : [meta.searchTerm, meta.price, meta.currency, meta.volumeMl, meta.alcoholPercent].join("|");
+        : [meta.searchTerm, meta.price, meta.currency, meta.packageAmount, meta.packageUnit, meta.volumeMl, meta.alcoholPercent].join("|");
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
         requestCurrentOffers();
@@ -706,7 +719,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   const titleMeta = document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content.trim();
   const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
   const h1 = document.querySelector("h1")?.textContent?.trim();
-  const codes = collectProductCodes(productLdJson);
+  const codes = uniqueStrings([...collectProductCodes(productLdJson), ...collectProductCodesFromUrl(parsedUrl)]);
   const productPageClue =
     isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
@@ -735,6 +748,18 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
         : productName
       : h1 ?? titleMeta ?? ogTitle ?? document.title);
   const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+  const productTitleCandidates = uniqueStrings([
+    normalizedSearchTerm,
+    productName,
+    brandName !== undefined && productName !== undefined && !productName.toLowerCase().includes(brandName.toLowerCase())
+      ? `${brandName} ${productName}`
+      : undefined,
+    h1,
+    titleMeta,
+    ogTitle,
+    document.title,
+  ]);
+  const packageQuantity = readProductPackageQuantity(productLdJson, productTitleCandidates);
 
   if (!productPageClue || normalizedSearchTerm.length < 8) {
     return undefined;
@@ -756,7 +781,10 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     ...(currency !== undefined ? { currency } : {}),
     ...(productUrl !== undefined ? { productUrl } : {}),
     ...(codes.length > 0 ? { codes } : {}),
+    ...(productTitleCandidates.length > 0 ? { productTitleCandidates } : {}),
     ...(organizationName !== undefined ? { organizationName } : {}),
+    ...(brandName !== undefined ? { productBrand: brandName } : {}),
+    ...(packageQuantity !== undefined ? { packageAmount: packageQuantity.amount, packageUnit: packageQuantity.unit } : {}),
     ...(volumeMl !== undefined ? { volumeMl } : {}),
     ...(alcoholPercent !== undefined ? { alcoholPercent } : {}),
   };
@@ -832,6 +860,14 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
 
   if (hostname.endsWith("prisradar.no")) {
     return /^\/produkter\/[^/]+\/?$/.test(pathname);
+  }
+
+  if (hostname.endsWith("sesum.no")) {
+    return /^\/produkt\/[^/]+\/?$/.test(pathname);
+  }
+
+  if (hostname.endsWith("enhver.no")) {
+    return /^\/brands\/[^/]+\/\d+\/?$/.test(pathname);
   }
 
   if (hostname.endsWith("store.steampowered.com")) {
@@ -1028,6 +1064,54 @@ function collectProductCodes(product: Record<string, unknown> | undefined): stri
     }
   }
   return [...codes];
+}
+
+function collectProductCodesFromUrl(parsedUrl: URL): string[] {
+  return uniqueStrings(`${parsedUrl.pathname} ${parsedUrl.search}`.match(/\b\d{8,14}\b/g) ?? []);
+}
+
+function readProductPackageQuantity(
+  product: Record<string, unknown> | undefined,
+  titleCandidates: string[],
+): ProductPackageQuantity | undefined {
+  if (product !== undefined) {
+    for (const value of [
+      product.weight,
+      product.size,
+      product.netWeight,
+      product.volume,
+      product.additionalProperty,
+    ]) {
+      const quantity = readPackageQuantityFromStructuredValue(value);
+      if (quantity !== undefined) return quantity;
+    }
+  }
+
+  const textQuantity = readPackageQuantityFromText([
+    readStringValue(product?.description),
+    ...titleCandidates,
+  ].filter((value): value is string => value !== undefined).join(" "));
+  return textQuantity;
+}
+
+function readPackageQuantityFromStructuredValue(value: unknown): ProductPackageQuantity | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const quantity = readPackageQuantityFromStructuredValue(item);
+      if (quantity !== undefined) return quantity;
+    }
+    return undefined;
+  }
+
+  const quantity = readPackageQuantityFromValue(value);
+  if (quantity !== undefined) return quantity;
+
+  if (!isRecord(value)) return undefined;
+  return readPackageQuantityFromText(Object.values(value).map((item) => String(item)).join(" "));
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => value !== undefined && value.length > 0))];
 }
 
 function readVinmonopoletPrice(text: string): number | undefined {
@@ -2077,6 +2161,14 @@ function renderNotice(
       background: #ffffff;
       border: 1px solid #d3e2dc;
       color: #0c4598;
+    }
+    .provider-sesum {
+      background: #0f7b55;
+      color: #ffffff;
+    }
+    .provider-enhver {
+      background: #ff6b35;
+      color: #ffffff;
     }
     .provider-isthereanydeal {
       background: #2d2f42;
@@ -4208,9 +4300,10 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
+    (value.matchedExactProduct === undefined || typeof value.matchedExactProduct === "boolean") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
     typeof value.amount === "number" &&
@@ -4573,6 +4666,8 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "godpris") return "godpris";
   if (priceMatch.source === "klarna") return "klarna";
   if (priceMatch.source === "prisradar") return "prisradar";
+  if (priceMatch.source === "sesum") return "sesum";
+  if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   if (priceMatch.source === "taxfree") return "taxfree";
   if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
@@ -4583,6 +4678,8 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "godpris") return "Godpris";
   if (priceMatch.source === "klarna") return "Klarna";
   if (priceMatch.source === "prisradar") return "Prisradar";
+  if (priceMatch.source === "sesum") return "SeSum";
+  if (priceMatch.source === "enhver") return "Enhver";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   if (priceMatch.source === "taxfree") return "Tax Free";
   if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";

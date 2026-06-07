@@ -46,6 +46,10 @@ const USERSCRIPT_BANNER = `\
 // @connect      open.er-api.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no
+// @connect      www.sesum.no
+// @connect      sesum.no
+// @connect      enhver.no
+// @connect      api.enhver.no
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js

@@ -6,6 +6,10 @@ import {
 import type {
   PlayStationRegionPriceResult,
 } from "./playstation-region-prices.js";
+import {
+  isProductPackageUnit,
+  type ProductPackageUnit,
+} from "./grocery-price-match-utils.js";
 
 export type CashbackFoundMessage = {
   type: "cashback-found";
@@ -29,8 +33,12 @@ export type GetPriceMatchForProductMessage = {
   currency?: string;
   productUrl?: string;
   codes?: string[];
+  productTitleCandidates?: string[];
   productPageClue?: boolean;
   organizationName?: string;
+  productBrand?: string;
+  packageAmount?: number;
+  packageUnit?: ProductPackageUnit;
   volumeMl?: number;
   alcoholPercent?: number;
 };
@@ -55,9 +63,10 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet" | "sesum" | "enhver";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
+  matchedExactProduct?: boolean;
   shopName: string;
   price: string;
   amount: number;
@@ -139,8 +148,12 @@ export function isGetPriceMatchForProductMessage(
     (value.currency === undefined || typeof value.currency === "string") &&
     (value.productUrl === undefined || typeof value.productUrl === "string") &&
     (value.codes === undefined || (Array.isArray(value.codes) && value.codes.every((code) => typeof code === "string"))) &&
+    (value.productTitleCandidates === undefined || (Array.isArray(value.productTitleCandidates) && value.productTitleCandidates.every((candidate) => typeof candidate === "string"))) &&
     (value.productPageClue === undefined || typeof value.productPageClue === "boolean") &&
     (value.organizationName === undefined || typeof value.organizationName === "string") &&
+    (value.productBrand === undefined || typeof value.productBrand === "string") &&
+    (value.packageAmount === undefined || typeof value.packageAmount === "number") &&
+    (value.packageUnit === undefined || isProductPackageUnit(value.packageUnit)) &&
     (value.volumeMl === undefined || typeof value.volumeMl === "number") &&
     (value.alcoholPercent === undefined || typeof value.alcoholPercent === "number")
   );
