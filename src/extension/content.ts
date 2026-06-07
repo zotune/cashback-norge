@@ -1835,11 +1835,14 @@ async function findSkyscannerFlightPriceMatchOffer(
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
   const pageCandidates = extractCurrentSkyscannerPageOfferCandidates(flightMeta);
+  const calendarCandidate = pageCandidates.length === 0 && isCurrentSkyscannerFlightSearchPageForMeta(flightMeta)
+    ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl)
+    : undefined;
   const candidates = pageCandidates.length > 0
     ? pageCandidates
-    : [
-      await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl),
-    ].filter((candidate): candidate is SkyscannerFlightOfferCandidate => candidate !== undefined);
+    : calendarCandidate !== undefined
+      ? [calendarCandidate]
+      : [];
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
 
@@ -1861,13 +1864,16 @@ async function findSkyscannerFlightPriceMatchOffer(
 }
 
 function extractCurrentSkyscannerPageOfferCandidates(flightMeta: FlightSearchMeta): SkyscannerFlightOfferCandidate[] {
+  if (!isCurrentSkyscannerFlightSearchPageForMeta(flightMeta)) return [];
+  return extractSkyscannerVisibleOfferCandidates(window.location.href);
+}
+
+function isCurrentSkyscannerFlightSearchPageForMeta(flightMeta: FlightSearchMeta): boolean {
   const parsedUrl = parseUrl(window.location.href);
-  if (parsedUrl === undefined || !isSkyscannerFlightSearchPage(parsedUrl)) return [];
+  if (parsedUrl === undefined || !isSkyscannerFlightSearchPage(parsedUrl)) return false;
 
   const currentMeta = extractSkyscannerFlightSearchMeta(parsedUrl);
-  if (currentMeta === undefined || buildFlightSearchMetaKey(currentMeta) !== buildFlightSearchMetaKey(flightMeta)) return [];
-
-  return extractSkyscannerVisibleOfferCandidates(parsedUrl.toString());
+  return currentMeta !== undefined && buildFlightSearchMetaKey(currentMeta) === buildFlightSearchMetaKey(flightMeta);
 }
 
 function readCurrentSkyscannerVisiblePriceKey(): string {

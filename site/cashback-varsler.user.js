@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780870180
+// @version      1780870485
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8303,9 +8303,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
     const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
     const pageCandidates = extractCurrentSkyscannerPageOfferCandidates(flightMeta);
-    const candidates = pageCandidates.length > 0 ? pageCandidates : [
-      await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl)
-    ].filter((candidate2) => candidate2 !== void 0);
+    const calendarCandidate = pageCandidates.length === 0 && isCurrentSkyscannerFlightSearchPageForMeta(flightMeta) ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl) : void 0;
+    const candidates = pageCandidates.length > 0 ? pageCandidates : calendarCandidate !== void 0 ? [calendarCandidate] : [];
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;
     return {
@@ -8325,11 +8324,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     };
   }
   function extractCurrentSkyscannerPageOfferCandidates(flightMeta) {
+    if (!isCurrentSkyscannerFlightSearchPageForMeta(flightMeta)) return [];
+    return extractSkyscannerVisibleOfferCandidates(window.location.href);
+  }
+  function isCurrentSkyscannerFlightSearchPageForMeta(flightMeta) {
     const parsedUrl = parseUrl(window.location.href);
-    if (parsedUrl === void 0 || !isSkyscannerFlightSearchPage(parsedUrl)) return [];
+    if (parsedUrl === void 0 || !isSkyscannerFlightSearchPage(parsedUrl)) return false;
     const currentMeta = extractSkyscannerFlightSearchMeta(parsedUrl);
-    if (currentMeta === void 0 || buildFlightSearchMetaKey(currentMeta) !== buildFlightSearchMetaKey(flightMeta)) return [];
-    return extractSkyscannerVisibleOfferCandidates(parsedUrl.toString());
+    return currentMeta !== void 0 && buildFlightSearchMetaKey(currentMeta) === buildFlightSearchMetaKey(flightMeta);
   }
   function readCurrentSkyscannerVisiblePriceKey() {
     return extractSkyscannerVisibleOfferCandidates(window.location.href).slice(0, 5).map((candidate) => `${Math.round(candidate.amount)}:${candidate.platform ?? ""}`).join(";");
