@@ -39,6 +39,8 @@ const USERSCRIPT_BANNER = `\
 // @connect      api.gg.deals
 // @connect      gg.deals
 // @connect      www.allkeyshop.com
+// @connect      itunes.apple.com
+// @connect      appstoreprice.org
 // @connect      namx6ho175-dsn.algolia.net
 // @connect      isthereanydeal.com
 // @connect      www.klarna.com

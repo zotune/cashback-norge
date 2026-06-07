@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780841475
+// @version      1780848842
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -19,6 +19,8 @@
 // @connect      api.gg.deals
 // @connect      gg.deals
 // @connect      www.allkeyshop.com
+// @connect      itunes.apple.com
+// @connect      appstoreprice.org
 // @connect      namx6ho175-dsn.algolia.net
 // @connect      isthereanydeal.com
 // @connect      www.klarna.com
@@ -398,7 +400,7 @@
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
-  function isRecord$4(value) {
+  function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
@@ -752,11 +754,11 @@
     });
   }
   function readAugmentedSteamAppInfo(value, targets) {
-    if (!isRecord$3(value) || !isRecord$3(value.prices)) return void 0;
+    if (!isRecord$4(value) || !isRecord$4(value.prices)) return void 0;
     for (const target of targets) {
       const targetPrices = value.prices[`${target.type}/${target.id}`];
-      if (!isRecord$3(targetPrices)) continue;
-      const urls = isRecord$3(targetPrices.urls) ? targetPrices.urls : void 0;
+      if (!isRecord$4(targetPrices)) continue;
+      const urls = isRecord$4(targetPrices.urls) ? targetPrices.urls : void 0;
       const infoUrl = typeof urls?.info === "string" && urls.info.length > 0 ? urls.info : void 0;
       if (infoUrl !== void 0) return { infoUrl };
     }
@@ -812,9 +814,9 @@
     }));
   }
   function readItadSearchGames(value) {
-    const results = Array.isArray(value) ? value : isRecord$3(value) && Array.isArray(value.games) ? value.games : [];
+    const results = Array.isArray(value) ? value : isRecord$4(value) && Array.isArray(value.games) ? value.games : [];
     return results.map((game) => {
-      if (!isRecord$3(game)) return void 0;
+      if (!isRecord$4(game)) return void 0;
       const slug = typeof game.slug === "string" && game.slug.length > 0 ? game.slug : void 0;
       const title = typeof game.title === "string" && game.title.length > 0 ? game.title : void 0;
       const type = readNumber$1(game.type);
@@ -883,13 +885,13 @@
     if (html === void 0) return void 0;
     const globalState = parseScriptJson(html, /var g = (\{[\s\S]*?\});\s*var page = /);
     const pageState = parseScriptJson(html, /var page = (\[[\s\S]*?\]);\s*var /);
-    if (!isRecord$3(globalState) || !Array.isArray(pageState)) return void 0;
-    const user = isRecord$3(globalState.user) ? globalState.user : void 0;
+    if (!isRecord$4(globalState) || !Array.isArray(pageState)) return void 0;
+    const user = isRecord$4(globalState.user) ? globalState.user : void 0;
     const token = typeof user?.token === "string" && user.token.length > 0 ? user.token : void 0;
     const visitorId = typeof user?.id === "string" && user.id.length > 0 ? user.id : void 0;
     const shops = readItadShops(globalState.shops);
-    const pageProps = isRecord$3(pageState[1]) ? pageState[1] : void 0;
-    const game = isRecord$3(pageProps?.game) ? pageProps.game : void 0;
+    const pageProps = isRecord$4(pageState[1]) ? pageState[1] : void 0;
+    const game = isRecord$4(pageProps?.game) ? pageProps.game : void 0;
     const gameId = typeof game?.id === "string" && game.id.length > 0 ? game.id : void 0;
     if (token === void 0 || gameId === void 0 || shops.size === 0) return void 0;
     const slug = typeof game?.slug === "string" && game.slug.length > 0 ? game.slug : void 0;
@@ -949,7 +951,7 @@
   }
   function readItadShops(value) {
     const shops = /* @__PURE__ */ new Map();
-    if (!isRecord$3(value)) return shops;
+    if (!isRecord$4(value)) return shops;
     for (const [rawId, rawShop] of Object.entries(value)) {
       const id = Number.parseInt(rawId, 10);
       const name = Array.isArray(rawShop) && typeof rawShop[0] === "string" ? rawShop[0] : void 0;
@@ -960,7 +962,7 @@
     return shops;
   }
   function readItadDeals(value, shops) {
-    if (!isRecord$3(value) || !Array.isArray(value.deals)) return [];
+    if (!isRecord$4(value) || !Array.isArray(value.deals)) return [];
     return value.deals.map((deal) => readItadDeal(deal, shops)).filter((deal) => deal !== void 0);
   }
   function isItadDealInScope(deal, scope) {
@@ -974,15 +976,15 @@
     return platform.includes("microsoft") || platform.includes("xbox") || platform.includes("windows");
   }
   function hasNokDeal(value) {
-    if (!isRecord$3(value) || !Array.isArray(value.deals)) return false;
+    if (!isRecord$4(value) || !Array.isArray(value.deals)) return false;
     return value.deals.some((deal) => {
-      if (!isRecord$3(deal)) return false;
+      if (!isRecord$4(deal)) return false;
       const price = readItadPrice(deal.priceNew);
       return price?.currency === "NOK";
     });
   }
   function readItadDeal(value, shops) {
-    if (!isRecord$3(value)) return void 0;
+    if (!isRecord$4(value)) return void 0;
     const shopId = readNumber$1(value.shop);
     const price = readItadPrice(value.priceNew);
     if (shopId === void 0 || price === void 0 || price.amount <= 0) return void 0;
@@ -996,7 +998,7 @@
       shopName,
       amount: price.amount,
       currency: price.currency,
-      price: formatCurrency$3(price.amount, price.currency),
+      price: formatCurrency$4(price.amount, price.currency),
       ...platform !== void 0 ? { platform } : {},
       ...url !== void 0 ? { url } : {},
       ...voucher !== void 0 ? { voucher } : {}
@@ -1060,7 +1062,7 @@
       return void 0;
     }
   }
-  function formatCurrency$3(amount, currency) {
+  function formatCurrency$4(amount, currency) {
     try {
       return new Intl.NumberFormat("nb-NO", {
         style: "currency",
@@ -1099,7 +1101,7 @@
     if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
     return value;
   }
-  function isRecord$3(value) {
+  function isRecord$4(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   function uniqueStrings$c(values) {
@@ -1195,7 +1197,7 @@
   }
   function readAllKeyShopData(html) {
     const gamePageTrans = readAssignedJsonObject(html, "gamePageTrans");
-    if (!isRecord$4(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
+    if (!isRecord$5(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
     const prices = gamePageTrans.prices.map(readAllKeyShopRawPrice).filter((price) => price !== void 0);
     if (prices.length === 0) return void 0;
     return {
@@ -1207,7 +1209,7 @@
     };
   }
   function readAllKeyShopRawPrice(value) {
-    if (!isRecord$4(value)) return void 0;
+    if (!isRecord$5(value)) return void 0;
     const merchantName = readString$1(value.merchantName);
     const amount = readAmount$1(value.price);
     if (merchantName === void 0 || amount === void 0 || amount <= 0) return void 0;
@@ -1241,9 +1243,9 @@
   }
   function readAllKeyShopEditions(value) {
     const editions = /* @__PURE__ */ new Map();
-    if (!isRecord$4(value)) return editions;
+    if (!isRecord$5(value)) return editions;
     for (const [id, edition] of Object.entries(value)) {
-      if (!isRecord$4(edition)) continue;
+      if (!isRecord$5(edition)) continue;
       const name = readString$1(edition.name);
       if (name !== void 0) editions.set(id, name);
     }
@@ -1251,9 +1253,9 @@
   }
   function readAllKeyShopRegions(value) {
     const regions = /* @__PURE__ */ new Map();
-    if (!isRecord$4(value)) return regions;
+    if (!isRecord$5(value)) return regions;
     for (const [id, region] of Object.entries(value)) {
-      if (!isRecord$4(region)) continue;
+      if (!isRecord$5(region)) continue;
       const name = readString$1(region.region_name) ?? readString$1(region.filter_name);
       if (name !== void 0) regions.set(id, name);
     }
@@ -1316,7 +1318,7 @@
     const value = await requestJson(EXCHANGE_RATES_URL, {
       headers: { "Accept": "application/json" }
     });
-    if (!isRecord$4(value) || value.result !== "success" || !isRecord$4(value.rates)) return void 0;
+    if (!isRecord$5(value) || value.result !== "success" || !isRecord$5(value.rates)) return void 0;
     const rates = {};
     for (const [currency, rate] of Object.entries(value.rates)) {
       if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
@@ -1490,7 +1492,7 @@
   function escapeRegExp$4(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  function formatCurrency$2(amount, currency) {
+  function formatCurrency$3(amount, currency) {
     try {
       return new Intl.NumberFormat("nb-NO", {
         style: "currency",
@@ -1502,7 +1504,7 @@
     }
   }
   function formatApproxCurrency(amount, currency) {
-    return `~${formatCurrency$2(amount, currency)}`;
+    return `~${formatCurrency$3(amount, currency)}`;
   }
   function currencyScale$1(currency) {
     if ((/* @__PURE__ */ new Set(["JPY", "KRW", "CLP", "VND", "IDR"])).has(currency.toUpperCase())) return 0;
@@ -1624,13 +1626,13 @@
     return shopName;
   }
   function readGgDealsApiPriceData(value, id) {
-    if (!isRecord$4(value) || value.success !== true || !isRecord$4(value.data)) return void 0;
+    if (!isRecord$5(value) || value.success !== true || !isRecord$5(value.data)) return void 0;
     const rawData = value.data[id];
-    if (!isRecord$4(rawData)) return void 0;
+    if (!isRecord$5(rawData)) return void 0;
     return readGgDealsPriceData(rawData);
   }
   function readGgDealsPriceData(value) {
-    const prices = isRecord$4(value.prices) ? value.prices : void 0;
+    const prices = isRecord$5(value.prices) ? value.prices : void 0;
     if (prices === void 0) return void 0;
     const currency = typeof prices.currency === "string" && prices.currency.length > 0 ? prices.currency.toUpperCase() : "NOK";
     return {
@@ -1711,8 +1713,8 @@
       amount: bucket.amount,
       sortAmount: bucket.amount,
       currency: bucket.currency,
-      price: formatCurrency$1(bucket.amount, bucket.currency),
-      ...bucket.historicalAmount !== void 0 && bucket.historicalAmount < bucket.amount ? { shippingPrice: `historisk lav ${formatCurrency$1(bucket.historicalAmount, bucket.currency)}` } : {}
+      price: formatCurrency$2(bucket.amount, bucket.currency),
+      ...bucket.historicalAmount !== void 0 && bucket.historicalAmount < bucket.amount ? { shippingPrice: `historisk lav ${formatCurrency$2(bucket.historicalAmount, bucket.currency)}` } : {}
     };
   }
   function isLikelyGgDealsProductMatch(message, title, url) {
@@ -1773,7 +1775,7 @@
   function escapeRegExp$3(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  function formatCurrency$1(amount, currency) {
+  function formatCurrency$2(amount, currency) {
     try {
       return new Intl.NumberFormat("nb-NO", {
         style: "currency",
@@ -4348,7 +4350,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   }
   function readTaxfreeCandidate(value, message) {
-    if (!isRecord$2(value)) return void 0;
+    if (!isRecord$3(value)) return void 0;
     const productType = readString(value.type);
     if (productType !== void 0 && productType !== "ALCOHOL") return void 0;
     if (!hasTaxfreeStock(value)) return void 0;
@@ -4647,10 +4649,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     );
   }
   function readVinmonopoletProductCodeFromResponse(value) {
-    if (!isRecord$2(value)) return void 0;
+    if (!isRecord$3(value)) return void 0;
     const directCode = normalizeVinmonopoletProductCode(readString(value.code));
     if (directCode !== void 0) return directCode;
-    const product = isRecord$2(value.product) ? value.product : void 0;
+    const product = isRecord$3(value.product) ? value.product : void 0;
     return normalizeVinmonopoletProductCode(readString(product?.code));
   }
   function readVinmonopoletProductOffer(value) {
@@ -4675,13 +4677,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     };
   }
   function readVinmonopoletProductRecord(value) {
-    if (!isRecord$2(value)) return void 0;
-    if (isRecord$2(value.product)) return value.product;
-    if (isRecord$2(value.data)) return value.data;
+    if (!isRecord$3(value)) return void 0;
+    if (isRecord$3(value.product)) return value.product;
+    if (isRecord$3(value.data)) return value.data;
     return value;
   }
   function readVinmonopoletSearchOffers(value) {
-    if (!isRecord$2(value) || !Array.isArray(value.products)) return [];
+    if (!isRecord$3(value) || !Array.isArray(value.products)) return [];
     return value.products.map(readVinmonopoletProductOffer).filter((offer) => offer !== void 0);
   }
   function readVinmonopoletProductPrice(product) {
@@ -4693,7 +4695,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     ].map(readVinmonopoletPriceValue).find((amount) => amount !== void 0);
   }
   function readVinmonopoletPriceValue(value) {
-    if (isRecord$2(value)) {
+    if (isRecord$3(value)) {
       return readNumber(value.value) ?? readNumber(value.amount) ?? readNumber(value.price) ?? readNumber(value.formattedValue);
     }
     return readNumber(value);
@@ -4753,19 +4755,19 @@ query SearchSuggestions($query: String!, $category: Int) {
     ].map(readString).map(readVintageYear).find((year) => year !== void 0);
   }
   function readFormattedValue(value) {
-    if (!isRecord$2(value)) return void 0;
+    if (!isRecord$3(value)) return void 0;
     return readString(value.formattedValue) ?? readString(value.readableValue);
   }
   function readValueFromRecord(value) {
-    if (!isRecord$2(value)) return void 0;
+    if (!isRecord$3(value)) return void 0;
     return readNumber(value.value);
   }
   function readTaxfreeHits(value) {
-    if (!isRecord$2(value) || !Array.isArray(value.results)) return [];
-    return value.results.filter(isRecord$2).flatMap((result) => Array.isArray(result.hits) ? result.hits : []);
+    if (!isRecord$3(value) || !Array.isArray(value.results)) return [];
+    return value.results.filter(isRecord$3).flatMap((result) => Array.isArray(result.hits) ? result.hits : []);
   }
   function readTaxfreeProductUrl(value) {
-    const localizedUrls = isRecord$2(value.localizedUrls) ? value.localizedUrls : void 0;
+    const localizedUrls = isRecord$3(value.localizedUrls) ? value.localizedUrls : void 0;
     const url = readString(localizedUrls?.no) ?? readString(value.url);
     if (url !== void 0) {
       return new URL(withNorwegianPathPrefix(url), TAXFREE_ORIGIN).toString();
@@ -4782,11 +4784,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     return /^\/no(?:\/|$)/i.test(path) ? path : `/no${path.startsWith("/") ? "" : "/"}${path}`;
   }
   function readNokPrice(value) {
-    if (!isRecord$2(value)) return void 0;
+    if (!isRecord$3(value)) return void 0;
     return readNumber(value.NOK);
   }
   function readLocalizedString(value) {
-    if (!isRecord$2(value)) return void 0;
+    if (!isRecord$3(value)) return void 0;
     return readString(value.no) ?? readString(value.en);
   }
   function readTaxfreeProductIdentifiers(value) {
@@ -5006,7 +5008,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
-  function isRecord$2(value) {
+  function isRecord$3(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
@@ -5267,13 +5269,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       return false;
     }
   }
-  async function findPlayStationRegionPrices(productUrl, textRequest = defaultTextRequest, jsonRequest = defaultJsonRequest) {
+  async function findPlayStationRegionPrices(productUrl, textRequest = defaultTextRequest$1, jsonRequest = defaultJsonRequest$1) {
     const product = await resolvePlayStationProduct(productUrl, textRequest);
     if (product === void 0) {
       return void 0;
     }
     const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
-    const rates = readNokBaseRates(ratesResponse);
+    const rates = readNokBaseRates$1(ratesResponse);
     if (rates === void 0) {
       return void 0;
     }
@@ -5295,9 +5297,9 @@ query SearchSuggestions($query: String!, $category: Int) {
         locale: region.locale,
         currency: offer.currency,
         price: offer.price,
-        formattedPrice: formatCurrency(offer.price, offer.currency, region.locale),
+        formattedPrice: formatCurrency$1(offer.price, offer.currency, region.locale),
         nokAmount,
-        formattedNok: formatCurrency(nokAmount, "NOK", "nb-NO"),
+        formattedNok: formatCurrency$1(nokAmount, "NOK", "nb-NO"),
         productUrl: regionOffer.productUrl
       };
       if (offer.name !== void 0) {
@@ -5408,7 +5410,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (rawValue === void 0 || rawValue.length === 0) {
         continue;
       }
-      const parsed = parseJson(decodeHtmlAttribute(rawValue));
+      const parsed = parseJson$1(decodeHtmlAttribute(rawValue));
       const productId = readProductId(parsed);
       if (productId !== void 0) {
         return productId;
@@ -5423,7 +5425,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (rawValue === void 0 || rawValue.length === 0) {
         continue;
       }
-      const parsed = parseJson(decodeHtmlAttribute(rawValue));
+      const parsed = parseJson$1(decodeHtmlAttribute(rawValue));
       const conceptId = readConceptId(parsed);
       if (conceptId !== void 0) {
         return conceptId;
@@ -5439,7 +5441,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       return void 0;
     }
-    if (!isRecord$1(value)) {
+    if (!isRecord$2(value)) {
       return void 0;
     }
     if (typeof value.productId === "string" && value.productId.length > 0) {
@@ -5455,7 +5457,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       return void 0;
     }
-    if (!isRecord$1(value)) {
+    if (!isRecord$2(value)) {
       return void 0;
     }
     const rawConceptId = value.conceptId;
@@ -5481,7 +5483,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (body === void 0 || body.length === 0) {
         continue;
       }
-      const parsed = parseJson(body);
+      const parsed = parseJson$1(body);
       const sku = readSku(parsed);
       if (sku !== void 0) {
         return sku;
@@ -5497,7 +5499,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       return void 0;
     }
-    if (!isRecord$1(value) || typeof value.sku !== "string" || value.sku.length === 0) {
+    if (!isRecord$2(value) || typeof value.sku !== "string" || value.sku.length === 0) {
       return void 0;
     }
     return value.sku;
@@ -5518,7 +5520,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (body === void 0 || body.length === 0) {
         continue;
       }
-      const parsed = parseJson(body);
+      const parsed = parseJson$1(body);
       const offer = readProductOffer(parsed);
       if (offer !== void 0) {
         return offer;
@@ -5541,7 +5543,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       return void 0;
     }
-    if (!isRecord$1(value)) {
+    if (!isRecord$2(value)) {
       return void 0;
     }
     const offer = readFirstOffer$1(value.offers);
@@ -5555,7 +5557,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function readFirstOffer$1(value) {
     const offer = Array.isArray(value) ? value[0] : value;
-    if (!isRecord$1(offer)) {
+    if (!isRecord$2(offer)) {
       return void 0;
     }
     const rawPrice = typeof offer.price === "number" ? offer.price : typeof offer.price === "string" ? Number.parseFloat(offer.price.replace(",", ".")) : Number.NaN;
@@ -5565,8 +5567,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return { price: rawPrice, currency };
   }
-  function readNokBaseRates(value) {
-    if (!isRecord$1(value) || value.result !== "success" || !isRecord$1(value.rates)) {
+  function readNokBaseRates$1(value) {
+    if (!isRecord$2(value) || value.result !== "success" || !isRecord$2(value.rates)) {
       return void 0;
     }
     const rates = {};
@@ -5599,7 +5601,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
     return results;
   }
-  async function defaultTextRequest(url) {
+  async function defaultTextRequest$1(url) {
     try {
       const response = await fetch(url);
       if (!response.ok) return void 0;
@@ -5608,7 +5610,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
-  async function defaultJsonRequest(url) {
+  async function defaultJsonRequest$1(url) {
     try {
       const response = await fetch(url);
       if (!response.ok) return void 0;
@@ -5617,7 +5619,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
-  function parseJson(value) {
+  function parseJson$1(value) {
     try {
       return JSON.parse(value);
     } catch {
@@ -5644,7 +5646,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return namedEntities[body.toLowerCase()] ?? entity;
     });
   }
-  function formatCurrency(amount, currency, locale) {
+  function formatCurrency$1(amount, currency, locale) {
     try {
       return new Intl.NumberFormat(locale, {
         style: "currency",
@@ -5658,8 +5660,723 @@ query SearchSuggestions($query: String!, $category: Int) {
   function currencyUsesMinorUnits(currency) {
     return !(/* @__PURE__ */ new Set(["JPY", "KRW", "CLP", "VND"])).has(currency.toUpperCase());
   }
-  function isRecord$1(value) {
+  function isRecord$2(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const APPSTOREPRICE_SOURCE_NAME = "AppStorePrice";
+  const APPSTOREPRICE_SOUND_CLOUD_URL = "https://appstoreprice.org/en/apps/336353151";
+  const APPSTOREPRICE_SPOTIFY_URL = "https://appstoreprice.org/en/apps/spotify";
+  const MAX_APPSTOREPRICE_TOOLTIP_PLANS = 10;
+  const APPLE_SEARCH_RESULT_LIMIT = 10;
+  const APPLE_SEARCH_MATCH_THRESHOLD = 70;
+  const APPSTOREPRICE_DOMAIN_SEARCH_ALIASES = {
+    "chatgpt.com": ["chatgpt", "openai chatgpt"],
+    "claude.ai": ["claude", "anthropic claude"],
+    "firecore.com": ["firecore", "infuse"],
+    "netflix.com": ["netflix"],
+    "soundcloud.com": ["soundcloud"]
+  };
+  const APPSTOREPRICE_ALWAYS_TRY_DOMAINS = /* @__PURE__ */ new Set([
+    "chatgpt.com",
+    "claude.ai",
+    "firecore.com",
+    "netflix.com",
+    "soundcloud.com"
+  ]);
+  const APPSTOREPRICE_DOMAIN_RESOLVER_EXCLUDED_DOMAINS = /* @__PURE__ */ new Set([
+    "apple.com",
+    "appstoreprice.org",
+    "google.com",
+    "microsoft.com",
+    "playstation.com",
+    "store.playstation.com",
+    "youtube.com"
+  ]);
+  const APPSTOREPRICE_COUNTRIES = {
+    AE: { countryName: "De forente arabiske emirater", flag: "🇦🇪", locale: "ar-AE" },
+    AR: { countryName: "Argentina", flag: "🇦🇷", locale: "es-AR" },
+    AU: { countryName: "Australia", flag: "🇦🇺", locale: "en-AU" },
+    BE: { countryName: "Belgia", flag: "🇧🇪", locale: "nl-BE" },
+    BR: { countryName: "Brasil", flag: "🇧🇷", locale: "pt-BR" },
+    CA: { countryName: "Canada", flag: "🇨🇦", locale: "en-CA" },
+    CH: { countryName: "Sveits", flag: "🇨🇭", locale: "de-CH" },
+    CL: { countryName: "Chile", flag: "🇨🇱", locale: "es-CL" },
+    CN: { countryName: "Kina", flag: "🇨🇳", locale: "zh-CN" },
+    CO: { countryName: "Colombia", flag: "🇨🇴", locale: "es-CO" },
+    CZ: { countryName: "Tsjekkia", flag: "🇨🇿", locale: "cs-CZ" },
+    DE: { countryName: "Tyskland", flag: "🇩🇪", locale: "de-DE" },
+    DK: { countryName: "Danmark", flag: "🇩🇰", locale: "da-DK" },
+    EG: { countryName: "Egypt", flag: "🇪🇬", locale: "ar-EG" },
+    ES: { countryName: "Spania", flag: "🇪🇸", locale: "es-ES" },
+    FI: { countryName: "Finland", flag: "🇫🇮", locale: "fi-FI" },
+    FR: { countryName: "Frankrike", flag: "🇫🇷", locale: "fr-FR" },
+    GB: { countryName: "UK", flag: "🇬🇧", locale: "en-GB" },
+    GR: { countryName: "Hellas", flag: "🇬🇷", locale: "el-GR" },
+    HK: { countryName: "Hongkong", flag: "🇭🇰", locale: "zh-HK" },
+    HU: { countryName: "Ungarn", flag: "🇭🇺", locale: "hu-HU" },
+    ID: { countryName: "Indonesia", flag: "🇮🇩", locale: "id-ID" },
+    IL: { countryName: "Israel", flag: "🇮🇱", locale: "he-IL" },
+    IN: { countryName: "India", flag: "🇮🇳", locale: "en-IN" },
+    IT: { countryName: "Italia", flag: "🇮🇹", locale: "it-IT" },
+    JP: { countryName: "Japan", flag: "🇯🇵", locale: "ja-JP" },
+    KR: { countryName: "Sør-Korea", flag: "🇰🇷", locale: "ko-KR" },
+    MX: { countryName: "Mexico", flag: "🇲🇽", locale: "es-MX" },
+    MY: { countryName: "Malaysia", flag: "🇲🇾", locale: "ms-MY" },
+    NG: { countryName: "Nigeria", flag: "🇳🇬", locale: "en-NG" },
+    NL: { countryName: "Nederland", flag: "🇳🇱", locale: "nl-NL" },
+    NO: { countryName: "Norge", flag: "🇳🇴", locale: "nb-NO" },
+    NZ: { countryName: "New Zealand", flag: "🇳🇿", locale: "en-NZ" },
+    PE: { countryName: "Peru", flag: "🇵🇪", locale: "es-PE" },
+    PH: { countryName: "Filippinene", flag: "🇵🇭", locale: "en-PH" },
+    PK: { countryName: "Pakistan", flag: "🇵🇰", locale: "en-PK" },
+    PL: { countryName: "Polen", flag: "🇵🇱", locale: "pl-PL" },
+    PT: { countryName: "Portugal", flag: "🇵🇹", locale: "pt-PT" },
+    RO: { countryName: "Romania", flag: "🇷🇴", locale: "ro-RO" },
+    RU: { countryName: "Russland", flag: "🇷🇺", locale: "ru-RU" },
+    SA: { countryName: "Saudi-Arabia", flag: "🇸🇦", locale: "ar-SA" },
+    SE: { countryName: "Sverige", flag: "🇸🇪", locale: "sv-SE" },
+    SG: { countryName: "Singapore", flag: "🇸🇬", locale: "en-SG" },
+    TH: { countryName: "Thailand", flag: "🇹🇭", locale: "th-TH" },
+    TR: { countryName: "Tyrkia", flag: "🇹🇷", locale: "tr-TR" },
+    TW: { countryName: "Taiwan", flag: "🇹🇼", locale: "zh-TW" },
+    UA: { countryName: "Ukraina", flag: "🇺🇦", locale: "uk-UA" },
+    US: { countryName: "USA", flag: "🇺🇸", locale: "en-US" },
+    VN: { countryName: "Vietnam", flag: "🇻🇳", locale: "vi-VN" },
+    ZA: { countryName: "Sør-Afrika", flag: "🇿🇦", locale: "en-ZA" }
+  };
+  function isAppStorePriceRegionPriceUrl(url) {
+    return getAppStorePriceConfig(url) !== void 0;
+  }
+  function isPotentialAppStorePriceRegionPriceUrl(url) {
+    return isAppStorePriceRegionPriceUrl(url) || getAppStorePriceDomainCandidate(url) !== void 0;
+  }
+  async function findAppStorePriceRegionPricesForUrl(url, textRequest = defaultTextRequest, jsonRequest = defaultJsonRequest) {
+    const config = await resolveAppStorePriceConfig(url, jsonRequest);
+    if (config === void 0) {
+      return void 0;
+    }
+    const html = await textRequest(config.sourceUrl);
+    if (html === void 0) {
+      return void 0;
+    }
+    const subscriptions = extractAppStorePriceSubscriptions(html).filter(hasPositiveAppStorePrice);
+    const subscription = selectDefaultAppStorePriceSubscription(subscriptions, config);
+    if (subscription === void 0 || subscription.prices.length === 0) {
+      return void 0;
+    }
+    const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
+    const rates = readNokBaseRates(ratesResponse);
+    const ratesUpdatedAt = rates?.updatedAt;
+    if (rates === void 0) {
+      return void 0;
+    }
+    const comparableSubscriptions = [
+      subscription,
+      ...subscriptions.filter((entry) => entry.subscriptionId !== subscription.subscriptionId)
+    ];
+    const availablePlanNames = uniquePlanNames(comparableSubscriptions.map(formatSubscriptionPlanLabel)).slice(0, MAX_APPSTOREPRICE_TOOLTIP_PLANS);
+    const planAlternativesByRegion = buildAppStorePricePlanAlternativesByRegion(
+      comparableSubscriptions,
+      rates,
+      subscription.prices.map((row) => row.region.toUpperCase())
+    );
+    const selectedPlanName = formatSubscriptionPlanLabel(subscription);
+    const periodSuffix = formatDurationSuffix(subscription.duration);
+    const prices = subscription.prices.map((row) => {
+      const countryCode = row.region.toUpperCase();
+      const currency = row.currency.toUpperCase();
+      const currencyRate = rates.rates[currency];
+      if (!Number.isFinite(row.price) || typeof currencyRate !== "number" || currencyRate <= 0) {
+        return void 0;
+      }
+      const country = APPSTOREPRICE_COUNTRIES[countryCode] ?? {
+        countryName: countryCode,
+        flag: countryCodeToFlag(countryCode),
+        locale: "en-US"
+      };
+      const nokAmount = row.price / currencyRate;
+      const planAlternatives = planAlternativesByRegion.get(countryCode);
+      return {
+        region: countryCode,
+        countryName: country.countryName,
+        flag: country.flag,
+        locale: country.locale,
+        currency,
+        price: row.price,
+        formattedPrice: `${currency} ${formatNativeAmount(row.price)}${periodSuffix}`,
+        nokAmount,
+        formattedNok: `${formatApproximateCurrency(nokAmount, "NOK", "nb-NO")}${periodSuffix}`,
+        productUrl: config.sourceUrl,
+        sourceProvider: "appstoreprice",
+        sourceName: APPSTOREPRICE_SOURCE_NAME,
+        sourceDetail: "App Store",
+        planName: selectedPlanName,
+        ...planAlternatives !== void 0 && planAlternatives.length > 0 ? { planAlternatives } : {}
+      };
+    }).filter((price) => price !== void 0).sort((a, b) => a.nokAmount - b.nokAmount);
+    if (prices.length === 0) {
+      return void 0;
+    }
+    return {
+      productId: config.productId,
+      productName: config.productName,
+      fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      ...ratesUpdatedAt !== void 0 ? { ratesUpdatedAt } : {},
+      sourceProvider: "appstoreprice",
+      sourceName: APPSTOREPRICE_SOURCE_NAME,
+      sourceDetail: "App Store",
+      planName: selectedPlanName,
+      availablePlanNames,
+      prices
+    };
+  }
+  function buildAppStorePricePlanAlternativesByRegion(subscriptions, rates, countryCodes) {
+    const alternativesByRegion = /* @__PURE__ */ new Map();
+    for (const countryCode of uniquePlanNames(countryCodes)) {
+      alternativesByRegion.set(countryCode, /* @__PURE__ */ new Map());
+    }
+    for (const subscription of subscriptions) {
+      const planName = formatSubscriptionPlanLabel(subscription);
+      for (const [countryCode, regionAlternatives] of alternativesByRegion) {
+        const alternative = buildAppStorePricePlanAlternative(subscription, countryCode, rates);
+        const existingAlternative = regionAlternatives.get(planName);
+        if (existingAlternative !== void 0 && existingAlternative.nokAmount !== void 0 && (alternative.nokAmount === void 0 || existingAlternative.nokAmount <= alternative.nokAmount)) {
+          continue;
+        }
+        regionAlternatives.set(planName, alternative);
+      }
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const [countryCode, alternatives] of alternativesByRegion) {
+      result.set(
+        countryCode,
+        Array.from(alternatives.values()).sort(compareAppStorePricePlanAlternatives).slice(0, MAX_APPSTOREPRICE_TOOLTIP_PLANS).map(({ nokAmount: _nokAmount, ...alternative }) => alternative)
+      );
+    }
+    return result;
+  }
+  function selectDefaultAppStorePriceSubscription(subscriptions, config) {
+    const configuredSubscription = subscriptions.find((entry) => entry.subscriptionId === config.subscriptionId || entry.name === config.planName);
+    if (configuredSubscription !== void 0 && isYearlyAppStorePriceSubscription(configuredSubscription)) {
+      return configuredSubscription;
+    }
+    return subscriptions.find(isYearlyAppStorePriceSubscription) ?? configuredSubscription ?? subscriptions[0];
+  }
+  function isYearlyAppStorePriceSubscription(subscription) {
+    return subscription.prices.length > 0 && (subscription.duration === "annual" || subscription.duration === "yearly");
+  }
+  function hasPositiveAppStorePrice(subscription) {
+    return subscription.prices.some((price) => price.price > 0);
+  }
+  function compareAppStorePricePlanAlternatives(first, second) {
+    if (first.nokAmount !== void 0 && second.nokAmount !== void 0) {
+      return first.nokAmount - second.nokAmount;
+    }
+    if (first.nokAmount !== void 0) {
+      return -1;
+    }
+    if (second.nokAmount !== void 0) {
+      return 1;
+    }
+    return first.planName.localeCompare(second.planName, "nb");
+  }
+  function buildAppStorePricePlanAlternative(subscription, countryCode, rates) {
+    const planName = formatSubscriptionPlanLabel(subscription);
+    const periodSuffix = formatDurationSuffix(subscription.duration);
+    const row = subscription.prices.find((price) => price.region.toUpperCase() === countryCode);
+    if (row === void 0) {
+      return {
+        planName,
+        unavailableReason: "Ikke funnet i denne regionen"
+      };
+    }
+    const currency = row.currency.toUpperCase();
+    const currencyRate = rates.rates[currency];
+    if (!Number.isFinite(row.price) || typeof currencyRate !== "number" || currencyRate <= 0) {
+      return {
+        planName,
+        unavailableReason: "Mangler valutakurs"
+      };
+    }
+    const nokAmount = row.price / currencyRate;
+    return {
+      planName,
+      formattedPrice: `${currency} ${formatNativeAmount(row.price)}${periodSuffix}`,
+      formattedNok: `${formatApproximateCurrency(nokAmount, "NOK", "nb-NO")}${periodSuffix}`,
+      nokAmount
+    };
+  }
+  function uniquePlanNames(planNames) {
+    const uniqueNames = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const planName of planNames) {
+      const normalized = planName.trim();
+      const key = normalized.toLowerCase();
+      if (normalized.length === 0 || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      uniqueNames.push(normalized);
+    }
+    return uniqueNames;
+  }
+  async function resolveAppStorePriceConfig(url, jsonRequest) {
+    const config = getAppStorePriceConfig(url);
+    if (config !== void 0) {
+      return config;
+    }
+    const candidate = getAppStorePriceDomainCandidate(url);
+    if (candidate === void 0) {
+      return void 0;
+    }
+    for (const searchTerm of candidate.searchTerms) {
+      const searchResults = await searchAppleSoftware(searchTerm, jsonRequest);
+      const match = findBestAppleSoftwareMatch(candidate.normalizedDomain, searchTerm, searchResults);
+      if (match !== void 0) {
+        return getAppleSearchAppStorePriceConfig(match);
+      }
+    }
+    return void 0;
+  }
+  async function searchAppleSoftware(term, jsonRequest) {
+    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&country=us&limit=${APPLE_SEARCH_RESULT_LIMIT}`;
+    const value = await jsonRequest(searchUrl);
+    if (!isRecord$1(value) || !Array.isArray(value.results)) {
+      return [];
+    }
+    return value.results.filter(isAppleSoftwareSearchResult);
+  }
+  function findBestAppleSoftwareMatch(inputDomain, searchTerm, results) {
+    let bestMatch;
+    let secondBestScore = 0;
+    results.forEach((result, index) => {
+      const score = scoreAppleSoftwareMatch(inputDomain, searchTerm, result, index);
+      if (bestMatch === void 0 || score > bestMatch.score) {
+        secondBestScore = bestMatch?.score ?? 0;
+        bestMatch = { result, score };
+        return;
+      }
+      if (score > secondBestScore) {
+        secondBestScore = score;
+      }
+    });
+    if (bestMatch === void 0 || bestMatch.score < APPLE_SEARCH_MATCH_THRESHOLD) {
+      return void 0;
+    }
+    const isStrongDomainMatch = appStoreResultDomains(bestMatch.result).some((domain) => domainsMatch(inputDomain, domain));
+    if (!isStrongDomainMatch && bestMatch.score - secondBestScore < 20) {
+      return void 0;
+    }
+    return bestMatch.result;
+  }
+  function scoreAppleSoftwareMatch(inputDomain, searchTerm, result, resultIndex) {
+    const domainBrand = normalizeSearchToken(inputDomain.split(".")[0] ?? inputDomain);
+    const searchBrand = normalizeSearchToken(searchTerm);
+    const appName = normalizeSearchToken(result.trackName);
+    const developerName = normalizeSearchToken(`${result.artistName ?? ""} ${result.sellerName ?? ""}`);
+    const bundleId = normalizeSearchToken(result.bundleId ?? "");
+    const metadataDomains = appStoreResultDomains(result);
+    let score = Math.max(0, 10 - resultIndex);
+    if (metadataDomains.some((domain) => domainsMatch(inputDomain, domain))) {
+      score += 70;
+    }
+    if (appName === domainBrand || appName === searchBrand) {
+      score += 55;
+      if (resultIndex === 0) {
+        score += 10;
+      }
+    } else if (appName.includes(domainBrand) || appName.includes(searchBrand)) {
+      score += 25;
+    }
+    if (developerName.includes(domainBrand) || developerName.includes(searchBrand)) {
+      score += 15;
+    }
+    if (bundleId.includes(domainBrand) || bundleId.includes(searchBrand)) {
+      score += 20;
+    }
+    return score;
+  }
+  function getAppleSearchAppStorePriceConfig(result) {
+    const appStoreId = String(result.trackId);
+    return getKnownAppStorePriceConfigForAppId(appStoreId) ?? {
+      cacheKey: `apple-app-${appStoreId}`,
+      productId: `appstoreprice:apple-app-${appStoreId}`,
+      productName: result.trackName,
+      sourceUrl: `https://appstoreprice.org/en/apps/${encodeURIComponent(appStoreId)}`
+    };
+  }
+  function getAppStorePriceConfig(url) {
+    try {
+      const parsedUrl = new URL(url);
+      const appStorePriceConfig = getConfigForAppStorePriceUrl(parsedUrl);
+      if (appStorePriceConfig !== void 0) {
+        return appStorePriceConfig;
+      }
+      const appleAppId = parseAppleAppId(parsedUrl);
+      if (appleAppId !== void 0) {
+        return getKnownAppStorePriceConfigForAppId(appleAppId) ?? getGenericAppStorePriceConfig(appleAppId, parsedUrl);
+      }
+      const knownDomainConfig = getKnownDomainAppStorePriceConfig(parsedUrl);
+      if (knownDomainConfig !== void 0) {
+        return knownDomainConfig;
+      }
+      if (isSoundCloudArtistPricingUrl(parsedUrl)) {
+        return getKnownAppStorePriceConfigForAppId("336353151");
+      }
+    } catch {
+      return void 0;
+    }
+    return void 0;
+  }
+  function getAppStorePriceDomainCandidate(url) {
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+        return void 0;
+      }
+      const normalizedDomain = normalizeRegistrableDomain(parsedUrl.hostname);
+      if (normalizedDomain === void 0 || APPSTOREPRICE_DOMAIN_RESOLVER_EXCLUDED_DOMAINS.has(normalizedDomain)) {
+        return void 0;
+      }
+      if (!APPSTOREPRICE_ALWAYS_TRY_DOMAINS.has(normalizedDomain) && !isLikelySubscriptionUrl(parsedUrl)) {
+        return void 0;
+      }
+      return {
+        normalizedDomain,
+        searchTerms: APPSTOREPRICE_DOMAIN_SEARCH_ALIASES[normalizedDomain] ?? [formatSearchTermFromDomain(normalizedDomain)]
+      };
+    } catch {
+      return void 0;
+    }
+  }
+  function isLikelySubscriptionUrl(url) {
+    const path = `${url.pathname} ${url.search}`.toLowerCase();
+    return /(?:premium|pricing|price|plans?|subscription|subscribe|checkout|upgrade|membership|pro|plus|artist|creator)/i.test(path);
+  }
+  function formatSearchTermFromDomain(domain) {
+    return domain.split(".")[0]?.replace(/[-_]+/g, " ").trim() || domain;
+  }
+  function normalizeRegistrableDomain(hostname) {
+    const labels = hostname.toLowerCase().replace(/\.$/, "").split(".").filter(Boolean);
+    while (labels.length > 2 && ["www", "m", "app", "checkout", "store", "account", "accounts", "billing"].includes(labels[0] ?? "")) {
+      labels.shift();
+    }
+    if (labels.length < 2) {
+      return void 0;
+    }
+    const lastTwo = labels.slice(-2).join(".");
+    const lastThree = labels.slice(-3).join(".");
+    const multiPartTlds = /* @__PURE__ */ new Set(["co.uk", "com.au", "com.br", "com.mx", "com.tr", "co.jp", "co.kr", "co.nz", "co.za", "com.sg"]);
+    return multiPartTlds.has(lastTwo) && labels.length >= 3 ? lastThree : lastTwo;
+  }
+  function appStoreResultDomains(result) {
+    return [result.sellerUrl, result.trackViewUrl].map((url) => {
+      if (url === void 0) {
+        return void 0;
+      }
+      try {
+        return normalizeRegistrableDomain(new URL(url).hostname);
+      } catch {
+        return void 0;
+      }
+    }).filter((domain) => domain !== void 0);
+  }
+  function domainsMatch(inputDomain, resultDomain) {
+    return inputDomain === resultDomain;
+  }
+  function normalizeSearchToken(value) {
+    return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").replace(/\b(?:app|apps|mobile|inc|llc|ltd|limited|pbc|opco|as|ab|gmbh|the)\b/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function getConfigForAppStorePriceUrl(url) {
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "appstoreprice.org") {
+      return void 0;
+    }
+    const appSlug = url.pathname.match(/\/apps\/([^/?#]+)/i)?.[1];
+    if (appSlug === void 0 || appSlug.length === 0) {
+      return void 0;
+    }
+    return getKnownAppStorePriceConfigForAppId(appSlug) ?? {
+      cacheKey: appSlug,
+      productId: `appstoreprice:${appSlug}`,
+      productName: formatNameFromSlug(appSlug),
+      sourceUrl: `https://appstoreprice.org/en/apps/${encodeURIComponent(appSlug)}`
+    };
+  }
+  function getKnownDomainAppStorePriceConfig(url) {
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname === "spotify.com" || hostname.endsWith(".spotify.com")) {
+      return getKnownAppStorePriceConfigForAppId("324684580");
+    }
+    if (hostname === "discord.com") {
+      return getKnownAppStorePriceConfigForAppId("985746746");
+    }
+    if ((hostname === "firecore.com" || hostname.endsWith(".firecore.com")) && /^\/infuse(?:\/|$)/i.test(url.pathname)) {
+      return getKnownAppStorePriceConfigForAppId("1136220934");
+    }
+    return void 0;
+  }
+  function getKnownAppStorePriceConfigForAppId(appId) {
+    if (appId === "336353151") {
+      return {
+        cacheKey: "soundcloud-artist-pro-yearly",
+        productId: "appstoreprice:soundcloud-artist-pro-yearly",
+        productName: "SoundCloud Artist Pro",
+        subscriptionId: "next_pro_yearly",
+        planName: "Artist Pro Yearly",
+        sourceUrl: APPSTOREPRICE_SOUND_CLOUD_URL
+      };
+    }
+    if (appId === "324684580") {
+      return {
+        cacheKey: "spotify-premium-individual-monthly",
+        productId: "appstoreprice:spotify-premium-individual-monthly",
+        productName: "Spotify Premium",
+        subscriptionId: "spotify_individual",
+        planName: "Premium Individual",
+        sourceUrl: APPSTOREPRICE_SPOTIFY_URL
+      };
+    }
+    if (appId === "985746746") {
+      return {
+        cacheKey: "discord-nitro-monthly",
+        productId: "appstoreprice:discord-nitro-monthly",
+        productName: "Discord Nitro",
+        subscriptionId: "premium_tier_2_monthly",
+        planName: "Nitro Monthly",
+        sourceUrl: "https://appstoreprice.org/en/apps/985746746"
+      };
+    }
+    if (appId === "1136220934") {
+      return {
+        cacheKey: "infuse-pro-monthly",
+        productId: "appstoreprice:infuse-pro-monthly",
+        productName: "Infuse Pro",
+        subscriptionId: "com.firecore.infuse.pro.30",
+        planName: "Infuse Pro - Monthly",
+        sourceUrl: "https://appstoreprice.org/en/apps/1136220934"
+      };
+    }
+    return void 0;
+  }
+  function getGenericAppStorePriceConfig(appId, url) {
+    return {
+      cacheKey: `apple-app-${appId}`,
+      productId: `appstoreprice:apple-app-${appId}`,
+      productName: readAppNameFromAppleUrl(url) ?? "App Store-app",
+      sourceUrl: `https://appstoreprice.org/en/apps/${encodeURIComponent(appId)}`
+    };
+  }
+  function parseAppleAppId(url) {
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "apps.apple.com") {
+      return void 0;
+    }
+    return url.pathname.match(/\/id(\d+)(?:[/?#]|$)/i)?.[1];
+  }
+  function readAppNameFromAppleUrl(url) {
+    const parts = url.pathname.split("/").filter(Boolean);
+    const appSegmentIndex = parts.findIndex((part) => part.toLowerCase() === "app");
+    const slug = appSegmentIndex >= 0 ? parts[appSegmentIndex + 1] : void 0;
+    return slug !== void 0 ? formatNameFromSlug(slug) : void 0;
+  }
+  function formatNameFromSlug(slug) {
+    const cleaned = decodeURIComponent(slug).replace(/^id\d+$/i, "App Store-app").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+    if (cleaned.length === 0) {
+      return "App Store-app";
+    }
+    return cleaned.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+  function isSoundCloudArtistPricingUrl(url) {
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname === "checkout.soundcloud.com") {
+      return /^\/artist\/?$/i.test(url.pathname);
+    }
+    if (hostname !== "soundcloud.com") {
+      return false;
+    }
+    return /(?:^|\/)(?:artist|artists|for-artists|pro|creator|creators|subscriptions|you\/subscriptions)(?:\/|$)/i.test(url.pathname);
+  }
+  function extractAppStorePriceSubscriptions(html) {
+    const normalized = normalizeNextFlightHtml(html);
+    let searchIndex = 0;
+    while (searchIndex < normalized.length) {
+      const markerIndex = normalized.indexOf('"subscriptions":[', searchIndex);
+      if (markerIndex < 0) {
+        return [];
+      }
+      const arrayStart = normalized.indexOf("[", markerIndex);
+      if (arrayStart < 0) {
+        return [];
+      }
+      const rawArray = readBalancedJsonArray(normalized, arrayStart);
+      if (rawArray === void 0) {
+        return [];
+      }
+      const parsed = parseJson(rawArray.replace(/"\$undefined"/g, "null"));
+      if (Array.isArray(parsed)) {
+        const subscriptions = parsed.filter(isAppStorePriceSubscription);
+        if (subscriptions.length > 0) {
+          return subscriptions;
+        }
+      }
+      searchIndex = markerIndex + '"subscriptions":['.length;
+    }
+    return [];
+  }
+  function normalizeNextFlightHtml(html) {
+    return html.replace(/\\"/g, '"').replace(/\\u([0-9a-fA-F]{4})/g, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+  }
+  function readBalancedJsonArray(value, startIndex) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = startIndex; index < value.length; index += 1) {
+      const character = value[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (character === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) {
+        continue;
+      }
+      if (character === "[") {
+        depth += 1;
+        continue;
+      }
+      if (character === "]") {
+        depth -= 1;
+        if (depth === 0) {
+          return value.slice(startIndex, index + 1);
+        }
+      }
+    }
+    return void 0;
+  }
+  function isAppStorePriceSubscription(value) {
+    return isRecord$1(value) && typeof value.subscriptionId === "string" && typeof value.name === "string" && (typeof value.duration === "string" || value.duration === null) && Array.isArray(value.prices) && value.prices.every(isAppStorePriceSubscriptionPrice);
+  }
+  function isAppStorePriceSubscriptionPrice(value) {
+    return isRecord$1(value) && typeof value.region === "string" && typeof value.regionName === "string" && typeof value.currency === "string" && typeof value.price === "number" && Number.isFinite(value.price);
+  }
+  function isAppleSoftwareSearchResult(value) {
+    return isRecord$1(value) && typeof value.trackId === "number" && Number.isFinite(value.trackId) && typeof value.trackName === "string" && (value.artistName === void 0 || typeof value.artistName === "string") && (value.sellerName === void 0 || typeof value.sellerName === "string") && (value.bundleId === void 0 || typeof value.bundleId === "string") && (value.sellerUrl === void 0 || typeof value.sellerUrl === "string") && (value.trackViewUrl === void 0 || typeof value.trackViewUrl === "string");
+  }
+  function readNokBaseRates(value) {
+    if (!isRecord$1(value) || value.result !== "success" || !isRecord$1(value.rates)) {
+      return void 0;
+    }
+    const rates = {};
+    for (const [currency, rate] of Object.entries(value.rates)) {
+      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+        rates[currency.toUpperCase()] = rate;
+      }
+    }
+    if (Object.keys(rates).length === 0) {
+      return void 0;
+    }
+    return {
+      rates,
+      ...typeof value.time_last_update_utc === "string" ? { updatedAt: value.time_last_update_utc } : {}
+    };
+  }
+  function formatDurationSuffix(duration) {
+    if (duration === "annual" || duration === "yearly") return "/år";
+    if (duration === "monthly") return "/mnd";
+    return "";
+  }
+  function formatSubscriptionPlanLabel(subscription) {
+    const name = subscription.name.trim();
+    const durationLabel = formatDurationLabel(subscription.duration);
+    if (durationLabel === void 0 || name.length === 0 || planNameAlreadyContainsDuration(name, subscription.duration)) {
+      return name;
+    }
+    return `${name} (${durationLabel})`;
+  }
+  function formatDurationLabel(duration) {
+    if (duration === "annual" || duration === "yearly") return "1 år";
+    if (duration === "monthly") return "1 mnd";
+    return void 0;
+  }
+  function planNameAlreadyContainsDuration(planName, duration) {
+    const normalized = planName.toLowerCase();
+    if (duration === "annual" || duration === "yearly") {
+      return /\b(?:annual|annually|year|yearly|år)\b/.test(normalized);
+    }
+    if (duration === "monthly") {
+      return /\b(?:month|monthly|mnd|måned)\b/.test(normalized);
+    }
+    return false;
+  }
+  function formatCurrency(amount, currency, locale) {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency,
+        currencyDisplay: "narrowSymbol"
+      }).format(amount);
+    } catch {
+      return `${currency} ${formatFallbackAmount(amount)}`;
+    }
+  }
+  function formatApproximateCurrency(amount, currency, locale) {
+    return `~${formatCurrency(amount, currency, locale)}`;
+  }
+  function formatFallbackAmount(amount) {
+    return new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: Number.isInteger(amount) ? 0 : 2
+    }).format(amount);
+  }
+  function formatNativeAmount(amount) {
+    return new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: Number.isInteger(amount) ? 0 : 2
+    }).format(amount);
+  }
+  function countryCodeToFlag(countryCode) {
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      return "";
+    }
+    return [...countryCode].map((letter) => String.fromCodePoint(127462 + letter.charCodeAt(0) - 65)).join("");
+  }
+  async function defaultTextRequest(url) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml"
+        }
+      });
+      if (!response.ok) return void 0;
+      return await response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  async function defaultJsonRequest(url) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return void 0;
+      return await response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function parseJson(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return void 0;
+    }
+  }
+  function isRecord$1(value) {
+    return typeof value === "object" && value !== null;
   }
   const noWords = [
     "asshole",
@@ -6417,7 +7134,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const [offers, priceMatches, regionPrices] = await Promise.all([
       getCurrentOffers(),
       getPriceMatchesForCurrentPage(),
-      getPlayStationRegionPricesForCurrentPage()
+      getRegionPricesForCurrentPage()
     ]);
     if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
       renderNoticeWithStoredState(offers, priceMatches, regionPrices);
@@ -6468,17 +7185,26 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return [];
   }
-  async function getPlayStationRegionPricesForCurrentPage() {
-    if (!isPlayStationProductUrl(window.location.href)) {
+  async function getRegionPricesForCurrentPage() {
+    const currentUrl = window.location.href;
+    const regionPriceLookupUrl = getRegionPriceLookupUrlForCurrentPage(currentUrl);
+    if (regionPriceLookupUrl === void 0) {
       return void 0;
     }
     const message = {
       type: "get-playstation-region-prices",
-      url: window.location.href
+      url: regionPriceLookupUrl
     };
     if (isUserscriptRuntime()) {
-      return findPlayStationRegionPrices(
-        window.location.href,
+      if (isPlayStationProductUrl(regionPriceLookupUrl)) {
+        return findPlayStationRegionPrices(
+          regionPriceLookupUrl,
+          (url) => userscriptTextRequest(url),
+          (url) => userscriptJsonRequest(url)
+        );
+      }
+      return findAppStorePriceRegionPricesForUrl(
+        regionPriceLookupUrl,
         (url) => userscriptTextRequest(url),
         (url) => userscriptJsonRequest(url)
       );
@@ -6488,6 +7214,34 @@ query SearchSuggestions($query: String!, $category: Int) {
       return response.result;
     }
     return void 0;
+  }
+  function getRegionPriceLookupUrlForCurrentPage(currentUrl) {
+    if (isPlayStationProductUrl(currentUrl) || isAppStorePriceRegionPriceUrl(currentUrl)) {
+      return currentUrl;
+    }
+    const appleAppStoreUrl = extractAppleAppStoreUrlFromCurrentDocument();
+    if (appleAppStoreUrl !== void 0) {
+      return appleAppStoreUrl;
+    }
+    return isPotentialAppStorePriceRegionPriceUrl(currentUrl) ? currentUrl : void 0;
+  }
+  function extractAppleAppStoreUrlFromCurrentDocument() {
+    const smartBannerAppId = document.querySelector('meta[name="apple-itunes-app"]')?.content.match(/(?:^|,\s*)app-id=(\d+)/i)?.[1];
+    if (smartBannerAppId !== void 0) {
+      const smartBannerUrl = `https://apps.apple.com/app/id${smartBannerAppId}`;
+      if (isAppStorePriceRegionPriceUrl(smartBannerUrl)) {
+        return smartBannerUrl;
+      }
+    }
+    const metaContentCandidates = [
+      ...Array.from(document.querySelectorAll("meta[property='og:url'], meta[name='twitter:app:url:iphone'], meta[name='twitter:app:url:ipad']")).map((element) => element.content),
+      ...Array.from(document.querySelectorAll("link[rel='canonical'], link[rel='alternate']")).map((element) => element.href)
+    ];
+    const metaUrl = metaContentCandidates.find(isAppStorePriceRegionPriceUrl);
+    if (metaUrl !== void 0) {
+      return metaUrl;
+    }
+    return Array.from(document.querySelectorAll("a[href]")).map((element) => element.href).find(isAppStorePriceRegionPriceUrl);
   }
   function isUserscriptRuntime() {
     return chrome.runtime.id === void 0;
@@ -7789,6 +8543,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-allkeyshop {
       background: #070b12;
+      color: #ffffff;
+    }
+    .provider-appstoreprice {
+      background: #007aff;
       color: #ffffff;
     }
     .provider-psprices {
@@ -9365,7 +10123,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         const card = buildRegionPriceCard(regionPrice, regionPrice.region === regionPrices.prices[0]?.region);
         const tooltip = document.createElement("div");
         tooltip.className = "offer-tooltip";
-        setTooltipContent(tooltip, [buildRegionPricesTooltip(regionPrices)]);
+        setTooltipContent(tooltip, buildRegionPriceTooltipParts(regionPrice, regionPrices));
         shadowRoot.append(tooltip);
         card.addEventListener("mouseenter", () => {
           positionTooltipRightOfPanel(tooltip, card, shadowRoot);
@@ -9705,7 +10463,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return section;
     }
     const firstLine = lines[0] ?? "";
-    const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) ? lines.slice(1) : lines;
+    const hasExplicitList = lines.slice(1).some((line) => /^[-•]\s+/.test(line));
+    const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) || hasExplicitList ? lines.slice(1) : lines;
     if (listLines.length !== lines.length) {
       const title = document.createElement("span");
       title.className = "offer-tooltip-title";
@@ -9802,10 +10561,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return typeof value.reason === "string";
   }
   function isPlayStationRegionPriceResult(value) {
-    return isRecord(value) && typeof value.productId === "string" && typeof value.fetchedAt === "string" && (value.productName === void 0 || typeof value.productName === "string") && (value.ratesUpdatedAt === void 0 || typeof value.ratesUpdatedAt === "string") && Array.isArray(value.prices) && value.prices.every(isPlayStationRegionPrice);
+    return isRecord(value) && typeof value.productId === "string" && typeof value.fetchedAt === "string" && (value.productName === void 0 || typeof value.productName === "string") && (value.ratesUpdatedAt === void 0 || typeof value.ratesUpdatedAt === "string") && (value.sourceProvider === void 0 || value.sourceProvider === "playstation" || value.sourceProvider === "appstoreprice") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.sourceDetail === void 0 || typeof value.sourceDetail === "string") && (value.planName === void 0 || typeof value.planName === "string") && (value.availablePlanNames === void 0 || Array.isArray(value.availablePlanNames) && value.availablePlanNames.every((entry) => typeof entry === "string")) && Array.isArray(value.prices) && value.prices.every(isPlayStationRegionPrice);
   }
   function isPlayStationRegionPrice(value) {
-    return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
+    return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string") && (value.sourceProvider === void 0 || value.sourceProvider === "playstation" || value.sourceProvider === "appstoreprice") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.sourceDetail === void 0 || typeof value.sourceDetail === "string") && (value.planName === void 0 || typeof value.planName === "string") && (value.planAlternatives === void 0 || Array.isArray(value.planAlternatives) && value.planAlternatives.every(isRegionPricePlanAlternative));
+  }
+  function isRegionPricePlanAlternative(value) {
+    return isRecord(value) && typeof value.planName === "string" && (value.formattedPrice === void 0 || typeof value.formattedPrice === "string") && (value.formattedNok === void 0 || typeof value.formattedNok === "string") && (value.unavailableReason === void 0 || typeof value.unavailableReason === "string");
   }
   function isPriceMatchOffer(value) {
     return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
@@ -10029,7 +10791,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     regionPriceMain.href = regionPrice.productUrl;
     regionPriceMain.target = "_blank";
     regionPriceMain.rel = "noreferrer";
-    regionPriceMain.title = `Åpne ${regionPrice.countryName} i PlayStation Store`;
+    if (regionPrice.sourceProvider !== "appstoreprice") {
+      regionPriceMain.title = `Åpne ${regionPrice.countryName} i PlayStation Store`;
+    }
     const regionPriceTitle = document.createElement("span");
     regionPriceTitle.className = "region-price-title";
     const regionPriceCountry = document.createElement("span");
@@ -10055,7 +10819,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         regionPriceAction.href = secondaryLink.url;
         regionPriceAction.target = "_blank";
         regionPriceAction.rel = "noreferrer";
-        regionPriceAction.title = secondaryLink.title;
+        if (secondaryLink.title !== void 0) {
+          regionPriceAction.title = secondaryLink.title;
+        }
         regionPriceAction.textContent = secondaryLink.label;
         regionPriceActions.append(regionPriceAction);
       }
@@ -10064,6 +10830,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return regionPriceCard;
   }
   function getRegionPriceSecondaryLinks(regionPrice) {
+    if (regionPrice.sourceProvider === "appstoreprice") {
+      return [{
+        label: regionPrice.sourceName ?? "AppStorePrice",
+        provider: "appstoreprice",
+        url: regionPrice.productUrl
+      }];
+    }
     if (regionPrice.region === "NO") {
       if (regionPrice.priceHistoryUrl === void 0) return [];
       return [{
@@ -10088,8 +10861,56 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       }
     ];
   }
+  function buildRegionPriceTooltipParts(regionPrice, regionPrices) {
+    if (regionPrice.sourceProvider === "appstoreprice") {
+      return buildAppStorePriceRegionPriceTooltipParts(regionPrice, regionPrices);
+    }
+    return [buildRegionPricesTooltip(regionPrices)];
+  }
+  function buildAppStorePriceRegionPriceTooltipParts(regionPrice, regionPrices) {
+    const sourceName = regionPrice.sourceName ?? regionPrices.sourceName ?? "AppStorePrice";
+    const planName = regionPrice.planName ?? regionPrices.planName ?? "valgt plan";
+    const planAlternatives = regionPrice.planAlternatives?.slice(0, 10) ?? [];
+    const planLines = planAlternatives.length > 0 ? planAlternatives.map((alternative) => `- ${formatRegionPricePlanAlternative(alternative, regionPrice.countryName)}`) : [`- ${planName}: ${regionPrice.formattedNok} (${regionPrice.formattedPrice})`];
+    const rateLine = regionPrices.ratesUpdatedAt !== void 0 ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
+    return [
+      `${regionPrice.flag} ${regionPrice.countryName}: ${planName} = ${regionPrice.formattedNok} (${regionPrice.formattedPrice})`,
+      [
+        `App Store-planer i ${regionPrice.countryName}`,
+        ...planLines
+      ].join("\n"),
+      [
+        `Kilde: ${sourceName}`,
+        "App Store/IAP-priser kan avvike fra direkte web-checkout hos tjenesten.",
+        "Regionbytte krever vanligvis Apple ID, gavekort eller betalingsmetode i samme region.",
+        rateLine
+      ].join("\n")
+    ];
+  }
+  function formatRegionPricePlanAlternative(alternative, countryName) {
+    if (alternative.formattedPrice !== void 0 && alternative.formattedNok !== void 0) {
+      return `${alternative.planName}: ${alternative.formattedNok} (${alternative.formattedPrice})`;
+    }
+    return `${alternative.planName}: ${alternative.unavailableReason ?? `Ikke funnet for ${countryName}`}`;
+  }
   function buildRegionPricesTooltip(regionPrices) {
     const rateLine = regionPrices.ratesUpdatedAt !== void 0 ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
+    if (regionPrices.sourceProvider === "appstoreprice") {
+      const planName = regionPrices.planName ?? regionPrices.productName ?? "abonnement";
+      const sourceName = regionPrices.sourceName ?? "AppStorePrice";
+      const availablePlanNames = regionPrices.availablePlanNames?.slice(0, 10) ?? [];
+      return [
+        `Viser: ${planName}.`,
+        `Kilde: App Store/IAP-regionpriser fra ${sourceName}.`,
+        ...availablePlanNames.length > 1 ? [`Planer funnet: ${availablePlanNames.join(", ")}.`] : [],
+        "Hold over en landrad for priser på flere planer i samme region.",
+        "Kan avvike fra direkte web-checkout hos tjenesten.",
+        "Regionbytte krever vanligvis Apple ID, gavekort eller betalingsmetode i samme region.",
+        "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
+        "Regionraden og chipen åpner AppStorePrice-siden.",
+        rateLine
+      ].join("\n");
+    }
     return [
       "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
       "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",

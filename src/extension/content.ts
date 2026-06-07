@@ -27,6 +27,11 @@ import {
   type PlayStationRegionPrice,
   type PlayStationRegionPriceResult,
 } from "../shared/playstation-region-prices";
+import {
+  findAppStorePriceRegionPricesForUrl,
+  isAppStorePriceRegionPriceUrl,
+  isPotentialAppStorePriceRegionPriceUrl,
+} from "../shared/appstoreprice-region-prices";
 import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
 
@@ -514,7 +519,7 @@ async function renderCurrentContext(): Promise<void> {
   const [offers, priceMatches, regionPrices] = await Promise.all([
     getCurrentOffers(),
     getPriceMatchesForCurrentPage(),
-    getPlayStationRegionPricesForCurrentPage(),
+    getRegionPricesForCurrentPage(),
   ]);
   if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
@@ -572,19 +577,29 @@ async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
   return [];
 }
 
-async function getPlayStationRegionPricesForCurrentPage(): Promise<PlayStationRegionPriceResult | undefined> {
-  if (!isPlayStationProductUrl(window.location.href)) {
+async function getRegionPricesForCurrentPage(): Promise<PlayStationRegionPriceResult | undefined> {
+  const currentUrl = window.location.href;
+  const regionPriceLookupUrl = getRegionPriceLookupUrlForCurrentPage(currentUrl);
+  if (regionPriceLookupUrl === undefined) {
     return undefined;
   }
 
   const message: GetPlayStationRegionPricesMessage = {
     type: "get-playstation-region-prices",
-    url: window.location.href,
+    url: regionPriceLookupUrl,
   };
 
   if (isUserscriptRuntime()) {
-    return findPlayStationRegionPrices(
-      window.location.href,
+    if (isPlayStationProductUrl(regionPriceLookupUrl)) {
+      return findPlayStationRegionPrices(
+        regionPriceLookupUrl,
+        (url) => userscriptTextRequest(url),
+        (url) => userscriptJsonRequest(url),
+      );
+    }
+
+    return findAppStorePriceRegionPricesForUrl(
+      regionPriceLookupUrl,
       (url) => userscriptTextRequest(url),
       (url) => userscriptJsonRequest(url),
     );
@@ -595,6 +610,46 @@ async function getPlayStationRegionPricesForCurrentPage(): Promise<PlayStationRe
     return response.result;
   }
   return undefined;
+}
+
+function getRegionPriceLookupUrlForCurrentPage(currentUrl: string): string | undefined {
+  if (isPlayStationProductUrl(currentUrl) || isAppStorePriceRegionPriceUrl(currentUrl)) {
+    return currentUrl;
+  }
+
+  const appleAppStoreUrl = extractAppleAppStoreUrlFromCurrentDocument();
+  if (appleAppStoreUrl !== undefined) {
+    return appleAppStoreUrl;
+  }
+
+  return isPotentialAppStorePriceRegionPriceUrl(currentUrl) ? currentUrl : undefined;
+}
+
+function extractAppleAppStoreUrlFromCurrentDocument(): string | undefined {
+  const smartBannerAppId = document
+    .querySelector<HTMLMetaElement>('meta[name="apple-itunes-app"]')
+    ?.content.match(/(?:^|,\s*)app-id=(\d+)/i)?.[1];
+  if (smartBannerAppId !== undefined) {
+    const smartBannerUrl = `https://apps.apple.com/app/id${smartBannerAppId}`;
+    if (isAppStorePriceRegionPriceUrl(smartBannerUrl)) {
+      return smartBannerUrl;
+    }
+  }
+
+  const metaContentCandidates = [
+    ...Array.from(document.querySelectorAll<HTMLMetaElement>("meta[property='og:url'], meta[name='twitter:app:url:iphone'], meta[name='twitter:app:url:ipad']"))
+      .map((element) => element.content),
+    ...Array.from(document.querySelectorAll<HTMLLinkElement>("link[rel='canonical'], link[rel='alternate']"))
+      .map((element) => element.href),
+  ];
+  const metaUrl = metaContentCandidates.find(isAppStorePriceRegionPriceUrl);
+  if (metaUrl !== undefined) {
+    return metaUrl;
+  }
+
+  return Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))
+    .map((element) => element.href)
+    .find(isAppStorePriceRegionPriceUrl);
 }
 
 function isUserscriptRuntime(): boolean {
@@ -2240,6 +2295,10 @@ function renderNotice(
       background: #070b12;
       color: #ffffff;
     }
+    .provider-appstoreprice {
+      background: #007aff;
+      color: #ffffff;
+    }
     .provider-psprices {
       background: #2b2927;
       color: #ffffff;
@@ -3805,7 +3864,7 @@ function renderNotice(
       const card = buildRegionPriceCard(regionPrice, regionPrice.region === regionPrices.prices[0]?.region);
       const tooltip = document.createElement("div");
       tooltip.className = "offer-tooltip";
-      setTooltipContent(tooltip, [buildRegionPricesTooltip(regionPrices)]);
+      setTooltipContent(tooltip, buildRegionPriceTooltipParts(regionPrice, regionPrices));
       shadowRoot.append(tooltip);
       card.addEventListener("mouseenter", () => {
         positionTooltipRightOfPanel(tooltip, card, shadowRoot);
@@ -4212,7 +4271,8 @@ function createTooltipSection(part: string): HTMLDivElement | undefined {
   }
 
   const firstLine = lines[0] ?? "";
-  const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) ? lines.slice(1) : lines;
+  const hasExplicitList = lines.slice(1).some((line) => /^[-•]\s+/.test(line));
+  const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) || hasExplicitList ? lines.slice(1) : lines;
 
   if (listLines.length !== lines.length) {
     const title = document.createElement("span");
@@ -4333,6 +4393,11 @@ function isPlayStationRegionPriceResult(value: unknown): value is PlayStationReg
     typeof value.fetchedAt === "string" &&
     (value.productName === undefined || typeof value.productName === "string") &&
     (value.ratesUpdatedAt === undefined || typeof value.ratesUpdatedAt === "string") &&
+    (value.sourceProvider === undefined || value.sourceProvider === "playstation" || value.sourceProvider === "appstoreprice") &&
+    (value.sourceName === undefined || typeof value.sourceName === "string") &&
+    (value.sourceDetail === undefined || typeof value.sourceDetail === "string") &&
+    (value.planName === undefined || typeof value.planName === "string") &&
+    (value.availablePlanNames === undefined || (Array.isArray(value.availablePlanNames) && value.availablePlanNames.every((entry) => typeof entry === "string"))) &&
     Array.isArray(value.prices) &&
     value.prices.every(isPlayStationRegionPrice)
   );
@@ -4350,7 +4415,21 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
     typeof value.nokAmount === "number" &&
     typeof value.formattedNok === "string" &&
     typeof value.productUrl === "string" &&
-    (value.priceHistoryUrl === undefined || typeof value.priceHistoryUrl === "string")
+    (value.priceHistoryUrl === undefined || typeof value.priceHistoryUrl === "string") &&
+    (value.sourceProvider === undefined || value.sourceProvider === "playstation" || value.sourceProvider === "appstoreprice") &&
+    (value.sourceName === undefined || typeof value.sourceName === "string") &&
+    (value.sourceDetail === undefined || typeof value.sourceDetail === "string") &&
+    (value.planName === undefined || typeof value.planName === "string") &&
+    (value.planAlternatives === undefined || (Array.isArray(value.planAlternatives) && value.planAlternatives.every(isRegionPricePlanAlternative)))
+  );
+}
+function isRegionPricePlanAlternative(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.planName === "string" &&
+    (value.formattedPrice === undefined || typeof value.formattedPrice === "string") &&
+    (value.formattedNok === undefined || typeof value.formattedNok === "string") &&
+    (value.unavailableReason === undefined || typeof value.unavailableReason === "string")
   );
 }
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
@@ -4658,7 +4737,9 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
   regionPriceMain.href = regionPrice.productUrl;
   regionPriceMain.target = "_blank";
   regionPriceMain.rel = "noreferrer";
-  regionPriceMain.title = `Åpne ${regionPrice.countryName} i PlayStation Store`;
+  if (regionPrice.sourceProvider !== "appstoreprice") {
+    regionPriceMain.title = `Åpne ${regionPrice.countryName} i PlayStation Store`;
+  }
 
   const regionPriceTitle = document.createElement("span");
   regionPriceTitle.className = "region-price-title";
@@ -4688,7 +4769,9 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
       regionPriceAction.href = secondaryLink.url;
       regionPriceAction.target = "_blank";
       regionPriceAction.rel = "noreferrer";
-      regionPriceAction.title = secondaryLink.title;
+      if (secondaryLink.title !== undefined) {
+        regionPriceAction.title = secondaryLink.title;
+      }
       regionPriceAction.textContent = secondaryLink.label;
       regionPriceActions.append(regionPriceAction);
     }
@@ -4698,13 +4781,21 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
 }
 type RegionPriceSecondaryLink = {
   label: string;
-  provider: "gcdeals" | "ggdeals" | "psprices";
-  title: string;
+  provider: "gcdeals" | "ggdeals" | "psprices" | "appstoreprice";
+  title?: string;
   url: string;
 };
 function getRegionPriceSecondaryLinks(
   regionPrice: PlayStationRegionPrice,
 ): RegionPriceSecondaryLink[] {
+  if (regionPrice.sourceProvider === "appstoreprice") {
+    return [{
+      label: regionPrice.sourceName ?? "AppStorePrice",
+      provider: "appstoreprice",
+      url: regionPrice.productUrl,
+    }];
+  }
+
   if (regionPrice.region === "NO") {
     if (regionPrice.priceHistoryUrl === undefined) return [];
     return [{
@@ -4729,8 +4820,71 @@ function getRegionPriceSecondaryLinks(
     },
   ];
 }
+function buildRegionPriceTooltipParts(
+  regionPrice: PlayStationRegionPrice,
+  regionPrices: PlayStationRegionPriceResult,
+): string[] {
+  if (regionPrice.sourceProvider === "appstoreprice") {
+    return buildAppStorePriceRegionPriceTooltipParts(regionPrice, regionPrices);
+  }
+
+  return [buildRegionPricesTooltip(regionPrices)];
+}
+function buildAppStorePriceRegionPriceTooltipParts(
+  regionPrice: PlayStationRegionPrice,
+  regionPrices: PlayStationRegionPriceResult,
+): string[] {
+  const sourceName = regionPrice.sourceName ?? regionPrices.sourceName ?? "AppStorePrice";
+  const planName = regionPrice.planName ?? regionPrices.planName ?? "valgt plan";
+  const planAlternatives = regionPrice.planAlternatives?.slice(0, 10) ?? [];
+  const planLines = planAlternatives.length > 0
+    ? planAlternatives.map((alternative) => `- ${formatRegionPricePlanAlternative(alternative, regionPrice.countryName)}`)
+    : [`- ${planName}: ${regionPrice.formattedNok} (${regionPrice.formattedPrice})`];
+  const rateLine = regionPrices.ratesUpdatedAt !== undefined ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
+
+  return [
+    `${regionPrice.flag} ${regionPrice.countryName}: ${planName} = ${regionPrice.formattedNok} (${regionPrice.formattedPrice})`,
+    [
+      `App Store-planer i ${regionPrice.countryName}`,
+      ...planLines,
+    ].join("\n"),
+    [
+      `Kilde: ${sourceName}`,
+      "App Store/IAP-priser kan avvike fra direkte web-checkout hos tjenesten.",
+      "Regionbytte krever vanligvis Apple ID, gavekort eller betalingsmetode i samme region.",
+      rateLine,
+    ].join("\n"),
+  ];
+}
+function formatRegionPricePlanAlternative(
+  alternative: NonNullable<PlayStationRegionPrice["planAlternatives"]>[number],
+  countryName: string,
+): string {
+  if (alternative.formattedPrice !== undefined && alternative.formattedNok !== undefined) {
+    return `${alternative.planName}: ${alternative.formattedNok} (${alternative.formattedPrice})`;
+  }
+
+  return `${alternative.planName}: ${alternative.unavailableReason ?? `Ikke funnet for ${countryName}`}`;
+}
 function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): string {
   const rateLine = regionPrices.ratesUpdatedAt !== undefined ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
+  if (regionPrices.sourceProvider === "appstoreprice") {
+    const planName = regionPrices.planName ?? regionPrices.productName ?? "abonnement";
+    const sourceName = regionPrices.sourceName ?? "AppStorePrice";
+    const availablePlanNames = regionPrices.availablePlanNames?.slice(0, 10) ?? [];
+    return [
+      `Viser: ${planName}.`,
+      `Kilde: App Store/IAP-regionpriser fra ${sourceName}.`,
+      ...(availablePlanNames.length > 1 ? [`Planer funnet: ${availablePlanNames.join(", ")}.`] : []),
+      "Hold over en landrad for priser på flere planer i samme region.",
+      "Kan avvike fra direkte web-checkout hos tjenesten.",
+      "Regionbytte krever vanligvis Apple ID, gavekort eller betalingsmetode i samme region.",
+      "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
+      "Regionraden og chipen åpner AppStorePrice-siden.",
+      rateLine,
+    ].join("\n");
+  }
+
   return [
     "Utenlandske priser krever PSN-konto i samme region og betaling med PSN-gavekort.",
     "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",

@@ -13,6 +13,11 @@ import {
   type PlayStationRegionPriceResult,
 } from "../shared/playstation-region-prices.js";
 import {
+  findAppStorePriceRegionPricesForUrl,
+  getAppStorePriceRegionPriceCacheKey,
+  isPotentialAppStorePriceRegionPriceUrl,
+} from "../shared/appstoreprice-region-prices.js";
+import {
   type CashbackFoundMessage,
   type CashbackNoneMessage,
   type GetPlayStationRegionPricesMessage,
@@ -36,6 +41,8 @@ const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
 const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v3";
 const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const APPSTOREPRICE_REGION_PRICE_CACHE_KEY = "appstoreprice-region-price-cache-v4";
+const APPSTOREPRICE_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshIndex();
@@ -121,22 +128,37 @@ async function findPriceMatchForProduct(
 async function getPlayStationRegionPrices(
   message: GetPlayStationRegionPricesMessage,
 ): Promise<PlayStationRegionPricesResponse> {
-  if (!isPlayStationProductUrl(message.url)) {
-    return { ok: true };
+  if (isPotentialAppStorePriceRegionPriceUrl(message.url)) {
+    const cached = await readCachedAppStorePriceRegionPrices(message.url);
+    if (cached !== undefined) {
+      return { ok: true, result: cached };
+    }
+
+    const result = await findAppStorePriceRegionPricesForUrl(message.url);
+    if (result === undefined) {
+      return { ok: true };
+    }
+
+    await cacheAppStorePriceRegionPrices(message.url, result);
+    return { ok: true, result };
   }
 
-  const cached = await readCachedPlayStationRegionPrices(message.url);
-  if (cached !== undefined) {
-    return { ok: true, result: cached };
+  if (isPlayStationProductUrl(message.url)) {
+    const cached = await readCachedPlayStationRegionPrices(message.url);
+    if (cached !== undefined) {
+      return { ok: true, result: cached };
+    }
+
+    const result = await findPlayStationRegionPrices(message.url);
+    if (result === undefined) {
+      return { ok: true };
+    }
+
+    await cachePlayStationRegionPrices(result);
+    return { ok: true, result };
   }
 
-  const result = await findPlayStationRegionPrices(message.url);
-  if (result === undefined) {
-    return { ok: true };
-  }
-
-  await cachePlayStationRegionPrices(result);
-  return { ok: true, result };
+  return { ok: true };
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {
@@ -229,6 +251,36 @@ async function cachePlayStationRegionPrices(result: PlayStationRegionPriceResult
   const next = isPlainRecord(cache) ? { ...cache } : {};
   next[result.productId] = result;
   await setStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY, next);
+}
+
+async function readCachedAppStorePriceRegionPrices(url: string): Promise<PlayStationRegionPriceResult | undefined> {
+  const cacheKey = getAppStorePriceRegionPriceCacheKey(url);
+  if (cacheKey === undefined) {
+    return undefined;
+  }
+
+  const cache = await getStorageValue(APPSTOREPRICE_REGION_PRICE_CACHE_KEY);
+  if (!isPlainRecord(cache)) {
+    return undefined;
+  }
+
+  const cached = cache[cacheKey];
+  if (!isPlayStationRegionPriceResult(cached) || !isFreshWithin(cached.fetchedAt, APPSTOREPRICE_REGION_PRICE_CACHE_MAX_AGE_MS)) {
+    return undefined;
+  }
+
+  return cached;
+}
+
+async function cacheAppStorePriceRegionPrices(url: string, result: PlayStationRegionPriceResult): Promise<void> {
+  const cache = await getStorageValue(APPSTOREPRICE_REGION_PRICE_CACHE_KEY);
+  const next = isPlainRecord(cache) ? { ...cache } : {};
+  const urlCacheKey = getAppStorePriceRegionPriceCacheKey(url);
+  if (urlCacheKey !== undefined) {
+    next[urlCacheKey] = result;
+  }
+  next[result.productId.replace(/^appstoreprice:/, "")] = result;
+  await setStorageValue(APPSTOREPRICE_REGION_PRICE_CACHE_KEY, next);
 }
 
 async function readBundledIndex(): Promise<CashbackIndex> {
@@ -349,6 +401,11 @@ function isPlayStationRegionPriceResult(value: unknown): value is PlayStationReg
     typeof value.fetchedAt === "string" &&
     (value.productName === undefined || typeof value.productName === "string") &&
     (value.ratesUpdatedAt === undefined || typeof value.ratesUpdatedAt === "string") &&
+    (value.sourceProvider === undefined || value.sourceProvider === "playstation" || value.sourceProvider === "appstoreprice") &&
+    (value.sourceName === undefined || typeof value.sourceName === "string") &&
+    (value.sourceDetail === undefined || typeof value.sourceDetail === "string") &&
+    (value.planName === undefined || typeof value.planName === "string") &&
+    (value.availablePlanNames === undefined || (Array.isArray(value.availablePlanNames) && value.availablePlanNames.every((entry) => typeof entry === "string"))) &&
     Array.isArray(value.prices) &&
     value.prices.every(isPlayStationRegionPrice)
   );
@@ -367,7 +424,22 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
     typeof value.nokAmount === "number" &&
     typeof value.formattedNok === "string" &&
     typeof value.productUrl === "string" &&
-    (value.priceHistoryUrl === undefined || typeof value.priceHistoryUrl === "string")
+    (value.priceHistoryUrl === undefined || typeof value.priceHistoryUrl === "string") &&
+    (value.sourceProvider === undefined || value.sourceProvider === "playstation" || value.sourceProvider === "appstoreprice") &&
+    (value.sourceName === undefined || typeof value.sourceName === "string") &&
+    (value.sourceDetail === undefined || typeof value.sourceDetail === "string") &&
+    (value.planName === undefined || typeof value.planName === "string") &&
+    (value.planAlternatives === undefined || (Array.isArray(value.planAlternatives) && value.planAlternatives.every(isRegionPricePlanAlternative)))
+  );
+}
+
+function isRegionPricePlanAlternative(value: unknown): boolean {
+  return (
+    isPlainRecord(value) &&
+    typeof value.planName === "string" &&
+    (value.formattedPrice === undefined || typeof value.formattedPrice === "string") &&
+    (value.formattedNok === undefined || typeof value.formattedNok === "string") &&
+    (value.unavailableReason === undefined || typeof value.unavailableReason === "string")
   );
 }
 

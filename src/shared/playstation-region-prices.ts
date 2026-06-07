@@ -1,3 +1,10 @@
+export type RegionPricePlanAlternative = {
+  planName: string;
+  formattedPrice?: string;
+  formattedNok?: string;
+  unavailableReason?: string;
+};
+
 export type PlayStationRegionPrice = {
   region: string;
   countryName: string;
@@ -10,6 +17,11 @@ export type PlayStationRegionPrice = {
   formattedNok: string;
   productUrl: string;
   priceHistoryUrl?: string;
+  sourceProvider?: "playstation" | "appstoreprice";
+  sourceName?: string;
+  sourceDetail?: string;
+  planName?: string;
+  planAlternatives?: RegionPricePlanAlternative[];
 };
 
 export type PlayStationRegionPriceResult = {
@@ -17,6 +29,11 @@ export type PlayStationRegionPriceResult = {
   productName?: string;
   fetchedAt: string;
   ratesUpdatedAt?: string;
+  sourceProvider?: "playstation" | "appstoreprice";
+  sourceName?: string;
+  sourceDetail?: string;
+  planName?: string;
+  availablePlanNames?: string[];
   prices: PlayStationRegionPrice[];
 };
 
