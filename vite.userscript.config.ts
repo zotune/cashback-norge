@@ -58,6 +58,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      kassal.app
 // @connect      www.finn.no
 // @connect      www.momondo.no
+// @connect      www.skyscanner.net
 // @connect      worka.panflights.com
 // @connect      workb.panflights.com
 // @connect      panflights.com

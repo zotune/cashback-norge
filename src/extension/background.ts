@@ -175,6 +175,7 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
   const supportedHosts = new Set([
     "www.finn.no",
     "www.momondo.no",
+    "www.skyscanner.net",
     "worka.panflights.com",
     "workb.panflights.com",
     "panflights.com",

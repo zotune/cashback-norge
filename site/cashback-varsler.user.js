@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780863102
+// @version      1780870180
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -38,6 +38,7 @@
 // @connect      kassal.app
 // @connect      www.finn.no
 // @connect      www.momondo.no
+// @connect      www.skyscanner.net
 // @connect      worka.panflights.com
 // @connect      workb.panflights.com
 // @connect      panflights.com
@@ -7124,6 +7125,41 @@ query SearchSuggestions($query: String!, $category: Int) {
   const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
   const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
   const MOMONDO_FLIGHT_PAGE_SIZE = 50;
+  const SKYSCANNER_FENRYR_BASE_URL = "https://www.skyscanner.net/g/fenryr/v1";
+  const SKYSCANNER_CLIENT_VERSION = "7.194.1";
+  const SKYSCANNER_CHANNEL_ID = "goandroid";
+  const SKYSCANNER_HTTP_HEADERS = {
+    Accept: "application/json",
+    "X-Skyscanner-Authenticated": "false",
+    "X-Skyscanner-ChannelId": SKYSCANNER_CHANNEL_ID,
+    "X-Skyscanner-Client": "skyscanner_android_app",
+    "X-Skyscanner-Client-Network-Type": "WIFI",
+    "X-Skyscanner-Client-Type": "net.skyscanner.android.main",
+    "X-Skyscanner-Client-Version": SKYSCANNER_CLIENT_VERSION,
+    "X-Skyscanner-Currency": "NOK",
+    "X-Skyscanner-Device": "Android-phone",
+    "X-Skyscanner-Device-Class": "phone",
+    "X-Skyscanner-Device-Model": "Pixel 8",
+    "X-Skyscanner-Device-OS-Type": "Android",
+    "X-Skyscanner-Device-OS-Version": "15",
+    "X-Skyscanner-Locale": "nb-NO",
+    "X-Skyscanner-Market": "NO"
+  };
+  const SKYSCANNER_CALENDAR_HEADERS = {
+    xSkyscannerChannelId: SKYSCANNER_CHANNEL_ID,
+    xSkyscannerClient: "skyscanner_android_app",
+    xSkyscannerClientType: "net.skyscanner.android.main",
+    xSkyscannerClientVersion: SKYSCANNER_CLIENT_VERSION,
+    xSkyscannerCurrency: "NOK",
+    xSkyscannerDeviceClass: "phone",
+    xSkyscannerDeviceModel: "Pixel 8",
+    xSkyscannerDeviceOsType: "Android",
+    xSkyscannerDeviceOsVersion: "15",
+    xSkyscannerDeviceType: "DEVICE_TYPE_MOBILE",
+    xSkyscannerEnableGeneralSearch: false,
+    xSkyscannerLocale: "nb-NO",
+    xSkyscannerMarket: "NO"
+  };
   const PSN_GC_DEALS_GIFT_CARD_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
   const PSN_GC_DEALS_GIFT_CARD_REGION_URLS = {
     AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
@@ -7271,7 +7307,10 @@ query SearchSuggestions($query: String!, $category: Int) {
         }
         const flightMeta = extractFlightSearchMeta(currentUrl);
         const productMeta = flightMeta === void 0 ? extractProductPageMeta() : void 0;
-        const metaKey = flightMeta !== void 0 ? buildFlightSearchMetaKey(flightMeta) : productMeta === void 0 ? "" : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent].join("|");
+        const metaKey = flightMeta !== void 0 ? [
+          buildFlightSearchMetaKey(flightMeta),
+          isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : ""
+        ].join("|") : productMeta === void 0 ? "" : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent].join("|");
         if (metaKey.length > 0 && metaKey !== latestMetaKey) {
           latestMetaKey = metaKey;
           requestCurrentOffers();
@@ -7450,7 +7489,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     const liveOffers = (await Promise.all([
       findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
       findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
-      findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)
+      findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+      findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)
     ])).filter((offer) => offer !== void 0);
     if (liveOffers.length === 0) return staticOffers;
     const liveSources = new Set(liveOffers.map((offer) => offer.source));
@@ -7460,7 +7500,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     ].sort(comparePriceMatchesBySortAmount);
   }
   function extractFlightSearchMeta(parsedUrl) {
-    return extractSasFlightSearchMeta(parsedUrl) ?? extractStoredFlightSearchMeta(parsedUrl) ?? extractVisibleFlightSearchMeta(parsedUrl);
+    return extractSasFlightSearchMeta(parsedUrl) ?? extractSkyscannerFlightSearchMeta(parsedUrl) ?? extractStoredFlightSearchMeta(parsedUrl) ?? extractVisibleFlightSearchMeta(parsedUrl);
   }
   function extractSasFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -7489,6 +7529,36 @@ query SearchSuggestions($query: String!, $category: Int) {
       children,
       infants
     };
+  }
+  function extractSkyscannerFlightSearchMeta(parsedUrl) {
+    if (!isSkyscannerFlightSearchPage(parsedUrl)) return void 0;
+    const parts = parsedUrl.pathname.split("/").filter(Boolean);
+    const flightsIndex = parts.findIndex((part) => part.toLowerCase() === "flights");
+    const origin = readIataCodeValue(parts[flightsIndex + 1]);
+    const destination = readIataCodeValue(parts[flightsIndex + 2]);
+    const outboundDate = readSkyscannerPathDate(parts[flightsIndex + 3]);
+    const inboundDate = readSkyscannerPathDate(parts[flightsIndex + 4]);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? readPositiveIntegerValue(parsedUrl.searchParams.get("adultsv2")) ?? 1,
+      youths: 0,
+      children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? readNonNegativeIntegerValue(parsedUrl.searchParams.get("childrenv2")) ?? 0,
+      infants: 0
+    });
+  }
+  function isSkyscannerFlightSearchPage(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return (hostname === "skyscanner.no" || hostname === "skyscanner.net") && /^\/transport\/flights\/[a-z]{3}\/[a-z]{3}\/\d{6}(?:\/\d{6})?\/?$/i.test(parsedUrl.pathname);
+  }
+  function readSkyscannerPathDate(value) {
+    if (value === void 0 || !/^\d{6}$/.test(value)) return void 0;
+    const year = Number.parseInt(value.slice(0, 2), 10);
+    const fullYear = year < 70 ? 2e3 + year : 1900 + year;
+    return readIsoDateValue(`${fullYear}-${value.slice(2, 4)}-${value.slice(4, 6)}`);
   }
   function extractStoredFlightSearchMeta(parsedUrl) {
     if (!isOpaqueFlightSearchPage(parsedUrl)) return void 0;
@@ -8212,24 +8282,198 @@ query SearchSuggestions($query: String!, $category: Int) {
     return `https://panflights.no/nb/${path}/?${params.toString()}`;
   }
   function buildSkyscannerFlightSearchUrl(flightMeta) {
+    const pathParts = [
+      flightMeta.origin.toLowerCase(),
+      flightMeta.destination.toLowerCase(),
+      compactIsoDate(flightMeta.outboundDate).slice(2),
+      flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate).slice(2) : void 0
+    ].filter((part) => part !== void 0);
     const params = new URLSearchParams({
-      origin: flightMeta.origin,
-      destination: flightMeta.destination,
-      outboundDate: flightMeta.outboundDate,
+      adults: String(flightMeta.adults),
       adultsv2: String(flightMeta.adults),
       cabinclass: "economy",
-      preferDirects: "false",
-      outboundaltsenabled: "false",
+      childrenv2: "",
       inboundaltsenabled: "false",
-      market: "NO",
-      locale: "nb-NO",
-      currency: "NOK",
+      outboundaltsenabled: "false",
+      preferdirects: "false",
       rtn: flightMeta.inboundDate !== void 0 ? "1" : "0"
     });
-    if (flightMeta.inboundDate !== void 0) {
-      params.set("inboundDate", flightMeta.inboundDate);
+    return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
+  }
+  async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
+    const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
+    const pageCandidates = extractCurrentSkyscannerPageOfferCandidates(flightMeta);
+    const candidates = pageCandidates.length > 0 ? pageCandidates : [
+      await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl)
+    ].filter((candidate2) => candidate2 !== void 0);
+    const candidate = candidates[0];
+    if (candidate === void 0) return void 0;
+    return {
+      source: "skyscanner",
+      sourceName: "Skyscanner",
+      details: searchDetails,
+      matchedExactProduct: true,
+      shopName: candidate.shopName,
+      price: candidate.price,
+      amount: candidate.amount,
+      sortAmount: candidate.sortAmount ?? candidate.amount,
+      currency: candidate.currency,
+      productName: routeTitle,
+      productUrl: candidate.productUrl,
+      offerUrl: candidate.productUrl,
+      alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
+    };
+  }
+  function extractCurrentSkyscannerPageOfferCandidates(flightMeta) {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0 || !isSkyscannerFlightSearchPage(parsedUrl)) return [];
+    const currentMeta = extractSkyscannerFlightSearchMeta(parsedUrl);
+    if (currentMeta === void 0 || buildFlightSearchMetaKey(currentMeta) !== buildFlightSearchMetaKey(flightMeta)) return [];
+    return extractSkyscannerVisibleOfferCandidates(parsedUrl.toString());
+  }
+  function readCurrentSkyscannerVisiblePriceKey() {
+    return extractSkyscannerVisibleOfferCandidates(window.location.href).slice(0, 5).map((candidate) => `${Math.round(candidate.amount)}:${candidate.platform ?? ""}`).join(";");
+  }
+  function extractSkyscannerVisibleOfferCandidates(productUrl) {
+    const text = (document.body?.innerText ?? "").replace(/\u00a0/g, " ");
+    const candidates = [
+      ...extractSkyscannerVisibleOfferCandidatesFromPattern(text, /(\d+)\s+tilbud\s+fra\s+(\d[\d\s]*)\s*kr\b/gi, productUrl)
+    ];
+    if (candidates.length === 0) {
+      candidates.push(...extractSkyscannerFallbackVisibleOfferCandidates(text, productUrl));
     }
-    return `https://www.skyscanner.net/g/referrals/v1/flights/day-view?${params.toString()}`;
+    return dedupeSkyscannerOfferCandidates(candidates).sort((left, right) => left.amount - right.amount);
+  }
+  function extractSkyscannerVisibleOfferCandidatesFromPattern(text, pattern, productUrl) {
+    const candidates = [];
+    for (const match of text.matchAll(pattern)) {
+      const offerCount = readPositiveIntegerValue(match[1]);
+      const amount = readPositiveNumberValue(match[2]);
+      if (amount === void 0) continue;
+      candidates.push({
+        shopName: "Skyscanner",
+        price: formatNokFlightPrice(amount),
+        amount,
+        sortAmount: amount,
+        currency: "NOK",
+        productUrl,
+        platform: [
+          "synlig treffliste",
+          offerCount !== void 0 ? `${offerCount} tilbud` : void 0
+        ].filter((part) => part !== void 0).join(", ")
+      });
+    }
+    return candidates;
+  }
+  function extractSkyscannerFallbackVisibleOfferCandidates(text, productUrl) {
+    const candidates = [];
+    const pattern = /\b(\d[\d\s]{0,8})\s*kr\b/gi;
+    for (const match of text.matchAll(pattern)) {
+      const amount = readPositiveNumberValue(match[1]);
+      if (amount === void 0) continue;
+      const index = match.index ?? 0;
+      const context = text.slice(Math.max(0, index - 160), Math.min(text.length, index + 160));
+      if (!/\b(?:tilbud|se mer|vis tilbud|detaljer)\b/i.test(context)) continue;
+      candidates.push({
+        shopName: "Skyscanner",
+        price: formatNokFlightPrice(amount),
+        amount,
+        sortAmount: amount,
+        currency: "NOK",
+        productUrl,
+        platform: "synlig treffliste"
+      });
+    }
+    return candidates;
+  }
+  function dedupeSkyscannerOfferCandidates(candidates) {
+    const seen = /* @__PURE__ */ new Set();
+    const uniqueCandidates = [];
+    for (const candidate of candidates) {
+      const key = `${Math.round(candidate.amount)}|${candidate.platform ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      uniqueCandidates.push(candidate);
+    }
+    return uniqueCandidates;
+  }
+  async function fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl) {
+    const [originEntityId, destinationEntityId] = await Promise.all([
+      fetchSkyscannerPlaceEntityId(flightMeta.origin, "inputorigin"),
+      fetchSkyscannerPlaceEntityId(flightMeta.destination, "inputdestination")
+    ]);
+    if (originEntityId === void 0 || destinationEntityId === void 0) return void 0;
+    return await fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originEntityId, destinationEntityId, true) ?? fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originEntityId, destinationEntityId, false);
+  }
+  async function fetchSkyscannerPlaceEntityId(iataCode, endpoint) {
+    const params = new URLSearchParams({ query: iataCode, placeTypes: "AIRPORT" });
+    const value = await userscriptJsonRequest(`${SKYSCANNER_FENRYR_BASE_URL}/${endpoint}?${params.toString()}`, {
+      headers: SKYSCANNER_HTTP_HEADERS,
+      credentials: "omit"
+    });
+    return isRecord(value) ? readSkyscannerPlaceEntityId(value, iataCode) : void 0;
+  }
+  function readSkyscannerPlaceEntityId(value, iataCode) {
+    let fallbackEntityId;
+    for (const suggestion of readRecordArray(value.inputSuggest)) {
+      const navigation = isRecord(suggestion.navigation) ? suggestion.navigation : void 0;
+      const flightParams = isRecord(navigation?.relevantFlightParams) ? navigation.relevantFlightParams : void 0;
+      const entityId = readStringValue(flightParams?.entityId) ?? readStringValue(navigation?.entityId);
+      const skyId = readStringValue(flightParams?.skyId)?.toUpperCase();
+      if (entityId !== void 0 && fallbackEntityId === void 0) fallbackEntityId = entityId;
+      if (entityId !== void 0 && skyId === iataCode.toUpperCase()) return entityId;
+    }
+    return fallbackEntityId;
+  }
+  async function fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originEntityId, destinationEntityId, isDirect) {
+    const pickDate = flightMeta.inboundDate ?? flightMeta.outboundDate;
+    const value = await userscriptJsonRequest(`${SKYSCANNER_FENRYR_BASE_URL}/pricecalendar/explore`, {
+      method: "POST",
+      headers: {
+        ...SKYSCANNER_HTTP_HEADERS,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        headers: SKYSCANNER_CALENDAR_HEADERS,
+        originId: originEntityId,
+        destinationId: destinationEntityId,
+        calendarStartDate: buildSkyscannerCalendarStartDate(flightMeta),
+        isDirect,
+        tripType: flightMeta.inboundDate !== void 0 ? "TRIP_TYPE_RETURN" : "TRIP_TYPE_ONEWAY",
+        isFixedDeparture: flightMeta.inboundDate !== void 0
+      }),
+      credentials: "omit"
+    });
+    if (!isRecord(value)) return void 0;
+    const day = readRecordArray(value.days).find((candidateDay) => readStringValue(candidateDay.day) === pickDate);
+    const flightPrice = isRecord(day?.flightPrice) ? day.flightPrice : void 0;
+    const money = readSkyscannerMoney(flightPrice);
+    if (money === void 0) return void 0;
+    return {
+      shopName: "Skyscanner kalender",
+      price: formatFlightPrice(money.amount, money.currency),
+      amount: money.amount,
+      sortAmount: money.amount,
+      currency: money.currency,
+      productUrl: resultUrl,
+      platform: [
+        "indikativ kalenderpris",
+        isDirect ? "direkte reiser" : "alle reiser",
+        flightMeta.inboundDate !== void 0 ? "tur/retur" : "én vei"
+      ].join(", ")
+    };
+  }
+  function buildSkyscannerCalendarStartDate(flightMeta) {
+    return flightMeta.inboundDate !== void 0 ? flightMeta.outboundDate : `${flightMeta.outboundDate.slice(0, 8)}01`;
+  }
+  function readSkyscannerMoney(value) {
+    if (value === void 0) return void 0;
+    const rawAmount = readPositiveNumberValue(value.amount);
+    if (rawAmount === void 0) return void 0;
+    const currency = readStringValue(value.currencyCode) ?? "NOK";
+    const unit = readStringValue(value.unit);
+    const amount = unit === "UNIT_CENTI" ? rawAmount / 100 : unit === "UNIT_MILLI" ? rawAmount / 1e3 : unit === "UNIT_MICRO" ? rawAmount / 1e6 : rawAmount;
+    return amount > 0 ? { amount, currency } : void 0;
   }
   function buildMomondoFlightSearchUrl(flightMeta) {
     const pathParts = [
@@ -9103,7 +9347,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "sas.no" || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "sas.no" || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
@@ -12619,16 +12863,17 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const details = priceMatch.details ?? priceMatch.shopName;
       const hasLivePriceList = alternatives2.length > 0 && (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
       if (hasLivePriceList) {
+        const isSkyscannerCalendarPrice = priceMatch.source === "skyscanner" && priceMatch.shopName === "Skyscanner kalender";
         return [
           `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
           [
             priceMatch.shopName,
             details !== priceMatch.shopName ? details : void 0,
-            `Beste treff: ${priceMatch.price}`,
-            "Dato og flyplasser er filtrert til samme søk."
+            `${isSkyscannerCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
+            isSkyscannerCalendarPrice ? "Skyscanner gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste." : "Dato og flyplasser er filtrert til samme søk."
           ].filter((line) => line !== void 0).join("\n"),
           [
-            "Treffliste",
+            isSkyscannerCalendarPrice ? "Prisgrunnlag" : "Treffliste",
             ...alternatives2.map(formatPriceMatchTooltipOffer)
           ].join("\n"),
           "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden."
