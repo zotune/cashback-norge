@@ -245,13 +245,6 @@ type PriceMatchOffer = {
   productUrl: string;
   offerUrl?: string;
   alternatives?: PriceMatchAlternative[];
-  relatedLinks?: PriceMatchRelatedLink[];
-};
-type PriceMatchRelatedLink = {
-  label: string;
-  url: string;
-  provider?: "ggdeals";
-  title?: string;
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -2696,10 +2689,6 @@ function renderNotice(
       justify-self: end;
       min-width: 0;
     }
-    .price-match-card--related .price-match-price {
-      color: #5d6b71;
-      font-weight: 700;
-    }
     .price-match-card.price-match-card--best .price-match-product,
     .price-match-card.price-match-card--best .price-match-price,
     .region-price-card.region-price-card--best .region-price-country,
@@ -3849,7 +3838,7 @@ function renderNotice(
 
     priceMatchSection.append(
       priceMatchToggle,
-      ...priceMatches.flatMap((priceMatch, index) => buildPriceMatchCards(priceMatch, index === 0)),
+      ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0)),
     );
   }
 
@@ -4158,7 +4147,7 @@ function clearNotice(): void {
 function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMatchOffer[]): void {
   if (priceMatches.length === 0) return;
 
-  const cards = shadowRoot.querySelectorAll<HTMLElement>(".price-match-card:not(.price-match-card--related)");
+  const cards = shadowRoot.querySelectorAll<HTMLElement>(".price-match-card");
   for (let index = 0; index < priceMatches.length; index++) {
     const card = cards[index];
     const priceMatch = priceMatches[index];
@@ -4372,17 +4361,7 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     typeof value.productName === "string" &&
     typeof value.productUrl === "string" &&
     (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
-    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative))) &&
-    (value.relatedLinks === undefined || (Array.isArray(value.relatedLinks) && value.relatedLinks.every(isPriceMatchRelatedLink)))
-  );
-}
-function isPriceMatchRelatedLink(value: unknown): value is PriceMatchRelatedLink {
-  return (
-    isRecord(value) &&
-    typeof value.label === "string" &&
-    typeof value.url === "string" &&
-    (value.provider === undefined || value.provider === "ggdeals") &&
-    (value.title === undefined || typeof value.title === "string")
+    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)))
   );
 }
 function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative {
@@ -4634,12 +4613,6 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "points") return 1;
   return 0;
 }
-function buildPriceMatchCards(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement[] {
-  return [
-    buildPriceMatchCard(priceMatch, isBest),
-    ...(priceMatch.relatedLinks ?? []).map((link) => buildPriceMatchRelatedLinkCard(priceMatch, link)),
-  ];
-}
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
   priceMatchCard.className = "price-match-card";
@@ -4665,39 +4638,6 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   const priceMatchBadge = document.createElement("span");
   priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-  priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
-  return priceMatchCard;
-}
-function buildPriceMatchRelatedLinkCard(
-  priceMatch: PriceMatchOffer,
-  link: PriceMatchRelatedLink,
-): HTMLAnchorElement {
-  const priceMatchCard = document.createElement("a");
-  priceMatchCard.className = "price-match-card price-match-card--related";
-  priceMatchCard.href = link.url;
-  priceMatchCard.target = "_blank";
-  priceMatchCard.rel = "noreferrer";
-  if (link.title !== undefined) {
-    priceMatchCard.title = link.title;
-  }
-
-  const priceMatchTitle = document.createElement("span");
-  priceMatchTitle.className = "price-match-title";
-  const priceMatchProduct = document.createElement("span");
-  priceMatchProduct.className = "price-match-product";
-  priceMatchProduct.textContent = priceMatch.productName;
-  const priceMatchShop = document.createElement("span");
-  priceMatchShop.className = "price-match-shop";
-  priceMatchShop.textContent = "Prissammenligning";
-  priceMatchTitle.append(priceMatchProduct, priceMatchShop);
-
-  const priceMatchPrice = document.createElement("span");
-  priceMatchPrice.className = "price-match-price";
-  priceMatchPrice.textContent = "Sjekk priser";
-
-  const priceMatchBadge = document.createElement("span");
-  priceMatchBadge.className = `provider-badge provider-${link.provider ?? "prisjakt"}`;
-  priceMatchBadge.textContent = link.label;
   priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
   return priceMatchCard;
 }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780830758
+// @version      1780831151
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -847,7 +847,6 @@
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
-  const GG_DEALS_ORIGIN = "https://gg.deals";
   const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
   const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
   const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
@@ -916,15 +915,7 @@
       price: bestDeal.price,
       productName,
       productUrl,
-      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative),
-      ...pageContext.slug !== void 0 ? {
-        relatedLinks: [{
-          label: "GG Deals",
-          provider: "ggdeals",
-          title: "Åpne spillet hos GG Deals",
-          url: `${GG_DEALS_ORIGIN}/game/${pageContext.slug}/`
-        }]
-      } : {}
+      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative)
     };
   }
   function isItadGameStoreProductUrl(rawUrl) {
@@ -7534,10 +7525,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       justify-self: end;
       min-width: 0;
     }
-    .price-match-card--related .price-match-price {
-      color: #5d6b71;
-      font-weight: 700;
-    }
     .price-match-card.price-match-card--best .price-match-product,
     .price-match-card.price-match-card--best .price-match-price,
     .region-price-card.region-price-card--best .region-price-country,
@@ -8692,7 +8679,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       });
       priceMatchSection.append(
         priceMatchToggle,
-        ...priceMatches.flatMap((priceMatch2, index) => buildPriceMatchCards(priceMatch2, index === 0))
+        ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
       );
     }
     body.append(header);
@@ -8952,7 +8939,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function attachPriceMatchTooltips(shadowRoot, priceMatches) {
     if (priceMatches.length === 0) return;
-    const cards = shadowRoot.querySelectorAll(".price-match-card:not(.price-match-card--related)");
+    const cards = shadowRoot.querySelectorAll(".price-match-card");
     for (let index = 0; index < priceMatches.length; index++) {
       const card = cards[index];
       const priceMatch = priceMatches[index];
@@ -9099,10 +9086,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)) && (value.relatedLinks === void 0 || Array.isArray(value.relatedLinks) && value.relatedLinks.every(isPriceMatchRelatedLink));
-  }
-  function isPriceMatchRelatedLink(value) {
-    return isRecord(value) && typeof value.label === "string" && typeof value.url === "string" && (value.provider === void 0 || value.provider === "ggdeals") && (value.title === void 0 || typeof value.title === "string");
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -9289,12 +9273,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (kind === "points") return 1;
     return 0;
   }
-  function buildPriceMatchCards(priceMatch, isBest = false) {
-    return [
-      buildPriceMatchCard(priceMatch, isBest),
-      ...(priceMatch.relatedLinks ?? []).map((link) => buildPriceMatchRelatedLinkCard(priceMatch, link))
-    ];
-  }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "price-match-card";
@@ -9317,33 +9295,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
-    return priceMatchCard;
-  }
-  function buildPriceMatchRelatedLinkCard(priceMatch, link) {
-    const priceMatchCard = document.createElement("a");
-    priceMatchCard.className = "price-match-card price-match-card--related";
-    priceMatchCard.href = link.url;
-    priceMatchCard.target = "_blank";
-    priceMatchCard.rel = "noreferrer";
-    if (link.title !== void 0) {
-      priceMatchCard.title = link.title;
-    }
-    const priceMatchTitle = document.createElement("span");
-    priceMatchTitle.className = "price-match-title";
-    const priceMatchProduct = document.createElement("span");
-    priceMatchProduct.className = "price-match-product";
-    priceMatchProduct.textContent = priceMatch.productName;
-    const priceMatchShop = document.createElement("span");
-    priceMatchShop.className = "price-match-shop";
-    priceMatchShop.textContent = "Prissammenligning";
-    priceMatchTitle.append(priceMatchProduct, priceMatchShop);
-    const priceMatchPrice = document.createElement("span");
-    priceMatchPrice.className = "price-match-price";
-    priceMatchPrice.textContent = "Sjekk priser";
-    const priceMatchBadge = document.createElement("span");
-    priceMatchBadge.className = `provider-badge provider-${link.provider ?? "prisjakt"}`;
-    priceMatchBadge.textContent = link.label;
     priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
     return priceMatchCard;
   }
