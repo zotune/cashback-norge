@@ -292,9 +292,10 @@ type FinnFlightOfferCandidate = PriceMatchAlternative & {
 };
 type PanFlightsOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
+  durationMinutes?: number;
 };
 type PanFlightsSearchVariant = {
-  sortOrder: "quality";
+  sortOrder: "quality" | "price";
   version: number;
   maxStops: number;
   searchId: number;
@@ -370,8 +371,12 @@ const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
 ];
 const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
   { sortOrder: "quality", version: 0, maxStops: 6, searchId: 1001 },
+  { sortOrder: "price", version: 255, maxStops: 6, searchId: 1002 },
+  { sortOrder: "price", version: 256, maxStops: 6, searchId: 1003 },
+  { sortOrder: "price", version: 257, maxStops: 6, searchId: 1004 },
 ];
 const PANFLIGHTS_FLIGHT_HITS_LIMIT = 100;
+const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
 const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
 const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
 const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
@@ -1386,8 +1391,9 @@ async function findPanFlightsFlightPriceMatchOffer(
         : extractPanFlightsOfferCandidates(resultData, flightMeta, resultUrl);
     }),
   );
+  const rankedCandidates = rankPanFlightsOfferCandidates(candidates);
 
-  const best = candidates[0];
+  const best = rankedCandidates[0];
   if (best === undefined) return undefined;
 
   return {
@@ -1403,7 +1409,7 @@ async function findPanFlightsFlightPriceMatchOffer(
     productName: routeTitle,
     productUrl: resultUrl,
     offerUrl: best.productUrl,
-    alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
+    alternatives: rankedCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate),
   };
 }
 
@@ -1527,6 +1533,7 @@ function extractPanFlightsOfferCandidates(
       readStringValue(resultData.provider) ??
       "PanFlights";
     const productUrl = readPanFlightsProductUrl(provider?.deep_link ?? packageRecord?.deep_link, resultUrl);
+    const durationMinutes = readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration);
     const platform = formatPanFlightsTripSummary(item);
 
     candidates.push({
@@ -1536,6 +1543,7 @@ function extractPanFlightsOfferCandidates(
       sortAmount: amount,
       currency,
       productUrl,
+      ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(platform !== undefined ? { platform } : {}),
     });
   }
@@ -1557,6 +1565,35 @@ function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[])
     uniqueCandidates.push(candidate);
   }
   return uniqueCandidates;
+}
+
+function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
+  const shortestDuration = candidates.reduce<number | undefined>((shortest, candidate) => {
+    if (candidate.durationMinutes === undefined) return shortest;
+    return shortest === undefined ? candidate.durationMinutes : Math.min(shortest, candidate.durationMinutes);
+  }, undefined);
+  const maxReasonableDuration = shortestDuration === undefined
+    ? undefined
+    : shortestDuration + PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES;
+
+  return [...candidates].sort((left, right) => {
+    const leftReasonable = isReasonablePanFlightsDuration(left, maxReasonableDuration);
+    const rightReasonable = isReasonablePanFlightsDuration(right, maxReasonableDuration);
+    if (leftReasonable !== rightReasonable) return leftReasonable ? -1 : 1;
+
+    const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+    if (amountDiff !== 0) return amountDiff;
+
+    return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+  });
+}
+
+function isReasonablePanFlightsDuration(
+  candidate: PanFlightsOfferCandidate,
+  maxReasonableDuration: number | undefined,
+): boolean {
+  if (maxReasonableDuration === undefined || candidate.durationMinutes === undefined) return true;
+  return candidate.durationMinutes <= maxReasonableDuration;
 }
 
 function isPanFlightsFlightMatchingSearch(item: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
@@ -4191,7 +4228,7 @@ function renderNotice(
     }
     .provider-momondo {
       background: #2e0b59;
-      color: #24c3e8;
+      color: #ff7a18;
     }
     .provider-skyscanner {
       background: #05203c;
