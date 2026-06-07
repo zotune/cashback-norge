@@ -18,6 +18,7 @@ import {
 import {
   isEpicGamesStoreProductUrl,
   isItadGameStoreProductUrl,
+  isMicrosoftStoreProductUrl,
 } from "../shared/isthereanydeal-price-match";
 import {
   findPlayStationRegionPrices,
@@ -282,33 +283,33 @@ const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
 const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
 const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
-const PSN_GIFT_CARD_DEALS_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
+const PSN_GIFT_CARD_DEALS_URL = "https://gg.deals/gift-cards-group/playstation-network-card-nok-norway/";
 const PSN_GIFT_CARD_REGION_URLS: Record<string, string> = {
-  AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
-  BR: "https://gcdeals.net/no/group/15/playstation-network-cards-brl-brazil",
-  CA: "https://gcdeals.net/no/group/16/playstation-network-cards-cad-canada",
-  CH: "https://gcdeals.net/no/group/10/playstation-network-cards-chf-switzerland",
-  DE: "https://gcdeals.net/no/group/3/playstation-network-cards-eur-germany",
-  DK: "https://gcdeals.net/no/group/515/playstation-network-gift-cards-dkk-denmark",
-  ES: "https://gcdeals.net/no/group/11/playstation-network-cards-eur-spain",
-  FI: "https://gcdeals.net/no/group/5/playstation-network-cards-eur-finland",
-  FR: "https://gcdeals.net/no/group/8/playstation-network-cards-eur-france",
-  GB: "https://gcdeals.net/no/group/2/playstation-network-cards-gbp-united-kingdom",
-  HK: "https://gcdeals.net/no/group/22/playstation-network-cards-hkd-hong-kong",
-  IN: "https://gcdeals.net/no/group/518/playstation-network-gift-cards-inr-india",
-  IT: "https://gcdeals.net/no/group/6/playstation-network-cards-eur-italy",
-  JP: "https://gcdeals.net/no/group/28/playstation-network-cards-jpy-japan",
-  KR: "https://gcdeals.net/no/group/1021/playstation-network-gift-cards-nok-south-korea",
-  MX: "https://gcdeals.net/no/group/32/playstation-network-cards-usd-mexico",
-  NO: "https://gcdeals.net/no/group/9/playstation-network-cards-nok-norway",
-  NZ: "https://gcdeals.net/no/group/34/playstation-network-cards-nzd-new-zealand",
-  PL: "https://gcdeals.net/no/group/4/playstation-network-cards-pln-poland",
-  SE: "https://gcdeals.net/no/group/522/playstation-network-gift-cards-sek-sweden",
-  SG: "https://gcdeals.net/no/group/41/playstation-network-cards-sgd-singapore",
-  US: "https://gcdeals.net/no/group/1/playstation-network-cards-usd-united-states",
-  TR: "https://gcdeals.net/no/group/1050/playstation-network-gift-cards-try-turkey",
-  UA: "https://gcdeals.net/no/group/1078/playstation-network-gift-cards-uah-ukraine",
-  ZA: "https://gcdeals.net/no/group/43/playstation-network-cards-zar-south-africa",
+  AU: "https://gg.deals/gift-cards-group/playstation-network-card-aud-australia/",
+  BR: "https://gg.deals/gift-cards-group/playstation-network-card-brl-brazil/",
+  CA: "https://gg.deals/gift-cards-group/playstation-network-card-cad-canada/",
+  CH: "https://gg.deals/gift-cards-group/playstation-network-card-chf-switzerland/",
+  DE: "https://gg.deals/gift-cards-group/playstation-network-card-eur-germany/",
+  DK: "https://gg.deals/gift-cards-group/playstation-network-card-dkk-denmark/",
+  ES: "https://gg.deals/gift-cards-group/playstation-network-card-eur-spain/",
+  FI: "https://gg.deals/gift-cards-group/playstation-network-card-eur-finland/",
+  FR: "https://gg.deals/gift-cards-group/playstation-network-card-eur-france/",
+  GB: "https://gg.deals/gift-cards-group/playstation-network-card-gbp-united-kingdom/",
+  HK: "https://gg.deals/gift-cards-group/playstation-network-card-hkd-hong-kong/",
+  IN: "https://gg.deals/gift-cards-group/playstation-network-card-inr-india/",
+  IT: "https://gg.deals/gift-cards-group/playstation-network-card-eur-italy/",
+  JP: "https://gg.deals/gift-cards-group/playstation-network-card-jpy-japan/",
+  KR: "https://gg.deals/gift-cards-group/playstation-network-card-krw-korea/",
+  MX: "https://gg.deals/gift-cards-group/playstation-network-card-mxn-mexico/",
+  NO: "https://gg.deals/gift-cards-group/playstation-network-card-nok-norway/",
+  NZ: "https://gg.deals/gift-cards-group/playstation-network-card-nzd-new-zealand/",
+  PL: "https://gg.deals/gift-cards-group/playstation-network-card-pln-poland/",
+  SE: "https://gg.deals/gift-cards-group/playstation-network-card-sek-sweden/",
+  SG: "https://gg.deals/gift-cards-group/playstation-network-card-sgd-singapore/",
+  US: "https://gg.deals/gift-cards-group/playstation-network-card-usd-united-states/",
+  TR: "https://gg.deals/gift-cards-group/playstation-network-card-try-turkey/",
+  UA: "https://gg.deals/gift-cards-group/playstation-network-card-uah-ukraine/",
+  ZA: "https://gg.deals/gift-cards-group/playstation-network-card-zar-south-africa/",
 };
 const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
 const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -899,14 +900,17 @@ function isTaxfreeProductPage(parsedUrl: URL): boolean {
 function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
   return isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
-    isEpicGamesStoreProductUrl(parsedUrl.toString());
+    isEpicGamesStoreProductUrl(parsedUrl.toString()) ||
+    isMicrosoftStoreProductUrl(parsedUrl.toString());
 }
 
 function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return hostname === "vinmonopolet.no" ||
     hostname === "tax-free.no" ||
-    hostname === "store.epicgames.com";
+    hostname === "store.epicgames.com" ||
+    hostname === "xbox.com" ||
+    hostname === "apps.microsoft.com";
 }
 
 function readVinmonopoletProductName(parsedUrl: URL, h1: string | undefined): string | undefined {
@@ -2193,8 +2197,8 @@ function renderNotice(
       background: #2d2f42;
       color: #ffffff;
     }
-    .provider-gcdeals {
-      background: #341083;
+    .provider-ggdeals {
+      background: #111018;
       color: #ffffff;
     }
     .provider-psprices {
@@ -4638,7 +4642,7 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
 }
 function getRegionPriceSecondaryLink(
   regionPrice: PlayStationRegionPrice,
-): { label: string; provider: "gcdeals" | "psprices"; title: string; url: string } | undefined {
+): { label: string; provider: "ggdeals" | "psprices"; title: string; url: string } | undefined {
   if (regionPrice.region === "NO") {
     if (regionPrice.priceHistoryUrl === undefined) return undefined;
     return {
@@ -4649,9 +4653,9 @@ function getRegionPriceSecondaryLink(
     };
   }
   return {
-    label: "GC Deals",
-    provider: "gcdeals",
-    title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GC Deals`,
+    label: "GG Deals",
+    provider: "ggdeals",
+    title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GG Deals`,
     url: PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL,
   };
 }
@@ -4662,8 +4666,7 @@ function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): s
     "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
     "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
     "Regionraden åpner spillet i regional PlayStation Store.",
-    "GC Deals-chipen åpner PSN-gavekort i valgt region.",
-    "PSPrices-chipen åpner norsk prishistorikk.",
+    "GG Deals-chipen åpner PSN-gavekort i valgt region.",
     rateLine,
   ].join("\n");
 }

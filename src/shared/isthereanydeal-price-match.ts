@@ -57,6 +57,7 @@ type ItadPrice = {
 type ItadProductTarget = {
   pageContext: ItadPageContext;
   currentShopId: number;
+  dealScope?: "microsoft";
   productName?: string;
 };
 
@@ -74,6 +75,7 @@ const ISTHEREANYDEAL_SEARCH_GAMES_URL = `${ISTHEREANYDEAL_ORIGIN}/search/api/gam
 const MAX_ITAD_ALTERNATIVES = 8;
 const MAX_STEAM_PURCHASE_TARGETS = 8;
 const EPIC_GAME_STORE_SHOP_ID = 16;
+const MICROSOFT_STORE_SHOP_ID = 48;
 const STEAM_SHOP_ID = 61;
 const FALLBACK_ITAD_SHOP_IDS = [
   19, 2, 4, 13, 15, 52, 16, 67, 6, 17, 75, 20, 24, 25, 27, 28, 26, 29, 76,
@@ -92,9 +94,12 @@ export async function findIsthereanydealPriceMatch(
   const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
   const deals = readItadDeals(gameInfo, pageContext.shops)
     .filter((deal) => deal.currency === "NOK")
+    .filter((deal) => isItadDealInScope(deal, target.dealScope))
     .sort((first, second) => first.amount - second.amount);
   const bestDeal = deals[0];
   if (bestDeal === undefined) return undefined;
+  const matchedCurrentMerchant = deals.some((deal) => deal.shopId === target.currentShopId);
+  if (target.dealScope === "microsoft" && !matchedCurrentMerchant) return undefined;
 
   const productName = pageContext.title ?? target.productName ?? readGameProductName(message) ?? "PC-spill";
   const productUrl = pageContext.slug !== undefined
@@ -104,7 +109,7 @@ export async function findIsthereanydealPriceMatch(
   return {
     source: "isthereanydeal",
     sourceName: "IsThereAnyDeal",
-    matchedCurrentMerchant: deals.some((deal) => deal.shopId === target.currentShopId),
+    matchedCurrentMerchant,
     shopName: bestDeal.shopName,
     amount: bestDeal.amount,
     sortAmount: bestDeal.amount,
@@ -117,7 +122,13 @@ export async function findIsthereanydealPriceMatch(
 }
 
 export function isItadGameStoreProductUrl(rawUrl: string | undefined): boolean {
-  return isSteamAppProductUrl(rawUrl) || isEpicGamesStoreProductUrl(rawUrl);
+  return isSteamAppProductUrl(rawUrl) ||
+    isEpicGamesStoreProductUrl(rawUrl) ||
+    isMicrosoftStoreProductUrl(rawUrl);
+}
+
+export function isMicrosoftStoreProductUrl(rawUrl: string | undefined): boolean {
+  return readMicrosoftStoreProductTarget(rawUrl) !== undefined;
 }
 
 export function isEpicGamesStoreProductUrl(rawUrl: string | undefined): boolean {
@@ -134,7 +145,8 @@ async function resolveItadProductTarget(
   requestText: TextRequest,
 ): Promise<ItadProductTarget | undefined> {
   return await resolveSteamItadProductTarget(message, requestJson, requestText) ??
-    await resolveEpicItadProductTarget(message, requestJson, requestText);
+    await resolveEpicItadProductTarget(message, requestJson, requestText) ??
+    await resolveMicrosoftStoreItadProductTarget(message, requestJson, requestText);
 }
 
 async function resolveSteamItadProductTarget(
@@ -178,26 +190,66 @@ async function resolveEpicItadProductTarget(
   const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
   if (epicSlug === undefined) return undefined;
 
-  const titleCandidates = readGameTitleCandidates(message, epicSlug);
-  const directContext = await fetchItadPageContext(itadGameInfoUrl(epicSlug), requestText);
-  if (directContext !== undefined && isItadGameContextLikelyMatch(directContext, titleCandidates, epicSlug)) {
-    return {
-      pageContext: directContext,
-      currentShopId: EPIC_GAME_STORE_SHOP_ID,
-      ...(titleCandidates[0] !== undefined ? { productName: titleCandidates[0] } : {}),
-    };
+  return resolveSearchableItadProductTarget({
+    message,
+    requestJson,
+    requestText,
+    currentShopId: EPIC_GAME_STORE_SHOP_ID,
+    slug: epicSlug,
+  });
+}
+
+async function resolveMicrosoftStoreItadProductTarget(
+  message: GetPriceMatchForProductMessage,
+  requestJson: JsonRequest,
+  requestText: TextRequest,
+): Promise<ItadProductTarget | undefined> {
+  const productTarget = readMicrosoftStoreProductTarget(message.url) ?? readMicrosoftStoreProductTarget(message.productUrl);
+  if (productTarget === undefined) return undefined;
+
+  return resolveSearchableItadProductTarget({
+    message,
+    requestJson,
+    requestText,
+    currentShopId: MICROSOFT_STORE_SHOP_ID,
+    dealScope: "microsoft",
+    ...(productTarget.slug !== undefined ? { slug: productTarget.slug } : {}),
+  });
+}
+
+async function resolveSearchableItadProductTarget(input: {
+  message: GetPriceMatchForProductMessage;
+  requestJson: JsonRequest;
+  requestText: TextRequest;
+  currentShopId: number;
+  slug?: string;
+  dealScope?: ItadProductTarget["dealScope"];
+}): Promise<ItadProductTarget | undefined> {
+  const { message, requestJson, requestText, currentShopId, slug, dealScope } = input;
+  const titleCandidates = readGameTitleCandidates(message, slug);
+  if (slug !== undefined) {
+    const directContext = await fetchItadPageContext(itadGameInfoUrl(slug), requestText);
+    if (directContext !== undefined && isItadGameContextLikelyMatch(directContext, titleCandidates, slug)) {
+      return {
+        pageContext: directContext,
+        currentShopId,
+        ...(dealScope !== undefined ? { dealScope } : {}),
+        ...(titleCandidates[0] !== undefined ? { productName: titleCandidates[0] } : {}),
+      };
+    }
   }
 
   for (const query of titleCandidates) {
     const games = await fetchItadSearchGames(query, requestJson);
-    const game = chooseBestItadSearchGame(games, query, epicSlug);
+    const game = chooseBestItadSearchGame(games, query, slug);
     if (game === undefined) continue;
 
     const pageContext = await fetchItadPageContext(itadGameInfoUrl(game.slug), requestText);
-    if (pageContext !== undefined && isItadGameContextLikelyMatch(pageContext, titleCandidates, epicSlug)) {
+    if (pageContext !== undefined && isItadGameContextLikelyMatch(pageContext, titleCandidates, slug)) {
       return {
         pageContext,
-        currentShopId: EPIC_GAME_STORE_SHOP_ID,
+        currentShopId,
+        ...(dealScope !== undefined ? { dealScope } : {}),
         productName: game.title,
       };
     }
@@ -236,6 +288,48 @@ function parseEpicGamesProductSlug(rawUrl: string | undefined): string | undefin
   } catch {
     return undefined;
   }
+}
+
+function readMicrosoftStoreProductTarget(rawUrl: string | undefined): { slug?: string } | undefined {
+  if (rawUrl === undefined) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    const segments = url.pathname.split("/").filter((segment) => segment.length > 0);
+
+    if (hostname === "xbox.com" || hostname === "www.xbox.com") {
+      const storeIndex = segments.findIndex((segment, index) => {
+        return segment.toLowerCase() === "store" && segments[index - 1]?.toLowerCase() === "games";
+      });
+      const rawSlug = storeIndex >= 0 ? segments[storeIndex + 1] : undefined;
+      const productId = storeIndex >= 0 ? segments[storeIndex + 2] : undefined;
+      if (!isMicrosoftStoreProductId(productId)) return undefined;
+
+      const slug = rawSlug !== undefined ? normalizeSlug(decodeURIComponent(rawSlug)) : undefined;
+      return slug !== undefined && slug.length > 0 ? { slug } : {};
+    }
+
+    if (hostname === "apps.microsoft.com") {
+      const detailIndex = segments.findIndex((segment) => segment.toLowerCase() === "detail");
+      if (detailIndex < 0) return undefined;
+
+      const firstDetailSegment = segments[detailIndex + 1];
+      const secondDetailSegment = segments[detailIndex + 2];
+      if (isMicrosoftStoreProductId(firstDetailSegment)) return {};
+      if (!isMicrosoftStoreProductId(secondDetailSegment)) return undefined;
+
+      const slug = firstDetailSegment !== undefined ? normalizeSlug(decodeURIComponent(firstDetailSegment)) : undefined;
+      return slug !== undefined && slug.length > 0 ? { slug } : {};
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isMicrosoftStoreProductId(value: string | undefined): boolean {
+  return value !== undefined && /^[a-z0-9]{8,}$/i.test(value);
 }
 
 async function fetchAugmentedSteamPrices(
@@ -371,13 +465,13 @@ function readItadSearchGames(value: unknown): ItadSearchGame[] {
 function chooseBestItadSearchGame(
   games: ItadSearchGame[],
   query: string,
-  expectedSlug: string,
+  expectedSlug?: string,
 ): ItadSearchGame | undefined {
-  const expectedSlugKey = normalizeSlug(expectedSlug);
+  const expectedSlugKey = expectedSlug !== undefined ? normalizeSlug(expectedSlug) : undefined;
   return games
     .map((game, index) => {
       const slugKey = normalizeSlug(game.slug);
-      const exactSlugScore = slugKey === expectedSlugKey ? 1.25 : 0;
+      const exactSlugScore = expectedSlugKey !== undefined && slugKey === expectedSlugKey ? 1.25 : 0;
       const titleScore = scoreProductTitleAgainstSearchTerm(query, game.title);
       const slugScore = scoreProductTitleAgainstSearchTerm(query, humanizeSlug(game.slug));
       const typeBonus = game.type === 1 ? 0.04 : game.type === 2 ? 0.02 : 0;
@@ -394,9 +488,9 @@ function chooseBestItadSearchGame(
 function isItadGameContextLikelyMatch(
   pageContext: ItadPageContext,
   titleCandidates: string[],
-  expectedSlug: string,
+  expectedSlug?: string,
 ): boolean {
-  if (pageContext.slug !== undefined && normalizeSlug(pageContext.slug) === normalizeSlug(expectedSlug)) {
+  if (expectedSlug !== undefined && pageContext.slug !== undefined && normalizeSlug(pageContext.slug) === normalizeSlug(expectedSlug)) {
     return true;
   }
   if (pageContext.title === undefined) return false;
@@ -580,6 +674,21 @@ function readItadDeals(value: unknown, shops: Map<number, string>): ItadDeal[] {
   return value.deals
     .map((deal) => readItadDeal(deal, shops))
     .filter((deal): deal is ItadDeal => deal !== undefined);
+}
+
+function isItadDealInScope(deal: ItadDeal, scope: ItadProductTarget["dealScope"]): boolean {
+  if (scope === undefined) return true;
+  if (scope === "microsoft") return isMicrosoftStoreDeal(deal);
+  return true;
+}
+
+function isMicrosoftStoreDeal(deal: ItadDeal): boolean {
+  if (deal.shopId === MICROSOFT_STORE_SHOP_ID) return true;
+
+  const platform = deal.platform?.toLowerCase() ?? "";
+  return platform.includes("microsoft") ||
+    platform.includes("xbox") ||
+    platform.includes("windows");
 }
 
 function hasNokDeal(value: unknown): boolean {

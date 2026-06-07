@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780825826
+// @version      1780826510
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -854,6 +854,7 @@
   const MAX_ITAD_ALTERNATIVES = 8;
   const MAX_STEAM_PURCHASE_TARGETS = 8;
   const EPIC_GAME_STORE_SHOP_ID = 16;
+  const MICROSOFT_STORE_SHOP_ID = 48;
   const STEAM_SHOP_ID = 61;
   const FALLBACK_ITAD_SHOP_IDS = [
     19,
@@ -896,15 +897,17 @@
     if (target === void 0) return void 0;
     const pageContext = target.pageContext;
     const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
-    const deals = readItadDeals(gameInfo, pageContext.shops).filter((deal) => deal.currency === "NOK").sort((first, second) => first.amount - second.amount);
+    const deals = readItadDeals(gameInfo, pageContext.shops).filter((deal) => deal.currency === "NOK").filter((deal) => isItadDealInScope(deal, target.dealScope)).sort((first, second) => first.amount - second.amount);
     const bestDeal = deals[0];
     if (bestDeal === void 0) return void 0;
+    const matchedCurrentMerchant = deals.some((deal) => deal.shopId === target.currentShopId);
+    if (target.dealScope === "microsoft" && !matchedCurrentMerchant) return void 0;
     const productName = pageContext.title ?? target.productName ?? readGameProductName(message) ?? "PC-spill";
     const productUrl = pageContext.slug !== void 0 ? `${ISTHEREANYDEAL_ORIGIN}/game/${pageContext.slug}/info/` : pageContext.infoUrl;
     return {
       source: "isthereanydeal",
       sourceName: "IsThereAnyDeal",
-      matchedCurrentMerchant: deals.some((deal) => deal.shopId === target.currentShopId),
+      matchedCurrentMerchant,
       shopName: bestDeal.shopName,
       amount: bestDeal.amount,
       sortAmount: bestDeal.amount,
@@ -916,7 +919,10 @@
     };
   }
   function isItadGameStoreProductUrl(rawUrl) {
-    return isSteamAppProductUrl(rawUrl) || isEpicGamesStoreProductUrl(rawUrl);
+    return isSteamAppProductUrl(rawUrl) || isEpicGamesStoreProductUrl(rawUrl) || isMicrosoftStoreProductUrl(rawUrl);
+  }
+  function isMicrosoftStoreProductUrl(rawUrl) {
+    return readMicrosoftStoreProductTarget(rawUrl) !== void 0;
   }
   function isEpicGamesStoreProductUrl(rawUrl) {
     return parseEpicGamesProductSlug(rawUrl) !== void 0;
@@ -925,7 +931,7 @@
     return parseSteamAppId(rawUrl) !== void 0;
   }
   async function resolveItadProductTarget(message, requestJson, requestText) {
-    return await resolveSteamItadProductTarget(message, requestJson, requestText) ?? await resolveEpicItadProductTarget(message, requestJson, requestText);
+    return await resolveSteamItadProductTarget(message, requestJson, requestText) ?? await resolveEpicItadProductTarget(message, requestJson, requestText) ?? await resolveMicrosoftStoreItadProductTarget(message, requestJson, requestText);
   }
   async function resolveSteamItadProductTarget(message, requestJson, requestText) {
     const appId = parseSteamAppId(message.url) ?? parseSteamAppId(message.productUrl);
@@ -955,24 +961,50 @@
   async function resolveEpicItadProductTarget(message, requestJson, requestText) {
     const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
     if (epicSlug === void 0) return void 0;
-    const titleCandidates = readGameTitleCandidates(message, epicSlug);
-    const directContext = await fetchItadPageContext(itadGameInfoUrl(epicSlug), requestText);
-    if (directContext !== void 0 && isItadGameContextLikelyMatch(directContext, titleCandidates, epicSlug)) {
-      return {
-        pageContext: directContext,
-        currentShopId: EPIC_GAME_STORE_SHOP_ID,
-        ...titleCandidates[0] !== void 0 ? { productName: titleCandidates[0] } : {}
-      };
+    return resolveSearchableItadProductTarget({
+      message,
+      requestJson,
+      requestText,
+      currentShopId: EPIC_GAME_STORE_SHOP_ID,
+      slug: epicSlug
+    });
+  }
+  async function resolveMicrosoftStoreItadProductTarget(message, requestJson, requestText) {
+    const productTarget = readMicrosoftStoreProductTarget(message.url) ?? readMicrosoftStoreProductTarget(message.productUrl);
+    if (productTarget === void 0) return void 0;
+    return resolveSearchableItadProductTarget({
+      message,
+      requestJson,
+      requestText,
+      currentShopId: MICROSOFT_STORE_SHOP_ID,
+      dealScope: "microsoft",
+      ...productTarget.slug !== void 0 ? { slug: productTarget.slug } : {}
+    });
+  }
+  async function resolveSearchableItadProductTarget(input) {
+    const { message, requestJson, requestText, currentShopId, slug, dealScope } = input;
+    const titleCandidates = readGameTitleCandidates(message, slug);
+    if (slug !== void 0) {
+      const directContext = await fetchItadPageContext(itadGameInfoUrl(slug), requestText);
+      if (directContext !== void 0 && isItadGameContextLikelyMatch(directContext, titleCandidates, slug)) {
+        return {
+          pageContext: directContext,
+          currentShopId,
+          ...dealScope !== void 0 ? { dealScope } : {},
+          ...titleCandidates[0] !== void 0 ? { productName: titleCandidates[0] } : {}
+        };
+      }
     }
     for (const query of titleCandidates) {
       const games = await fetchItadSearchGames(query, requestJson);
-      const game = chooseBestItadSearchGame(games, query, epicSlug);
+      const game = chooseBestItadSearchGame(games, query, slug);
       if (game === void 0) continue;
       const pageContext = await fetchItadPageContext(itadGameInfoUrl(game.slug), requestText);
-      if (pageContext !== void 0 && isItadGameContextLikelyMatch(pageContext, titleCandidates, epicSlug)) {
+      if (pageContext !== void 0 && isItadGameContextLikelyMatch(pageContext, titleCandidates, slug)) {
         return {
           pageContext,
-          currentShopId: EPIC_GAME_STORE_SHOP_ID,
+          currentShopId,
+          ...dealScope !== void 0 ? { dealScope } : {},
           productName: game.title
         };
       }
@@ -1005,6 +1037,40 @@
     } catch {
       return void 0;
     }
+  }
+  function readMicrosoftStoreProductTarget(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+      const segments = url.pathname.split("/").filter((segment) => segment.length > 0);
+      if (hostname === "xbox.com" || hostname === "www.xbox.com") {
+        const storeIndex = segments.findIndex((segment, index) => {
+          return segment.toLowerCase() === "store" && segments[index - 1]?.toLowerCase() === "games";
+        });
+        const rawSlug = storeIndex >= 0 ? segments[storeIndex + 1] : void 0;
+        const productId = storeIndex >= 0 ? segments[storeIndex + 2] : void 0;
+        if (!isMicrosoftStoreProductId(productId)) return void 0;
+        const slug = rawSlug !== void 0 ? normalizeSlug(decodeURIComponent(rawSlug)) : void 0;
+        return slug !== void 0 && slug.length > 0 ? { slug } : {};
+      }
+      if (hostname === "apps.microsoft.com") {
+        const detailIndex = segments.findIndex((segment) => segment.toLowerCase() === "detail");
+        if (detailIndex < 0) return void 0;
+        const firstDetailSegment = segments[detailIndex + 1];
+        const secondDetailSegment = segments[detailIndex + 2];
+        if (isMicrosoftStoreProductId(firstDetailSegment)) return {};
+        if (!isMicrosoftStoreProductId(secondDetailSegment)) return void 0;
+        const slug = firstDetailSegment !== void 0 ? normalizeSlug(decodeURIComponent(firstDetailSegment)) : void 0;
+        return slug !== void 0 && slug.length > 0 ? { slug } : {};
+      }
+      return void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function isMicrosoftStoreProductId(value) {
+    return value !== void 0 && /^[a-z0-9]{8,}$/i.test(value);
   }
   async function fetchAugmentedSteamPrices(targets, requestJson) {
     if (targets.length === 0) return void 0;
@@ -1100,10 +1166,10 @@
     }).filter((game) => game !== void 0);
   }
   function chooseBestItadSearchGame(games, query, expectedSlug) {
-    const expectedSlugKey = normalizeSlug(expectedSlug);
+    const expectedSlugKey = expectedSlug !== void 0 ? normalizeSlug(expectedSlug) : void 0;
     return games.map((game, index) => {
       const slugKey = normalizeSlug(game.slug);
-      const exactSlugScore = slugKey === expectedSlugKey ? 1.25 : 0;
+      const exactSlugScore = expectedSlugKey !== void 0 && slugKey === expectedSlugKey ? 1.25 : 0;
       const titleScore = scoreProductTitleAgainstSearchTerm(query, game.title);
       const slugScore = scoreProductTitleAgainstSearchTerm(query, humanizeSlug(game.slug));
       const typeBonus = game.type === 1 ? 0.04 : game.type === 2 ? 0.02 : 0;
@@ -1115,7 +1181,7 @@
     }).filter(({ exactSlugScore, score }) => exactSlugScore > 0 || score >= 0.55).sort((first, second) => second.score - first.score)[0]?.game;
   }
   function isItadGameContextLikelyMatch(pageContext, titleCandidates, expectedSlug) {
-    if (pageContext.slug !== void 0 && normalizeSlug(pageContext.slug) === normalizeSlug(expectedSlug)) {
+    if (expectedSlug !== void 0 && pageContext.slug !== void 0 && normalizeSlug(pageContext.slug) === normalizeSlug(expectedSlug)) {
       return true;
     }
     if (pageContext.title === void 0) return false;
@@ -1235,6 +1301,16 @@
   function readItadDeals(value, shops) {
     if (!isRecord$3(value) || !Array.isArray(value.deals)) return [];
     return value.deals.map((deal) => readItadDeal(deal, shops)).filter((deal) => deal !== void 0);
+  }
+  function isItadDealInScope(deal, scope) {
+    if (scope === void 0) return true;
+    if (scope === "microsoft") return isMicrosoftStoreDeal(deal);
+    return true;
+  }
+  function isMicrosoftStoreDeal(deal) {
+    if (deal.shopId === MICROSOFT_STORE_SHOP_ID) return true;
+    const platform = deal.platform?.toLowerCase() ?? "";
+    return platform.includes("microsoft") || platform.includes("xbox") || platform.includes("windows");
   }
   function hasNokDeal(value) {
     if (!isRecord$3(value) || !Array.isArray(value.deals)) return false;
@@ -5431,33 +5507,33 @@ query SearchSuggestions($query: String!, $category: Int) {
   const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
   const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
-  const PSN_GIFT_CARD_DEALS_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
+  const PSN_GIFT_CARD_DEALS_URL = "https://gg.deals/gift-cards-group/playstation-network-card-nok-norway/";
   const PSN_GIFT_CARD_REGION_URLS = {
-    AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
-    BR: "https://gcdeals.net/no/group/15/playstation-network-cards-brl-brazil",
-    CA: "https://gcdeals.net/no/group/16/playstation-network-cards-cad-canada",
-    CH: "https://gcdeals.net/no/group/10/playstation-network-cards-chf-switzerland",
-    DE: "https://gcdeals.net/no/group/3/playstation-network-cards-eur-germany",
-    DK: "https://gcdeals.net/no/group/515/playstation-network-gift-cards-dkk-denmark",
-    ES: "https://gcdeals.net/no/group/11/playstation-network-cards-eur-spain",
-    FI: "https://gcdeals.net/no/group/5/playstation-network-cards-eur-finland",
-    FR: "https://gcdeals.net/no/group/8/playstation-network-cards-eur-france",
-    GB: "https://gcdeals.net/no/group/2/playstation-network-cards-gbp-united-kingdom",
-    HK: "https://gcdeals.net/no/group/22/playstation-network-cards-hkd-hong-kong",
-    IN: "https://gcdeals.net/no/group/518/playstation-network-gift-cards-inr-india",
-    IT: "https://gcdeals.net/no/group/6/playstation-network-cards-eur-italy",
-    JP: "https://gcdeals.net/no/group/28/playstation-network-cards-jpy-japan",
-    KR: "https://gcdeals.net/no/group/1021/playstation-network-gift-cards-nok-south-korea",
-    MX: "https://gcdeals.net/no/group/32/playstation-network-cards-usd-mexico",
-    NO: "https://gcdeals.net/no/group/9/playstation-network-cards-nok-norway",
-    NZ: "https://gcdeals.net/no/group/34/playstation-network-cards-nzd-new-zealand",
-    PL: "https://gcdeals.net/no/group/4/playstation-network-cards-pln-poland",
-    SE: "https://gcdeals.net/no/group/522/playstation-network-gift-cards-sek-sweden",
-    SG: "https://gcdeals.net/no/group/41/playstation-network-cards-sgd-singapore",
-    US: "https://gcdeals.net/no/group/1/playstation-network-cards-usd-united-states",
-    TR: "https://gcdeals.net/no/group/1050/playstation-network-gift-cards-try-turkey",
-    UA: "https://gcdeals.net/no/group/1078/playstation-network-gift-cards-uah-ukraine",
-    ZA: "https://gcdeals.net/no/group/43/playstation-network-cards-zar-south-africa"
+    AU: "https://gg.deals/gift-cards-group/playstation-network-card-aud-australia/",
+    BR: "https://gg.deals/gift-cards-group/playstation-network-card-brl-brazil/",
+    CA: "https://gg.deals/gift-cards-group/playstation-network-card-cad-canada/",
+    CH: "https://gg.deals/gift-cards-group/playstation-network-card-chf-switzerland/",
+    DE: "https://gg.deals/gift-cards-group/playstation-network-card-eur-germany/",
+    DK: "https://gg.deals/gift-cards-group/playstation-network-card-dkk-denmark/",
+    ES: "https://gg.deals/gift-cards-group/playstation-network-card-eur-spain/",
+    FI: "https://gg.deals/gift-cards-group/playstation-network-card-eur-finland/",
+    FR: "https://gg.deals/gift-cards-group/playstation-network-card-eur-france/",
+    GB: "https://gg.deals/gift-cards-group/playstation-network-card-gbp-united-kingdom/",
+    HK: "https://gg.deals/gift-cards-group/playstation-network-card-hkd-hong-kong/",
+    IN: "https://gg.deals/gift-cards-group/playstation-network-card-inr-india/",
+    IT: "https://gg.deals/gift-cards-group/playstation-network-card-eur-italy/",
+    JP: "https://gg.deals/gift-cards-group/playstation-network-card-jpy-japan/",
+    KR: "https://gg.deals/gift-cards-group/playstation-network-card-krw-korea/",
+    MX: "https://gg.deals/gift-cards-group/playstation-network-card-mxn-mexico/",
+    NO: "https://gg.deals/gift-cards-group/playstation-network-card-nok-norway/",
+    NZ: "https://gg.deals/gift-cards-group/playstation-network-card-nzd-new-zealand/",
+    PL: "https://gg.deals/gift-cards-group/playstation-network-card-pln-poland/",
+    SE: "https://gg.deals/gift-cards-group/playstation-network-card-sek-sweden/",
+    SG: "https://gg.deals/gift-cards-group/playstation-network-card-sgd-singapore/",
+    US: "https://gg.deals/gift-cards-group/playstation-network-card-usd-united-states/",
+    TR: "https://gg.deals/gift-cards-group/playstation-network-card-try-turkey/",
+    UA: "https://gg.deals/gift-cards-group/playstation-network-card-uah-ukraine/",
+    ZA: "https://gg.deals/gift-cards-group/playstation-network-card-zar-south-africa/"
   };
   const ACTIVATED_OFFERS_STORAGE_KEY = "cashback-varsler-activated-offers";
   const OFFER_ACTIVATION_TTL_MS = 2 * 60 * 60 * 1e3;
@@ -5902,11 +5978,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(parsedUrl.pathname);
   }
   function isDynamicPriceMatchProductPage(parsedUrl) {
-    return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString());
+    return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString());
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com";
+    return hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
@@ -6957,8 +7033,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       background: #2d2f42;
       color: #ffffff;
     }
-    .provider-gcdeals {
-      background: #341083;
+    .provider-ggdeals {
+      background: #111018;
       color: #ffffff;
     }
     .provider-psprices {
@@ -9230,9 +9306,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       };
     }
     return {
-      label: "GC Deals",
-      provider: "gcdeals",
-      title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GC Deals`,
+      label: "GG Deals",
+      provider: "ggdeals",
+      title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GG Deals`,
       url: PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL
     };
   }
@@ -9243,8 +9319,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
       "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
       "Regionraden åpner spillet i regional PlayStation Store.",
-      "GC Deals-chipen åpner PSN-gavekort i valgt region.",
-      "PSPrices-chipen åpner norsk prishistorikk.",
+      "GG Deals-chipen åpner PSN-gavekort i valgt region.",
       rateLine
     ].join("\n");
   }
