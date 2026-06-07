@@ -68,7 +68,6 @@ type ItadSearchGame = {
 };
 
 const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
-const GG_DEALS_ORIGIN = "https://gg.deals";
 const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
 const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
 const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
@@ -119,16 +118,6 @@ export async function findIsthereanydealPriceMatch(
     productName,
     productUrl,
     alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative),
-    ...(pageContext.slug !== undefined
-      ? {
-          relatedLinks: [{
-            label: "GG Deals",
-            provider: "ggdeals",
-            title: "Åpne spillet hos GG Deals",
-            url: `${GG_DEALS_ORIGIN}/game/${pageContext.slug}/`,
-          }],
-        }
-      : {}),
   };
 }
 

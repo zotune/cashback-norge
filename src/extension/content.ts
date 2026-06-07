@@ -245,13 +245,6 @@ type PriceMatchOffer = {
   productUrl: string;
   offerUrl?: string;
   alternatives?: PriceMatchAlternative[];
-  relatedLinks?: PriceMatchRelatedLink[];
-};
-type PriceMatchRelatedLink = {
-  label: string;
-  url: string;
-  provider?: "ggdeals";
-  title?: string;
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -2639,23 +2632,6 @@ function renderNotice(
       padding: 6px 9px;
       text-decoration: none;
     }
-    .price-match-title,
-    .price-match-price {
-      color: inherit;
-      text-decoration: none;
-    }
-    .price-match-badges {
-      align-items: center;
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      justify-content: flex-end;
-      min-width: 0;
-    }
-    .price-match-badges .provider-badge {
-      text-decoration: none;
-      white-space: nowrap;
-    }
     .region-price-card {
       grid-template-columns: minmax(0, 1fr) auto;
     }
@@ -4344,17 +4320,7 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     typeof value.productName === "string" &&
     typeof value.productUrl === "string" &&
     (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
-    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative))) &&
-    (value.relatedLinks === undefined || (Array.isArray(value.relatedLinks) && value.relatedLinks.every(isPriceMatchRelatedLink)))
-  );
-}
-function isPriceMatchRelatedLink(value: unknown): value is PriceMatchRelatedLink {
-  return (
-    isRecord(value) &&
-    typeof value.label === "string" &&
-    typeof value.url === "string" &&
-    (value.provider === undefined || value.provider === "ggdeals") &&
-    (value.title === undefined || typeof value.title === "string")
+    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)))
   );
 }
 function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative {
@@ -4606,16 +4572,16 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "points") return 1;
   return 0;
 }
-function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLDivElement {
-  const priceMatchCard = document.createElement("div");
+function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
+  const priceMatchCard = document.createElement("a");
   priceMatchCard.className = "price-match-card";
   if (isBest) priceMatchCard.classList.add("price-match-card--best");
+  priceMatchCard.href = priceMatch.productUrl;
+  priceMatchCard.target = "_blank";
+  priceMatchCard.rel = "noreferrer";
 
-  const priceMatchTitle = document.createElement("a");
+  const priceMatchTitle = document.createElement("span");
   priceMatchTitle.className = "price-match-title";
-  priceMatchTitle.href = priceMatch.productUrl;
-  priceMatchTitle.target = "_blank";
-  priceMatchTitle.rel = "noreferrer";
   const priceMatchProduct = document.createElement("span");
   priceMatchProduct.className = "price-match-product";
   priceMatchProduct.textContent = priceMatch.productName;
@@ -4624,38 +4590,15 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLD
   priceMatchShop.textContent = priceMatch.shopName;
   priceMatchTitle.append(priceMatchProduct, priceMatchShop);
 
-  const priceMatchPrice = document.createElement("a");
+  const priceMatchPrice = document.createElement("span");
   priceMatchPrice.className = "price-match-price";
-  priceMatchPrice.href = priceMatch.productUrl;
-  priceMatchPrice.target = "_blank";
-  priceMatchPrice.rel = "noreferrer";
   priceMatchPrice.textContent = priceMatch.price;
 
-  const priceMatchBadges = document.createElement("span");
-  priceMatchBadges.className = "price-match-badges";
-  const priceMatchBadge = document.createElement("a");
+  const priceMatchBadge = document.createElement("span");
   priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
-  priceMatchBadge.href = priceMatch.productUrl;
-  priceMatchBadge.target = "_blank";
-  priceMatchBadge.rel = "noreferrer";
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-  priceMatchBadges.append(priceMatchBadge, ...buildPriceMatchRelatedLinkBadges(priceMatch));
-  priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadges);
+  priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
   return priceMatchCard;
-}
-function buildPriceMatchRelatedLinkBadges(priceMatch: PriceMatchOffer): HTMLAnchorElement[] {
-  return (priceMatch.relatedLinks ?? []).map((link) => {
-    const badge = document.createElement("a");
-    badge.className = `provider-badge provider-${link.provider ?? "prisjakt"}`;
-    badge.href = link.url;
-    badge.target = "_blank";
-    badge.rel = "noreferrer";
-    badge.textContent = link.label;
-    if (link.title !== undefined) {
-      badge.title = link.title;
-    }
-    return badge;
-  });
 }
 function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = false): HTMLDivElement {
   const regionPriceCard = document.createElement("div");

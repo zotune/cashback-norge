@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780826891
+// @version      1780830242
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -847,7 +847,6 @@
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
-  const GG_DEALS_ORIGIN = "https://gg.deals";
   const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
   const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
   const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
@@ -916,15 +915,7 @@
       price: bestDeal.price,
       productName,
       productUrl,
-      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative),
-      ...pageContext.slug !== void 0 ? {
-        relatedLinks: [{
-          label: "GG Deals",
-          provider: "ggdeals",
-          title: "Åpne spillet hos GG Deals",
-          url: `${GG_DEALS_ORIGIN}/game/${pageContext.slug}/`
-        }]
-      } : {}
+      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative)
     };
   }
   function isItadGameStoreProductUrl(rawUrl) {
@@ -7477,23 +7468,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 6px 9px;
       text-decoration: none;
     }
-    .price-match-title,
-    .price-match-price {
-      color: inherit;
-      text-decoration: none;
-    }
-    .price-match-badges {
-      align-items: center;
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      justify-content: flex-end;
-      min-width: 0;
-    }
-    .price-match-badges .provider-badge {
-      text-decoration: none;
-      white-space: nowrap;
-    }
     .region-price-card {
       grid-template-columns: minmax(0, 1fr) auto;
     }
@@ -9071,10 +9045,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)) && (value.relatedLinks === void 0 || Array.isArray(value.relatedLinks) && value.relatedLinks.every(isPriceMatchRelatedLink));
-  }
-  function isPriceMatchRelatedLink(value) {
-    return isRecord(value) && typeof value.label === "string" && typeof value.url === "string" && (value.provider === void 0 || value.provider === "ggdeals") && (value.title === void 0 || typeof value.title === "string");
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -9262,14 +9233,14 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return 0;
   }
   function buildPriceMatchCard(priceMatch, isBest = false) {
-    const priceMatchCard = document.createElement("div");
+    const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "price-match-card";
     if (isBest) priceMatchCard.classList.add("price-match-card--best");
-    const priceMatchTitle = document.createElement("a");
+    priceMatchCard.href = priceMatch.productUrl;
+    priceMatchCard.target = "_blank";
+    priceMatchCard.rel = "noreferrer";
+    const priceMatchTitle = document.createElement("span");
     priceMatchTitle.className = "price-match-title";
-    priceMatchTitle.href = priceMatch.productUrl;
-    priceMatchTitle.target = "_blank";
-    priceMatchTitle.rel = "noreferrer";
     const priceMatchProduct = document.createElement("span");
     priceMatchProduct.className = "price-match-product";
     priceMatchProduct.textContent = priceMatch.productName;
@@ -9277,37 +9248,14 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     priceMatchShop.className = "price-match-shop";
     priceMatchShop.textContent = priceMatch.shopName;
     priceMatchTitle.append(priceMatchProduct, priceMatchShop);
-    const priceMatchPrice = document.createElement("a");
+    const priceMatchPrice = document.createElement("span");
     priceMatchPrice.className = "price-match-price";
-    priceMatchPrice.href = priceMatch.productUrl;
-    priceMatchPrice.target = "_blank";
-    priceMatchPrice.rel = "noreferrer";
     priceMatchPrice.textContent = priceMatch.price;
-    const priceMatchBadges = document.createElement("span");
-    priceMatchBadges.className = "price-match-badges";
-    const priceMatchBadge = document.createElement("a");
+    const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
-    priceMatchBadge.href = priceMatch.productUrl;
-    priceMatchBadge.target = "_blank";
-    priceMatchBadge.rel = "noreferrer";
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-    priceMatchBadges.append(priceMatchBadge, ...buildPriceMatchRelatedLinkBadges(priceMatch));
-    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadges);
+    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
     return priceMatchCard;
-  }
-  function buildPriceMatchRelatedLinkBadges(priceMatch) {
-    return (priceMatch.relatedLinks ?? []).map((link) => {
-      const badge = document.createElement("a");
-      badge.className = `provider-badge provider-${link.provider ?? "prisjakt"}`;
-      badge.href = link.url;
-      badge.target = "_blank";
-      badge.rel = "noreferrer";
-      badge.textContent = link.label;
-      if (link.title !== void 0) {
-        badge.title = link.title;
-      }
-      return badge;
-    });
   }
   function buildRegionPriceCard(regionPrice, isBest = false) {
     const regionPriceCard = document.createElement("div");
