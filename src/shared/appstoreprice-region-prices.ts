@@ -67,20 +67,24 @@ const APPSTOREPRICE_DOMAIN_SEARCH_ALIASES: Record<string, string[]> = {
   "chatgpt.com": ["chatgpt", "openai chatgpt"],
   "claude.ai": ["claude", "anthropic claude"],
   "firecore.com": ["firecore", "infuse"],
+  "github.com": ["github"],
   "netflix.com": ["netflix"],
   "soundcloud.com": ["soundcloud"],
   "twitter.com": ["x", "twitter"],
   "x.com": ["x", "twitter"],
+  "youtube.com": ["youtube", "youtube premium"],
 };
 
 const APPSTOREPRICE_ALWAYS_TRY_DOMAINS = new Set([
   "chatgpt.com",
   "claude.ai",
   "firecore.com",
+  "github.com",
   "netflix.com",
   "soundcloud.com",
   "twitter.com",
   "x.com",
+  "youtube.com",
 ]);
 
 const APPSTOREPRICE_DOMAIN_RESOLVER_EXCLUDED_DOMAINS = new Set([
@@ -90,7 +94,6 @@ const APPSTOREPRICE_DOMAIN_RESOLVER_EXCLUDED_DOMAINS = new Set([
   "microsoft.com",
   "playstation.com",
   "store.playstation.com",
-  "youtube.com",
 ]);
 
 const APPSTOREPRICE_COUNTRIES: Record<string, AppStorePriceCountry> = {
@@ -179,8 +182,11 @@ export async function findAppStorePriceRegionPricesForUrl(
     return undefined;
   }
 
-  const subscriptions = extractAppStorePriceSubscriptions(html)
-    .filter((entry) => hasPositiveAppStorePrice(entry) && hasSupportedAppStorePriceDuration(entry));
+  const subscriptions = filterAppStorePriceSubscriptions(
+    extractAppStorePriceSubscriptions(html)
+      .filter((entry) => hasPositiveAppStorePrice(entry) && hasSupportedAppStorePriceDuration(entry)),
+    config,
+  );
   const subscription = selectDefaultAppStorePriceSubscription(subscriptions, config);
   if (subscription === undefined || subscription.prices.length === 0) {
     return undefined;
@@ -199,14 +205,15 @@ export async function findAppStorePriceRegionPricesForUrl(
   ];
   const availablePlanNames = uniquePlanNames(comparableSubscriptions.map(formatSubscriptionPlanLabel))
     .slice(0, MAX_APPSTOREPRICE_TOOLTIP_PLANS);
+  const selectedPlanName = formatSubscriptionPlanLabel(subscription);
+  const selectedRows = buildMergedAppStorePricePlanRows(comparableSubscriptions, selectedPlanName);
   const planAlternativesByRegion = buildAppStorePricePlanAlternativesByRegion(
     comparableSubscriptions,
     rates,
-    subscription.prices.map((row) => row.region.toUpperCase()),
+    selectedRows.map((row) => row.region.toUpperCase()),
   );
-  const selectedPlanName = formatSubscriptionPlanLabel(subscription);
   const periodSuffix = formatDurationSuffix(subscription.duration);
-  const prices = subscription.prices
+  const prices = selectedRows
     .map((row): PlayStationRegionPrice | undefined => {
       const countryCode = row.region.toUpperCase();
       const currency = row.currency.toUpperCase();
@@ -278,12 +285,10 @@ function buildAppStorePricePlanAlternativesByRegion(
     for (const [countryCode, regionAlternatives] of alternativesByRegion) {
       const alternative = buildAppStorePricePlanAlternative(subscription, countryCode, rates);
       const existingAlternative = regionAlternatives.get(planName);
-      if (
-        existingAlternative !== undefined &&
-        existingAlternative.nokAmount !== undefined &&
-        (alternative.nokAmount === undefined || existingAlternative.nokAmount <= alternative.nokAmount)
-      ) {
-        continue;
+      if (existingAlternative !== undefined) {
+        if (existingAlternative.nokAmount !== undefined || alternative.nokAmount === undefined) {
+          continue;
+        }
       }
 
       regionAlternatives.set(planName, alternative);
@@ -304,6 +309,27 @@ function buildAppStorePricePlanAlternativesByRegion(
   return result;
 }
 
+function buildMergedAppStorePricePlanRows(
+  subscriptions: AppStorePriceSubscription[],
+  selectedPlanName: string,
+): AppStorePriceSubscriptionPrice[] {
+  const rowsByCountry = new Map<string, AppStorePriceSubscriptionPrice>();
+  for (const subscription of subscriptions) {
+    if (formatSubscriptionPlanLabel(subscription) !== selectedPlanName) {
+      continue;
+    }
+
+    for (const row of subscription.prices) {
+      const countryCode = row.region.toUpperCase();
+      if (!rowsByCountry.has(countryCode)) {
+        rowsByCountry.set(countryCode, row);
+      }
+    }
+  }
+
+  return Array.from(rowsByCountry.values());
+}
+
 function selectDefaultAppStorePriceSubscription(
   subscriptions: AppStorePriceSubscription[],
   config: AppStorePriceConfig,
@@ -314,6 +340,24 @@ function selectDefaultAppStorePriceSubscription(
   }
 
   return subscriptions.find(isYearlyAppStorePriceSubscription) ?? configuredSubscription ?? subscriptions[0];
+}
+
+function filterAppStorePriceSubscriptions(
+  subscriptions: AppStorePriceSubscription[],
+  config: AppStorePriceConfig,
+): AppStorePriceSubscription[] {
+  if (isYouTubeAppStorePriceConfig(config)) {
+    return subscriptions.filter((subscription) => inferYouTubeAppStorePriceSubscriptionName(subscription) !== undefined);
+  }
+
+  return subscriptions;
+}
+
+function isYouTubeAppStorePriceConfig(config: AppStorePriceConfig): boolean {
+  return (
+    config.productName.toLowerCase().includes("youtube") ||
+    /\/(?:544007664|1017492454)(?:[/?#]|$)/.test(config.sourceUrl)
+  );
 }
 
 function isYearlyAppStorePriceSubscription(subscription: AppStorePriceSubscription): boolean {
@@ -658,6 +702,14 @@ function getConfigForAppStorePriceUrl(url: URL): AppStorePriceConfig | undefined
 
 function getKnownDomainAppStorePriceConfig(url: URL): AppStorePriceConfig | undefined {
   const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname === "music.apple.com") {
+    return getKnownAppStorePriceConfigForAppId("1108187390");
+  }
+
+  if (hostname === "music.youtube.com") {
+    return getKnownAppStorePriceConfigForAppId("1017492454");
+  }
+
   if (hostname === "spotify.com" || hostname.endsWith(".spotify.com")) {
     return getKnownAppStorePriceConfigForAppId("324684580");
   }
@@ -693,6 +745,42 @@ function getKnownAppStorePriceConfigForAppId(appId: string): AppStorePriceConfig
       subscriptionId: "spotify_individual",
       planName: "Premium Individual",
       sourceUrl: APPSTOREPRICE_SPOTIFY_URL,
+    };
+  }
+
+  if (appId === "544007664") {
+    return {
+      cacheKey: "youtube-premium",
+      productId: "appstoreprice:youtube-premium",
+      productName: "YouTube Premium",
+      sourceUrl: "https://appstoreprice.org/en/apps/544007664",
+    };
+  }
+
+  if (appId === "1017492454") {
+    return {
+      cacheKey: "youtube-music",
+      productId: "appstoreprice:youtube-music",
+      productName: "YouTube Music",
+      sourceUrl: "https://appstoreprice.org/en/apps/1017492454",
+    };
+  }
+
+  if (appId === "1108187390") {
+    return {
+      cacheKey: "apple-music",
+      productId: "appstoreprice:apple-music",
+      productName: "Apple Music",
+      sourceUrl: "https://appstoreprice.org/en/apps/applemusic",
+    };
+  }
+
+  if (appId === "1477376905") {
+    return {
+      cacheKey: "github",
+      productId: "appstoreprice:github",
+      productName: "GitHub",
+      sourceUrl: "https://appstoreprice.org/en/apps/1477376905",
     };
   }
 
@@ -934,7 +1022,7 @@ function inferKnownAppStorePriceSubscriptionName(subscription: AppStorePriceSubs
   const subscriptionId = subscription.subscriptionId.toUpperCase();
   const name = subscription.name.toLowerCase();
   if (!subscriptionId.includes("NF99") && !name.includes("netflix")) {
-    return undefined;
+    return inferYouTubeAppStorePriceSubscriptionName(subscription);
   }
 
   if (subscriptionId.includes("_4001_") || /\bb[aá]sico\b/i.test(subscription.name)) {
@@ -948,6 +1036,32 @@ function inferKnownAppStorePriceSubscriptionName(subscription: AppStorePriceSubs
   }
   if (subscriptionId === "ITUNES_INAPP_TIER8") {
     return "Netflix Standard";
+  }
+
+  return undefined;
+}
+
+function inferYouTubeAppStorePriceSubscriptionName(subscription: AppStorePriceSubscription): string | undefined {
+  const subscriptionId = subscription.subscriptionId.toLowerCase();
+  const name = subscription.name.toLowerCase();
+  if (!subscriptionId.includes("youtube") && !name.includes("youtube") && !name.includes("premium lite")) {
+    return undefined;
+  }
+
+  if (name.includes("premium lite")) {
+    return "YouTube Premium Lite";
+  }
+  if (name.includes("music") && name.includes("family")) {
+    return "YouTube Music Family";
+  }
+  if (name.includes("music")) {
+    return "YouTube Music";
+  }
+  if (name.includes("family")) {
+    return "YouTube Premium Family";
+  }
+  if (name.includes("premium") || name.includes("red")) {
+    return "YouTube Premium";
   }
 
   return undefined;
