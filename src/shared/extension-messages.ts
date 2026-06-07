@@ -73,7 +73,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
