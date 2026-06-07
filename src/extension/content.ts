@@ -228,6 +228,15 @@ type GetPlayStationRegionPricesMessage = {
   type: "get-playstation-region-prices";
   url: string;
 };
+type HttpRequestMessage = {
+  type: "http-request";
+  url: string;
+  responseType: "json" | "text";
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  credentials?: RequestCredentials;
+};
 type OffersForUrlResponse =
   | {
       ok: true;
@@ -238,7 +247,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "skyscanner";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   matchedExactProduct?: boolean;
@@ -262,6 +271,33 @@ type PriceMatchAlternative = {
   shippingPrice?: string;
   totalPrice?: string;
 };
+type FlightSearchMeta = {
+  origin: string;
+  destination: string;
+  outboundDate: string;
+  inboundDate?: string;
+  adults: number;
+  youths: number;
+  children: number;
+  infants: number;
+};
+type FinnFlightSearchData = {
+  searchId: string;
+  flightApiUrl: string;
+  resultUrl: string;
+};
+type FinnFlightOfferCandidate = PriceMatchAlternative & {
+  productUrl: string;
+};
+type PanFlightsOfferCandidate = PriceMatchAlternative & {
+  productUrl: string;
+};
+type PanFlightsSearchVariant = {
+  sortOrder: "price" | "duration";
+  version: number;
+  maxStops: number;
+  searchId: number;
+};
 type PriceMatchForProductResponse =
   | {
       ok: true;
@@ -281,6 +317,22 @@ type PlayStationRegionPricesResponse =
       ok: false;
       reason: string;
     };
+type HttpRequestResponse =
+  | {
+      ok: true;
+      responseType: "json";
+      value: unknown;
+    }
+  | {
+      ok: true;
+      responseType: "text";
+      text: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+      status?: number;
+    };
 type ProductPageMeta = Omit<GetPriceMatchForProductMessage, "type">;
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
@@ -289,6 +341,20 @@ const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
 const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
 const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
+const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
+const FINN_FLIGHT_POLL_ATTEMPTS = 7;
+const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
+const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
+  "https://worka.panflights.com/skypickersearchsingle",
+  "https://workb.panflights.com/skypickersearchsingle",
+  "https://panflights.com/skypickersearchsingle",
+];
+const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
+  { sortOrder: "price", version: 0, maxStops: 6, searchId: 1002 },
+  { sortOrder: "duration", version: 0, maxStops: 0, searchId: 1000 },
+];
+const PANFLIGHTS_FLIGHT_HITS_LIMIT = 100;
 const PSN_GC_DEALS_GIFT_CARD_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
 const PSN_GC_DEALS_GIFT_CARD_REGION_URLS: Record<string, string> = {
   AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
@@ -459,10 +525,13 @@ function installDynamicProductPageRefresh(): void {
         return;
       }
 
-      const meta = extractProductPageMeta();
-      const metaKey = meta === undefined
-        ? ""
-        : [meta.searchTerm, meta.price, meta.currency, meta.packageAmount, meta.packageUnit, meta.volumeMl, meta.alcoholPercent].join("|");
+      const flightMeta = extractSasFlightSearchMeta(currentUrl);
+      const productMeta = flightMeta === undefined ? extractProductPageMeta() : undefined;
+      const metaKey = flightMeta !== undefined
+        ? buildFlightSearchMetaKey(flightMeta)
+        : productMeta === undefined
+          ? ""
+          : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent].join("|");
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
         requestCurrentOffers();
@@ -560,6 +629,9 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
 }
 
 async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
+  const flightOffers = await findFlightPriceMatchOffers();
+  if (flightOffers.length > 0) return flightOffers;
+
   const productMeta = extractProductPageMeta();
   if (productMeta === undefined) return [];
   const message: GetPriceMatchForProductMessage = {
@@ -575,6 +647,843 @@ async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
     return response.offers ?? (response.offer !== undefined ? [response.offer] : []);
   }
   return [];
+}
+
+async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return [];
+
+  const flightMeta = extractSasFlightSearchMeta(parsedUrl);
+  if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
+
+  const routeTitle = `${flightMeta.origin} -> ${flightMeta.destination}`;
+  const searchDetails = [
+    formatFlightDateRange(flightMeta),
+    formatFlightPassengerText(flightMeta),
+    "samme flyplasser",
+  ].join(", ");
+
+  const staticOffers = [
+    buildFlightPriceMatchOffer({
+      source: "finnreise",
+      sourceName: "FINN Reise",
+      productUrl: buildFinnFlightSearchUrl(flightMeta),
+      routeTitle,
+      searchDetails,
+    }),
+    buildFlightPriceMatchOffer({
+      source: "panflights",
+      sourceName: "PanFlights",
+      productUrl: buildPanFlightsFlightSearchUrl(flightMeta),
+      routeTitle,
+      searchDetails,
+    }),
+    buildFlightPriceMatchOffer({
+      source: "skyscanner",
+      sourceName: "Skyscanner",
+      productUrl: buildSkyscannerFlightSearchUrl(flightMeta),
+      routeTitle,
+      searchDetails,
+    }),
+  ];
+
+  const liveOffers = (await Promise.all([
+    findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails),
+    findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails),
+  ])).filter((offer): offer is PriceMatchOffer => offer !== undefined);
+  if (liveOffers.length === 0) return staticOffers;
+
+  const liveSources = new Set(liveOffers.map((offer) => offer.source));
+  return [
+    ...liveOffers,
+    ...staticOffers.filter((offer) => !liveSources.has(offer.source)),
+  ].sort(comparePriceMatchesBySortAmount);
+}
+
+function extractSasFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "sas.no" || !/^\/book-new\/revenue\/flights\/?$/i.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  const origin = readIataCodeParam(parsedUrl, "origin");
+  const destination = readIataCodeParam(parsedUrl, "destination");
+  const outboundDate = readIsoDateParam(parsedUrl, "outboundDate");
+  const inboundDate = readIsoDateParam(parsedUrl, "inboundDate");
+  if (origin === undefined || destination === undefined || outboundDate === undefined) {
+    return undefined;
+  }
+
+  const adults = readNonNegativeIntegerParam(parsedUrl, "adults", 1);
+  const youths = readNonNegativeIntegerParam(parsedUrl, "youths", 0);
+  const children = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+  const infants = readNonNegativeIntegerParam(parsedUrl, "infants", 0);
+  if (adults + youths + children + infants <= 0) return undefined;
+
+  return {
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    adults,
+    youths,
+    children,
+    infants,
+  };
+}
+
+function isFlightSearchPassengerMatchSupported(flightMeta: FlightSearchMeta): boolean {
+  return flightMeta.adults > 0 && flightMeta.youths === 0 && flightMeta.children === 0 && flightMeta.infants === 0;
+}
+
+function buildFlightPriceMatchOffer(input: {
+  source: NonNullable<PriceMatchOffer["source"]>;
+  sourceName: string;
+  productUrl: string;
+  routeTitle: string;
+  searchDetails: string;
+}): PriceMatchOffer {
+  return {
+    source: input.source,
+    sourceName: input.sourceName,
+    matchedExactProduct: true,
+    shopName: input.searchDetails,
+    price: "Sjekk pris",
+    amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+    sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+    currency: "NOK",
+    productName: input.routeTitle,
+    productUrl: input.productUrl,
+  };
+}
+
+async function findFinnFlightPriceMatchOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+): Promise<PriceMatchOffer | undefined> {
+  const resultUrl = buildFinnFlightSearchUrl(flightMeta);
+  const searchData = await fetchFinnFlightSearchData(resultUrl);
+  if (searchData === undefined) return undefined;
+
+  const resultData = await pollFinnFlightResults(searchData, flightMeta);
+  if (resultData === undefined) return undefined;
+
+  const candidates = extractFinnFlightOfferCandidates(resultData, searchData.searchId, flightMeta);
+  const best = candidates[0];
+  if (best === undefined) return undefined;
+
+  return {
+    source: "finnreise",
+    sourceName: "FINN Reise",
+    matchedExactProduct: true,
+    shopName: `${best.shopName} - ${searchDetails}`,
+    price: best.price,
+    amount: best.amount,
+    sortAmount: best.sortAmount ?? best.amount,
+    currency: best.currency,
+    productName: routeTitle,
+    productUrl: searchData.resultUrl,
+    offerUrl: best.productUrl,
+    alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
+  };
+}
+
+async function fetchFinnFlightSearchData(resultUrl: string): Promise<FinnFlightSearchData | undefined> {
+  const html = await userscriptTextRequest(resultUrl, {
+    headers: { Accept: "text/html" },
+    credentials: "omit",
+  });
+  if (html === undefined) return undefined;
+
+  const nextData = parseFinnNextData(html);
+  const pageProps = isRecord(nextData?.props) && isRecord(nextData.props.pageProps)
+    ? nextData.props.pageProps
+    : undefined;
+  const searchData = isRecord(pageProps?.searchData) ? pageProps.searchData : undefined;
+  const config = isRecord(pageProps?.config) ? pageProps.config : undefined;
+  const searchId = readStringValue(searchData?.searchId);
+  if (searchId === undefined) return undefined;
+
+  return {
+    searchId,
+    flightApiUrl: readStringValue(config?.flightApiUrl) ?? FINN_FLIGHT_API_FALLBACK_URL,
+    resultUrl,
+  };
+}
+
+function parseFinnNextData(html: string): Record<string, unknown> | undefined {
+  const match = html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (match?.[1] === undefined) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(match[1]);
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function pollFinnFlightResults(
+  searchData: FinnFlightSearchData,
+  flightMeta: FlightSearchMeta,
+): Promise<Record<string, unknown> | undefined> {
+  let latestResult: Record<string, unknown> | undefined;
+  let progress = 0;
+
+  for (let attempt = 0; attempt < FINN_FLIGHT_POLL_ATTEMPTS; attempt++) {
+    await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
+    const resultUrl = buildFinnFlightResultApiUrl(searchData.flightApiUrl, searchData.searchId, flightMeta, progress);
+    const value = await userscriptJsonRequest(resultUrl, {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+    });
+    if (!isRecord(value) || !Array.isArray(value.trips)) continue;
+
+    latestResult = value;
+    progress = readNumberValue(value.progress) ?? progress;
+    if (progress >= 100) break;
+  }
+
+  return latestResult;
+}
+
+function buildFinnFlightResultApiUrl(
+  flightApiUrl: string,
+  searchId: string,
+  flightMeta: FlightSearchMeta,
+  progress: number,
+): string {
+  const params = buildFinnFlightExactAirportParams(flightMeta);
+  params.set("sortCriteria", "priceAmount_asc");
+  params.set("cacheBuster", String(Date.now()));
+  params.set("progress", String(progress));
+  return `${flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchId)}?${params.toString()}`;
+}
+
+function extractFinnFlightOfferCandidates(
+  resultData: Record<string, unknown>,
+  searchId: string,
+  flightMeta: FlightSearchMeta,
+): FinnFlightOfferCandidate[] {
+  const candidates: FinnFlightOfferCandidate[] = [];
+
+  for (const trip of readRecordArray(resultData.trips)) {
+    if (!isFinnFlightTripMatchingSearch(trip, flightMeta)) continue;
+
+    const tripSummary = formatFinnFlightTripSummary(trip);
+    for (const offer of readRecordArray(trip.offers)) {
+      const amount = readNumberValue(offer.priceAmount);
+      const shopName = readStringValue(offer.brand);
+      const offerId = readStringValue(offer.offerId);
+      if (amount === undefined || shopName === undefined || offerId === undefined) continue;
+
+      const platform = [
+        tripSummary,
+        formatFinnFlightLuggageSummary(offer),
+      ].filter((part): part is string => part !== undefined && part.length > 0).join(", ");
+
+      candidates.push({
+        shopName,
+        price: formatNokFlightPrice(amount),
+        amount,
+        sortAmount: amount,
+        currency: "NOK",
+        productUrl: buildFinnFlightOfferUrl(searchId, offerId),
+        ...(platform.length > 0 ? { platform } : {}),
+      });
+    }
+  }
+
+  return dedupeFinnFlightOfferCandidates(candidates)
+    .sort(comparePriceMatchesBySortAmount);
+}
+
+function dedupeFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[]): FinnFlightOfferCandidate[] {
+  const seen = new Set<string>();
+  const uniqueCandidates: FinnFlightOfferCandidate[] = [];
+  for (const candidate of candidates) {
+    const key = [
+      candidate.shopName,
+      candidate.amount,
+      candidate.platform ?? "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueCandidates.push(candidate);
+  }
+  return uniqueCandidates;
+}
+
+function isFinnFlightTripMatchingSearch(trip: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+  const legs = readRecordArray(trip.legs);
+  const outboundLeg = legs[0];
+  if (outboundLeg === undefined || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)) {
+    return false;
+  }
+
+  if (flightMeta.inboundDate === undefined) return true;
+
+  const inboundLeg = legs[1];
+  return inboundLeg !== undefined && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, flightMeta.inboundDate);
+}
+
+function isFinnFlightLegMatch(leg: Record<string, unknown>, origin: string, destination: string, date: string): boolean {
+  return readFinnFlightLegAirport(leg, "legOrigin", "origin") === origin &&
+    readFinnFlightLegAirport(leg, "legDestination", "destination") === destination &&
+    readFinnFlightLegDate(leg) === date;
+}
+
+function readFinnFlightLegAirport(
+  leg: Record<string, unknown>,
+  legKey: "legOrigin" | "legDestination",
+  segmentKey: "origin" | "destination",
+): string | undefined {
+  const legAirport = readStringValue(leg[legKey]);
+  if (legAirport !== undefined) return legAirport.toUpperCase();
+
+  const firstSegment = readRecordArray(leg.segments)[0];
+  return readStringValue(firstSegment?.[segmentKey])?.toUpperCase();
+}
+
+function readFinnFlightLegDate(leg: Record<string, unknown>): string | undefined {
+  const legDepartureTime = readStringValue(leg.legDepartureTime);
+  const firstSegment = readRecordArray(leg.segments)[0];
+  const segmentDepartureTime = readStringValue(firstSegment?.departureTime);
+  return (legDepartureTime ?? segmentDepartureTime)?.slice(0, 10);
+}
+
+function buildFinnFlightOfferUrl(searchId: string, offerId: string): string {
+  const params = new URLSearchParams({ searchId, offerId });
+  return `https://www.finn.no/reise/flybilletter/ut/?${params.toString()}`;
+}
+
+function buildFinnFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+  const params = new URLSearchParams({
+    adults: String(flightMeta.adults),
+    cabinType: "economy",
+    requestedDepartureDate: flightMeta.outboundDate,
+    requestedDestination: `${flightMeta.destination}.AIRPORT`,
+    requestedOrigin: `${flightMeta.origin}.AIRPORT`,
+    tripType: flightMeta.inboundDate !== undefined ? "roundtrip" : "oneway",
+  });
+  const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
+  for (const [key, value] of exactAirportParams.entries()) {
+    params.set(key, value);
+  }
+  params.set("sortCriteria", "priceAmount_asc");
+  if (flightMeta.inboundDate !== undefined) {
+    params.set("requestedReturnDate", flightMeta.inboundDate);
+  }
+  return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
+}
+
+function buildFinnFlightExactAirportParams(flightMeta: FlightSearchMeta): URLSearchParams {
+  const params = new URLSearchParams({
+    departureAirportLeg1: flightMeta.origin,
+    arrivalAirportLeg1: flightMeta.destination,
+  });
+  if (flightMeta.inboundDate !== undefined) {
+    params.set("departureAirportLeg2", flightMeta.destination);
+    params.set("arrivalAirportLeg2", flightMeta.origin);
+  }
+  return params;
+}
+
+async function findPanFlightsFlightPriceMatchOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+): Promise<PriceMatchOffer | undefined> {
+  const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
+  const resultDataList = await Promise.all(
+    PANFLIGHTS_FLIGHT_SEARCH_VARIANTS.map((variant) => fetchPanFlightsFlightSearchResult(flightMeta, variant)),
+  );
+  const candidates = dedupePanFlightsOfferCandidates(
+    resultDataList.flatMap((resultData) => {
+      return resultData === undefined
+        ? []
+        : extractPanFlightsOfferCandidates(resultData, flightMeta, resultUrl);
+    }),
+  ).sort(comparePriceMatchesBySortAmount);
+
+  const best = candidates[0];
+  if (best === undefined) return undefined;
+
+  return {
+    source: "panflights",
+    sourceName: "PanFlights",
+    matchedExactProduct: true,
+    shopName: `${best.shopName} - ${searchDetails}`,
+    price: best.price,
+    amount: best.amount,
+    sortAmount: best.sortAmount ?? best.amount,
+    currency: best.currency,
+    productName: routeTitle,
+    productUrl: resultUrl,
+    offerUrl: best.productUrl,
+    alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
+  };
+}
+
+async function fetchPanFlightsFlightSearchResult(
+  flightMeta: FlightSearchMeta,
+  variant: PanFlightsSearchVariant,
+): Promise<Record<string, unknown> | undefined> {
+  const body = new URLSearchParams({
+    data: JSON.stringify(buildPanFlightsFlightSearchPayload(flightMeta, variant)),
+  }).toString();
+
+  for (const endpoint of PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS) {
+    const value = await userscriptJsonRequest(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
+      body,
+      credentials: "omit",
+    });
+    if (isRecord(value) && Array.isArray(value.flighttab)) return value;
+  }
+
+  return undefined;
+}
+
+function buildPanFlightsFlightSearchPayload(
+  flightMeta: FlightSearchMeta,
+  variant: PanFlightsSearchVariant,
+): Record<string, unknown> {
+  const outboundDate = splitIsoDateParts(flightMeta.outboundDate);
+  const inboundDate = flightMeta.inboundDate !== undefined ? splitIsoDateParts(flightMeta.inboundDate) : undefined;
+  const leg: Record<string, string> = {
+    dffd: outboundDate.day,
+    dftd: outboundDate.day,
+    dffm: outboundDate.month,
+    dftm: outboundDate.month,
+    dffy: outboundDate.year,
+    dfty: outboundDate.year,
+    fromlocsid: flightMeta.origin,
+    fromlocrad: "0",
+    fromloclat: "0",
+    fromloclng: "0",
+    tolocsid: flightMeta.destination,
+    tolocrad: "0",
+    toloclat: "0",
+    toloclng: "0",
+    somin: "0",
+    somax: "96",
+  };
+
+  if (inboundDate !== undefined) {
+    leg.dtfd = inboundDate.day;
+    leg.dttd = inboundDate.day;
+    leg.dtfm = inboundDate.month;
+    leg.dttm = inboundDate.month;
+    leg.dtfy = inboundDate.year;
+    leg.dtty = inboundDate.year;
+  }
+
+  return {
+    timefilters: inboundDate !== undefined ? [0, 24, 0, 24, 0, 24, 0, 24] : [0, 24, 0, 24],
+    typeFlight: inboundDate !== undefined ? "round" : "oneway",
+    sortorder: variant.sortOrder,
+    sortradio: "price",
+    mode: "search",
+    submode: false,
+    locale: "nb",
+    market: "no",
+    hitslimit: PANFLIGHTS_FLIGHT_HITS_LIMIT,
+    calupdate: 0,
+    cc: "0",
+    oneforcity: "0",
+    oneperdate: "0",
+    currency: "NOK",
+    adults: String(flightMeta.adults),
+    children: "0",
+    infants: "0",
+    class: "Y",
+    carryons: 0,
+    checkedluggages: 0,
+    airlines: "",
+    airports: "",
+    endairports: "",
+    stopovers: "",
+    maxstops: variant.maxStops,
+    useragent: navigator.userAgent,
+    devicetype: "PC",
+    bundle: JSON.stringify({ addc: "1" }),
+    minprice: 0,
+    maxprice: 999999999999,
+    leglist: [leg],
+    searchid: variant.searchId,
+    user_ip: "127.0.0.1",
+    version: variant.version,
+  };
+}
+
+function extractPanFlightsOfferCandidates(
+  resultData: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+): PanFlightsOfferCandidate[] {
+  const currency = readStringValue(resultData.currency) ?? "NOK";
+  const candidates: PanFlightsOfferCandidate[] = [];
+
+  for (const item of readRecordArray(resultData.flighttab)) {
+    if (!isPanFlightsFlightMatchingSearch(item, flightMeta)) continue;
+
+    const packageRecord = readPanFlightsPackageRecord(item);
+    const provider = readPanFlightsBestProvider(resultData, item);
+    const amount = readPositiveNumberValue(provider?.price) ??
+      readPositiveNumberValue(item.price) ??
+      readPositiveNumberValue(packageRecord?.price);
+    if (amount === undefined) continue;
+
+    const shopName = readStringValue(provider?.provider) ??
+      readStringValue(item.provider) ??
+      readStringValue(packageRecord?.provider) ??
+      readStringValue(resultData.provider) ??
+      "PanFlights";
+    const productUrl = readPanFlightsProductUrl(provider?.deep_link ?? packageRecord?.deep_link, resultUrl);
+    const platform = formatPanFlightsTripSummary(item);
+
+    candidates.push({
+      shopName,
+      price: formatNokFlightPrice(amount),
+      amount,
+      sortAmount: amount,
+      currency,
+      productUrl,
+      ...(platform !== undefined ? { platform } : {}),
+    });
+  }
+
+  return candidates;
+}
+
+function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
+  const seen = new Set<string>();
+  const uniqueCandidates: PanFlightsOfferCandidate[] = [];
+  for (const candidate of candidates) {
+    const key = [
+      candidate.shopName,
+      Math.round(candidate.amount),
+      candidate.platform ?? "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueCandidates.push(candidate);
+  }
+  return uniqueCandidates;
+}
+
+function isPanFlightsFlightMatchingSearch(item: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+  const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+  const outboundRoute = routeList[0];
+  if (
+    outboundRoute === undefined ||
+    !isPanFlightsRouteLegMatch(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)
+  ) {
+    return false;
+  }
+
+  const inboundDate = flightMeta.inboundDate;
+  if (inboundDate === undefined) return true;
+
+  return isPanFlightsRouteLegMatch(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin, inboundDate) ||
+    routeList.some((route) => {
+      return isPanFlightsRouteLegMatch(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin, inboundDate);
+    });
+}
+
+function isPanFlightsRouteLegMatch(
+  route: Record<string, unknown>,
+  dataKey: "tripdata" | "backdata",
+  timeKey: "dTime" | "drTime",
+  origin: string,
+  destination: string,
+  date: string,
+): boolean {
+  const legData = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+  return readStringValue(legData?.flyFrom)?.toUpperCase() === origin &&
+    readStringValue(legData?.flyTo)?.toUpperCase() === destination &&
+    formatPanFlightsEpochDate(readNumberValue(route[timeKey])) === date;
+}
+
+function readPanFlightsBestProvider(
+  resultData: Record<string, unknown>,
+  item: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const packageRecord = readPanFlightsPackageRecord(item);
+  const providerCandidates = readRecordArray(packageRecord?.providerlist);
+  const prefingerprint = readStringValue(packageRecord?.prefingerprint);
+  const retparams = isRecord(resultData.retparams) ? resultData.retparams : undefined;
+  const providersByFingerprint = isRecord(retparams?.providers) ? retparams.providers : undefined;
+  if (prefingerprint !== undefined) {
+    providerCandidates.push(...readRecordArray(providersByFingerprint?.[prefingerprint]));
+  }
+
+  return providerCandidates
+    .filter((provider) => readPositiveNumberValue(provider.price) !== undefined)
+    .sort((left, right) => {
+      return (readPositiveNumberValue(left.price) ?? Number.MAX_SAFE_INTEGER) -
+        (readPositiveNumberValue(right.price) ?? Number.MAX_SAFE_INTEGER);
+    })[0];
+}
+
+function readPanFlightsPackageRecord(item: Record<string, unknown>): Record<string, unknown> | undefined {
+  return isRecord(item.package) ? item.package : undefined;
+}
+
+function readPanFlightsProductUrl(value: unknown, fallbackUrl: string): string {
+  const url = readStringValue(value);
+  if (url === undefined) return fallbackUrl;
+  return parseUrlWithBase(url, "https://panflights.com/")?.toString() ?? fallbackUrl;
+}
+
+function formatPanFlightsTripSummary(item: Record<string, unknown>): string | undefined {
+  const packageRecord = readPanFlightsPackageRecord(item);
+  const outboundRoute = readRecordArray(packageRecord?.routelist)[0];
+  const parts = [
+    outboundRoute !== undefined ? collectPanFlightsCarrierNames(outboundRoute).join("/") : undefined,
+    outboundRoute !== undefined ? formatPanFlightsStops(outboundRoute) : undefined,
+    formatPanFlightsDuration(readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration)),
+  ].filter((part): part is string => part !== undefined && part.length > 0);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
+function collectPanFlightsCarrierNames(route: Record<string, unknown>): string[] {
+  const carriers = new Set<string>();
+  for (const dataKey of ["tripdata", "backdata"] as const) {
+    const legData = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+    for (const carrier of (readStringValue(legData?.airlines) ?? "").split(",")) {
+      const trimmed = carrier.trim();
+      if (trimmed.length > 0) carriers.add(trimmed);
+    }
+  }
+  return [...carriers];
+}
+
+function formatPanFlightsStops(route: Record<string, unknown>): string | undefined {
+  const stops = (["tripdata", "backdata"] as const)
+    .map((dataKey) => {
+      const legData = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+      const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
+      return specs.length > 0 ? Math.max(0, specs.length - 1) : undefined;
+    })
+    .filter((stopCount): stopCount is number => stopCount !== undefined);
+
+  if (stops.length === 0) return undefined;
+  if (stops.every((stopCount) => stopCount === 0)) return "direkte";
+  return stops.map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`).join(" / ");
+}
+
+function formatPanFlightsDuration(minutes: number | undefined): string | undefined {
+  if (minutes === undefined) return undefined;
+  const totalMinutes = Math.round(minutes);
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  if (hours <= 0) return `${remainingMinutes} min`;
+  return remainingMinutes === 0 ? `${hours} t` : `${hours} t ${remainingMinutes} min`;
+}
+
+function formatPanFlightsEpochDate(epochSeconds: number | undefined): string | undefined {
+  if (epochSeconds === undefined) return undefined;
+  const date = new Date(epochSeconds * 1000);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
+}
+
+function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+  const outboundDate = compactIsoDate(flightMeta.outboundDate);
+  const inboundDate = flightMeta.inboundDate !== undefined ? compactIsoDate(flightMeta.inboundDate) : undefined;
+  const path = inboundDate !== undefined ? "roundtrip" : "oneway";
+  const v2 = inboundDate !== undefined
+    ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}`
+    : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
+  const params = new URLSearchParams({ v2, order: "price" });
+  return `https://panflights.no/${path}?${params.toString()}`;
+}
+
+function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+  const params = new URLSearchParams({
+    origin: flightMeta.origin,
+    destination: flightMeta.destination,
+    outboundDate: flightMeta.outboundDate,
+    adultsv2: String(flightMeta.adults),
+    cabinclass: "economy",
+    preferDirects: "false",
+    outboundaltsenabled: "false",
+    inboundaltsenabled: "false",
+    market: "NO",
+    locale: "nb-NO",
+    currency: "NOK",
+    rtn: flightMeta.inboundDate !== undefined ? "1" : "0",
+  });
+  if (flightMeta.inboundDate !== undefined) {
+    params.set("inboundDate", flightMeta.inboundDate);
+  }
+  return `https://www.skyscanner.net/g/referrals/v1/flights/day-view?${params.toString()}`;
+}
+
+function readIataCodeParam(parsedUrl: URL, key: string): string | undefined {
+  const value = parsedUrl.searchParams.get(key)?.trim().toUpperCase();
+  return value !== undefined && /^[A-Z]{3}$/.test(value) ? value : undefined;
+}
+
+function readIsoDateParam(parsedUrl: URL, key: string): string | undefined {
+  const value = parsedUrl.searchParams.get(key)?.trim();
+  if (value === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const parsedDate = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== value) {
+    return undefined;
+  }
+  return value;
+}
+
+function readNonNegativeIntegerParam(parsedUrl: URL, key: string, fallback: number): number {
+  const value = parsedUrl.searchParams.get(key);
+  if (value === null) return fallback;
+  const parsedValue = Number.parseInt(value, 10);
+  return Number.isInteger(parsedValue) && parsedValue >= 0 ? parsedValue : fallback;
+}
+
+function splitIsoDateParts(value: string): { year: string; month: string; day: string } {
+  return {
+    year: value.slice(0, 4),
+    month: value.slice(5, 7),
+    day: value.slice(8, 10),
+  };
+}
+
+function readPositiveNumberValue(value: unknown): number | undefined {
+  const numberValue = readNumberValue(value);
+  return numberValue !== undefined && numberValue > 0 ? numberValue : undefined;
+}
+
+function compactIsoDate(value: string): string {
+  return value.replace(/-/g, "");
+}
+
+function comparePriceMatchesBySortAmount(
+  left: Pick<PriceMatchOffer, "amount" | "sortAmount">,
+  right: Pick<PriceMatchOffer, "amount" | "sortAmount">,
+): number {
+  return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+}
+
+function readRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function formatNokFlightPrice(amount: number): string {
+  return `${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(amount)} kr`;
+}
+
+function formatFinnFlightTripSummary(trip: Record<string, unknown>): string {
+  const legs = readRecordArray(trip.legs);
+  return [
+    collectFinnFlightCarrierNames(legs).join("/"),
+    formatFinnFlightStops(legs),
+    formatFinnFlightTimeSummary(legs),
+  ].filter((part): part is string => part !== undefined && part.length > 0).join(", ");
+}
+
+function collectFinnFlightCarrierNames(legs: Array<Record<string, unknown>>): string[] {
+  const carriers = new Set<string>();
+  for (const leg of legs) {
+    for (const segment of readRecordArray(leg.segments)) {
+      const carrier = readStringValue(segment.marketingCarrierName) ?? readStringValue(segment.marketingCarrier);
+      if (carrier !== undefined) carriers.add(carrier);
+    }
+  }
+  return [...carriers];
+}
+
+function formatFinnFlightStops(legs: Array<Record<string, unknown>>): string | undefined {
+  if (legs.length === 0) return undefined;
+
+  const stops = legs.map((leg) => {
+    const declaredStops = readNumberValue(leg.numberOfStops);
+    if (declaredStops !== undefined) return declaredStops;
+    return Math.max(0, readRecordArray(leg.segments).length - 1);
+  });
+  if (stops.every((stopCount) => stopCount === 0)) return "direkte";
+  return stops.map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`).join(" / ");
+}
+
+function formatFinnFlightTimeSummary(legs: Array<Record<string, unknown>>): string | undefined {
+  const ranges = legs
+    .map(formatFinnFlightLegTimeRange)
+    .filter((range): range is string => range !== undefined);
+  return ranges.length > 0 ? ranges.join(" / ") : undefined;
+}
+
+function formatFinnFlightLegTimeRange(leg: Record<string, unknown>): string | undefined {
+  const firstSegment = readRecordArray(leg.segments)[0];
+  const departureTime = readStringValue(leg.legDepartureTime) ?? readStringValue(firstSegment?.departureTime);
+  const arrivalTime = readStringValue(leg.legArrivalTime) ?? readStringValue(firstSegment?.arrivalTime);
+  const departureClock = formatFinnFlightClock(departureTime);
+  const arrivalClock = formatFinnFlightClock(arrivalTime);
+  return departureClock !== undefined && arrivalClock !== undefined
+    ? `${departureClock}-${arrivalClock}`
+    : undefined;
+}
+
+function formatFinnFlightClock(value: string | undefined): string | undefined {
+  return value?.match(/T(\d{2}):(\d{2})/)?.slice(1, 3).join(":");
+}
+
+function formatFinnFlightLuggageSummary(offer: Record<string, unknown>): string | undefined {
+  const handLuggage = formatFinnFlightLuggageValue(readStringValue(offer.handLuggage));
+  const checkedLuggage = formatFinnFlightLuggageValue(readStringValue(offer.checkedLuggage));
+  const parts = [
+    handLuggage !== undefined ? `håndbagasje ${handLuggage}` : undefined,
+    checkedLuggage !== undefined ? `innsjekket ${checkedLuggage}` : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
+function formatFinnFlightLuggageValue(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (value === "included") return "inkl.";
+  if (value === "not_included") return "ikke inkl.";
+  if (value === "unknown") return "ukjent";
+  return value.replace(/_/g, " ");
+}
+
+function formatFlightDateRange(flightMeta: FlightSearchMeta): string {
+  if (flightMeta.inboundDate === undefined) {
+    return formatFlightDate(flightMeta.outboundDate);
+  }
+  return `${formatFlightDate(flightMeta.outboundDate)} - ${formatFlightDate(flightMeta.inboundDate)}`;
+}
+
+function formatFlightDate(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("nb-NO", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function formatFlightPassengerText(flightMeta: FlightSearchMeta): string {
+  return flightMeta.adults === 1 ? "1 voksen" : `${flightMeta.adults} voksne`;
+}
+
+function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
+  return [
+    flightMeta.origin,
+    flightMeta.destination,
+    flightMeta.outboundDate,
+    flightMeta.inboundDate ?? "",
+    flightMeta.adults,
+    flightMeta.youths,
+    flightMeta.children,
+    flightMeta.infants,
+  ].join("|");
 }
 
 async function getRegionPricesForCurrentPage(): Promise<PlayStationRegionPriceResult | undefined> {
@@ -696,6 +1605,16 @@ async function userscriptJsonRequest(
     });
   }
 
+  if (!isUserscriptRuntime()) {
+    const response = await sendRuntimeMessage<HttpRequestResponse>({
+      type: "http-request",
+      url,
+      responseType: "json",
+      ...init,
+    } satisfies HttpRequestMessage);
+    return isHttpRequestJsonResponse(response) ? response.value : undefined;
+  }
+
   try {
     const response = await fetch(url, init);
     if (!response.ok) return undefined;
@@ -745,6 +1664,16 @@ async function userscriptTextRequest(
     });
   }
 
+  if (!isUserscriptRuntime()) {
+    const response = await sendRuntimeMessage<HttpRequestResponse>({
+      type: "http-request",
+      url,
+      responseType: "text",
+      ...init,
+    } satisfies HttpRequestMessage);
+    return isHttpRequestTextResponse(response) ? response.text : undefined;
+  }
+
   try {
     const response = await fetch(url, init);
     if (!response.ok) return undefined;
@@ -752,6 +1681,14 @@ async function userscriptTextRequest(
   } catch {
     return undefined;
   }
+}
+
+function isHttpRequestJsonResponse(value: unknown): value is Extract<HttpRequestResponse, { responseType: "json" }> {
+  return isRecord(value) && value.ok === true && value.responseType === "json";
+}
+
+function isHttpRequestTextResponse(value: unknown): value is Extract<HttpRequestResponse, { responseType: "text" }> {
+  return isRecord(value) && value.ok === true && value.responseType === "text" && typeof value.text === "string";
 }
 
 function parseUserscriptJsonResponse(response: unknown): unknown | undefined {
@@ -982,7 +1919,8 @@ function isTaxfreeProductPage(parsedUrl: URL): boolean {
 }
 
 function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
-  return isVinmonopoletProductPage(parsedUrl) ||
+  return extractSasFlightSearchMeta(parsedUrl) !== undefined ||
+    isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
     isEpicGamesStoreProductUrl(parsedUrl.toString()) ||
     isSteamAppProductUrl(parsedUrl.toString()) ||
@@ -991,7 +1929,8 @@ function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
 
 function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-  return hostname === "vinmonopolet.no" ||
+  return hostname === "sas.no" ||
+    hostname === "vinmonopolet.no" ||
     hostname === "tax-free.no" ||
     hostname === "store.epicgames.com" ||
     hostname === "store.steampowered.com" ||
@@ -2279,6 +3218,18 @@ function renderNotice(
       background: #c8103a;
       color: #ffffff;
     }
+    .provider-finnreise {
+      background: #06befb;
+      color: #07121a;
+    }
+    .provider-panflights {
+      background: #ff4900;
+      color: #ffffff;
+    }
+    .provider-skyscanner {
+      background: #00b2d6;
+      color: #ffffff;
+    }
     .provider-isthereanydeal {
       background: #2d2f42;
       color: #ffffff;
@@ -2932,6 +3883,12 @@ function renderNotice(
       white-space: normal;
       width: max-content;
       z-index: 2147483647;
+    }
+    .offer-tooltip--scrollable {
+      max-height: min(70vh, 560px);
+      max-width: min(520px, calc(100vw - 24px));
+      overflow: auto;
+      pointer-events: auto;
     }
     .offer-tooltip-section + .offer-tooltip-section {
       margin-top: 8px;
@@ -4221,15 +5178,35 @@ function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMat
 
     const tooltip = document.createElement("div");
     tooltip.className = "offer-tooltip";
+    if (isScrollablePriceMatchTooltip(priceMatch)) {
+      tooltip.classList.add("offer-tooltip--scrollable");
+    }
     setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
     shadowRoot.append(tooltip);
 
-    card.addEventListener("mouseenter", () => {
+    let hideTimer: number | undefined;
+    const clearHideTimer = () => {
+      if (hideTimer === undefined) return;
+      window.clearTimeout(hideTimer);
+      hideTimer = undefined;
+    };
+    const showTooltip = () => {
+      clearHideTimer();
       positionTooltipRightOfPanel(tooltip, card, shadowRoot);
-    });
-    card.addEventListener("mouseleave", () => {
-      tooltip.classList.remove("visible");
-    });
+    };
+    const scheduleHideTooltip = () => {
+      clearHideTimer();
+      hideTimer = window.setTimeout(() => {
+        if (!card.matches(":hover") && !tooltip.matches(":hover")) {
+          tooltip.classList.remove("visible");
+        }
+      }, 120);
+    };
+
+    card.addEventListener("mouseenter", showTooltip);
+    card.addEventListener("mouseleave", scheduleHideTooltip);
+    tooltip.addEventListener("mouseenter", showTooltip);
+    tooltip.addEventListener("mouseleave", scheduleHideTooltip);
   }
 }
 
@@ -4435,7 +5412,7 @@ function isRegionPricePlanAlternative(value: unknown): boolean {
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "skyscanner") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     (value.matchedExactProduct === undefined || typeof value.matchedExactProduct === "boolean") &&
@@ -4901,6 +5878,9 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "sesum") return "sesum";
   if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "kassal") return "kassal";
+  if (priceMatch.source === "finnreise") return "finnreise";
+  if (priceMatch.source === "panflights") return "panflights";
+  if (priceMatch.source === "skyscanner") return "skyscanner";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   if (priceMatch.source === "ggdeals") return "ggdeals";
   if (priceMatch.source === "allkeyshop") return "allkeyshop";
@@ -4916,6 +5896,9 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "sesum") return "SeSum";
   if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "kassal") return "Kassalapp";
+  if (priceMatch.source === "finnreise") return "FINN Reise";
+  if (priceMatch.source === "panflights") return "PanFlights";
+  if (priceMatch.source === "skyscanner") return "Skyscanner";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   if (priceMatch.source === "ggdeals") return "GG Deals";
   if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";
@@ -4924,6 +5907,35 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
+  if (isFlightSearchPriceMatch(priceMatch)) {
+    const alternatives = priceMatch.alternatives ?? [];
+    const hasLivePriceList = alternatives.length > 0 &&
+      (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
+
+    if (hasLivePriceList) {
+      return [
+        `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+        [
+          priceMatch.shopName,
+          `Laveste pris: ${priceMatch.price}`,
+          "Dato og flyplasser er filtrert til samme søk.",
+        ].join("\n"),
+        [
+          "Prisliste",
+          ...alternatives.map(formatPriceMatchTooltipOffer),
+        ].join("\n"),
+        "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden.",
+      ].join("\n\n");
+    }
+
+    return [
+      `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+      priceMatch.shopName,
+      "Åpner prissøk med samme flyplasser, datoer og antall voksne.",
+      "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden.",
+    ].join("\n");
+  }
+
   const alternatives = priceMatch.alternatives?.length
     ? priceMatch.alternatives
     : [{ shopName: priceMatch.shopName, price: priceMatch.price }];
@@ -4931,6 +5943,16 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
     `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
     alternatives.map(formatPriceMatchTooltipOffer).join("\n"),
   ].join("\n\n");
+}
+function isFlightSearchPriceMatch(priceMatch: PriceMatchOffer): boolean {
+  return priceMatch.source === "finnreise" ||
+    priceMatch.source === "panflights" ||
+    priceMatch.source === "skyscanner";
+}
+function isScrollablePriceMatchTooltip(priceMatch: PriceMatchOffer): boolean {
+  return isFlightSearchPriceMatch(priceMatch) &&
+    priceMatch.alternatives !== undefined &&
+    priceMatch.alternatives.length > 5;
 }
 function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "platform" | "shippingPrice" | "totalPrice">): string {
   const details = [

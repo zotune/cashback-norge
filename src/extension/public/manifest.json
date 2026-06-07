@@ -28,7 +28,11 @@
     "https://sesum.no/*",
     "https://enhver.no/*",
     "https://api.enhver.no/*",
-    "https://kassal.app/*"
+    "https://kassal.app/*",
+    "https://www.finn.no/*",
+    "https://worka.panflights.com/*",
+    "https://workb.panflights.com/*",
+    "https://panflights.com/*"
   ],
   "background": {
     "service_worker": "assets/background.js",

@@ -22,10 +22,13 @@ import {
   type CashbackNoneMessage,
   type GetPlayStationRegionPricesMessage,
   type GetPriceMatchForProductMessage,
+  type HttpRequestMessage,
+  type HttpRequestResponse,
   type GetOffersForUrlMessage,
   type OffersForUrlResponse,
   type PlayStationRegionPricesResponse,
   type PriceMatchForProductResponse,
+  isHttpRequestMessage,
   isGetPlayStationRegionPricesMessage,
   isGetOffersForUrlMessage,
   isGetPriceMatchForProductMessage,
@@ -79,7 +82,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function handleRuntimeMessage(
   message: unknown,
-  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse) => void,
+  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse | HttpRequestResponse) => void,
 ): Promise<void> {
   if (isGetOffersForUrlMessage(message)) {
     const response = await findOffersForUrl(message);
@@ -95,6 +98,12 @@ async function handleRuntimeMessage(
 
   if (isGetPlayStationRegionPricesMessage(message)) {
     const response = await getPlayStationRegionPrices(message);
+    sendResponse(response);
+    return;
+  }
+
+  if (isHttpRequestMessage(message)) {
+    const response = await proxyHttpRequest(message);
     sendResponse(response);
     return;
   }
@@ -159,6 +168,38 @@ async function getPlayStationRegionPrices(
   }
 
   return { ok: true };
+}
+
+async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpRequestResponse> {
+  const parsedUrl = parseHttpUrl(message.url);
+  const supportedHosts = new Set([
+    "www.finn.no",
+    "worka.panflights.com",
+    "workb.panflights.com",
+    "panflights.com",
+  ]);
+  if (parsedUrl === undefined || !supportedHosts.has(parsedUrl.hostname)) {
+    return { ok: false, reason: "Unsupported host" };
+  }
+
+  try {
+    const init: RequestInit = { method: message.method ?? "GET" };
+    if (message.headers !== undefined) init.headers = message.headers;
+    if (message.body !== undefined) init.body = message.body;
+    if (message.credentials !== undefined) init.credentials = message.credentials;
+
+    const response = await fetch(message.url, init);
+    if (!response.ok) {
+      return { ok: false, reason: `HTTP ${response.status}`, status: response.status };
+    }
+
+    if (message.responseType === "text") {
+      return { ok: true, responseType: "text", text: await response.text() };
+    }
+    return { ok: true, responseType: "json", value: await response.json() };
+  } catch {
+    return { ok: false, reason: "Request failed" };
+  }
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {

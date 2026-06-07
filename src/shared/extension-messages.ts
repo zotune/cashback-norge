@@ -48,6 +48,16 @@ export type GetPlayStationRegionPricesMessage = {
   url: string;
 };
 
+export type HttpRequestMessage = {
+  type: "http-request";
+  url: string;
+  responseType: "json" | "text";
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  credentials?: RequestCredentials;
+};
+
 export type ToggleNoticeMessage = {
   type: "toggle-notice";
 };
@@ -63,7 +73,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "skyscanner";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   matchedExactProduct?: boolean;
@@ -108,6 +118,23 @@ export type PlayStationRegionPricesResponse =
   | {
       ok: false;
       reason: string;
+    };
+
+export type HttpRequestResponse =
+  | {
+      ok: true;
+      responseType: "json";
+      value: unknown;
+    }
+  | {
+      ok: true;
+      responseType: "text";
+      text: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+      status?: number;
     };
 
 export function isCashbackFoundMessage(
@@ -170,6 +197,21 @@ export function isGetPlayStationRegionPricesMessage(
   );
 }
 
+export function isHttpRequestMessage(
+  value: unknown,
+): value is HttpRequestMessage {
+  return (
+    isRecord(value) &&
+    value.type === "http-request" &&
+    typeof value.url === "string" &&
+    (value.responseType === "json" || value.responseType === "text") &&
+    (value.method === undefined || typeof value.method === "string") &&
+    (value.headers === undefined || isStringRecord(value.headers)) &&
+    (value.body === undefined || typeof value.body === "string") &&
+    (value.credentials === undefined || value.credentials === "include" || value.credentials === "omit" || value.credentials === "same-origin")
+  );
+}
+
 export function isOffersForUrlResponse(
   value: unknown,
 ): value is OffersForUrlResponse {
@@ -185,4 +227,8 @@ export function isOffersForUrlResponse(
   }
 
   return typeof value.reason === "string";
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
 }

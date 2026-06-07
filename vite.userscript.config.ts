@@ -56,6 +56,10 @@ const USERSCRIPT_BANNER = `\
 // @connect      enhver.no
 // @connect      api.enhver.no
 // @connect      kassal.app
+// @connect      www.finn.no
+// @connect      worka.panflights.com
+// @connect      workb.panflights.com
+// @connect      panflights.com
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js
