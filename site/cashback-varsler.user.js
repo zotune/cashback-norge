@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780848842
+// @version      1780849603
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -5674,14 +5674,18 @@ query SearchSuggestions($query: String!, $category: Int) {
     "claude.ai": ["claude", "anthropic claude"],
     "firecore.com": ["firecore", "infuse"],
     "netflix.com": ["netflix"],
-    "soundcloud.com": ["soundcloud"]
+    "soundcloud.com": ["soundcloud"],
+    "twitter.com": ["x", "twitter"],
+    "x.com": ["x", "twitter"]
   };
   const APPSTOREPRICE_ALWAYS_TRY_DOMAINS = /* @__PURE__ */ new Set([
     "chatgpt.com",
     "claude.ai",
     "firecore.com",
     "netflix.com",
-    "soundcloud.com"
+    "soundcloud.com",
+    "twitter.com",
+    "x.com"
   ]);
   const APPSTOREPRICE_DOMAIN_RESOLVER_EXCLUDED_DOMAINS = /* @__PURE__ */ new Set([
     "apple.com",
@@ -5759,7 +5763,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (html === void 0) {
       return void 0;
     }
-    const subscriptions = extractAppStorePriceSubscriptions(html).filter(hasPositiveAppStorePrice);
+    const subscriptions = extractAppStorePriceSubscriptions(html).filter((entry) => hasPositiveAppStorePrice(entry) && hasSupportedAppStorePriceDuration(entry));
     const subscription = selectDefaultAppStorePriceSubscription(subscriptions, config);
     if (subscription === void 0 || subscription.prices.length === 0) {
       return void 0;
@@ -5867,6 +5871,16 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function hasPositiveAppStorePrice(subscription) {
     return subscription.prices.some((price) => price.price > 0);
+  }
+  function hasSupportedAppStorePriceDuration(subscription) {
+    return subscription.duration === "monthly" || subscription.duration === "annual" || subscription.duration === "yearly" || subscription.duration === null && isLifetimeAppStorePriceSubscription(subscription);
+  }
+  function isLifetimeAppStorePriceSubscription(subscription) {
+    const names = [
+      subscription.name,
+      ...Object.values(subscription.localizedNames ?? {})
+    ];
+    return names.some((name) => /\b(?:lifetime|life\s*time|forever|permanent|livstid)\b/i.test(name));
   }
   function compareAppStorePricePlanAlternatives(first, second) {
     if (first.nokAmount !== void 0 && second.nokAmount !== void 0) {
@@ -6262,7 +6276,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return void 0;
   }
   function isAppStorePriceSubscription(value) {
-    return isRecord$1(value) && typeof value.subscriptionId === "string" && typeof value.name === "string" && (typeof value.duration === "string" || value.duration === null) && Array.isArray(value.prices) && value.prices.every(isAppStorePriceSubscriptionPrice);
+    return isRecord$1(value) && typeof value.subscriptionId === "string" && typeof value.name === "string" && (typeof value.duration === "string" || value.duration === null) && (value.localizedNames === void 0 || isStringRecord(value.localizedNames)) && Array.isArray(value.prices) && value.prices.every(isAppStorePriceSubscriptionPrice);
   }
   function isAppStorePriceSubscriptionPrice(value) {
     return isRecord$1(value) && typeof value.region === "string" && typeof value.regionName === "string" && typeof value.currency === "string" && typeof value.price === "number" && Number.isFinite(value.price);
@@ -6294,12 +6308,56 @@ query SearchSuggestions($query: String!, $category: Int) {
     return "";
   }
   function formatSubscriptionPlanLabel(subscription) {
-    const name = subscription.name.trim();
+    const name = formatAppStorePriceSubscriptionName(subscription);
     const durationLabel = formatDurationLabel(subscription.duration);
     if (durationLabel === void 0 || name.length === 0 || planNameAlreadyContainsDuration(name, subscription.duration)) {
       return name;
     }
     return `${name} (${durationLabel})`;
+  }
+  function formatAppStorePriceSubscriptionName(subscription) {
+    return inferKnownAppStorePriceSubscriptionName(subscription) ?? pickPreferredAppStorePriceSubscriptionName(subscription) ?? subscription.name.trim();
+  }
+  function inferKnownAppStorePriceSubscriptionName(subscription) {
+    const subscriptionId = subscription.subscriptionId.toUpperCase();
+    const name = subscription.name.toLowerCase();
+    if (!subscriptionId.includes("NF99") && !name.includes("netflix")) {
+      return void 0;
+    }
+    if (subscriptionId.includes("_4001_") || /\bb[aá]sico\b/i.test(subscription.name)) {
+      return "Netflix Basic";
+    }
+    if (subscriptionId.includes("_3088_") || /\b(?:standard|2s|2 screens?)\b/i.test(subscription.name)) {
+      return "Netflix Standard";
+    }
+    if (subscriptionId.includes("_3108_") || /\b(?:premium|4s|4 screens?)\b/i.test(subscription.name)) {
+      return "Netflix Premium";
+    }
+    if (subscriptionId === "ITUNES_INAPP_TIER8") {
+      return "Netflix Standard";
+    }
+    return void 0;
+  }
+  function pickPreferredAppStorePriceSubscriptionName(subscription) {
+    const localizedNames = subscription.localizedNames ?? {};
+    const preferredRegions = ["US", "GB", "CA", "AU", "IE", "NZ", "NO"];
+    for (const region of preferredRegions) {
+      const localizedName = localizedNames[region]?.trim();
+      if (localizedName !== void 0 && localizedName.length > 0 && isLikelyEnglishPlanName(localizedName)) {
+        return localizedName;
+      }
+    }
+    const directName = subscription.name.trim();
+    if (directName.length > 0 && isLikelyEnglishPlanName(directName)) {
+      return directName;
+    }
+    return Object.values(localizedNames).map((name) => name.trim()).find((name) => name.length > 0 && isLikelyEnglishPlanName(name));
+  }
+  function isLikelyEnglishPlanName(planName) {
+    if (!/^[\x20-\x7e]+$/.test(planName)) {
+      return false;
+    }
+    return !/\b(?:basico|básico|pantalla|pantallas|transmision|transmisión|ilimitada|gerät|geräte|gleichzeitig|lebenslang)\b/i.test(planName);
   }
   function formatDurationLabel(duration) {
     if (duration === "annual" || duration === "yearly") return "1 år";
@@ -6377,6 +6435,9 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isRecord$1(value) {
     return typeof value === "object" && value !== null;
+  }
+  function isStringRecord(value) {
+    return isRecord$1(value) && Object.values(value).every((entry) => typeof entry === "string");
   }
   const noWords = [
     "asshole",

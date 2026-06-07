@@ -26,6 +26,7 @@ type AppStorePriceSubscription = {
   subscriptionId: string;
   name: string;
   duration: string | null;
+  localizedNames?: Record<string, string>;
   prices: AppStorePriceSubscriptionPrice[];
 };
 
@@ -68,6 +69,8 @@ const APPSTOREPRICE_DOMAIN_SEARCH_ALIASES: Record<string, string[]> = {
   "firecore.com": ["firecore", "infuse"],
   "netflix.com": ["netflix"],
   "soundcloud.com": ["soundcloud"],
+  "twitter.com": ["x", "twitter"],
+  "x.com": ["x", "twitter"],
 };
 
 const APPSTOREPRICE_ALWAYS_TRY_DOMAINS = new Set([
@@ -76,6 +79,8 @@ const APPSTOREPRICE_ALWAYS_TRY_DOMAINS = new Set([
   "firecore.com",
   "netflix.com",
   "soundcloud.com",
+  "twitter.com",
+  "x.com",
 ]);
 
 const APPSTOREPRICE_DOMAIN_RESOLVER_EXCLUDED_DOMAINS = new Set([
@@ -174,7 +179,8 @@ export async function findAppStorePriceRegionPricesForUrl(
     return undefined;
   }
 
-  const subscriptions = extractAppStorePriceSubscriptions(html).filter(hasPositiveAppStorePrice);
+  const subscriptions = extractAppStorePriceSubscriptions(html)
+    .filter((entry) => hasPositiveAppStorePrice(entry) && hasSupportedAppStorePriceDuration(entry));
   const subscription = selectDefaultAppStorePriceSubscription(subscriptions, config);
   if (subscription === undefined || subscription.prices.length === 0) {
     return undefined;
@@ -316,6 +322,23 @@ function isYearlyAppStorePriceSubscription(subscription: AppStorePriceSubscripti
 
 function hasPositiveAppStorePrice(subscription: AppStorePriceSubscription): boolean {
   return subscription.prices.some((price) => price.price > 0);
+}
+
+function hasSupportedAppStorePriceDuration(subscription: AppStorePriceSubscription): boolean {
+  return (
+    subscription.duration === "monthly" ||
+    subscription.duration === "annual" ||
+    subscription.duration === "yearly" ||
+    (subscription.duration === null && isLifetimeAppStorePriceSubscription(subscription))
+  );
+}
+
+function isLifetimeAppStorePriceSubscription(subscription: AppStorePriceSubscription): boolean {
+  const names = [
+    subscription.name,
+    ...Object.values(subscription.localizedNames ?? {}),
+  ];
+  return names.some((name) => /\b(?:lifetime|life\s*time|forever|permanent|livstid)\b/i.test(name));
 }
 
 function compareAppStorePricePlanAlternatives(
@@ -832,6 +855,7 @@ function isAppStorePriceSubscription(value: unknown): value is AppStorePriceSubs
     typeof value.subscriptionId === "string" &&
     typeof value.name === "string" &&
     (typeof value.duration === "string" || value.duration === null) &&
+    (value.localizedNames === undefined || isStringRecord(value.localizedNames)) &&
     Array.isArray(value.prices) &&
     value.prices.every(isAppStorePriceSubscriptionPrice)
   );
@@ -891,13 +915,70 @@ function formatDurationSuffix(duration: string | null): string {
 }
 
 function formatSubscriptionPlanLabel(subscription: AppStorePriceSubscription): string {
-  const name = subscription.name.trim();
+  const name = formatAppStorePriceSubscriptionName(subscription);
   const durationLabel = formatDurationLabel(subscription.duration);
   if (durationLabel === undefined || name.length === 0 || planNameAlreadyContainsDuration(name, subscription.duration)) {
     return name;
   }
 
   return `${name} (${durationLabel})`;
+}
+
+function formatAppStorePriceSubscriptionName(subscription: AppStorePriceSubscription): string {
+  return inferKnownAppStorePriceSubscriptionName(subscription)
+    ?? pickPreferredAppStorePriceSubscriptionName(subscription)
+    ?? subscription.name.trim();
+}
+
+function inferKnownAppStorePriceSubscriptionName(subscription: AppStorePriceSubscription): string | undefined {
+  const subscriptionId = subscription.subscriptionId.toUpperCase();
+  const name = subscription.name.toLowerCase();
+  if (!subscriptionId.includes("NF99") && !name.includes("netflix")) {
+    return undefined;
+  }
+
+  if (subscriptionId.includes("_4001_") || /\bb[aá]sico\b/i.test(subscription.name)) {
+    return "Netflix Basic";
+  }
+  if (subscriptionId.includes("_3088_") || /\b(?:standard|2s|2 screens?)\b/i.test(subscription.name)) {
+    return "Netflix Standard";
+  }
+  if (subscriptionId.includes("_3108_") || /\b(?:premium|4s|4 screens?)\b/i.test(subscription.name)) {
+    return "Netflix Premium";
+  }
+  if (subscriptionId === "ITUNES_INAPP_TIER8") {
+    return "Netflix Standard";
+  }
+
+  return undefined;
+}
+
+function pickPreferredAppStorePriceSubscriptionName(subscription: AppStorePriceSubscription): string | undefined {
+  const localizedNames = subscription.localizedNames ?? {};
+  const preferredRegions = ["US", "GB", "CA", "AU", "IE", "NZ", "NO"];
+  for (const region of preferredRegions) {
+    const localizedName = localizedNames[region]?.trim();
+    if (localizedName !== undefined && localizedName.length > 0 && isLikelyEnglishPlanName(localizedName)) {
+      return localizedName;
+    }
+  }
+
+  const directName = subscription.name.trim();
+  if (directName.length > 0 && isLikelyEnglishPlanName(directName)) {
+    return directName;
+  }
+
+  return Object.values(localizedNames)
+    .map((name) => name.trim())
+    .find((name) => name.length > 0 && isLikelyEnglishPlanName(name));
+}
+
+function isLikelyEnglishPlanName(planName: string): boolean {
+  if (!/^[\x20-\x7e]+$/.test(planName)) {
+    return false;
+  }
+
+  return !/\b(?:basico|básico|pantalla|pantallas|transmision|transmisión|ilimitada|gerät|geräte|gleichzeitig|lebenslang)\b/i.test(planName);
 }
 
 function formatDurationLabel(duration: string | null): string | undefined {
@@ -989,4 +1070,11 @@ function parseJson(value: string): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every((entry) => typeof entry === "string")
+  );
 }
