@@ -803,14 +803,6 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
       cardSearchDetails,
       fullSearchDetails,
     }),
-    buildFlightPriceMatchOffer({
-      source: "skyscanner",
-      sourceName: "Skyscanner",
-      productUrl: buildSkyscannerFlightSearchUrl(flightMeta),
-      routeTitle,
-      cardSearchDetails,
-      fullSearchDetails,
-    }),
   ];
 
   const liveOffers = (await Promise.all([

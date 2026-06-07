@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780870485
+// @version      1780870599
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7473,14 +7473,6 @@ query SearchSuggestions($query: String!, $category: Int) {
         source: "panflights",
         sourceName: "PanFlights",
         productUrl: buildPanFlightsFlightSearchUrl(flightMeta),
-        routeTitle,
-        cardSearchDetails,
-        fullSearchDetails
-      }),
-      buildFlightPriceMatchOffer({
-        source: "skyscanner",
-        sourceName: "Skyscanner",
-        productUrl: buildSkyscannerFlightSearchUrl(flightMeta),
         routeTitle,
         cardSearchDetails,
         fullSearchDetails
