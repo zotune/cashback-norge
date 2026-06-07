@@ -76,6 +76,14 @@ export type PriceMatchOffer = {
   productUrl: string;
   offerUrl?: string;
   alternatives?: PriceMatchAlternative[];
+  relatedLinks?: PriceMatchRelatedLink[];
+};
+
+export type PriceMatchRelatedLink = {
+  label: string;
+  url: string;
+  provider?: "ggdeals";
+  title?: string;
 };
 
 export type PriceMatchAlternative = {
