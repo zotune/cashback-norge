@@ -2,6 +2,11 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
+import { findAllKeyShopPriceMatch } from "./allkeyshop-price-match.js";
+import {
+  findGgDealsPriceMatch,
+  type GgDealsPriceMatchOptions,
+} from "./ggdeals-price-match.js";
 import { findGodprisPriceMatch } from "./godpris-price-match.js";
 import {
   findIsthereanydealPriceMatch,
@@ -39,10 +44,15 @@ type TextRequest = (
 
 const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
 
+export type PriceMatchRuntimeOptions = {
+  ggDeals?: GgDealsPriceMatchOptions;
+};
+
 export async function findPriceMatches(
   message: GetPriceMatchForProductMessage,
   requestJson?: JsonRequest,
   requestText?: TextRequest,
+  options: PriceMatchRuntimeOptions = {},
 ): Promise<PriceMatchOffer[]> {
   if (isVinmonopoletProductUrl(message.url)) {
     const taxfreeOffer = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
@@ -55,8 +65,13 @@ export async function findPriceMatches(
   }
 
   if (isItadGameStoreProductUrl(message.url) || isItadGameStoreProductUrl(message.productUrl)) {
-    const isthereanydealOffer = await ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText));
-    return isthereanydealOffer !== undefined ? [isthereanydealOffer] : [];
+    const [isthereanydealOffer, ggDealsOffer, allKeyShopOffer] = await Promise.all([
+      ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText)),
+      ignorePriceMatchFailure(findGgDealsPriceMatch(message, requestJson, requestText, options.ggDeals)),
+      ignorePriceMatchFailure(findAllKeyShopPriceMatch(message, requestJson, requestText)),
+    ]);
+    return sortPriceMatchOffers([isthereanydealOffer, ggDealsOffer, allKeyShopOffer]
+      .filter((offer): offer is PriceMatchOffer => offer !== undefined));
   }
 
   const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer] = await Promise.all([
@@ -107,11 +122,7 @@ export async function findPriceMatches(
     return [];
   }
 
-  return allowedOffers.sort((first, second) => {
-      const amountDifference = first.amount - second.amount;
-      if (amountDifference !== 0) return amountDifference;
-      return sourceRank(first) - sourceRank(second);
-  });
+  return sortPriceMatchOffers(allowedOffers);
 }
 
 function isSupplementalPriceMatchOfferAligned(
@@ -184,9 +195,19 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "enhver") return 5;
   if (offer.source === "kassal") return 6;
   if (offer.source === "isthereanydeal") return 7;
-  if (offer.source === "taxfree") return 8;
-  if (offer.source === "vinmonopolet") return 8;
+  if (offer.source === "ggdeals") return 8;
+  if (offer.source === "allkeyshop") return 9;
+  if (offer.source === "taxfree") return 10;
+  if (offer.source === "vinmonopolet") return 10;
   return 4;
+}
+
+function sortPriceMatchOffers(offers: PriceMatchOffer[]): PriceMatchOffer[] {
+  return offers.sort((first, second) => {
+    const amountDifference = first.amount - second.amount;
+    if (amountDifference !== 0) return amountDifference;
+    return sourceRank(first) - sourceRank(second);
+  });
 }
 
 function isPriceMatchAllowedForCurrentPage(
@@ -264,6 +285,7 @@ function isKnownPriceMatchSourceProductUrl(rawUrl: string | undefined): boolean 
     if (hostname.endsWith("sesum.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
     if (hostname.endsWith("enhver.no")) return /^\/brands\/[^/]+\/\d+\/?$/.test(pathname);
     if (hostname.endsWith("kassal.app")) return /^\/vare\/[^/]+\/?$/.test(pathname);
+    if (hostname.endsWith("allkeyshop.com")) return /^\/blog\/buy-[^/]+-cd-key-compare-prices\/?$/.test(pathname);
     return false;
   } catch {
     return false;

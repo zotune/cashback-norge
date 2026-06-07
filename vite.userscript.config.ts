@@ -36,6 +36,9 @@ const USERSCRIPT_BANNER = `\
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      api.augmentedsteam.com
+// @connect      api.gg.deals
+// @connect      gg.deals
+// @connect      www.allkeyshop.com
 // @connect      namx6ho175-dsn.algolia.net
 // @connect      isthereanydeal.com
 // @connect      www.klarna.com

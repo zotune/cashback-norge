@@ -63,7 +63,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   matchedExactProduct?: boolean;

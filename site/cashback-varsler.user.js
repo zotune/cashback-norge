@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780831151
+// @version      1780841475
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -16,6 +16,9 @@
 // @connect      browser-extension-backend.cloud.pji.nu
 // @connect      godpris.no
 // @connect      api.augmentedsteam.com
+// @connect      api.gg.deals
+// @connect      gg.deals
+// @connect      www.allkeyshop.com
 // @connect      namx6ho175-dsn.algolia.net
 // @connect      isthereanydeal.com
 // @connect      www.klarna.com
@@ -395,147 +398,7 @@
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
-  const PACKAGE_QUANTITY_PATTERN = /\b(\d+(?:[,.]\d+)?)\s*(kg|kgm|kilo|kilogram|g|gr|grm|gram|grams|l|ltr|liter|litre|dl|dlt|cl|clt|ml|mlt|stk|stykk|stykke|pcs|pc|pk|pakke|pack)(?=$|[^A-Za-z0-9])/gi;
-  const GROCERY_CONTEXT_HOSTS = [
-    "oda.com",
-    "kolonial.no",
-    "meny.no",
-    "spar.no",
-    "kiwi.no",
-    "joker.no",
-    "rema.no",
-    "rema1000.no",
-    "coop.no",
-    "bunnpris.no",
-    "holdbart.no",
-    "europris.no",
-    "matkroken.no",
-    "naerbutikken.no",
-    "kassal.app",
-    "sesum.no",
-    "enhver.no"
-  ];
-  function readPackageQuantityFromText(text) {
-    if (text === void 0) return void 0;
-    const quantities = [];
-    for (const match of text.matchAll(PACKAGE_QUANTITY_PATTERN)) {
-      const amount = parseLocalizedNumber$2(match[1] ?? "");
-      const unit = normalizePackageUnit(match[2] ?? "");
-      if (unit === void 0 || !Number.isFinite(amount) || amount <= 0) continue;
-      const normalizedAmount = normalizePackageAmount(amount * unit.multiplier);
-      if (!isReasonablePackageQuantity(normalizedAmount, unit.unit)) continue;
-      quantities.push({ amount: normalizedAmount, unit: unit.unit });
-    }
-    return quantities.find((quantity) => quantity.unit !== "pcs") ?? quantities[0];
-  }
-  function readPackageQuantityFromValue(value) {
-    if (typeof value === "string" || typeof value === "number") {
-      return readPackageQuantityFromText(String(value));
-    }
-    if (!isPlainRecord$7(value)) return void 0;
-    const rawAmount = readNumberLike$7(value.value) ?? readNumberLike$7(value.amount) ?? readNumberLike$7(value.weight) ?? readNumberLike$7(value.volume);
-    const rawUnit = readStringLike$6(value.unitText) ?? readStringLike$6(value.unitCode) ?? readStringLike$6(value.unit) ?? readStringLike$6(value.measurementTechnique);
-    if (rawAmount === void 0 || rawUnit === void 0) {
-      return readPackageQuantityFromText(Object.values(value).map((item) => String(item)).join(" "));
-    }
-    const unit = normalizePackageUnit(rawUnit);
-    if (unit === void 0) return void 0;
-    const amount = normalizePackageAmount(rawAmount * unit.multiplier);
-    return isReasonablePackageQuantity(amount, unit.unit) ? { amount, unit: unit.unit } : void 0;
-  }
-  function isSamePackageQuantity(first, second) {
-    if (first === void 0 || second === void 0 || first.unit !== second.unit) return false;
-    return Math.abs(first.amount - second.amount) <= Math.max(0.5, first.amount * 0.01);
-  }
-  function buildPackageQuantityLabels(quantity) {
-    if (quantity === void 0) return [];
-    if (quantity.unit === "g") {
-      const grams = formatPackageAmount(quantity.amount);
-      const labels = [`${grams}g`, `${grams} g`];
-      if (quantity.amount >= 1e3 && quantity.amount % 1e3 === 0) {
-        const kilos = formatPackageAmount(quantity.amount / 1e3);
-        labels.push(`${kilos}kg`, `${kilos} kg`);
-      }
-      return uniqueStrings$b(labels);
-    }
-    if (quantity.unit === "ml") {
-      const milliliters = formatPackageAmount(quantity.amount);
-      const labels = [`${milliliters}ml`, `${milliliters} ml`];
-      if (quantity.amount >= 100 && quantity.amount % 10 === 0) {
-        const liters = formatPackageAmount(quantity.amount / 1e3);
-        labels.push(`${liters}l`, `${liters} l`);
-      }
-      if (quantity.amount % 10 === 0) {
-        const centiliters = formatPackageAmount(quantity.amount / 10);
-        labels.push(`${centiliters}cl`, `${centiliters} cl`);
-      }
-      return uniqueStrings$b(labels);
-    }
-    const pieces = formatPackageAmount(quantity.amount);
-    return uniqueStrings$b([`${pieces}stk`, `${pieces} stk`, `${pieces}pk`, `${pieces} pk`]);
-  }
-  function isLikelyGroceryPriceMatchContext(...rawUrls) {
-    return rawUrls.some((rawUrl) => {
-      if (rawUrl === void 0) return false;
-      try {
-        const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
-        return GROCERY_CONTEXT_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
-      } catch {
-        return false;
-      }
-    });
-  }
-  function normalizePackageUnit(rawUnit) {
-    const unit = transliterateNorwegianCharacters$5(rawUnit).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-zA-Z]/g, "").toLowerCase();
-    if (unit === "kg" || unit === "kgm" || unit === "kilo" || unit === "kilogram") return { unit: "g", multiplier: 1e3 };
-    if (unit === "g" || unit === "gr" || unit === "grm" || unit === "gram" || unit === "grams") return { unit: "g", multiplier: 1 };
-    if (unit === "l" || unit === "ltr" || unit === "liter" || unit === "litre") return { unit: "ml", multiplier: 1e3 };
-    if (unit === "dl" || unit === "dlt") return { unit: "ml", multiplier: 100 };
-    if (unit === "cl" || unit === "clt") return { unit: "ml", multiplier: 10 };
-    if (unit === "ml" || unit === "mlt") return { unit: "ml", multiplier: 1 };
-    if (unit === "stk" || unit === "stykk" || unit === "stykke" || unit === "pcs" || unit === "pc") {
-      return { unit: "pcs", multiplier: 1 };
-    }
-    if (unit === "pk" || unit === "pakke" || unit === "pack") return { unit: "pcs", multiplier: 1 };
-    return void 0;
-  }
-  function isReasonablePackageQuantity(amount, unit) {
-    if (!Number.isFinite(amount) || amount <= 0) return false;
-    if (unit === "pcs") return amount <= 200;
-    return amount <= 1e5;
-  }
-  function normalizePackageAmount(amount) {
-    return Number.isInteger(amount) ? amount : Number(amount.toFixed(2));
-  }
-  function formatPackageAmount(amount) {
-    return Number.isInteger(amount) ? String(amount) : String(Number(amount.toFixed(2))).replace(".", ",");
-  }
-  function parseLocalizedNumber$2(value) {
-    const compact = value.replace(/\s/g, "").replace(",", ".");
-    const parsed = Number.parseFloat(compact);
-    return Number.isFinite(parsed) ? parsed : Number.NaN;
-  }
-  function readStringLike$6(value) {
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : void 0;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-    return void 0;
-  }
-  function readNumberLike$7(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value !== "string") return void 0;
-    const parsed = parseLocalizedNumber$2(value);
-    return Number.isFinite(parsed) ? parsed : void 0;
-  }
-  function transliterateNorwegianCharacters$5(value) {
-    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
-  }
-  function uniqueStrings$b(values) {
-    return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
-  }
-  function isPlainRecord$7(value) {
+  function isRecord$4(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
@@ -618,18 +481,18 @@
     const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
     const separatorPrefixCandidates = PRODUCT_TITLE_BASE_MATCH_SEPARATORS.map((separator) => normalizedSearchTerm.split(separator)[0]);
     const buyTitleMatch = normalizedSearchTerm.match(/^(?:kj\u00f8p|kjop|buy)\s+(.+?)\s+(?:hos|at)\s+.+$/i);
-    return uniqueStrings$a([
+    return uniqueStrings$d([
       normalizedSearchTerm,
       ...separatorPrefixCandidates,
       buyTitleMatch?.[1]
     ]).filter((candidate) => candidate.length >= 4);
   }
   function tokenizeMatchText$1(value) {
-    const normalizedValue = transliterateNorwegianCharacters$4(value).normalize("NFD").replace(/\p{Diacritic}/gu, "");
-    return uniqueStrings$a(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
+    const normalizedValue = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    return uniqueStrings$d(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
   }
   function normalizeMatchToken$1(value) {
-    const normalized = transliterateNorwegianCharacters$4(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    const normalized = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
     return normalized.length > 0 ? normalized : void 0;
   }
   function canonicalizeMatchToken$1(token) {
@@ -638,213 +501,11 @@
   function hasUnrequestedConditionVariant$1(queryTokens, titleTokens) {
     return CONDITION_VARIANT_TOKENS$1.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
   }
-  function transliterateNorwegianCharacters$4(value) {
+  function transliterateNorwegianCharacters$5(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
   }
-  function uniqueStrings$a(values) {
+  function uniqueStrings$d(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
-  }
-  const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
-  const MIN_PRODUCT_TITLE_MATCH_SCORE = 0.45;
-  const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
-    "discontinued",
-    "not_available",
-    "not_in_stock",
-    "out_of_stock"
-  ]);
-  const BRAND_MATCH_GROUPS = [
-    ["apple"],
-    ["google", "pixel"],
-    ["microsoft", "xbox"],
-    ["nintendo"],
-    ["samsung"],
-    ["sony", "playstation"]
-  ];
-  async function findGodprisPriceMatch(message, requestJson = fetchJson$6, requestText = fetchText$5) {
-    if (!message.productPageClue && message.searchTerm.trim().length < 8) {
-      return void 0;
-    }
-    const searchQueries = uniqueStrings$9([
-      ...(message.codes ?? []).filter(isLikelyGtin$6),
-      message.searchTerm
-    ]);
-    const packageQuantity = getMessagePackageQuantity$3(message);
-    for (const query of searchQueries) {
-      const productId = await fetchGodprisProductId(query, requestJson, message.searchTerm, packageQuantity);
-      if (productId === void 0) continue;
-      const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
-        headers: { "Accept": "text/html,application/xhtml+xml" }
-      });
-      const offer = html !== void 0 ? readGodprisProductPage(html, productId, packageQuantity) : void 0;
-      if (offer !== void 0) return offer;
-    }
-    return void 0;
-  }
-  async function fetchGodprisProductId(query, requestJson, titleHint, packageQuantity) {
-    const normalizedQuery = query.trim();
-    if (normalizedQuery.length < 4) return void 0;
-    const params = new URLSearchParams({ q: normalizedQuery });
-    const value = await requestJson(`https://godpris.no/api/product/search?${params.toString()}`, {
-      headers: { "Accept": "application/json" }
-    });
-    if (!isPlainRecord$6(value) || !Array.isArray(value.results)) return void 0;
-    const isCodeQuery = isLikelyGtin$6(normalizedQuery);
-    let bestMatch;
-    for (const result of value.results) {
-      if (!isPlainRecord$6(result)) continue;
-      const id = readStringLike$5(result.id);
-      if (id === void 0) continue;
-      const title = readStringLike$5(result.title);
-      const groupTitle = readStringLike$5(result.group_title);
-      const brand = readStringLike$5(result.brand);
-      const matchQuery = isCodeQuery && titleHint !== void 0 ? titleHint : normalizedQuery;
-      const score = Math.max(
-        scoreGodprisProductMatch(matchQuery, uniqueStrings$9([brand, title]).join(" "), brand, packageQuantity),
-        scoreGodprisProductMatch(matchQuery, title ?? "", brand, packageQuantity),
-        scoreGodprisProductMatch(matchQuery, groupTitle ?? "", brand, packageQuantity)
-      );
-      if (bestMatch === void 0 || score > bestMatch.score) {
-        bestMatch = { id, score };
-      }
-    }
-    return bestMatch !== void 0 && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE ? bestMatch.id : void 0;
-  }
-  function scoreGodprisProductMatch(query, title, brand, packageQuantity) {
-    if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
-    if (!isGodprisPackageQuantityCompatible(packageQuantity, title)) return 0;
-    const score = scoreProductTitleAgainstSearchTerm(query, title);
-    return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
-  }
-  function hasGodprisBrandConflict(query, brand) {
-    if (brand === void 0) return false;
-    const queryTokens = new Set(tokenizeGodprisBrandText(query));
-    const brandTokens = new Set(tokenizeGodprisBrandText(brand));
-    if (queryTokens.size === 0 || brandTokens.size === 0) return false;
-    const queryBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => queryTokens.has(token)));
-    if (queryBrandGroups.length === 0) return false;
-    return !queryBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
-  }
-  function readGodprisProductPage(html, fallbackProductId, packageQuantity) {
-    const page = readGodprisDataPage(html);
-    const props = isPlainRecord$6(page?.props) ? page.props : void 0;
-    const product = isPlainRecord$6(props?.product) ? props.product : void 0;
-    const prices = Array.isArray(props?.prices) ? props.prices : [];
-    if (product === void 0 || prices.length === 0) return void 0;
-    const productId = readStringLike$5(product.id) ?? fallbackProductId;
-    const rawProductName = readStringLike$5(product.title) ?? readStringLike$5(product.name);
-    const productBrand = readStringLike$5(product.brand);
-    const productName = withLeadingBrand$1(rawProductName, productBrand) ?? "Godpris-produkt";
-    if (!isGodprisPackageQuantityCompatible(packageQuantity, productName)) return void 0;
-    const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
-    const best = offers[0];
-    if (best === void 0) return void 0;
-    return {
-      ...best,
-      source: "godpris",
-      sourceName: "Godpris",
-      productName,
-      productUrl: `${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`,
-      alternatives: offers.slice(0, 8).map((offer) => ({
-        shopName: offer.shopName,
-        amount: offer.amount,
-        currency: offer.currency,
-        price: offer.price
-      }))
-    };
-  }
-  function getMessagePackageQuantity$3(message) {
-    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
-  }
-  function isGodprisPackageQuantityCompatible(expectedQuantity, productName) {
-    if (expectedQuantity === void 0) return true;
-    const productQuantity = readPackageQuantityFromText(productName);
-    return productQuantity === void 0 || isSamePackageQuantity(expectedQuantity, productQuantity);
-  }
-  function readGodprisDataPage(html) {
-    const match = html.match(/<div id="app" data-page="([^"]*)"/);
-    if (match?.[1] === void 0) return void 0;
-    try {
-      return JSON.parse(decodeHtmlAttribute$1(match[1]));
-    } catch {
-      return void 0;
-    }
-  }
-  function withLeadingBrand$1(productName, brandName) {
-    if (productName === void 0) return void 0;
-    if (brandName === void 0 || productName.toLowerCase().includes(brandName.toLowerCase())) return productName;
-    return `${brandName} ${productName}`;
-  }
-  function readGodprisOffer(value) {
-    if (!isPlainRecord$6(value)) return void 0;
-    const shop = isPlainRecord$6(value.shop) ? value.shop : void 0;
-    const amount = readNumberLike$6(value.price);
-    const shopName = readStringLike$5(shop?.title) ?? readStringLike$5(value.shop_title);
-    const availability = readStringLike$5(value.availability)?.toLowerCase();
-    if (amount === void 0 || amount <= 0 || shopName === void 0) return void 0;
-    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$3.has(availability)) return void 0;
-    const offerUrl = readStringLike$5(value.click_url) ?? readStringLike$5(value.url);
-    return {
-      shopName,
-      amount,
-      currency: "NOK",
-      price: formatNokPrice$6(amount),
-      ...offerUrl !== void 0 ? { offerUrl } : {}
-    };
-  }
-  async function fetchJson$6(url, init) {
-    try {
-      const response = await fetch(url, init);
-      if (!response.ok) return void 0;
-      return response.json();
-    } catch {
-      return void 0;
-    }
-  }
-  async function fetchText$5(url, init) {
-    try {
-      const response = await fetch(url, init);
-      if (!response.ok) return void 0;
-      return response.text();
-    } catch {
-      return void 0;
-    }
-  }
-  function formatNokPrice$6(amount) {
-    const formatted = new Intl.NumberFormat("nb-NO", {
-      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
-    }).format(amount);
-    return `${formatted} kr`;
-  }
-  function decodeHtmlAttribute$1(value) {
-    return value.replace(/&quot;/g, '"').replace(/&#039;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-  }
-  function readStringLike$5(value) {
-    if (typeof value !== "string" && typeof value !== "number") return void 0;
-    const trimmed = String(value).trim();
-    return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function readNumberLike$6(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value !== "string") return void 0;
-    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
-    return Number.isFinite(parsed) ? parsed : void 0;
-  }
-  function tokenizeGodprisBrandText(value) {
-    return uniqueStrings$9(value.split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/).map(normalizeGodprisBrandToken).filter((token) => token !== void 0 && token.length >= 2));
-  }
-  function normalizeGodprisBrandToken(value) {
-    const normalized = value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-    return normalized.length > 0 ? normalized : void 0;
-  }
-  function uniqueStrings$9(values) {
-    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
-  }
-  function isLikelyGtin$6(value) {
-    const normalized = value.trim();
-    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
-  }
-  function isPlainRecord$6(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
   const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
@@ -892,7 +553,7 @@
     64,
     72
   ];
-  async function findIsthereanydealPriceMatch(message, requestJson = fetchJson$5, requestText = fetchText$4) {
+  async function findIsthereanydealPriceMatch(message, requestJson = fetchJson$8, requestText = fetchText$7) {
     const target = await resolveItadProductTarget(message, requestJson, requestText);
     if (target === void 0) return void 0;
     const pageContext = target.pageContext;
@@ -902,7 +563,7 @@
     if (bestDeal === void 0) return void 0;
     const matchedCurrentMerchant = deals.some((deal) => deal.shopId === target.currentShopId);
     if (target.dealScope === "microsoft" && !matchedCurrentMerchant) return void 0;
-    const productName = pageContext.title ?? target.productName ?? readGameProductName(message) ?? "PC-spill";
+    const productName = pageContext.title ?? target.productName ?? readGameProductName$1(message) ?? "PC-spill";
     const productUrl = pageContext.slug !== void 0 ? `${ISTHEREANYDEAL_ORIGIN}/game/${pageContext.slug}/info/` : pageContext.infoUrl;
     return {
       source: "isthereanydeal",
@@ -915,7 +576,7 @@
       price: bestDeal.price,
       productName,
       productUrl,
-      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative)
+      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative$2)
     };
   }
   function isItadGameStoreProductUrl(rawUrl) {
@@ -951,7 +612,7 @@
     if (appInfo?.infoUrl === void 0) return void 0;
     const pageContext = await fetchItadPageContext(appInfo.infoUrl, requestText);
     if (pageContext === void 0) return void 0;
-    const productName = readSteamProductName(message);
+    const productName = readSteamProductName$1(message);
     return {
       pageContext,
       currentShopId: STEAM_SHOP_ID,
@@ -983,7 +644,7 @@
   }
   async function resolveSearchableItadProductTarget(input) {
     const { message, requestJson, requestText, currentShopId, slug, dealScope } = input;
-    const titleCandidates = readGameTitleCandidates(message, slug);
+    const titleCandidates = readGameTitleCandidates$2(message, slug);
     if (slug !== void 0) {
       const directContext = await fetchItadPageContext(itadGameInfoUrl(slug), requestText);
       if (directContext !== void 0 && isItadGameContextLikelyMatch(directContext, titleCandidates, slug)) {
@@ -1171,7 +832,7 @@
       const slugKey = normalizeSlug(game.slug);
       const exactSlugScore = expectedSlugKey !== void 0 && slugKey === expectedSlugKey ? 1.25 : 0;
       const titleScore = scoreProductTitleAgainstSearchTerm(query, game.title);
-      const slugScore = scoreProductTitleAgainstSearchTerm(query, humanizeSlug(game.slug));
+      const slugScore = scoreProductTitleAgainstSearchTerm(query, humanizeSlug$1(game.slug));
       const typeBonus = game.type === 1 ? 0.04 : game.type === 2 ? 0.02 : 0;
       return {
         game,
@@ -1189,26 +850,26 @@
       return isLikelySameProductTitle(candidate, pageContext.title ?? "", 0.58) || scoreProductTitleAgainstSearchTerm(candidate, pageContext.title ?? "") >= 0.72;
     });
   }
-  function readGameTitleCandidates(message, slug) {
-    return uniqueStrings$8([
-      ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants),
-      ...readGameTitleCandidateVariants(message.searchTerm),
-      readSteamProductName(message),
-      slug !== void 0 ? humanizeSlug(slug) : void 0
+  function readGameTitleCandidates$2(message, slug) {
+    return uniqueStrings$c([
+      ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants$2),
+      ...readGameTitleCandidateVariants$2(message.searchTerm),
+      readSteamProductName$1(message),
+      slug !== void 0 ? humanizeSlug$1(slug) : void 0
     ]).filter((candidate) => candidate.length >= 2 && candidate.length <= 120);
   }
-  function readGameTitleCandidateVariants(value) {
+  function readGameTitleCandidateVariants$2(value) {
     if (value === void 0) return [];
     const normalized = value.trim().replace(/\s+/g, " ");
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$8([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$c([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function itadGameInfoUrl(slug) {
     return `${ISTHEREANYDEAL_ORIGIN}/game/${encodeURIComponent(normalizeSlug(slug))}/info/`;
   }
-  function humanizeSlug(slug) {
+  function humanizeSlug$1(slug) {
     return slug.replace(/--+/g, " ").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   }
   function normalizeSlug(value) {
@@ -1335,7 +996,7 @@
       shopName,
       amount: price.amount,
       currency: price.currency,
-      price: formatCurrency$1(price.amount, price.currency),
+      price: formatCurrency$3(price.amount, price.currency),
       ...platform !== void 0 ? { platform } : {},
       ...url !== void 0 ? { url } : {},
       ...voucher !== void 0 ? { voucher } : {}
@@ -1343,7 +1004,7 @@
   }
   function readItadDealPlatform(value) {
     const platformNames = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-    const names = uniqueStrings$8(platformNames.filter((item) => typeof item === "string").map((item) => item.trim()).filter((item) => item.length > 0));
+    const names = uniqueStrings$c(platformNames.filter((item) => typeof item === "string").map((item) => item.trim()).filter((item) => item.length > 0));
     return names.length > 0 ? names.join(", ") : void 0;
   }
   function readItadPrice(value) {
@@ -1351,13 +1012,13 @@
     const amountMinor = readNumber$1(value[0]);
     const currency = typeof value[1] === "string" ? value[1].toUpperCase() : void 0;
     if (amountMinor === void 0 || currency === void 0) return void 0;
-    const scale = currencyScale(currency);
+    const scale = currencyScale$2(currency);
     return {
       amount: amountMinor / Math.pow(10, scale),
       currency
     };
   }
-  function toPriceMatchAlternative(deal) {
+  function toPriceMatchAlternative$2(deal) {
     return {
       shopName: deal.shopName,
       amount: deal.amount,
@@ -1368,16 +1029,16 @@
       ...deal.voucher !== void 0 ? { shippingPrice: `kode ${deal.voucher}` } : {}
     };
   }
-  function readGameProductName(message) {
-    return readGameTitleCandidates(message)[0];
+  function readGameProductName$1(message) {
+    return readGameTitleCandidates$2(message)[0];
   }
-  function readSteamProductName(message) {
-    const slugName = readSteamProductNameFromUrl(message.url) ?? readSteamProductNameFromUrl(message.productUrl);
+  function readSteamProductName$1(message) {
+    const slugName = readSteamProductNameFromUrl$1(message.url) ?? readSteamProductNameFromUrl$1(message.productUrl);
     if (slugName !== void 0) return slugName;
     const cleaned = message.searchTerm.replace(/^spar\s+\d+\s*%\s+på\s+/i, "").replace(/\s+i\s+steam$/i, "").trim();
     return cleaned.length > 0 ? cleaned : void 0;
   }
-  function readSteamProductNameFromUrl(rawUrl) {
+  function readSteamProductNameFromUrl$1(rawUrl) {
     if (rawUrl === void 0) return void 0;
     try {
       const url = new URL(rawUrl);
@@ -1399,6 +1060,719 @@
       return void 0;
     }
   }
+  function formatCurrency$3(amount, currency) {
+    try {
+      return new Intl.NumberFormat("nb-NO", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: currencyScale$2(currency)
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(currencyScale$2(currency))} ${currency}`;
+    }
+  }
+  function currencyScale$2(currency) {
+    if ((/* @__PURE__ */ new Set(["JPY", "KRW", "CLP", "VND", "IDR"])).has(currency.toUpperCase())) return 0;
+    if ((/* @__PURE__ */ new Set(["BHD", "KWD", "OMR"])).has(currency.toUpperCase())) return 3;
+    return 2;
+  }
+  async function fetchJson$8(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      const text = await response.text();
+      return text.length > 0 ? JSON.parse(text) : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchText$7(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  function readNumber$1(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
+    return value;
+  }
+  function isRecord$3(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function uniqueStrings$c(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
+  const ALLKEYSHOP_BLOG_ORIGIN = `${ALLKEYSHOP_ORIGIN}/blog`;
+  const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
+  const MAX_ALLKEYSHOP_ALTERNATIVES = 8;
+  const STATIC_NOK_BASE_RATES = {
+    rates: {
+      AUD: 0.15,
+      CAD: 0.148,
+      DKK: 0.686,
+      EUR: 0.092,
+      GBP: 0.079,
+      NOK: 1,
+      PLN: 0.39,
+      SEK: 1,
+      USD: 0.106
+    }
+  };
+  const ALLKEYSHOP_HTML_REQUESTS = [
+    {
+      headers: { "Accept": "text/html,application/xhtml+xml" },
+      credentials: "include"
+    },
+    {
+      headers: { "Accept": "text/html,application/xhtml+xml" }
+    }
+  ];
+  async function findAllKeyShopPriceMatch(message, requestJson = fetchJson$7, requestText = fetchText$6) {
+    if (!isAllKeyShopSupportedGameUrl(message.url) && !isAllKeyShopSupportedGameUrl(message.productUrl)) {
+      return void 0;
+    }
+    const page = await fetchAllKeyShopPageData(message, requestText);
+    if (page === void 0) return void 0;
+    const rates = await fetchNokBaseRates(requestJson) ?? STATIC_NOK_BASE_RATES;
+    const platformScope = readPlatformScope(message);
+    const titleCandidates = readGameTitleCandidates$1(message);
+    const offers = page.data.prices.filter((price) => price.dispo === void 0 || price.dispo > 0).filter((price) => price.account !== true).filter((price) => isActivationPlatformAllowed(price.activationPlatform, platformScope)).filter((price) => isAllKeyShopEditionAllowed(page.data.editions.get(price.edition ?? ""), titleCandidates)).map((price) => toAllKeyShopOffer(price, page.data.currency, page.data.editions, page.data.regions, rates)).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
+    const best = offers[0];
+    if (best === void 0) return void 0;
+    const productName = page.data.title ?? titleCandidates[0] ?? "PC-spill";
+    return {
+      source: "allkeyshop",
+      sourceName: "ALLKEYSHOP",
+      matchedExactProduct: true,
+      shopName: best.shopName,
+      amount: best.amount,
+      sortAmount: best.amount,
+      currency: best.currency,
+      price: formatApproxCurrency(best.amount, best.currency),
+      productName,
+      productUrl: page.url,
+      alternatives: offers.slice(0, MAX_ALLKEYSHOP_ALTERNATIVES).map(toPriceMatchAlternative$1)
+    };
+  }
+  function isAllKeyShopSupportedGameUrl(rawUrl) {
+    return isSteamAppProductUrl(rawUrl) || isEpicGamesStoreProductUrl(rawUrl) || isMicrosoftStoreProductUrl(rawUrl) || isAllKeyShopProductUrl(rawUrl);
+  }
+  function isAllKeyShopProductUrl(rawUrl) {
+    if (rawUrl === void 0) return false;
+    try {
+      const url = new URL(rawUrl);
+      const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+      return hostname === "allkeyshop.com" && /\/blog\/buy-[^/]+-cd-key-compare-prices\/?$/i.test(url.pathname);
+    } catch {
+      return false;
+    }
+  }
+  async function fetchAllKeyShopPageData(message, requestText) {
+    const titleCandidates = readGameTitleCandidates$1(message);
+    for (const url of buildAllKeyShopPageUrlCandidates(message, titleCandidates)) {
+      for (const init of ALLKEYSHOP_HTML_REQUESTS) {
+        const html = await requestText(url, init);
+        if (html === void 0) continue;
+        const data = readAllKeyShopData(html);
+        if (data === void 0 || !isLikelyAllKeyShopProductMatch(data.title, titleCandidates, url)) continue;
+        return { data, url };
+      }
+    }
+    return void 0;
+  }
+  function buildAllKeyShopPageUrlCandidates(message, titleCandidates) {
+    const directUrls = [message.url, message.productUrl].filter((url) => url !== void 0 && isAllKeyShopProductUrl(url));
+    const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
+    const slugUrls = uniqueStrings$b([
+      epicSlug,
+      ...titleCandidates.map(toAllKeyShopSlug)
+    ]).map((slug) => `${ALLKEYSHOP_BLOG_ORIGIN}/buy-${encodeURIComponent(slug)}-cd-key-compare-prices/`);
+    return uniqueStrings$b([...directUrls, ...slugUrls]);
+  }
+  function readAllKeyShopData(html) {
+    const gamePageTrans = readAssignedJsonObject(html, "gamePageTrans");
+    if (!isRecord$4(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
+    const prices = gamePageTrans.prices.map(readAllKeyShopRawPrice).filter((price) => price !== void 0);
+    if (prices.length === 0) return void 0;
+    return {
+      currency: readAllKeyShopCurrency(html),
+      editions: readAllKeyShopEditions(gamePageTrans.editions),
+      prices,
+      regions: readAllKeyShopRegions(gamePageTrans.regions),
+      ...readAllKeyShopTitle(html)
+    };
+  }
+  function readAllKeyShopRawPrice(value) {
+    if (!isRecord$4(value)) return void 0;
+    const merchantName = readString$1(value.merchantName);
+    const amount = readAmount$1(value.price);
+    if (merchantName === void 0 || amount === void 0 || amount <= 0) return void 0;
+    const activationPlatform = readString$1(value.activationPlatform);
+    const edition = readString$1(value.edition);
+    const region = readString$1(value.region);
+    const voucherCode = readString$1(value.voucher_code);
+    return {
+      merchantName,
+      price: amount,
+      ...readOptionalAmount$1("priceCard", value.priceCard),
+      ...readOptionalAmount$1("pricePaypal", value.pricePaypal),
+      ...typeof value.account === "boolean" ? { account: value.account } : {},
+      ...typeof value.dispo === "number" ? { dispo: value.dispo } : {},
+      ...typeof value.isOfficial === "boolean" ? { isOfficial: value.isOfficial } : {},
+      ...activationPlatform !== void 0 ? { activationPlatform } : {},
+      ...edition !== void 0 ? { edition } : {},
+      ...region !== void 0 ? { region } : {},
+      ...voucherCode !== void 0 ? { voucherCode } : {}
+    };
+  }
+  function readOptionalAmount$1(key, value) {
+    const amount = readAmount$1(value);
+    return amount !== void 0 && amount > 0 ? { [key]: amount } : {};
+  }
+  function readAllKeyShopCurrency(html) {
+    const siteCurrency = html.match(/window\.__site\s*=\s*\{[\s\S]{0,1200}?"currency"\s*:\s*"([a-z]{3})"/i)?.[1];
+    if (siteCurrency !== void 0) return siteCurrency.toUpperCase();
+    const schemaCurrency = html.match(/"priceCurrency"\s*:\s*"([a-z]{3})"/i)?.[1];
+    return schemaCurrency !== void 0 ? schemaCurrency.toUpperCase() : "EUR";
+  }
+  function readAllKeyShopEditions(value) {
+    const editions = /* @__PURE__ */ new Map();
+    if (!isRecord$4(value)) return editions;
+    for (const [id, edition] of Object.entries(value)) {
+      if (!isRecord$4(edition)) continue;
+      const name = readString$1(edition.name);
+      if (name !== void 0) editions.set(id, name);
+    }
+    return editions;
+  }
+  function readAllKeyShopRegions(value) {
+    const regions = /* @__PURE__ */ new Map();
+    if (!isRecord$4(value)) return regions;
+    for (const [id, region] of Object.entries(value)) {
+      if (!isRecord$4(region)) continue;
+      const name = readString$1(region.region_name) ?? readString$1(region.filter_name);
+      if (name !== void 0) regions.set(id, name);
+    }
+    return regions;
+  }
+  function readAllKeyShopTitle(html) {
+    const h1 = stripTags$1(decodeHtml$3(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? ""));
+    const title = h1.replace(/^Buy\s+/i, "").replace(/\s+CD Key\s+Compare Prices.*$/i, "").replace(/\s+Compare Prices.*$/i, "").trim();
+    return title.length > 0 ? { title } : {};
+  }
+  function toAllKeyShopOffer(price, currency, editions, regions, rates) {
+    const amount = pickAllKeyShopPayableAmount(price);
+    const nokAmount = convertToNok(amount, currency, rates);
+    if (nokAmount === void 0) return void 0;
+    const platform = formatActivationPlatform(price.activationPlatform);
+    const region = price.region !== void 0 ? regions.get(price.region) : void 0;
+    const edition = price.edition !== void 0 ? editions.get(price.edition) : void 0;
+    return {
+      amount: nokAmount,
+      currency: "NOK",
+      originalAmount: amount,
+      originalCurrency: currency,
+      shopName: price.merchantName,
+      ...platform !== void 0 ? { platform } : {},
+      ...region !== void 0 ? { region } : {},
+      ...edition !== void 0 ? { edition } : {},
+      ...price.voucherCode !== void 0 ? { voucherCode: price.voucherCode } : {}
+    };
+  }
+  function pickAllKeyShopPayableAmount(price) {
+    const payableAmounts = [
+      price.priceCard,
+      price.pricePaypal
+    ].filter((amount) => amount !== void 0 && Number.isFinite(amount) && amount > 0).sort((first, second) => first - second);
+    return payableAmounts[0] ?? price.price;
+  }
+  function toPriceMatchAlternative$1(offer) {
+    return {
+      shopName: offer.shopName,
+      amount: offer.amount,
+      sortAmount: offer.amount,
+      currency: offer.currency,
+      price: formatApproxCurrency(offer.amount, offer.currency),
+      ...(() => {
+        const details = formatAllKeyShopTooltipDetails(offer);
+        return details !== void 0 ? { platform: details } : {};
+      })()
+    };
+  }
+  function formatAllKeyShopTooltipDetails(offer) {
+    const details = [
+      offer.platform,
+      offer.region,
+      offer.edition,
+      offer.voucherCode !== void 0 ? `kode ${offer.voucherCode}` : void 0
+    ].filter((detail) => detail !== void 0 && detail.length > 0);
+    return details.length > 0 ? details.join(", ") : void 0;
+  }
+  async function fetchNokBaseRates(requestJson) {
+    const value = await requestJson(EXCHANGE_RATES_URL, {
+      headers: { "Accept": "application/json" }
+    });
+    if (!isRecord$4(value) || value.result !== "success" || !isRecord$4(value.rates)) return void 0;
+    const rates = {};
+    for (const [currency, rate] of Object.entries(value.rates)) {
+      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+        rates[currency.toUpperCase()] = rate;
+      }
+    }
+    return Object.keys(rates).length > 0 ? { rates } : void 0;
+  }
+  function convertToNok(amount, currency, rates) {
+    const normalizedCurrency = currency.toUpperCase();
+    if (normalizedCurrency === "NOK") return amount;
+    const rate = rates.rates[normalizedCurrency];
+    if (typeof rate !== "number" || rate <= 0) return void 0;
+    return amount / rate;
+  }
+  function readPlatformScope(message) {
+    if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
+      return ["steam", "microsoft-windows", "windows", "xbox-play-anywhere"];
+    }
+    if (isEpicGamesStoreProductUrl(message.url) || isEpicGamesStoreProductUrl(message.productUrl)) return ["epic", "epic-store", "epic-games", "epic-games-store"];
+    if (isMicrosoftStoreProductUrl(message.url) || isMicrosoftStoreProductUrl(message.productUrl)) {
+      return ["microsoft-windows", "windows", "xbox", "xbox-play-anywhere"];
+    }
+    return [];
+  }
+  function isActivationPlatformAllowed(value, allowedPlatforms) {
+    if (allowedPlatforms.length === 0) return true;
+    if (value === void 0) return false;
+    const normalized = normalizePlatform(value);
+    return allowedPlatforms.some((platform) => normalized === normalizePlatform(platform));
+  }
+  function formatActivationPlatform(value) {
+    if (value === void 0) return void 0;
+    const normalized = normalizePlatform(value);
+    if (normalized === "steam") return "Steam";
+    if (normalized === "epic" || normalized === "epic-store" || normalized === "epic-games" || normalized === "epic-games-store") return "Epic Games";
+    if (normalized === "microsoft-windows" || normalized === "windows") return "Microsoft Store";
+    if (normalized === "xbox-play-anywhere") return "Xbox Play Anywhere";
+    if (normalized === "xbox") return "Xbox";
+    return value.split(/[-_\s]+/g).filter((part) => part.length > 0).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(" ");
+  }
+  function normalizePlatform(value) {
+    return value.trim().toLowerCase().replace(/[_\s]+/g, "-");
+  }
+  function isAllKeyShopEditionAllowed(editionName, titleCandidates) {
+    const targetEdition = readEditionKeyword(titleCandidates.join(" "));
+    if (targetEdition === void 0) {
+      return editionName === void 0 || isStandardEdition(editionName);
+    }
+    if (editionName === void 0) return true;
+    return normalizeEdition(editionName).includes(targetEdition);
+  }
+  function readEditionKeyword(value) {
+    const normalized = normalizeEdition(value);
+    for (const keyword of ["premium", "deluxe", "ultimate", "complete", "collector", "constellation", "special", "gold"]) {
+      if (normalized.includes(keyword)) return keyword;
+    }
+    return void 0;
+  }
+  function isStandardEdition(value) {
+    const normalized = normalizeEdition(value);
+    return normalized === "standard" || normalized === "base" || normalized === "normal";
+  }
+  function normalizeEdition(value) {
+    return value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function isLikelyAllKeyShopProductMatch(title, titleCandidates, url) {
+    if (title === void 0) return true;
+    const slug = url.match(/\/buy-([^/]+)-cd-key-compare-prices\/?$/i)?.[1];
+    if (slug !== void 0 && titleCandidates.some((candidate) => toAllKeyShopSlug(candidate) === slug)) return true;
+    return titleCandidates.some((candidate) => scoreProductTitleAgainstSearchTerm(candidate, title) >= 0.72);
+  }
+  function readGameTitleCandidates$1(message) {
+    return uniqueStrings$b([
+      ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants$1),
+      ...readGameTitleCandidateVariants$1(message.searchTerm),
+      readSteamProductName(message),
+      ...readGameTitleCandidateVariants$1(parseEpicGamesProductSlug(message.url)),
+      ...readGameTitleCandidateVariants$1(parseEpicGamesProductSlug(message.productUrl))
+    ]).filter((candidate) => candidate.length >= 2 && candidate.length <= 120);
+  }
+  function readGameTitleCandidateVariants$1(value) {
+    if (value === void 0) return [];
+    const normalized = humanizeSlug(value).trim().replace(/\s+/g, " ");
+    if (normalized.length === 0) return [];
+    const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:on|i|p\u00e5)\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store)$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
+    const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
+    return uniqueStrings$b([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+  }
+  function humanizeSlug(value) {
+    return value.replace(/[-_]+/g, " ");
+  }
+  function readSteamProductName(message) {
+    return readSteamProductNameFromUrl(message.url) ?? readSteamProductNameFromUrl(message.productUrl);
+  }
+  function readSteamProductNameFromUrl(rawUrl) {
+    if (rawUrl === void 0) return void 0;
+    try {
+      const url = new URL(rawUrl);
+      const match = url.pathname.match(/^\/app\/\d+\/([^/?#]+)/i);
+      const slug = match?.[1];
+      if (slug === void 0) return void 0;
+      const name = decodeURIComponent(slug).replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+      return name.length > 0 ? name : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function toAllKeyShopSlug(value) {
+    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  }
+  function readAssignedJsonObject(html, variableName) {
+    const marker = new RegExp(`\\bvar\\s+${escapeRegExp$4(variableName)}\\s*=\\s*`, "i");
+    const match = marker.exec(html);
+    if (match === null) return void 0;
+    const start = match.index + match[0].length;
+    const jsonStart = html.indexOf("{", start);
+    if (jsonStart < 0) return void 0;
+    const jsonEnd = findBalancedObjectEnd(html, jsonStart);
+    if (jsonEnd === void 0) return void 0;
+    try {
+      return JSON.parse(html.slice(jsonStart, jsonEnd + 1));
+    } catch {
+      return void 0;
+    }
+  }
+  function findBalancedObjectEnd(value, startIndex) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = startIndex; index < value.length; index++) {
+      const char = value[index];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === "\\") {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{") depth += 1;
+      if (char === "}") {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+    return void 0;
+  }
+  function readString$1(value) {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : void 0;
+  }
+  function readAmount$1(value) {
+    const amount = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value.replace(",", ".")) : Number.NaN;
+    return Number.isFinite(amount) && amount >= 0 ? amount : void 0;
+  }
+  function uniqueStrings$b(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function stripTags$1(value) {
+    return value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  }
+  function decodeHtml$3(value) {
+    return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+  }
+  function escapeRegExp$4(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function formatCurrency$2(amount, currency) {
+    try {
+      return new Intl.NumberFormat("nb-NO", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: currencyScale$1(currency)
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(currencyScale$1(currency))} ${currency}`;
+    }
+  }
+  function formatApproxCurrency(amount, currency) {
+    return `~${formatCurrency$2(amount, currency)}`;
+  }
+  function currencyScale$1(currency) {
+    if ((/* @__PURE__ */ new Set(["JPY", "KRW", "CLP", "VND", "IDR"])).has(currency.toUpperCase())) return 0;
+    if ((/* @__PURE__ */ new Set(["BHD", "KWD", "OMR"])).has(currency.toUpperCase())) return 3;
+    return 2;
+  }
+  async function fetchJson$7(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchText$6(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  const GG_DEALS_ORIGIN = "https://gg.deals";
+  const GG_DEALS_STEAM_APP_PRICE_URL = "https://api.gg.deals/v1/prices/by-steam-app-id/";
+  const DEFAULT_GG_DEALS_API_KEY = "sqz5OjdsyxNW2e0i3aF5BA0p5rpd0fHU";
+  const DEFAULT_GG_DEALS_REGION = "no";
+  const MAX_GG_DEALS_ALTERNATIVES = 4;
+  async function findGgDealsPriceMatch(message, requestJson = fetchJson$6, requestText = fetchText$5, options = {}) {
+    if (!isGgDealsSupportedGameUrl(message.url) && !isGgDealsSupportedGameUrl(message.productUrl)) {
+      return void 0;
+    }
+    const steamAppId = parseSteamAppId(message.url) ?? parseSteamAppId(message.productUrl);
+    const apiKey = normalizeApiKey(options.apiKey);
+    const region = normalizeRegion(options.region);
+    if (steamAppId !== void 0 && apiKey !== void 0) {
+      const apiOffer = await fetchGgDealsSteamAppPriceMatch({
+        apiKey,
+        appId: steamAppId,
+        message,
+        region,
+        requestJson
+      });
+      if (apiOffer !== void 0) return apiOffer;
+    }
+    return fetchGgDealsPagePriceMatch({
+      message,
+      requestText,
+      ...steamAppId !== void 0 ? { steamAppId } : {}
+    });
+  }
+  function isGgDealsSupportedGameUrl(rawUrl) {
+    return isSteamAppProductUrl(rawUrl) || isEpicGamesStoreProductUrl(rawUrl);
+  }
+  async function fetchGgDealsSteamAppPriceMatch(input) {
+    const params = new URLSearchParams({
+      ids: String(input.appId),
+      key: input.apiKey,
+      region: input.region
+    });
+    const value = await input.requestJson(`${GG_DEALS_STEAM_APP_PRICE_URL}?${params.toString()}`, {
+      headers: { "Accept": "application/json" }
+    });
+    const data = readGgDealsApiPriceData(value, String(input.appId));
+    if (data === void 0) return void 0;
+    return buildGgDealsOffer(input.message, data, `${GG_DEALS_ORIGIN}/steam/app/${input.appId}/`);
+  }
+  async function fetchGgDealsPagePriceMatch(input) {
+    for (const url of buildGgDealsPageUrlCandidates(input.message, input.steamAppId)) {
+      const html = await input.requestText(url, {
+        headers: { "Accept": "text/html" },
+        credentials: "include"
+      });
+      if (html === void 0 || isCloudflareChallenge(html)) continue;
+      const data = readGgDealsPagePriceData(html);
+      if (data === void 0 || !isLikelyGgDealsProductMatch(input.message, data.title, url)) continue;
+      return buildGgDealsOffer(input.message, data, url);
+    }
+    return void 0;
+  }
+  function buildGgDealsPageUrlCandidates(message, steamAppId) {
+    const urls = [];
+    if (steamAppId !== void 0) {
+      urls.push(`${GG_DEALS_ORIGIN}/steam/app/${steamAppId}/`);
+    }
+    const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
+    const slugs = uniqueStrings$a([
+      epicSlug,
+      ...readGameTitleCandidates(message).map(toGgDealsSlug)
+    ]);
+    for (const slug of slugs) {
+      if (slug.length > 0) urls.push(`${GG_DEALS_ORIGIN}/game/${encodeURIComponent(slug)}/`);
+    }
+    return uniqueStrings$a(urls);
+  }
+  function buildGgDealsOffer(message, data, fallbackUrl) {
+    const alternatives = readGgDealsPriceBuckets(data).sort((first, second) => first.amount - second.amount).map(toPriceMatchAlternative);
+    const best = alternatives[0];
+    if (best === void 0) return void 0;
+    const productName = data.title ?? readGameProductName(message) ?? "PC-spill";
+    return {
+      source: "ggdeals",
+      sourceName: "GG Deals",
+      matchedExactProduct: true,
+      shopName: formatPrimaryGgDealsShopName(best.shopName),
+      amount: best.amount,
+      sortAmount: best.sortAmount ?? best.amount,
+      currency: best.currency,
+      price: best.price,
+      productName,
+      productUrl: data.url ?? fallbackUrl,
+      alternatives: alternatives.slice(0, MAX_GG_DEALS_ALTERNATIVES)
+    };
+  }
+  function formatPrimaryGgDealsShopName(shopName) {
+    if (shopName === "Beste keyshop") return "GG Deals Keyshops";
+    if (shopName === "Beste offisielle butikk") return "GG Deals Official Stores";
+    return shopName;
+  }
+  function readGgDealsApiPriceData(value, id) {
+    if (!isRecord$4(value) || value.success !== true || !isRecord$4(value.data)) return void 0;
+    const rawData = value.data[id];
+    if (!isRecord$4(rawData)) return void 0;
+    return readGgDealsPriceData(rawData);
+  }
+  function readGgDealsPriceData(value) {
+    const prices = isRecord$4(value.prices) ? value.prices : void 0;
+    if (prices === void 0) return void 0;
+    const currency = typeof prices.currency === "string" && prices.currency.length > 0 ? prices.currency.toUpperCase() : "NOK";
+    return {
+      ...typeof value.title === "string" && value.title.length > 0 ? { title: value.title } : {},
+      ...typeof value.url === "string" && value.url.length > 0 ? { url: value.url } : {},
+      prices: {
+        currency,
+        ...readOptionalAmount("currentRetail", prices),
+        ...readOptionalAmount("currentKeyshops", prices),
+        ...readOptionalAmount("historicalRetail", prices),
+        ...readOptionalAmount("historicalKeyshops", prices)
+      }
+    };
+  }
+  function readOptionalAmount(key, value) {
+    const amount = readAmount(value[key]);
+    return amount !== void 0 ? { [key]: amount } : {};
+  }
+  function readGgDealsPagePriceData(html) {
+    const title = decodeHtml$2(stripTags(
+      html.match(/class=["'][^"']*(?:game-info-title|game-header-title)[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] ?? ""
+    )) || void 0;
+    const url = decodeHtml$2(
+      html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1] ?? html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i)?.[1] ?? ""
+    ) || void 0;
+    const currentRetail = readPagePrice(html, "Official Stores");
+    const currentKeyshops = readPagePrice(html, "Keyshops");
+    const historicalRetail = readPagePrice(html, "Official Stores Low");
+    const historicalKeyshops = readPagePrice(html, "Keyshops Low");
+    if (currentRetail === void 0 && currentKeyshops === void 0 && historicalRetail === void 0 && historicalKeyshops === void 0) {
+      return void 0;
+    }
+    return {
+      ...title !== void 0 ? { title } : {},
+      ...url !== void 0 ? { url } : {},
+      prices: {
+        currency: readPageCurrency(html) ?? "NOK",
+        ...currentRetail !== void 0 ? { currentRetail } : {},
+        ...currentKeyshops !== void 0 ? { currentKeyshops } : {},
+        ...historicalRetail !== void 0 ? { historicalRetail } : {},
+        ...historicalKeyshops !== void 0 ? { historicalKeyshops } : {}
+      }
+    };
+  }
+  function readPagePrice(html, label) {
+    const labelPattern = escapeRegExp$3(label);
+    const labelMatch = html.match(new RegExp(`${labelPattern}[\\s\\S]{0,1200}?class=["'][^"']*price-inner numeric[^"']*["'][^>]*>([\\s\\S]*?)<`, "i"));
+    const rawPrice = labelMatch?.[1];
+    if (rawPrice === void 0) return void 0;
+    return readLocalizedAmount(decodeHtml$2(stripTags(rawPrice)));
+  }
+  function readPageCurrency(html) {
+    if (/\bNOK\b|kr\b/i.test(html)) return "NOK";
+    if (/\bUSD\b|\$/i.test(html)) return "USD";
+    if (/\bEUR\b|€/i.test(html)) return "EUR";
+    if (/\bGBP\b|£/i.test(html)) return "GBP";
+    return void 0;
+  }
+  function readGgDealsPriceBuckets(data) {
+    return [
+      data.prices.currentRetail !== void 0 ? {
+        amount: data.prices.currentRetail,
+        currency: data.prices.currency,
+        ...data.prices.historicalRetail !== void 0 ? { historicalAmount: data.prices.historicalRetail } : {},
+        shopName: "Beste offisielle butikk"
+      } : void 0,
+      data.prices.currentKeyshops !== void 0 ? {
+        amount: data.prices.currentKeyshops,
+        currency: data.prices.currency,
+        ...data.prices.historicalKeyshops !== void 0 ? { historicalAmount: data.prices.historicalKeyshops } : {},
+        shopName: "Beste keyshop"
+      } : void 0
+    ].filter((bucket) => bucket !== void 0);
+  }
+  function toPriceMatchAlternative(bucket) {
+    return {
+      shopName: bucket.shopName,
+      amount: bucket.amount,
+      sortAmount: bucket.amount,
+      currency: bucket.currency,
+      price: formatCurrency$1(bucket.amount, bucket.currency),
+      ...bucket.historicalAmount !== void 0 && bucket.historicalAmount < bucket.amount ? { shippingPrice: `historisk lav ${formatCurrency$1(bucket.historicalAmount, bucket.currency)}` } : {}
+    };
+  }
+  function isLikelyGgDealsProductMatch(message, title, url) {
+    if (title === void 0) return true;
+    const slug = url.match(/\/game\/([^/?#]+)\/?/i)?.[1];
+    const candidates = readGameTitleCandidates(message);
+    if (slug !== void 0 && candidates.some((candidate) => toGgDealsSlug(candidate) === slug)) return true;
+    return candidates.some((candidate) => scoreProductTitleAgainstSearchTerm(candidate, title) >= 0.72);
+  }
+  function readGameTitleCandidates(message) {
+    return uniqueStrings$a([
+      ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants),
+      ...readGameTitleCandidateVariants(message.searchTerm)
+    ]).filter((candidate) => candidate.length >= 2 && candidate.length <= 120);
+  }
+  function readGameTitleCandidateVariants(value) {
+    if (value === void 0) return [];
+    const normalized = value.trim().replace(/\s+/g, " ");
+    if (normalized.length === 0) return [];
+    const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
+    const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
+    return uniqueStrings$a([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+  }
+  function readGameProductName(message) {
+    return readGameTitleCandidates(message)[0];
+  }
+  function normalizeApiKey(value) {
+    const trimmed = value?.trim();
+    return trimmed !== void 0 && trimmed.length > 0 ? trimmed : DEFAULT_GG_DEALS_API_KEY;
+  }
+  function normalizeRegion(value) {
+    const trimmed = value?.trim().toLowerCase();
+    return trimmed !== void 0 && /^[a-z]{2}$/.test(trimmed) ? trimmed : DEFAULT_GG_DEALS_REGION;
+  }
+  function readAmount(value) {
+    const amount = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value.replace(",", ".")) : Number.NaN;
+    return Number.isFinite(amount) && amount >= 0 ? amount : void 0;
+  }
+  function readLocalizedAmount(value) {
+    const normalized = value.replace(/\s/g, "").replace(/[^0-9,.-]/g, "").replace(",", ".");
+    return readAmount(normalized);
+  }
+  function isCloudflareChallenge(html) {
+    return /cf-mitigated["']?\s*:\s*challenge/i.test(html) || /<title>\s*Just a moment\.\.\.\s*<\/title>/i.test(html) || /Enable JavaScript and cookies to continue/i.test(html);
+  }
+  function toGgDealsSlug(value) {
+    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  }
+  function uniqueStrings$a(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function stripTags(value) {
+    return value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  }
+  function decodeHtml$2(value) {
+    return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+  }
+  function escapeRegExp$3(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
   function formatCurrency$1(amount, currency) {
     try {
       return new Intl.NumberFormat("nb-NO", {
@@ -1415,12 +1789,319 @@
     if ((/* @__PURE__ */ new Set(["BHD", "KWD", "OMR"])).has(currency.toUpperCase())) return 3;
     return 2;
   }
+  async function fetchJson$6(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.json();
+    } catch {
+      return void 0;
+    }
+  }
+  async function fetchText$5(url, init) {
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) return void 0;
+      return response.text();
+    } catch {
+      return void 0;
+    }
+  }
+  const PACKAGE_QUANTITY_PATTERN = /\b(\d+(?:[,.]\d+)?)\s*(kg|kgm|kilo|kilogram|g|gr|grm|gram|grams|l|ltr|liter|litre|dl|dlt|cl|clt|ml|mlt|stk|stykk|stykke|pcs|pc|pk|pakke|pack)(?=$|[^A-Za-z0-9])/gi;
+  const GROCERY_CONTEXT_HOSTS = [
+    "oda.com",
+    "kolonial.no",
+    "meny.no",
+    "spar.no",
+    "kiwi.no",
+    "joker.no",
+    "rema.no",
+    "rema1000.no",
+    "coop.no",
+    "bunnpris.no",
+    "holdbart.no",
+    "europris.no",
+    "matkroken.no",
+    "naerbutikken.no",
+    "kassal.app",
+    "sesum.no",
+    "enhver.no"
+  ];
+  function readPackageQuantityFromText(text) {
+    if (text === void 0) return void 0;
+    const quantities = [];
+    for (const match of text.matchAll(PACKAGE_QUANTITY_PATTERN)) {
+      const amount = parseLocalizedNumber$2(match[1] ?? "");
+      const unit = normalizePackageUnit(match[2] ?? "");
+      if (unit === void 0 || !Number.isFinite(amount) || amount <= 0) continue;
+      const normalizedAmount = normalizePackageAmount(amount * unit.multiplier);
+      if (!isReasonablePackageQuantity(normalizedAmount, unit.unit)) continue;
+      quantities.push({ amount: normalizedAmount, unit: unit.unit });
+    }
+    return quantities.find((quantity) => quantity.unit !== "pcs") ?? quantities[0];
+  }
+  function readPackageQuantityFromValue(value) {
+    if (typeof value === "string" || typeof value === "number") {
+      return readPackageQuantityFromText(String(value));
+    }
+    if (!isPlainRecord$7(value)) return void 0;
+    const rawAmount = readNumberLike$7(value.value) ?? readNumberLike$7(value.amount) ?? readNumberLike$7(value.weight) ?? readNumberLike$7(value.volume);
+    const rawUnit = readStringLike$6(value.unitText) ?? readStringLike$6(value.unitCode) ?? readStringLike$6(value.unit) ?? readStringLike$6(value.measurementTechnique);
+    if (rawAmount === void 0 || rawUnit === void 0) {
+      return readPackageQuantityFromText(Object.values(value).map((item) => String(item)).join(" "));
+    }
+    const unit = normalizePackageUnit(rawUnit);
+    if (unit === void 0) return void 0;
+    const amount = normalizePackageAmount(rawAmount * unit.multiplier);
+    return isReasonablePackageQuantity(amount, unit.unit) ? { amount, unit: unit.unit } : void 0;
+  }
+  function isSamePackageQuantity(first, second) {
+    if (first === void 0 || second === void 0 || first.unit !== second.unit) return false;
+    return Math.abs(first.amount - second.amount) <= Math.max(0.5, first.amount * 0.01);
+  }
+  function buildPackageQuantityLabels(quantity) {
+    if (quantity === void 0) return [];
+    if (quantity.unit === "g") {
+      const grams = formatPackageAmount(quantity.amount);
+      const labels = [`${grams}g`, `${grams} g`];
+      if (quantity.amount >= 1e3 && quantity.amount % 1e3 === 0) {
+        const kilos = formatPackageAmount(quantity.amount / 1e3);
+        labels.push(`${kilos}kg`, `${kilos} kg`);
+      }
+      return uniqueStrings$9(labels);
+    }
+    if (quantity.unit === "ml") {
+      const milliliters = formatPackageAmount(quantity.amount);
+      const labels = [`${milliliters}ml`, `${milliliters} ml`];
+      if (quantity.amount >= 100 && quantity.amount % 10 === 0) {
+        const liters = formatPackageAmount(quantity.amount / 1e3);
+        labels.push(`${liters}l`, `${liters} l`);
+      }
+      if (quantity.amount % 10 === 0) {
+        const centiliters = formatPackageAmount(quantity.amount / 10);
+        labels.push(`${centiliters}cl`, `${centiliters} cl`);
+      }
+      return uniqueStrings$9(labels);
+    }
+    const pieces = formatPackageAmount(quantity.amount);
+    return uniqueStrings$9([`${pieces}stk`, `${pieces} stk`, `${pieces}pk`, `${pieces} pk`]);
+  }
+  function isLikelyGroceryPriceMatchContext(...rawUrls) {
+    return rawUrls.some((rawUrl) => {
+      if (rawUrl === void 0) return false;
+      try {
+        const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
+        return GROCERY_CONTEXT_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+      } catch {
+        return false;
+      }
+    });
+  }
+  function normalizePackageUnit(rawUnit) {
+    const unit = transliterateNorwegianCharacters$4(rawUnit).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-zA-Z]/g, "").toLowerCase();
+    if (unit === "kg" || unit === "kgm" || unit === "kilo" || unit === "kilogram") return { unit: "g", multiplier: 1e3 };
+    if (unit === "g" || unit === "gr" || unit === "grm" || unit === "gram" || unit === "grams") return { unit: "g", multiplier: 1 };
+    if (unit === "l" || unit === "ltr" || unit === "liter" || unit === "litre") return { unit: "ml", multiplier: 1e3 };
+    if (unit === "dl" || unit === "dlt") return { unit: "ml", multiplier: 100 };
+    if (unit === "cl" || unit === "clt") return { unit: "ml", multiplier: 10 };
+    if (unit === "ml" || unit === "mlt") return { unit: "ml", multiplier: 1 };
+    if (unit === "stk" || unit === "stykk" || unit === "stykke" || unit === "pcs" || unit === "pc") {
+      return { unit: "pcs", multiplier: 1 };
+    }
+    if (unit === "pk" || unit === "pakke" || unit === "pack") return { unit: "pcs", multiplier: 1 };
+    return void 0;
+  }
+  function isReasonablePackageQuantity(amount, unit) {
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    if (unit === "pcs") return amount <= 200;
+    return amount <= 1e5;
+  }
+  function normalizePackageAmount(amount) {
+    return Number.isInteger(amount) ? amount : Number(amount.toFixed(2));
+  }
+  function formatPackageAmount(amount) {
+    return Number.isInteger(amount) ? String(amount) : String(Number(amount.toFixed(2))).replace(".", ",");
+  }
+  function parseLocalizedNumber$2(value) {
+    const compact = value.replace(/\s/g, "").replace(",", ".");
+    const parsed = Number.parseFloat(compact);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+  function readStringLike$6(value) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : void 0;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    return void 0;
+  }
+  function readNumberLike$7(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = parseLocalizedNumber$2(value);
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function transliterateNorwegianCharacters$4(value) {
+    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
+  }
+  function uniqueStrings$9(values) {
+    return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
+  }
+  function isPlainRecord$7(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
+  const MIN_PRODUCT_TITLE_MATCH_SCORE = 0.45;
+  const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
+    "discontinued",
+    "not_available",
+    "not_in_stock",
+    "out_of_stock"
+  ]);
+  const BRAND_MATCH_GROUPS = [
+    ["apple"],
+    ["google", "pixel"],
+    ["microsoft", "xbox"],
+    ["nintendo"],
+    ["samsung"],
+    ["sony", "playstation"]
+  ];
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$5, requestText = fetchText$4) {
+    if (!message.productPageClue && message.searchTerm.trim().length < 8) {
+      return void 0;
+    }
+    const searchQueries = uniqueStrings$8([
+      ...(message.codes ?? []).filter(isLikelyGtin$6),
+      message.searchTerm
+    ]);
+    const packageQuantity = getMessagePackageQuantity$3(message);
+    for (const query of searchQueries) {
+      const productId = await fetchGodprisProductId(query, requestJson, message.searchTerm, packageQuantity);
+      if (productId === void 0) continue;
+      const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
+        headers: { "Accept": "text/html,application/xhtml+xml" }
+      });
+      const offer = html !== void 0 ? readGodprisProductPage(html, productId, packageQuantity) : void 0;
+      if (offer !== void 0) return offer;
+    }
+    return void 0;
+  }
+  async function fetchGodprisProductId(query, requestJson, titleHint, packageQuantity) {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 4) return void 0;
+    const params = new URLSearchParams({ q: normalizedQuery });
+    const value = await requestJson(`https://godpris.no/api/product/search?${params.toString()}`, {
+      headers: { "Accept": "application/json" }
+    });
+    if (!isPlainRecord$6(value) || !Array.isArray(value.results)) return void 0;
+    const isCodeQuery = isLikelyGtin$6(normalizedQuery);
+    let bestMatch;
+    for (const result of value.results) {
+      if (!isPlainRecord$6(result)) continue;
+      const id = readStringLike$5(result.id);
+      if (id === void 0) continue;
+      const title = readStringLike$5(result.title);
+      const groupTitle = readStringLike$5(result.group_title);
+      const brand = readStringLike$5(result.brand);
+      const matchQuery = isCodeQuery && titleHint !== void 0 ? titleHint : normalizedQuery;
+      const score = Math.max(
+        scoreGodprisProductMatch(matchQuery, uniqueStrings$8([brand, title]).join(" "), brand, packageQuantity),
+        scoreGodprisProductMatch(matchQuery, title ?? "", brand, packageQuantity),
+        scoreGodprisProductMatch(matchQuery, groupTitle ?? "", brand, packageQuantity)
+      );
+      if (bestMatch === void 0 || score > bestMatch.score) {
+        bestMatch = { id, score };
+      }
+    }
+    return bestMatch !== void 0 && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE ? bestMatch.id : void 0;
+  }
+  function scoreGodprisProductMatch(query, title, brand, packageQuantity) {
+    if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
+    if (!isGodprisPackageQuantityCompatible(packageQuantity, title)) return 0;
+    const score = scoreProductTitleAgainstSearchTerm(query, title);
+    return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
+  }
+  function hasGodprisBrandConflict(query, brand) {
+    if (brand === void 0) return false;
+    const queryTokens = new Set(tokenizeGodprisBrandText(query));
+    const brandTokens = new Set(tokenizeGodprisBrandText(brand));
+    if (queryTokens.size === 0 || brandTokens.size === 0) return false;
+    const queryBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => queryTokens.has(token)));
+    if (queryBrandGroups.length === 0) return false;
+    return !queryBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
+  }
+  function readGodprisProductPage(html, fallbackProductId, packageQuantity) {
+    const page = readGodprisDataPage(html);
+    const props = isPlainRecord$6(page?.props) ? page.props : void 0;
+    const product = isPlainRecord$6(props?.product) ? props.product : void 0;
+    const prices = Array.isArray(props?.prices) ? props.prices : [];
+    if (product === void 0 || prices.length === 0) return void 0;
+    const productId = readStringLike$5(product.id) ?? fallbackProductId;
+    const rawProductName = readStringLike$5(product.title) ?? readStringLike$5(product.name);
+    const productBrand = readStringLike$5(product.brand);
+    const productName = withLeadingBrand$1(rawProductName, productBrand) ?? "Godpris-produkt";
+    if (!isGodprisPackageQuantityCompatible(packageQuantity, productName)) return void 0;
+    const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
+    const best = offers[0];
+    if (best === void 0) return void 0;
+    return {
+      ...best,
+      source: "godpris",
+      sourceName: "Godpris",
+      productName,
+      productUrl: `${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`,
+      alternatives: offers.slice(0, 8).map((offer) => ({
+        shopName: offer.shopName,
+        amount: offer.amount,
+        currency: offer.currency,
+        price: offer.price
+      }))
+    };
+  }
+  function getMessagePackageQuantity$3(message) {
+    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
+  }
+  function isGodprisPackageQuantityCompatible(expectedQuantity, productName) {
+    if (expectedQuantity === void 0) return true;
+    const productQuantity = readPackageQuantityFromText(productName);
+    return productQuantity === void 0 || isSamePackageQuantity(expectedQuantity, productQuantity);
+  }
+  function readGodprisDataPage(html) {
+    const match = html.match(/<div id="app" data-page="([^"]*)"/);
+    if (match?.[1] === void 0) return void 0;
+    try {
+      return JSON.parse(decodeHtmlAttribute$1(match[1]));
+    } catch {
+      return void 0;
+    }
+  }
+  function withLeadingBrand$1(productName, brandName) {
+    if (productName === void 0) return void 0;
+    if (brandName === void 0 || productName.toLowerCase().includes(brandName.toLowerCase())) return productName;
+    return `${brandName} ${productName}`;
+  }
+  function readGodprisOffer(value) {
+    if (!isPlainRecord$6(value)) return void 0;
+    const shop = isPlainRecord$6(value.shop) ? value.shop : void 0;
+    const amount = readNumberLike$6(value.price);
+    const shopName = readStringLike$5(shop?.title) ?? readStringLike$5(value.shop_title);
+    const availability = readStringLike$5(value.availability)?.toLowerCase();
+    if (amount === void 0 || amount <= 0 || shopName === void 0) return void 0;
+    if (availability !== void 0 && BAD_AVAILABILITY_STATUSES$3.has(availability)) return void 0;
+    const offerUrl = readStringLike$5(value.click_url) ?? readStringLike$5(value.url);
+    return {
+      shopName,
+      amount,
+      currency: "NOK",
+      price: formatNokPrice$6(amount),
+      ...offerUrl !== void 0 ? { offerUrl } : {}
+    };
+  }
   async function fetchJson$5(url, init) {
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
-      const text = await response.text();
-      return text.length > 0 ? JSON.parse(text) : void 0;
+      return response.json();
     } catch {
       return void 0;
     }
@@ -1434,15 +2115,42 @@
       return void 0;
     }
   }
-  function readNumber$1(value) {
-    if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
-    return value;
+  function formatNokPrice$6(amount) {
+    const formatted = new Intl.NumberFormat("nb-NO", {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2
+    }).format(amount);
+    return `${formatted} kr`;
   }
-  function isRecord$3(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+  function decodeHtmlAttribute$1(value) {
+    return value.replace(/&quot;/g, '"').replace(/&#039;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  }
+  function readStringLike$5(value) {
+    if (typeof value !== "string" && typeof value !== "number") return void 0;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberLike$6(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function tokenizeGodprisBrandText(value) {
+    return uniqueStrings$8(value.split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/).map(normalizeGodprisBrandToken).filter((token) => token !== void 0 && token.length >= 2));
+  }
+  function normalizeGodprisBrandToken(value) {
+    const normalized = value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    return normalized.length > 0 ? normalized : void 0;
   }
   function uniqueStrings$8(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function isLikelyGtin$6(value) {
+    const normalized = value.trim();
+    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
+  }
+  function isPlainRecord$6(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const ENHVER_GROCERIES_URL = "https://api.enhver.no/groceries";
   const ENHVER_PRODUCT_URL = "https://enhver.no/brands/kiwi/";
@@ -4302,7 +5010,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
-  async function findPriceMatches(message, requestJson, requestText) {
+  async function findPriceMatches(message, requestJson, requestText, options = {}) {
     if (isVinmonopoletProductUrl(message.url)) {
       const taxfreeOffer2 = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
       return taxfreeOffer2 !== void 0 ? [taxfreeOffer2] : [];
@@ -4312,8 +5020,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       return vinmonopoletOffer !== void 0 ? [vinmonopoletOffer] : [];
     }
     if (isItadGameStoreProductUrl(message.url) || isItadGameStoreProductUrl(message.productUrl)) {
-      const isthereanydealOffer2 = await ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText));
-      return isthereanydealOffer2 !== void 0 ? [isthereanydealOffer2] : [];
+      const [isthereanydealOffer2, ggDealsOffer, allKeyShopOffer] = await Promise.all([
+        ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText)),
+        ignorePriceMatchFailure(findGgDealsPriceMatch(message, requestJson, requestText, options.ggDeals)),
+        ignorePriceMatchFailure(findAllKeyShopPriceMatch(message, requestJson, requestText))
+      ]);
+      return sortPriceMatchOffers([isthereanydealOffer2, ggDealsOffer, allKeyShopOffer].filter((offer) => offer !== void 0));
     }
     const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer] = await Promise.all([
       ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
@@ -4351,11 +5063,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    return allowedOffers.sort((first, second) => {
-      const amountDifference = first.amount - second.amount;
-      if (amountDifference !== 0) return amountDifference;
-      return sourceRank(first) - sourceRank(second);
-    });
+    return sortPriceMatchOffers(allowedOffers);
   }
   function isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms) {
     if (offer.source !== "godpris" && offer.source !== "prisradar") return true;
@@ -4401,9 +5109,18 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (offer.source === "enhver") return 5;
     if (offer.source === "kassal") return 6;
     if (offer.source === "isthereanydeal") return 7;
-    if (offer.source === "taxfree") return 8;
-    if (offer.source === "vinmonopolet") return 8;
+    if (offer.source === "ggdeals") return 8;
+    if (offer.source === "allkeyshop") return 9;
+    if (offer.source === "taxfree") return 10;
+    if (offer.source === "vinmonopolet") return 10;
     return 4;
+  }
+  function sortPriceMatchOffers(offers) {
+    return offers.sort((first, second) => {
+      const amountDifference = first.amount - second.amount;
+      if (amountDifference !== 0) return amountDifference;
+      return sourceRank(first) - sourceRank(second);
+    });
   }
   function isPriceMatchAllowedForCurrentPage(offers, message) {
     if (isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl)) {
@@ -4445,6 +5162,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (hostname.endsWith("sesum.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
       if (hostname.endsWith("enhver.no")) return /^\/brands\/[^/]+\/\d+\/?$/.test(pathname);
       if (hostname.endsWith("kassal.app")) return /^\/vare\/[^/]+\/?$/.test(pathname);
+      if (hostname.endsWith("allkeyshop.com")) return /^\/blog\/buy-[^/]+-cd-key-compare-prices\/?$/.test(pathname);
       return false;
     } catch {
       return false;
@@ -6006,11 +6724,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(parsedUrl.pathname);
   }
   function isDynamicPriceMatchProductPage(parsedUrl) {
-    return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString());
+    return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isSteamAppProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString());
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
@@ -7067,6 +7785,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-ggdeals {
       background: #111018;
+      color: #ffffff;
+    }
+    .provider-allkeyshop {
+      background: #070b12;
       color: #ffffff;
     }
     .provider-psprices {
@@ -9086,7 +9808,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -9385,6 +10107,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "enhver") return "enhver";
     if (priceMatch.source === "kassal") return "kassal";
     if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
+    if (priceMatch.source === "ggdeals") return "ggdeals";
+    if (priceMatch.source === "allkeyshop") return "allkeyshop";
     if (priceMatch.source === "taxfree") return "taxfree";
     if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
     return "prisjakt";
@@ -9398,6 +10122,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "enhver") return "enhver";
     if (priceMatch.source === "kassal") return "Kassalapp";
     if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
+    if (priceMatch.source === "ggdeals") return "GG Deals";
+    if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";
     if (priceMatch.source === "taxfree") return "Tax Free";
     if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";
     return "Prisjakt";

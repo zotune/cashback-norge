@@ -272,7 +272,7 @@ export function parseSteamAppId(rawUrl: string | undefined): number | undefined 
   }
 }
 
-function parseEpicGamesProductSlug(rawUrl: string | undefined): string | undefined {
+export function parseEpicGamesProductSlug(rawUrl: string | undefined): string | undefined {
   if (rawUrl === undefined) return undefined;
   try {
     const url = new URL(rawUrl);

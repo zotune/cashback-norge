@@ -19,6 +19,7 @@ import {
   isEpicGamesStoreProductUrl,
   isItadGameStoreProductUrl,
   isMicrosoftStoreProductUrl,
+  isSteamAppProductUrl,
 } from "../shared/isthereanydeal-price-match";
 import {
   findPlayStationRegionPrices,
@@ -232,7 +233,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   matchedExactProduct?: boolean;
@@ -929,6 +930,7 @@ function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
   return isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
     isEpicGamesStoreProductUrl(parsedUrl.toString()) ||
+    isSteamAppProductUrl(parsedUrl.toString()) ||
     isMicrosoftStoreProductUrl(parsedUrl.toString());
 }
 
@@ -937,6 +939,7 @@ function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   return hostname === "vinmonopolet.no" ||
     hostname === "tax-free.no" ||
     hostname === "store.epicgames.com" ||
+    hostname === "store.steampowered.com" ||
     hostname === "xbox.com" ||
     hostname === "apps.microsoft.com";
 }
@@ -2231,6 +2234,10 @@ function renderNotice(
     }
     .provider-ggdeals {
       background: #111018;
+      color: #ffffff;
+    }
+    .provider-allkeyshop {
+      background: #070b12;
       color: #ffffff;
     }
     .provider-psprices {
@@ -4349,7 +4356,7 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     (value.matchedExactProduct === undefined || typeof value.matchedExactProduct === "boolean") &&
@@ -4741,6 +4748,8 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "kassal") return "kassal";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
+  if (priceMatch.source === "ggdeals") return "ggdeals";
+  if (priceMatch.source === "allkeyshop") return "allkeyshop";
   if (priceMatch.source === "taxfree") return "taxfree";
   if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
   return "prisjakt";
@@ -4754,6 +4763,8 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "kassal") return "Kassalapp";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
+  if (priceMatch.source === "ggdeals") return "GG Deals";
+  if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";
   if (priceMatch.source === "taxfree") return "Tax Free";
   if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";
   return "Prisjakt";
