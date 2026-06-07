@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780870599
+// @version      1780871333
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7125,6 +7125,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
   const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
   const MOMONDO_FLIGHT_PAGE_SIZE = 50;
+  const MOMONDO_DEFAULT_FLIGHT_SORT_MODE = "bestflight_a";
   const SKYSCANNER_FENRYR_BASE_URL = "https://www.skyscanner.net/g/fenryr/v1";
   const SKYSCANNER_CLIENT_VERSION = "7.194.1";
   const SKYSCANNER_CHANNEL_ID = "goandroid";
@@ -7492,7 +7493,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     ].sort(comparePriceMatchesBySortAmount);
   }
   function extractFlightSearchMeta(parsedUrl) {
-    return extractSasFlightSearchMeta(parsedUrl) ?? extractSkyscannerFlightSearchMeta(parsedUrl) ?? extractStoredFlightSearchMeta(parsedUrl) ?? extractVisibleFlightSearchMeta(parsedUrl);
+    return extractSasFlightSearchMeta(parsedUrl) ?? extractFinnFlightSearchMeta(parsedUrl) ?? extractPanFlightsFlightSearchMeta(parsedUrl) ?? extractMomondoFlightSearchMeta(parsedUrl) ?? extractSkyscannerFlightSearchMeta(parsedUrl) ?? extractStoredFlightSearchMeta(parsedUrl) ?? extractVisibleFlightSearchMeta(parsedUrl);
   }
   function extractSasFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -7521,6 +7522,84 @@ query SearchSuggestions($query: String!, $category: Int) {
       children,
       infants
     };
+  }
+  function extractFinnFlightSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "finn.no" || !/^\/reise\/flybilletter\/resultat\/?$/i.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    const origin = readIataCodeFromValues([
+      parsedUrl.searchParams.get("departureAirportLeg1"),
+      parsedUrl.searchParams.get("requestedOrigin")
+    ]);
+    const destination = readIataCodeFromValues([
+      parsedUrl.searchParams.get("arrivalAirportLeg1"),
+      parsedUrl.searchParams.get("requestedDestination")
+    ]);
+    const outboundDate = readIsoDateFromValues([
+      parsedUrl.searchParams.get("requestedDepartureDate"),
+      parsedUrl.searchParams.get("departureDate")
+    ]);
+    const inboundDate = readIsoDateFromValues([
+      parsedUrl.searchParams.get("requestedReturnDate"),
+      parsedUrl.searchParams.get("returnDate")
+    ]);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
+      youths: 0,
+      children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+      infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0
+    });
+  }
+  function extractPanFlightsFlightSearchMeta(parsedUrl) {
+    if (!isPanFlightsSearchPage(parsedUrl)) return void 0;
+    const v2 = parsedUrl.searchParams.get("v2");
+    if (v2 === null) return void 0;
+    const parts = v2.split("_");
+    const origin = readIataCodeValue(parts[0]);
+    const destination = readIataCodeValue(parts[1]);
+    const outboundDate = readCompactIsoDateValue(parts[2]);
+    const inboundDate = readCompactIsoDateValue(parts[3]);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? readPositiveIntegerValue(parsedUrl.searchParams.get("ad")) ?? 1,
+      youths: 0,
+      children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+      infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0
+    });
+  }
+  function extractMomondoFlightSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "momondo.no" || !/^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?\/?$/i.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    const parts = parsedUrl.pathname.split("/").filter(Boolean);
+    const routePart = parts[1];
+    const routeParts = routePart?.split("-");
+    const origin = readIataCodeValue(routeParts?.[0]);
+    const destination = readIataCodeValue(routeParts?.[1]);
+    const outboundDate = readIsoDateValue(parts[2]);
+    const inboundDate = readIsoDateValue(parts[3]);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
+      youths: 0,
+      children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+      infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0
+    });
   }
   function extractSkyscannerFlightSearchMeta(parsedUrl) {
     if (!isSkyscannerFlightSearchPage(parsedUrl)) return void 0;
@@ -8475,14 +8554,27 @@ query SearchSuggestions($query: String!, $category: Int) {
       flightMeta.outboundDate,
       flightMeta.inboundDate
     ].filter((part) => part !== void 0);
-    const params = new URLSearchParams({ sort: "bestflight_a" });
+    const params = new URLSearchParams({ sort: MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
     if (flightMeta.adults !== 1) {
       params.set("adults", String(flightMeta.adults));
     }
     return `https://www.momondo.no/flight-search/${pathParts.map(encodeURIComponent).join("/")}?${params.toString()}`;
   }
+  function readCurrentMomondoFlightSearchUrl(flightMeta) {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return void 0;
+    const currentMeta = extractMomondoFlightSearchMeta(parsedUrl);
+    return currentMeta !== void 0 && isSameFlightSearchMeta(currentMeta, flightMeta) ? parsedUrl.toString() : void 0;
+  }
+  function isSameFlightSearchMeta(left, right) {
+    return left.origin === right.origin && left.destination === right.destination && left.outboundDate === right.outboundDate && left.inboundDate === right.inboundDate && left.adults === right.adults && left.youths === right.youths && left.children === right.children && left.infants === right.infants;
+  }
+  function readMomondoFlightSortMode(url) {
+    const sortMode = parseUrl(url)?.searchParams.get("sort");
+    return sortMode === "price_a" || sortMode === "bestflight_a" ? sortMode : void 0;
+  }
   async function findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
-    const resultUrl = buildMomondoFlightSearchUrl(flightMeta);
+    const resultUrl = readCurrentMomondoFlightSearchUrl(flightMeta) ?? buildMomondoFlightSearchUrl(flightMeta);
     const searchData = await fetchMomondoFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
     const resultData = await pollMomondoFlightResults(searchData, flightMeta);
@@ -8514,7 +8606,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (html === void 0) return void 0;
     const formToken = parseMomondoFormToken(html);
     if (formToken === void 0) return void 0;
-    return { formToken, resultUrl };
+    return {
+      formToken,
+      resultUrl,
+      sortMode: readMomondoFlightSortMode(resultUrl) ?? MOMONDO_DEFAULT_FLIGHT_SORT_MODE
+    };
   }
   function parseMomondoFormToken(html) {
     return html.match(/window\.R9\.formToken\s*=\s*'([^']+)'/)?.[1] ?? html.match(/window\.R9\.formToken\s*=\s*"([^"]+)"/)?.[1];
@@ -8552,11 +8648,11 @@ query SearchSuggestions($query: String!, $category: Int) {
         "X-CSRF": searchData.formToken,
         "x-kayak-session-error-check": "iris"
       },
-      body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, searchId, filterState)),
+      body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, searchId, filterState, searchData.sortMode)),
       credentials: "include"
     });
   }
-  function buildMomondoFlightPollPayload(flightMeta, searchId, filterState) {
+  function buildMomondoFlightPollPayload(flightMeta, searchId, filterState, sortMode) {
     return {
       ...filterState !== void 0 ? { filterParams: { fs: filterState } } : {},
       userSearchParams: {
@@ -8564,7 +8660,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         legs: buildMomondoFlightRequestLegs(flightMeta),
         passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
         pageType: "frontDoor",
-        sortMode: "bestflight_a"
+        sortMode
       },
       searchMetaData: {
         priceMode: "total",
@@ -8624,10 +8720,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (isMomondoFlightPoorItinerary(result)) continue;
       const tripSummary = formatMomondoFlightTripSummary(result, resultData);
       const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
-      for (const bookingOption of readRecordArray(result.bookingOptions)) {
-        const amount = readMomondoBookingOptionAmount(bookingOption);
+      const bookingOptions = readRecordArray(result.bookingOptions).filter(isMomondoBookingOptionAvailable);
+      const useDisplayPrices = bookingOptions.some((bookingOption) => {
+        return readMomondoBookingOptionDisplayAmount(bookingOption) !== void 0;
+      });
+      for (const bookingOption of bookingOptions) {
+        const amount = useDisplayPrices ? readMomondoBookingOptionDisplayAmount(bookingOption) : readMomondoBookingOptionAmount(bookingOption);
         if (amount === void 0) continue;
-        const currency = readMomondoBookingOptionCurrency(bookingOption) ?? "NOK";
+        const currency = (useDisplayPrices ? readMomondoBookingOptionDisplayCurrency(bookingOption) : readMomondoBookingOptionCurrency(bookingOption)) ?? "NOK";
         const luggageSummary = formatMomondoFlightLuggageSummary(bookingOption);
         const platform = [tripSummary, luggageSummary].filter((part) => part !== void 0 && part.length > 0).join(", ");
         candidates.push({
@@ -8665,17 +8765,38 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return uniqueCandidates;
   }
+  function isMomondoBookingOptionAvailable(bookingOption) {
+    if (bookingOption.hidden === true || bookingOption.isHidden === true || bookingOption.disabled === true || bookingOption.isDisabled === true || bookingOption.unavailable === true || bookingOption.isUnavailable === true || bookingOption.available === false || bookingOption.isAvailable === false || bookingOption.visible === false || bookingOption.isVisible === false) {
+      return false;
+    }
+    return [
+      bookingOption.status,
+      bookingOption.state,
+      bookingOption.bookingState,
+      bookingOption.availabilityStatus,
+      bookingOption.displayStatus
+    ].every((value) => {
+      const normalized = readStringValue(value)?.toLowerCase();
+      return normalized === void 0 || !/unavailable|hidden|expired|sold[_\s-]?out|stale|invalid|failed|removed/.test(normalized);
+    });
+  }
+  function readMomondoBookingOptionDisplayAmount(bookingOption) {
+    const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : void 0;
+    return readPositiveNumberValue(displayPrice?.price);
+  }
+  function readMomondoBookingOptionDisplayCurrency(bookingOption) {
+    const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : void 0;
+    return readStringValue(displayPrice?.currency);
+  }
   function readMomondoBookingOptionAmount(bookingOption) {
     const fees = isRecord(bookingOption.fees) ? bookingOption.fees : void 0;
     const totalPrice = isRecord(fees?.totalPrice) ? fees.totalPrice : void 0;
-    const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : void 0;
-    return readPositiveNumberValue(totalPrice?.price) ?? readPositiveNumberValue(displayPrice?.price) ?? readPositiveNumberValue(bookingOption.price);
+    return readMomondoBookingOptionDisplayAmount(bookingOption) ?? readPositiveNumberValue(totalPrice?.price) ?? readPositiveNumberValue(bookingOption.price);
   }
   function readMomondoBookingOptionCurrency(bookingOption) {
     const fees = isRecord(bookingOption.fees) ? bookingOption.fees : void 0;
     const totalPrice = isRecord(fees?.totalPrice) ? fees.totalPrice : void 0;
-    const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : void 0;
-    return readStringValue(totalPrice?.currency) ?? readStringValue(displayPrice?.currency) ?? readStringValue(bookingOption.currency);
+    return readMomondoBookingOptionDisplayCurrency(bookingOption) ?? readStringValue(totalPrice?.currency) ?? readStringValue(bookingOption.currency);
   }
   function readMomondoProviderName(bookingOption, resultData) {
     const providerCode = readStringValue(bookingOption.providerCode);
@@ -8811,6 +8932,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
     return parsedValue;
+  }
+  function readCompactIsoDateValue(value) {
+    if (typeof value !== "string" || !/^\d{8}$/.test(value)) return void 0;
+    return readIsoDateValue(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`);
   }
   function readIataCodeFromValues(values) {
     for (const value of values) {
@@ -9341,7 +9466,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "sas.no" || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "sas.no" || hostname === "finn.no" || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;

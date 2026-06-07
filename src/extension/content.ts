@@ -300,9 +300,11 @@ type PanFlightsSearchVariant = {
   maxStops: number;
   searchId: number;
 };
+type MomondoFlightSortMode = "bestflight_a" | "price_a";
 type MomondoFlightSearchData = {
   formToken: string;
   resultUrl: string;
+  sortMode: MomondoFlightSortMode;
 };
 type MomondoFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
@@ -385,6 +387,7 @@ const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/fli
 const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
 const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
 const MOMONDO_FLIGHT_PAGE_SIZE = 50;
+const MOMONDO_DEFAULT_FLIGHT_SORT_MODE: MomondoFlightSortMode = "bestflight_a";
 const SKYSCANNER_FENRYR_BASE_URL = "https://www.skyscanner.net/g/fenryr/v1";
 const SKYSCANNER_CLIENT_VERSION = "7.194.1";
 const SKYSCANNER_CHANNEL_ID = "goandroid";
@@ -822,6 +825,9 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
 
 function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
   return extractSasFlightSearchMeta(parsedUrl) ??
+    extractFinnFlightSearchMeta(parsedUrl) ??
+    extractPanFlightsFlightSearchMeta(parsedUrl) ??
+    extractMomondoFlightSearchMeta(parsedUrl) ??
     extractSkyscannerFlightSearchMeta(parsedUrl) ??
     extractStoredFlightSearchMeta(parsedUrl) ??
     extractVisibleFlightSearchMeta(parsedUrl);
@@ -857,6 +863,96 @@ function extractSasFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefine
     children,
     infants,
   };
+}
+
+function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "finn.no" || !/^\/reise\/flybilletter\/resultat\/?$/i.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  const origin = readIataCodeFromValues([
+    parsedUrl.searchParams.get("departureAirportLeg1"),
+    parsedUrl.searchParams.get("requestedOrigin"),
+  ]);
+  const destination = readIataCodeFromValues([
+    parsedUrl.searchParams.get("arrivalAirportLeg1"),
+    parsedUrl.searchParams.get("requestedDestination"),
+  ]);
+  const outboundDate = readIsoDateFromValues([
+    parsedUrl.searchParams.get("requestedDepartureDate"),
+    parsedUrl.searchParams.get("departureDate"),
+  ]);
+  const inboundDate = readIsoDateFromValues([
+    parsedUrl.searchParams.get("requestedReturnDate"),
+    parsedUrl.searchParams.get("returnDate"),
+  ]);
+  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
+    youths: 0,
+    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+  });
+}
+
+function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  if (!isPanFlightsSearchPage(parsedUrl)) return undefined;
+
+  const v2 = parsedUrl.searchParams.get("v2");
+  if (v2 === null) return undefined;
+
+  const parts = v2.split("_");
+  const origin = readIataCodeValue(parts[0]);
+  const destination = readIataCodeValue(parts[1]);
+  const outboundDate = readCompactIsoDateValue(parts[2]);
+  const inboundDate = readCompactIsoDateValue(parts[3]);
+  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ??
+      readPositiveIntegerValue(parsedUrl.searchParams.get("ad")) ??
+      1,
+    youths: 0,
+    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+  });
+}
+
+function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "momondo.no" || !/^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?\/?$/i.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  const parts = parsedUrl.pathname.split("/").filter(Boolean);
+  const routePart = parts[1];
+  const routeParts = routePart?.split("-");
+  const origin = readIataCodeValue(routeParts?.[0]);
+  const destination = readIataCodeValue(routeParts?.[1]);
+  const outboundDate = readIsoDateValue(parts[2]);
+  const inboundDate = readIsoDateValue(parts[3]);
+  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
+    youths: 0,
+    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+  });
 }
 
 function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -2066,11 +2162,37 @@ function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     flightMeta.outboundDate,
     flightMeta.inboundDate,
   ].filter((part): part is string => part !== undefined);
-  const params = new URLSearchParams({ sort: "bestflight_a" });
+  const params = new URLSearchParams({ sort: MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
   if (flightMeta.adults !== 1) {
     params.set("adults", String(flightMeta.adults));
   }
   return `https://www.momondo.no/flight-search/${pathParts.map(encodeURIComponent).join("/")}?${params.toString()}`;
+}
+
+function readCurrentMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return undefined;
+
+  const currentMeta = extractMomondoFlightSearchMeta(parsedUrl);
+  return currentMeta !== undefined && isSameFlightSearchMeta(currentMeta, flightMeta)
+    ? parsedUrl.toString()
+    : undefined;
+}
+
+function isSameFlightSearchMeta(left: FlightSearchMeta, right: FlightSearchMeta): boolean {
+  return left.origin === right.origin &&
+    left.destination === right.destination &&
+    left.outboundDate === right.outboundDate &&
+    left.inboundDate === right.inboundDate &&
+    left.adults === right.adults &&
+    left.youths === right.youths &&
+    left.children === right.children &&
+    left.infants === right.infants;
+}
+
+function readMomondoFlightSortMode(url: string): MomondoFlightSortMode | undefined {
+  const sortMode = parseUrl(url)?.searchParams.get("sort");
+  return sortMode === "price_a" || sortMode === "bestflight_a" ? sortMode : undefined;
 }
 
 async function findMomondoFlightPriceMatchOffer(
@@ -2078,7 +2200,7 @@ async function findMomondoFlightPriceMatchOffer(
   routeTitle: string,
   searchDetails: string,
 ): Promise<PriceMatchOffer | undefined> {
-  const resultUrl = buildMomondoFlightSearchUrl(flightMeta);
+  const resultUrl = readCurrentMomondoFlightSearchUrl(flightMeta) ?? buildMomondoFlightSearchUrl(flightMeta);
   const searchData = await fetchMomondoFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
@@ -2116,7 +2238,11 @@ async function fetchMomondoFlightSearchData(resultUrl: string): Promise<MomondoF
   const formToken = parseMomondoFormToken(html);
   if (formToken === undefined) return undefined;
 
-  return { formToken, resultUrl };
+  return {
+    formToken,
+    resultUrl,
+    sortMode: readMomondoFlightSortMode(resultUrl) ?? MOMONDO_DEFAULT_FLIGHT_SORT_MODE,
+  };
 }
 
 function parseMomondoFormToken(html: string): string | undefined {
@@ -2172,7 +2298,7 @@ function requestMomondoFlightPoll(
       "X-CSRF": searchData.formToken,
       "x-kayak-session-error-check": "iris",
     },
-    body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, searchId, filterState)),
+    body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, searchId, filterState, searchData.sortMode)),
     credentials: "include",
   });
 }
@@ -2181,6 +2307,7 @@ function buildMomondoFlightPollPayload(
   flightMeta: FlightSearchMeta,
   searchId: string | undefined,
   filterState: string | undefined,
+  sortMode: MomondoFlightSortMode,
 ): Record<string, unknown> {
   return {
     ...(filterState !== undefined ? { filterParams: { fs: filterState } } : {}),
@@ -2189,7 +2316,7 @@ function buildMomondoFlightPollPayload(
       legs: buildMomondoFlightRequestLegs(flightMeta),
       passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
       pageType: "frontDoor",
-      sortMode: "bestflight_a",
+      sortMode,
     },
     searchMetaData: {
       priceMode: "total",
@@ -2268,12 +2395,22 @@ function extractMomondoFlightOfferCandidates(
 
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
     const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
+    const bookingOptions = readRecordArray(result.bookingOptions).filter(isMomondoBookingOptionAvailable);
+    const useDisplayPrices = bookingOptions.some((bookingOption) => {
+      return readMomondoBookingOptionDisplayAmount(bookingOption) !== undefined;
+    });
 
-    for (const bookingOption of readRecordArray(result.bookingOptions)) {
-      const amount = readMomondoBookingOptionAmount(bookingOption);
+    for (const bookingOption of bookingOptions) {
+      const amount = useDisplayPrices
+        ? readMomondoBookingOptionDisplayAmount(bookingOption)
+        : readMomondoBookingOptionAmount(bookingOption);
       if (amount === undefined) continue;
 
-      const currency = readMomondoBookingOptionCurrency(bookingOption) ?? "NOK";
+      const currency = (
+        useDisplayPrices
+          ? readMomondoBookingOptionDisplayCurrency(bookingOption)
+          : readMomondoBookingOptionCurrency(bookingOption)
+      ) ?? "NOK";
       const luggageSummary = formatMomondoFlightLuggageSummary(bookingOption);
       const platform = [tripSummary, luggageSummary]
         .filter((part): part is string => part !== undefined && part.length > 0)
@@ -2319,21 +2456,57 @@ function dedupeMomondoFlightOfferCandidates(candidates: MomondoFlightOfferCandid
   return uniqueCandidates;
 }
 
+function isMomondoBookingOptionAvailable(bookingOption: Record<string, unknown>): boolean {
+  if (
+    bookingOption.hidden === true ||
+    bookingOption.isHidden === true ||
+    bookingOption.disabled === true ||
+    bookingOption.isDisabled === true ||
+    bookingOption.unavailable === true ||
+    bookingOption.isUnavailable === true ||
+    bookingOption.available === false ||
+    bookingOption.isAvailable === false ||
+    bookingOption.visible === false ||
+    bookingOption.isVisible === false
+  ) {
+    return false;
+  }
+
+  return [
+    bookingOption.status,
+    bookingOption.state,
+    bookingOption.bookingState,
+    bookingOption.availabilityStatus,
+    bookingOption.displayStatus,
+  ].every((value) => {
+    const normalized = readStringValue(value)?.toLowerCase();
+    return normalized === undefined || !/unavailable|hidden|expired|sold[_\s-]?out|stale|invalid|failed|removed/.test(normalized);
+  });
+}
+
+function readMomondoBookingOptionDisplayAmount(bookingOption: Record<string, unknown>): number | undefined {
+  const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : undefined;
+  return readPositiveNumberValue(displayPrice?.price);
+}
+
+function readMomondoBookingOptionDisplayCurrency(bookingOption: Record<string, unknown>): string | undefined {
+  const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : undefined;
+  return readStringValue(displayPrice?.currency);
+}
+
 function readMomondoBookingOptionAmount(bookingOption: Record<string, unknown>): number | undefined {
   const fees = isRecord(bookingOption.fees) ? bookingOption.fees : undefined;
   const totalPrice = isRecord(fees?.totalPrice) ? fees.totalPrice : undefined;
-  const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : undefined;
-  return readPositiveNumberValue(totalPrice?.price) ??
-    readPositiveNumberValue(displayPrice?.price) ??
+  return readMomondoBookingOptionDisplayAmount(bookingOption) ??
+    readPositiveNumberValue(totalPrice?.price) ??
     readPositiveNumberValue(bookingOption.price);
 }
 
 function readMomondoBookingOptionCurrency(bookingOption: Record<string, unknown>): string | undefined {
   const fees = isRecord(bookingOption.fees) ? bookingOption.fees : undefined;
   const totalPrice = isRecord(fees?.totalPrice) ? fees.totalPrice : undefined;
-  const displayPrice = isRecord(bookingOption.displayPrice) ? bookingOption.displayPrice : undefined;
-  return readStringValue(totalPrice?.currency) ??
-    readStringValue(displayPrice?.currency) ??
+  return readMomondoBookingOptionDisplayCurrency(bookingOption) ??
+    readStringValue(totalPrice?.currency) ??
     readStringValue(bookingOption.currency);
 }
 
@@ -2536,6 +2709,11 @@ function readIsoDateValue(value: unknown): string | undefined {
     return undefined;
   }
   return parsedValue;
+}
+
+function readCompactIsoDateValue(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^\d{8}$/.test(value)) return undefined;
+  return readIsoDateValue(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`);
 }
 
 function readIataCodeFromValues(values: unknown[]): string | undefined {
@@ -3241,6 +3419,10 @@ function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
 function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return hostname === "sas.no" ||
+    hostname === "finn.no" ||
+    hostname === "momondo.no" ||
+    hostname === "panflights.no" ||
+    hostname === "panflights.com" ||
     hostname === "shop.lufthansa.com" ||
     hostname === "booking.norwegian.com" ||
     hostname === "skyscanner.no" ||
