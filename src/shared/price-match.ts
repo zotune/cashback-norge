@@ -8,6 +8,7 @@ import {
   isSteamAppProductUrl,
 } from "./isthereanydeal-price-match.js";
 import { findEnhverPriceMatch } from "./enhver-price-match.js";
+import { findKassalPriceMatch } from "./kassal-price-match.js";
 import { findKlarnaPriceMatch } from "./klarna-price-match.js";
 import {
   isLikelySameProductTitle,
@@ -58,7 +59,7 @@ export async function findPriceMatches(
     return isthereanydealOffer !== undefined ? [isthereanydealOffer] : [];
   }
 
-  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer] = await Promise.all([
+  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer] = await Promise.all([
     ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
     ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText)),
     ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson)),
@@ -67,6 +68,7 @@ export async function findPriceMatches(
     ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson)),
     ignorePriceMatchFailure(findSesumPriceMatch(message, requestText)),
     ignorePriceMatchFailure(findEnhverPriceMatch(message, requestJson, requestText)),
+    ignorePriceMatchFailure(findKassalPriceMatch(message, requestText)),
   ]);
 
   const anchorOffers = [prisjaktOffer, klarnaOffer]
@@ -90,6 +92,7 @@ export async function findPriceMatches(
     taxfreeOffer,
     sesumOffer,
     enhverOffer,
+    kassalOffer,
   ]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   const productAnchorTerms = uniqueStrings([
@@ -179,9 +182,10 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "prisradar") return 3;
   if (offer.source === "sesum") return 4;
   if (offer.source === "enhver") return 5;
-  if (offer.source === "isthereanydeal") return 6;
-  if (offer.source === "taxfree") return 7;
-  if (offer.source === "vinmonopolet") return 7;
+  if (offer.source === "kassal") return 6;
+  if (offer.source === "isthereanydeal") return 7;
+  if (offer.source === "taxfree") return 8;
+  if (offer.source === "vinmonopolet") return 8;
   return 4;
 }
 
@@ -259,6 +263,7 @@ function isKnownPriceMatchSourceProductUrl(rawUrl: string | undefined): boolean 
     if (hostname.endsWith("prisradar.no")) return /^\/produkter\/[^/]+\/?$/.test(pathname);
     if (hostname.endsWith("sesum.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
     if (hostname.endsWith("enhver.no")) return /^\/brands\/[^/]+\/\d+\/?$/.test(pathname);
+    if (hostname.endsWith("kassal.app")) return /^\/vare\/[^/]+\/?$/.test(pathname);
     return false;
   } catch {
     return false;

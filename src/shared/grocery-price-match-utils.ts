@@ -26,6 +26,7 @@ const GROCERY_CONTEXT_HOSTS = [
   "europris.no",
   "matkroken.no",
   "naerbutikken.no",
+  "kassal.app",
   "sesum.no",
   "enhver.no",
 ];

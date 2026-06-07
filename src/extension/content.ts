@@ -228,7 +228,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet" | "sesum" | "enhver";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal";
   sourceName?: string;
   matchedCurrentMerchant?: boolean;
   matchedExactProduct?: boolean;
@@ -325,6 +325,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "prisradar.no",
   "sesum.no",
   "enhver.no",
+  "kassal.app",
 ]);
 installOfferActivationClickTracker();
 chrome.runtime.onMessage.addListener((message) => {
@@ -868,6 +869,10 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
 
   if (hostname.endsWith("enhver.no")) {
     return /^\/brands\/[^/]+\/\d+\/?$/.test(pathname);
+  }
+
+  if (hostname.endsWith("kassal.app")) {
+    return /^\/vare\/[^/]+\/?$/.test(pathname);
   }
 
   if (hostname.endsWith("store.steampowered.com")) {
@@ -2163,11 +2168,17 @@ function renderNotice(
       color: #0c4598;
     }
     .provider-sesum {
-      background: #0f7b55;
-      color: #ffffff;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      color: #111827;
     }
     .provider-enhver {
-      background: #ff6b35;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      color: #162333;
+    }
+    .provider-kassal {
+      background: #c8103a;
       color: #ffffff;
     }
     .provider-isthereanydeal {
@@ -4300,7 +4311,7 @@ function isPlayStationRegionPrice(value: unknown): value is PlayStationRegionPri
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     (value.matchedExactProduct === undefined || typeof value.matchedExactProduct === "boolean") &&
@@ -4668,6 +4679,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "prisradar") return "prisradar";
   if (priceMatch.source === "sesum") return "sesum";
   if (priceMatch.source === "enhver") return "enhver";
+  if (priceMatch.source === "kassal") return "kassal";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   if (priceMatch.source === "taxfree") return "taxfree";
   if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
@@ -4679,7 +4691,8 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "klarna") return "Klarna";
   if (priceMatch.source === "prisradar") return "Prisradar";
   if (priceMatch.source === "sesum") return "SeSum";
-  if (priceMatch.source === "enhver") return "Enhver";
+  if (priceMatch.source === "enhver") return "enhver";
+  if (priceMatch.source === "kassal") return "Kassalapp";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   if (priceMatch.source === "taxfree") return "Tax Free";
   if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";

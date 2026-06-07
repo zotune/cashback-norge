@@ -22,7 +22,8 @@
     "https://www.sesum.no/*",
     "https://sesum.no/*",
     "https://enhver.no/*",
-    "https://api.enhver.no/*"
+    "https://api.enhver.no/*",
+    "https://kassal.app/*"
   ],
   "background": {
     "service_worker": "assets/background.js",

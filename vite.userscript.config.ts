@@ -50,6 +50,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      sesum.no
 // @connect      enhver.no
 // @connect      api.enhver.no
+// @connect      kassal.app
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js

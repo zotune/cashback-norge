@@ -85,7 +85,7 @@ export async function findEnhverPriceMatch(
 
   return {
     source: "enhver",
-    sourceName: "Enhver",
+    sourceName: "enhver",
     matchedExactProduct: true,
     shopName: best.shopName,
     amount: best.amount,
