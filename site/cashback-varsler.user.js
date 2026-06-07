@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780830242
+// @version      1780830758
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -847,6 +847,7 @@
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
+  const GG_DEALS_ORIGIN = "https://gg.deals";
   const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
   const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
   const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
@@ -915,7 +916,15 @@
       price: bestDeal.price,
       productName,
       productUrl,
-      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative)
+      alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative),
+      ...pageContext.slug !== void 0 ? {
+        relatedLinks: [{
+          label: "GG Deals",
+          provider: "ggdeals",
+          title: "Åpne spillet hos GG Deals",
+          url: `${GG_DEALS_ORIGIN}/game/${pageContext.slug}/`
+        }]
+      } : {}
     };
   }
   function isItadGameStoreProductUrl(rawUrl) {
@@ -5507,8 +5516,36 @@ query SearchSuggestions($query: String!, $category: Int) {
   const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
   const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
-  const PSN_GIFT_CARD_DEALS_URL = "https://gg.deals/gift-cards-group/playstation-network-card-nok-norway/";
-  const PSN_GIFT_CARD_REGION_URLS = {
+  const PSN_GC_DEALS_GIFT_CARD_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
+  const PSN_GC_DEALS_GIFT_CARD_REGION_URLS = {
+    AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
+    BR: "https://gcdeals.net/no/group/15/playstation-network-cards-brl-brazil",
+    CA: "https://gcdeals.net/no/group/16/playstation-network-cards-cad-canada",
+    CH: "https://gcdeals.net/no/group/10/playstation-network-cards-chf-switzerland",
+    DE: "https://gcdeals.net/no/group/3/playstation-network-cards-eur-germany",
+    DK: "https://gcdeals.net/no/group/515/playstation-network-gift-cards-dkk-denmark",
+    ES: "https://gcdeals.net/no/group/11/playstation-network-cards-eur-spain",
+    FI: "https://gcdeals.net/no/group/5/playstation-network-cards-eur-finland",
+    FR: "https://gcdeals.net/no/group/8/playstation-network-cards-eur-france",
+    GB: "https://gcdeals.net/no/group/2/playstation-network-cards-gbp-united-kingdom",
+    HK: "https://gcdeals.net/no/group/22/playstation-network-cards-hkd-hong-kong",
+    IN: "https://gcdeals.net/no/group/518/playstation-network-gift-cards-inr-india",
+    IT: "https://gcdeals.net/no/group/6/playstation-network-cards-eur-italy",
+    JP: "https://gcdeals.net/no/group/28/playstation-network-cards-jpy-japan",
+    KR: "https://gcdeals.net/no/group/1021/playstation-network-gift-cards-nok-south-korea",
+    MX: "https://gcdeals.net/no/group/32/playstation-network-cards-usd-mexico",
+    NO: "https://gcdeals.net/no/group/9/playstation-network-cards-nok-norway",
+    NZ: "https://gcdeals.net/no/group/34/playstation-network-cards-nzd-new-zealand",
+    PL: "https://gcdeals.net/no/group/4/playstation-network-cards-pln-poland",
+    SE: "https://gcdeals.net/no/group/522/playstation-network-gift-cards-sek-sweden",
+    SG: "https://gcdeals.net/no/group/41/playstation-network-cards-sgd-singapore",
+    US: "https://gcdeals.net/no/group/1/playstation-network-cards-usd-united-states",
+    TR: "https://gcdeals.net/no/group/1050/playstation-network-gift-cards-try-turkey",
+    UA: "https://gcdeals.net/no/group/1078/playstation-network-gift-cards-uah-ukraine",
+    ZA: "https://gcdeals.net/no/group/43/playstation-network-cards-zar-south-africa"
+  };
+  const PSN_GG_DEALS_GIFT_CARD_URL = "https://gg.deals/gift-cards-group/playstation-network-card-nok-norway/";
+  const PSN_GG_DEALS_GIFT_CARD_REGION_URLS = {
     AU: "https://gg.deals/gift-cards-group/playstation-network-card-aud-australia/",
     BR: "https://gg.deals/gift-cards-group/playstation-network-card-brl-brazil/",
     CA: "https://gg.deals/gift-cards-group/playstation-network-card-cad-canada/",
@@ -7033,6 +7070,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       background: #2d2f42;
       color: #ffffff;
     }
+    .provider-gcdeals {
+      background: #341083;
+      color: #ffffff;
+    }
     .provider-ggdeals {
       background: #111018;
       color: #ffffff;
@@ -7483,6 +7524,19 @@ query SearchSuggestions($query: String!, $category: Int) {
       justify-self: end;
       text-decoration: none;
       white-space: nowrap;
+    }
+    .region-price-actions {
+      align-items: center;
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: flex-end;
+      justify-self: end;
+      min-width: 0;
+    }
+    .price-match-card--related .price-match-price {
+      color: #5d6b71;
+      font-weight: 700;
     }
     .price-match-card.price-match-card--best .price-match-product,
     .price-match-card.price-match-card--best .price-match-price,
@@ -8638,7 +8692,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       });
       priceMatchSection.append(
         priceMatchToggle,
-        ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
+        ...priceMatches.flatMap((priceMatch2, index) => buildPriceMatchCards(priceMatch2, index === 0))
       );
     }
     body.append(header);
@@ -8898,7 +8952,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function attachPriceMatchTooltips(shadowRoot, priceMatches) {
     if (priceMatches.length === 0) return;
-    const cards = shadowRoot.querySelectorAll(".price-match-card");
+    const cards = shadowRoot.querySelectorAll(".price-match-card:not(.price-match-card--related)");
     for (let index = 0; index < priceMatches.length; index++) {
       const card = cards[index];
       const priceMatch = priceMatches[index];
@@ -9045,7 +9099,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return isRecord(value) && typeof value.region === "string" && typeof value.countryName === "string" && typeof value.flag === "string" && typeof value.locale === "string" && typeof value.currency === "string" && typeof value.price === "number" && typeof value.formattedPrice === "string" && typeof value.nokAmount === "number" && typeof value.formattedNok === "string" && typeof value.productUrl === "string" && (value.priceHistoryUrl === void 0 || typeof value.priceHistoryUrl === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)) && (value.relatedLinks === void 0 || Array.isArray(value.relatedLinks) && value.relatedLinks.every(isPriceMatchRelatedLink));
+  }
+  function isPriceMatchRelatedLink(value) {
+    return isRecord(value) && typeof value.label === "string" && typeof value.url === "string" && (value.provider === void 0 || value.provider === "ggdeals") && (value.title === void 0 || typeof value.title === "string");
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
@@ -9232,6 +9289,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (kind === "points") return 1;
     return 0;
   }
+  function buildPriceMatchCards(priceMatch, isBest = false) {
+    return [
+      buildPriceMatchCard(priceMatch, isBest),
+      ...(priceMatch.relatedLinks ?? []).map((link) => buildPriceMatchRelatedLinkCard(priceMatch, link))
+    ];
+  }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "price-match-card";
@@ -9254,6 +9317,33 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
+    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
+    return priceMatchCard;
+  }
+  function buildPriceMatchRelatedLinkCard(priceMatch, link) {
+    const priceMatchCard = document.createElement("a");
+    priceMatchCard.className = "price-match-card price-match-card--related";
+    priceMatchCard.href = link.url;
+    priceMatchCard.target = "_blank";
+    priceMatchCard.rel = "noreferrer";
+    if (link.title !== void 0) {
+      priceMatchCard.title = link.title;
+    }
+    const priceMatchTitle = document.createElement("span");
+    priceMatchTitle.className = "price-match-title";
+    const priceMatchProduct = document.createElement("span");
+    priceMatchProduct.className = "price-match-product";
+    priceMatchProduct.textContent = priceMatch.productName;
+    const priceMatchShop = document.createElement("span");
+    priceMatchShop.className = "price-match-shop";
+    priceMatchShop.textContent = "Prissammenligning";
+    priceMatchTitle.append(priceMatchProduct, priceMatchShop);
+    const priceMatchPrice = document.createElement("span");
+    priceMatchPrice.className = "price-match-price";
+    priceMatchPrice.textContent = "Sjekk priser";
+    const priceMatchBadge = document.createElement("span");
+    priceMatchBadge.className = `provider-badge provider-${link.provider ?? "prisjakt"}`;
+    priceMatchBadge.textContent = link.label;
     priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
     return priceMatchCard;
   }
@@ -9281,36 +9371,49 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     regionPriceNok.textContent = regionPrice.formattedNok;
     regionPriceMain.append(regionPriceTitle, regionPriceNok);
     regionPriceCard.append(regionPriceMain);
-    const secondaryLink = getRegionPriceSecondaryLink(regionPrice);
-    if (secondaryLink !== void 0) {
+    const secondaryLinks = getRegionPriceSecondaryLinks(regionPrice);
+    if (secondaryLinks.length > 0) {
       regionPriceCard.classList.add("region-price-card-with-action");
-      const regionPriceAction = document.createElement("a");
-      regionPriceAction.className = `provider-badge provider-${secondaryLink.provider} region-price-action`;
-      regionPriceAction.href = secondaryLink.url;
-      regionPriceAction.target = "_blank";
-      regionPriceAction.rel = "noreferrer";
-      regionPriceAction.title = secondaryLink.title;
-      regionPriceAction.textContent = secondaryLink.label;
-      regionPriceCard.append(regionPriceAction);
+      const regionPriceActions = document.createElement("span");
+      regionPriceActions.className = "region-price-actions";
+      for (const secondaryLink of secondaryLinks) {
+        const regionPriceAction = document.createElement("a");
+        regionPriceAction.className = `provider-badge provider-${secondaryLink.provider} region-price-action`;
+        regionPriceAction.href = secondaryLink.url;
+        regionPriceAction.target = "_blank";
+        regionPriceAction.rel = "noreferrer";
+        regionPriceAction.title = secondaryLink.title;
+        regionPriceAction.textContent = secondaryLink.label;
+        regionPriceActions.append(regionPriceAction);
+      }
+      regionPriceCard.append(regionPriceActions);
     }
     return regionPriceCard;
   }
-  function getRegionPriceSecondaryLink(regionPrice) {
+  function getRegionPriceSecondaryLinks(regionPrice) {
     if (regionPrice.region === "NO") {
-      if (regionPrice.priceHistoryUrl === void 0) return void 0;
-      return {
+      if (regionPrice.priceHistoryUrl === void 0) return [];
+      return [{
         label: "psprices",
         provider: "psprices",
         title: "Åpne norsk prishistorikk hos PSPrices",
         url: regionPrice.priceHistoryUrl
-      };
+      }];
     }
-    return {
-      label: "GG Deals",
-      provider: "ggdeals",
-      title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GG Deals`,
-      url: PSN_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GIFT_CARD_DEALS_URL
-    };
+    return [
+      {
+        label: "GC Deals",
+        provider: "gcdeals",
+        title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GC Deals`,
+        url: PSN_GC_DEALS_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GC_DEALS_GIFT_CARD_URL
+      },
+      {
+        label: "GG Deals",
+        provider: "ggdeals",
+        title: `Finn PSN-gavekort for ${regionPrice.countryName} hos GG Deals`,
+        url: PSN_GG_DEALS_GIFT_CARD_REGION_URLS[regionPrice.region] ?? PSN_GG_DEALS_GIFT_CARD_URL
+      }
+    ];
   }
   function buildRegionPricesTooltip(regionPrices) {
     const rateLine = regionPrices.ratesUpdatedAt !== void 0 ? `FX: ${regionPrices.ratesUpdatedAt}` : "FX: live NOK conversion";
@@ -9319,7 +9422,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       "Typisk flyt: legg regionkontoen til på PS5-en, kjøp og last ned spillet der, spill fra norsk konto etterpå.",
       "Alle tilgjengelige regioner vises i listen, sortert billigst først.",
       "Regionraden åpner spillet i regional PlayStation Store.",
-      "GG Deals-chipen åpner PSN-gavekort i valgt region.",
+      "GC Deals- og GG Deals-chipene åpner PSN-gavekort i valgt region.",
       rateLine
     ].join("\n");
   }
