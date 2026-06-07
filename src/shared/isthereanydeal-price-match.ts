@@ -3,6 +3,10 @@ import type {
   PriceMatchAlternative,
   PriceMatchOffer,
 } from "./extension-messages.js";
+import {
+  isLikelySameProductTitle,
+  scoreProductTitleAgainstSearchTerm,
+} from "./product-title-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 
 type TextRequest = (
@@ -40,6 +44,7 @@ type ItadDeal = {
   amount: number;
   currency: string;
   price: string;
+  platform?: string;
   url?: string;
   voucher?: string;
 };
@@ -49,12 +54,26 @@ type ItadPrice = {
   currency: string;
 };
 
+type ItadProductTarget = {
+  pageContext: ItadPageContext;
+  currentShopId: number;
+  productName?: string;
+};
+
+type ItadSearchGame = {
+  slug: string;
+  title: string;
+  type?: number;
+};
+
 const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
 const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
 const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
 const ISTHEREANYDEAL_GAME_INFO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/game/info/`;
+const ISTHEREANYDEAL_SEARCH_GAMES_URL = `${ISTHEREANYDEAL_ORIGIN}/search/api/games/`;
 const MAX_ITAD_ALTERNATIVES = 8;
 const MAX_STEAM_PURCHASE_TARGETS = 8;
+const EPIC_GAME_STORE_SHOP_ID = 16;
 const STEAM_SHOP_ID = 61;
 const FALLBACK_ITAD_SHOP_IDS = [
   19, 2, 4, 13, 15, 52, 16, 67, 6, 17, 75, 20, 24, 25, 27, 28, 26, 29, 76,
@@ -66,6 +85,63 @@ export async function findIsthereanydealPriceMatch(
   requestJson: JsonRequest = fetchJson,
   requestText: TextRequest = fetchText,
 ): Promise<PriceMatchOffer | undefined> {
+  const target = await resolveItadProductTarget(message, requestJson, requestText);
+  if (target === undefined) return undefined;
+
+  const pageContext = target.pageContext;
+  const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
+  const deals = readItadDeals(gameInfo, pageContext.shops)
+    .filter((deal) => deal.currency === "NOK")
+    .sort((first, second) => first.amount - second.amount);
+  const bestDeal = deals[0];
+  if (bestDeal === undefined) return undefined;
+
+  const productName = pageContext.title ?? target.productName ?? readGameProductName(message) ?? "PC-spill";
+  const productUrl = pageContext.slug !== undefined
+    ? `${ISTHEREANYDEAL_ORIGIN}/game/${pageContext.slug}/info/`
+    : pageContext.infoUrl;
+
+  return {
+    source: "isthereanydeal",
+    sourceName: "IsThereAnyDeal",
+    matchedCurrentMerchant: deals.some((deal) => deal.shopId === target.currentShopId),
+    shopName: bestDeal.shopName,
+    amount: bestDeal.amount,
+    sortAmount: bestDeal.amount,
+    currency: bestDeal.currency,
+    price: bestDeal.price,
+    productName,
+    productUrl,
+    alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative),
+  };
+}
+
+export function isItadGameStoreProductUrl(rawUrl: string | undefined): boolean {
+  return isSteamAppProductUrl(rawUrl) || isEpicGamesStoreProductUrl(rawUrl);
+}
+
+export function isEpicGamesStoreProductUrl(rawUrl: string | undefined): boolean {
+  return parseEpicGamesProductSlug(rawUrl) !== undefined;
+}
+
+export function isSteamAppProductUrl(rawUrl: string | undefined): boolean {
+  return parseSteamAppId(rawUrl) !== undefined;
+}
+
+async function resolveItadProductTarget(
+  message: GetPriceMatchForProductMessage,
+  requestJson: JsonRequest,
+  requestText: TextRequest,
+): Promise<ItadProductTarget | undefined> {
+  return await resolveSteamItadProductTarget(message, requestJson, requestText) ??
+    await resolveEpicItadProductTarget(message, requestJson, requestText);
+}
+
+async function resolveSteamItadProductTarget(
+  message: GetPriceMatchForProductMessage,
+  requestJson: JsonRequest,
+  requestText: TextRequest,
+): Promise<ItadProductTarget | undefined> {
   const appId = parseSteamAppId(message.url) ?? parseSteamAppId(message.productUrl);
   if (appId === undefined) return undefined;
 
@@ -86,35 +162,48 @@ export async function findIsthereanydealPriceMatch(
   const pageContext = await fetchItadPageContext(appInfo.infoUrl, requestText);
   if (pageContext === undefined) return undefined;
 
-  const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
-  const deals = readItadDeals(gameInfo, pageContext.shops)
-    .filter((deal) => deal.currency === "NOK")
-    .sort((first, second) => first.amount - second.amount);
-  const bestDeal = deals[0];
-  if (bestDeal === undefined) return undefined;
-
-  const productName = pageContext.title ?? readSteamProductName(message) ?? "Steam-spill";
-  const productUrl = pageContext.slug !== undefined
-    ? `${ISTHEREANYDEAL_ORIGIN}/game/${pageContext.slug}/info/`
-    : pageContext.infoUrl;
-
+  const productName = readSteamProductName(message);
   return {
-    source: "isthereanydeal",
-    sourceName: "IsThereAnyDeal",
-    matchedCurrentMerchant: deals.some((deal) => deal.shopId === STEAM_SHOP_ID),
-    shopName: bestDeal.shopName,
-    amount: bestDeal.amount,
-    sortAmount: bestDeal.amount,
-    currency: bestDeal.currency,
-    price: bestDeal.price,
-    productName,
-    productUrl,
-    alternatives: deals.slice(0, MAX_ITAD_ALTERNATIVES).map(toPriceMatchAlternative),
+    pageContext,
+    currentShopId: STEAM_SHOP_ID,
+    ...(productName !== undefined ? { productName } : {}),
   };
 }
 
-export function isSteamAppProductUrl(rawUrl: string | undefined): boolean {
-  return parseSteamAppId(rawUrl) !== undefined;
+async function resolveEpicItadProductTarget(
+  message: GetPriceMatchForProductMessage,
+  requestJson: JsonRequest,
+  requestText: TextRequest,
+): Promise<ItadProductTarget | undefined> {
+  const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
+  if (epicSlug === undefined) return undefined;
+
+  const titleCandidates = readGameTitleCandidates(message, epicSlug);
+  const directContext = await fetchItadPageContext(itadGameInfoUrl(epicSlug), requestText);
+  if (directContext !== undefined && isItadGameContextLikelyMatch(directContext, titleCandidates, epicSlug)) {
+    return {
+      pageContext: directContext,
+      currentShopId: EPIC_GAME_STORE_SHOP_ID,
+      ...(titleCandidates[0] !== undefined ? { productName: titleCandidates[0] } : {}),
+    };
+  }
+
+  for (const query of titleCandidates) {
+    const games = await fetchItadSearchGames(query, requestJson);
+    const game = chooseBestItadSearchGame(games, query, epicSlug);
+    if (game === undefined) continue;
+
+    const pageContext = await fetchItadPageContext(itadGameInfoUrl(game.slug), requestText);
+    if (pageContext !== undefined && isItadGameContextLikelyMatch(pageContext, titleCandidates, epicSlug)) {
+      return {
+        pageContext,
+        currentShopId: EPIC_GAME_STORE_SHOP_ID,
+        productName: game.title,
+      };
+    }
+  }
+
+  return undefined;
 }
 
 export function parseSteamAppId(rawUrl: string | undefined): number | undefined {
@@ -126,6 +215,24 @@ export function parseSteamAppId(rawUrl: string | undefined): number | undefined 
 
     const appId = Number.parseInt(url.pathname.match(/^\/app\/(\d+)(?:\/|$)/i)?.[1] ?? "", 10);
     return Number.isInteger(appId) && appId > 0 ? appId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseEpicGamesProductSlug(rawUrl: string | undefined): string | undefined {
+  if (rawUrl === undefined) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "store.epicgames.com") return undefined;
+
+    const segments = url.pathname.split("/").filter((segment) => segment.length > 0);
+    const productIndex = segments.findIndex((segment) => segment.toLowerCase() === "p");
+    const rawSlug = productIndex >= 0 ? segments[productIndex + 1] : undefined;
+    if (rawSlug === undefined) return undefined;
+
+    return normalizeSlug(decodeURIComponent(rawSlug));
   } catch {
     return undefined;
   }
@@ -223,6 +330,136 @@ function readSteamPurchaseTargets(html: string): AugmentedSteamTarget[] {
   }
 
   return targets;
+}
+
+async function fetchItadSearchGames(
+  query: string,
+  requestJson: JsonRequest,
+): Promise<ItadSearchGame[]> {
+  const trimmedQuery = query.trim();
+  if (trimmedQuery.length < 2) return [];
+
+  const searchParams = new URLSearchParams({ q: trimmedQuery });
+  return readItadSearchGames(await requestJson(`${ISTHEREANYDEAL_SEARCH_GAMES_URL}?${searchParams.toString()}`, {
+    headers: { "Accept": "application/json" },
+  }));
+}
+
+function readItadSearchGames(value: unknown): ItadSearchGame[] {
+  const results = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.games)
+      ? value.games
+      : [];
+
+  return results
+    .map((game) => {
+      if (!isRecord(game)) return undefined;
+      const slug = typeof game.slug === "string" && game.slug.length > 0 ? game.slug : undefined;
+      const title = typeof game.title === "string" && game.title.length > 0 ? game.title : undefined;
+      const type = readNumber(game.type);
+      if (slug === undefined || title === undefined) return undefined;
+      return {
+        slug,
+        title,
+        ...(type !== undefined ? { type } : {}),
+      };
+    })
+    .filter((game): game is ItadSearchGame => game !== undefined);
+}
+
+function chooseBestItadSearchGame(
+  games: ItadSearchGame[],
+  query: string,
+  expectedSlug: string,
+): ItadSearchGame | undefined {
+  const expectedSlugKey = normalizeSlug(expectedSlug);
+  return games
+    .map((game, index) => {
+      const slugKey = normalizeSlug(game.slug);
+      const exactSlugScore = slugKey === expectedSlugKey ? 1.25 : 0;
+      const titleScore = scoreProductTitleAgainstSearchTerm(query, game.title);
+      const slugScore = scoreProductTitleAgainstSearchTerm(query, humanizeSlug(game.slug));
+      const typeBonus = game.type === 1 ? 0.04 : game.type === 2 ? 0.02 : 0;
+      return {
+        game,
+        exactSlugScore,
+        score: Math.max(exactSlugScore, titleScore, slugScore) + typeBonus - (index * 0.001),
+      };
+    })
+    .filter(({ exactSlugScore, score }) => exactSlugScore > 0 || score >= 0.55)
+    .sort((first, second) => second.score - first.score)[0]?.game;
+}
+
+function isItadGameContextLikelyMatch(
+  pageContext: ItadPageContext,
+  titleCandidates: string[],
+  expectedSlug: string,
+): boolean {
+  if (pageContext.slug !== undefined && normalizeSlug(pageContext.slug) === normalizeSlug(expectedSlug)) {
+    return true;
+  }
+  if (pageContext.title === undefined) return false;
+
+  return titleCandidates.some((candidate) => {
+    return isLikelySameProductTitle(candidate, pageContext.title ?? "", 0.58) ||
+      scoreProductTitleAgainstSearchTerm(candidate, pageContext.title ?? "") >= 0.72;
+  });
+}
+
+function readGameTitleCandidates(
+  message: GetPriceMatchForProductMessage,
+  slug?: string,
+): string[] {
+  return uniqueStrings([
+    ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants),
+    ...readGameTitleCandidateVariants(message.searchTerm),
+    readSteamProductName(message),
+    slug !== undefined ? humanizeSlug(slug) : undefined,
+  ])
+    .filter((candidate) => candidate.length >= 2 && candidate.length <= 120);
+}
+
+function readGameTitleCandidateVariants(value: string | undefined): string[] {
+  if (value === undefined) return [];
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length === 0) return [];
+
+  const withoutKnownSuffix = normalized
+    .replace(/\s+\|\s+.*$/i, "")
+    .replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "")
+    .replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
+  const withoutBuyPrefix = withoutKnownSuffix
+    .replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "")
+    .trim();
+
+  return uniqueStrings([withoutBuyPrefix, withoutKnownSuffix, normalized])
+    .filter((candidate) => candidate.length > 0);
+}
+
+function itadGameInfoUrl(slug: string): string {
+  return `${ISTHEREANYDEAL_ORIGIN}/game/${encodeURIComponent(normalizeSlug(slug))}/info/`;
+}
+
+function humanizeSlug(slug: string): string {
+  return slug
+    .replace(/--+/g, " ")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeSlug(value: string): string {
+  return value
+    .replace(/[\u00C6\u00E6]/g, "ae")
+    .replace(/[\u00D8\u00F8]/g, "o")
+    .replace(/[\u00C5\u00E5]/g, "a")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 async function fetchItadPageContext(
@@ -365,6 +602,7 @@ function readItadDeal(value: unknown, shops: Map<number, string>): ItadDeal | un
   if (shopName === undefined) return undefined;
 
   const url = typeof value.url === "string" && value.url.length > 0 ? value.url : undefined;
+  const platform = readItadDealPlatform(value.drm);
   const voucher = typeof value.voucher === "string" && value.voucher.trim().length > 0
     ? value.voucher.trim()
     : undefined;
@@ -374,9 +612,23 @@ function readItadDeal(value: unknown, shops: Map<number, string>): ItadDeal | un
     amount: price.amount,
     currency: price.currency,
     price: formatCurrency(price.amount, price.currency),
+    ...(platform !== undefined ? { platform } : {}),
     ...(url !== undefined ? { url } : {}),
     ...(voucher !== undefined ? { voucher } : {}),
   };
+}
+
+function readItadDealPlatform(value: unknown): string | undefined {
+  const platformNames = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : [];
+  const names = uniqueStrings(platformNames
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0));
+  return names.length > 0 ? names.join(", ") : undefined;
 }
 
 function readItadPrice(value: unknown): ItadPrice | undefined {
@@ -399,8 +651,13 @@ function toPriceMatchAlternative(deal: ItadDeal): PriceMatchAlternative {
     sortAmount: deal.amount,
     currency: deal.currency,
     price: deal.price,
+    ...(deal.platform !== undefined ? { platform: deal.platform } : {}),
     ...(deal.voucher !== undefined ? { shippingPrice: `kode ${deal.voucher}` } : {}),
   };
+}
+
+function readGameProductName(message: GetPriceMatchForProductMessage): string | undefined {
+  return readGameTitleCandidates(message)[0];
 }
 
 function readSteamProductName(message: GetPriceMatchForProductMessage): string | undefined {
@@ -484,4 +741,10 @@ function readNumber(value: unknown): number | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return [...new Set(values
+    .map((value) => value?.trim())
+    .filter((value): value is string => value !== undefined && value.length > 0))];
 }

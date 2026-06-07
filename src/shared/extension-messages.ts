@@ -84,6 +84,7 @@ export type PriceMatchAlternative = {
   amount: number;
   sortAmount?: number;
   currency: string;
+  platform?: string;
   shippingPrice?: string;
   totalPrice?: string;
 };

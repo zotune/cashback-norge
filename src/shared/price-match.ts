@@ -5,7 +5,7 @@ import type {
 import { findGodprisPriceMatch } from "./godpris-price-match.js";
 import {
   findIsthereanydealPriceMatch,
-  isSteamAppProductUrl,
+  isItadGameStoreProductUrl,
 } from "./isthereanydeal-price-match.js";
 import { findEnhverPriceMatch } from "./enhver-price-match.js";
 import { findKassalPriceMatch } from "./kassal-price-match.js";
@@ -54,7 +54,7 @@ export async function findPriceMatches(
     return vinmonopoletOffer !== undefined ? [vinmonopoletOffer] : [];
   }
 
-  if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
+  if (isItadGameStoreProductUrl(message.url) || isItadGameStoreProductUrl(message.productUrl)) {
     const isthereanydealOffer = await ignorePriceMatchFailure(findIsthereanydealPriceMatch(message, requestJson, requestText));
     return isthereanydealOffer !== undefined ? [isthereanydealOffer] : [];
   }

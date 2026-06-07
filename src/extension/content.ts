@@ -15,7 +15,10 @@ import {
   type ProductPackageQuantity,
   type ProductPackageUnit,
 } from "../shared/grocery-price-match-utils";
-import { isSteamAppProductUrl } from "../shared/isthereanydeal-price-match";
+import {
+  isEpicGamesStoreProductUrl,
+  isItadGameStoreProductUrl,
+} from "../shared/isthereanydeal-price-match";
 import {
   findPlayStationRegionPrices,
   isPlayStationProductUrl,
@@ -248,6 +251,7 @@ type PriceMatchAlternative = {
   amount: number;
   sortAmount?: number;
   currency: string;
+  platform?: string;
   shippingPrice?: string;
   totalPrice?: string;
 };
@@ -875,8 +879,8 @@ function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
     return /^\/vare\/[^/]+\/?$/.test(pathname);
   }
 
-  if (hostname.endsWith("store.steampowered.com")) {
-    return /^\/app\/\d+(?:\/|$)/.test(pathname);
+  if (isItadGameStoreProductUrl(parsedUrl.toString())) {
+    return true;
   }
 
   return false;
@@ -893,12 +897,16 @@ function isTaxfreeProductPage(parsedUrl: URL): boolean {
 }
 
 function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
-  return isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl);
+  return isVinmonopoletProductPage(parsedUrl) ||
+    isTaxfreeProductPage(parsedUrl) ||
+    isEpicGamesStoreProductUrl(parsedUrl.toString());
 }
 
 function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-  return hostname === "vinmonopolet.no" || hostname === "tax-free.no";
+  return hostname === "vinmonopolet.no" ||
+    hostname === "tax-free.no" ||
+    hostname === "store.epicgames.com";
 }
 
 function readVinmonopoletProductName(parsedUrl: URL, h1: string | undefined): string | undefined {
@@ -924,7 +932,7 @@ function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
     return true;
   }
 
-  if (isSteamAppProductUrl(parsedUrl.toString())) {
+  if (isItadGameStoreProductUrl(parsedUrl.toString())) {
     return true;
   }
 
@@ -3004,9 +3012,7 @@ function renderNotice(
   sumInput.addEventListener("keydown", (e) => {
     if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
   });
-  if (mainOffers.length > 0) {
-    header.append(sumInput);
-  }
+  header.append(sumInput);
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
   const offerList = document.createElement("div");
@@ -3196,10 +3202,9 @@ function renderNotice(
     addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
   }
   for (const card of PREMIUM_CARDS) {
-    if (card.label === "Curve") continue;
     if (card.label === "Crypto" && cryptoSub !== undefined) continue;
-    const { chip, label } = createBonusChip(card);
-    if (card.label === "Crypto") {
+    const { chip, label } = createBonusChip(card, card.label === "Curve" ? curveOffer?.activationUrl : undefined);
+    if (card.label === "Crypto" || card.label === "Curve") {
       const badge = chip.querySelector(".provider-badge")!;
       const wrapper = document.createElement("span");
       wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
@@ -3221,19 +3226,6 @@ function renderNotice(
   selectedItems.className = "chip-group-items";
   selectedGroup.append(selectedLabel, selectedItems);
   let hasSelectedItems = false;
-  if (curveOffer !== undefined) {
-    const curveCard = PREMIUM_CARDS.find((c) => c.label === "Curve")!;
-    const { chip, label } = createBonusChip(curveCard, curveOffer.activationUrl);
-    const badge = chip.querySelector(".provider-badge")!;
-    const wrapper = document.createElement("span");
-    wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
-    badge.replaceWith(wrapper);
-    wrapper.append(makeAdChip(), badge);
-    bonusChipLabels.push({ element: label, pct: curveCard.pct * 100, approx: curveCard.approx, defaultText: label.textContent ?? "" });
-    addChipTooltip(chip, curveCard.tip, shadowRoot);
-    selectedItems.append(chip);
-    hasSelectedItems = true;
-  }
   if (cryptoSub !== undefined) {
     const cryptoChip = document.createElement("a");
     cryptoChip.className = "bonus-chip";
@@ -3809,7 +3801,8 @@ function renderNotice(
   if (mainOffers.length > 0) body.append(offerList);
   if (regionPrices !== undefined && regionPrices.prices.length > 0) body.append(regionPricesSection);
   if (priceMatches.length > 0) body.append(priceMatchSection);
-  if (offers.length > 0) body.append(chipsSection, codesSection);
+  body.append(chipsSection);
+  if (offers.length > 0) body.append(codesSection);
 
   let userHasVoted = false;
 
@@ -4334,6 +4327,7 @@ function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative
     typeof value.amount === "number" &&
     (value.sortAmount === undefined || typeof value.sortAmount === "number") &&
     typeof value.currency === "string" &&
+    (value.platform === undefined || typeof value.platform === "string") &&
     (value.shippingPrice === undefined || typeof value.shippingPrice === "string") &&
     (value.totalPrice === undefined || typeof value.totalPrice === "string")
   );
@@ -4707,13 +4701,15 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
     alternatives.map(formatPriceMatchTooltipOffer).join("\n"),
   ].join("\n\n");
 }
-function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "shippingPrice" | "totalPrice">): string {
-  const shippingSuffix = offer.totalPrice !== undefined
-    ? ` (${offer.shippingPrice ?? "frakt"}, totalt ${offer.totalPrice})`
-    : offer.shippingPrice !== undefined
-      ? ` (${offer.shippingPrice})`
-      : "";
-  return `- ${offer.shopName} ${offer.price}${shippingSuffix}`;
+function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "platform" | "shippingPrice" | "totalPrice">): string {
+  const details = [
+    offer.platform,
+    offer.totalPrice !== undefined
+      ? `${offer.shippingPrice ?? "frakt"}, totalt ${offer.totalPrice}`
+      : offer.shippingPrice,
+  ].filter((detail): detail is string => detail !== undefined && detail.length > 0);
+  const detailsSuffix = details.length > 0 ? ` (${details.join(", ")})` : "";
+  return `- ${offer.shopName} ${offer.price}${detailsSuffix}`;
 }
 function formatProviderName(provider: CashbackOffer["provider"]): string {
   return PROVIDER_NAMES[provider] ?? provider;
