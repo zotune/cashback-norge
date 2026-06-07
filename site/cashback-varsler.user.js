@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780876081
+// @version      1780876649
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8826,7 +8826,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
     const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
     const pageCandidates = extractCurrentSkyscannerPageOfferCandidates(flightMeta);
-    const calendarCandidate = pageCandidates.length === 0 && isCurrentSkyscannerFlightSearchPageForMeta(flightMeta) ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl) : void 0;
+    const calendarCandidate = pageCandidates.length === 0 ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl) : void 0;
     const candidates = pageCandidates.length > 0 ? pageCandidates : calendarCandidate !== void 0 ? [calendarCandidate] : [];
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;

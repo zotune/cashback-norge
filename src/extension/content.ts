@@ -2555,7 +2555,7 @@ async function findSkyscannerFlightPriceMatchOffer(
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
   const pageCandidates = extractCurrentSkyscannerPageOfferCandidates(flightMeta);
-  const calendarCandidate = pageCandidates.length === 0 && isCurrentSkyscannerFlightSearchPageForMeta(flightMeta)
+  const calendarCandidate = pageCandidates.length === 0
     ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl)
     : undefined;
   const candidates = pageCandidates.length > 0
