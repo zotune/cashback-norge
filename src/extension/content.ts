@@ -399,23 +399,23 @@ const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
 const FINN_FLIGHT_POLL_ATTEMPTS = 7;
 const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
 const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
-  "https://workb.panflights.com/skypickersearchsingle",
   "https://worka.panflights.com/skypickersearchsingle",
   "https://panflights.com/skypickersearchsingle",
+  "https://workb.panflights.com/skypickersearchsingle",
 ];
 const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1000 },
   { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1001 },
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1002 },
-  { sortOrder: "quality", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1008 },
-  { sortOrder: "quality", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1009 },
-  { sortOrder: "quality", sortRadio: "quality", version: "255", maxStops: 3, searchId: 1011 },
   { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1004 },
-  { sortOrder: "price", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1008 },
-  { sortOrder: "price", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1009 },
-  { sortOrder: "price", sortRadio: "quality", version: "255", maxStops: 3, searchId: 1011 },
+  { sortOrder: "price", sortRadio: "quality", version: "610", maxStops: 3, searchId: 1010 },
+  { sortOrder: "price", sortRadio: "quality", version: "609", maxStops: 3, searchId: 1011 },
+  { sortOrder: "price", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1012 },
+  { sortOrder: "price", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1013 },
+  { sortOrder: "price", sortRadio: "quality", version: "608", maxStops: 3, searchId: 1014 },
+  { sortOrder: "price", sortRadio: "quality", version: "255", maxStops: 3, searchId: 1015 },
 ];
-const PANFLIGHTS_FLIGHT_HITS_LIMIT = 100;
+const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
 const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
 const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
 const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
@@ -1905,7 +1905,9 @@ async function fetchPanFlightsFlightSearchResult(
       body,
       credentials: "omit",
     });
-    if (isRecord(value) && Array.isArray(value.flighttab)) return { resultData: value, variant };
+    if (isRecord(value) && Array.isArray(value.flighttab) && value.flighttab.length > 0) {
+      return { resultData: value, variant };
+    }
   }
 
   return undefined;
