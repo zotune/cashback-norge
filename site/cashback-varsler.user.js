@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780880474
+// @version      1780881110
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8045,12 +8045,12 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     };
   }
   async function findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
-    const resultUrl = buildFinnFlightSearchUrl(flightMeta);
+    const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildFinnFlightSearchUrl(flightMeta);
     const searchData = await fetchFinnFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
     const resultData = await pollFinnFlightResults(searchData, flightMeta);
     if (resultData === void 0) return void 0;
-    const candidates = extractFinnFlightOfferCandidates(resultData, searchData.searchId, flightMeta);
+    const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta);
     const best = candidates[0];
     if (best === void 0) return void 0;
     return {
@@ -8079,13 +8079,30 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     const pageProps = isRecord(nextData?.props) && isRecord(nextData.props.pageProps) ? nextData.props.pageProps : void 0;
     const searchData = isRecord(pageProps?.searchData) ? pageProps.searchData : void 0;
     const config = isRecord(pageProps?.config) ? pageProps.config : void 0;
+    if (searchData === void 0) return void 0;
     const searchId = readStringValue(searchData?.searchId);
     if (searchId === void 0) return void 0;
+    const resultParams = buildFinnFlightResultParamsFromSearchData(searchData);
     return {
       searchId,
       flightApiUrl: readStringValue(config?.flightApiUrl) ?? FINN_FLIGHT_API_FALLBACK_URL,
-      resultUrl
+      resultUrl,
+      ...resultParams !== void 0 ? { resultParams } : {}
     };
+  }
+  function readCurrentFinnFlightSearchUrl(flightMeta) {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return void 0;
+    const currentMeta = extractFinnFlightSearchMeta(parsedUrl);
+    return currentMeta !== void 0 && isSameFlightSearchMeta(currentMeta, flightMeta) ? parsedUrl.toString() : void 0;
+  }
+  function buildFinnFlightResultParamsFromSearchData(searchData) {
+    const params = new URLSearchParams();
+    for (const key of ["departureAirportLeg1", "arrivalAirportLeg1", "departureAirportLeg2", "arrivalAirportLeg2"]) {
+      const value = readStringValue(searchData[key]);
+      if (value !== void 0 && value.length > 0) params.set(key, value);
+    }
+    return [...params].length > 0 ? params : void 0;
   }
   function parseFinnNextData(html) {
     const match = html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
@@ -8102,7 +8119,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     let progress = 0;
     for (let attempt = 0; attempt < FINN_FLIGHT_POLL_ATTEMPTS; attempt++) {
       await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
-      const resultUrl = buildFinnFlightResultApiUrl(searchData.flightApiUrl, searchData.searchId, flightMeta, progress);
+      const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress);
       const value = await userscriptJsonRequest(resultUrl, {
         headers: { Accept: "application/json" },
         credentials: "omit"
@@ -8114,16 +8131,16 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     }
     return latestResult;
   }
-  function buildFinnFlightResultApiUrl(flightApiUrl, searchId, flightMeta, progress) {
-    const params = buildFinnFlightExactAirportParams(flightMeta);
+  function buildFinnFlightResultApiUrl(searchData, flightMeta, progress) {
+    const params = searchData.resultParams !== void 0 ? new URLSearchParams(searchData.resultParams) : buildFinnFlightExactAirportParams(flightMeta);
     params.set("cacheBuster", String(Date.now()));
     params.set("progress", String(progress));
-    return `${flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchId)}?${params.toString()}`;
+    return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
   }
-  function extractFinnFlightOfferCandidates(resultData, searchId, flightMeta) {
+  function extractFinnFlightOfferCandidates(resultData, searchData, flightMeta) {
     const candidates = [];
     for (const trip of readRecordArray(resultData.trips)) {
-      if (!isFinnFlightTripMatchingSearch(trip, flightMeta)) continue;
+      if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData)) continue;
       const tripSummary = formatFinnFlightTripSummary(trip);
       for (const offer of readRecordArray(trip.offers)) {
         const amount = readNumberValue(offer.priceAmount);
@@ -8140,12 +8157,12 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
           amount,
           sortAmount: amount,
           currency: "NOK",
-          productUrl: buildFinnFlightOfferUrl(searchId, offerId),
+          productUrl: buildFinnFlightOfferUrl(searchData.searchId, offerId),
           ...platform.length > 0 ? { platform } : {}
         });
       }
     }
-    return dedupeFinnFlightOfferCandidates(candidates);
+    return rankFinnFlightOfferCandidates(dedupeFinnFlightOfferCandidates(candidates));
   }
   function dedupeFinnFlightOfferCandidates(candidates) {
     const seen = /* @__PURE__ */ new Set();
@@ -8162,18 +8179,40 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     }
     return uniqueCandidates;
   }
-  function isFinnFlightTripMatchingSearch(trip, flightMeta) {
+  function rankFinnFlightOfferCandidates(candidates) {
+    return [...candidates].sort((left, right) => {
+      return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+    });
+  }
+  function isFinnFlightTripMatchingSearch(trip, flightMeta, searchData) {
     const legs = readRecordArray(trip.legs);
     const outboundLeg = legs[0];
-    if (outboundLeg === void 0 || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)) {
+    if (outboundLeg === void 0 || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, searchData, flightMeta.outboundDate)) {
       return false;
     }
     if (flightMeta.inboundDate === void 0) return true;
     const inboundLeg = legs[1];
-    return inboundLeg !== void 0 && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, flightMeta.inboundDate);
+    return inboundLeg !== void 0 && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, searchData, flightMeta.inboundDate);
   }
-  function isFinnFlightLegMatch(leg, origin, destination, date) {
-    return readFinnFlightLegAirport(leg, "legOrigin", "origin") === origin && readFinnFlightLegAirport(leg, "legDestination", "destination") === destination && readFinnFlightLegDate(leg) === date;
+  function isFinnFlightLegMatch(leg, origin, destination, searchData, date) {
+    const legOrigin = readFinnFlightLegAirport(leg, "legOrigin", "origin");
+    const legDestination = readFinnFlightLegAirport(leg, "legDestination", "destination");
+    return legOrigin !== void 0 && legDestination !== void 0 && isFinnAirportMatchingSearch(legOrigin, origin, searchData) && isFinnAirportMatchingSearch(legDestination, destination, searchData) && readFinnFlightLegDate(leg) === date;
+  }
+  function isFinnAirportMatchingSearch(airport, requestedAirport, searchData) {
+    if (airport === requestedAirport) return true;
+    return collectFinnAllowedAirportCodes(searchData, requestedAirport).has(airport);
+  }
+  function collectFinnAllowedAirportCodes(searchData, requestedAirport) {
+    const allowedAirports = /* @__PURE__ */ new Set([requestedAirport]);
+    if (searchData.resultParams === void 0) return allowedAirports;
+    for (const value of searchData.resultParams.values()) {
+      const airports = value.split(",").map((part) => readIataCodeValue(part)).filter((airport) => airport !== void 0);
+      if (airports.includes(requestedAirport)) {
+        for (const airport of airports) allowedAirports.add(airport);
+      }
+    }
+    return allowedAirports;
   }
   function readFinnFlightLegAirport(leg, legKey, segmentKey) {
     const legAirport = readStringValue(leg[legKey]);

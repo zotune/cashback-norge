@@ -286,6 +286,7 @@ type FinnFlightSearchData = {
   searchId: string;
   flightApiUrl: string;
   resultUrl: string;
+  resultParams?: URLSearchParams;
 };
 type FinnFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
@@ -1495,14 +1496,14 @@ async function findFinnFlightPriceMatchOffer(
   routeTitle: string,
   searchDetails: string,
 ): Promise<PriceMatchOffer | undefined> {
-  const resultUrl = buildFinnFlightSearchUrl(flightMeta);
+  const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildFinnFlightSearchUrl(flightMeta);
   const searchData = await fetchFinnFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
   const resultData = await pollFinnFlightResults(searchData, flightMeta);
   if (resultData === undefined) return undefined;
 
-  const candidates = extractFinnFlightOfferCandidates(resultData, searchData.searchId, flightMeta);
+  const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta);
   const best = candidates[0];
   if (best === undefined) return undefined;
 
@@ -1524,6 +1525,9 @@ async function findFinnFlightPriceMatchOffer(
 }
 
 async function fetchFinnFlightSearchData(resultUrl: string): Promise<FinnFlightSearchData | undefined> {
+  const currentSearchData = readCurrentFinnFlightSearchData(resultUrl);
+  if (currentSearchData !== undefined) return currentSearchData;
+
   const html = await userscriptTextRequest(resultUrl, {
     headers: { Accept: "text/html" },
     credentials: "omit",
@@ -1531,19 +1535,67 @@ async function fetchFinnFlightSearchData(resultUrl: string): Promise<FinnFlightS
   if (html === undefined) return undefined;
 
   const nextData = parseFinnNextData(html);
+  return buildFinnFlightSearchDataFromNextData(nextData, resultUrl);
+}
+
+function readCurrentFinnFlightSearchData(resultUrl: string): FinnFlightSearchData | undefined {
+  const parsedResultUrl = parseUrl(resultUrl);
+  const parsedCurrentUrl = parseUrl(window.location.href);
+  if (parsedResultUrl === undefined || parsedCurrentUrl === undefined || parsedResultUrl.toString() !== parsedCurrentUrl.toString()) {
+    return undefined;
+  }
+
+  const nextDataText = document.getElementById("__NEXT_DATA__")?.textContent;
+  if (nextDataText === undefined || nextDataText.trim().length === 0) return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(nextDataText);
+    return buildFinnFlightSearchDataFromNextData(isRecord(parsed) ? parsed : undefined, resultUrl);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildFinnFlightSearchDataFromNextData(
+  nextData: Record<string, unknown> | undefined,
+  resultUrl: string,
+): FinnFlightSearchData | undefined {
   const pageProps = isRecord(nextData?.props) && isRecord(nextData.props.pageProps)
     ? nextData.props.pageProps
     : undefined;
   const searchData = isRecord(pageProps?.searchData) ? pageProps.searchData : undefined;
   const config = isRecord(pageProps?.config) ? pageProps.config : undefined;
+  if (searchData === undefined) return undefined;
+
   const searchId = readStringValue(searchData?.searchId);
   if (searchId === undefined) return undefined;
+  const resultParams = buildFinnFlightResultParamsFromSearchData(searchData);
 
   return {
     searchId,
     flightApiUrl: readStringValue(config?.flightApiUrl) ?? FINN_FLIGHT_API_FALLBACK_URL,
     resultUrl,
+    ...(resultParams !== undefined ? { resultParams } : {}),
   };
+}
+
+function readCurrentFinnFlightSearchUrl(flightMeta: FlightSearchMeta): string | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return undefined;
+
+  const currentMeta = extractFinnFlightSearchMeta(parsedUrl);
+  return currentMeta !== undefined && isSameFlightSearchMeta(currentMeta, flightMeta)
+    ? parsedUrl.toString()
+    : undefined;
+}
+
+function buildFinnFlightResultParamsFromSearchData(searchData: Record<string, unknown>): URLSearchParams | undefined {
+  const params = new URLSearchParams();
+  for (const key of ["departureAirportLeg1", "arrivalAirportLeg1", "departureAirportLeg2", "arrivalAirportLeg2"]) {
+    const value = readStringValue(searchData[key]);
+    if (value !== undefined && value.length > 0) params.set(key, value);
+  }
+  return [...params].length > 0 ? params : undefined;
 }
 
 function parseFinnNextData(html: string): Record<string, unknown> | undefined {
@@ -1566,7 +1618,7 @@ async function pollFinnFlightResults(
 
   for (let attempt = 0; attempt < FINN_FLIGHT_POLL_ATTEMPTS; attempt++) {
     await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
-    const resultUrl = buildFinnFlightResultApiUrl(searchData.flightApiUrl, searchData.searchId, flightMeta, progress);
+    const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress);
     const value = await userscriptJsonRequest(resultUrl, {
       headers: { Accept: "application/json" },
       credentials: "omit",
@@ -1582,26 +1634,27 @@ async function pollFinnFlightResults(
 }
 
 function buildFinnFlightResultApiUrl(
-  flightApiUrl: string,
-  searchId: string,
+  searchData: FinnFlightSearchData,
   flightMeta: FlightSearchMeta,
   progress: number,
 ): string {
-  const params = buildFinnFlightExactAirportParams(flightMeta);
+  const params = searchData.resultParams !== undefined
+    ? new URLSearchParams(searchData.resultParams)
+    : buildFinnFlightExactAirportParams(flightMeta);
   params.set("cacheBuster", String(Date.now()));
   params.set("progress", String(progress));
-  return `${flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchId)}?${params.toString()}`;
+  return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
 }
 
 function extractFinnFlightOfferCandidates(
   resultData: Record<string, unknown>,
-  searchId: string,
+  searchData: FinnFlightSearchData,
   flightMeta: FlightSearchMeta,
 ): FinnFlightOfferCandidate[] {
   const candidates: FinnFlightOfferCandidate[] = [];
 
   for (const trip of readRecordArray(resultData.trips)) {
-    if (!isFinnFlightTripMatchingSearch(trip, flightMeta)) continue;
+    if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData)) continue;
 
     const tripSummary = formatFinnFlightTripSummary(trip);
     for (const offer of readRecordArray(trip.offers)) {
@@ -1621,13 +1674,13 @@ function extractFinnFlightOfferCandidates(
         amount,
         sortAmount: amount,
         currency: "NOK",
-        productUrl: buildFinnFlightOfferUrl(searchId, offerId),
+        productUrl: buildFinnFlightOfferUrl(searchData.searchId, offerId),
         ...(platform.length > 0 ? { platform } : {}),
       });
     }
   }
 
-  return dedupeFinnFlightOfferCandidates(candidates);
+  return rankFinnFlightOfferCandidates(dedupeFinnFlightOfferCandidates(candidates));
 }
 
 function dedupeFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[]): FinnFlightOfferCandidate[] {
@@ -1646,23 +1699,67 @@ function dedupeFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[])
   return uniqueCandidates;
 }
 
-function isFinnFlightTripMatchingSearch(trip: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+function rankFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[]): FinnFlightOfferCandidate[] {
+  return [...candidates].sort((left, right) => {
+    return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+  });
+}
+
+function isFinnFlightTripMatchingSearch(
+  trip: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  searchData: FinnFlightSearchData,
+): boolean {
   const legs = readRecordArray(trip.legs);
   const outboundLeg = legs[0];
-  if (outboundLeg === undefined || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)) {
+  if (outboundLeg === undefined || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, searchData, flightMeta.outboundDate)) {
     return false;
   }
 
   if (flightMeta.inboundDate === undefined) return true;
 
   const inboundLeg = legs[1];
-  return inboundLeg !== undefined && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, flightMeta.inboundDate);
+  return inboundLeg !== undefined && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, searchData, flightMeta.inboundDate);
 }
 
-function isFinnFlightLegMatch(leg: Record<string, unknown>, origin: string, destination: string, date: string): boolean {
-  return readFinnFlightLegAirport(leg, "legOrigin", "origin") === origin &&
-    readFinnFlightLegAirport(leg, "legDestination", "destination") === destination &&
+function isFinnFlightLegMatch(
+  leg: Record<string, unknown>,
+  origin: string,
+  destination: string,
+  searchData: FinnFlightSearchData,
+  date: string,
+): boolean {
+  const legOrigin = readFinnFlightLegAirport(leg, "legOrigin", "origin");
+  const legDestination = readFinnFlightLegAirport(leg, "legDestination", "destination");
+  return legOrigin !== undefined &&
+    legDestination !== undefined &&
+    isFinnAirportMatchingSearch(legOrigin, origin, searchData) &&
+    isFinnAirportMatchingSearch(legDestination, destination, searchData) &&
     readFinnFlightLegDate(leg) === date;
+}
+
+function isFinnAirportMatchingSearch(
+  airport: string,
+  requestedAirport: string,
+  searchData: FinnFlightSearchData,
+): boolean {
+  if (airport === requestedAirport) return true;
+  return collectFinnAllowedAirportCodes(searchData, requestedAirport).has(airport);
+}
+
+function collectFinnAllowedAirportCodes(searchData: FinnFlightSearchData, requestedAirport: string): Set<string> {
+  const allowedAirports = new Set([requestedAirport]);
+  if (searchData.resultParams === undefined) return allowedAirports;
+
+  for (const value of searchData.resultParams.values()) {
+    const airports = value.split(",")
+      .map((part) => readIataCodeValue(part))
+      .filter((airport): airport is string => airport !== undefined);
+    if (airports.includes(requestedAirport)) {
+      for (const airport of airports) allowedAirports.add(airport);
+    }
+  }
+  return allowedAirports;
 }
 
 function readFinnFlightLegAirport(
