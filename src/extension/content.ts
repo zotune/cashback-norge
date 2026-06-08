@@ -247,7 +247,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -317,6 +317,9 @@ type TravellinkFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   durationMinutes?: number;
   meRating?: number;
+};
+type TripComFlightOfferCandidate = PriceMatchAlternative & {
+  productUrl: string;
 };
 type MomondoFlightLegSummary = {
   origin: string;
@@ -455,6 +458,14 @@ const TRAVELLINK_GRAPHQL_ENDPOINT = `${TRAVELLINK_BASE_URL}/frontend-api/service
 const TRAVELLINK_COMMON_HEADERS: Record<string, string> = {
   Accept: "application/json, text/javascript, */*; q=0.01",
   "Content-Type": "application/json; charset=UTF-8",
+};
+const TRIP_COM_BASE_URL = "https://us.trip.com";
+const TRIP_COM_LOW_PRICE_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/14427/GetLowPriceInCalender`;
+const TRIP_COM_DEFAULT_CURRENCY = "USD";
+const TRIP_COM_USD_TO_NOK_SORT_RATE = 11;
+const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
+  Accept: "application/json",
+  "Content-Type": "application/json;charset=UTF-8",
 };
 const TRAVELLINK_SEARCH_QUERY = `
 query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
@@ -880,6 +891,7 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
     safelyFindFlightPriceMatchOffer(() => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
     safelyFindFlightPriceMatchOffer(() => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
     safelyFindFlightPriceMatchOffer(() => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
+    safelyFindFlightPriceMatchOffer(() => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
   ])).filter((offer): offer is PriceMatchOffer => offer !== undefined);
   if (liveOffers.length === 0) return staticOffers;
 
@@ -907,6 +919,7 @@ function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
     extractMomondoFlightSearchMeta(parsedUrl) ??
     extractSkyscannerFlightSearchMeta(parsedUrl) ??
     extractTravellinkFlightSearchMeta(parsedUrl) ??
+    extractTripComFlightSearchMeta(parsedUrl) ??
     extractStoredFlightSearchMeta(parsedUrl) ??
     extractVisibleFlightSearchMeta(parsedUrl);
 }
@@ -1110,6 +1123,32 @@ function readTravellinkHashParams(hash: string): URLSearchParams {
     if (key.length > 0) params.set(key, decodeURIComponent(value));
   }
   return params;
+}
+
+function extractTripComFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (!hostname.endsWith("trip.com") || !/^\/flights\/showfarefirst\/?$/i.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  const origin = readIataCodeParam(parsedUrl, "dcity");
+  const destination = readIataCodeParam(parsedUrl, "acity");
+  const outboundDate = readIsoDateParam(parsedUrl, "ddate");
+  const inboundDate = /^rt$/i.test(parsedUrl.searchParams.get("triptype") ?? "")
+    ? readIsoDateParam(parsedUrl, "rdate")
+    : undefined;
+  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("quantity")) ?? 1,
+    youths: 0,
+    children: 0,
+    infants: 0,
+  });
 }
 
 function isSkyscannerFlightSearchPage(parsedUrl: URL): boolean {
@@ -1876,9 +1915,7 @@ function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): 
     if (candidate.durationMinutes === undefined) return shortest;
     return shortest === undefined ? candidate.durationMinutes : Math.min(shortest, candidate.durationMinutes);
   }, undefined);
-  const maxReasonableDuration = shortestDuration === undefined
-    ? undefined
-    : shortestDuration + PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES;
+  const maxReasonableDuration = calculateMaxReasonableFlightDuration(shortestDuration);
 
   return [...candidates].sort((left, right) => {
     const leftReasonable = isReasonablePanFlightsDuration(left, maxReasonableDuration);
@@ -1890,6 +1927,12 @@ function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): 
 
     return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
   });
+}
+
+function calculateMaxReasonableFlightDuration(shortestDuration: number | undefined): number | undefined {
+  if (shortestDuration === undefined) return undefined;
+  if (shortestDuration >= 600) return shortestDuration * 2;
+  return shortestDuration + PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES;
 }
 
 function isReasonablePanFlightsDuration(
@@ -2484,9 +2527,7 @@ function rankTravellinkOfferCandidates(
     if (candidate.durationMinutes === undefined) return shortest;
     return shortest === undefined ? candidate.durationMinutes : Math.min(shortest, candidate.durationMinutes);
   }, undefined);
-  const maxReasonableDuration = shortestDuration === undefined
-    ? undefined
-    : shortestDuration + PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES;
+  const maxReasonableDuration = calculateMaxReasonableFlightDuration(shortestDuration);
 
   return [...candidates].sort((left, right) => {
     const leftReasonable = isReasonableTravellinkDuration(left, maxReasonableDuration);
@@ -2546,6 +2587,145 @@ function formatTravellinkFlightDurationSummary(legs: TravellinkFlightLegSummary[
     .map((leg) => formatPanFlightsDuration(leg.durationMinutes))
     .filter((duration): duration is string => duration !== undefined);
   return durations.length > 0 ? durations.join(" / ") : undefined;
+}
+
+function buildTripComFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+  const params = new URLSearchParams({
+    dcity: flightMeta.origin.toLowerCase(),
+    acity: flightMeta.destination.toLowerCase(),
+    ddate: flightMeta.outboundDate,
+    triptype: flightMeta.inboundDate !== undefined ? "rt" : "ow",
+    class: "y",
+    lowpricesource: "searchform",
+    quantity: String(flightMeta.adults),
+    searchboxarg: "t",
+    nonstoponly: "off",
+    locale: "en-US",
+    curr: TRIP_COM_DEFAULT_CURRENCY,
+  });
+  if (flightMeta.inboundDate !== undefined) params.set("rdate", flightMeta.inboundDate);
+  return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
+}
+
+async function findTripComFlightPriceMatchOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+): Promise<PriceMatchOffer | undefined> {
+  if (flightMeta.inboundDate === undefined) return undefined;
+
+  const resultUrl = buildTripComFlightSearchUrl(flightMeta);
+  const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
+    method: "POST",
+    headers: TRIP_COM_COMMON_HEADERS,
+    body: JSON.stringify(buildTripComLowPricePayload(flightMeta)),
+    credentials: "omit",
+  });
+  if (!isRecord(resultData)) return undefined;
+
+  const candidate = extractTripComCalendarCandidate(resultData, flightMeta, resultUrl);
+  if (candidate === undefined) return undefined;
+
+  return {
+    source: "tripcom",
+    sourceName: "Trip.com",
+    details: searchDetails,
+    matchedExactProduct: true,
+    shopName: candidate.shopName,
+    price: candidate.price,
+    amount: candidate.amount,
+    sortAmount: candidate.sortAmount ?? candidate.amount,
+    currency: candidate.currency,
+    productName: routeTitle,
+    productUrl: resultUrl,
+    offerUrl: candidate.productUrl,
+    alternatives: [candidate].map(({ productUrl: _productUrl, ...alternative }) => alternative),
+  };
+}
+
+function buildTripComLowPricePayload(flightMeta: FlightSearchMeta): Record<string, unknown> {
+  return {
+    dCity: flightMeta.origin,
+    aCity: flightMeta.destination,
+    dDate: flightMeta.outboundDate,
+    flightWayType: flightMeta.inboundDate !== undefined ? "RT" : "OW",
+    departureAirport: flightMeta.origin,
+    arrivalAirport: flightMeta.destination,
+    cabinClass: "Economy",
+    transferType: "ANY",
+    searchInfo: {
+      travelerNum: {
+        adult: flightMeta.adults,
+        child: 0,
+        infant: 0,
+      },
+    },
+    abtList: [],
+    offSet: 30,
+    ...(flightMeta.inboundDate !== undefined ? { aDate: flightMeta.inboundDate, startInterval: 30, endInterval: 30 } : {}),
+    Head: {
+      Group: "Trip",
+      Source: "ONLINE",
+      Version: "3",
+      Currency: TRIP_COM_DEFAULT_CURRENCY,
+      Locale: "en-US",
+      Language: "en",
+      ClientID: "",
+      PageId: "10320667452",
+    },
+  };
+}
+
+function extractTripComCalendarCandidate(
+  resultData: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+): TripComFlightOfferCandidate | undefined {
+  const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
+  const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList)
+    .find((item) => isTripComCalendarItemMatchingSearch(item, flightMeta));
+  const amount = readPositiveNumberValue(calendarItem?.currencyPrice);
+  if (amount === undefined) return undefined;
+
+  const estimatedNokAmount = estimateTripComNokAmount(amount, currency);
+  const isEstimatedCurrency = estimatedNokAmount !== undefined && currency.toUpperCase() !== "NOK";
+  const displayAmount = estimatedNokAmount ?? amount;
+  const displayCurrency = estimatedNokAmount !== undefined ? "NOK" : currency;
+
+  return {
+    shopName: "Trip.com kalender",
+    price: isEstimatedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
+    amount: displayAmount,
+    sortAmount: estimatedNokAmount ?? estimateTripComSortAmount(amount, currency),
+    currency: displayCurrency,
+    productUrl: resultUrl,
+    platform: [
+      "indikativ kalenderpris",
+      isEstimatedCurrency ? `Trip.com viser ${formatFlightPrice(amount, currency)}` : undefined,
+      flightMeta.inboundDate !== undefined ? "tur/retur" : "én vei",
+      "samme flyplasser",
+    ].filter((part) => part !== undefined).join(", "),
+  };
+}
+
+function isTripComCalendarItemMatchingSearch(
+  item: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+): boolean {
+  if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
+  if (flightMeta.inboundDate === undefined) return true;
+  return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
+}
+
+function estimateTripComSortAmount(amount: number, currency: string): number {
+  return estimateTripComNokAmount(amount, currency) ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT;
+}
+
+function estimateTripComNokAmount(amount: number, currency: string): number | undefined {
+  const normalizedCurrency = currency.toUpperCase();
+  if (normalizedCurrency === "NOK") return amount;
+  if (normalizedCurrency === "USD") return Math.round(amount * TRIP_COM_USD_TO_NOK_SORT_RATE);
+  return undefined;
 }
 
 async function findSkyscannerFlightPriceMatchOffer(
@@ -3503,6 +3683,10 @@ function formatNokFlightPrice(amount: number): string {
   return `${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(amount)} kr`;
 }
 
+function formatApproxNokFlightPrice(amount: number): string {
+  return `~${formatNokFlightPrice(amount)}`;
+}
+
 function formatFinnFlightTripSummary(trip: Record<string, unknown>): string {
   const legs = readRecordArray(trip.legs);
   return [
@@ -4068,6 +4252,8 @@ function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
     hostname === "panflights.no" ||
     hostname === "panflights.com" ||
     hostname === "travellink.no" ||
+    hostname === "trip.com" ||
+    hostname.endsWith(".trip.com") ||
     hostname === "shop.lufthansa.com" ||
     hostname === "booking.norwegian.com" ||
     hostname === "skyscanner.no" ||
@@ -5379,6 +5565,10 @@ function renderNotice(
     }
     .provider-travellink {
       background: #006471;
+      color: #ffffff;
+    }
+    .provider-tripcom {
+      background: #2563eb;
       color: #ffffff;
     }
     .provider-isthereanydeal {
@@ -7556,7 +7746,7 @@ function isRegionPricePlanAlternative(value: unknown): boolean {
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.details === undefined || typeof value.details === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
@@ -8028,6 +8218,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "momondo") return "momondo";
   if (priceMatch.source === "skyscanner") return "skyscanner";
   if (priceMatch.source === "travellink") return "travellink";
+  if (priceMatch.source === "tripcom") return "tripcom";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   if (priceMatch.source === "ggdeals") return "ggdeals";
   if (priceMatch.source === "allkeyshop") return "allkeyshop";
@@ -8048,6 +8239,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "momondo") return "momondo";
   if (priceMatch.source === "skyscanner") return "Skyscanner";
   if (priceMatch.source === "travellink") return "Travellink";
+  if (priceMatch.source === "tripcom") return "Trip.com";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   if (priceMatch.source === "ggdeals") return "GG Deals";
   if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";
@@ -8063,19 +8255,20 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
       (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
 
     if (hasLivePriceList) {
-      const isSkyscannerCalendarPrice = priceMatch.source === "skyscanner" && priceMatch.shopName === "Skyscanner kalender";
+      const isCalendarPrice = (priceMatch.source === "skyscanner" && priceMatch.shopName === "Skyscanner kalender") ||
+        (priceMatch.source === "tripcom" && priceMatch.shopName === "Trip.com kalender");
       return [
         `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
         [
           priceMatch.shopName,
           details !== priceMatch.shopName ? details : undefined,
-          `${isSkyscannerCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
-          isSkyscannerCalendarPrice
-            ? "Skyscanner gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste."
+          `${isCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
+          isCalendarPrice
+            ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.`
             : "Dato og flyplasser er filtrert til samme søk.",
         ].filter((line): line is string => line !== undefined).join("\n"),
         [
-          isSkyscannerCalendarPrice ? "Prisgrunnlag" : "Treffliste",
+          isCalendarPrice ? "Prisgrunnlag" : "Treffliste",
           ...alternatives.map(formatPriceMatchTooltipOffer),
         ].join("\n"),
         "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden.",
@@ -8103,7 +8296,8 @@ function isFlightSearchPriceMatch(priceMatch: PriceMatchOffer): boolean {
     priceMatch.source === "panflights" ||
     priceMatch.source === "momondo" ||
     priceMatch.source === "skyscanner" ||
-    priceMatch.source === "travellink";
+    priceMatch.source === "travellink" ||
+    priceMatch.source === "tripcom";
 }
 function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "platform" | "shippingPrice" | "totalPrice">): string {
   const details = [
