@@ -409,18 +409,15 @@ const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
 const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1000 },
   { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 },
-  { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1002 },
-  { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1004 },
-  { sortOrder: "price", sortRadio: "quality", version: "610", maxStops: 3, searchId: 1010 },
-  { sortOrder: "price", sortRadio: "quality", version: "609", maxStops: 3, searchId: 1011 },
-  { sortOrder: "price", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1012 },
-  { sortOrder: "price", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1013 },
-  { sortOrder: "price", sortRadio: "quality", version: "608", maxStops: 3, searchId: 1014 },
-  { sortOrder: "price", sortRadio: "quality", version: "255", maxStops: 3, searchId: 1015 },
+  { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1002 },
+  { sortOrder: "quality", sortRadio: "quality", version: 255, maxStops: 3, searchId: 1255 },
+  { sortOrder: "price", sortRadio: "quality", version: 255, maxStops: 3, searchId: 1256 },
 ];
 const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
 const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
 const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
+const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
+const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
 const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
 const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
 const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -687,6 +684,7 @@ function installDynamicProductPageRefresh(): void {
         ? [
           buildFlightSearchMetaKey(flightMeta),
           isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : "",
+          isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
         ].join("|")
         : productMeta === undefined
           ? ""
@@ -1851,17 +1849,20 @@ async function findPanFlightsFlightPriceMatchOffer(
   searchDetails: string,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
-  const resultDataList = await Promise.all(
-    PANFLIGHTS_FLIGHT_SEARCH_VARIANTS.map((variant) => fetchPanFlightsFlightSearchResult(flightMeta, variant)),
-  );
-  const candidates = dedupePanFlightsOfferCandidates(
+  const [pageCandidates, resultDataList] = await Promise.all([
+    readCurrentPanFlightsPageOfferCandidates(flightMeta, resultUrl),
+    fetchPanFlightsFlightSearchResults(flightMeta),
+  ]);
+  const apiCandidates = dedupePanFlightsOfferCandidates(
     resultDataList.flatMap((resultData) => {
       return resultData === undefined
         ? []
         : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl);
     }),
   );
-  const rankedCandidates = rankPanFlightsOfferCandidates(candidates);
+  const rankedCandidates = pageCandidates.length > 0
+    ? mergePanFlightsVisibleCandidates(pageCandidates, apiCandidates)
+    : rankPanFlightsOfferCandidates(apiCandidates);
 
   const best = rankedCandidates[0];
   if (best === undefined) return undefined;
@@ -1893,6 +1894,402 @@ async function findPanFlightsFlightPriceMatchOffer(
   };
 }
 
+async function fetchPanFlightsFlightSearchResults(
+  flightMeta: FlightSearchMeta,
+): Promise<Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined>> {
+  const results: Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> = [];
+  for (const variant of PANFLIGHTS_FLIGHT_SEARCH_VARIANTS) {
+    results.push(await fetchPanFlightsFlightSearchResult(flightMeta, variant));
+  }
+  return results;
+}
+
+async function readCurrentPanFlightsPageOfferCandidates(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+): Promise<PanFlightsOfferCandidate[]> {
+  const stateCandidates = await readCurrentPanFlightsPageStateOfferCandidates(flightMeta, resultUrl);
+  return stateCandidates.length > 0
+    ? stateCandidates
+    : extractCurrentPanFlightsPageOfferCandidates(flightMeta, resultUrl);
+}
+
+function readCurrentPanFlightsPageStateOfferCandidates(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+): Promise<PanFlightsOfferCandidate[]> {
+  if (!isCurrentPanFlightsSearchPageForMeta(flightMeta)) return Promise.resolve([]);
+
+  const scriptHost = document.documentElement ?? document.head ?? document.body;
+  if (scriptHost === null) return Promise.resolve([]);
+
+  const requestId = `panflights-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return new Promise((resolve) => {
+    let settled = false;
+    let timeoutId: number | undefined;
+
+    const finish = (candidates: PanFlightsOfferCandidate[]): void => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      window.removeEventListener("message", handleMessage);
+      resolve(candidates);
+    };
+
+    const handleMessage = (event: MessageEvent<unknown>): void => {
+      if (event.source !== window || !isRecord(event.data)) return;
+      if (event.data.type !== PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE || event.data.requestId !== requestId) return;
+      finish(readPanFlightsPageStateCandidateRecords(event.data.candidates, resultUrl));
+    };
+
+    window.addEventListener("message", handleMessage);
+    timeoutId = window.setTimeout(() => finish([]), PANFLIGHTS_PAGE_STATE_TIMEOUT_MS);
+
+    const script = document.createElement("script");
+    script.textContent = buildPanFlightsPageStateReaderScript(requestId, flightMeta);
+    scriptHost.append(script);
+    script.remove();
+  });
+}
+
+function readPanFlightsPageStateCandidateRecords(
+  value: unknown,
+  resultUrl: string,
+): PanFlightsOfferCandidate[] {
+  return readRecordArray(value).flatMap((candidate, index) => {
+    const amount = readPositiveNumberValue(candidate.amount);
+    if (amount === undefined) return [];
+
+    const shopName = readStringValue(candidate.shopName) ?? "PanFlights";
+    const productUrl = readPanFlightsProductUrl(candidate.productUrl, resultUrl);
+    const sourceRank = readNumberValue(candidate.sourceRank) ?? index;
+    const sortAmount = readPositiveNumberValue(candidate.sortAmount) ?? amount;
+    const durationMinutes = readNumberValue(candidate.durationMinutes);
+    const qualityScore = readNumberValue(candidate.qualityScore);
+    const routeFingerprint = readStringValue(candidate.routeFingerprint);
+    const platform = readStringValue(candidate.platform);
+
+    return [{
+      shopName,
+      price: formatNokFlightPrice(amount),
+      amount,
+      sortAmount,
+      currency: "NOK",
+      productUrl,
+      sourceRank,
+      sourceSortOrder: "quality" as const,
+      sourceVersion: 0,
+      ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+      ...(qualityScore !== undefined ? { qualityScore } : {}),
+      ...(routeFingerprint !== undefined ? { routeFingerprint } : {}),
+      ...(platform !== undefined ? { platform } : {}),
+    }];
+  });
+}
+
+function buildPanFlightsPageStateReaderScript(requestId: string, flightMeta: FlightSearchMeta): string {
+  return `(() => {
+  const messageType = ${JSON.stringify(PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE)};
+  const requestId = ${JSON.stringify(requestId)};
+  const flightMeta = ${JSON.stringify(flightMeta)};
+  const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  const readString = (value) => typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  const readNumber = (value) => {
+    const parsed = typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseFloat(value.replace(/\\s/g, "").replace(",", "."))
+        : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const readPositiveNumber = (value) => {
+    const parsed = readNumber(value);
+    return parsed !== undefined && parsed > 0 ? parsed : undefined;
+  };
+  const readArray = (value) => Array.isArray(value) ? value.filter(isRecord) : [];
+  const readCode = (value) => (readString(value) || "").toUpperCase();
+  const formatEpochDate = (value) => {
+    const parsed = readNumber(value);
+    if (parsed === undefined) return undefined;
+    const date = new Date(parsed * 1000);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
+  };
+  const readPackage = (item) => isRecord(item.package) ? item.package : item;
+  const readRouteList = (item) => readArray(readPackage(item).routelist);
+  const routeLegMatches = (route, dataKey, timeKey, origin, destination, date) => {
+    const leg = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+    return leg !== undefined &&
+      readCode(leg.flyFrom) === origin &&
+      readCode(leg.flyTo) === destination &&
+      formatEpochDate(route[timeKey]) === date;
+  };
+  const routeLegDateMatches = (route, dataKey, timeKey, date) => {
+    const leg = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+    return leg !== undefined && formatEpochDate(route[timeKey]) === date;
+  };
+  const itemMatchesSearch = (item) => {
+    const routes = readRouteList(item);
+    const outboundRoute = routes[0];
+    if (outboundRoute === undefined) return false;
+    if (!routeLegMatches(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)) return false;
+    if (flightMeta.inboundDate === undefined) return true;
+    return routeLegMatches(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin, flightMeta.inboundDate) ||
+      routes.some((route) => routeLegMatches(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin, flightMeta.inboundDate));
+  };
+  const itemMatchesDates = (item) => {
+    const routes = readRouteList(item);
+    const outboundRoute = routes[0];
+    if (outboundRoute === undefined) return false;
+    if (!routeLegDateMatches(outboundRoute, "tripdata", "dTime", flightMeta.outboundDate)) return false;
+    if (flightMeta.inboundDate === undefined) return true;
+    return routeLegDateMatches(outboundRoute, "backdata", "drTime", flightMeta.inboundDate) ||
+      routes.some((route) => routeLegDateMatches(route, "tripdata", "dTime", flightMeta.inboundDate));
+  };
+  const readBestOffer = (item) => {
+    const offerHash = isRecord(item.offerhash) ? item.offerhash : undefined;
+    const bestKey = readString(item.bestproviderkey);
+    if (offerHash !== undefined && bestKey !== undefined && isRecord(offerHash[bestKey])) return offerHash[bestKey];
+    if (offerHash !== undefined) {
+      const firstOffer = Object.values(offerHash).find(isRecord);
+      if (firstOffer !== undefined) return firstOffer;
+    }
+    const packageOfferHash = isRecord(readPackage(item).offerhash) ? readPackage(item).offerhash : undefined;
+    if (packageOfferHash !== undefined && bestKey !== undefined && isRecord(packageOfferHash[bestKey])) return packageOfferHash[bestKey];
+    return undefined;
+  };
+  const readUrlCandidate = (value) => {
+    if (Array.isArray(value)) return value.map(readString).find(Boolean);
+    return readString(value);
+  };
+  const formatDuration = (minutes) => {
+    const parsed = readNumber(minutes);
+    if (parsed === undefined) return undefined;
+    const totalMinutes = Math.round(parsed);
+    const hours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    if (hours <= 0) return remainingMinutes + " min";
+    return remainingMinutes === 0 ? hours + " t" : hours + " t " + remainingMinutes + " min";
+  };
+  const collectCarriers = (route) => {
+    const carriers = new Set();
+    for (const dataKey of ["tripdata", "backdata"]) {
+      const leg = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+      for (const carrier of (readString(leg && leg.airlines) || "").split(",")) {
+        const trimmed = carrier.trim();
+        if (trimmed.length > 0) carriers.add(trimmed);
+      }
+    }
+    return [...carriers];
+  };
+  const formatStops = (route) => {
+    const stops = ["tripdata", "backdata"].flatMap((dataKey) => {
+      const leg = isRecord(route[dataKey]) ? route[dataKey] : undefined;
+      return Array.isArray(leg && leg.spec) ? [Math.max(0, leg.spec.length - 1)] : [];
+    });
+    if (stops.length === 0) return undefined;
+    return stops.every((stopCount) => stopCount === 0)
+      ? "direkte"
+      : stops.map((stopCount) => stopCount === 0 ? "direkte" : stopCount + " stopp").join(" / ");
+  };
+  const formatSummary = (item) => {
+    const packageRecord = readPackage(item);
+    const outboundRoute = readRouteList(item)[0];
+    const parts = [
+      outboundRoute !== undefined ? collectCarriers(outboundRoute).join("/") : undefined,
+      outboundRoute !== undefined ? formatStops(outboundRoute) : undefined,
+      formatDuration(packageRecord.duration !== undefined ? packageRecord.duration : item.duration),
+    ].filter((part) => typeof part === "string" && part.length > 0);
+    return parts.length > 0 ? parts.join(", ") : "PanFlights synlig treffliste";
+  };
+  const readCandidates = () => {
+    const state = window.ResultsBaseObj;
+    if (!isRecord(state)) return [];
+    const rawRows = readArray(state.useflighttab).length > 0 ? readArray(state.useflighttab) : readArray(state.flighttab);
+    const searchableRows = rawRows.filter((item) => !item.invalid && item.quality !== 0);
+    const routeRows = searchableRows.filter(itemMatchesSearch);
+    const dateRows = routeRows.length > 0 ? routeRows : searchableRows.filter(itemMatchesDates);
+    return dateRows.slice(0, 60).flatMap((item, sourceRank) => {
+      if (item.filtered || item.invalid || item.quality === 0) return [];
+      const packageRecord = readPackage(item);
+      const bestOffer = readBestOffer(item);
+      const amount = readPositiveNumber(item.price_pp) ??
+        readPositiveNumber(item.price) ??
+        readPositiveNumber(packageRecord.price) ??
+        readPositiveNumber(bestOffer && bestOffer.price);
+      if (amount === undefined) return [];
+      const shopName = readString(item.provider) ??
+        readString(bestOffer && bestOffer.provider) ??
+        readString(bestOffer && bestOffer.name) ??
+        readString(packageRecord.provider) ??
+        "PanFlights";
+      return [{
+        shopName,
+        amount,
+        sortAmount: readPositiveNumber(item.sortprice) ?? amount,
+        productUrl: readUrlCandidate(bestOffer && bestOffer.deep_link) ??
+          readUrlCandidate(item.deep_link) ??
+          readUrlCandidate(packageRecord.deep_link) ??
+          location.href,
+        platform: formatSummary(item),
+        durationMinutes: readNumber(packageRecord.duration !== undefined ? packageRecord.duration : item.duration),
+        qualityScore: readNumber(item.quality !== undefined ? item.quality : packageRecord.quality),
+        routeFingerprint: readString(packageRecord.routefingerprint) ?? readString(item.routefingerprint),
+        sourceRank,
+      }];
+    });
+  };
+  try {
+    window.postMessage({ type: messageType, requestId, candidates: readCandidates() }, "*");
+  } catch {
+    window.postMessage({ type: messageType, requestId, candidates: [] }, "*");
+  }
+})();`;
+}
+
+function extractCurrentPanFlightsPageOfferCandidates(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+): PanFlightsOfferCandidate[] {
+  if (!isCurrentPanFlightsSearchPageForMeta(flightMeta)) return [];
+
+  const packageElements = [
+    ...document.querySelectorAll<HTMLElement>(".packagewrap"),
+  ].filter(isPanFlightsVisiblePackageElement);
+
+  return packageElements.flatMap((element, sourceRank) => {
+    const offerElement = element.querySelector<HTMLElement>(".offer") ?? element;
+    if (offerElement === null) return [];
+
+    const amount = readPanFlightsVisibleOfferAmount(offerElement);
+    if (amount === undefined) return [];
+
+    const providerText = cleanPanFlightsVisibleText(
+      offerElement.querySelector<HTMLElement>(".service, .provider, .providername")?.innerText,
+    );
+    const linkElement = offerElement.querySelector<HTMLAnchorElement | HTMLElement>(".exitbutton, a[href]");
+    const productUrl = readPanFlightsVisibleOfferUrl(linkElement, resultUrl);
+    const platform = formatPanFlightsVisibleTripSummary(element);
+
+    return [{
+      shopName: providerText ?? "PanFlights",
+      price: formatNokFlightPrice(amount),
+      amount,
+      sortAmount: amount,
+      currency: "NOK",
+      productUrl,
+      sourceRank,
+      sourceSortOrder: "quality" as const,
+      sourceVersion: 0,
+      ...(platform !== undefined ? { platform } : {}),
+    }];
+  });
+}
+
+function isPanFlightsVisiblePackageElement(element: HTMLElement): boolean {
+  if (!element.isConnected) return false;
+  if (element.closest("template, #package_templ, #offer_templ, #offerlink_templ, #domtemplates") !== null) return false;
+  const text = cleanPanFlightsVisibleText(element.innerText);
+  if (text === undefined) return false;
+  if (readPanFlightsVisibleOfferAmount(element) === undefined) return false;
+  return element.getClientRects().length > 0 || isVisibleElement(element);
+}
+
+function readPanFlightsVisibleOfferAmount(element: HTMLElement): number | undefined {
+  const priceElementText = [
+    ...element.querySelectorAll<HTMLElement>(".offer .price, .price"),
+  ].map((priceElement) => priceElement.innerText).find((text) => readNokAmountFromText(text) !== undefined);
+  const priceElementAmount = readNokAmountFromText(priceElementText);
+  if (priceElementAmount !== undefined) return priceElementAmount;
+
+  return readNokAmountFromPriceLikeText(element.innerText);
+}
+
+function isCurrentPanFlightsSearchPageForMeta(flightMeta: FlightSearchMeta): boolean {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined || !isPanFlightsSearchPage(parsedUrl)) return false;
+
+  const currentMeta = extractPanFlightsFlightSearchMeta(parsedUrl);
+  return currentMeta !== undefined && buildFlightSearchMetaKey(currentMeta) === buildFlightSearchMetaKey(flightMeta);
+}
+
+function readCurrentPanFlightsVisiblePriceKey(flightMeta: FlightSearchMeta): string {
+  return extractCurrentPanFlightsPageOfferCandidates(flightMeta, window.location.href)
+    .slice(0, 5)
+    .map((candidate) => `${Math.round(candidate.amount)}:${candidate.shopName}:${candidate.platform ?? ""}`)
+    .join(";");
+}
+
+function readPanFlightsVisibleOfferUrl(element: HTMLElement | null, fallbackUrl: string): string {
+  if (element === null) return fallbackUrl;
+  const href = element instanceof HTMLAnchorElement
+    ? element.href
+    : element.getAttribute("data-href") ?? element.getAttribute("href");
+  return href === null ? fallbackUrl : parseUrlWithBase(href, fallbackUrl)?.toString() ?? fallbackUrl;
+}
+
+function formatPanFlightsVisibleTripSummary(packageElement: HTMLElement): string | undefined {
+  const companies = uniqueStrings(
+    [...packageElement.querySelectorAll<HTMLElement>(".flight .company")]
+      .map((element) => cleanPanFlightsVisibleText(element.innerText))
+      .filter((value): value is string => value !== undefined),
+  );
+  const durations = uniqueStrings(
+    [...packageElement.querySelectorAll<HTMLElement>(".flight .duration")]
+      .map((element) => cleanPanFlightsVisibleText(element.innerText))
+      .filter((value): value is string => value !== undefined),
+  );
+  const parts = [
+    companies.length > 0 ? companies.join("/") : undefined,
+    durations.length > 0 ? durations.join(" / ") : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.length > 0 ? parts.join(", ") : "synlig treffliste";
+}
+
+function cleanPanFlightsVisibleText(value: string | undefined): string | undefined {
+  const cleaned = value?.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned === undefined || cleaned.length === 0 ? undefined : cleaned;
+}
+
+function readNokAmountFromText(value: string | undefined): number | undefined {
+  const cleaned = cleanPanFlightsVisibleText(value);
+  if (cleaned === undefined) return undefined;
+
+  const match = cleaned.match(/\b(\d[\d\s.]*)\s*(?:kr|nok|,-)?\b/i);
+  if (match === null || match[1] === undefined) return undefined;
+  const amount = Number.parseInt(match[1].replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
+
+function readNokAmountFromPriceLikeText(value: string | undefined): number | undefined {
+  const cleaned = cleanPanFlightsVisibleText(value);
+  if (cleaned === undefined) return undefined;
+
+  const match = cleaned.match(/\b(\d[\d\s.]*)\s*(?:kr|nok|,-)\b/i);
+  if (match === null || match[1] === undefined) return undefined;
+  const amount = Number.parseInt(match[1].replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
+
+function mergePanFlightsVisibleCandidates(
+  visibleCandidates: PanFlightsOfferCandidate[],
+  apiCandidates: PanFlightsOfferCandidate[],
+): PanFlightsOfferCandidate[] {
+  const visibleKeys = new Set(visibleCandidates.map(buildPanFlightsCandidateLooseKey));
+  const rankedApiCandidates = rankPanFlightsOfferCandidates(apiCandidates);
+  return [
+    ...visibleCandidates,
+    ...rankedApiCandidates.filter((candidate) => !visibleKeys.has(buildPanFlightsCandidateLooseKey(candidate))),
+  ];
+}
+
+function buildPanFlightsCandidateLooseKey(candidate: PanFlightsOfferCandidate): string {
+  return [
+    candidate.shopName.toLowerCase(),
+    Math.round(candidate.amount),
+    candidate.platform?.toLowerCase() ?? "",
+  ].join("|");
+}
+
 async function fetchPanFlightsFlightSearchResult(
   flightMeta: FlightSearchMeta,
   variant: PanFlightsSearchVariant,
@@ -1901,7 +2298,7 @@ async function fetchPanFlightsFlightSearchResult(
     data: JSON.stringify(buildPanFlightsFlightSearchPayload(
       flightMeta,
       variant,
-      buildPanFlightsRequestSearchId(variant.searchId),
+      variant.searchId,
     )),
   }).toString();
 
@@ -1921,10 +2318,6 @@ async function fetchPanFlightsFlightSearchResult(
   }
 
   return undefined;
-}
-
-function buildPanFlightsRequestSearchId(baseSearchId: number): number {
-  return baseSearchId * 1_000_000 + (Date.now() % 1_000_000);
 }
 
 function buildPanFlightsFlightSearchPayload(
@@ -1968,7 +2361,7 @@ function buildPanFlightsFlightSearchPayload(
     typeFlight: inboundDate !== undefined ? "round" : "oneway",
     sortorder: variant.sortOrder,
     sortradio: variant.sortRadio,
-    mode: "search",
+    mode: "findroute",
     submode: "",
     locale: "nb",
     market: "no",
@@ -2015,15 +2408,16 @@ function extractPanFlightsOfferCandidates(
 
     const packageRecord = readPanFlightsPackageRecord(item);
     const provider = readPanFlightsBestProvider(resultData, item);
-    const amount = readPositiveNumberValue(provider?.price) ??
+    const amount = readPositiveNumberValue(item.price_pp) ??
       readPositiveNumberValue(item.price) ??
-      readPositiveNumberValue(packageRecord?.price);
+      readPositiveNumberValue(packageRecord?.price) ??
+      readPositiveNumberValue(provider?.price);
     if (amount === undefined) continue;
 
     const deepLink = provider?.deep_link ?? packageRecord?.deep_link;
     const productUrl = readPanFlightsProductUrl(deepLink, resultUrl);
-    const shopName = readStringValue(provider?.provider) ??
-      readStringValue(item.provider) ??
+    const shopName = readStringValue(item.provider) ??
+      readStringValue(provider?.provider) ??
       readStringValue(packageRecord?.provider) ??
       readPanFlightsProviderNameFromUrl(deepLink) ??
       readStringValue(resultData.provider) ??
@@ -2055,25 +2449,55 @@ function extractPanFlightsOfferCandidates(
 }
 
 function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
-  const seen = new Set<string>();
-  const uniqueCandidates: PanFlightsOfferCandidate[] = [];
+  const uniqueCandidatesByKey = new Map<string, PanFlightsOfferCandidate>();
   for (const candidate of candidates) {
     const key = [
       candidate.shopName,
       Math.round(candidate.amount),
       candidate.platform ?? "",
     ].join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    uniqueCandidates.push(candidate);
+    const existingCandidate = uniqueCandidatesByKey.get(key);
+    if (
+      existingCandidate === undefined ||
+      comparePanFlightsCandidateSourcePriority(candidate, existingCandidate) < 0
+    ) {
+      uniqueCandidatesByKey.set(key, candidate);
+    }
   }
-  return uniqueCandidates;
+  return [...uniqueCandidatesByKey.values()];
+}
+
+function comparePanFlightsCandidateSourcePriority(
+  left: PanFlightsOfferCandidate,
+  right: PanFlightsOfferCandidate,
+): number {
+  const sourcePriorityDiff = getPanFlightsCandidateSourcePriority(left) -
+    getPanFlightsCandidateSourcePriority(right);
+  if (sourcePriorityDiff !== 0) return sourcePriorityDiff;
+
+  const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) -
+    (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+  if (qualityDiff !== 0) return qualityDiff;
+
+  const sourceRankDiff = left.sourceRank - right.sourceRank;
+  if (sourceRankDiff !== 0) return sourceRankDiff;
+
+  return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) -
+    (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+}
+
+function getPanFlightsCandidateSourcePriority(candidate: PanFlightsOfferCandidate): number {
+  if (candidate.sourceSortOrder === "quality" && candidate.sourceVersion === 0) return 0;
+  if (candidate.sourceSortOrder === "quality") return 1;
+  if (candidate.sourceSortOrder === "price" && candidate.sourceVersion !== 0) return 2;
+  if (candidate.sourceSortOrder === "price") return 3;
+  if (candidate.sourceSortOrder === "duration") return 4;
+  return 5;
 }
 
 function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
   const panFlightsBestRouteCandidates = sortPanFlightsQualityCandidates(candidates.filter((candidate) => {
     return candidate.sourceSortOrder === "quality" &&
-      candidate.sourceVersion === 0 &&
       candidate.qualityScore !== undefined;
   }));
   const bestRouteCandidate = panFlightsBestRouteCandidates[0];
