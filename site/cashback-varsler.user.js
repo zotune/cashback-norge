@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780878512
+// @version      1780878940
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8230,6 +8230,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     const rankedCandidates = rankPanFlightsOfferCandidates(candidates);
     const best = rankedCandidates[0];
     if (best === void 0) return void 0;
+    const tooltipCandidates = prioritizeProviderDiversePanFlightsAlternatives(rankedCandidates);
     return {
       source: "panflights",
       sourceName: "PanFlights",
@@ -8243,7 +8244,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       productName: routeTitle,
       productUrl: resultUrl,
       offerUrl: best.productUrl,
-      alternatives: rankedCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate)
+      alternatives: tooltipCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate)
     };
   }
   async function fetchPanFlightsFlightSearchResult(flightMeta, variant) {
@@ -8390,8 +8391,29 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   }
   function calculateMaxReasonableFlightDuration(shortestDuration) {
     if (shortestDuration === void 0) return void 0;
-    if (shortestDuration >= 600) return shortestDuration * 2;
-    return shortestDuration + PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES;
+    const adaptiveBuffer = Math.max(
+      PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES,
+      Math.min(shortestDuration, 24 * 60)
+    );
+    return shortestDuration + adaptiveBuffer;
+  }
+  function prioritizeProviderDiversePanFlightsAlternatives(candidates) {
+    const best = candidates[0];
+    if (best === void 0) return candidates;
+    const bestShopName = best.shopName.toLowerCase();
+    const providerBestCandidates = /* @__PURE__ */ new Map();
+    for (const candidate of candidates.slice(1)) {
+      const shopName = candidate.shopName.toLowerCase();
+      if (shopName === bestShopName || providerBestCandidates.has(shopName)) continue;
+      providerBestCandidates.set(shopName, candidate);
+    }
+    const promotedCandidates = [...providerBestCandidates.values()];
+    const promotedCandidateSet = new Set(promotedCandidates);
+    return [
+      best,
+      ...promotedCandidates,
+      ...candidates.slice(1).filter((candidate) => !promotedCandidateSet.has(candidate))
+    ];
   }
   function isReasonablePanFlightsDuration(candidate, maxReasonableDuration) {
     if (maxReasonableDuration === void 0 || candidate.durationMinutes === void 0) return true;

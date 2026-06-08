@@ -1735,6 +1735,7 @@ async function findPanFlightsFlightPriceMatchOffer(
 
   const best = rankedCandidates[0];
   if (best === undefined) return undefined;
+  const tooltipCandidates = prioritizeProviderDiversePanFlightsAlternatives(rankedCandidates);
 
   return {
     source: "panflights",
@@ -1749,7 +1750,7 @@ async function findPanFlightsFlightPriceMatchOffer(
     productName: routeTitle,
     productUrl: resultUrl,
     offerUrl: best.productUrl,
-    alternatives: rankedCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate),
+    alternatives: tooltipCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate),
   };
 }
 
@@ -1931,8 +1932,34 @@ function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): 
 
 function calculateMaxReasonableFlightDuration(shortestDuration: number | undefined): number | undefined {
   if (shortestDuration === undefined) return undefined;
-  if (shortestDuration >= 600) return shortestDuration * 2;
-  return shortestDuration + PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES;
+  const adaptiveBuffer = Math.max(
+    PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES,
+    Math.min(shortestDuration, 24 * 60),
+  );
+  return shortestDuration + adaptiveBuffer;
+}
+
+function prioritizeProviderDiversePanFlightsAlternatives(
+  candidates: PanFlightsOfferCandidate[],
+): PanFlightsOfferCandidate[] {
+  const best = candidates[0];
+  if (best === undefined) return candidates;
+
+  const bestShopName = best.shopName.toLowerCase();
+  const providerBestCandidates = new Map<string, PanFlightsOfferCandidate>();
+  for (const candidate of candidates.slice(1)) {
+    const shopName = candidate.shopName.toLowerCase();
+    if (shopName === bestShopName || providerBestCandidates.has(shopName)) continue;
+    providerBestCandidates.set(shopName, candidate);
+  }
+
+  const promotedCandidates = [...providerBestCandidates.values()];
+  const promotedCandidateSet = new Set(promotedCandidates);
+  return [
+    best,
+    ...promotedCandidates,
+    ...candidates.slice(1).filter((candidate) => !promotedCandidateSet.has(candidate)),
+  ];
 }
 
 function isReasonablePanFlightsDuration(
