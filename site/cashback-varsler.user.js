@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780907012
+// @version      1780907959
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8324,15 +8324,21 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
         productUrl: _productUrl,
         durationMinutes: _durationMinutes,
         qualityScore: _qualityScore,
+        routeFingerprint: _routeFingerprint,
         sourceRank: _sourceRank,
         sourceSortOrder: _sourceSortOrder,
+        sourceVersion: _sourceVersion,
         ...candidate
       }) => candidate)
     };
   }
   async function fetchPanFlightsFlightSearchResult(flightMeta, variant) {
     const body = new URLSearchParams({
-      data: JSON.stringify(buildPanFlightsFlightSearchPayload(flightMeta, variant))
+      data: JSON.stringify(buildPanFlightsFlightSearchPayload(
+        flightMeta,
+        variant,
+        buildPanFlightsRequestSearchId(variant.searchId)
+      ))
     }).toString();
     for (const endpoint of PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS) {
       const value = await userscriptJsonRequest(endpoint, {
@@ -8350,7 +8356,10 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     }
     return void 0;
   }
-  function buildPanFlightsFlightSearchPayload(flightMeta, variant) {
+  function buildPanFlightsRequestSearchId(baseSearchId) {
+    return baseSearchId * 1e6 + Date.now() % 1e6;
+  }
+  function buildPanFlightsFlightSearchPayload(flightMeta, variant, searchId) {
     const outboundDate = splitIsoDateParts(flightMeta.outboundDate);
     const inboundDate = flightMeta.inboundDate !== void 0 ? splitIsoDateParts(flightMeta.inboundDate) : void 0;
     const leg = {
@@ -8412,7 +8421,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       minprice: 0,
       maxprice: 999999999999,
       leglist: [leg],
-      searchid: variant.searchId,
+      searchid: searchId,
       user_ip: "127.0.0.1",
       version: variant.version
     };
@@ -8431,6 +8440,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       const shopName = readStringValue(provider?.provider) ?? readStringValue(item.provider) ?? readStringValue(packageRecord?.provider) ?? readPanFlightsProviderNameFromUrl(deepLink) ?? readStringValue(resultData.provider) ?? "PanFlights";
       const durationMinutes = readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration);
       const qualityScore = readNumberValue(item.quality) ?? readNumberValue(packageRecord?.quality);
+      const routeFingerprint = readStringValue(packageRecord?.routefingerprint) ?? readStringValue(item.routefingerprint);
       const platform = formatPanFlightsTripSummary(item);
       candidates.push({
         shopName,
@@ -8441,8 +8451,10 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
         productUrl,
         sourceRank: sourceRank2,
         sourceSortOrder: variant.sortOrder,
+        sourceVersion: variant.version,
         ...durationMinutes !== void 0 ? { durationMinutes } : {},
         ...qualityScore !== void 0 ? { qualityScore } : {},
+        ...routeFingerprint !== void 0 ? { routeFingerprint } : {},
         ...platform !== void 0 ? { platform } : {}
       });
     }
@@ -8464,18 +8476,49 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     return uniqueCandidates;
   }
   function rankPanFlightsOfferCandidates(candidates) {
-    if (candidates.some((candidate) => candidate.qualityScore !== void 0)) {
-      return [...candidates].sort((left, right) => {
-        const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) - (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
-        if (qualityDiff !== 0) return qualityDiff;
-        const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
-        if (amountDiff !== 0) return amountDiff;
-        const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
-        if (durationDiff !== 0) return durationDiff;
-        return left.sourceRank - right.sourceRank;
+    const panFlightsBestRouteCandidates = sortPanFlightsQualityCandidates(candidates.filter((candidate) => {
+      return candidate.sourceSortOrder === "quality" && candidate.sourceVersion === 0 && candidate.qualityScore !== void 0;
+    }));
+    const bestRouteCandidate = panFlightsBestRouteCandidates[0];
+    if (bestRouteCandidate !== void 0) {
+      const sameRouteCandidates = sortPanFlightsSameRouteCandidates(
+        bestRouteCandidate.routeFingerprint === void 0 ? [bestRouteCandidate] : candidates.filter((candidate) => candidate.routeFingerprint === bestRouteCandidate.routeFingerprint)
+      );
+      const sameRouteCandidateSet = new Set(sameRouteCandidates);
+      const bestRouteCandidateSet = new Set(panFlightsBestRouteCandidates);
+      const otherCandidates = candidates.filter((candidate) => {
+        return !sameRouteCandidateSet.has(candidate) && !bestRouteCandidateSet.has(candidate);
       });
+      return [
+        ...sameRouteCandidates,
+        ...panFlightsBestRouteCandidates.filter((candidate) => !sameRouteCandidateSet.has(candidate)),
+        ...sortPanFlightsQualityCandidates(otherCandidates.filter((candidate) => candidate.qualityScore !== void 0)),
+        ...rankPanFlightsPriceCandidates(otherCandidates.filter((candidate) => candidate.qualityScore === void 0))
+      ];
     }
     return rankPanFlightsPriceCandidates(candidates);
+  }
+  function sortPanFlightsQualityCandidates(candidates) {
+    return [...candidates].sort((left, right) => {
+      const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) - (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+      if (qualityDiff !== 0) return qualityDiff;
+      const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+      if (amountDiff !== 0) return amountDiff;
+      const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+      if (durationDiff !== 0) return durationDiff;
+      return left.sourceRank - right.sourceRank;
+    });
+  }
+  function sortPanFlightsSameRouteCandidates(candidates) {
+    return [...candidates].sort((left, right) => {
+      const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+      if (amountDiff !== 0) return amountDiff;
+      const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) - (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+      if (qualityDiff !== 0) return qualityDiff;
+      const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+      if (durationDiff !== 0) return durationDiff;
+      return left.sourceRank - right.sourceRank;
+    });
   }
   function rankPanFlightsPriceCandidates(candidates) {
     const shortestDuration = candidates.reduce((shortest, candidate) => {

@@ -296,8 +296,10 @@ type PanFlightsOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   durationMinutes?: number;
   qualityScore?: number;
+  routeFingerprint?: string;
   sourceRank: number;
   sourceSortOrder: PanFlightsSearchVariant["sortOrder"];
+  sourceVersion: PanFlightsSearchVariant["version"];
 };
 type PanFlightsSearchVariant = {
   sortOrder: "duration" | "quality" | "price";
@@ -1882,8 +1884,10 @@ async function findPanFlightsFlightPriceMatchOffer(
       productUrl: _productUrl,
       durationMinutes: _durationMinutes,
       qualityScore: _qualityScore,
+      routeFingerprint: _routeFingerprint,
       sourceRank: _sourceRank,
       sourceSortOrder: _sourceSortOrder,
+      sourceVersion: _sourceVersion,
       ...candidate
     }) => candidate),
   };
@@ -1894,7 +1898,11 @@ async function fetchPanFlightsFlightSearchResult(
   variant: PanFlightsSearchVariant,
 ): Promise<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> {
   const body = new URLSearchParams({
-    data: JSON.stringify(buildPanFlightsFlightSearchPayload(flightMeta, variant)),
+    data: JSON.stringify(buildPanFlightsFlightSearchPayload(
+      flightMeta,
+      variant,
+      buildPanFlightsRequestSearchId(variant.searchId),
+    )),
   }).toString();
 
   for (const endpoint of PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS) {
@@ -1915,9 +1923,14 @@ async function fetchPanFlightsFlightSearchResult(
   return undefined;
 }
 
+function buildPanFlightsRequestSearchId(baseSearchId: number): number {
+  return baseSearchId * 1_000_000 + (Date.now() % 1_000_000);
+}
+
 function buildPanFlightsFlightSearchPayload(
   flightMeta: FlightSearchMeta,
   variant: PanFlightsSearchVariant,
+  searchId: number,
 ): Record<string, unknown> {
   const outboundDate = splitIsoDateParts(flightMeta.outboundDate);
   const inboundDate = flightMeta.inboundDate !== undefined ? splitIsoDateParts(flightMeta.inboundDate) : undefined;
@@ -1982,7 +1995,7 @@ function buildPanFlightsFlightSearchPayload(
     minprice: 0,
     maxprice: 999999999999,
     leglist: [leg],
-    searchid: variant.searchId,
+    searchid: searchId,
     user_ip: "127.0.0.1",
     version: variant.version,
   };
@@ -2017,6 +2030,8 @@ function extractPanFlightsOfferCandidates(
       "PanFlights";
     const durationMinutes = readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration);
     const qualityScore = readNumberValue(item.quality) ?? readNumberValue(packageRecord?.quality);
+    const routeFingerprint = readStringValue(packageRecord?.routefingerprint) ??
+      readStringValue(item.routefingerprint);
     const platform = formatPanFlightsTripSummary(item);
 
     candidates.push({
@@ -2028,8 +2043,10 @@ function extractPanFlightsOfferCandidates(
       productUrl,
       sourceRank,
       sourceSortOrder: variant.sortOrder,
+      sourceVersion: variant.version,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(qualityScore !== undefined ? { qualityScore } : {}),
+      ...(routeFingerprint !== undefined ? { routeFingerprint } : {}),
       ...(platform !== undefined ? { platform } : {}),
     });
   }
@@ -2054,24 +2071,66 @@ function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[])
 }
 
 function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
-  if (candidates.some((candidate) => candidate.qualityScore !== undefined)) {
-    return [...candidates].sort((left, right) => {
-      const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) -
-        (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
-      if (qualityDiff !== 0) return qualityDiff;
-
-      const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
-      if (amountDiff !== 0) return amountDiff;
-
-      const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) -
-        (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
-      if (durationDiff !== 0) return durationDiff;
-
-      return left.sourceRank - right.sourceRank;
+  const panFlightsBestRouteCandidates = sortPanFlightsQualityCandidates(candidates.filter((candidate) => {
+    return candidate.sourceSortOrder === "quality" &&
+      candidate.sourceVersion === 0 &&
+      candidate.qualityScore !== undefined;
+  }));
+  const bestRouteCandidate = panFlightsBestRouteCandidates[0];
+  if (bestRouteCandidate !== undefined) {
+    const sameRouteCandidates = sortPanFlightsSameRouteCandidates(
+      bestRouteCandidate.routeFingerprint === undefined
+        ? [bestRouteCandidate]
+        : candidates.filter((candidate) => candidate.routeFingerprint === bestRouteCandidate.routeFingerprint),
+    );
+    const sameRouteCandidateSet = new Set(sameRouteCandidates);
+    const bestRouteCandidateSet = new Set(panFlightsBestRouteCandidates);
+    const otherCandidates = candidates.filter((candidate) => {
+      return !sameRouteCandidateSet.has(candidate) && !bestRouteCandidateSet.has(candidate);
     });
+    return [
+      ...sameRouteCandidates,
+      ...panFlightsBestRouteCandidates.filter((candidate) => !sameRouteCandidateSet.has(candidate)),
+      ...sortPanFlightsQualityCandidates(otherCandidates.filter((candidate) => candidate.qualityScore !== undefined)),
+      ...rankPanFlightsPriceCandidates(otherCandidates.filter((candidate) => candidate.qualityScore === undefined)),
+    ];
   }
 
   return rankPanFlightsPriceCandidates(candidates);
+}
+
+function sortPanFlightsQualityCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
+  return [...candidates].sort((left, right) => {
+    const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) -
+      (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+    if (qualityDiff !== 0) return qualityDiff;
+
+    const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+    if (amountDiff !== 0) return amountDiff;
+
+    const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) -
+      (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+    if (durationDiff !== 0) return durationDiff;
+
+    return left.sourceRank - right.sourceRank;
+  });
+}
+
+function sortPanFlightsSameRouteCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
+  return [...candidates].sort((left, right) => {
+    const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+    if (amountDiff !== 0) return amountDiff;
+
+    const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) -
+      (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+    if (qualityDiff !== 0) return qualityDiff;
+
+    const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) -
+      (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+    if (durationDiff !== 0) return durationDiff;
+
+    return left.sourceRank - right.sourceRank;
+  });
 }
 
 function rankPanFlightsPriceCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
