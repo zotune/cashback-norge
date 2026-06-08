@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780881110
+// @version      1780881436
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8070,12 +8070,32 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     };
   }
   async function fetchFinnFlightSearchData(resultUrl) {
+    const currentSearchData = readCurrentFinnFlightSearchData(resultUrl);
+    if (currentSearchData !== void 0) return currentSearchData;
     const html = await userscriptTextRequest(resultUrl, {
       headers: { Accept: "text/html" },
       credentials: "omit"
     });
     if (html === void 0) return void 0;
     const nextData = parseFinnNextData(html);
+    return buildFinnFlightSearchDataFromNextData(nextData, resultUrl);
+  }
+  function readCurrentFinnFlightSearchData(resultUrl) {
+    const parsedResultUrl = parseUrl(resultUrl);
+    const parsedCurrentUrl = parseUrl(window.location.href);
+    if (parsedResultUrl === void 0 || parsedCurrentUrl === void 0 || parsedResultUrl.toString() !== parsedCurrentUrl.toString()) {
+      return void 0;
+    }
+    const nextDataText = document.getElementById("__NEXT_DATA__")?.textContent;
+    if (nextDataText === void 0 || nextDataText === null || nextDataText.trim().length === 0) return void 0;
+    try {
+      const parsed = JSON.parse(nextDataText);
+      return buildFinnFlightSearchDataFromNextData(isRecord(parsed) ? parsed : void 0, resultUrl);
+    } catch {
+      return void 0;
+    }
+  }
+  function buildFinnFlightSearchDataFromNextData(nextData, resultUrl) {
     const pageProps = isRecord(nextData?.props) && isRecord(nextData.props.pageProps) ? nextData.props.pageProps : void 0;
     const searchData = isRecord(pageProps?.searchData) ? pageProps.searchData : void 0;
     const config = isRecord(pageProps?.config) ? pageProps.config : void 0;

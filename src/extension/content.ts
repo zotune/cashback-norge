@@ -1546,7 +1546,7 @@ function readCurrentFinnFlightSearchData(resultUrl: string): FinnFlightSearchDat
   }
 
   const nextDataText = document.getElementById("__NEXT_DATA__")?.textContent;
-  if (nextDataText === undefined || nextDataText.trim().length === 0) return undefined;
+  if (nextDataText === undefined || nextDataText === null || nextDataText.trim().length === 0) return undefined;
 
   try {
     const parsed: unknown = JSON.parse(nextDataText);
