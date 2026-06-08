@@ -328,6 +328,10 @@ type TravellinkFlightOfferCandidate = PriceMatchAlternative & {
 type TripComFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
 };
+type NokBaseRates = {
+  rates: Record<string, number>;
+  updatedAt?: string;
+};
 type MomondoFlightLegSummary = {
   origin: string;
   destination: string;
@@ -398,6 +402,10 @@ const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
 const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
+const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = false;
+const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
+const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
+const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
 const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
 const FINN_FLIGHT_POLL_ATTEMPTS = 7;
 const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -468,8 +476,8 @@ const TRAVELLINK_COMMON_HEADERS: Record<string, string> = {
 };
 const TRIP_COM_BASE_URL = "https://us.trip.com";
 const TRIP_COM_LOW_PRICE_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/14427/GetLowPriceInCalender`;
+const TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearch`;
 const TRIP_COM_DEFAULT_CURRENCY = "USD";
-const TRIP_COM_USD_TO_NOK_SORT_RATE = 11;
 const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
   Accept: "application/json",
   "Content-Type": "application/json;charset=UTF-8",
@@ -883,24 +891,34 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
       cardSearchDetails,
       fullSearchDetails,
     }),
-    buildFlightPriceMatchOffer({
-      source: "panflights",
-      sourceName: "PanFlights",
-      productUrl: buildPanFlightsFlightSearchUrl(flightMeta),
-      routeTitle,
-      cardSearchDetails,
-      fullSearchDetails,
-    }),
+    ...(ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE
+      ? [buildFlightPriceMatchOffer({
+        source: "panflights",
+        sourceName: "PanFlights",
+        productUrl: buildPanFlightsFlightSearchUrl(flightMeta),
+        routeTitle,
+        cardSearchDetails,
+        fullSearchDetails,
+      })]
+      : []),
   ];
 
-  const liveOffers = (await Promise.all([
-    safelyFindFlightPriceMatchOffer(() => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
-    safelyFindFlightPriceMatchOffer(() => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
-    safelyFindFlightPriceMatchOffer(() => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
-    safelyFindFlightPriceMatchOffer(() => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
-    safelyFindFlightPriceMatchOffer(() => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
-    safelyFindFlightPriceMatchOffer(() => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)),
-  ])).filter((offer): offer is PriceMatchOffer => offer !== undefined);
+  const liveOfferFinders: Array<() => Promise<PriceMatchOffer | undefined>> = [
+    () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+    ...(ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE
+      ? [() => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      : []),
+    () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+    () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+    ...(ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE
+      ? [() => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      : []),
+    ...(ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE
+      ? [() => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      : []),
+  ];
+  const liveOffers = (await Promise.all(liveOfferFinders.map((findOffer) => safelyFindFlightPriceMatchOffer(findOffer))))
+    .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   if (liveOffers.length === 0) return staticOffers;
 
   const liveSources = new Set(liveOffers.map((offer) => offer.source));
@@ -3285,9 +3303,50 @@ async function findTripComFlightPriceMatchOffer(
   routeTitle: string,
   searchDetails: string,
 ): Promise<PriceMatchOffer | undefined> {
-  if (flightMeta.inboundDate === undefined) return undefined;
-
   const resultUrl = buildTripComFlightSearchUrl(flightMeta);
+  const rates = await fetchNokBaseRates();
+  const listResultData = await userscriptJsonRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
+    method: "POST",
+    headers: TRIP_COM_COMMON_HEADERS,
+    body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta)),
+    credentials: "omit",
+  });
+  const listCandidates = isRecord(listResultData)
+    ? extractTripComListOfferCandidates(listResultData, resultUrl, rates)
+    : [];
+
+  const calendarCandidate = listCandidates.length === 0 && flightMeta.inboundDate !== undefined
+    ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates)
+    : undefined;
+  const candidates = dedupeTripComOfferCandidates([
+    ...listCandidates,
+    ...(calendarCandidate !== undefined ? [calendarCandidate] : []),
+  ]);
+  const best = candidates[0];
+  if (best === undefined) return undefined;
+
+  return {
+    source: "tripcom",
+    sourceName: "Trip.com",
+    details: searchDetails,
+    matchedExactProduct: true,
+    shopName: best.shopName,
+    price: best.price,
+    amount: best.amount,
+    sortAmount: best.sortAmount ?? best.amount,
+    currency: best.currency,
+    productName: routeTitle,
+    productUrl: resultUrl,
+    offerUrl: best.productUrl,
+    alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
+  };
+}
+
+async function findTripComCalendarOfferCandidate(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+  rates: NokBaseRates | undefined,
+): Promise<TripComFlightOfferCandidate | undefined> {
   const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
     method: "POST",
     headers: TRIP_COM_COMMON_HEADERS,
@@ -3296,24 +3355,225 @@ async function findTripComFlightPriceMatchOffer(
   });
   if (!isRecord(resultData)) return undefined;
 
-  const candidate = extractTripComCalendarCandidate(resultData, flightMeta, resultUrl);
-  if (candidate === undefined) return undefined;
+  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates);
+}
+
+async function safelyFindTripComCalendarOfferCandidate(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+  rates: NokBaseRates | undefined,
+): Promise<TripComFlightOfferCandidate | undefined> {
+  try {
+    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildTripComFlightListSearchPayload(flightMeta: FlightSearchMeta): Record<string, unknown> {
+  return {
+    searchCriteria: {
+      grade: 1,
+      passengerInfoType: {
+        adultCount: flightMeta.adults,
+        childCount: 0,
+        infantCount: 0,
+      },
+      tripType: flightMeta.inboundDate !== undefined ? 2 : 1,
+      journeyNo: 1,
+      journeyInfoTypes: buildTripComJourneyInfoTypes(flightMeta),
+      token: "",
+    },
+    sortInfoType: {
+      orderBy: "Score",
+      direction: true,
+      topList: [],
+    },
+    filterType: null,
+    tagList: [],
+    flagList: [],
+    abtList: [],
+    searchTrigger: 2,
+    head: buildTripComFlightListSearchHead(),
+  };
+}
+
+function buildTripComJourneyInfoTypes(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
+  const journeys = [
+    {
+      journeyNo: 1,
+      departCode: flightMeta.origin,
+      arriveCode: flightMeta.destination,
+      departDate: flightMeta.outboundDate,
+      departAirport: "",
+      arriveAirport: "",
+    },
+  ];
+  if (flightMeta.inboundDate !== undefined) {
+    journeys.push({
+      journeyNo: 2,
+      departCode: flightMeta.destination,
+      arriveCode: flightMeta.origin,
+      departDate: flightMeta.inboundDate,
+      departAirport: "",
+      arriveAirport: "",
+    });
+  }
+  return journeys;
+}
+
+function buildTripComFlightListSearchHead(): Record<string, unknown> {
+  return {
+    cid: "",
+    cver: "500",
+    syscode: "PWA",
+    appid: "700021",
+    extension: [
+      { name: "sotpLocale", value: "en-US" },
+      { name: "sotpCurrency", value: TRIP_COM_DEFAULT_CURRENCY },
+      { name: "sotpGroup", value: "Trip" },
+      { name: "project", value: "xtaro" },
+      { name: "deviceType", value: "mobile" },
+      { name: "platformType", value: "web" },
+      { name: "requestSource", value: "release" },
+    ],
+  };
+}
+
+function extractTripComListOfferCandidates(
+  resultData: Record<string, unknown>,
+  resultUrl: string,
+  rates: NokBaseRates | undefined,
+): TripComFlightOfferCandidate[] {
+  const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
+  const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
+  const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
+  const candidates = readRecordArray(resultData.itineraryList)
+    .flatMap((itinerary) => {
+      const tripSummary = formatTripComItinerarySummary(itinerary, airlineNames);
+      return readRecordArray(itinerary.policies).map((policy): TripComFlightOfferCandidate | undefined => {
+        const amount = readTripComPolicyAmount(policy);
+        if (amount === undefined) return undefined;
+
+        return toTripComOfferCandidate({
+          amount,
+          currency,
+          productUrl: resultUrl,
+          rates,
+          platformParts: [tripSummary],
+        });
+      });
+    })
+    .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined);
+  return dedupeTripComOfferCandidates(candidates);
+}
+
+function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
+  const price = isRecord(policy.price) ? policy.price : undefined;
+  const adultPrice = isRecord(price?.adult) ? price.adult : undefined;
+  return readPositiveNumberValue(price?.totalPrice) ??
+    readPositiveNumberValue(price?.averagePrice) ??
+    readPositiveNumberValue(adultPrice?.totalPrice);
+}
+
+function toTripComOfferCandidate(input: {
+  amount: number;
+  currency: string;
+  productUrl: string;
+  rates: NokBaseRates | undefined;
+  platformParts: Array<string | undefined>;
+}): TripComFlightOfferCandidate | undefined {
+  const convertedNokAmount = convertToNok(input.amount, input.currency, input.rates);
+  const isConvertedCurrency = convertedNokAmount !== undefined && input.currency.toUpperCase() !== "NOK";
+  const displayAmount = convertedNokAmount ?? input.amount;
+  const displayCurrency = convertedNokAmount !== undefined ? "NOK" : input.currency;
 
   return {
-    source: "tripcom",
-    sourceName: "Trip.com",
-    details: searchDetails,
-    matchedExactProduct: true,
-    shopName: candidate.shopName,
-    price: candidate.price,
-    amount: candidate.amount,
-    sortAmount: candidate.sortAmount ?? candidate.amount,
-    currency: candidate.currency,
-    productName: routeTitle,
-    productUrl: resultUrl,
-    offerUrl: candidate.productUrl,
-    alternatives: [candidate].map(({ productUrl: _productUrl, ...alternative }) => alternative),
+    shopName: "Trip.com",
+    price: isConvertedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
+    amount: displayAmount,
+    sortAmount: convertedNokAmount ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+    currency: displayCurrency,
+    productUrl: input.productUrl,
+    platform: [
+      ...input.platformParts,
+      isConvertedCurrency ? `Trip.com viser ${formatFlightPrice(input.amount, input.currency)}` : undefined,
+    ].filter((part): part is string => part !== undefined && part.length > 0).join(", "),
   };
+}
+
+function buildTripComAirlineNameMap(value: unknown): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const airline of readRecordArray(value)) {
+    const code = readStringValue(airline.code)?.toUpperCase() ??
+      readStringValue(airline.airlineCode)?.toUpperCase();
+    const name = readStringValue(airline.name) ??
+      readStringValue(airline.airlineName) ??
+      readStringValue(airline.shortName);
+    if (code !== undefined && name !== undefined) map[code] = name;
+  }
+  return map;
+}
+
+function formatTripComItinerarySummary(
+  itinerary: Record<string, unknown>,
+  airlineNames: Record<string, string>,
+): string | undefined {
+  const journeys = readRecordArray(itinerary.journeyList);
+  const parts = [
+    formatTripComCarrierSummary(journeys, airlineNames),
+    formatTripComStopsSummary(journeys),
+    formatTripComDurationSummary(journeys),
+  ].filter((part): part is string => part !== undefined && part.length > 0);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
+function formatTripComCarrierSummary(
+  journeys: Array<Record<string, unknown>>,
+  airlineNames: Record<string, string>,
+): string | undefined {
+  const carriers = uniqueStrings(journeys.flatMap((journey) => {
+    return readRecordArray(journey.transSectionList)
+      .map((section) => {
+        const flightInfo = isRecord(section.flightInfo) ? section.flightInfo : undefined;
+        const code = readStringValue(flightInfo?.airlineCode)?.toUpperCase();
+        return code !== undefined ? (airlineNames[code] ?? code) : undefined;
+      })
+      .filter((carrier): carrier is string => carrier !== undefined);
+  }));
+  return carriers.length > 0 ? carriers.join("/") : undefined;
+}
+
+function formatTripComStopsSummary(journeys: Array<Record<string, unknown>>): string | undefined {
+  if (journeys.length === 0) return undefined;
+  const stopTexts = journeys
+    .map((journey) => Math.max(0, readRecordArray(journey.transSectionList).length - 1))
+    .map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`);
+  return uniqueStrings(stopTexts).join(" / ");
+}
+
+function formatTripComDurationSummary(journeys: Array<Record<string, unknown>>): string | undefined {
+  const durations = journeys
+    .map((journey) => formatPanFlightsDuration(readNumberValue(journey.duration)))
+    .filter((duration): duration is string => duration !== undefined);
+  return durations.length > 0 ? durations.join(" / ") : undefined;
+}
+
+function dedupeTripComOfferCandidates(
+  candidates: TripComFlightOfferCandidate[],
+): TripComFlightOfferCandidate[] {
+  const seen = new Set<string>();
+  const uniqueCandidates: TripComFlightOfferCandidate[] = [];
+  for (const candidate of candidates) {
+    const key = [
+      Math.round(candidate.sortAmount ?? candidate.amount),
+      candidate.platform ?? "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueCandidates.push(candidate);
+  }
+  return uniqueCandidates.slice(0, 20);
 }
 
 function buildTripComLowPricePayload(flightMeta: FlightSearchMeta): Record<string, unknown> {
@@ -3353,6 +3613,7 @@ function extractTripComCalendarCandidate(
   resultData: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
   resultUrl: string,
+  rates: NokBaseRates | undefined,
 ): TripComFlightOfferCandidate | undefined {
   const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
   const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList)
@@ -3360,25 +3621,18 @@ function extractTripComCalendarCandidate(
   const amount = readPositiveNumberValue(calendarItem?.currencyPrice);
   if (amount === undefined) return undefined;
 
-  const estimatedNokAmount = estimateTripComNokAmount(amount, currency);
-  const isEstimatedCurrency = estimatedNokAmount !== undefined && currency.toUpperCase() !== "NOK";
-  const displayAmount = estimatedNokAmount ?? amount;
-  const displayCurrency = estimatedNokAmount !== undefined ? "NOK" : currency;
-
-  return {
-    shopName: "Trip.com kalender",
-    price: isEstimatedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
-    amount: displayAmount,
-    sortAmount: estimatedNokAmount ?? estimateTripComSortAmount(amount, currency),
-    currency: displayCurrency,
+  const candidate = toTripComOfferCandidate({
+    amount,
+    currency,
     productUrl: resultUrl,
-    platform: [
+    rates,
+    platformParts: [
       "indikativ kalenderpris",
-      isEstimatedCurrency ? `Trip.com viser ${formatFlightPrice(amount, currency)}` : undefined,
       flightMeta.inboundDate !== undefined ? "tur/retur" : "én vei",
       "samme flyplasser",
-    ].filter((part) => part !== undefined).join(", "),
-  };
+    ],
+  });
+  return candidate !== undefined ? { ...candidate, shopName: "Trip.com kalender" } : undefined;
 }
 
 function isTripComCalendarItemMatchingSearch(
@@ -3390,14 +3644,38 @@ function isTripComCalendarItemMatchingSearch(
   return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
 }
 
-function estimateTripComSortAmount(amount: number, currency: string): number {
-  return estimateTripComNokAmount(amount, currency) ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT;
+let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
+
+async function fetchNokBaseRates(): Promise<NokBaseRates | undefined> {
+  if (nokBaseRatesPromise === undefined) {
+    nokBaseRatesPromise = userscriptJsonRequest(EXCHANGE_RATES_URL, {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+    }).then(readNokBaseRates, () => undefined);
+  }
+  return nokBaseRatesPromise;
 }
 
-function estimateTripComNokAmount(amount: number, currency: string): number | undefined {
+function readNokBaseRates(value: unknown): NokBaseRates | undefined {
+  if (!isRecord(value) || value.result !== "success" || !isRecord(value.rates)) return undefined;
+
+  const rates: Record<string, number> = {};
+  for (const [currency, rate] of Object.entries(value.rates)) {
+    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+      rates[currency.toUpperCase()] = rate;
+    }
+  }
+  if (Object.keys(rates).length === 0) return undefined;
+
+  const updatedAt = readStringValue(value.time_last_update_utc);
+  return updatedAt !== undefined ? { rates, updatedAt } : { rates };
+}
+
+function convertToNok(amount: number, currency: string, rates: NokBaseRates | undefined): number | undefined {
   const normalizedCurrency = currency.toUpperCase();
-  if (normalizedCurrency === "NOK") return amount;
-  if (normalizedCurrency === "USD") return Math.round(amount * TRIP_COM_USD_TO_NOK_SORT_RATE);
+  if (normalizedCurrency === "NOK") return Math.round(amount);
+  const rate = rates?.rates[normalizedCurrency];
+  if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) return amount / rate;
   return undefined;
 }
 

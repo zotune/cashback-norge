@@ -173,6 +173,7 @@ async function getPlayStationRegionPrices(
 async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpRequestResponse> {
   const parsedUrl = parseHttpUrl(message.url);
   const supportedHosts = new Set([
+    "open.er-api.com",
     "www.finn.no",
     "www.momondo.no",
     "www.skyscanner.net",
