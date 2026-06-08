@@ -282,6 +282,7 @@ type FlightSearchMeta = {
   children: number;
   infants: number;
 };
+type FinnFlightSearchScope = "exact" | "metropolitan";
 type FinnFlightSearchData = {
   searchId: string;
   flightApiUrl: string;
@@ -876,7 +877,7 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
     buildFlightPriceMatchOffer({
       source: "finnreise",
       sourceName: "FINN",
-      productUrl: buildFinnFlightSearchUrl(flightMeta),
+      productUrl: buildDefaultFinnFlightSearchUrl(flightMeta),
       routeTitle,
       cardSearchDetails,
       fullSearchDetails,
@@ -1496,7 +1497,7 @@ async function findFinnFlightPriceMatchOffer(
   routeTitle: string,
   searchDetails: string,
 ): Promise<PriceMatchOffer | undefined> {
-  const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildFinnFlightSearchUrl(flightMeta);
+  const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
   const searchData = await fetchFinnFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
@@ -1786,18 +1787,42 @@ function buildFinnFlightOfferUrl(searchId: string, offerId: string): string {
   return `https://www.finn.no/reise/flybilletter/ut/?${params.toString()}`;
 }
 
-function buildFinnFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+function buildDefaultFinnFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+  return buildFinnFlightSearchUrl(
+    flightMeta,
+    shouldUseFinnMetropolitanSearchForCurrentPage() ? "metropolitan" : "exact",
+  );
+}
+
+function shouldUseFinnMetropolitanSearchForCurrentPage(): boolean {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return false;
+
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return isPanFlightsSearchPage(parsedUrl) ||
+    isSkyscannerFlightSearchPage(parsedUrl) ||
+    hostname === "momondo.no" ||
+    hostname === "travellink.no" ||
+    hostname.endsWith("trip.com");
+}
+
+function buildFinnFlightSearchUrl(
+  flightMeta: FlightSearchMeta,
+  scope: FinnFlightSearchScope = "exact",
+): string {
   const params = new URLSearchParams({
     adults: String(flightMeta.adults),
     cabinType: "economy",
     requestedDepartureDate: flightMeta.outboundDate,
-    requestedDestination: `${flightMeta.destination}.AIRPORT`,
-    requestedOrigin: `${flightMeta.origin}.AIRPORT`,
+    requestedDestination: `${flightMeta.destination}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
+    requestedOrigin: `${flightMeta.origin}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
     tripType: flightMeta.inboundDate !== undefined ? "roundtrip" : "oneway",
   });
-  const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
-  for (const [key, value] of exactAirportParams.entries()) {
-    params.set(key, value);
+  if (scope === "exact") {
+    const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
+    for (const [key, value] of exactAirportParams.entries()) {
+      params.set(key, value);
+    }
   }
   if (flightMeta.inboundDate !== undefined) {
     params.set("requestedReturnDate", flightMeta.inboundDate);

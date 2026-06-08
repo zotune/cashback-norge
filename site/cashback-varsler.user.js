@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780881436
+// @version      1780881884
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7523,7 +7523,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       buildFlightPriceMatchOffer({
         source: "finnreise",
         sourceName: "FINN",
-        productUrl: buildFinnFlightSearchUrl(flightMeta),
+        productUrl: buildDefaultFinnFlightSearchUrl(flightMeta),
         routeTitle,
         cardSearchDetails,
         fullSearchDetails
@@ -8045,7 +8045,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     };
   }
   async function findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
-    const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildFinnFlightSearchUrl(flightMeta);
+    const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
     const searchData = await fetchFinnFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
     const resultData = await pollFinnFlightResults(searchData, flightMeta);
@@ -8250,18 +8250,32 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     const params = new URLSearchParams({ searchId, offerId });
     return `https://www.finn.no/reise/flybilletter/ut/?${params.toString()}`;
   }
-  function buildFinnFlightSearchUrl(flightMeta) {
+  function buildDefaultFinnFlightSearchUrl(flightMeta) {
+    return buildFinnFlightSearchUrl(
+      flightMeta,
+      shouldUseFinnMetropolitanSearchForCurrentPage() ? "metropolitan" : "exact"
+    );
+  }
+  function shouldUseFinnMetropolitanSearchForCurrentPage() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return false;
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return isPanFlightsSearchPage(parsedUrl) || isSkyscannerFlightSearchPage(parsedUrl) || hostname === "momondo.no" || hostname === "travellink.no" || hostname.endsWith("trip.com");
+  }
+  function buildFinnFlightSearchUrl(flightMeta, scope = "exact") {
     const params = new URLSearchParams({
       adults: String(flightMeta.adults),
       cabinType: "economy",
       requestedDepartureDate: flightMeta.outboundDate,
-      requestedDestination: `${flightMeta.destination}.AIRPORT`,
-      requestedOrigin: `${flightMeta.origin}.AIRPORT`,
+      requestedDestination: `${flightMeta.destination}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
+      requestedOrigin: `${flightMeta.origin}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
       tripType: flightMeta.inboundDate !== void 0 ? "roundtrip" : "oneway"
     });
-    const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
-    for (const [key, value] of exactAirportParams.entries()) {
-      params.set(key, value);
+    if (scope === "exact") {
+      const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
+      for (const [key, value] of exactAirportParams.entries()) {
+        params.set(key, value);
+      }
     }
     if (flightMeta.inboundDate !== void 0) {
       params.set("requestedReturnDate", flightMeta.inboundDate);
