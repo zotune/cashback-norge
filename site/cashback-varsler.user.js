@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780878940
+// @version      1780880474
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7119,6 +7119,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1e3 },
     { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1001 },
     { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1002 },
+    { sortOrder: "quality", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1008 },
+    { sortOrder: "quality", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1009 },
+    { sortOrder: "quality", sortRadio: "quality", version: "255", maxStops: 3, searchId: 1011 },
     { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1004 },
     { sortOrder: "price", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1008 },
     { sortOrder: "price", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1009 },
@@ -8224,7 +8227,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     );
     const candidates = dedupePanFlightsOfferCandidates(
       resultDataList.flatMap((resultData) => {
-        return resultData === void 0 ? [] : extractPanFlightsOfferCandidates(resultData, flightMeta, resultUrl);
+        return resultData === void 0 ? [] : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl);
       })
     );
     const rankedCandidates = rankPanFlightsOfferCandidates(candidates);
@@ -8244,7 +8247,13 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       productName: routeTitle,
       productUrl: resultUrl,
       offerUrl: best.productUrl,
-      alternatives: tooltipCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate)
+      alternatives: tooltipCandidates.map(({
+        productUrl: _productUrl,
+        durationMinutes: _durationMinutes,
+        sourceRank: _sourceRank,
+        sourceSortOrder: _sourceSortOrder,
+        ...candidate
+      }) => candidate)
     };
   }
   async function fetchPanFlightsFlightSearchResult(flightMeta, variant) {
@@ -8261,7 +8270,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
         body,
         credentials: "omit"
       });
-      if (isRecord(value) && Array.isArray(value.flighttab)) return value;
+      if (isRecord(value) && Array.isArray(value.flighttab)) return { resultData: value, variant };
     }
     return void 0;
   }
@@ -8332,10 +8341,10 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       version: variant.version
     };
   }
-  function extractPanFlightsOfferCandidates(resultData, flightMeta, resultUrl) {
+  function extractPanFlightsOfferCandidates(resultData, variant, flightMeta, resultUrl) {
     const currency = readStringValue(resultData.currency) ?? "NOK";
     const candidates = [];
-    for (const item of readRecordArray(resultData.flighttab)) {
+    for (const [sourceRank2, item] of readRecordArray(resultData.flighttab).entries()) {
       if (!isPanFlightsFlightMatchingSearch(item, flightMeta)) continue;
       const packageRecord = readPanFlightsPackageRecord(item);
       const provider = readPanFlightsBestProvider(resultData, item);
@@ -8353,6 +8362,8 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
         sortAmount: amount,
         currency,
         productUrl,
+        sourceRank: sourceRank2,
+        sourceSortOrder: variant.sortOrder,
         ...durationMinutes !== void 0 ? { durationMinutes } : {},
         ...platform !== void 0 ? { platform } : {}
       });
@@ -8375,6 +8386,24 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     return uniqueCandidates;
   }
   function rankPanFlightsOfferCandidates(candidates) {
+    const qualityCandidates = candidates.filter((candidate) => candidate.sourceSortOrder === "quality");
+    if (qualityCandidates.length > 0) {
+      const rankedQualityCandidates = [...qualityCandidates].sort((left, right) => {
+        const rankDiff = left.sourceRank - right.sourceRank;
+        if (rankDiff !== 0) return rankDiff;
+        const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+        if (amountDiff !== 0) return amountDiff;
+        return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+      });
+      const qualityCandidateSet = new Set(rankedQualityCandidates);
+      return [
+        ...rankedQualityCandidates,
+        ...rankPanFlightsPriceCandidates(candidates.filter((candidate) => !qualityCandidateSet.has(candidate)))
+      ];
+    }
+    return rankPanFlightsPriceCandidates(candidates);
+  }
+  function rankPanFlightsPriceCandidates(candidates) {
     const shortestDuration = candidates.reduce((shortest, candidate) => {
       if (candidate.durationMinutes === void 0) return shortest;
       return shortest === void 0 ? candidate.durationMinutes : Math.min(shortest, candidate.durationMinutes);
@@ -9298,9 +9327,40 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     };
   }
   function buildMomondoExactAirportFilterState(resultData, flightMeta) {
-    const allowedAirports = /* @__PURE__ */ new Set([flightMeta.origin, flightMeta.destination]);
+    const allowedAirports = collectMomondoAllowedAirportFilterCodes(resultData, [flightMeta.origin, flightMeta.destination]);
     const excludedAirports = [...collectMomondoAirportFilterCodes(resultData)].filter((airport) => !allowedAirports.has(airport)).sort();
     return excludedAirports.length > 0 ? `airports=-${excludedAirports.join(",")}` : void 0;
+  }
+  function collectMomondoAllowedAirportFilterCodes(resultData, requestedCodes) {
+    const requestedAirports = new Set(requestedCodes);
+    const allowedAirports = new Set(requestedCodes);
+    for (const group of collectMomondoAirportFilterGroups(resultData)) {
+      const groupAirports = readRecordArray(isRecord(group.filterData) ? group.filterData.items : void 0).map((item) => readIataCodeValue(item.id)).filter((airport) => airport !== void 0);
+      if (groupAirports.some((airport) => requestedAirports.has(airport))) {
+        for (const airport of groupAirports) allowedAirports.add(airport);
+      }
+    }
+    return allowedAirports;
+  }
+  function collectMomondoAirportFilterGroups(resultData) {
+    const filterData = isRecord(resultData.filterData) ? resultData.filterData : void 0;
+    const airportsFilter = isRecord(filterData?.airports) ? filterData.airports : void 0;
+    const groups = [];
+    collectMomondoAirportFilterGroupsFromNode(airportsFilter, groups);
+    return groups;
+  }
+  function collectMomondoAirportFilterGroupsFromNode(value, groups) {
+    if (!isRecord(value)) return;
+    const items = readRecordArray(isRecord(value.filterData) ? value.filterData.items : void 0);
+    if (items.some((item) => readIataCodeValue(item.id) !== void 0)) groups.push(value);
+    const nestedFilterData = isRecord(value.filterData) ? value.filterData : void 0;
+    collectMomondoAirportFilterGroupsFromNode(nestedFilterData, groups);
+    for (const child of readRecordArray(value.items)) {
+      collectMomondoAirportFilterGroupsFromNode(child, groups);
+    }
+    for (const child of readRecordArray(value.filterGroups)) {
+      collectMomondoAirportFilterGroupsFromNode(child, groups);
+    }
   }
   function collectMomondoAirportFilterCodes(resultData) {
     const codes = /* @__PURE__ */ new Set();
@@ -9439,15 +9499,19 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   function isMomondoFlightMatchingSearch(result, resultData, flightMeta) {
     const legs = readMomondoFlightLegSummaries(result, resultData);
     const outboundLeg = legs[0];
-    if (outboundLeg === void 0 || !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)) {
+    if (outboundLeg === void 0 || !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, resultData, flightMeta.outboundDate)) {
       return false;
     }
     if (flightMeta.inboundDate === void 0) return true;
     const inboundLeg = legs[1];
-    return inboundLeg !== void 0 && isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, flightMeta.inboundDate);
+    return inboundLeg !== void 0 && isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, resultData, flightMeta.inboundDate);
   }
-  function isMomondoFlightLegMatch(leg, origin, destination, date) {
-    return leg.origin === origin && leg.destination === destination && leg.departureDate === date;
+  function isMomondoFlightLegMatch(leg, origin, destination, resultData, date) {
+    return isMomondoAirportMatchingSearch(leg.origin, origin, resultData) && isMomondoAirportMatchingSearch(leg.destination, destination, resultData) && leg.departureDate === date;
+  }
+  function isMomondoAirportMatchingSearch(airport, requestedAirport, resultData) {
+    if (airport === requestedAirport) return true;
+    return collectMomondoAllowedAirportFilterCodes(resultData, [requestedAirport]).has(airport);
   }
   function readMomondoFlightLegSummaries(result, resultData) {
     const segmentsById = isRecord(resultData.segments) ? resultData.segments : {};

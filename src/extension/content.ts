@@ -293,6 +293,8 @@ type FinnFlightOfferCandidate = PriceMatchAlternative & {
 type PanFlightsOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   durationMinutes?: number;
+  sourceRank: number;
+  sourceSortOrder: PanFlightsSearchVariant["sortOrder"];
 };
 type PanFlightsSearchVariant = {
   sortOrder: "duration" | "quality" | "price";
@@ -403,6 +405,9 @@ const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1000 },
   { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1001 },
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1002 },
+  { sortOrder: "quality", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1008 },
+  { sortOrder: "quality", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1009 },
+  { sortOrder: "quality", sortRadio: "quality", version: "255", maxStops: 3, searchId: 1011 },
   { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1004 },
   { sortOrder: "price", sortRadio: "quality", version: "257", maxStops: 3, searchId: 1008 },
   { sortOrder: "price", sortRadio: "quality", version: "256", maxStops: 3, searchId: 1009 },
@@ -1728,7 +1733,7 @@ async function findPanFlightsFlightPriceMatchOffer(
     resultDataList.flatMap((resultData) => {
       return resultData === undefined
         ? []
-        : extractPanFlightsOfferCandidates(resultData, flightMeta, resultUrl);
+        : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl);
     }),
   );
   const rankedCandidates = rankPanFlightsOfferCandidates(candidates);
@@ -1750,14 +1755,20 @@ async function findPanFlightsFlightPriceMatchOffer(
     productName: routeTitle,
     productUrl: resultUrl,
     offerUrl: best.productUrl,
-    alternatives: tooltipCandidates.map(({ productUrl: _productUrl, durationMinutes: _durationMinutes, ...candidate }) => candidate),
+    alternatives: tooltipCandidates.map(({
+      productUrl: _productUrl,
+      durationMinutes: _durationMinutes,
+      sourceRank: _sourceRank,
+      sourceSortOrder: _sourceSortOrder,
+      ...candidate
+    }) => candidate),
   };
 }
 
 async function fetchPanFlightsFlightSearchResult(
   flightMeta: FlightSearchMeta,
   variant: PanFlightsSearchVariant,
-): Promise<Record<string, unknown> | undefined> {
+): Promise<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> {
   const body = new URLSearchParams({
     data: JSON.stringify(buildPanFlightsFlightSearchPayload(flightMeta, variant)),
   }).toString();
@@ -1772,7 +1783,7 @@ async function fetchPanFlightsFlightSearchResult(
       body,
       credentials: "omit",
     });
-    if (isRecord(value) && Array.isArray(value.flighttab)) return value;
+    if (isRecord(value) && Array.isArray(value.flighttab)) return { resultData: value, variant };
   }
 
   return undefined;
@@ -1853,13 +1864,14 @@ function buildPanFlightsFlightSearchPayload(
 
 function extractPanFlightsOfferCandidates(
   resultData: Record<string, unknown>,
+  variant: PanFlightsSearchVariant,
   flightMeta: FlightSearchMeta,
   resultUrl: string,
 ): PanFlightsOfferCandidate[] {
   const currency = readStringValue(resultData.currency) ?? "NOK";
   const candidates: PanFlightsOfferCandidate[] = [];
 
-  for (const item of readRecordArray(resultData.flighttab)) {
+  for (const [sourceRank, item] of readRecordArray(resultData.flighttab).entries()) {
     if (!isPanFlightsFlightMatchingSearch(item, flightMeta)) continue;
 
     const packageRecord = readPanFlightsPackageRecord(item);
@@ -1887,6 +1899,8 @@ function extractPanFlightsOfferCandidates(
       sortAmount: amount,
       currency,
       productUrl,
+      sourceRank,
+      sourceSortOrder: variant.sortOrder,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(platform !== undefined ? { platform } : {}),
     });
@@ -1912,6 +1926,28 @@ function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[])
 }
 
 function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
+  const qualityCandidates = candidates.filter((candidate) => candidate.sourceSortOrder === "quality");
+  if (qualityCandidates.length > 0) {
+    const rankedQualityCandidates = [...qualityCandidates].sort((left, right) => {
+      const rankDiff = left.sourceRank - right.sourceRank;
+      if (rankDiff !== 0) return rankDiff;
+
+      const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
+      if (amountDiff !== 0) return amountDiff;
+
+      return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+    });
+    const qualityCandidateSet = new Set(rankedQualityCandidates);
+    return [
+      ...rankedQualityCandidates,
+      ...rankPanFlightsPriceCandidates(candidates.filter((candidate) => !qualityCandidateSet.has(candidate))),
+    ];
+  }
+
+  return rankPanFlightsPriceCandidates(candidates);
+}
+
+function rankPanFlightsPriceCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
   const shortestDuration = candidates.reduce<number | undefined>((shortest, candidate) => {
     if (candidate.durationMinutes === undefined) return shortest;
     return shortest === undefined ? candidate.durationMinutes : Math.min(shortest, candidate.durationMinutes);
@@ -3170,11 +3206,49 @@ function buildMomondoExactAirportFilterState(
   resultData: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
 ): string | undefined {
-  const allowedAirports = new Set([flightMeta.origin, flightMeta.destination]);
+  const allowedAirports = collectMomondoAllowedAirportFilterCodes(resultData, [flightMeta.origin, flightMeta.destination]);
   const excludedAirports = [...collectMomondoAirportFilterCodes(resultData)]
     .filter((airport) => !allowedAirports.has(airport))
     .sort();
   return excludedAirports.length > 0 ? `airports=-${excludedAirports.join(",")}` : undefined;
+}
+
+function collectMomondoAllowedAirportFilterCodes(resultData: Record<string, unknown>, requestedCodes: string[]): Set<string> {
+  const requestedAirports = new Set(requestedCodes);
+  const allowedAirports = new Set(requestedCodes);
+  for (const group of collectMomondoAirportFilterGroups(resultData)) {
+    const groupAirports = readRecordArray(isRecord(group.filterData) ? group.filterData.items : undefined)
+      .map((item) => readIataCodeValue(item.id))
+      .filter((airport): airport is string => airport !== undefined);
+    if (groupAirports.some((airport) => requestedAirports.has(airport))) {
+      for (const airport of groupAirports) allowedAirports.add(airport);
+    }
+  }
+  return allowedAirports;
+}
+
+function collectMomondoAirportFilterGroups(resultData: Record<string, unknown>): Array<Record<string, unknown>> {
+  const filterData = isRecord(resultData.filterData) ? resultData.filterData : undefined;
+  const airportsFilter = isRecord(filterData?.airports) ? filterData.airports : undefined;
+  const groups: Array<Record<string, unknown>> = [];
+  collectMomondoAirportFilterGroupsFromNode(airportsFilter, groups);
+  return groups;
+}
+
+function collectMomondoAirportFilterGroupsFromNode(value: unknown, groups: Array<Record<string, unknown>>): void {
+  if (!isRecord(value)) return;
+
+  const items = readRecordArray(isRecord(value.filterData) ? value.filterData.items : undefined);
+  if (items.some((item) => readIataCodeValue(item.id) !== undefined)) groups.push(value);
+
+  const nestedFilterData = isRecord(value.filterData) ? value.filterData : undefined;
+  collectMomondoAirportFilterGroupsFromNode(nestedFilterData, groups);
+  for (const child of readRecordArray(value.items)) {
+    collectMomondoAirportFilterGroupsFromNode(child, groups);
+  }
+  for (const child of readRecordArray(value.filterGroups)) {
+    collectMomondoAirportFilterGroupsFromNode(child, groups);
+  }
 }
 
 function collectMomondoAirportFilterCodes(resultData: Record<string, unknown>): Set<string> {
@@ -3378,7 +3452,7 @@ function isMomondoFlightMatchingSearch(
   const outboundLeg = legs[0];
   if (
     outboundLeg === undefined ||
-    !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)
+    !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, resultData, flightMeta.outboundDate)
   ) {
     return false;
   }
@@ -3387,18 +3461,28 @@ function isMomondoFlightMatchingSearch(
 
   const inboundLeg = legs[1];
   return inboundLeg !== undefined &&
-    isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, flightMeta.inboundDate);
+    isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, resultData, flightMeta.inboundDate);
 }
 
 function isMomondoFlightLegMatch(
   leg: MomondoFlightLegSummary,
   origin: string,
   destination: string,
+  resultData: Record<string, unknown>,
   date: string,
 ): boolean {
-  return leg.origin === origin &&
-    leg.destination === destination &&
+  return isMomondoAirportMatchingSearch(leg.origin, origin, resultData) &&
+    isMomondoAirportMatchingSearch(leg.destination, destination, resultData) &&
     leg.departureDate === date;
+}
+
+function isMomondoAirportMatchingSearch(
+  airport: string,
+  requestedAirport: string,
+  resultData: Record<string, unknown>,
+): boolean {
+  if (airport === requestedAirport) return true;
+  return collectMomondoAllowedAirportFilterCodes(resultData, [requestedAirport]).has(airport);
 }
 
 function readMomondoFlightLegSummaries(
