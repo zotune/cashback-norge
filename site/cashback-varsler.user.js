@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780894859
+// @version      1780907012
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7117,7 +7117,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   ];
   const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS = [
     { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1e3 },
-    { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1001 },
+    { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 },
     { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1002 },
     { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1004 },
     { sortOrder: "price", sortRadio: "quality", version: "610", maxStops: 3, searchId: 1010 },
@@ -8323,6 +8323,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       alternatives: tooltipCandidates.map(({
         productUrl: _productUrl,
         durationMinutes: _durationMinutes,
+        qualityScore: _qualityScore,
         sourceRank: _sourceRank,
         sourceSortOrder: _sourceSortOrder,
         ...candidate
@@ -8429,6 +8430,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
       const productUrl = readPanFlightsProductUrl(deepLink, resultUrl);
       const shopName = readStringValue(provider?.provider) ?? readStringValue(item.provider) ?? readStringValue(packageRecord?.provider) ?? readPanFlightsProviderNameFromUrl(deepLink) ?? readStringValue(resultData.provider) ?? "PanFlights";
       const durationMinutes = readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration);
+      const qualityScore = readNumberValue(item.quality) ?? readNumberValue(packageRecord?.quality);
       const platform = formatPanFlightsTripSummary(item);
       candidates.push({
         shopName,
@@ -8440,6 +8442,7 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
         sourceRank: sourceRank2,
         sourceSortOrder: variant.sortOrder,
         ...durationMinutes !== void 0 ? { durationMinutes } : {},
+        ...qualityScore !== void 0 ? { qualityScore } : {},
         ...platform !== void 0 ? { platform } : {}
       });
     }
@@ -8461,20 +8464,16 @@ query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
     return uniqueCandidates;
   }
   function rankPanFlightsOfferCandidates(candidates) {
-    const qualityCandidates = candidates.filter((candidate) => candidate.sourceSortOrder === "quality");
-    if (qualityCandidates.length > 0) {
-      const rankedQualityCandidates = [...qualityCandidates].sort((left, right) => {
-        const rankDiff = left.sourceRank - right.sourceRank;
-        if (rankDiff !== 0) return rankDiff;
+    if (candidates.some((candidate) => candidate.qualityScore !== void 0)) {
+      return [...candidates].sort((left, right) => {
+        const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) - (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+        if (qualityDiff !== 0) return qualityDiff;
         const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
         if (amountDiff !== 0) return amountDiff;
-        return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+        const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+        if (durationDiff !== 0) return durationDiff;
+        return left.sourceRank - right.sourceRank;
       });
-      const qualityCandidateSet = new Set(rankedQualityCandidates);
-      return [
-        ...rankedQualityCandidates,
-        ...rankPanFlightsPriceCandidates(candidates.filter((candidate) => !qualityCandidateSet.has(candidate)))
-      ];
     }
     return rankPanFlightsPriceCandidates(candidates);
   }

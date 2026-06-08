@@ -295,6 +295,7 @@ type FinnFlightOfferCandidate = PriceMatchAlternative & {
 type PanFlightsOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   durationMinutes?: number;
+  qualityScore?: number;
   sourceRank: number;
   sourceSortOrder: PanFlightsSearchVariant["sortOrder"];
 };
@@ -405,7 +406,7 @@ const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
 ];
 const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1000 },
-  { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1001 },
+  { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 },
   { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 0, searchId: 1002 },
   { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1004 },
   { sortOrder: "price", sortRadio: "quality", version: "610", maxStops: 3, searchId: 1010 },
@@ -1880,6 +1881,7 @@ async function findPanFlightsFlightPriceMatchOffer(
     alternatives: tooltipCandidates.map(({
       productUrl: _productUrl,
       durationMinutes: _durationMinutes,
+      qualityScore: _qualityScore,
       sourceRank: _sourceRank,
       sourceSortOrder: _sourceSortOrder,
       ...candidate
@@ -2014,6 +2016,7 @@ function extractPanFlightsOfferCandidates(
       readStringValue(resultData.provider) ??
       "PanFlights";
     const durationMinutes = readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration);
+    const qualityScore = readNumberValue(item.quality) ?? readNumberValue(packageRecord?.quality);
     const platform = formatPanFlightsTripSummary(item);
 
     candidates.push({
@@ -2026,6 +2029,7 @@ function extractPanFlightsOfferCandidates(
       sourceRank,
       sourceSortOrder: variant.sortOrder,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+      ...(qualityScore !== undefined ? { qualityScore } : {}),
       ...(platform !== undefined ? { platform } : {}),
     });
   }
@@ -2050,22 +2054,21 @@ function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[])
 }
 
 function rankPanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[]): PanFlightsOfferCandidate[] {
-  const qualityCandidates = candidates.filter((candidate) => candidate.sourceSortOrder === "quality");
-  if (qualityCandidates.length > 0) {
-    const rankedQualityCandidates = [...qualityCandidates].sort((left, right) => {
-      const rankDiff = left.sourceRank - right.sourceRank;
-      if (rankDiff !== 0) return rankDiff;
+  if (candidates.some((candidate) => candidate.qualityScore !== undefined)) {
+    return [...candidates].sort((left, right) => {
+      const qualityDiff = (left.qualityScore ?? Number.MAX_SAFE_INTEGER) -
+        (right.qualityScore ?? Number.MAX_SAFE_INTEGER);
+      if (qualityDiff !== 0) return qualityDiff;
 
       const amountDiff = (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
       if (amountDiff !== 0) return amountDiff;
 
-      return (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) - (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+      const durationDiff = (left.durationMinutes ?? Number.MAX_SAFE_INTEGER) -
+        (right.durationMinutes ?? Number.MAX_SAFE_INTEGER);
+      if (durationDiff !== 0) return durationDiff;
+
+      return left.sourceRank - right.sourceRank;
     });
-    const qualityCandidateSet = new Set(rankedQualityCandidates);
-    return [
-      ...rankedQualityCandidates,
-      ...rankPanFlightsPriceCandidates(candidates.filter((candidate) => !qualityCandidateSet.has(candidate))),
-    ];
   }
 
   return rankPanFlightsPriceCandidates(candidates);
