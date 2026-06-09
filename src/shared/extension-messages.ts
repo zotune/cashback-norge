@@ -87,6 +87,8 @@ export type PriceMatchOffer = {
   productUrl: string;
   offerUrl?: string;
   alternatives?: PriceMatchAlternative[];
+  // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
+  searchIncomplete?: boolean;
 };
 
 export type PriceMatchAlternative = {

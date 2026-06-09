@@ -106,7 +106,9 @@ async function verifyFinn(context) {
 
   let result;
   let progress = 0;
-  for (let attempt = 0; attempt < 9; attempt++) {
+  const maxPolls = Number(args.polls ?? 9);
+  const startedAt = Date.now();
+  for (let attempt = 0; attempt < maxPolls; attempt++) {
     await sleep(1100);
     pollParams.set("cacheBuster", String(Date.now()));
     pollParams.set("progress", String(progress));
@@ -117,6 +119,8 @@ async function verifyFinn(context) {
     if (!value || !Array.isArray(value.trips)) continue;
     result = value;
     progress = typeof value.progress === "number" ? value.progress : progress;
+    const cheapest = Math.min(...value.trips.flatMap((trip) => (Array.isArray(trip.offers) ? trip.offers : []).map((o) => o.priceAmount).filter((n) => typeof n === "number")));
+    console.log(`  poll ${attempt + 1} (${Math.round((Date.now() - startedAt) / 1000)}s): progress=${progress}, trips=${value.trips.length}, billigst=${Number.isFinite(cheapest) ? Math.round(cheapest) : "?"}kr`);
     if (progress >= 100) break;
   }
   if (!result) { console.log("FINN: ingen API-resultater"); return; }

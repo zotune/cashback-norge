@@ -263,6 +263,8 @@ type PriceMatchOffer = {
   offerUrl?: string;
   durationText?: string;
   alternatives?: PriceMatchAlternative[];
+  // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
+  searchIncomplete?: boolean;
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -331,6 +333,10 @@ type MomondoFlightOfferCandidate = PriceMatchAlternative & {
 type SkyscannerFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   score?: number;
+};
+type SkyscannerFlightOfferSearchResult = {
+  candidates: SkyscannerFlightOfferCandidate[];
+  searchComplete: boolean;
 };
 type SkyscannerFlightPlace = {
   entityId: string;
@@ -451,7 +457,12 @@ const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airpor
 const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
 const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
 const FINN_FLIGHT_POLL_ATTEMPTS = 7;
+// Modningsrunder trenger bare et ferskt øyeblikksbilde (progress=0 gir full snapshot).
+const FINN_FLIGHT_REFRESH_POLL_ATTEMPTS = 2;
 const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
+// Flysøk (særlig langdistanse) modner i 30-60 s hos kildene. Kilder som rapporterer
+// umodent søk re-polles med exponential backoff (cap 16 s) mens panelet vises.
+const FLIGHT_PRICE_MATURATION_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 16000, 16000];
 const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
   "https://worka.panflights.com/skypickersearchsingle",
   "https://panflights.com/skypickersearchsingle",
@@ -557,7 +568,7 @@ const STATIC_FLIGHT_METROPOLITAN_AIRPORTS: Record<string, string[]> = {
 };
 let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
 let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
-const skyscannerFlightOfferCache = new Map<string, TimedPromiseCacheEntry<SkyscannerFlightOfferCandidate[]>>();
+const skyscannerFlightOfferCache = new Map<string, TimedPromiseCacheEntry<SkyscannerFlightOfferSearchResult>>();
 const skyscannerFlightPlaceCache = new Map<string, TimedPromiseCacheEntry<SkyscannerFlightPlace[]>>();
 const TRAVELLINK_SEARCH_QUERY = `
 query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
@@ -880,14 +891,19 @@ function hasBlockedHostname(blockedHosts: ReadonlySet<string>, hostname: string)
   return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
 }
 
+let renderGeneration = 0;
+
 async function renderCurrentContext(): Promise<void> {
+  const generation = ++renderGeneration;
   const [offers, priceMatches, regionPrices] = await Promise.all([
     getCurrentOffers().catch(() => []),
     getPriceMatchesForCurrentPage().catch(() => []),
     getRegionPricesForCurrentPage().catch(() => undefined),
   ]);
+  if (generation !== renderGeneration) return;
   if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
+    scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
     return;
   }
   clearNotice();
@@ -945,12 +961,36 @@ async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
   return [];
 }
 
+type FlightOfferFindOptions = {
+  // Modningsrunde: hent et kjapt øyeblikksbilde i stedet for full poll-løkke.
+  refresh?: boolean;
+};
+
+type FlightLiveOfferFinder = {
+  source: NonNullable<PriceMatchOffer["source"]>;
+  sourceName: string;
+  findOffer: (options?: FlightOfferFindOptions) => Promise<PriceMatchOffer | undefined>;
+};
+
+type FlightPriceMatchSession = {
+  staticOffers: PriceMatchOffer[];
+  liveOfferFinders: FlightLiveOfferFinder[];
+};
+
 async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
+  const session = await buildFlightPriceMatchSession();
+  if (session === undefined) return [];
+
+  const liveOffers = await runFlightLiveOfferFinders(session.liveOfferFinders);
+  return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
+}
+
+async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession | undefined> {
   const parsedUrl = parseUrl(window.location.href);
-  if (parsedUrl === undefined) return [];
+  if (parsedUrl === undefined) return undefined;
 
   const flightMeta = extractFlightSearchMeta(parsedUrl);
-  if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
+  if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return undefined;
 
   const airportLookup = await buildFlightAirportLookup(flightMeta);
   const routeTitle = `${flightMeta.origin} → ${flightMeta.destination}`;
@@ -982,25 +1022,32 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
       : []),
   ];
 
-  const liveOfferFinders: Array<{
-    sourceName: string;
-    findOffer: () => Promise<PriceMatchOffer | undefined>;
-  }> = [
-    { sourceName: "FINN", findOffer: () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+  const liveOfferFinders: FlightLiveOfferFinder[] = [
+    { source: "finnreise", sourceName: "FINN", findOffer: (options?: FlightOfferFindOptions) => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, options) },
     ...(ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE
-      ? [{ sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
+      ? [{ source: "panflights" as const, sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
-    { sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
-    { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+    { source: "momondo", sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+    { source: "skyscanner", sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
     ...(ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE
-      ? [{ sourceName: "Travellink", findOffer: () => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
+      ? [{ source: "travellink" as const, sourceName: "Travellink", findOffer: () => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
     ...(ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE
-      ? [{ sourceName: "Trip", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
+      ? [{ source: "tripcom" as const, sourceName: "Trip", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
       : []),
   ];
-  const liveOffers = (await Promise.all(liveOfferFinders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, findOffer))))
+  return { staticOffers, liveOfferFinders };
+}
+
+async function runFlightLiveOfferFinders(
+  finders: FlightLiveOfferFinder[],
+  options?: FlightOfferFindOptions,
+): Promise<PriceMatchOffer[]> {
+  return (await Promise.all(finders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, () => findOffer(options)))))
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
+}
+
+function mergeFlightPriceMatchOffers(staticOffers: PriceMatchOffer[], liveOffers: PriceMatchOffer[]): PriceMatchOffer[] {
   if (liveOffers.length === 0) return staticOffers;
 
   const liveSources = new Set(liveOffers.map((offer) => offer.source));
@@ -1008,6 +1055,68 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
     ...liveOffers,
     ...staticOffers.filter((offer) => !liveSources.has(offer.source)),
   ].sort(comparePriceMatchesBySortAmount);
+}
+
+function scheduleFlightPriceMatchMaturation(
+  generation: number,
+  offers: CashbackOffer[],
+  priceMatches: PriceMatchOffer[],
+  regionPrices: PlayStationRegionPriceResult | undefined,
+): void {
+  if (!priceMatches.some((offer) => offer.searchIncomplete === true)) return;
+  void matureFlightPriceMatches(generation, offers, priceMatches, regionPrices).catch(() => undefined);
+}
+
+async function matureFlightPriceMatches(
+  generation: number,
+  offers: CashbackOffer[],
+  priceMatches: PriceMatchOffer[],
+  regionPrices: PlayStationRegionPriceResult | undefined,
+): Promise<void> {
+  let currentMatches = priceMatches;
+  for (const delayMs of FLIGHT_PRICE_MATURATION_DELAYS_MS) {
+    await sleep(delayMs);
+    if (generation !== renderGeneration) return;
+
+    const incompleteSources = new Set(
+      currentMatches.filter((offer) => offer.searchIncomplete === true).map((offer) => offer.source),
+    );
+    if (incompleteSources.size === 0) return;
+
+    const session = await buildFlightPriceMatchSession();
+    if (session === undefined) return;
+    const refreshedOffers = await runFlightLiveOfferFinders(
+      session.liveOfferFinders.filter((finder) => incompleteSources.has(finder.source)),
+      { refresh: true },
+    );
+    if (generation !== renderGeneration) return;
+    if (refreshedOffers.length === 0) continue;
+
+    // Umodne øyeblikksbilder kan mangle de billigste resultatene; behold beste pris
+    // for kilden til søket melder ferdig.
+    const mergedRefreshedOffers = refreshedOffers.map((offer) => {
+      if (offer.searchIncomplete !== true) return offer;
+      const previous = currentMatches.find((match) => match.source === offer.source);
+      return previous !== undefined && (previous.sortAmount ?? previous.amount) < (offer.sortAmount ?? offer.amount)
+        ? previous
+        : offer;
+    });
+    const refreshedSources = new Set(mergedRefreshedOffers.map((offer) => offer.source));
+    const nextMatches = [
+      ...mergedRefreshedOffers,
+      ...currentMatches.filter((offer) => !refreshedSources.has(offer.source)),
+    ].sort(comparePriceMatchesBySortAmount);
+    const changed = JSON.stringify(nextMatches) !== JSON.stringify(currentMatches);
+    currentMatches = nextMatches;
+    if (changed) renderNoticeWithStoredState(offers, currentMatches, regionPrices);
+  }
+
+  if (generation !== renderGeneration) return;
+  if (currentMatches.some((offer) => offer.searchIncomplete === true)) {
+    // Backoff-budsjettet er brukt opp – fjern «oppdaterer»-indikatoren fra kortene.
+    currentMatches = currentMatches.map(({ searchIncomplete: _searchIncomplete, ...offer }) => offer);
+    renderNoticeWithStoredState(offers, currentMatches, regionPrices);
+  }
 }
 
 async function safelyFindFlightPriceMatchOffer(
@@ -1683,17 +1792,19 @@ async function findFinnFlightPriceMatchOffer(
   routeTitle: string,
   searchDetails: string,
   airportLookup: FlightAirportCodeLookup,
+  options?: FlightOfferFindOptions,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
   const searchData = await fetchFinnFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
-  const resultData = await pollFinnFlightResults(searchData, flightMeta);
+  const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true);
   if (resultData === undefined) return undefined;
 
   const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
   const best = candidates[0];
   if (best === undefined) return undefined;
+  const progress = readNumberValue(resultData.progress);
 
   return {
     source: "finnreise",
@@ -1709,6 +1820,7 @@ async function findFinnFlightPriceMatchOffer(
     productUrl: searchData.resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(progress !== undefined && progress < 100 ? { searchIncomplete: true } : {}),
     alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
 }
@@ -1822,12 +1934,14 @@ function parseFinnNextData(html: string): Record<string, unknown> | undefined {
 async function pollFinnFlightResults(
   searchData: FinnFlightSearchData,
   flightMeta: FlightSearchMeta,
+  quickRefresh = false,
 ): Promise<Record<string, unknown> | undefined> {
   let latestResult: Record<string, unknown> | undefined;
   let progress = 0;
+  const maxAttempts = quickRefresh ? FINN_FLIGHT_REFRESH_POLL_ATTEMPTS : FINN_FLIGHT_POLL_ATTEMPTS;
 
-  for (let attempt = 0; attempt < FINN_FLIGHT_POLL_ATTEMPTS; attempt++) {
-    await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (!quickRefresh || attempt > 0) await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
     const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress);
     const value = await userscriptJsonRequest(resultUrl, {
       headers: { Accept: "application/json" },
@@ -4044,7 +4158,7 @@ async function findSkyscannerFlightPriceMatchOffer(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-  const candidates = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
+  const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
 
@@ -4062,6 +4176,7 @@ async function findSkyscannerFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: resultUrl,
     ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+    ...(searchComplete ? {} : { searchIncomplete: true }),
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
 }
@@ -4070,19 +4185,22 @@ function fetchCachedSkyscannerFlightOfferCandidates(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   airportLookup: FlightAirportCodeLookup,
-): Promise<SkyscannerFlightOfferCandidate[]> {
+): Promise<SkyscannerFlightOfferSearchResult> {
   const cacheKey = buildSkyscannerFlightOfferCacheKey(flightMeta, airportLookup);
   const cachedEntry = skyscannerFlightOfferCache.get(cacheKey);
   const now = Date.now();
   if (cachedEntry !== undefined && cachedEntry.expiresAt > now) return cachedEntry.promise;
 
-  const entry: TimedPromiseCacheEntry<SkyscannerFlightOfferCandidate[]> = {
+  const entry: TimedPromiseCacheEntry<SkyscannerFlightOfferSearchResult> = {
     expiresAt: now + SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS,
     promise: fetchUncachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup),
   };
   entry.promise.then(
-    (candidates) => {
-      entry.expiresAt = Date.now() + (candidates.length > 0 ? SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS);
+    (result) => {
+      // Umodne søk caches ikke, slik at modningsrundene henter ferskt resultat.
+      entry.expiresAt = result.searchComplete
+        ? Date.now() + (result.candidates.length > 0 ? SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS)
+        : Date.now();
     },
     () => {
       if (skyscannerFlightOfferCache.get(cacheKey) === entry) skyscannerFlightOfferCache.delete(cacheKey);
@@ -4096,12 +4214,15 @@ async function fetchUncachedSkyscannerFlightOfferCandidates(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   airportLookup: FlightAirportCodeLookup,
-): Promise<SkyscannerFlightOfferCandidate[]> {
-  const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
-  if (apiCandidates.length > 0) return apiCandidates;
+): Promise<SkyscannerFlightOfferSearchResult> {
+  const apiResult = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
+  if (apiResult.candidates.length > 0) return apiResult;
 
   const calendarCandidate = await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl);
-  return calendarCandidate !== undefined ? [calendarCandidate] : [];
+  return {
+    candidates: calendarCandidate !== undefined ? [calendarCandidate] : [],
+    searchComplete: apiResult.searchComplete,
+  };
 }
 
 function buildSkyscannerFlightOfferCacheKey(
@@ -4119,19 +4240,19 @@ async function fetchSkyscannerFlightSearchCandidates(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   airportLookup: FlightAirportCodeLookup,
-): Promise<SkyscannerFlightOfferCandidate[]> {
+): Promise<SkyscannerFlightOfferSearchResult> {
   const [originPlace, destinationPlace] = await Promise.all([
     fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
     fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination"),
   ]);
-  if (originPlace === undefined || destinationPlace === undefined) return [];
+  if (originPlace === undefined || destinationPlace === undefined) return { candidates: [], searchComplete: true };
 
   const headers = buildSkyscannerWebSearchHeaders(resultUrl);
   let latestResult = await requestSkyscannerFlightSearch(
     buildSkyscannerFlightSearchPayload(flightMeta, originPlace, destinationPlace),
     headers,
   );
-  if (latestResult === undefined) return [];
+  if (latestResult === undefined) return { candidates: [], searchComplete: true };
 
   for (let attempt = 0; attempt < SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS; attempt++) {
     const context = isRecord(latestResult.context) ? latestResult.context : undefined;
@@ -4144,7 +4265,12 @@ async function fetchSkyscannerFlightSearchCandidates(
     if (pollResult !== undefined) latestResult = pollResult;
   }
 
-  return extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl);
+  const finalContext = isRecord(latestResult.context) ? latestResult.context : undefined;
+  const finalStatus = readStringValue(finalContext?.status)?.toLowerCase();
+  return {
+    candidates: extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl),
+    searchComplete: finalStatus === undefined || finalStatus === "complete",
+  };
 }
 
 function requestSkyscannerFlightSearch(
@@ -4819,6 +4945,8 @@ async function findMomondoFlightPriceMatchOffer(
   const displayedCandidates = visibleBestPrice === undefined
     ? candidates
     : [displayedBest, ...candidates.slice(1)];
+  const searchIncomplete = readStringValue(resultData.status) !== "complete" &&
+    resultData.isTopResultsRankingStable !== true;
 
   return {
     source: "momondo",
@@ -4834,6 +4962,7 @@ async function findMomondoFlightPriceMatchOffer(
     productUrl: searchData.resultUrl,
     offerUrl: displayedBest.productUrl,
     ...(displayedBest.durationText !== undefined ? { durationText: displayedBest.durationText } : {}),
+    ...(searchIncomplete ? { searchIncomplete: true } : {}),
     alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
 }
@@ -8095,6 +8224,20 @@ function renderNotice(
       justify-self: end;
       white-space: nowrap;
     }
+    .price-match-card--updating {
+      animation: price-match-updating-sweep 1.8s linear infinite;
+      background-image: linear-gradient(90deg, rgba(58, 125, 85, 0) 0%, rgba(58, 125, 85, 0.14) 50%, rgba(58, 125, 85, 0) 100%);
+      background-repeat: no-repeat;
+      background-size: 45% 100%;
+    }
+    @keyframes price-match-updating-sweep {
+      0% {
+        background-position: -100% 0;
+      }
+      100% {
+        background-position: 200% 0;
+      }
+    }
     .codes-list {
       display: flex;
       flex-direction: column;
@@ -10072,6 +10215,10 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchPrice.textContent = currentMomondoVisibleBestPrice === undefined
     ? priceMatch.price
     : formatNokFlightPrice(currentMomondoVisibleBestPrice);
+  if (priceMatch.searchIncomplete === true) {
+    priceMatchCard.classList.add("price-match-card--updating");
+    priceMatchCard.title = "Søket pågår fortsatt – prisen kan bli oppdatert";
+  }
 
   const priceMatchBadge = document.createElement("span");
   priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
