@@ -464,7 +464,8 @@ const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
 const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
 const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
 const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
-const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
+const MOMONDO_FLIGHT_DYNAMIC_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/dynamic/flights/poll";
+const MOMONDO_FLIGHT_V2_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
 const MOMONDO_FLIGHT_POLL_ATTEMPTS = 7;
 const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
 const MOMONDO_FLIGHT_PAGE_SIZE = 50;
@@ -4869,14 +4870,27 @@ async function pollMomondoFlightResults(
   return latestFilteredCandidateResult ?? latestCandidateResult ?? latestResult;
 }
 
-function requestMomondoFlightPoll(
+async function requestMomondoFlightPoll(
   searchData: MomondoFlightSearchData,
   flightMeta: FlightSearchMeta,
   airportLookup: FlightAirportCodeLookup,
   searchId: string | undefined,
   filterState: string | undefined,
 ): Promise<unknown | undefined> {
-  return userscriptJsonRequest(MOMONDO_FLIGHT_POLL_ENDPOINT, {
+  const dynamicResult = await userscriptJsonRequest(MOMONDO_FLIGHT_DYNAMIC_POLL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-CSRF": searchData.formToken,
+      "x-kayak-session-error-check": "iris",
+    },
+    body: JSON.stringify(buildMomondoFlightDynamicPollPayload(flightMeta, searchId, filterState, searchData.sortMode)),
+    credentials: "include",
+  });
+  if (isRecord(dynamicResult) && Array.isArray(dynamicResult.results)) return dynamicResult;
+
+  return userscriptJsonRequest(MOMONDO_FLIGHT_V2_POLL_ENDPOINT, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -4887,6 +4901,29 @@ function requestMomondoFlightPoll(
     body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, airportLookup, searchId, filterState, searchData.sortMode)),
     credentials: "include",
   });
+}
+
+function buildMomondoFlightDynamicPollPayload(
+  flightMeta: FlightSearchMeta,
+  searchId: string | undefined,
+  filterState: string | undefined,
+  sortMode: MomondoFlightSortMode,
+): Record<string, unknown> {
+  return {
+    filterParams: filterState !== undefined ? { fs: filterState } : {},
+    userSearchParams: {
+      legs: buildMomondoFlightDynamicRequestLegs(flightMeta),
+      ...(searchId !== undefined ? { searchId } : {}),
+      passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
+      passengerDetails: Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
+      sortMode,
+    },
+    searchMetaData: {
+      pageNumber: 1,
+      searchTypes: [],
+      ...(searchId !== undefined ? { skipResultsInSecondPhase: false } : {}),
+    },
+  };
 }
 
 function buildMomondoFlightPollPayload(
@@ -5002,6 +5039,16 @@ function buildMomondoFlightRequestLegs(flightMeta: FlightSearchMeta, airportLook
   return legs;
 }
 
+function buildMomondoFlightDynamicRequestLegs(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
+  const legs = [
+    buildMomondoFlightDynamicRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate),
+  ];
+  if (flightMeta.inboundDate !== undefined) {
+    legs.push(buildMomondoFlightDynamicRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate));
+  }
+  return legs;
+}
+
 function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string, airportLookup: FlightAirportCodeLookup): Record<string, unknown> {
   return {
     origin: buildMomondoFlightRequestPlace(origin, airportLookup),
@@ -5012,8 +5059,21 @@ function buildMomondoFlightRequestLeg(origin: string, destination: string, date:
   };
 }
 
+function buildMomondoFlightDynamicRequestLeg(origin: string, destination: string, date: string): Record<string, unknown> {
+  return {
+    origin: buildMomondoFlightDynamicRequestPlace(origin),
+    destination: buildMomondoFlightDynamicRequestPlace(destination),
+    date,
+    flex: "exact",
+  };
+}
+
 function buildMomondoFlightRequestPlace(code: string, airportLookup: FlightAirportCodeLookup): Record<string, unknown> {
   return { locationType: "airports", airports: listFlightRequestAirportCodes(code, airportLookup) };
+}
+
+function buildMomondoFlightDynamicRequestPlace(code: string): Record<string, unknown> {
+  return { locationType: "airports", airports: [code.toUpperCase()] };
 }
 
 function extractMomondoFlightOfferCandidates(
