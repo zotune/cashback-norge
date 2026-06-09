@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781033687
+// @version      1781035082
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7128,10 +7128,10 @@ query SearchSuggestions($query: String!, $category: Int) {
   const SKYSCANNER_CLIENT_VERSION = "7.194.1";
   const SKYSCANNER_CHANNEL_ID = "goandroid";
   const SKYSCANNER_WEB_CHANNEL_ID = "website";
-  const SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS = 5;
+  const SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS = 8;
   const SKYSCANNER_WEB_SEARCH_POLL_INTERVAL_MS = 1200;
   const SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS = 5 * 60 * 1e3;
-  const SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS = 5 * 60 * 1e3;
+  const SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS = 45 * 1e3;
   const SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
   const SKYSCANNER_EMPTY_FLIGHT_PLACE_CACHE_TTL_MS = 90 * 1e3;
   const SKYSCANNER_HTTP_HEADERS = {
@@ -7509,30 +7509,6 @@ query SearchSuggestions($query: String!, $category: Int) {
         cardSearchDetails,
         fullSearchDetails
       }),
-      buildFlightPriceMatchOffer({
-        source: "momondo",
-        sourceName: "momondo",
-        productUrl: buildMomondoFlightSearchUrl(flightMeta),
-        routeTitle,
-        cardSearchDetails,
-        fullSearchDetails
-      }),
-      buildFlightPriceMatchOffer({
-        source: "skyscanner",
-        sourceName: "Skyscanner",
-        productUrl: buildSkyscannerFlightSearchUrl(flightMeta),
-        routeTitle,
-        cardSearchDetails,
-        fullSearchDetails
-      }),
-      ...[buildFlightPriceMatchOffer({
-        source: "tripcom",
-        sourceName: "Trip.com",
-        productUrl: buildTripComFlightSearchUrl(flightMeta),
-        routeTitle,
-        cardSearchDetails,
-        fullSearchDetails
-      })],
       ...[]
     ];
     const liveOfferFinders = [
@@ -7541,7 +7517,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       { sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
       { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
       ...[],
-      ...[{ sourceName: "Trip.com", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
+      ...[{ sourceName: "Trip", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
     ];
     const liveOffers = (await Promise.all(liveOfferFinders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, findOffer)))).filter((offer) => offer !== void 0);
     if (liveOffers.length === 0) return staticOffers;
@@ -8539,7 +8515,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (best === void 0) return void 0;
     return {
       source: "tripcom",
-      sourceName: "Trip.com",
+      sourceName: "Trip",
       details: searchDetails,
       matchedExactProduct: true,
       shopName: best.shopName,
@@ -8766,7 +8742,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const displayAmount = convertedNokAmount ?? input.amount;
     const priceCurrency = convertedNokAmount !== void 0 ? "NOK" : displayCurrency;
     return {
-      shopName: "Trip.com",
+      shopName: "Trip",
       price: isConvertedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, priceCurrency),
       amount: displayAmount,
       sortAmount: convertedNokAmount ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT,
@@ -8882,7 +8858,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         formatFlightAirportScopeText(flightMeta, airportLookup)
       ]
     });
-    return candidate !== void 0 ? { ...candidate, shopName: "Trip.com kalender" } : void 0;
+    return candidate !== void 0 ? { ...candidate, shopName: "Trip kalender" } : void 0;
   }
   function isTripComCalendarItemMatchingSearch(item, flightMeta) {
     if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
@@ -9000,14 +8976,15 @@ query SearchSuggestions($query: String!, $category: Int) {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
-      credentials: "omit",
+      // Send Skyscanner-cookies (PerimeterX _pxvid) slik at bot-vakten slipper oss gjennom.
+      credentials: "include",
       timeoutMs: 3e4
     }).then((value) => isRecord(value) ? value : void 0);
   }
   function pollSkyscannerFlightSearch(sessionId, headers) {
     return userscriptJsonRequest(`${SKYSCANNER_WEB_UNIFIED_SEARCH_ENDPOINT}${encodeURIComponent(sessionId)}`, {
       headers,
-      credentials: "omit",
+      credentials: "include",
       timeoutMs: 3e4
     }).then((value) => isRecord(value) ? value : void 0);
   }
@@ -9296,7 +9273,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const params = new URLSearchParams({ query: iataCode, placeTypes: placeType });
     const value = await userscriptJsonRequest(`${SKYSCANNER_FENRYR_BASE_URL}/${endpoint}?${params.toString()}`, {
       headers: SKYSCANNER_HTTP_HEADERS,
-      credentials: "omit"
+      credentials: "include"
     });
     return isRecord(value) ? readSkyscannerFlightPlaces(value) : [];
   }
@@ -9341,7 +9318,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         tripType: flightMeta.inboundDate !== void 0 ? "TRIP_TYPE_RETURN" : "TRIP_TYPE_ONEWAY",
         isFixedDeparture: flightMeta.inboundDate !== void 0
       }),
-      credentials: "omit"
+      credentials: "include"
     });
     if (!isRecord(value)) return void 0;
     const day = readRecordArray(value.days).find((candidateDay) => readStringValue(candidateDay.day) === pickDate);
@@ -12019,6 +11996,9 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 6px 9px;
       text-decoration: none;
     }
+    .price-match-card.price-match-card--with-duration {
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+    }
     .region-price-card {
       grid-template-columns: minmax(0, 1fr) auto;
     }
@@ -12085,7 +12065,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       color: #5d6b71;
       font-size: 10px;
       font-weight: 600;
-      margin-left: 4px;
+      justify-self: end;
+      white-space: nowrap;
     }
     .codes-list {
       display: flex;
@@ -13840,16 +13821,19 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     priceMatchPrice.className = "price-match-price";
     const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" ? readCurrentMomondoVisibleBestPriceForCurrentPage() : void 0;
     priceMatchPrice.textContent = currentMomondoVisibleBestPrice === void 0 ? priceMatch.price : formatNokFlightPrice(currentMomondoVisibleBestPrice);
-    if (priceMatch.durationText !== void 0 && priceMatch.durationText.length > 0) {
-      const priceMatchDuration = document.createElement("span");
-      priceMatchDuration.className = "price-match-duration";
-      priceMatchDuration.textContent = `(${priceMatch.durationText})`;
-      priceMatchPrice.append(priceMatchDuration);
-    }
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-    priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
+    const hasDuration = priceMatch.durationText !== void 0 && priceMatch.durationText.length > 0;
+    if (hasDuration) {
+      const priceMatchDuration = document.createElement("span");
+      priceMatchDuration.className = "price-match-duration";
+      priceMatchDuration.textContent = priceMatch.durationText ?? "";
+      priceMatchCard.classList.add("price-match-card--with-duration");
+      priceMatchCard.append(priceMatchTitle, priceMatchDuration, priceMatchPrice, priceMatchBadge);
+    } else {
+      priceMatchCard.append(priceMatchTitle, priceMatchPrice, priceMatchBadge);
+    }
     return priceMatchCard;
   }
   function buildRegionPriceCard(regionPrice, isBest = false) {
@@ -14023,7 +14007,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (priceMatch.source === "momondo") return "momondo";
     if (priceMatch.source === "skyscanner") return "Skyscanner";
     if (priceMatch.source === "travellink") return "Travellink";
-    if (priceMatch.source === "tripcom") return "Trip.com";
+    if (priceMatch.source === "tripcom") return "Trip";
     if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
     if (priceMatch.source === "ggdeals") return "GG Deals";
     if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";
@@ -14038,7 +14022,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const airportScopeText = formatFlightPriceMatchAirportScopeText(priceMatch);
       const hasLivePriceList = alternatives2.length > 0 && (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
       if (hasLivePriceList) {
-        const isCalendarPrice = priceMatch.source === "skyscanner" && priceMatch.shopName === "Skyscanner kalender" || priceMatch.source === "tripcom" && priceMatch.shopName === "Trip.com kalender";
+        const isCalendarPrice = priceMatch.source === "skyscanner" && priceMatch.shopName === "Skyscanner kalender" || priceMatch.source === "tripcom" && priceMatch.shopName === "Trip kalender";
         return [
           `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
           [
