@@ -4017,8 +4017,8 @@ async function findSkyscannerFlightPriceMatchOffer(
     sortAmount: candidate.sortAmount ?? candidate.amount,
     currency: candidate.currency,
     productName: routeTitle,
-    productUrl: candidate.productUrl,
-    offerUrl: candidate.productUrl,
+    productUrl: resultUrl,
+    offerUrl: resultUrl,
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
 }

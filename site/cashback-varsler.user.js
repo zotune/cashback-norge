@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781017034
+// @version      1781017207
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8881,8 +8881,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       sortAmount: candidate.sortAmount ?? candidate.amount,
       currency: candidate.currency,
       productName: routeTitle,
-      productUrl: candidate.productUrl,
-      offerUrl: candidate.productUrl,
+      productUrl: resultUrl,
+      offerUrl: resultUrl,
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
   }
