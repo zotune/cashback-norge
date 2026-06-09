@@ -3488,7 +3488,7 @@ async function fetchTripComFlightListSearch(
     method: "POST",
     headers: TRIP_COM_COMMON_HEADERS,
     body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, session)),
-    credentials: "include",
+    credentials: "omit",
     timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
   });
   return text !== undefined ? parseTripComSseResponse(text) : undefined;
@@ -3659,27 +3659,54 @@ function extractTripComListOfferCandidates(
   const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
   const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
   const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
-  const candidates = readRecordArray(resultData.itineraryList)
-    .flatMap((itinerary) => {
-      const tripSummary = formatTripComItinerarySummary(itinerary, airlineNames);
-      return readRecordArray(itinerary.policies).map((policy): TripComFlightOfferCandidate | undefined => {
-        const amount = readTripComPolicyAmount(policy);
-        if (amount === undefined) return undefined;
+  const lowestPriceCandidate = extractTripComBasicLowestPriceCandidate(basicInfo, resultUrl, currency, sortLabel);
+  const candidates = [
+    ...(lowestPriceCandidate !== undefined ? [lowestPriceCandidate] : []),
+    ...readRecordArray(resultData.itineraryList)
+      .flatMap((itinerary) => {
+        const tripSummary = formatTripComItinerarySummary(itinerary, airlineNames);
+        return readRecordArray(itinerary.policies).map((policy): TripComFlightOfferCandidate | undefined => {
+          const amount = readTripComPolicyAmount(policy);
+          if (amount === undefined) return undefined;
 
-        return toTripComOfferCandidate({
-          amount,
-          currency,
-          productUrl: resultUrl,
-          platformParts: [`Trip.com ${sortLabel}`, tripSummary],
+          return toTripComOfferCandidate({
+            amount,
+            currency,
+            productUrl: resultUrl,
+            platformParts: [`Trip.com ${sortLabel}`, tripSummary],
+          });
         });
-      });
-    })
-    .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined);
+      })
+      .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined),
+  ];
   return dedupeTripComOfferCandidates(candidates);
 }
 
 function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
   const price = isRecord(policy.price) ? policy.price : undefined;
+  return readTripComPriceAmount(price);
+}
+
+function extractTripComBasicLowestPriceCandidate(
+  basicInfo: Record<string, unknown>,
+  resultUrl: string,
+  currency: string,
+  sortLabel: string,
+): TripComFlightOfferCandidate | undefined {
+  const lowestPrice = isRecord(basicInfo.lowestPrice) ? basicInfo.lowestPrice : undefined;
+  const amount = readTripComPriceAmount(lowestPrice);
+  if (amount === undefined) return undefined;
+
+  return toTripComOfferCandidate({
+    amount,
+    currency,
+    productUrl: resultUrl,
+    platformParts: [`Trip.com ${sortLabel}`, "laveste API-pris"],
+  });
+}
+
+function readTripComPriceAmount(price: Record<string, unknown> | undefined): number | undefined {
+  if (price === undefined) return undefined;
   const adultPrice = isRecord(price?.adult) ? price.adult : undefined;
   return readPositiveNumberValue(price?.totalPrice) ??
     readPositiveNumberValue(price?.averagePrice) ??

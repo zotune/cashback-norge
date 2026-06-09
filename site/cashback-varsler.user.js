@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781013932
+// @version      1781014435
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -8499,7 +8499,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       method: "POST",
       headers: TRIP_COM_COMMON_HEADERS,
       body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, session)),
-      credentials: "include",
+      credentials: "omit",
       timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
     });
     return text !== void 0 ? parseTripComSseResponse(text) : void 0;
@@ -8639,23 +8639,42 @@ query SearchSuggestions($query: String!, $category: Int) {
     const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
     const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
-    const candidates = readRecordArray(resultData.itineraryList).flatMap((itinerary) => {
-      const tripSummary = formatTripComItinerarySummary(itinerary, airlineNames);
-      return readRecordArray(itinerary.policies).map((policy) => {
-        const amount = readTripComPolicyAmount(policy);
-        if (amount === void 0) return void 0;
-        return toTripComOfferCandidate({
-          amount,
-          currency,
-          productUrl: resultUrl,
-          platformParts: [`Trip.com ${sortLabel}`, tripSummary]
+    const lowestPriceCandidate = extractTripComBasicLowestPriceCandidate(basicInfo, resultUrl, currency, sortLabel);
+    const candidates = [
+      ...lowestPriceCandidate !== void 0 ? [lowestPriceCandidate] : [],
+      ...readRecordArray(resultData.itineraryList).flatMap((itinerary) => {
+        const tripSummary = formatTripComItinerarySummary(itinerary, airlineNames);
+        return readRecordArray(itinerary.policies).map((policy) => {
+          const amount = readTripComPolicyAmount(policy);
+          if (amount === void 0) return void 0;
+          return toTripComOfferCandidate({
+            amount,
+            currency,
+            productUrl: resultUrl,
+            platformParts: [`Trip.com ${sortLabel}`, tripSummary]
+          });
         });
-      });
-    }).filter((candidate) => candidate !== void 0);
+      }).filter((candidate) => candidate !== void 0)
+    ];
     return dedupeTripComOfferCandidates(candidates);
   }
   function readTripComPolicyAmount(policy) {
     const price = isRecord(policy.price) ? policy.price : void 0;
+    return readTripComPriceAmount(price);
+  }
+  function extractTripComBasicLowestPriceCandidate(basicInfo, resultUrl, currency, sortLabel) {
+    const lowestPrice = isRecord(basicInfo.lowestPrice) ? basicInfo.lowestPrice : void 0;
+    const amount = readTripComPriceAmount(lowestPrice);
+    if (amount === void 0) return void 0;
+    return toTripComOfferCandidate({
+      amount,
+      currency,
+      productUrl: resultUrl,
+      platformParts: [`Trip.com ${sortLabel}`, "laveste API-pris"]
+    });
+  }
+  function readTripComPriceAmount(price) {
+    if (price === void 0) return void 0;
     const adultPrice = isRecord(price?.adult) ? price.adult : void 0;
     return readPositiveNumberValue(price?.totalPrice) ?? readPositiveNumberValue(price?.averagePrice) ?? readPositiveNumberValue(adultPrice?.totalPrice);
   }
