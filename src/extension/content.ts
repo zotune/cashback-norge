@@ -937,7 +937,7 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
   if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
 
   const airportLookup = await buildFlightAirportLookup(flightMeta);
-  const routeTitle = `${flightMeta.origin} -> ${flightMeta.destination}`;
+  const routeTitle = `${flightMeta.origin} → ${flightMeta.destination}`;
   const fullSearchDetails = [
     formatFlightDateRange(flightMeta),
     formatFlightPassengerText(flightMeta),

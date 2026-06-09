@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781017845
+// @version      1781018204
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7483,7 +7483,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const flightMeta = extractFlightSearchMeta(parsedUrl);
     if (flightMeta === void 0 || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
     const airportLookup = await buildFlightAirportLookup(flightMeta);
-    const routeTitle = `${flightMeta.origin} -> ${flightMeta.destination}`;
+    const routeTitle = `${flightMeta.origin} → ${flightMeta.destination}`;
     const fullSearchDetails = [
       formatFlightDateRange(flightMeta),
       formatFlightPassengerText(flightMeta),
