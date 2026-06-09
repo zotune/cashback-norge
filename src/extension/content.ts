@@ -346,6 +346,10 @@ type SkyscannerFlightLegSummary = {
   stopCount: number;
   carrierNames: string[];
 };
+type TimedPromiseCacheEntry<T> = {
+  expiresAt: number;
+  promise: Promise<T>;
+};
 type TravellinkFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   durationMinutes?: number;
@@ -472,6 +476,10 @@ const SKYSCANNER_CHANNEL_ID = "goandroid";
 const SKYSCANNER_WEB_CHANNEL_ID = "website";
 const SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS = 5;
 const SKYSCANNER_WEB_SEARCH_POLL_INTERVAL_MS = 1200;
+const SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS = 5 * 60 * 1000;
+const SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS = 90 * 1000;
+const SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const SKYSCANNER_EMPTY_FLIGHT_PLACE_CACHE_TTL_MS = 90 * 1000;
 const SKYSCANNER_HTTP_HEADERS: Record<string, string> = {
   Accept: "application/json",
   "X-Skyscanner-Authenticated": "false",
@@ -534,6 +542,8 @@ const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
 };
 let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
 let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
+const skyscannerFlightOfferCache = new Map<string, TimedPromiseCacheEntry<SkyscannerFlightOfferCandidate[]>>();
+const skyscannerFlightPlaceCache = new Map<string, TimedPromiseCacheEntry<SkyscannerFlightPlace[]>>();
 const TRAVELLINK_SEARCH_QUERY = `
 query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   searchItinerary(searchItineraryRequest: $searchItineraryRequest) {
@@ -3994,15 +4004,7 @@ async function findSkyscannerFlightPriceMatchOffer(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-  const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
-  const calendarCandidate = apiCandidates.length === 0
-    ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl)
-    : undefined;
-  const candidates = apiCandidates.length > 0
-    ? apiCandidates
-    : calendarCandidate !== undefined
-      ? [calendarCandidate]
-      : [];
+  const candidates = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
 
@@ -4021,6 +4023,55 @@ async function findSkyscannerFlightPriceMatchOffer(
     offerUrl: resultUrl,
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
+}
+
+function fetchCachedSkyscannerFlightOfferCandidates(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+  airportLookup: FlightAirportCodeLookup,
+): Promise<SkyscannerFlightOfferCandidate[]> {
+  const cacheKey = buildSkyscannerFlightOfferCacheKey(flightMeta, airportLookup);
+  const cachedEntry = skyscannerFlightOfferCache.get(cacheKey);
+  const now = Date.now();
+  if (cachedEntry !== undefined && cachedEntry.expiresAt > now) return cachedEntry.promise;
+
+  const entry: TimedPromiseCacheEntry<SkyscannerFlightOfferCandidate[]> = {
+    expiresAt: now + SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS,
+    promise: fetchUncachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup),
+  };
+  entry.promise.then(
+    (candidates) => {
+      entry.expiresAt = Date.now() + (candidates.length > 0 ? SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS);
+    },
+    () => {
+      if (skyscannerFlightOfferCache.get(cacheKey) === entry) skyscannerFlightOfferCache.delete(cacheKey);
+    },
+  );
+  skyscannerFlightOfferCache.set(cacheKey, entry);
+  return entry.promise;
+}
+
+async function fetchUncachedSkyscannerFlightOfferCandidates(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+  airportLookup: FlightAirportCodeLookup,
+): Promise<SkyscannerFlightOfferCandidate[]> {
+  const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
+  if (apiCandidates.length > 0) return apiCandidates;
+
+  const calendarCandidate = await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl);
+  return calendarCandidate !== undefined ? [calendarCandidate] : [];
+}
+
+function buildSkyscannerFlightOfferCacheKey(
+  flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+): string {
+  return [
+    buildFlightSearchMetaKey(flightMeta),
+    [...collectEquivalentFlightAirportCodes(flightMeta.origin, airportLookup)].sort().join(","),
+    [...collectEquivalentFlightAirportCodes(flightMeta.destination, airportLookup)].sort().join(","),
+  ].join("|");
 }
 
 async function fetchSkyscannerFlightSearchCandidates(
@@ -4455,6 +4506,32 @@ async function fetchSkyscannerFlightPlace(
 }
 
 async function fetchSkyscannerFlightPlaces(
+  iataCode: string,
+  endpoint: "inputorigin" | "inputdestination",
+  placeType: "AIRPORT" | "CITY",
+): Promise<SkyscannerFlightPlace[]> {
+  const cacheKey = `${endpoint}|${placeType}|${iataCode.toUpperCase()}`;
+  const cachedEntry = skyscannerFlightPlaceCache.get(cacheKey);
+  const now = Date.now();
+  if (cachedEntry !== undefined && cachedEntry.expiresAt > now) return cachedEntry.promise;
+
+  const entry: TimedPromiseCacheEntry<SkyscannerFlightPlace[]> = {
+    expiresAt: now + SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS,
+    promise: fetchUncachedSkyscannerFlightPlaces(iataCode, endpoint, placeType),
+  };
+  entry.promise.then(
+    (places) => {
+      entry.expiresAt = Date.now() + (places.length > 0 ? SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_PLACE_CACHE_TTL_MS);
+    },
+    () => {
+      if (skyscannerFlightPlaceCache.get(cacheKey) === entry) skyscannerFlightPlaceCache.delete(cacheKey);
+    },
+  );
+  skyscannerFlightPlaceCache.set(cacheKey, entry);
+  return entry.promise;
+}
+
+async function fetchUncachedSkyscannerFlightPlaces(
   iataCode: string,
   endpoint: "inputorigin" | "inputdestination",
   placeType: "AIRPORT" | "CITY",

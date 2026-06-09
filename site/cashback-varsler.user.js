@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781017207
+// @version      1781017845
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7128,6 +7128,10 @@ query SearchSuggestions($query: String!, $category: Int) {
   const SKYSCANNER_WEB_CHANNEL_ID = "website";
   const SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS = 5;
   const SKYSCANNER_WEB_SEARCH_POLL_INTERVAL_MS = 1200;
+  const SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS = 5 * 60 * 1e3;
+  const SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS = 90 * 1e3;
+  const SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
+  const SKYSCANNER_EMPTY_FLIGHT_PLACE_CACHE_TTL_MS = 90 * 1e3;
   const SKYSCANNER_HTTP_HEADERS = {
     Accept: "application/json",
     "X-Skyscanner-Authenticated": "false",
@@ -7182,6 +7186,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   };
   let flightAirportDataPromise;
   let nokBaseRatesPromise;
+  const skyscannerFlightOfferCache = /* @__PURE__ */ new Map();
+  const skyscannerFlightPlaceCache = /* @__PURE__ */ new Map();
   const PSN_GC_DEALS_GIFT_CARD_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
   const PSN_GC_DEALS_GIFT_CARD_REGION_URLS = {
     AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
@@ -8865,9 +8871,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-    const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
-    const calendarCandidate = apiCandidates.length === 0 ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl) : void 0;
-    const candidates = apiCandidates.length > 0 ? apiCandidates : calendarCandidate !== void 0 ? [calendarCandidate] : [];
+    const candidates = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;
     return {
@@ -8885,6 +8889,39 @@ query SearchSuggestions($query: String!, $category: Int) {
       offerUrl: resultUrl,
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
+  }
+  function fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup) {
+    const cacheKey = buildSkyscannerFlightOfferCacheKey(flightMeta, airportLookup);
+    const cachedEntry = skyscannerFlightOfferCache.get(cacheKey);
+    const now = Date.now();
+    if (cachedEntry !== void 0 && cachedEntry.expiresAt > now) return cachedEntry.promise;
+    const entry = {
+      expiresAt: now + SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS,
+      promise: fetchUncachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup)
+    };
+    entry.promise.then(
+      (candidates) => {
+        entry.expiresAt = Date.now() + (candidates.length > 0 ? SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS);
+      },
+      () => {
+        if (skyscannerFlightOfferCache.get(cacheKey) === entry) skyscannerFlightOfferCache.delete(cacheKey);
+      }
+    );
+    skyscannerFlightOfferCache.set(cacheKey, entry);
+    return entry.promise;
+  }
+  async function fetchUncachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup) {
+    const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
+    if (apiCandidates.length > 0) return apiCandidates;
+    const calendarCandidate = await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl);
+    return calendarCandidate !== void 0 ? [calendarCandidate] : [];
+  }
+  function buildSkyscannerFlightOfferCacheKey(flightMeta, airportLookup) {
+    return [
+      buildFlightSearchMetaKey(flightMeta),
+      [...collectEquivalentFlightAirportCodes(flightMeta.origin, airportLookup)].sort().join(","),
+      [...collectEquivalentFlightAirportCodes(flightMeta.destination, airportLookup)].sort().join(",")
+    ].join("|");
   }
   async function fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup) {
     const [originPlace, destinationPlace] = await Promise.all([
@@ -9183,6 +9220,26 @@ query SearchSuggestions($query: String!, $category: Int) {
     return selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces);
   }
   async function fetchSkyscannerFlightPlaces(iataCode, endpoint, placeType) {
+    const cacheKey = `${endpoint}|${placeType}|${iataCode.toUpperCase()}`;
+    const cachedEntry = skyscannerFlightPlaceCache.get(cacheKey);
+    const now = Date.now();
+    if (cachedEntry !== void 0 && cachedEntry.expiresAt > now) return cachedEntry.promise;
+    const entry = {
+      expiresAt: now + SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS,
+      promise: fetchUncachedSkyscannerFlightPlaces(iataCode, endpoint, placeType)
+    };
+    entry.promise.then(
+      (places) => {
+        entry.expiresAt = Date.now() + (places.length > 0 ? SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_PLACE_CACHE_TTL_MS);
+      },
+      () => {
+        if (skyscannerFlightPlaceCache.get(cacheKey) === entry) skyscannerFlightPlaceCache.delete(cacheKey);
+      }
+    );
+    skyscannerFlightPlaceCache.set(cacheKey, entry);
+    return entry.promise;
+  }
+  async function fetchUncachedSkyscannerFlightPlaces(iataCode, endpoint, placeType) {
     const params = new URLSearchParams({ query: iataCode, placeTypes: placeType });
     const value = await userscriptJsonRequest(`${SKYSCANNER_FENRYR_BASE_URL}/${endpoint}?${params.toString()}`, {
       headers: SKYSCANNER_HTTP_HEADERS,
