@@ -762,6 +762,7 @@ function installDynamicProductPageRefresh(): void {
           buildFlightSearchMetaKey(flightMeta),
           isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : "",
           isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
+          isMomondoFlightSearchPage(currentUrl) ? readCurrentMomondoVisiblePriceKey() : "",
         ].join("|")
         : productMeta === undefined
           ? ""
@@ -4697,6 +4698,66 @@ function readMomondoFlightSortMode(url: string): MomondoFlightSortMode | undefin
   return sortMode === "price_a" || sortMode === "bestflight_a" ? sortMode : undefined;
 }
 
+function readCurrentMomondoVisibleBestPrice(flightMeta: FlightSearchMeta): number | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined || readCurrentMomondoFlightSearchUrl(flightMeta) === undefined) return undefined;
+  if (readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return undefined;
+
+  const text = document.body?.innerText;
+  if (text === undefined || text.length === 0) return undefined;
+
+  const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
+  for (const section of sections) {
+    const normalized = section.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (!/\b(?:Velg|Select)\b/i.test(normalized)) continue;
+    if (/\b(?:Annonse|Ad)\b/i.test(normalized)) continue;
+
+    const prices = readMomondoVisibleNokAmounts(normalized);
+    const amount = prices[prices.length - 1];
+    if (amount !== undefined) return amount;
+  }
+
+  return undefined;
+}
+
+function readCurrentMomondoVisibleBestPriceForCurrentPage(): number | undefined {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return undefined;
+
+  if (!isMomondoFlightSearchPage(parsedUrl) || readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return undefined;
+
+  const text = document.body?.innerText;
+  if (text === undefined || text.length === 0) return undefined;
+
+  const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
+  for (const section of sections) {
+    const normalized = section.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (!/\b(?:Velg|Select)\b/i.test(normalized)) continue;
+    if (/\b(?:Annonse|Ad)\b/i.test(normalized)) continue;
+
+    const prices = readMomondoVisibleNokAmounts(normalized);
+    const amount = prices[prices.length - 1];
+    if (amount !== undefined) return amount;
+  }
+
+  return undefined;
+}
+
+function readCurrentMomondoVisiblePriceKey(): string {
+  return String(readCurrentMomondoVisibleBestPriceForCurrentPage() ?? "");
+}
+
+function isMomondoFlightSearchPage(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return hostname === "momondo.no" && /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?\/?$/i.test(parsedUrl.pathname);
+}
+
+function readMomondoVisibleNokAmounts(value: string): number[] {
+  return [...value.matchAll(/\b(?:\d{1,3}(?:[\s.\u00a0]\d{3})+|\d{3,})\s*(?:kr|nok|,-)\b/gi)]
+    .map((match) => readNokAmountFromPriceLikeText(match[0]))
+    .filter((amount): amount is number => amount !== undefined);
+}
+
 async function findMomondoFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
@@ -4713,21 +4774,33 @@ async function findMomondoFlightPriceMatchOffer(
   const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
   const best = candidates[0];
   if (best === undefined) return undefined;
+  const visibleBestPrice = readCurrentMomondoVisibleBestPrice(flightMeta);
+  const displayedBest: MomondoFlightOfferCandidate = visibleBestPrice === undefined
+    ? best
+    : {
+      ...best,
+      price: formatNokFlightPrice(visibleBestPrice),
+      amount: visibleBestPrice,
+      sortAmount: visibleBestPrice,
+    };
+  const displayedCandidates = visibleBestPrice === undefined
+    ? candidates
+    : [displayedBest, ...candidates.slice(1)];
 
   return {
     source: "momondo",
     sourceName: "momondo",
     details: searchDetails,
     matchedExactProduct: true,
-    shopName: best.shopName,
-    price: best.price,
-    amount: best.amount,
-    sortAmount: best.sortAmount ?? best.amount,
-    currency: best.currency,
+    shopName: displayedBest.shopName,
+    price: displayedBest.price,
+    amount: displayedBest.amount,
+    sortAmount: displayedBest.sortAmount ?? displayedBest.amount,
+    currency: displayedBest.currency,
     productName: routeTitle,
     productUrl: searchData.resultUrl,
-    offerUrl: best.productUrl,
-    alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
+    offerUrl: displayedBest.productUrl,
+    alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
 }
 
@@ -9850,7 +9923,12 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
 
   const priceMatchPrice = document.createElement("span");
   priceMatchPrice.className = "price-match-price";
-  priceMatchPrice.textContent = priceMatch.price;
+  const currentMomondoVisibleBestPrice = priceMatch.source === "momondo"
+    ? readCurrentMomondoVisibleBestPriceForCurrentPage()
+    : undefined;
+  priceMatchPrice.textContent = currentMomondoVisibleBestPrice === undefined
+    ? priceMatch.price
+    : formatNokFlightPrice(currentMomondoVisibleBestPrice);
 
   const priceMatchBadge = document.createElement("span");
   priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;

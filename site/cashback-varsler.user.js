@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781028166
+// @version      1781029076
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7345,7 +7345,8 @@ query SearchSuggestions($query: String!, $category: Int) {
         const metaKey = flightMeta !== void 0 ? [
           buildFlightSearchMetaKey(flightMeta),
           isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : "",
-          isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : ""
+          isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
+          isMomondoFlightSearchPage(currentUrl) ? readCurrentMomondoVisiblePriceKey() : ""
         ].join("|") : productMeta === void 0 ? "" : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent].join("|");
         if (metaKey.length > 0 && metaKey !== latestMetaKey) {
           latestMetaKey = metaKey;
@@ -9355,6 +9356,50 @@ query SearchSuggestions($query: String!, $category: Int) {
     const sortMode = parseUrl(url)?.searchParams.get("sort");
     return sortMode === "price_a" || sortMode === "bestflight_a" ? sortMode : void 0;
   }
+  function readCurrentMomondoVisibleBestPrice(flightMeta) {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0 || readCurrentMomondoFlightSearchUrl(flightMeta) === void 0) return void 0;
+    if (readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return void 0;
+    const text = document.body?.innerText;
+    if (text === void 0 || text.length === 0) return void 0;
+    const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
+    for (const section of sections) {
+      const normalized = section.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+      if (!/\b(?:Velg|Select)\b/i.test(normalized)) continue;
+      if (/\b(?:Annonse|Ad)\b/i.test(normalized)) continue;
+      const prices = readMomondoVisibleNokAmounts(normalized);
+      const amount = prices[prices.length - 1];
+      if (amount !== void 0) return amount;
+    }
+    return void 0;
+  }
+  function readCurrentMomondoVisibleBestPriceForCurrentPage() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return void 0;
+    if (!isMomondoFlightSearchPage(parsedUrl) || readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return void 0;
+    const text = document.body?.innerText;
+    if (text === void 0 || text.length === 0) return void 0;
+    const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
+    for (const section of sections) {
+      const normalized = section.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+      if (!/\b(?:Velg|Select)\b/i.test(normalized)) continue;
+      if (/\b(?:Annonse|Ad)\b/i.test(normalized)) continue;
+      const prices = readMomondoVisibleNokAmounts(normalized);
+      const amount = prices[prices.length - 1];
+      if (amount !== void 0) return amount;
+    }
+    return void 0;
+  }
+  function readCurrentMomondoVisiblePriceKey() {
+    return String(readCurrentMomondoVisibleBestPriceForCurrentPage() ?? "");
+  }
+  function isMomondoFlightSearchPage(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return hostname === "momondo.no" && /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?\/?$/i.test(parsedUrl.pathname);
+  }
+  function readMomondoVisibleNokAmounts(value) {
+    return [...value.matchAll(/\b(?:\d{1,3}(?:[\s.\u00a0]\d{3})+|\d{3,})\s*(?:kr|nok|,-)\b/gi)].map((match) => readNokAmountFromPriceLikeText(match[0])).filter((amount) => amount !== void 0);
+  }
   async function findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = readCurrentMomondoFlightSearchUrl(flightMeta) ?? buildMomondoFlightSearchUrl(flightMeta);
     const searchData = await fetchMomondoFlightSearchData(resultUrl);
@@ -9364,20 +9409,28 @@ query SearchSuggestions($query: String!, $category: Int) {
     const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
     const best = candidates[0];
     if (best === void 0) return void 0;
+    const visibleBestPrice = readCurrentMomondoVisibleBestPrice(flightMeta);
+    const displayedBest = visibleBestPrice === void 0 ? best : {
+      ...best,
+      price: formatNokFlightPrice(visibleBestPrice),
+      amount: visibleBestPrice,
+      sortAmount: visibleBestPrice
+    };
+    const displayedCandidates = visibleBestPrice === void 0 ? candidates : [displayedBest, ...candidates.slice(1)];
     return {
       source: "momondo",
       sourceName: "momondo",
       details: searchDetails,
       matchedExactProduct: true,
-      shopName: best.shopName,
-      price: best.price,
-      amount: best.amount,
-      sortAmount: best.sortAmount ?? best.amount,
-      currency: best.currency,
+      shopName: displayedBest.shopName,
+      price: displayedBest.price,
+      amount: displayedBest.amount,
+      sortAmount: displayedBest.sortAmount ?? displayedBest.amount,
+      currency: displayedBest.currency,
       productName: routeTitle,
       productUrl: searchData.resultUrl,
-      offerUrl: best.productUrl,
-      alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate)
+      offerUrl: displayedBest.productUrl,
+      alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate)
     };
   }
   async function fetchMomondoFlightSearchData(resultUrl) {
@@ -13675,7 +13728,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     priceMatchTitle.append(priceMatchProduct, priceMatchShop);
     const priceMatchPrice = document.createElement("span");
     priceMatchPrice.className = "price-match-price";
-    priceMatchPrice.textContent = priceMatch.price;
+    const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" ? readCurrentMomondoVisibleBestPriceForCurrentPage() : void 0;
+    priceMatchPrice.textContent = currentMomondoVisibleBestPrice === void 0 ? priceMatch.price : formatNokFlightPrice(currentMomondoVisibleBestPrice);
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
