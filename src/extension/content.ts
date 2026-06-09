@@ -465,7 +465,7 @@ const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
 const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
 const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
 const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
-const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
+const MOMONDO_FLIGHT_POLL_ATTEMPTS = 7;
 const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
 const MOMONDO_FLIGHT_PAGE_SIZE = 50;
 const MOMONDO_DEFAULT_FLIGHT_SORT_MODE: MomondoFlightSortMode = "bestflight_a";
@@ -539,6 +539,13 @@ const TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS = 30000;
 const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
   Accept: "text/event-stream, application/json",
   "Content-Type": "application/json;charset=UTF-8",
+};
+const STATIC_FLIGHT_METROPOLITAN_AIRPORTS: Record<string, string[]> = {
+  LON: ["LCY", "LGW", "LHR", "LTN", "STN", "SEN"],
+  NYC: ["EWR", "JFK", "LGA"],
+  OSA: ["ITM", "KIX", "UKB"],
+  SEL: ["GMP", "ICN"],
+  TYO: ["HND", "NRT"],
 };
 let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
 let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
@@ -1558,10 +1565,15 @@ function isFlightSearchPassengerMatchSupported(flightMeta: FlightSearchMeta): bo
 
 async function buildFlightAirportLookup(flightMeta: FlightSearchMeta): Promise<FlightAirportCodeLookup> {
   const lookup: FlightAirportCodeLookup = new Map();
+  const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
+  for (const requestedCode of requestedCodes) {
+    const airports = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[requestedCode];
+    if (airports !== undefined) lookup.set(requestedCode, airports);
+  }
+
   const airportData = await fetchFlightAirportData();
   if (airportData === undefined) return lookup;
 
-  const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
   const flightableAirports = airportData.filter((airport) => airport.iataType === "airport" && airport.flightable);
   for (const requestedCode of requestedCodes) {
     const hasExactAirport = flightableAirports.some((airport) => airport.code === requestedCode);
@@ -1889,9 +1901,7 @@ function dedupeFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[])
 }
 
 function rankFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[]): FinnFlightOfferCandidate[] {
-  return [...candidates].sort((left, right) => {
-    return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
-  });
+  return candidates;
 }
 
 function isFinnFlightTripMatchingSearch(
@@ -4749,6 +4759,8 @@ async function pollMomondoFlightResults(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<Record<string, unknown> | undefined> {
   let latestResult: Record<string, unknown> | undefined;
+  let latestCandidateResult: Record<string, unknown> | undefined;
+  let latestFilteredCandidateResult: Record<string, unknown> | undefined;
   let searchId: string | undefined;
   let filterState: string | undefined;
 
@@ -4764,18 +4776,24 @@ async function pollMomondoFlightResults(
 
     const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl);
     const nextFilterState = filterState ?? buildMomondoExactAirportFilterState(value, flightMeta, airportLookup);
+    if (candidates.length > 0) {
+      latestCandidateResult = value;
+      if (requestFilterState !== undefined || nextFilterState === undefined) {
+        latestFilteredCandidateResult = value;
+      }
+    }
     if (requestFilterState === undefined && nextFilterState !== undefined) {
       filterState = nextFilterState;
       continue;
     }
 
     const status = readStringValue(value.status);
-    if (status === "complete" || (candidates.length > 0 && (value.isTopResultsRankingStable === true || attempt > 0))) {
+    if (candidates.length > 0 && (value.isTopResultsRankingStable === true || attempt >= 2 || (status === "complete" && attempt > 0))) {
       return value;
     }
   }
 
-  return latestResult;
+  return latestFilteredCandidateResult ?? latestCandidateResult ?? latestResult;
 }
 
 function requestMomondoFlightPoll(
@@ -4931,10 +4949,25 @@ function extractMomondoFlightOfferCandidates(
   airportLookup: FlightAirportCodeLookup,
   fallbackUrl: string,
 ): MomondoFlightOfferCandidate[] {
+  const strictCandidates = collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, true);
+  if (strictCandidates.length > 0) return dedupeMomondoFlightOfferCandidates(strictCandidates);
+
+  return dedupeMomondoFlightOfferCandidates(
+    collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, false),
+  );
+}
+
+function collectMomondoFlightOfferCandidates(
+  resultData: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+  fallbackUrl: string,
+  requireMatchingSearch: boolean,
+): MomondoFlightOfferCandidate[] {
   const candidates: MomondoFlightOfferCandidate[] = [];
 
   for (const result of readRecordArray(resultData.results)) {
-    if (!isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
+    if (requireMatchingSearch && !isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
     if (isMomondoFlightPoorItinerary(result)) continue;
 
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
@@ -4972,16 +5005,50 @@ function extractMomondoFlightOfferCandidates(
     }
   }
 
-  return dedupeMomondoFlightOfferCandidates(candidates);
+  return candidates;
 }
 
 function isMomondoFlightPoorItinerary(result: Record<string, unknown>): boolean {
   if (readStringValue(result.type)?.toLowerCase() === "fsr") return true;
   if (result.hasHackerFares === true) return true;
+  if (result.hasSelfTransfer === true || hasMomondoSelfTransferWarning(result.warnings)) return true;
 
-  return readRecordArray(result.legs).some((leg) => {
-    return readRecordArray(leg.segments).some((segmentRef) => segmentRef.hasSelfTransfer === true);
+  return readRecordArray(result.legs).some(hasMomondoSelfTransferLeg) ||
+    readRecordArray(result.legFarings).some(hasMomondoSelfTransferLegFaring) ||
+    readRecordArray(result.bookingOptions).some(hasMomondoSelfTransferBookingOption);
+}
+
+function hasMomondoSelfTransferWarning(value: unknown): boolean {
+  const warnings = Array.isArray(value) ? value : [];
+  return warnings.some((warning) => {
+    return typeof warning === "string" && /self[_\s-]*transfer/i.test(warning);
   });
+}
+
+function hasMomondoSelfTransferLeg(leg: Record<string, unknown>): boolean {
+  if (leg.hasSelfTransfer === true) return true;
+  return readRecordArray(leg.segments).some((segmentRef) => {
+    return segmentRef.hasSelfTransfer === true ||
+      segmentRef.isSelfTransfer === true ||
+      hasMomondoSelfTransferWarning(segmentRef.warnings);
+  });
+}
+
+function hasMomondoSelfTransferLegFaring(legFaring: Record<string, unknown>): boolean {
+  if (legFaring.isSelfTransfer === true || legFaring.hasSelfTransfer === true) return true;
+  return readRecordArray(legFaring.segmentFarings).some((segmentFaring) => {
+    return segmentFaring.isSelfTransfer === true || segmentFaring.hasSelfTransfer === true;
+  });
+}
+
+function hasMomondoSelfTransferBookingOption(bookingOption: Record<string, unknown>): boolean {
+  if (bookingOption.isSelfTransfer === true || bookingOption.hasSelfTransfer === true) return true;
+  const flags = isRecord(bookingOption.flags) ? bookingOption.flags : undefined;
+  return flags?.hasVirtualInterline === true ||
+    flags?.isVirtualInterline === true ||
+    flags?.isSelfTransfer === true ||
+    flags?.hasSelfTransfer === true ||
+    flags?.isSelfTransferProtection === true;
 }
 
 function dedupeMomondoFlightOfferCandidates(candidates: MomondoFlightOfferCandidate[]): MomondoFlightOfferCandidate[] {

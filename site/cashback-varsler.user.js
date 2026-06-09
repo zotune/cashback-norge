@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781018204
+// @version      1781028166
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7117,7 +7117,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
   const MOMONDO_FLIGHT_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
-  const MOMONDO_FLIGHT_POLL_ATTEMPTS = 5;
+  const MOMONDO_FLIGHT_POLL_ATTEMPTS = 7;
   const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
   const MOMONDO_FLIGHT_PAGE_SIZE = 50;
   const MOMONDO_DEFAULT_FLIGHT_SORT_MODE = "bestflight_a";
@@ -7183,6 +7183,13 @@ query SearchSuggestions($query: String!, $category: Int) {
   const TRIP_COM_COMMON_HEADERS = {
     Accept: "text/event-stream, application/json",
     "Content-Type": "application/json;charset=UTF-8"
+  };
+  const STATIC_FLIGHT_METROPOLITAN_AIRPORTS = {
+    LON: ["LCY", "LGW", "LHR", "LTN", "STN", "SEN"],
+    NYC: ["EWR", "JFK", "LGA"],
+    OSA: ["ITM", "KIX", "UKB"],
+    SEL: ["GMP", "ICN"],
+    TYO: ["HND", "NRT"]
   };
   let flightAirportDataPromise;
   let nokBaseRatesPromise;
@@ -7997,9 +8004,13 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   async function buildFlightAirportLookup(flightMeta) {
     const lookup = /* @__PURE__ */ new Map();
+    const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
+    for (const requestedCode of requestedCodes) {
+      const airports = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[requestedCode];
+      if (airports !== void 0) lookup.set(requestedCode, airports);
+    }
     const airportData = await fetchFlightAirportData();
     if (airportData === void 0) return lookup;
-    const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
     const flightableAirports = airportData.filter((airport) => airport.iataType === "airport" && airport.flightable);
     for (const requestedCode of requestedCodes) {
       const hasExactAirport = flightableAirports.some((airport) => airport.code === requestedCode);
@@ -8244,9 +8255,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return uniqueCandidates;
   }
   function rankFinnFlightOfferCandidates(candidates) {
-    return [...candidates].sort((left, right) => {
-      return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
-    });
+    return candidates;
   }
   function isFinnFlightTripMatchingSearch(trip, flightMeta, searchData, airportLookup) {
     const legs = readRecordArray(trip.legs);
@@ -9390,6 +9399,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   async function pollMomondoFlightResults(searchData, flightMeta, airportLookup) {
     let latestResult;
+    let latestCandidateResult;
+    let latestFilteredCandidateResult;
     let searchId;
     let filterState;
     for (let attempt = 0; attempt < MOMONDO_FLIGHT_POLL_ATTEMPTS; attempt++) {
@@ -9401,16 +9412,22 @@ query SearchSuggestions($query: String!, $category: Int) {
       searchId = readStringValue(value.searchId) ?? searchId;
       const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl);
       const nextFilterState = filterState ?? buildMomondoExactAirportFilterState(value, flightMeta, airportLookup);
+      if (candidates.length > 0) {
+        latestCandidateResult = value;
+        if (requestFilterState !== void 0 || nextFilterState === void 0) {
+          latestFilteredCandidateResult = value;
+        }
+      }
       if (requestFilterState === void 0 && nextFilterState !== void 0) {
         filterState = nextFilterState;
         continue;
       }
       const status = readStringValue(value.status);
-      if (status === "complete" || candidates.length > 0 && (value.isTopResultsRankingStable === true || attempt > 0)) {
+      if (candidates.length > 0 && (value.isTopResultsRankingStable === true || attempt >= 2 || status === "complete" && attempt > 0)) {
         return value;
       }
     }
-    return latestResult;
+    return latestFilteredCandidateResult ?? latestCandidateResult ?? latestResult;
   }
   function requestMomondoFlightPoll(searchData, flightMeta, airportLookup, searchId, filterState) {
     return userscriptJsonRequest(MOMONDO_FLIGHT_POLL_ENDPOINT, {
@@ -9521,9 +9538,16 @@ query SearchSuggestions($query: String!, $category: Int) {
     return { locationType: "airports", airports: listFlightRequestAirportCodes(code, airportLookup) };
   }
   function extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl) {
+    const strictCandidates = collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, true);
+    if (strictCandidates.length > 0) return dedupeMomondoFlightOfferCandidates(strictCandidates);
+    return dedupeMomondoFlightOfferCandidates(
+      collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, false)
+    );
+  }
+  function collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, requireMatchingSearch) {
     const candidates = [];
     for (const result of readRecordArray(resultData.results)) {
-      if (!isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
+      if (requireMatchingSearch && !isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
       if (isMomondoFlightPoorItinerary(result)) continue;
       const tripSummary = formatMomondoFlightTripSummary(result, resultData);
       const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
@@ -9548,14 +9572,36 @@ query SearchSuggestions($query: String!, $category: Int) {
         });
       }
     }
-    return dedupeMomondoFlightOfferCandidates(candidates);
+    return candidates;
   }
   function isMomondoFlightPoorItinerary(result) {
     if (readStringValue(result.type)?.toLowerCase() === "fsr") return true;
     if (result.hasHackerFares === true) return true;
-    return readRecordArray(result.legs).some((leg) => {
-      return readRecordArray(leg.segments).some((segmentRef) => segmentRef.hasSelfTransfer === true);
+    if (result.hasSelfTransfer === true || hasMomondoSelfTransferWarning(result.warnings)) return true;
+    return readRecordArray(result.legs).some(hasMomondoSelfTransferLeg) || readRecordArray(result.legFarings).some(hasMomondoSelfTransferLegFaring) || readRecordArray(result.bookingOptions).some(hasMomondoSelfTransferBookingOption);
+  }
+  function hasMomondoSelfTransferWarning(value) {
+    const warnings = Array.isArray(value) ? value : [];
+    return warnings.some((warning) => {
+      return typeof warning === "string" && /self[_\s-]*transfer/i.test(warning);
     });
+  }
+  function hasMomondoSelfTransferLeg(leg) {
+    if (leg.hasSelfTransfer === true) return true;
+    return readRecordArray(leg.segments).some((segmentRef) => {
+      return segmentRef.hasSelfTransfer === true || segmentRef.isSelfTransfer === true || hasMomondoSelfTransferWarning(segmentRef.warnings);
+    });
+  }
+  function hasMomondoSelfTransferLegFaring(legFaring) {
+    if (legFaring.isSelfTransfer === true || legFaring.hasSelfTransfer === true) return true;
+    return readRecordArray(legFaring.segmentFarings).some((segmentFaring) => {
+      return segmentFaring.isSelfTransfer === true || segmentFaring.hasSelfTransfer === true;
+    });
+  }
+  function hasMomondoSelfTransferBookingOption(bookingOption) {
+    if (bookingOption.isSelfTransfer === true || bookingOption.hasSelfTransfer === true) return true;
+    const flags = isRecord(bookingOption.flags) ? bookingOption.flags : void 0;
+    return flags?.hasVirtualInterline === true || flags?.isVirtualInterline === true || flags?.isSelfTransfer === true || flags?.hasSelfTransfer === true || flags?.isSelfTransferProtection === true;
   }
   function dedupeMomondoFlightOfferCandidates(candidates) {
     const seen = /* @__PURE__ */ new Set();
