@@ -440,8 +440,10 @@ const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
 const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
-const FLIGHT_TOOLTIP_MAX_ROWS = 10;
+const FLIGHT_TOOLTIP_MAX_ROWS = 6;
 const FLIGHT_OFFER_CANDIDATE_LIMIT = 10;
+// Sikkerhetsgrense for alle høyre-tooltips, slik at ingen blir absurd høy.
+const TOOLTIP_MAX_LINES = 35;
 const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
@@ -8261,6 +8263,10 @@ function renderNotice(
     .offer-tooltip-list li {
       padding-left: 2px;
     }
+    .offer-tooltip-more {
+      color: #9aa7b0;
+      font-style: italic;
+    }
     .offer-tooltip.visible {
       display: block;
     }
@@ -9554,10 +9560,28 @@ function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMat
 }
 
 function setTooltipContent(tooltip: HTMLElement, parts: string[]): void {
-  const sections = parts
-    .flatMap((part) => part.split(/\n{2,}/))
-    .map(createTooltipSection)
-    .filter((section): section is HTMLDivElement => section !== undefined);
+  const sectionParts = parts.flatMap((part) => part.split(/\n{2,}/));
+  const sections: HTMLDivElement[] = [];
+  let lineCount = 0;
+  let truncated = false;
+  for (const part of sectionParts) {
+    const partLines = part.split("\n").map((line) => line.trim()).filter(Boolean).length;
+    if (partLines === 0) continue;
+    if (lineCount + partLines > TOOLTIP_MAX_LINES && sections.length > 0) {
+      truncated = true;
+      break;
+    }
+    const section = createTooltipSection(part);
+    if (section === undefined) continue;
+    sections.push(section);
+    lineCount += partLines;
+  }
+  if (truncated) {
+    const moreSection = document.createElement("div");
+    moreSection.className = "offer-tooltip-section offer-tooltip-more";
+    moreSection.textContent = "… se resten hos kilden";
+    sections.push(moreSection);
+  }
   tooltip.replaceChildren(...sections);
 }
 
