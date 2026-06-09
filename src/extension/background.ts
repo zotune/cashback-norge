@@ -177,6 +177,7 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     "api.travelpayouts.com",
     "www.finn.no",
     "www.momondo.no",
+    "www.skyscanner.no",
     "www.skyscanner.net",
     "www.travellink.no",
     "us.trip.com",

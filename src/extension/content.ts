@@ -328,6 +328,23 @@ type MomondoFlightOfferCandidate = PriceMatchAlternative & {
 };
 type SkyscannerFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
+  score?: number;
+};
+type SkyscannerFlightPlace = {
+  entityId: string;
+  skyId: string;
+  flightPlaceType: "AIRPORT" | "CITY";
+  placeOfStayEntityId?: string;
+};
+type SkyscannerFlightLegSummary = {
+  origin: string;
+  destination: string;
+  departureDate?: string;
+  departureTime?: string;
+  arrivalTime?: string;
+  durationMinutes?: number;
+  stopCount: number;
+  carrierNames: string[];
 };
 type TravellinkFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
@@ -449,8 +466,12 @@ const MOMONDO_FLIGHT_POLL_INTERVAL_MS = 1100;
 const MOMONDO_FLIGHT_PAGE_SIZE = 50;
 const MOMONDO_DEFAULT_FLIGHT_SORT_MODE: MomondoFlightSortMode = "bestflight_a";
 const SKYSCANNER_FENRYR_BASE_URL = "https://www.skyscanner.net/g/fenryr/v1";
+const SKYSCANNER_WEB_UNIFIED_SEARCH_ENDPOINT = "https://www.skyscanner.no/g/radar/api/v2/web-unified-search/";
 const SKYSCANNER_CLIENT_VERSION = "7.194.1";
 const SKYSCANNER_CHANNEL_ID = "goandroid";
+const SKYSCANNER_WEB_CHANNEL_ID = "website";
+const SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS = 5;
+const SKYSCANNER_WEB_SEARCH_POLL_INTERVAL_MS = 1200;
 const SKYSCANNER_HTTP_HEADERS: Record<string, string> = {
   Accept: "application/json",
   "X-Skyscanner-Authenticated": "false",
@@ -482,6 +503,17 @@ const SKYSCANNER_CALENDAR_HEADERS = {
   xSkyscannerEnableGeneralSearch: false,
   xSkyscannerLocale: "nb-NO",
   xSkyscannerMarket: "NO",
+};
+const SKYSCANNER_WEB_SEARCH_HEADERS: Record<string, string> = {
+  Accept: "application/json",
+  "Content-Type": "application/json",
+  "X-Skyscanner-Ads-Sponsored-View-Type": "ADS_SPONSORED_VIEW_DAY_VIEW",
+  "X-Skyscanner-ChannelId": SKYSCANNER_WEB_CHANNEL_ID,
+  "X-Skyscanner-Consent-Adverts": "false",
+  "X-Skyscanner-Currency": "NOK",
+  "X-Skyscanner-Locale": "nb-NO",
+  "X-Skyscanner-Market": "NO",
+  "X-Skyscanner-Skip-Accommodation-Carhire": "true",
 };
 const TRAVELLINK_BASE_URL = "https://www.travellink.no";
 const TRAVELLINK_HOME_URL = `${TRAVELLINK_BASE_URL}/travel/`;
@@ -933,7 +965,7 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
       ? [{ sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
     { sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
-    { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) },
+    { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
     ...(ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE
       ? [{ sourceName: "Travellink", findOffer: () => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
@@ -3959,14 +3991,15 @@ async function findSkyscannerFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-  const pageCandidates = extractCurrentSkyscannerPageOfferCandidates(flightMeta);
-  const calendarCandidate = pageCandidates.length === 0
+  const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
+  const calendarCandidate = apiCandidates.length === 0
     ? await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl)
     : undefined;
-  const candidates = pageCandidates.length > 0
-    ? pageCandidates
+  const candidates = apiCandidates.length > 0
+    ? apiCandidates
     : calendarCandidate !== undefined
       ? [calendarCandidate]
       : [];
@@ -3990,17 +4023,327 @@ async function findSkyscannerFlightPriceMatchOffer(
   };
 }
 
-function extractCurrentSkyscannerPageOfferCandidates(flightMeta: FlightSearchMeta): SkyscannerFlightOfferCandidate[] {
-  if (!isCurrentSkyscannerFlightSearchPageForMeta(flightMeta)) return [];
-  return extractSkyscannerVisibleOfferCandidates(window.location.href);
+async function fetchSkyscannerFlightSearchCandidates(
+  flightMeta: FlightSearchMeta,
+  resultUrl: string,
+  airportLookup: FlightAirportCodeLookup,
+): Promise<SkyscannerFlightOfferCandidate[]> {
+  const [originPlace, destinationPlace] = await Promise.all([
+    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
+    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination"),
+  ]);
+  if (originPlace === undefined || destinationPlace === undefined) return [];
+
+  const headers = buildSkyscannerWebSearchHeaders(resultUrl);
+  let latestResult = await requestSkyscannerFlightSearch(
+    buildSkyscannerFlightSearchPayload(flightMeta, originPlace, destinationPlace),
+    headers,
+  );
+  if (latestResult === undefined) return [];
+
+  for (let attempt = 0; attempt < SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS; attempt++) {
+    const context = isRecord(latestResult.context) ? latestResult.context : undefined;
+    const status = readStringValue(context?.status)?.toLowerCase();
+    const sessionId = readStringValue(context?.sessionId);
+    if (status === "complete" || sessionId === undefined) break;
+
+    await sleep(SKYSCANNER_WEB_SEARCH_POLL_INTERVAL_MS);
+    const pollResult = await pollSkyscannerFlightSearch(sessionId, headers);
+    if (pollResult !== undefined) latestResult = pollResult;
+  }
+
+  return extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl);
 }
 
-function isCurrentSkyscannerFlightSearchPageForMeta(flightMeta: FlightSearchMeta): boolean {
-  const parsedUrl = parseUrl(window.location.href);
-  if (parsedUrl === undefined || !isSkyscannerFlightSearchPage(parsedUrl)) return false;
+function requestSkyscannerFlightSearch(
+  payload: Record<string, unknown>,
+  headers: Record<string, string>,
+): Promise<Record<string, unknown> | undefined> {
+  return userscriptJsonRequest(SKYSCANNER_WEB_UNIFIED_SEARCH_ENDPOINT, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    credentials: "omit",
+    timeoutMs: 30000,
+  }).then((value) => isRecord(value) ? value : undefined);
+}
 
-  const currentMeta = extractSkyscannerFlightSearchMeta(parsedUrl);
-  return currentMeta !== undefined && buildFlightSearchMetaKey(currentMeta) === buildFlightSearchMetaKey(flightMeta);
+function pollSkyscannerFlightSearch(
+  sessionId: string,
+  headers: Record<string, string>,
+): Promise<Record<string, unknown> | undefined> {
+  return userscriptJsonRequest(`${SKYSCANNER_WEB_UNIFIED_SEARCH_ENDPOINT}${encodeURIComponent(sessionId)}`, {
+    headers,
+    credentials: "omit",
+    timeoutMs: 30000,
+  }).then((value) => isRecord(value) ? value : undefined);
+}
+
+function buildSkyscannerWebSearchHeaders(resultUrl: string): Record<string, string> {
+  const viewId = createRandomRequestId();
+  return {
+    ...SKYSCANNER_WEB_SEARCH_HEADERS,
+    Referer: resultUrl,
+    "X-Skyscanner-Traveller-Context": createRandomRequestId(),
+    "X-Skyscanner-TrustedFunnelId": viewId,
+    "X-Skyscanner-ViewId": viewId,
+  };
+}
+
+function createRandomRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function buildSkyscannerFlightSearchPayload(
+  flightMeta: FlightSearchMeta,
+  originPlace: SkyscannerFlightPlace,
+  destinationPlace: SkyscannerFlightPlace,
+): Record<string, unknown> {
+  const legs = [
+    buildSkyscannerFlightSearchLeg(originPlace, destinationPlace, flightMeta.outboundDate, destinationPlace.placeOfStayEntityId),
+  ];
+  if (flightMeta.inboundDate !== undefined) {
+    legs.push(buildSkyscannerFlightSearchLeg(destinationPlace, originPlace, flightMeta.inboundDate));
+  }
+
+  return {
+    cabinClass: "ECONOMY",
+    childAges: [],
+    adults: flightMeta.adults,
+    legs,
+  };
+}
+
+function buildSkyscannerFlightSearchLeg(
+  originPlace: SkyscannerFlightPlace,
+  destinationPlace: SkyscannerFlightPlace,
+  date: string,
+  placeOfStayEntityId?: string,
+): Record<string, unknown> {
+  const dateParts = splitIsoDateParts(date);
+  return {
+    legOrigin: { "@type": "entity", entityId: originPlace.entityId },
+    legDestination: { "@type": "entity", entityId: destinationPlace.entityId },
+    dates: {
+      "@type": "date",
+      year: dateParts.year,
+      month: dateParts.month,
+      day: dateParts.day,
+    },
+    ...(placeOfStayEntityId !== undefined ? { placeOfStay: placeOfStayEntityId } : {}),
+  };
+}
+
+function extractSkyscannerFlightSearchCandidates(
+  resultData: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+  fallbackUrl: string,
+): SkyscannerFlightOfferCandidate[] {
+  const itineraries = isRecord(resultData.itineraries) ? resultData.itineraries : undefined;
+  if (itineraries === undefined) return [];
+
+  const candidates: SkyscannerFlightOfferCandidate[] = [];
+  for (const result of readRecordValues(itineraries.results)) {
+    if (!isSkyscannerFlightMatchingSearch(result, flightMeta, airportLookup)) continue;
+    if (result.isSelfTransfer === true && result.isProtectedSelfTransfer !== true) continue;
+
+    const score = readNumberValue(result.score);
+    const tripSummary = formatSkyscannerFlightTripSummary(result);
+    const rankSummary = score !== undefined ? `Skyscanner anbefalt ${Math.round(score * 100)}%` : "Skyscanner anbefalt";
+    const tags = readSkyscannerResultTags(result);
+    const tagSummary = tags.includes("cheapest") ? "billigst" : undefined;
+    const platform = [rankSummary, tagSummary, tripSummary]
+      .filter((part): part is string => part !== undefined && part.length > 0)
+      .join(", ");
+
+    for (const pricingOption of readSkyscannerPricingOptions(result)) {
+      const amount = readSkyscannerPricingOptionAmount(pricingOption, result);
+      if (amount === undefined) continue;
+
+      candidates.push({
+        shopName: readSkyscannerAgentName(pricingOption, itineraries) ?? "Skyscanner",
+        price: formatNokFlightPrice(amount),
+        amount,
+        sortAmount: amount,
+        currency: "NOK",
+        productUrl: readSkyscannerPricingOptionUrl(pricingOption, fallbackUrl),
+        ...(score !== undefined ? { score } : {}),
+        ...(platform.length > 0 ? { platform } : {}),
+      });
+    }
+  }
+
+  return dedupeSkyscannerOfferCandidates(candidates)
+    .sort(compareSkyscannerOfferCandidates)
+    .slice(0, 20);
+}
+
+function readSkyscannerResultTags(result: Record<string, unknown>): string[] {
+  return Array.isArray(result.tags)
+    ? result.tags.filter(isString).map((tag) => tag.toLowerCase())
+    : [];
+}
+
+function readSkyscannerPricingOptions(result: Record<string, unknown>): Array<Record<string, unknown>> {
+  return readRecordArray(result.pricingOptions).filter((pricingOption) => {
+    const price = isRecord(pricingOption.price) ? pricingOption.price : undefined;
+    const status = readStringValue(price?.updateStatus)?.toLowerCase();
+    return status === undefined || status === "current";
+  });
+}
+
+function readSkyscannerPricingOptionAmount(
+  pricingOption: Record<string, unknown>,
+  result: Record<string, unknown>,
+): number | undefined {
+  const optionPrice = isRecord(pricingOption.price) ? pricingOption.price : undefined;
+  const resultPrice = isRecord(result.price) ? result.price : undefined;
+  return readPositiveNumberValue(optionPrice?.amount) ??
+    readPositiveNumberValue(resultPrice?.raw);
+}
+
+function readSkyscannerPricingOptionUrl(pricingOption: Record<string, unknown>, fallbackUrl: string): string {
+  for (const item of readRecordArray(pricingOption.items)) {
+    const url = readStringValue(item.url);
+    if (url === undefined) continue;
+
+    const parsedUrl = parseUrlWithBase(url, "https://www.skyscanner.no");
+    if (parsedUrl !== undefined) return parsedUrl.toString();
+  }
+  return fallbackUrl;
+}
+
+function readSkyscannerAgentName(
+  pricingOption: Record<string, unknown>,
+  itineraries: Record<string, unknown>,
+): string | undefined {
+  const agentId = readSkyscannerPricingOptionAgentId(pricingOption);
+  if (agentId === undefined) return undefined;
+
+  const agent = readRecordArray(itineraries.agents)
+    .find((candidateAgent) => readStringValue(candidateAgent.id) === agentId);
+  return readStringValue(agent?.name) ?? agentId;
+}
+
+function readSkyscannerPricingOptionAgentId(pricingOption: Record<string, unknown>): string | undefined {
+  const itemAgentId = readRecordArray(pricingOption.items)
+    .map((item) => readStringValue(item.agentId))
+    .find((agentId): agentId is string => agentId !== undefined);
+  if (itemAgentId !== undefined) return itemAgentId;
+
+  return Array.isArray(pricingOption.agentIds)
+    ? pricingOption.agentIds.map(readStringValue).find((agentId): agentId is string => agentId !== undefined)
+    : undefined;
+}
+
+function compareSkyscannerOfferCandidates(
+  left: SkyscannerFlightOfferCandidate,
+  right: SkyscannerFlightOfferCandidate,
+): number {
+  const scoreDifference = (right.score ?? 0) - (left.score ?? 0);
+  if (Math.abs(scoreDifference) > 0.000001) return scoreDifference;
+  return left.amount - right.amount;
+}
+
+function isSkyscannerFlightMatchingSearch(
+  result: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+): boolean {
+  const legs = readSkyscannerFlightLegSummaries(result);
+  const outboundLeg = legs[0];
+  if (
+    outboundLeg === undefined ||
+    !isSkyscannerFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, airportLookup, flightMeta.outboundDate)
+  ) {
+    return false;
+  }
+
+  if (flightMeta.inboundDate === undefined) return true;
+
+  const inboundLeg = legs[1];
+  return inboundLeg !== undefined &&
+    isSkyscannerFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, airportLookup, flightMeta.inboundDate);
+}
+
+function isSkyscannerFlightLegMatch(
+  leg: SkyscannerFlightLegSummary,
+  origin: string,
+  destination: string,
+  airportLookup: FlightAirportCodeLookup,
+  date: string,
+): boolean {
+  return collectEquivalentFlightAirportCodes(origin, airportLookup).has(leg.origin) &&
+    collectEquivalentFlightAirportCodes(destination, airportLookup).has(leg.destination) &&
+    leg.departureDate === date;
+}
+
+function readSkyscannerFlightLegSummaries(result: Record<string, unknown>): SkyscannerFlightLegSummary[] {
+  return readRecordArray(result.legs)
+    .map((leg): SkyscannerFlightLegSummary | undefined => {
+      const origin = readSkyscannerLegPlaceCode(isRecord(leg.origin) ? leg.origin : undefined);
+      const destination = readSkyscannerLegPlaceCode(isRecord(leg.destination) ? leg.destination : undefined);
+      if (origin === undefined || destination === undefined) return undefined;
+
+      const carriers = isRecord(leg.carriers) ? leg.carriers : undefined;
+      const departureTime = readStringValue(leg.departure);
+      const arrivalTime = readStringValue(leg.arrival);
+      const durationMinutes = readPositiveNumberValue(leg.durationInMinutes);
+      return {
+        origin,
+        destination,
+        ...(departureTime !== undefined ? { departureDate: departureTime.slice(0, 10), departureTime } : {}),
+        ...(arrivalTime !== undefined ? { arrivalTime } : {}),
+        ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+        stopCount: readNonNegativeIntegerValue(leg.stopCount) ?? 0,
+        carrierNames: readRecordArray(carriers?.marketing)
+          .map((carrier) => readStringValue(carrier.name))
+          .filter((carrierName): carrierName is string => carrierName !== undefined),
+      };
+    })
+    .filter((leg): leg is SkyscannerFlightLegSummary => leg !== undefined);
+}
+
+function readSkyscannerLegPlaceCode(place: Record<string, unknown> | undefined): string | undefined {
+  return readIataCodeValue(place?.displayCode) ?? readIataCodeValue(place?.id);
+}
+
+function formatSkyscannerFlightTripSummary(result: Record<string, unknown>): string | undefined {
+  const legs = readSkyscannerFlightLegSummaries(result);
+  const carriers = uniqueStrings(legs.flatMap((leg) => leg.carrierNames));
+  const parts = [
+    carriers.join("/"),
+    formatSkyscannerFlightStops(legs),
+    formatSkyscannerFlightTimeSummary(legs),
+    formatSkyscannerFlightDurationSummary(legs),
+  ].filter((part): part is string => part !== undefined && part.length > 0);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
+function formatSkyscannerFlightStops(legs: SkyscannerFlightLegSummary[]): string | undefined {
+  if (legs.length === 0) return undefined;
+  if (legs.every((leg) => leg.stopCount === 0)) return "direkte";
+  return legs.map((leg) => leg.stopCount === 0 ? "direkte" : `${leg.stopCount} stopp`).join(" / ");
+}
+
+function formatSkyscannerFlightTimeSummary(legs: SkyscannerFlightLegSummary[]): string | undefined {
+  const ranges = legs
+    .map((leg) => {
+      const departureClock = formatMomondoFlightClock(leg.departureTime);
+      const arrivalClock = formatMomondoFlightClock(leg.arrivalTime);
+      return departureClock !== undefined && arrivalClock !== undefined ? `${departureClock}-${arrivalClock}` : undefined;
+    })
+    .filter((range): range is string => range !== undefined);
+  return ranges.length > 0 ? ranges.join(" / ") : undefined;
+}
+
+function formatSkyscannerFlightDurationSummary(legs: SkyscannerFlightLegSummary[]): string | undefined {
+  const durations = legs
+    .map((leg) => formatPanFlightsDuration(leg.durationMinutes))
+    .filter((duration): duration is string => duration !== undefined);
+  return durations.length > 0 ? durations.join(" / ") : undefined;
 }
 
 function readCurrentSkyscannerVisiblePriceKey(): string {
@@ -4078,7 +4421,7 @@ function dedupeSkyscannerOfferCandidates(candidates: SkyscannerFlightOfferCandid
   const seen = new Set<string>();
   const uniqueCandidates: SkyscannerFlightOfferCandidate[] = [];
   for (const candidate of candidates) {
-    const key = `${Math.round(candidate.amount)}|${candidate.platform ?? ""}`;
+    const key = `${candidate.shopName}|${Math.round(candidate.amount)}|${candidate.platform ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     uniqueCandidates.push(candidate);
@@ -4090,39 +4433,72 @@ async function fetchSkyscannerFlightCalendarCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
 ): Promise<SkyscannerFlightOfferCandidate | undefined> {
-  const [originEntityId, destinationEntityId] = await Promise.all([
-    fetchSkyscannerPlaceEntityId(flightMeta.origin, "inputorigin"),
-    fetchSkyscannerPlaceEntityId(flightMeta.destination, "inputdestination"),
+  const [originPlace, destinationPlace] = await Promise.all([
+    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
+    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination"),
   ]);
-  if (originEntityId === undefined || destinationEntityId === undefined) return undefined;
+  if (originPlace === undefined || destinationPlace === undefined) return undefined;
 
-  return await fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originEntityId, destinationEntityId, true) ??
-    fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originEntityId, destinationEntityId, false);
+  return await fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originPlace.entityId, destinationPlace.entityId, true) ??
+    fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originPlace.entityId, destinationPlace.entityId, false);
 }
 
-async function fetchSkyscannerPlaceEntityId(
+async function fetchSkyscannerFlightPlace(
   iataCode: string,
   endpoint: "inputorigin" | "inputdestination",
-): Promise<string | undefined> {
-  const params = new URLSearchParams({ query: iataCode, placeTypes: "AIRPORT" });
+): Promise<SkyscannerFlightPlace | undefined> {
+  const [airportPlaces, cityPlaces] = await Promise.all([
+    fetchSkyscannerFlightPlaces(iataCode, endpoint, "AIRPORT"),
+    fetchSkyscannerFlightPlaces(iataCode, endpoint, "CITY"),
+  ]);
+  return selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces);
+}
+
+async function fetchSkyscannerFlightPlaces(
+  iataCode: string,
+  endpoint: "inputorigin" | "inputdestination",
+  placeType: "AIRPORT" | "CITY",
+): Promise<SkyscannerFlightPlace[]> {
+  const params = new URLSearchParams({ query: iataCode, placeTypes: placeType });
   const value = await userscriptJsonRequest(`${SKYSCANNER_FENRYR_BASE_URL}/${endpoint}?${params.toString()}`, {
     headers: SKYSCANNER_HTTP_HEADERS,
     credentials: "omit",
   });
-  return isRecord(value) ? readSkyscannerPlaceEntityId(value, iataCode) : undefined;
+  return isRecord(value) ? readSkyscannerFlightPlaces(value) : [];
 }
 
-function readSkyscannerPlaceEntityId(value: Record<string, unknown>, iataCode: string): string | undefined {
-  let fallbackEntityId: string | undefined;
+function selectSkyscannerFlightPlace(
+  iataCode: string,
+  airportPlaces: SkyscannerFlightPlace[],
+  cityPlaces: SkyscannerFlightPlace[],
+): SkyscannerFlightPlace | undefined {
+  const normalizedCode = iataCode.toUpperCase();
+  return airportPlaces.find((place) => place.skyId === normalizedCode && place.flightPlaceType === "AIRPORT") ??
+    cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A` || place.skyId.startsWith(normalizedCode)) ??
+    airportPlaces[0] ??
+    cityPlaces[0];
+}
+
+function readSkyscannerFlightPlaces(value: Record<string, unknown>): SkyscannerFlightPlace[] {
+  const places: SkyscannerFlightPlace[] = [];
   for (const suggestion of readRecordArray(value.inputSuggest)) {
     const navigation = isRecord(suggestion.navigation) ? suggestion.navigation : undefined;
     const flightParams = isRecord(navigation?.relevantFlightParams) ? navigation.relevantFlightParams : undefined;
     const entityId = readStringValue(flightParams?.entityId) ?? readStringValue(navigation?.entityId);
     const skyId = readStringValue(flightParams?.skyId)?.toUpperCase();
-    if (entityId !== undefined && fallbackEntityId === undefined) fallbackEntityId = entityId;
-    if (entityId !== undefined && skyId === iataCode.toUpperCase()) return entityId;
+    const flightPlaceType = readStringValue(flightParams?.flightPlaceType)?.toUpperCase();
+    if (entityId === undefined || skyId === undefined || (flightPlaceType !== "AIRPORT" && flightPlaceType !== "CITY")) continue;
+
+    const hotelParams = isRecord(navigation?.relevantHotelParams) ? navigation.relevantHotelParams : undefined;
+    const placeOfStayEntityId = readStringValue(hotelParams?.entityId);
+    places.push({
+      entityId,
+      skyId,
+      flightPlaceType,
+      ...(placeOfStayEntityId !== undefined ? { placeOfStayEntityId } : {}),
+    });
   }
-  return fallbackEntityId;
+  return places;
 }
 
 async function fetchSkyscannerCalendarCandidate(
@@ -4969,6 +5345,11 @@ function comparePriceMatchesBySortAmount(
 
 function readRecordArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function readRecordValues(value: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(value)) return value.filter(isRecord);
+  return isRecord(value) ? Object.values(value).filter(isRecord) : [];
 }
 
 function formatNokFlightPrice(amount: number): string {
