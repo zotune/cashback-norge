@@ -3,7 +3,7 @@
   "name": "Cashback Norge",
   "description": "Shows cashback offers for supported stores.",
   "version": "0.2.6",
-  "permissions": ["storage", "tabs", "cookies"],
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://browser-extension-backend.cloud.pji.nu/*",
     "https://native-backend.cloud.pji.nu/*",

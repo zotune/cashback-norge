@@ -58,11 +58,6 @@ export type HttpRequestMessage = {
   credentials?: RequestCredentials;
 };
 
-export type GetTripComSessionMessage = {
-  type: "get-trip-com-session";
-  url: string;
-};
-
 export type ToggleNoticeMessage = {
   type: "toggle-notice";
 };
@@ -143,17 +138,6 @@ export type HttpRequestResponse =
       status?: number;
     };
 
-export type TripComSessionResponse =
-  | {
-      ok: true;
-      cid?: string;
-      vid?: string;
-    }
-  | {
-      ok: false;
-      reason: string;
-    };
-
 export function isCashbackFoundMessage(
   value: unknown,
 ): value is CashbackFoundMessage {
@@ -226,16 +210,6 @@ export function isHttpRequestMessage(
     (value.headers === undefined || isStringRecord(value.headers)) &&
     (value.body === undefined || typeof value.body === "string") &&
     (value.credentials === undefined || value.credentials === "include" || value.credentials === "omit" || value.credentials === "same-origin")
-  );
-}
-
-export function isGetTripComSessionMessage(
-  value: unknown,
-): value is GetTripComSessionMessage {
-  return (
-    isRecord(value) &&
-    value.type === "get-trip-com-session" &&
-    typeof value.url === "string"
   );
 }
 

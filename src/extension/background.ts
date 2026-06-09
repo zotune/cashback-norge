@@ -22,16 +22,13 @@ import {
   type CashbackNoneMessage,
   type GetPlayStationRegionPricesMessage,
   type GetPriceMatchForProductMessage,
-  type GetTripComSessionMessage,
   type HttpRequestMessage,
   type HttpRequestResponse,
   type GetOffersForUrlMessage,
   type OffersForUrlResponse,
   type PlayStationRegionPricesResponse,
   type PriceMatchForProductResponse,
-  type TripComSessionResponse,
   isHttpRequestMessage,
-  isGetTripComSessionMessage,
   isGetPlayStationRegionPricesMessage,
   isGetOffersForUrlMessage,
   isGetPriceMatchForProductMessage,
@@ -85,7 +82,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function handleRuntimeMessage(
   message: unknown,
-  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse | HttpRequestResponse | TripComSessionResponse) => void,
+  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse | HttpRequestResponse) => void,
 ): Promise<void> {
   if (isGetOffersForUrlMessage(message)) {
     const response = await findOffersForUrl(message);
@@ -107,12 +104,6 @@ async function handleRuntimeMessage(
 
   if (isHttpRequestMessage(message)) {
     const response = await proxyHttpRequest(message);
-    sendResponse(response);
-    return;
-  }
-
-  if (isGetTripComSessionMessage(message)) {
-    const response = await getTripComSession(message);
     sendResponse(response);
     return;
   }
@@ -216,51 +207,6 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
   } catch {
     return { ok: false, reason: "Request failed" };
   }
-}
-
-async function getTripComSession(message: GetTripComSessionMessage): Promise<TripComSessionResponse> {
-  const parsedUrl = parseHttpUrl(message.url);
-  if (parsedUrl === undefined || !isTripComHostname(parsedUrl.hostname)) {
-    return { ok: false, reason: "Unsupported host" };
-  }
-
-  try {
-    await fetch(message.url, {
-      credentials: "include",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
-  } catch {
-    // The cookie jar may already contain a usable Trip.com session.
-  }
-
-  try {
-    const [guidCookie, vidCookie] = await Promise.all([
-      getChromeCookie({ url: message.url, name: "GUID" }),
-      getChromeCookie({ url: message.url, name: "UBT_VID" }),
-    ]);
-    return {
-      ok: true,
-      ...(guidCookie?.value !== undefined && guidCookie.value.length > 0 ? { cid: guidCookie.value } : {}),
-      ...(vidCookie?.value !== undefined && vidCookie.value.length > 0 ? { vid: vidCookie.value } : {}),
-    };
-  } catch {
-    return { ok: true };
-  }
-}
-
-function getChromeCookie(details: { url: string; name: string }): Promise<chrome.cookies.Cookie | undefined> {
-  return new Promise((resolveValue) => {
-    chrome.cookies.get(details, (cookie) => {
-      resolveValue(cookie ?? undefined);
-    });
-  });
-}
-
-function isTripComHostname(hostname: string): boolean {
-  const normalizedHostname = hostname.toLowerCase();
-  return normalizedHostname === "trip.com" || normalizedHostname.endsWith(".trip.com");
 }
 
 async function notifyTab(tabId: number, url: string): Promise<void> {

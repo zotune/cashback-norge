@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781013161
+// @version      1781013932
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1119,7 +1119,7 @@
   }
   const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
   const ALLKEYSHOP_BLOG_ORIGIN = `${ALLKEYSHOP_ORIGIN}/blog`;
-  const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
+  const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
   const MAX_ALLKEYSHOP_ALTERNATIVES = 8;
   const STATIC_NOK_BASE_RATES = {
     rates: {
@@ -1149,7 +1149,7 @@
     }
     const page = await fetchAllKeyShopPageData(message, requestText);
     if (page === void 0) return void 0;
-    const rates = await fetchNokBaseRates$1(requestJson) ?? STATIC_NOK_BASE_RATES;
+    const rates = await fetchNokBaseRates(requestJson) ?? STATIC_NOK_BASE_RATES;
     const platformScope = readPlatformScope(message);
     const titleCandidates = readGameTitleCandidates$1(message);
     const offers = page.data.prices.filter((price) => price.dispo === void 0 || price.dispo > 0).filter((price) => price.account !== true).filter((price) => isActivationPlatformAllowed(price.activationPlatform, platformScope)).filter((price) => isAllKeyShopEditionAllowed(page.data.editions.get(price.edition ?? ""), titleCandidates)).map((price) => toAllKeyShopOffer(price, page.data.currency, page.data.editions, page.data.regions, rates)).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
@@ -1278,7 +1278,7 @@
   }
   function toAllKeyShopOffer(price, currency, editions, regions, rates) {
     const amount = pickAllKeyShopPayableAmount(price);
-    const nokAmount = convertToNok$1(amount, currency, rates);
+    const nokAmount = convertToNok(amount, currency, rates);
     if (nokAmount === void 0) return void 0;
     const platform = formatActivationPlatform(price.activationPlatform);
     const region = price.region !== void 0 ? regions.get(price.region) : void 0;
@@ -1324,8 +1324,8 @@
     ].filter((detail) => detail !== void 0 && detail.length > 0);
     return details.length > 0 ? details.join(", ") : void 0;
   }
-  async function fetchNokBaseRates$1(requestJson) {
-    const value = await requestJson(EXCHANGE_RATES_URL$1, {
+  async function fetchNokBaseRates(requestJson) {
+    const value = await requestJson(EXCHANGE_RATES_URL, {
       headers: { "Accept": "application/json" }
     });
     if (!isRecord$5(value) || value.result !== "success" || !isRecord$5(value.rates)) return void 0;
@@ -1337,7 +1337,7 @@
     }
     return Object.keys(rates).length > 0 ? { rates } : void 0;
   }
-  function convertToNok$1(amount, currency, rates) {
+  function convertToNok(amount, currency, rates) {
     const normalizedCurrency = currency.toUpperCase();
     if (normalizedCurrency === "NOK") return amount;
     const rate = rates.rates[normalizedCurrency];
@@ -1441,7 +1441,7 @@
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   }
   function readAssignedJsonObject(html, variableName) {
-    const marker = new RegExp(`\\bvar\\s+${escapeRegExp$5(variableName)}\\s*=\\s*`, "i");
+    const marker = new RegExp(`\\bvar\\s+${escapeRegExp$4(variableName)}\\s*=\\s*`, "i");
     const match = marker.exec(html);
     if (match === null) return void 0;
     const start = match.index + match[0].length;
@@ -1499,7 +1499,7 @@
   function decodeHtml$3(value) {
     return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
   }
-  function escapeRegExp$5(value) {
+  function escapeRegExp$4(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function formatCurrency$3(amount, currency) {
@@ -1688,7 +1688,7 @@
     };
   }
   function readPagePrice(html, label) {
-    const labelPattern = escapeRegExp$4(label);
+    const labelPattern = escapeRegExp$3(label);
     const labelMatch = html.match(new RegExp(`${labelPattern}[\\s\\S]{0,1200}?class=["'][^"']*price-inner numeric[^"']*["'][^>]*>([\\s\\S]*?)<`, "i"));
     const rawPrice = labelMatch?.[1];
     if (rawPrice === void 0) return void 0;
@@ -1782,7 +1782,7 @@
   function decodeHtml$2(value) {
     return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
   }
-  function escapeRegExp$4(value) {
+  function escapeRegExp$3(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function formatCurrency$2(amount, currency) {
@@ -2273,13 +2273,13 @@
     return normalizeBrandText$2(title).includes(brand);
   }
   function readEnhverProductTitle(html, grocery) {
-    const escapedName = escapeRegExp$3(String(grocery.groceryId));
+    const escapedName = escapeRegExp$2(String(grocery.groceryId));
     const pattern = new RegExp(`title:"((?:\\\\.|[^"\\\\])*)",groceryId:${escapedName},(?:(?!\\{title:)[\\s\\S])*?prices:\\[`);
     const rawTitle = html.match(pattern)?.[1];
     return rawTitle !== void 0 ? unescapeJsString(rawTitle).trim() || void 0 : void 0;
   }
   function readEnhverPrices(html, groceryId) {
-    const escapedId = escapeRegExp$3(String(groceryId));
+    const escapedId = escapeRegExp$2(String(groceryId));
     const pattern = new RegExp(`title:"(?:\\\\.|[^"\\\\])*",groceryId:${escapedId},(?:(?!\\{title:)[\\s\\S])*?prices:\\[([^\\]]+)\\]`);
     const rawPrices = html.match(pattern)?.[1];
     if (rawPrices === void 0) return [];
@@ -2363,7 +2363,7 @@
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function escapeRegExp$3(value) {
+  function escapeRegExp$2(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function normalizeBrandText$2(value) {
@@ -2642,13 +2642,13 @@
   function removePackageLabels$1(value, quantityLabels) {
     let cleaned = value;
     for (const label of quantityLabels) {
-      const escaped = escapeRegExp$2(label).replace(/\\ /g, "\\s*");
+      const escaped = escapeRegExp$1(label).replace(/\\ /g, "\\s*");
       cleaned = cleaned.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
     }
     return cleaned.replace(/\s+/g, " ").trim();
   }
   function removeTokenPhrase$1(value, phrase) {
-    const escaped = escapeRegExp$2(phrase).replace(/\\ /g, "\\s+");
+    const escaped = escapeRegExp$1(phrase).replace(/\\ /g, "\\s+");
     return value.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ").replace(/\s+/g, " ").trim();
   }
   function hasMeaningfulProductTerm(value) {
@@ -2702,7 +2702,7 @@
     return value.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
   function readHtmlAttribute(html, attributeName) {
-    const match = html.match(new RegExp(`\\b${escapeRegExp$2(attributeName)}=["']([^"']*)["']`, "i"));
+    const match = html.match(new RegExp(`\\b${escapeRegExp$1(attributeName)}=["']([^"']*)["']`, "i"));
     const value = match?.[1];
     return value !== void 0 && value.trim().length > 0 ? value.trim() : void 0;
   }
@@ -2715,7 +2715,7 @@
   function normalizeBrandText$1(value) {
     return transliterateNorwegianCharacters$3(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
-  function escapeRegExp$2(value) {
+  function escapeRegExp$1(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function uniqueStrings$6(values) {
@@ -4050,13 +4050,13 @@ query SearchSuggestions($query: String!, $category: Int) {
   function removePackageLabels(value, quantityLabels) {
     let cleaned = value;
     for (const label of quantityLabels) {
-      const escaped = escapeRegExp$1(label).replace(/\\ /g, "\\s*");
+      const escaped = escapeRegExp(label).replace(/\\ /g, "\\s*");
       cleaned = cleaned.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
     }
     return cleaned.replace(/\s+/g, " ").trim();
   }
   function removeTokenPhrase(value, phrase) {
-    const escaped = escapeRegExp$1(phrase).replace(/\\ /g, "\\s+");
+    const escaped = escapeRegExp(phrase).replace(/\\ /g, "\\s+");
     return value.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ").replace(/\s+/g, " ").trim();
   }
   function slugifySesumTitle(value) {
@@ -4155,7 +4155,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }).filter((price) => price !== void 0);
   }
   function readNextFlightJsonArray(html, key, followingKey) {
-    const escapedPattern = new RegExp(`\\\\"${escapeRegExp$1(key)}\\\\":(\\[[\\s\\S]*?\\]),\\\\"${escapeRegExp$1(followingKey)}\\\\":`);
+    const escapedPattern = new RegExp(`\\\\"${escapeRegExp(key)}\\\\":(\\[[\\s\\S]*?\\]),\\\\"${escapeRegExp(followingKey)}\\\\":`);
     const escapedMatch = html.match(escapedPattern);
     if (escapedMatch?.[1] !== void 0) {
       try {
@@ -4165,7 +4165,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         return void 0;
       }
     }
-    const plainPattern = new RegExp(`"${escapeRegExp$1(key)}":(\\[[\\s\\S]*?\\]),"${escapeRegExp$1(followingKey)}":`);
+    const plainPattern = new RegExp(`"${escapeRegExp(key)}":(\\[[\\s\\S]*?\\]),"${escapeRegExp(followingKey)}":`);
     const plainMatch = html.match(plainPattern);
     if (plainMatch?.[1] === void 0) return void 0;
     try {
@@ -4176,14 +4176,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   }
   function readEscapedJsonLdString(html, key) {
-    const escaped = html.match(new RegExp(`\\\\\\\\"${escapeRegExp$1(key)}\\\\\\\\":\\\\\\\\"([^"\\\\]+)\\\\\\\\"`))?.[1];
+    const escaped = html.match(new RegExp(`\\\\\\\\"${escapeRegExp(key)}\\\\\\\\":\\\\\\\\"([^"\\\\]+)\\\\\\\\"`))?.[1];
     if (escaped !== void 0) return unescapeNextFlightString(escaped);
-    const plain = html.match(new RegExp(`"${escapeRegExp$1(key)}"\\s*:\\s*"([^"]+)"`))?.[1];
+    const plain = html.match(new RegExp(`"${escapeRegExp(key)}"\\s*:\\s*"([^"]+)"`))?.[1];
     return plain !== void 0 ? decodeHtml(plain) : void 0;
   }
   function readMetaContent(html, nameOrProperty) {
-    const pattern = new RegExp(`<meta\\s+(?:name|property)=["']${escapeRegExp$1(nameOrProperty)}["'][^>]*content=["']([^"']*)["']`, "i");
-    const alternatePattern = new RegExp(`<meta\\s+content=["']([^"']*)["'][^>]*(?:name|property)=["']${escapeRegExp$1(nameOrProperty)}["']`, "i");
+    const pattern = new RegExp(`<meta\\s+(?:name|property)=["']${escapeRegExp(nameOrProperty)}["'][^>]*content=["']([^"']*)["']`, "i");
+    const alternatePattern = new RegExp(`<meta\\s+content=["']([^"']*)["'][^>]*(?:name|property)=["']${escapeRegExp(nameOrProperty)}["']`, "i");
     const raw = html.match(pattern)?.[1] ?? html.match(alternatePattern)?.[1];
     return raw !== void 0 ? decodeHtml(raw).trim() : void 0;
   }
@@ -4255,7 +4255,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function normalizeBrandText(value) {
     return transliterateNorwegianCharacters$1(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
-  function escapeRegExp$1(value) {
+  function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function uniqueStrings$2(values) {
@@ -5285,7 +5285,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
     const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
-    const rates = readNokBaseRates$2(ratesResponse);
+    const rates = readNokBaseRates$1(ratesResponse);
     if (rates === void 0) {
       return void 0;
     }
@@ -5577,7 +5577,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return { price: rawPrice, currency };
   }
-  function readNokBaseRates$2(value) {
+  function readNokBaseRates$1(value) {
     if (!isRecord$2(value) || value.result !== "success" || !isRecord$2(value.rates)) {
       return void 0;
     }
@@ -5785,7 +5785,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
     const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
-    const rates = readNokBaseRates$1(ratesResponse);
+    const rates = readNokBaseRates(ratesResponse);
     const ratesUpdatedAt = rates?.updatedAt;
     if (rates === void 0) {
       return void 0;
@@ -6365,7 +6365,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isAppleSoftwareSearchResult(value) {
     return isRecord$1(value) && typeof value.trackId === "number" && Number.isFinite(value.trackId) && typeof value.trackName === "string" && (value.artistName === void 0 || typeof value.artistName === "string") && (value.sellerName === void 0 || typeof value.sellerName === "string") && (value.bundleId === void 0 || typeof value.bundleId === "string") && (value.sellerUrl === void 0 || typeof value.sellerUrl === "string") && (value.trackViewUrl === void 0 || typeof value.trackViewUrl === "string");
   }
-  function readNokBaseRates$1(value) {
+  function readNokBaseRates(value) {
     if (!isRecord$1(value) || value.result !== "success" || !isRecord$1(value.rates)) {
       return void 0;
     }
@@ -7109,7 +7109,6 @@ query SearchSuggestions($query: String!, $category: Int) {
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
   const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
-  const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
   const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
   const FINN_FLIGHT_POLL_ATTEMPTS = 7;
   const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -7164,7 +7163,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     "Content-Type": "application/json;charset=UTF-8"
   };
   let flightAirportDataPromise;
-  let nokBaseRatesPromise;
   const PSN_GC_DEALS_GIFT_CARD_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
   const PSN_GC_DEALS_GIFT_CARD_REGION_URLS = {
     AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
@@ -8462,20 +8460,18 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   async function findTripComFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = buildTripComFlightSearchUrl(flightMeta);
-    const ratesPromise = fetchNokBaseRates();
-    const session = await fetchTripComFlightSearchSession(resultUrl);
-    const [rates, cheapestResultData, recommendedResultData] = await Promise.all([
-      ratesPromise,
+    const session = {};
+    const [cheapestResultData, recommendedResultData, calendarCandidate] = await Promise.all([
       fetchTripComFlightListSearch(flightMeta, session, "Price"),
-      fetchTripComFlightListSearch(flightMeta, session, "Score")
+      fetchTripComFlightListSearch(flightMeta, session, "Score"),
+      flightMeta.inboundDate !== void 0 ? safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup) : Promise.resolve(void 0)
     ]);
-    const cheapestCandidates = isRecord(cheapestResultData) ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, rates, "billigst") : [];
-    const recommendedCandidates = isRecord(recommendedResultData) ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, rates, "anbefalt") : [];
+    const cheapestCandidates = isRecord(cheapestResultData) ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, "billigst") : [];
+    const recommendedCandidates = isRecord(recommendedResultData) ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, "anbefalt") : [];
     const listCandidates = dedupeTripComOfferCandidates([
       ...cheapestCandidates,
       ...recommendedCandidates
     ]);
-    const calendarCandidate = listCandidates.length === 0 && flightMeta.inboundDate !== void 0 ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup) : void 0;
     const candidates = dedupeTripComOfferCandidates([
       ...listCandidates,
       ...calendarCandidate !== void 0 ? [calendarCandidate] : []
@@ -8508,88 +8504,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     });
     return text !== void 0 ? parseTripComSseResponse(text) : void 0;
   }
-  async function fetchTripComFlightSearchSession(resultUrl) {
-    const userscriptSession = await fetchTripComFlightSearchSessionFromUserscript(resultUrl);
-    if (userscriptSession !== void 0) return userscriptSession;
-    if (!isUserscriptRuntime()) {
-      const response = await sendRuntimeMessage({
-        type: "get-trip-com-session",
-        url: resultUrl
-      });
-      if (isTripComSessionResponse(response)) {
-        return {
-          ...response.cid !== void 0 ? { cid: response.cid } : {},
-          ...response.vid !== void 0 ? { vid: response.vid } : {}
-        };
-      }
-    }
-    await warmTripComFlightSearchSession(resultUrl);
-    return {};
-  }
-  async function fetchTripComFlightSearchSessionFromUserscript(resultUrl) {
-    const gmRequest = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : void 0;
-    if (gmRequest === void 0) return void 0;
-    return new Promise((resolveValue) => {
-      const requestOptions = {
-        method: "GET",
-        url: resultUrl,
-        headers: {
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        },
-        timeout: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
-        onload: (response) => {
-          resolveValue(readTripComSessionFromResponseHeaders(response.responseHeaders) ?? {});
-        },
-        onerror: () => resolveValue({}),
-        ontimeout: () => resolveValue({})
-      };
-      const maybePromise = gmRequest(requestOptions);
-      if (isPromiseLike(maybePromise)) {
-        maybePromise.then(
-          (response) => resolveValue(isRecord(response) ? readTripComSessionFromResponseHeaders(readStringValue(response.responseHeaders)) ?? {} : {}),
-          () => resolveValue({})
-        );
-      }
-    });
-  }
-  async function warmTripComFlightSearchSession(resultUrl) {
-    try {
-      await userscriptTextRequest(resultUrl, {
-        headers: {
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        },
-        credentials: "include"
-      });
-    } catch {
-    }
-  }
-  function readTripComSessionFromResponseHeaders(responseHeaders) {
-    const cid = readSetCookieHeaderValue(responseHeaders, "GUID");
-    const vid = readSetCookieHeaderValue(responseHeaders, "UBT_VID");
-    if (cid === void 0 && vid === void 0) return void 0;
-    return {
-      ...cid !== void 0 ? { cid } : {},
-      ...vid !== void 0 ? { vid } : {}
-    };
-  }
-  function readSetCookieHeaderValue(responseHeaders, cookieName) {
-    if (responseHeaders === void 0) return void 0;
-    const pattern = new RegExp(`(?:^|\\r?\\n)set-cookie:\\s*${escapeRegExp(cookieName)}=([^;\\r\\n]*)`, "gi");
-    let value;
-    let match;
-    while ((match = pattern.exec(responseHeaders)) !== null) {
-      const candidate = match[1]?.trim();
-      if (candidate !== void 0 && candidate.length > 0) value = candidate;
-    }
-    return value;
-  }
-  function escapeRegExp(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-  function isTripComSessionResponse(value) {
-    return isRecord(value) && value.ok === true && (value.cid === void 0 || typeof value.cid === "string") && (value.vid === void 0 || typeof value.vid === "string");
-  }
-  async function findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup) {
+  async function findTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup) {
     const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
       method: "POST",
       headers: TRIP_COM_COMMON_HEADERS,
@@ -8598,11 +8513,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
     });
     if (!isRecord(resultData)) return void 0;
-    return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates, airportLookup);
+    return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, airportLookup);
   }
-  async function safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup) {
+  async function safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup) {
     try {
-      return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup);
+      return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup);
     } catch {
       return void 0;
     }
@@ -8720,7 +8635,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     });
     return records.find((record) => Array.isArray(record.itineraryList)) ?? records[records.length - 1];
   }
-  function extractTripComListOfferCandidates(resultData, resultUrl, rates, sortLabel) {
+  function extractTripComListOfferCandidates(resultData, resultUrl, sortLabel) {
     const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
     const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
@@ -8733,7 +8648,6 @@ query SearchSuggestions($query: String!, $category: Int) {
           amount,
           currency,
           productUrl: resultUrl,
-          rates,
           platformParts: [`Trip.com ${sortLabel}`, tripSummary]
         });
       });
@@ -8746,21 +8660,15 @@ query SearchSuggestions($query: String!, $category: Int) {
     return readPositiveNumberValue(price?.totalPrice) ?? readPositiveNumberValue(price?.averagePrice) ?? readPositiveNumberValue(adultPrice?.totalPrice);
   }
   function toTripComOfferCandidate(input) {
-    const convertedNokAmount = convertToNok(input.amount, input.currency, input.rates);
-    const isConvertedCurrency = convertedNokAmount !== void 0 && input.currency.toUpperCase() !== "NOK";
-    const displayAmount = convertedNokAmount ?? input.amount;
-    const displayCurrency = convertedNokAmount !== void 0 ? "NOK" : input.currency;
+    const displayCurrency = input.currency.toUpperCase();
     return {
       shopName: "Trip.com",
-      price: isConvertedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
-      amount: displayAmount,
-      sortAmount: convertedNokAmount ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+      price: formatFlightPrice(input.amount, displayCurrency),
+      amount: input.amount,
+      sortAmount: input.amount,
       currency: displayCurrency,
       productUrl: input.productUrl,
-      platform: [
-        ...input.platformParts,
-        isConvertedCurrency ? `Trip.com viser ${formatFlightPrice(input.amount, input.currency)}` : void 0
-      ].filter((part) => part !== void 0 && part.length > 0).join(", ")
+      platform: input.platformParts.filter((part) => part !== void 0 && part.length > 0).join(", ")
     };
   }
   function buildTripComAirlineNameMap(value) {
@@ -8846,7 +8754,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     };
   }
-  function extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates, airportLookup) {
+  function extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, airportLookup) {
     const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList).find((item) => isTripComCalendarItemMatchingSearch(item, flightMeta));
     const amount = readPositiveNumberValue(calendarItem?.currencyPrice);
@@ -8855,7 +8763,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       amount,
       currency,
       productUrl: resultUrl,
-      rates,
       platformParts: [
         "indikativ kalenderpris",
         flightMeta.inboundDate !== void 0 ? "tur/retur" : "én vei",
@@ -8868,34 +8775,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
     if (flightMeta.inboundDate === void 0) return true;
     return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
-  }
-  async function fetchNokBaseRates() {
-    if (nokBaseRatesPromise === void 0) {
-      nokBaseRatesPromise = userscriptJsonRequest(EXCHANGE_RATES_URL, {
-        headers: { Accept: "application/json" },
-        credentials: "omit"
-      }).then(readNokBaseRates, () => void 0);
-    }
-    return nokBaseRatesPromise;
-  }
-  function readNokBaseRates(value) {
-    if (!isRecord(value) || value.result !== "success" || !isRecord(value.rates)) return void 0;
-    const rates = {};
-    for (const [currency, rate] of Object.entries(value.rates)) {
-      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
-        rates[currency.toUpperCase()] = rate;
-      }
-    }
-    if (Object.keys(rates).length === 0) return void 0;
-    const updatedAt = readStringValue(value.time_last_update_utc);
-    return updatedAt !== void 0 ? { rates, updatedAt } : { rates };
-  }
-  function convertToNok(amount, currency, rates) {
-    const normalizedCurrency = currency.toUpperCase();
-    if (normalizedCurrency === "NOK") return Math.round(amount);
-    const rate = rates?.rates[normalizedCurrency];
-    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) return amount / rate;
-    return void 0;
   }
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
     const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
@@ -9613,9 +9492,6 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function formatNokFlightPrice(amount) {
     return `${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(amount)} kr`;
-  }
-  function formatApproxNokFlightPrice(amount) {
-    return `~${formatNokFlightPrice(amount)}`;
   }
   function formatFinnFlightTripSummary(trip) {
     const legs = readRecordArray(trip.legs);

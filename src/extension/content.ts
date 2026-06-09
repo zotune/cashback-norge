@@ -238,10 +238,6 @@ type HttpRequestMessage = {
   body?: string;
   credentials?: RequestCredentials;
 };
-type GetTripComSessionMessage = {
-  type: "get-trip-com-session";
-  url: string;
-};
 type OffersForUrlResponse =
   | {
       ok: true;
@@ -346,10 +342,6 @@ type TripComFlightSession = {
 type TripComFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
 };
-type NokBaseRates = {
-  rates: Record<string, number>;
-  updatedAt?: string;
-};
 type MomondoFlightLegSummary = {
   origin: string;
   destination: string;
@@ -411,16 +403,6 @@ type HttpRequestResponse =
       reason: string;
       status?: number;
     };
-type TripComSessionResponse =
-  | {
-      ok: true;
-      cid?: string;
-      vid?: string;
-    }
-  | {
-      ok: false;
-      reason: string;
-    };
 type ProductPageMeta = Omit<GetPriceMatchForProductMessage, "type">;
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
@@ -434,7 +416,6 @@ const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
 const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
-const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
 const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
 const FINN_FLIGHT_POLL_ATTEMPTS = 7;
 const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -513,7 +494,6 @@ const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
   "Content-Type": "application/json;charset=UTF-8",
 };
 let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
-let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
 const TRAVELLINK_SEARCH_QUERY = `
 query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   searchItinerary(searchItineraryRequest: $searchItineraryRequest) {
@@ -3455,28 +3435,26 @@ async function findTripComFlightPriceMatchOffer(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildTripComFlightSearchUrl(flightMeta);
-  const ratesPromise = fetchNokBaseRates();
-  const session = await fetchTripComFlightSearchSession(resultUrl);
+  const session: TripComFlightSession = {};
 
-  const [rates, cheapestResultData, recommendedResultData] = await Promise.all([
-    ratesPromise,
+  const [cheapestResultData, recommendedResultData, calendarCandidate] = await Promise.all([
     fetchTripComFlightListSearch(flightMeta, session, "Price"),
     fetchTripComFlightListSearch(flightMeta, session, "Score"),
+    flightMeta.inboundDate !== undefined
+      ? safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup)
+      : Promise.resolve(undefined),
   ]);
   const cheapestCandidates = isRecord(cheapestResultData)
-    ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, rates, "billigst")
+    ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, "billigst")
     : [];
   const recommendedCandidates = isRecord(recommendedResultData)
-    ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, rates, "anbefalt")
+    ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, "anbefalt")
     : [];
   const listCandidates = dedupeTripComOfferCandidates([
     ...cheapestCandidates,
     ...recommendedCandidates,
   ]);
 
-  const calendarCandidate = listCandidates.length === 0 && flightMeta.inboundDate !== undefined
-    ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup)
-    : undefined;
   const candidates = dedupeTripComOfferCandidates([
     ...listCandidates,
     ...(calendarCandidate !== undefined ? [calendarCandidate] : []),
@@ -3516,112 +3494,9 @@ async function fetchTripComFlightListSearch(
   return text !== undefined ? parseTripComSseResponse(text) : undefined;
 }
 
-async function fetchTripComFlightSearchSession(resultUrl: string): Promise<TripComFlightSession> {
-  const userscriptSession = await fetchTripComFlightSearchSessionFromUserscript(resultUrl);
-  if (userscriptSession !== undefined) return userscriptSession;
-
-  if (!isUserscriptRuntime()) {
-    const response = await sendRuntimeMessage<TripComSessionResponse>({
-      type: "get-trip-com-session",
-      url: resultUrl,
-    } satisfies GetTripComSessionMessage);
-    if (isTripComSessionResponse(response)) {
-      return {
-        ...(response.cid !== undefined ? { cid: response.cid } : {}),
-        ...(response.vid !== undefined ? { vid: response.vid } : {}),
-      };
-    }
-  }
-
-  await warmTripComFlightSearchSession(resultUrl);
-  return {};
-}
-
-async function fetchTripComFlightSearchSessionFromUserscript(resultUrl: string): Promise<TripComFlightSession | undefined> {
-  const gmRequest = typeof GM_xmlhttpRequest === "function"
-    ? GM_xmlhttpRequest
-    : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function"
-      ? GM.xmlHttpRequest
-      : undefined;
-  if (gmRequest === undefined) return undefined;
-
-  return new Promise((resolveValue) => {
-    const requestOptions: UserscriptHttpRequestOptions = {
-      method: "GET",
-      url: resultUrl,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      timeout: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
-      onload: (response) => {
-        resolveValue(readTripComSessionFromResponseHeaders(response.responseHeaders) ?? {});
-      },
-      onerror: () => resolveValue({}),
-      ontimeout: () => resolveValue({}),
-    };
-
-    const maybePromise = gmRequest(requestOptions);
-    if (isPromiseLike(maybePromise)) {
-      maybePromise.then(
-        (response) => resolveValue(isRecord(response) ? readTripComSessionFromResponseHeaders(readStringValue(response.responseHeaders)) ?? {} : {}),
-        () => resolveValue({}),
-      );
-    }
-  });
-}
-
-async function warmTripComFlightSearchSession(resultUrl: string): Promise<void> {
-  try {
-    await userscriptTextRequest(resultUrl, {
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      credentials: "include",
-    });
-  } catch {
-    // Trip.com may still answer the SSE endpoint without a warmed page session.
-  }
-}
-
-function readTripComSessionFromResponseHeaders(responseHeaders: string | undefined): TripComFlightSession | undefined {
-  const cid = readSetCookieHeaderValue(responseHeaders, "GUID");
-  const vid = readSetCookieHeaderValue(responseHeaders, "UBT_VID");
-  if (cid === undefined && vid === undefined) return undefined;
-  return {
-    ...(cid !== undefined ? { cid } : {}),
-    ...(vid !== undefined ? { vid } : {}),
-  };
-}
-
-function readSetCookieHeaderValue(responseHeaders: string | undefined, cookieName: string): string | undefined {
-  if (responseHeaders === undefined) return undefined;
-  const pattern = new RegExp(`(?:^|\\r?\\n)set-cookie:\\s*${escapeRegExp(cookieName)}=([^;\\r\\n]*)`, "gi");
-  let value: string | undefined;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(responseHeaders)) !== null) {
-    const candidate = match[1]?.trim();
-    if (candidate !== undefined && candidate.length > 0) value = candidate;
-  }
-  return value;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function isTripComSessionResponse(value: unknown): value is Extract<TripComSessionResponse, { ok: true }> {
-  return (
-    isRecord(value) &&
-    value.ok === true &&
-    (value.cid === undefined || typeof value.cid === "string") &&
-    (value.vid === undefined || typeof value.vid === "string")
-  );
-}
-
 async function findTripComCalendarOfferCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
-  rates: NokBaseRates | undefined,
   airportLookup: FlightAirportCodeLookup,
 ): Promise<TripComFlightOfferCandidate | undefined> {
   const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
@@ -3633,17 +3508,16 @@ async function findTripComCalendarOfferCandidate(
   });
   if (!isRecord(resultData)) return undefined;
 
-  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates, airportLookup);
+  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, airportLookup);
 }
 
 async function safelyFindTripComCalendarOfferCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
-  rates: NokBaseRates | undefined,
   airportLookup: FlightAirportCodeLookup,
 ): Promise<TripComFlightOfferCandidate | undefined> {
   try {
-    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup);
+    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup);
   } catch {
     return undefined;
   }
@@ -3780,7 +3654,6 @@ function parseTripComSseResponse(text: string): Record<string, unknown> | undefi
 function extractTripComListOfferCandidates(
   resultData: Record<string, unknown>,
   resultUrl: string,
-  rates: NokBaseRates | undefined,
   sortLabel: string,
 ): TripComFlightOfferCandidate[] {
   const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
@@ -3797,7 +3670,6 @@ function extractTripComListOfferCandidates(
           amount,
           currency,
           productUrl: resultUrl,
-          rates,
           platformParts: [`Trip.com ${sortLabel}`, tripSummary],
         });
       });
@@ -3818,25 +3690,18 @@ function toTripComOfferCandidate(input: {
   amount: number;
   currency: string;
   productUrl: string;
-  rates: NokBaseRates | undefined;
   platformParts: Array<string | undefined>;
 }): TripComFlightOfferCandidate | undefined {
-  const convertedNokAmount = convertToNok(input.amount, input.currency, input.rates);
-  const isConvertedCurrency = convertedNokAmount !== undefined && input.currency.toUpperCase() !== "NOK";
-  const displayAmount = convertedNokAmount ?? input.amount;
-  const displayCurrency = convertedNokAmount !== undefined ? "NOK" : input.currency;
+  const displayCurrency = input.currency.toUpperCase();
 
   return {
     shopName: "Trip.com",
-    price: isConvertedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
-    amount: displayAmount,
-    sortAmount: convertedNokAmount ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+    price: formatFlightPrice(input.amount, displayCurrency),
+    amount: input.amount,
+    sortAmount: input.amount,
     currency: displayCurrency,
     productUrl: input.productUrl,
-    platform: [
-      ...input.platformParts,
-      isConvertedCurrency ? `Trip.com viser ${formatFlightPrice(input.amount, input.currency)}` : undefined,
-    ].filter((part): part is string => part !== undefined && part.length > 0).join(", "),
+    platform: input.platformParts.filter((part): part is string => part !== undefined && part.length > 0).join(", "),
   };
 }
 
@@ -3953,7 +3818,6 @@ function extractTripComCalendarCandidate(
   resultData: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
   resultUrl: string,
-  rates: NokBaseRates | undefined,
   airportLookup: FlightAirportCodeLookup,
 ): TripComFlightOfferCandidate | undefined {
   const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
@@ -3966,7 +3830,6 @@ function extractTripComCalendarCandidate(
     amount,
     currency,
     productUrl: resultUrl,
-    rates,
     platformParts: [
       "indikativ kalenderpris",
       flightMeta.inboundDate !== undefined ? "tur/retur" : "én vei",
@@ -3983,39 +3846,6 @@ function isTripComCalendarItemMatchingSearch(
   if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
   if (flightMeta.inboundDate === undefined) return true;
   return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
-}
-
-async function fetchNokBaseRates(): Promise<NokBaseRates | undefined> {
-  if (nokBaseRatesPromise === undefined) {
-    nokBaseRatesPromise = userscriptJsonRequest(EXCHANGE_RATES_URL, {
-      headers: { Accept: "application/json" },
-      credentials: "omit",
-    }).then(readNokBaseRates, () => undefined);
-  }
-  return nokBaseRatesPromise;
-}
-
-function readNokBaseRates(value: unknown): NokBaseRates | undefined {
-  if (!isRecord(value) || value.result !== "success" || !isRecord(value.rates)) return undefined;
-
-  const rates: Record<string, number> = {};
-  for (const [currency, rate] of Object.entries(value.rates)) {
-    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
-      rates[currency.toUpperCase()] = rate;
-    }
-  }
-  if (Object.keys(rates).length === 0) return undefined;
-
-  const updatedAt = readStringValue(value.time_last_update_utc);
-  return updatedAt !== undefined ? { rates, updatedAt } : { rates };
-}
-
-function convertToNok(amount: number, currency: string, rates: NokBaseRates | undefined): number | undefined {
-  const normalizedCurrency = currency.toUpperCase();
-  if (normalizedCurrency === "NOK") return Math.round(amount);
-  const rate = rates?.rates[normalizedCurrency];
-  if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) return amount / rate;
-  return undefined;
 }
 
 async function findSkyscannerFlightPriceMatchOffer(
@@ -5036,10 +4866,6 @@ function readRecordArray(value: unknown): Array<Record<string, unknown>> {
 
 function formatNokFlightPrice(amount: number): string {
   return `${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(amount)} kr`;
-}
-
-function formatApproxNokFlightPrice(amount: number): string {
-  return `~${formatNokFlightPrice(amount)}`;
 }
 
 function formatFinnFlightTripSummary(trip: Record<string, unknown>): string {
