@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781015160
+// @version      1781015745
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7110,6 +7110,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
   const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
   const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
+  const TRIP_COM_FLIGHT_SEARCH_GRADES = [1, 3];
   const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
   const FINN_FLIGHT_POLL_ATTEMPTS = 7;
   const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -8464,24 +8465,28 @@ query SearchSuggestions($query: String!, $category: Int) {
     const resultUrl = buildTripComFlightSearchUrl(flightMeta);
     const session = {};
     const ratesPromise = fetchNokBaseRates();
-    const [rates, directResultData, recommendedResultData, cheapestResultData, calendarCandidate] = await Promise.all([
+    const listSearchSpecs = TRIP_COM_FLIGHT_SEARCH_GRADES.flatMap((grade) => [
+      { grade, sortOrder: "Direct", sortLabel: "nonstop først", primary: true },
+      { grade, sortOrder: "Score", sortLabel: "anbefalt", primary: true },
+      { grade, sortOrder: "Price", sortLabel: "billigst", primary: false }
+    ]);
+    const [rates, listResults, calendarCandidate] = await Promise.all([
       ratesPromise,
-      fetchTripComFlightListSearch(flightMeta, session, "Direct"),
-      fetchTripComFlightListSearch(flightMeta, session, "Score"),
-      fetchTripComFlightListSearch(flightMeta, session, "Price"),
+      Promise.all(listSearchSpecs.map(async (spec) => ({
+        ...spec,
+        resultData: await fetchTripComFlightListSearch(flightMeta, session, spec.sortOrder, spec.grade)
+      }))),
       flightMeta.inboundDate !== void 0 ? ratesPromise.then((rates2) => safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup, rates2)) : Promise.resolve(void 0)
     ]);
-    const directCandidates = isRecord(directResultData) ? extractTripComListOfferCandidates(directResultData, resultUrl, rates, "nonstop først") : [];
-    const recommendedCandidates = isRecord(recommendedResultData) ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, rates, "anbefalt") : [];
-    const cheapestCandidates = isRecord(cheapestResultData) ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, rates, "billigst") : [];
+    const primaryListCandidates = listResults.flatMap((result) => result.primary && isRecord(result.resultData) ? extractTripComListOfferCandidates(result.resultData, resultUrl, rates, result.sortLabel) : []);
+    const alternativeListCandidates = listResults.flatMap((result) => isRecord(result.resultData) ? extractTripComListOfferCandidates(result.resultData, resultUrl, rates, result.sortLabel) : []);
     const primaryCandidates = dedupeTripComOfferCandidates([
       ...calendarCandidate !== void 0 ? [calendarCandidate] : [],
-      ...directCandidates,
-      ...recommendedCandidates
+      ...primaryListCandidates
     ]);
     const candidates = dedupeTripComOfferCandidates([
       ...primaryCandidates,
-      ...cheapestCandidates
+      ...alternativeListCandidates
     ]);
     const best = primaryCandidates[0] ?? candidates[0];
     if (best === void 0) return void 0;
@@ -8501,11 +8506,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
   }
-  async function fetchTripComFlightListSearch(flightMeta, session, sortOrder) {
+  async function fetchTripComFlightListSearch(flightMeta, session, sortOrder, grade) {
     const text = await userscriptTextRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
       method: "POST",
       headers: TRIP_COM_COMMON_HEADERS,
-      body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, session)),
+      body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, grade, session)),
       credentials: "omit",
       timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
     });
@@ -8529,11 +8534,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
-  function buildTripComFlightListSearchPayload(flightMeta, sortOrder, session) {
+  function buildTripComFlightListSearchPayload(flightMeta, sortOrder, grade, session) {
     return {
       mode: 0,
       searchCriteria: {
-        grade: 1,
+        grade,
         realGrade: 1,
         tripType: flightMeta.inboundDate !== void 0 ? 2 : 1,
         journeyNo: 1,
@@ -8680,7 +8685,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       currency,
       productUrl: resultUrl,
       rates,
-      platformParts: [`Trip.com ${sortLabel}`, "laveste API-pris"]
+      platformParts: [`Trip.com ${sortLabel}`, "tab-pris"]
     });
   }
   function readTripComPriceAmount(price) {
@@ -8794,8 +8799,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList).find((item) => isTripComCalendarItemMatchingSearch(item, flightMeta));
     const calendarAmount = readPositiveNumberValue(calendarItem?.currencyPrice);
-    const lowestAmount = readPositiveNumberValue(resultData.lowestCurrencyPrice);
-    const amount = calendarAmount ?? lowestAmount;
+    const amount = calendarAmount;
     if (amount === void 0) return void 0;
     const candidate = toTripComOfferCandidate({
       amount,
@@ -8803,12 +8807,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: resultUrl,
       rates,
       platformParts: [
-        calendarAmount !== void 0 ? "indikativ kalenderpris" : "laveste API-pris",
+        "indikativ kalenderpris",
         flightMeta.inboundDate !== void 0 ? "tur/retur" : "én vei",
         formatFlightAirportScopeText(flightMeta, airportLookup)
       ]
     });
-    return candidate !== void 0 ? { ...candidate, shopName: calendarAmount !== void 0 ? "Trip.com kalender" : "Trip.com" } : void 0;
+    return candidate !== void 0 ? { ...candidate, shopName: "Trip.com kalender" } : void 0;
   }
   function isTripComCalendarItemMatchingSearch(item, flightMeta) {
     if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
