@@ -334,13 +334,17 @@ type TravellinkFlightOfferCandidate = PriceMatchAlternative & {
   durationMinutes?: number;
   meRating?: number;
 };
-type TripComFlightSortOrder = "Price" | "Score";
+type TripComFlightSortOrder = "Direct" | "Price" | "Score";
 type TripComFlightSession = {
   cid?: string;
   vid?: string;
 };
 type TripComFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
+};
+type NokBaseRates = {
+  rates: Record<string, number>;
+  updatedAt?: string;
 };
 type MomondoFlightLegSummary = {
   origin: string;
@@ -416,6 +420,7 @@ const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
 const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
+const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
 const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
 const FINN_FLIGHT_POLL_ATTEMPTS = 7;
 const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -494,6 +499,7 @@ const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
   "Content-Type": "application/json;charset=UTF-8",
 };
 let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
+let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
 const TRAVELLINK_SEARCH_QUERY = `
 query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   searchItinerary(searchItineraryRequest: $searchItineraryRequest) {
@@ -3436,30 +3442,36 @@ async function findTripComFlightPriceMatchOffer(
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildTripComFlightSearchUrl(flightMeta);
   const session: TripComFlightSession = {};
+  const ratesPromise = fetchNokBaseRates();
 
-  const [cheapestResultData, recommendedResultData, calendarCandidate] = await Promise.all([
-    fetchTripComFlightListSearch(flightMeta, session, "Price"),
+  const [rates, directResultData, recommendedResultData, cheapestResultData, calendarCandidate] = await Promise.all([
+    ratesPromise,
+    fetchTripComFlightListSearch(flightMeta, session, "Direct"),
     fetchTripComFlightListSearch(flightMeta, session, "Score"),
+    fetchTripComFlightListSearch(flightMeta, session, "Price"),
     flightMeta.inboundDate !== undefined
-      ? safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup)
+      ? ratesPromise.then((rates) => safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup, rates))
       : Promise.resolve(undefined),
   ]);
-  const cheapestCandidates = isRecord(cheapestResultData)
-    ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, "billigst")
+  const directCandidates = isRecord(directResultData)
+    ? extractTripComListOfferCandidates(directResultData, resultUrl, rates, "nonstop først")
     : [];
   const recommendedCandidates = isRecord(recommendedResultData)
-    ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, "anbefalt")
+    ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, rates, "anbefalt")
     : [];
-  const listCandidates = dedupeTripComOfferCandidates([
-    ...cheapestCandidates,
+  const cheapestCandidates = isRecord(cheapestResultData)
+    ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, rates, "billigst")
+    : [];
+  const primaryCandidates = dedupeTripComOfferCandidates([
+    ...(calendarCandidate !== undefined ? [calendarCandidate] : []),
+    ...directCandidates,
     ...recommendedCandidates,
   ]);
-
   const candidates = dedupeTripComOfferCandidates([
-    ...listCandidates,
-    ...(calendarCandidate !== undefined ? [calendarCandidate] : []),
+    ...primaryCandidates,
+    ...cheapestCandidates,
   ]);
-  const best = candidates[0];
+  const best = primaryCandidates[0] ?? candidates[0];
   if (best === undefined) return undefined;
 
   return {
@@ -3498,6 +3510,7 @@ async function findTripComCalendarOfferCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   airportLookup: FlightAirportCodeLookup,
+  rates: NokBaseRates | undefined,
 ): Promise<TripComFlightOfferCandidate | undefined> {
   const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
     method: "POST",
@@ -3508,16 +3521,17 @@ async function findTripComCalendarOfferCandidate(
   });
   if (!isRecord(resultData)) return undefined;
 
-  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, airportLookup);
+  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, airportLookup, rates);
 }
 
 async function safelyFindTripComCalendarOfferCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   airportLookup: FlightAirportCodeLookup,
+  rates: NokBaseRates | undefined,
 ): Promise<TripComFlightOfferCandidate | undefined> {
   try {
-    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup);
+    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup, rates);
   } catch {
     return undefined;
   }
@@ -3529,8 +3543,9 @@ function buildTripComFlightListSearchPayload(
   session: TripComFlightSession,
 ): Record<string, unknown> {
   return {
+    mode: 0,
     searchCriteria: {
-      grade: 3,
+      grade: 1,
       realGrade: 1,
       tripType: flightMeta.inboundDate !== undefined ? 2 : 1,
       journeyNo: 1,
@@ -3654,12 +3669,13 @@ function parseTripComSseResponse(text: string): Record<string, unknown> | undefi
 function extractTripComListOfferCandidates(
   resultData: Record<string, unknown>,
   resultUrl: string,
+  rates: NokBaseRates | undefined,
   sortLabel: string,
 ): TripComFlightOfferCandidate[] {
   const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
   const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
   const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
-  const lowestPriceCandidate = extractTripComBasicLowestPriceCandidate(basicInfo, resultUrl, currency, sortLabel);
+  const lowestPriceCandidate = extractTripComBasicLowestPriceCandidate(basicInfo, resultUrl, rates, currency, sortLabel);
   const candidates = [
     ...(lowestPriceCandidate !== undefined ? [lowestPriceCandidate] : []),
     ...readRecordArray(resultData.itineraryList)
@@ -3670,11 +3686,12 @@ function extractTripComListOfferCandidates(
           if (amount === undefined) return undefined;
 
           return toTripComOfferCandidate({
-            amount,
-            currency,
-            productUrl: resultUrl,
-            platformParts: [`Trip.com ${sortLabel}`, tripSummary],
-          });
+          amount,
+          currency,
+          productUrl: resultUrl,
+          rates,
+          platformParts: [`Trip.com ${sortLabel}`, tripSummary],
+        });
         });
       })
       .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined),
@@ -3690,6 +3707,7 @@ function readTripComPolicyAmount(policy: Record<string, unknown>): number | unde
 function extractTripComBasicLowestPriceCandidate(
   basicInfo: Record<string, unknown>,
   resultUrl: string,
+  rates: NokBaseRates | undefined,
   currency: string,
   sortLabel: string,
 ): TripComFlightOfferCandidate | undefined {
@@ -3701,6 +3719,7 @@ function extractTripComBasicLowestPriceCandidate(
     amount,
     currency,
     productUrl: resultUrl,
+    rates,
     platformParts: [`Trip.com ${sortLabel}`, "laveste API-pris"],
   });
 }
@@ -3717,18 +3736,26 @@ function toTripComOfferCandidate(input: {
   amount: number;
   currency: string;
   productUrl: string;
+  rates: NokBaseRates | undefined;
   platformParts: Array<string | undefined>;
 }): TripComFlightOfferCandidate | undefined {
   const displayCurrency = input.currency.toUpperCase();
+  const convertedNokAmount = convertToNok(input.amount, displayCurrency, input.rates);
+  const isConvertedCurrency = convertedNokAmount !== undefined && displayCurrency !== "NOK";
+  const displayAmount = convertedNokAmount ?? input.amount;
+  const priceCurrency = convertedNokAmount !== undefined ? "NOK" : displayCurrency;
 
   return {
     shopName: "Trip.com",
-    price: formatFlightPrice(input.amount, displayCurrency),
-    amount: input.amount,
-    sortAmount: input.amount,
-    currency: displayCurrency,
+    price: isConvertedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, priceCurrency),
+    amount: displayAmount,
+    sortAmount: convertedNokAmount ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+    currency: priceCurrency,
     productUrl: input.productUrl,
-    platform: input.platformParts.filter((part): part is string => part !== undefined && part.length > 0).join(", "),
+    platform: [
+      ...input.platformParts,
+      isConvertedCurrency ? `Trip.com viser ${formatFlightPrice(input.amount, displayCurrency)}` : undefined,
+    ].filter((part): part is string => part !== undefined && part.length > 0).join(", "),
   };
 }
 
@@ -3814,8 +3841,8 @@ function buildTripComLowPricePayload(flightMeta: FlightSearchMeta): Record<strin
     aCity: flightMeta.destination,
     dDate: flightMeta.outboundDate,
     flightWayType: flightMeta.inboundDate !== undefined ? "RT" : "OW",
-    departureAirport: flightMeta.origin,
-    arrivalAirport: flightMeta.destination,
+    departureAirport: "",
+    arrivalAirport: "",
     cabinClass: "Economy",
     transferType: "ANY",
     searchInfo: {
@@ -3827,7 +3854,7 @@ function buildTripComLowPricePayload(flightMeta: FlightSearchMeta): Record<strin
     },
     abtList: [],
     offSet: 30,
-    ...(flightMeta.inboundDate !== undefined ? { aDate: flightMeta.inboundDate, startInterval: 30, endInterval: 30 } : {}),
+    ...(flightMeta.inboundDate !== undefined ? { aDate: flightMeta.inboundDate, startInterval: 0, endInterval: 30, searchMode: "Compare" } : {}),
     Head: {
       Group: "Trip",
       Source: "ONLINE",
@@ -3846,24 +3873,30 @@ function extractTripComCalendarCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   airportLookup: FlightAirportCodeLookup,
+  rates: NokBaseRates | undefined,
 ): TripComFlightOfferCandidate | undefined {
   const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
   const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList)
     .find((item) => isTripComCalendarItemMatchingSearch(item, flightMeta));
-  const amount = readPositiveNumberValue(calendarItem?.currencyPrice);
+  const calendarAmount = readPositiveNumberValue(calendarItem?.currencyPrice);
+  const lowestAmount = readPositiveNumberValue(resultData.lowestCurrencyPrice);
+  const amount = calendarAmount ?? lowestAmount;
   if (amount === undefined) return undefined;
 
   const candidate = toTripComOfferCandidate({
     amount,
     currency,
     productUrl: resultUrl,
+    rates,
     platformParts: [
-      "indikativ kalenderpris",
+      calendarAmount !== undefined ? "indikativ kalenderpris" : "laveste API-pris",
       flightMeta.inboundDate !== undefined ? "tur/retur" : "én vei",
       formatFlightAirportScopeText(flightMeta, airportLookup),
     ],
   });
-  return candidate !== undefined ? { ...candidate, shopName: "Trip.com kalender" } : undefined;
+  return candidate !== undefined
+    ? { ...candidate, shopName: calendarAmount !== undefined ? "Trip.com kalender" : "Trip.com" }
+    : undefined;
 }
 
 function isTripComCalendarItemMatchingSearch(
@@ -3873,6 +3906,39 @@ function isTripComCalendarItemMatchingSearch(
   if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
   if (flightMeta.inboundDate === undefined) return true;
   return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
+}
+
+async function fetchNokBaseRates(): Promise<NokBaseRates | undefined> {
+  if (nokBaseRatesPromise === undefined) {
+    nokBaseRatesPromise = userscriptJsonRequest(EXCHANGE_RATES_URL, {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+    }).then(readNokBaseRates, () => undefined);
+  }
+  return nokBaseRatesPromise;
+}
+
+function readNokBaseRates(value: unknown): NokBaseRates | undefined {
+  if (!isRecord(value) || value.result !== "success" || !isRecord(value.rates)) return undefined;
+
+  const rates: Record<string, number> = {};
+  for (const [currency, rate] of Object.entries(value.rates)) {
+    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+      rates[currency.toUpperCase()] = rate;
+    }
+  }
+  if (Object.keys(rates).length === 0) return undefined;
+
+  const updatedAt = readStringValue(value.time_last_update_utc);
+  return updatedAt !== undefined ? { rates, updatedAt } : { rates };
+}
+
+function convertToNok(amount: number, currency: string, rates: NokBaseRates | undefined): number | undefined {
+  const normalizedCurrency = currency.toUpperCase();
+  if (normalizedCurrency === "NOK") return Math.round(amount);
+  const rate = rates?.rates[normalizedCurrency];
+  if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) return amount / rate;
+  return undefined;
 }
 
 async function findSkyscannerFlightPriceMatchOffer(
@@ -4893,6 +4959,10 @@ function readRecordArray(value: unknown): Array<Record<string, unknown>> {
 
 function formatNokFlightPrice(amount: number): string {
   return `${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(amount)} kr`;
+}
+
+function formatApproxNokFlightPrice(amount: number): string {
+  return `~${formatNokFlightPrice(amount)}`;
 }
 
 function formatFinnFlightTripSummary(trip: Record<string, unknown>): string {
