@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1780924409
+// @version      1781013161
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -29,6 +29,7 @@
 // @connect      www.vinmonopolet.no
 // @connect      vinmonopolet.no
 // @connect      open.er-api.com
+// @connect      api.travelpayouts.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no
 // @connect      www.sesum.no
@@ -1118,7 +1119,7 @@
   }
   const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
   const ALLKEYSHOP_BLOG_ORIGIN = `${ALLKEYSHOP_ORIGIN}/blog`;
-  const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
+  const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
   const MAX_ALLKEYSHOP_ALTERNATIVES = 8;
   const STATIC_NOK_BASE_RATES = {
     rates: {
@@ -1148,7 +1149,7 @@
     }
     const page = await fetchAllKeyShopPageData(message, requestText);
     if (page === void 0) return void 0;
-    const rates = await fetchNokBaseRates(requestJson) ?? STATIC_NOK_BASE_RATES;
+    const rates = await fetchNokBaseRates$1(requestJson) ?? STATIC_NOK_BASE_RATES;
     const platformScope = readPlatformScope(message);
     const titleCandidates = readGameTitleCandidates$1(message);
     const offers = page.data.prices.filter((price) => price.dispo === void 0 || price.dispo > 0).filter((price) => price.account !== true).filter((price) => isActivationPlatformAllowed(price.activationPlatform, platformScope)).filter((price) => isAllKeyShopEditionAllowed(page.data.editions.get(price.edition ?? ""), titleCandidates)).map((price) => toAllKeyShopOffer(price, page.data.currency, page.data.editions, page.data.regions, rates)).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
@@ -1277,7 +1278,7 @@
   }
   function toAllKeyShopOffer(price, currency, editions, regions, rates) {
     const amount = pickAllKeyShopPayableAmount(price);
-    const nokAmount = convertToNok(amount, currency, rates);
+    const nokAmount = convertToNok$1(amount, currency, rates);
     if (nokAmount === void 0) return void 0;
     const platform = formatActivationPlatform(price.activationPlatform);
     const region = price.region !== void 0 ? regions.get(price.region) : void 0;
@@ -1323,8 +1324,8 @@
     ].filter((detail) => detail !== void 0 && detail.length > 0);
     return details.length > 0 ? details.join(", ") : void 0;
   }
-  async function fetchNokBaseRates(requestJson) {
-    const value = await requestJson(EXCHANGE_RATES_URL, {
+  async function fetchNokBaseRates$1(requestJson) {
+    const value = await requestJson(EXCHANGE_RATES_URL$1, {
       headers: { "Accept": "application/json" }
     });
     if (!isRecord$5(value) || value.result !== "success" || !isRecord$5(value.rates)) return void 0;
@@ -1336,7 +1337,7 @@
     }
     return Object.keys(rates).length > 0 ? { rates } : void 0;
   }
-  function convertToNok(amount, currency, rates) {
+  function convertToNok$1(amount, currency, rates) {
     const normalizedCurrency = currency.toUpperCase();
     if (normalizedCurrency === "NOK") return amount;
     const rate = rates.rates[normalizedCurrency];
@@ -1440,7 +1441,7 @@
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   }
   function readAssignedJsonObject(html, variableName) {
-    const marker = new RegExp(`\\bvar\\s+${escapeRegExp$4(variableName)}\\s*=\\s*`, "i");
+    const marker = new RegExp(`\\bvar\\s+${escapeRegExp$5(variableName)}\\s*=\\s*`, "i");
     const match = marker.exec(html);
     if (match === null) return void 0;
     const start = match.index + match[0].length;
@@ -1498,7 +1499,7 @@
   function decodeHtml$3(value) {
     return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
   }
-  function escapeRegExp$4(value) {
+  function escapeRegExp$5(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function formatCurrency$3(amount, currency) {
@@ -1687,7 +1688,7 @@
     };
   }
   function readPagePrice(html, label) {
-    const labelPattern = escapeRegExp$3(label);
+    const labelPattern = escapeRegExp$4(label);
     const labelMatch = html.match(new RegExp(`${labelPattern}[\\s\\S]{0,1200}?class=["'][^"']*price-inner numeric[^"']*["'][^>]*>([\\s\\S]*?)<`, "i"));
     const rawPrice = labelMatch?.[1];
     if (rawPrice === void 0) return void 0;
@@ -1781,7 +1782,7 @@
   function decodeHtml$2(value) {
     return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
   }
-  function escapeRegExp$3(value) {
+  function escapeRegExp$4(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function formatCurrency$2(amount, currency) {
@@ -2272,13 +2273,13 @@
     return normalizeBrandText$2(title).includes(brand);
   }
   function readEnhverProductTitle(html, grocery) {
-    const escapedName = escapeRegExp$2(String(grocery.groceryId));
+    const escapedName = escapeRegExp$3(String(grocery.groceryId));
     const pattern = new RegExp(`title:"((?:\\\\.|[^"\\\\])*)",groceryId:${escapedName},(?:(?!\\{title:)[\\s\\S])*?prices:\\[`);
     const rawTitle = html.match(pattern)?.[1];
     return rawTitle !== void 0 ? unescapeJsString(rawTitle).trim() || void 0 : void 0;
   }
   function readEnhverPrices(html, groceryId) {
-    const escapedId = escapeRegExp$2(String(groceryId));
+    const escapedId = escapeRegExp$3(String(groceryId));
     const pattern = new RegExp(`title:"(?:\\\\.|[^"\\\\])*",groceryId:${escapedId},(?:(?!\\{title:)[\\s\\S])*?prices:\\[([^\\]]+)\\]`);
     const rawPrices = html.match(pattern)?.[1];
     if (rawPrices === void 0) return [];
@@ -2362,7 +2363,7 @@
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function escapeRegExp$2(value) {
+  function escapeRegExp$3(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function normalizeBrandText$2(value) {
@@ -2641,13 +2642,13 @@
   function removePackageLabels$1(value, quantityLabels) {
     let cleaned = value;
     for (const label of quantityLabels) {
-      const escaped = escapeRegExp$1(label).replace(/\\ /g, "\\s*");
+      const escaped = escapeRegExp$2(label).replace(/\\ /g, "\\s*");
       cleaned = cleaned.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
     }
     return cleaned.replace(/\s+/g, " ").trim();
   }
   function removeTokenPhrase$1(value, phrase) {
-    const escaped = escapeRegExp$1(phrase).replace(/\\ /g, "\\s+");
+    const escaped = escapeRegExp$2(phrase).replace(/\\ /g, "\\s+");
     return value.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ").replace(/\s+/g, " ").trim();
   }
   function hasMeaningfulProductTerm(value) {
@@ -2701,7 +2702,7 @@
     return value.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
   function readHtmlAttribute(html, attributeName) {
-    const match = html.match(new RegExp(`\\b${escapeRegExp$1(attributeName)}=["']([^"']*)["']`, "i"));
+    const match = html.match(new RegExp(`\\b${escapeRegExp$2(attributeName)}=["']([^"']*)["']`, "i"));
     const value = match?.[1];
     return value !== void 0 && value.trim().length > 0 ? value.trim() : void 0;
   }
@@ -2714,7 +2715,7 @@
   function normalizeBrandText$1(value) {
     return transliterateNorwegianCharacters$3(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
-  function escapeRegExp$1(value) {
+  function escapeRegExp$2(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function uniqueStrings$6(values) {
@@ -4049,13 +4050,13 @@ query SearchSuggestions($query: String!, $category: Int) {
   function removePackageLabels(value, quantityLabels) {
     let cleaned = value;
     for (const label of quantityLabels) {
-      const escaped = escapeRegExp(label).replace(/\\ /g, "\\s*");
+      const escaped = escapeRegExp$1(label).replace(/\\ /g, "\\s*");
       cleaned = cleaned.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
     }
     return cleaned.replace(/\s+/g, " ").trim();
   }
   function removeTokenPhrase(value, phrase) {
-    const escaped = escapeRegExp(phrase).replace(/\\ /g, "\\s+");
+    const escaped = escapeRegExp$1(phrase).replace(/\\ /g, "\\s+");
     return value.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ").replace(/\s+/g, " ").trim();
   }
   function slugifySesumTitle(value) {
@@ -4154,7 +4155,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }).filter((price) => price !== void 0);
   }
   function readNextFlightJsonArray(html, key, followingKey) {
-    const escapedPattern = new RegExp(`\\\\"${escapeRegExp(key)}\\\\":(\\[[\\s\\S]*?\\]),\\\\"${escapeRegExp(followingKey)}\\\\":`);
+    const escapedPattern = new RegExp(`\\\\"${escapeRegExp$1(key)}\\\\":(\\[[\\s\\S]*?\\]),\\\\"${escapeRegExp$1(followingKey)}\\\\":`);
     const escapedMatch = html.match(escapedPattern);
     if (escapedMatch?.[1] !== void 0) {
       try {
@@ -4164,7 +4165,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         return void 0;
       }
     }
-    const plainPattern = new RegExp(`"${escapeRegExp(key)}":(\\[[\\s\\S]*?\\]),"${escapeRegExp(followingKey)}":`);
+    const plainPattern = new RegExp(`"${escapeRegExp$1(key)}":(\\[[\\s\\S]*?\\]),"${escapeRegExp$1(followingKey)}":`);
     const plainMatch = html.match(plainPattern);
     if (plainMatch?.[1] === void 0) return void 0;
     try {
@@ -4175,14 +4176,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   }
   function readEscapedJsonLdString(html, key) {
-    const escaped = html.match(new RegExp(`\\\\\\\\"${escapeRegExp(key)}\\\\\\\\":\\\\\\\\"([^"\\\\]+)\\\\\\\\"`))?.[1];
+    const escaped = html.match(new RegExp(`\\\\\\\\"${escapeRegExp$1(key)}\\\\\\\\":\\\\\\\\"([^"\\\\]+)\\\\\\\\"`))?.[1];
     if (escaped !== void 0) return unescapeNextFlightString(escaped);
-    const plain = html.match(new RegExp(`"${escapeRegExp(key)}"\\s*:\\s*"([^"]+)"`))?.[1];
+    const plain = html.match(new RegExp(`"${escapeRegExp$1(key)}"\\s*:\\s*"([^"]+)"`))?.[1];
     return plain !== void 0 ? decodeHtml(plain) : void 0;
   }
   function readMetaContent(html, nameOrProperty) {
-    const pattern = new RegExp(`<meta\\s+(?:name|property)=["']${escapeRegExp(nameOrProperty)}["'][^>]*content=["']([^"']*)["']`, "i");
-    const alternatePattern = new RegExp(`<meta\\s+content=["']([^"']*)["'][^>]*(?:name|property)=["']${escapeRegExp(nameOrProperty)}["']`, "i");
+    const pattern = new RegExp(`<meta\\s+(?:name|property)=["']${escapeRegExp$1(nameOrProperty)}["'][^>]*content=["']([^"']*)["']`, "i");
+    const alternatePattern = new RegExp(`<meta\\s+content=["']([^"']*)["'][^>]*(?:name|property)=["']${escapeRegExp$1(nameOrProperty)}["']`, "i");
     const raw = html.match(pattern)?.[1] ?? html.match(alternatePattern)?.[1];
     return raw !== void 0 ? decodeHtml(raw).trim() : void 0;
   }
@@ -4254,7 +4255,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function normalizeBrandText(value) {
     return transliterateNorwegianCharacters$1(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
-  function escapeRegExp(value) {
+  function escapeRegExp$1(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function uniqueStrings$2(values) {
@@ -5284,7 +5285,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
     const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
-    const rates = readNokBaseRates$1(ratesResponse);
+    const rates = readNokBaseRates$2(ratesResponse);
     if (rates === void 0) {
       return void 0;
     }
@@ -5576,7 +5577,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return { price: rawPrice, currency };
   }
-  function readNokBaseRates$1(value) {
+  function readNokBaseRates$2(value) {
     if (!isRecord$2(value) || value.result !== "success" || !isRecord$2(value.rates)) {
       return void 0;
     }
@@ -5784,7 +5785,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
     const ratesResponse = await jsonRequest("https://open.er-api.com/v6/latest/NOK");
-    const rates = readNokBaseRates(ratesResponse);
+    const rates = readNokBaseRates$1(ratesResponse);
     const ratesUpdatedAt = rates?.updatedAt;
     if (rates === void 0) {
       return void 0;
@@ -6364,7 +6365,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isAppleSoftwareSearchResult(value) {
     return isRecord$1(value) && typeof value.trackId === "number" && Number.isFinite(value.trackId) && typeof value.trackName === "string" && (value.artistName === void 0 || typeof value.artistName === "string") && (value.sellerName === void 0 || typeof value.sellerName === "string") && (value.bundleId === void 0 || typeof value.bundleId === "string") && (value.sellerUrl === void 0 || typeof value.sellerUrl === "string") && (value.trackViewUrl === void 0 || typeof value.trackViewUrl === "string");
   }
-  function readNokBaseRates(value) {
+  function readNokBaseRates$1(value) {
     if (!isRecord$1(value) || value.result !== "success" || !isRecord$1(value.rates)) {
       return void 0;
     }
@@ -7107,6 +7108,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
+  const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
+  const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
   const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
   const FINN_FLIGHT_POLL_ATTEMPTS = 7;
   const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
@@ -7153,13 +7156,15 @@ query SearchSuggestions($query: String!, $category: Int) {
   };
   const TRIP_COM_BASE_URL = "https://us.trip.com";
   const TRIP_COM_LOW_PRICE_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/14427/GetLowPriceInCalender`;
-  const TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearch`;
+  const TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearchSSE`;
   const TRIP_COM_DEFAULT_CURRENCY = "USD";
-  const TRIP_COM_USD_TO_NOK_SORT_RATE = 11;
+  const TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS = 3e4;
   const TRIP_COM_COMMON_HEADERS = {
-    Accept: "application/json",
+    Accept: "text/event-stream, application/json",
     "Content-Type": "application/json;charset=UTF-8"
   };
+  let flightAirportDataPromise;
+  let nokBaseRatesPromise;
   const PSN_GC_DEALS_GIFT_CARD_URL = "https://gcdeals.net/no/explore?sort=relevance&category%5B0%5D=1&type%5B0%5D=1";
   const PSN_GC_DEALS_GIFT_CARD_REGION_URLS = {
     AU: "https://gcdeals.net/no/group/12/playstation-network-cards-aud-australia",
@@ -7454,11 +7459,12 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (parsedUrl === void 0) return [];
     const flightMeta = extractFlightSearchMeta(parsedUrl);
     if (flightMeta === void 0 || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
+    const airportLookup = await buildFlightAirportLookup(flightMeta);
     const routeTitle = `${flightMeta.origin} -> ${flightMeta.destination}`;
     const fullSearchDetails = [
       formatFlightDateRange(flightMeta),
       formatFlightPassengerText(flightMeta),
-      "samme flyplasser"
+      formatFlightAirportScopeText(flightMeta, airportLookup)
     ].join(", ");
     const cardSearchDetails = formatFlightCardSearchDetails(flightMeta);
     const staticOffers = [
@@ -7473,14 +7479,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       ...[]
     ];
     const liveOfferFinders = [
-      () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+      { sourceName: "FINN", findOffer: () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
       ...[],
-      () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
-      () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+      { sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+      { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) },
       ...[],
-      ...[() => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      ...[{ sourceName: "Trip.com", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
     ];
-    const liveOffers = (await Promise.all(liveOfferFinders.map((findOffer) => safelyFindFlightPriceMatchOffer(findOffer)))).filter((offer) => offer !== void 0);
+    const liveOffers = (await Promise.all(liveOfferFinders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, findOffer)))).filter((offer) => offer !== void 0);
     if (liveOffers.length === 0) return staticOffers;
     const liveSources = new Set(liveOffers.map((offer) => offer.source));
     return [
@@ -7488,10 +7494,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       ...staticOffers.filter((offer) => !liveSources.has(offer.source))
     ].sort(comparePriceMatchesBySortAmount);
   }
-  async function safelyFindFlightPriceMatchOffer(findOffer) {
+  async function safelyFindFlightPriceMatchOffer(sourceName, findOffer) {
     try {
       return await findOffer();
-    } catch {
+    } catch (error) {
+      console.warn(`[Cashback Norge] Kunne ikke hente flypris fra ${sourceName}.`, error);
       return void 0;
     }
   }
@@ -7965,6 +7972,67 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isFlightSearchPassengerMatchSupported(flightMeta) {
     return flightMeta.adults > 0 && flightMeta.youths === 0 && flightMeta.children === 0 && flightMeta.infants === 0;
   }
+  async function buildFlightAirportLookup(flightMeta) {
+    const lookup = /* @__PURE__ */ new Map();
+    const airportData = await fetchFlightAirportData();
+    if (airportData === void 0) return lookup;
+    const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
+    const flightableAirports = airportData.filter((airport) => airport.iataType === "airport" && airport.flightable);
+    for (const requestedCode of requestedCodes) {
+      const hasExactAirport = flightableAirports.some((airport) => airport.code === requestedCode);
+      if (hasExactAirport) continue;
+      const cityAirports = uniqueStrings(
+        flightableAirports.filter((airport) => airport.cityCode === requestedCode).map((airport) => airport.code)
+      );
+      if (cityAirports.length > 0) lookup.set(requestedCode, cityAirports);
+    }
+    return lookup;
+  }
+  async function fetchFlightAirportData() {
+    if (flightAirportDataPromise === void 0) {
+      flightAirportDataPromise = userscriptJsonRequest(TRAVELPAYOUTS_AIRPORTS_URL, {
+        headers: { Accept: "application/json" },
+        credentials: "omit",
+        timeoutMs: 4e3
+      }).then(readFlightAirportData, () => void 0);
+    }
+    return flightAirportDataPromise;
+  }
+  function readFlightAirportData(value) {
+    if (!Array.isArray(value)) return void 0;
+    const airports = [];
+    for (const item of value) {
+      if (!isRecord(item)) continue;
+      const code = readIataCodeValue(item.code);
+      const cityCode = readIataCodeValue(item.city_code);
+      const iataType = readStringValue(item.iata_type);
+      if (code === void 0 || cityCode === void 0 || iataType === void 0) continue;
+      airports.push({
+        code,
+        cityCode,
+        iataType,
+        flightable: item.flightable === true
+      });
+    }
+    return airports.length > 0 ? airports : void 0;
+  }
+  function hasMetropolitanFlightSearchCode(flightMeta, airportLookup) {
+    return airportLookup.has(flightMeta.origin) || airportLookup.has(flightMeta.destination);
+  }
+  function formatFlightAirportScopeText(flightMeta, airportLookup) {
+    return hasMetropolitanFlightSearchCode(flightMeta, airportLookup) ? "samme byområde/flyplasser" : "samme flyplasser";
+  }
+  function formatFlightPriceMatchAirportScopeText(priceMatch) {
+    return priceMatch.details?.includes("samme byområde/flyplasser") === true ? "samme byområde/flyplasser" : "samme flyplasser";
+  }
+  function collectEquivalentFlightAirportCodes(code, airportLookup) {
+    const normalizedCode = code.toUpperCase();
+    return /* @__PURE__ */ new Set([normalizedCode, ...airportLookup.get(normalizedCode) ?? []]);
+  }
+  function listFlightRequestAirportCodes(code, airportLookup) {
+    const normalizedCode = code.toUpperCase();
+    return airportLookup.get(normalizedCode) ?? [normalizedCode];
+  }
   function buildFlightPriceMatchOffer(input) {
     return {
       source: input.source,
@@ -7980,13 +8048,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: input.productUrl
     };
   }
-  async function findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
+  async function findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
     const searchData = await fetchFinnFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
     const resultData = await pollFinnFlightResults(searchData, flightMeta);
     if (resultData === void 0) return void 0;
-    const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta);
+    const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
     const best = candidates[0];
     if (best === void 0) return void 0;
     return {
@@ -8039,11 +8107,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     const searchId = readStringValue(searchData?.searchId);
     if (searchId === void 0) return void 0;
     const resultParams = buildFinnFlightResultParamsFromSearchData(searchData);
+    const airportGroups = buildFinnFlightAirportGroupsFromSearchData(searchData);
     return {
       searchId,
       flightApiUrl: readStringValue(config?.flightApiUrl) ?? FINN_FLIGHT_API_FALLBACK_URL,
       resultUrl,
-      ...resultParams !== void 0 ? { resultParams } : {}
+      ...resultParams !== void 0 ? { resultParams } : {},
+      ...Object.keys(airportGroups).length > 0 ? { airportGroups } : {}
     };
   }
   function readCurrentFinnFlightSearchUrl(flightMeta) {
@@ -8059,6 +8129,21 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (value !== void 0 && value.length > 0) params.set(key, value);
     }
     return [...params].length > 0 ? params : void 0;
+  }
+  function buildFinnFlightAirportGroupsFromSearchData(searchData) {
+    const groups = {};
+    const origin = readIataCodeValue(searchData.origin);
+    const destination = readIataCodeValue(searchData.destination);
+    addFinnFlightAirportGroup(groups, origin, readStringValue(searchData.departureAirportLeg1));
+    addFinnFlightAirportGroup(groups, destination, readStringValue(searchData.arrivalAirportLeg1));
+    addFinnFlightAirportGroup(groups, destination, readStringValue(searchData.departureAirportLeg2));
+    addFinnFlightAirportGroup(groups, origin, readStringValue(searchData.arrivalAirportLeg2));
+    return groups;
+  }
+  function addFinnFlightAirportGroup(groups, code, value) {
+    if (code === void 0 || value === void 0) return;
+    const airports = uniqueStrings(value.split(",").map((part) => readIataCodeValue(part)).filter((airport) => airport !== void 0));
+    if (airports.length > 0) groups[code] = airports;
   }
   function parseFinnNextData(html) {
     const match = html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
@@ -8093,10 +8178,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     params.set("progress", String(progress));
     return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
   }
-  function extractFinnFlightOfferCandidates(resultData, searchData, flightMeta) {
+  function extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup) {
     const candidates = [];
     for (const trip of readRecordArray(resultData.trips)) {
-      if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData)) continue;
+      if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData, airportLookup)) continue;
       const tripSummary = formatFinnFlightTripSummary(trip);
       for (const offer of readRecordArray(trip.offers)) {
         const amount = readNumberValue(offer.priceAmount);
@@ -8140,31 +8225,35 @@ query SearchSuggestions($query: String!, $category: Int) {
       return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
     });
   }
-  function isFinnFlightTripMatchingSearch(trip, flightMeta, searchData) {
+  function isFinnFlightTripMatchingSearch(trip, flightMeta, searchData, airportLookup) {
     const legs = readRecordArray(trip.legs);
     const outboundLeg = legs[0];
-    if (outboundLeg === void 0 || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, searchData, flightMeta.outboundDate)) {
+    if (outboundLeg === void 0 || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, searchData, airportLookup, flightMeta.outboundDate)) {
       return false;
     }
     if (flightMeta.inboundDate === void 0) return true;
     const inboundLeg = legs[1];
-    return inboundLeg !== void 0 && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, searchData, flightMeta.inboundDate);
+    return inboundLeg !== void 0 && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, searchData, airportLookup, flightMeta.inboundDate);
   }
-  function isFinnFlightLegMatch(leg, origin, destination, searchData, date) {
+  function isFinnFlightLegMatch(leg, origin, destination, searchData, airportLookup, date) {
     const legOrigin = readFinnFlightLegAirport(leg, "legOrigin", "origin");
     const legDestination = readFinnFlightLegAirport(leg, "legDestination", "destination");
-    return legOrigin !== void 0 && legDestination !== void 0 && isFinnAirportMatchingSearch(legOrigin, origin, searchData) && isFinnAirportMatchingSearch(legDestination, destination, searchData) && readFinnFlightLegDate(leg) === date;
+    return legOrigin !== void 0 && legDestination !== void 0 && isFinnAirportMatchingSearch(legOrigin, origin, searchData, airportLookup) && isFinnAirportMatchingSearch(legDestination, destination, searchData, airportLookup) && readFinnFlightLegDate(leg) === date;
   }
-  function isFinnAirportMatchingSearch(airport, requestedAirport, searchData) {
+  function isFinnAirportMatchingSearch(airport, requestedAirport, searchData, airportLookup) {
     if (airport === requestedAirport) return true;
-    return collectFinnAllowedAirportCodes(searchData, requestedAirport).has(airport);
+    return collectFinnAllowedAirportCodes(searchData, requestedAirport, airportLookup).has(airport);
   }
-  function collectFinnAllowedAirportCodes(searchData, requestedAirport) {
-    const allowedAirports = /* @__PURE__ */ new Set([requestedAirport]);
+  function collectFinnAllowedAirportCodes(searchData, requestedAirport, airportLookup) {
+    const requestedAirports = collectEquivalentFlightAirportCodes(requestedAirport, airportLookup);
+    for (const airport of searchData.airportGroups?.[requestedAirport] ?? []) {
+      requestedAirports.add(airport);
+    }
+    const allowedAirports = new Set(requestedAirports);
     if (searchData.resultParams === void 0) return allowedAirports;
     for (const value of searchData.resultParams.values()) {
       const airports = value.split(",").map((part) => readIataCodeValue(part)).filter((airport) => airport !== void 0);
-      if (airports.includes(requestedAirport)) {
+      if (airports.some((airport) => requestedAirports.has(airport))) {
         for (const airport of airports) allowedAirports.add(airport);
       }
     }
@@ -8371,20 +8460,26 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (flightMeta.inboundDate !== void 0) params.set("rdate", flightMeta.inboundDate);
     return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
   }
-  async function findTripComFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
+  async function findTripComFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = buildTripComFlightSearchUrl(flightMeta);
-    const listResultData = await userscriptJsonRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
-      method: "POST",
-      headers: TRIP_COM_COMMON_HEADERS,
-      body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta)),
-      credentials: "omit"
-    });
-    const listCandidates = isRecord(listResultData) ? extractTripComListOfferCandidates(listResultData, resultUrl) : [];
-    const calendarCandidate = flightMeta.inboundDate !== void 0 ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl) : void 0;
-    const candidates = [
+    const ratesPromise = fetchNokBaseRates();
+    const session = await fetchTripComFlightSearchSession(resultUrl);
+    const [rates, cheapestResultData, recommendedResultData] = await Promise.all([
+      ratesPromise,
+      fetchTripComFlightListSearch(flightMeta, session, "Price"),
+      fetchTripComFlightListSearch(flightMeta, session, "Score")
+    ]);
+    const cheapestCandidates = isRecord(cheapestResultData) ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, rates, "billigst") : [];
+    const recommendedCandidates = isRecord(recommendedResultData) ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, rates, "anbefalt") : [];
+    const listCandidates = dedupeTripComOfferCandidates([
+      ...cheapestCandidates,
+      ...recommendedCandidates
+    ]);
+    const calendarCandidate = listCandidates.length === 0 && flightMeta.inboundDate !== void 0 ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup) : void 0;
+    const candidates = dedupeTripComOfferCandidates([
       ...listCandidates,
       ...calendarCandidate !== void 0 ? [calendarCandidate] : []
-    ].sort(comparePriceMatchesBySortAmount);
+    ]);
     const best = candidates[0];
     if (best === void 0) return void 0;
     return {
@@ -8403,48 +8498,148 @@ query SearchSuggestions($query: String!, $category: Int) {
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
   }
-  async function findTripComCalendarOfferCandidate(flightMeta, resultUrl) {
+  async function fetchTripComFlightListSearch(flightMeta, session, sortOrder) {
+    const text = await userscriptTextRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
+      method: "POST",
+      headers: TRIP_COM_COMMON_HEADERS,
+      body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, session)),
+      credentials: "include",
+      timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
+    });
+    return text !== void 0 ? parseTripComSseResponse(text) : void 0;
+  }
+  async function fetchTripComFlightSearchSession(resultUrl) {
+    const userscriptSession = await fetchTripComFlightSearchSessionFromUserscript(resultUrl);
+    if (userscriptSession !== void 0) return userscriptSession;
+    if (!isUserscriptRuntime()) {
+      const response = await sendRuntimeMessage({
+        type: "get-trip-com-session",
+        url: resultUrl
+      });
+      if (isTripComSessionResponse(response)) {
+        return {
+          ...response.cid !== void 0 ? { cid: response.cid } : {},
+          ...response.vid !== void 0 ? { vid: response.vid } : {}
+        };
+      }
+    }
+    await warmTripComFlightSearchSession(resultUrl);
+    return {};
+  }
+  async function fetchTripComFlightSearchSessionFromUserscript(resultUrl) {
+    const gmRequest = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : void 0;
+    if (gmRequest === void 0) return void 0;
+    return new Promise((resolveValue) => {
+      const requestOptions = {
+        method: "GET",
+        url: resultUrl,
+        headers: {
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        timeout: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
+        onload: (response) => {
+          resolveValue(readTripComSessionFromResponseHeaders(response.responseHeaders) ?? {});
+        },
+        onerror: () => resolveValue({}),
+        ontimeout: () => resolveValue({})
+      };
+      const maybePromise = gmRequest(requestOptions);
+      if (isPromiseLike(maybePromise)) {
+        maybePromise.then(
+          (response) => resolveValue(isRecord(response) ? readTripComSessionFromResponseHeaders(readStringValue(response.responseHeaders)) ?? {} : {}),
+          () => resolveValue({})
+        );
+      }
+    });
+  }
+  async function warmTripComFlightSearchSession(resultUrl) {
+    try {
+      await userscriptTextRequest(resultUrl, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        credentials: "include"
+      });
+    } catch {
+    }
+  }
+  function readTripComSessionFromResponseHeaders(responseHeaders) {
+    const cid = readSetCookieHeaderValue(responseHeaders, "GUID");
+    const vid = readSetCookieHeaderValue(responseHeaders, "UBT_VID");
+    if (cid === void 0 && vid === void 0) return void 0;
+    return {
+      ...cid !== void 0 ? { cid } : {},
+      ...vid !== void 0 ? { vid } : {}
+    };
+  }
+  function readSetCookieHeaderValue(responseHeaders, cookieName) {
+    if (responseHeaders === void 0) return void 0;
+    const pattern = new RegExp(`(?:^|\\r?\\n)set-cookie:\\s*${escapeRegExp(cookieName)}=([^;\\r\\n]*)`, "gi");
+    let value;
+    let match;
+    while ((match = pattern.exec(responseHeaders)) !== null) {
+      const candidate = match[1]?.trim();
+      if (candidate !== void 0 && candidate.length > 0) value = candidate;
+    }
+    return value;
+  }
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function isTripComSessionResponse(value) {
+    return isRecord(value) && value.ok === true && (value.cid === void 0 || typeof value.cid === "string") && (value.vid === void 0 || typeof value.vid === "string");
+  }
+  async function findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup) {
     const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
       method: "POST",
       headers: TRIP_COM_COMMON_HEADERS,
       body: JSON.stringify(buildTripComLowPricePayload(flightMeta)),
-      credentials: "omit"
+      credentials: "omit",
+      timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
     });
     if (!isRecord(resultData)) return void 0;
-    return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl);
+    return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates, airportLookup);
   }
-  async function safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl) {
+  async function safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup) {
     try {
-      return await findTripComCalendarOfferCandidate(flightMeta, resultUrl);
+      return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup);
     } catch {
       return void 0;
     }
   }
-  function buildTripComFlightListSearchPayload(flightMeta) {
+  function buildTripComFlightListSearchPayload(flightMeta, sortOrder, session) {
     return {
       searchCriteria: {
-        grade: 1,
+        grade: 3,
+        realGrade: 1,
+        tripType: flightMeta.inboundDate !== void 0 ? 2 : 1,
+        journeyNo: 1,
         passengerInfoType: {
           adultCount: flightMeta.adults,
           childCount: 0,
           infantCount: 0
         },
-        tripType: flightMeta.inboundDate !== void 0 ? 2 : 1,
-        journeyNo: 1,
         journeyInfoTypes: buildTripComJourneyInfoTypes(flightMeta),
-        token: ""
+        policyId: null
       },
       sortInfoType: {
-        orderBy: "Score",
+        orderBy: sortOrder,
         direction: true,
         topList: []
       },
-      filterType: null,
+      filterType: {
+        filterFlagTypes: [],
+        queryItemSettings: [],
+        studentsSelectedStatus: true
+      },
       tagList: [],
-      flagList: [],
-      abtList: [],
-      searchTrigger: 2,
-      head: buildTripComFlightListSearchHead()
+      flagList: ["NEED_RESET_SORT", "FullDataCache"],
+      abtList: [
+        { abCode: "250811_IBU_wjrankol", abVersion: "A" },
+        { abCode: "251023_IBU_pricetool", abVersion: "E" },
+        { abCode: "260302_IBU_farecardjc", abVersion: "B" }
+      ],
+      head: buildTripComFlightListSearchHead(session)
     };
   }
   function buildTripComJourneyInfoTypes(flightMeta) {
@@ -8470,24 +8665,62 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return journeys;
   }
-  function buildTripComFlightListSearchHead() {
+  function buildTripComFlightListSearchHead(session) {
+    const timestamp = Date.now();
+    const batchId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : String(timestamp);
     return {
-      cid: "",
-      cver: "500",
-      syscode: "PWA",
-      appid: "700021",
+      cid: session.cid ?? "",
+      ctok: "",
+      cver: "3",
+      lang: "01",
+      sid: "8888",
+      syscode: "40",
+      auth: "",
+      xsid: "",
       extension: [
+        { name: "source", value: "ONLINE" },
+        { name: "sotpGroup", value: "Trip" },
         { name: "sotpLocale", value: "en-US" },
         { name: "sotpCurrency", value: TRIP_COM_DEFAULT_CURRENCY },
-        { name: "sotpGroup", value: "Trip" },
-        { name: "project", value: "xtaro" },
-        { name: "deviceType", value: "mobile" },
-        { name: "platformType", value: "web" },
-        { name: "requestSource", value: "release" }
-      ]
+        { name: "allianceID", value: "0" },
+        { name: "sid", value: "0" },
+        { name: "ouid", value: "" },
+        { name: "uuid" },
+        { name: "useDistributionType", value: "1" },
+        { name: "flt_app_session_transactionId", value: `1-mf-${timestamp}-WEB` },
+        { name: "vid", value: session.vid ?? `${timestamp}.cashbackvarsler` },
+        { name: "pvid", value: "1" },
+        { name: "Flt_SessionId", value: "1" },
+        { name: "channel", value: "EnglishSite" },
+        { name: "x-ua", value: "v=3_os=ONLINE_osv=10.15.7" },
+        { name: "PageId", value: "10320667452" },
+        { name: "clientTime", value: new Date(timestamp).toISOString() },
+        { name: "LowPriceSource", value: "searchForm" },
+        { name: "Flt_BatchId", value: batchId },
+        { name: "BlockTokenTimeout", value: "0" },
+        { name: "full_link_time_scene", value: "pure_list_page" },
+        { name: "xproduct", value: "baggage" },
+        { name: "hotelEntrance", value: "Flight" },
+        { name: "units", value: "METRIC" },
+        { name: "sotpUnit", value: "METRIC" }
+      ],
+      Locale: "en-US",
+      Language: "en",
+      Currency: TRIP_COM_DEFAULT_CURRENCY,
+      ClientID: "",
+      appid: "700020"
     };
   }
-  function extractTripComListOfferCandidates(resultData, resultUrl) {
+  function parseTripComSseResponse(text) {
+    const records = text.split(/\n\n+/).flatMap((block) => {
+      const data = block.split(/\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n").trim();
+      if (data.length === 0 || data === "[DONE]") return [];
+      const parsed = parseJsonValue(data);
+      return isRecord(parsed) ? [parsed] : [];
+    });
+    return records.find((record) => Array.isArray(record.itineraryList)) ?? records[records.length - 1];
+  }
+  function extractTripComListOfferCandidates(resultData, resultUrl, rates, sortLabel) {
     const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
     const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
@@ -8496,23 +8729,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       return readRecordArray(itinerary.policies).map((policy) => {
         const amount = readTripComPolicyAmount(policy);
         if (amount === void 0) return void 0;
-        const estimatedNokAmount = estimateTripComNokAmount(amount, currency);
-        const isEstimatedCurrency = estimatedNokAmount !== void 0 && currency.toUpperCase() !== "NOK";
-        const displayAmount = estimatedNokAmount ?? amount;
-        const displayCurrency = estimatedNokAmount !== void 0 ? "NOK" : currency;
-        const candidate = {
-          shopName: "Trip.com",
-          price: isEstimatedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
-          amount: displayAmount,
-          sortAmount: estimatedNokAmount ?? estimateTripComSortAmount(amount, currency),
-          currency: displayCurrency,
+        return toTripComOfferCandidate({
+          amount,
+          currency,
           productUrl: resultUrl,
-          platform: [
-            tripSummary,
-            isEstimatedCurrency ? `Trip.com viser ${formatFlightPrice(amount, currency)}` : void 0
-          ].filter((part) => part !== void 0 && part.length > 0).join(", ")
-        };
-        return candidate;
+          rates,
+          platformParts: [`Trip.com ${sortLabel}`, tripSummary]
+        });
       });
     }).filter((candidate) => candidate !== void 0);
     return dedupeTripComOfferCandidates(candidates);
@@ -8521,6 +8744,24 @@ query SearchSuggestions($query: String!, $category: Int) {
     const price = isRecord(policy.price) ? policy.price : void 0;
     const adultPrice = isRecord(price?.adult) ? price.adult : void 0;
     return readPositiveNumberValue(price?.totalPrice) ?? readPositiveNumberValue(price?.averagePrice) ?? readPositiveNumberValue(adultPrice?.totalPrice);
+  }
+  function toTripComOfferCandidate(input) {
+    const convertedNokAmount = convertToNok(input.amount, input.currency, input.rates);
+    const isConvertedCurrency = convertedNokAmount !== void 0 && input.currency.toUpperCase() !== "NOK";
+    const displayAmount = convertedNokAmount ?? input.amount;
+    const displayCurrency = convertedNokAmount !== void 0 ? "NOK" : input.currency;
+    return {
+      shopName: "Trip.com",
+      price: isConvertedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
+      amount: displayAmount,
+      sortAmount: convertedNokAmount ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+      currency: displayCurrency,
+      productUrl: input.productUrl,
+      platform: [
+        ...input.platformParts,
+        isConvertedCurrency ? `Trip.com viser ${formatFlightPrice(input.amount, input.currency)}` : void 0
+      ].filter((part) => part !== void 0 && part.length > 0).join(", ")
+    };
   }
   function buildTripComAirlineNameMap(value) {
     const map = {};
@@ -8562,16 +8803,16 @@ query SearchSuggestions($query: String!, $category: Int) {
   function dedupeTripComOfferCandidates(candidates) {
     const seen = /* @__PURE__ */ new Set();
     const uniqueCandidates = [];
-    for (const candidate of candidates.sort(comparePriceMatchesBySortAmount)) {
+    for (const candidate of candidates) {
       const key = [
         Math.round(candidate.sortAmount ?? candidate.amount),
-        candidate.platform ?? ""
+        candidate.platform?.replace(/^Trip\.com (?:billigst|anbefalt),\s*/i, "") ?? ""
       ].join("|");
       if (seen.has(key)) continue;
       seen.add(key);
       uniqueCandidates.push(candidate);
     }
-    return uniqueCandidates.slice(0, 20);
+    return uniqueCandidates.sort((a, b) => (a.sortAmount ?? a.amount) - (b.sortAmount ?? b.amount)).slice(0, 20);
   }
   function buildTripComLowPricePayload(flightMeta) {
     return {
@@ -8605,42 +8846,55 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     };
   }
-  function extractTripComCalendarCandidate(resultData, flightMeta, resultUrl) {
+  function extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates, airportLookup) {
     const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList).find((item) => isTripComCalendarItemMatchingSearch(item, flightMeta));
     const amount = readPositiveNumberValue(calendarItem?.currencyPrice);
     if (amount === void 0) return void 0;
-    const estimatedNokAmount = estimateTripComNokAmount(amount, currency);
-    const isEstimatedCurrency = estimatedNokAmount !== void 0 && currency.toUpperCase() !== "NOK";
-    const displayAmount = estimatedNokAmount ?? amount;
-    const displayCurrency = estimatedNokAmount !== void 0 ? "NOK" : currency;
-    return {
-      shopName: "Trip.com kalender",
-      price: isEstimatedCurrency ? formatApproxNokFlightPrice(displayAmount) : formatFlightPrice(displayAmount, displayCurrency),
-      amount: displayAmount,
-      sortAmount: estimatedNokAmount ?? estimateTripComSortAmount(amount, currency),
-      currency: displayCurrency,
+    const candidate = toTripComOfferCandidate({
+      amount,
+      currency,
       productUrl: resultUrl,
-      platform: [
+      rates,
+      platformParts: [
         "indikativ kalenderpris",
-        isEstimatedCurrency ? `Trip.com viser ${formatFlightPrice(amount, currency)}` : void 0,
         flightMeta.inboundDate !== void 0 ? "tur/retur" : "én vei",
-        "samme flyplasser"
-      ].filter((part) => part !== void 0).join(", ")
-    };
+        formatFlightAirportScopeText(flightMeta, airportLookup)
+      ]
+    });
+    return candidate !== void 0 ? { ...candidate, shopName: "Trip.com kalender" } : void 0;
   }
   function isTripComCalendarItemMatchingSearch(item, flightMeta) {
     if (formatPanFlightsEpochDate(readNumberValue(item.dDate)) !== flightMeta.outboundDate) return false;
     if (flightMeta.inboundDate === void 0) return true;
     return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
   }
-  function estimateTripComSortAmount(amount, currency) {
-    return estimateTripComNokAmount(amount, currency) ?? FLIGHT_STATIC_PRICE_SORT_AMOUNT;
+  async function fetchNokBaseRates() {
+    if (nokBaseRatesPromise === void 0) {
+      nokBaseRatesPromise = userscriptJsonRequest(EXCHANGE_RATES_URL, {
+        headers: { Accept: "application/json" },
+        credentials: "omit"
+      }).then(readNokBaseRates, () => void 0);
+    }
+    return nokBaseRatesPromise;
   }
-  function estimateTripComNokAmount(amount, currency) {
+  function readNokBaseRates(value) {
+    if (!isRecord(value) || value.result !== "success" || !isRecord(value.rates)) return void 0;
+    const rates = {};
+    for (const [currency, rate] of Object.entries(value.rates)) {
+      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+        rates[currency.toUpperCase()] = rate;
+      }
+    }
+    if (Object.keys(rates).length === 0) return void 0;
+    const updatedAt = readStringValue(value.time_last_update_utc);
+    return updatedAt !== void 0 ? { rates, updatedAt } : { rates };
+  }
+  function convertToNok(amount, currency, rates) {
     const normalizedCurrency = currency.toUpperCase();
-    if (normalizedCurrency === "NOK") return amount;
-    if (normalizedCurrency === "USD") return Math.round(amount * TRIP_COM_USD_TO_NOK_SORT_RATE);
+    if (normalizedCurrency === "NOK") return Math.round(amount);
+    const rate = rates?.rates[normalizedCurrency];
+    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) return amount / rate;
     return void 0;
   }
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
@@ -8845,13 +9099,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     const sortMode = parseUrl(url)?.searchParams.get("sort");
     return sortMode === "price_a" || sortMode === "bestflight_a" ? sortMode : void 0;
   }
-  async function findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails) {
+  async function findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = readCurrentMomondoFlightSearchUrl(flightMeta) ?? buildMomondoFlightSearchUrl(flightMeta);
     const searchData = await fetchMomondoFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
-    const resultData = await pollMomondoFlightResults(searchData, flightMeta);
+    const resultData = await pollMomondoFlightResults(searchData, flightMeta, airportLookup);
     if (resultData === void 0) return void 0;
-    const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, searchData.resultUrl);
+    const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
     const best = candidates[0];
     if (best === void 0) return void 0;
     return {
@@ -8887,19 +9141,19 @@ query SearchSuggestions($query: String!, $category: Int) {
   function parseMomondoFormToken(html) {
     return html.match(/window\.R9\.formToken\s*=\s*'([^']+)'/)?.[1] ?? html.match(/window\.R9\.formToken\s*=\s*"([^"]+)"/)?.[1];
   }
-  async function pollMomondoFlightResults(searchData, flightMeta) {
+  async function pollMomondoFlightResults(searchData, flightMeta, airportLookup) {
     let latestResult;
     let searchId;
     let filterState;
     for (let attempt = 0; attempt < MOMONDO_FLIGHT_POLL_ATTEMPTS; attempt++) {
       if (attempt > 0) await sleep(MOMONDO_FLIGHT_POLL_INTERVAL_MS);
       const requestFilterState = filterState;
-      const value = await requestMomondoFlightPoll(searchData, flightMeta, searchId, requestFilterState);
+      const value = await requestMomondoFlightPoll(searchData, flightMeta, airportLookup, searchId, requestFilterState);
       if (!isRecord(value) || !Array.isArray(value.results)) continue;
       latestResult = value;
       searchId = readStringValue(value.searchId) ?? searchId;
-      const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, searchData.resultUrl);
-      const nextFilterState = filterState ?? buildMomondoExactAirportFilterState(value, flightMeta);
+      const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl);
+      const nextFilterState = filterState ?? buildMomondoExactAirportFilterState(value, flightMeta, airportLookup);
       if (requestFilterState === void 0 && nextFilterState !== void 0) {
         filterState = nextFilterState;
         continue;
@@ -8911,7 +9165,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return latestResult;
   }
-  function requestMomondoFlightPoll(searchData, flightMeta, searchId, filterState) {
+  function requestMomondoFlightPoll(searchData, flightMeta, airportLookup, searchId, filterState) {
     return userscriptJsonRequest(MOMONDO_FLIGHT_POLL_ENDPOINT, {
       method: "POST",
       headers: {
@@ -8920,16 +9174,16 @@ query SearchSuggestions($query: String!, $category: Int) {
         "X-CSRF": searchData.formToken,
         "x-kayak-session-error-check": "iris"
       },
-      body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, searchId, filterState, searchData.sortMode)),
+      body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, airportLookup, searchId, filterState, searchData.sortMode)),
       credentials: "include"
     });
   }
-  function buildMomondoFlightPollPayload(flightMeta, searchId, filterState, sortMode) {
+  function buildMomondoFlightPollPayload(flightMeta, airportLookup, searchId, filterState, sortMode) {
     return {
       ...filterState !== void 0 ? { filterParams: { fs: filterState } } : {},
       userSearchParams: {
         ...searchId !== void 0 ? { searchId } : {},
-        legs: buildMomondoFlightRequestLegs(flightMeta),
+        legs: buildMomondoFlightRequestLegs(flightMeta, airportLookup),
         passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
         pageType: "frontDoor",
         sortMode
@@ -8942,14 +9196,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     };
   }
-  function buildMomondoExactAirportFilterState(resultData, flightMeta) {
-    const allowedAirports = collectMomondoAllowedAirportFilterCodes(resultData, [flightMeta.origin, flightMeta.destination]);
+  function buildMomondoExactAirportFilterState(resultData, flightMeta, airportLookup) {
+    const allowedAirports = collectMomondoAllowedAirportFilterCodes(resultData, [flightMeta.origin, flightMeta.destination], airportLookup);
     const excludedAirports = [...collectMomondoAirportFilterCodes(resultData)].filter((airport) => !allowedAirports.has(airport)).sort();
     return excludedAirports.length > 0 ? `airports=-${excludedAirports.join(",")}` : void 0;
   }
-  function collectMomondoAllowedAirportFilterCodes(resultData, requestedCodes) {
-    const requestedAirports = new Set(requestedCodes);
-    const allowedAirports = new Set(requestedCodes);
+  function collectMomondoAllowedAirportFilterCodes(resultData, requestedCodes, airportLookup) {
+    const requestedAirports = new Set(requestedCodes.flatMap((code) => [...collectEquivalentFlightAirportCodes(code, airportLookup)]));
+    const allowedAirports = new Set(requestedAirports);
     for (const group of collectMomondoAirportFilterGroups(resultData)) {
       const groupAirports = readRecordArray(isRecord(group.filterData) ? group.filterData.items : void 0).map((item) => readIataCodeValue(item.id)).filter((airport) => airport !== void 0);
       if (groupAirports.some((airport) => requestedAirports.has(airport))) {
@@ -8998,28 +9252,31 @@ query SearchSuggestions($query: String!, $category: Int) {
       collectMomondoAirportFilterCodesFromNode(child, codes);
     }
   }
-  function buildMomondoFlightRequestLegs(flightMeta) {
+  function buildMomondoFlightRequestLegs(flightMeta, airportLookup) {
     const legs = [
-      buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)
+      buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, airportLookup)
     ];
     if (flightMeta.inboundDate !== void 0) {
-      legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate));
+      legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, airportLookup));
     }
     return legs;
   }
-  function buildMomondoFlightRequestLeg(origin, destination, date) {
+  function buildMomondoFlightRequestLeg(origin, destination, date, airportLookup) {
     return {
-      origin: { locationType: "airports", airports: [origin] },
-      destination: { locationType: "airports", airports: [destination] },
+      origin: buildMomondoFlightRequestPlace(origin, airportLookup),
+      destination: buildMomondoFlightRequestPlace(destination, airportLookup),
       date,
       flex: "exact",
       cabinClass: "economy"
     };
   }
-  function extractMomondoFlightOfferCandidates(resultData, flightMeta, fallbackUrl) {
+  function buildMomondoFlightRequestPlace(code, airportLookup) {
+    return { locationType: "airports", airports: listFlightRequestAirportCodes(code, airportLookup) };
+  }
+  function extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl) {
     const candidates = [];
     for (const result of readRecordArray(resultData.results)) {
-      if (!isMomondoFlightMatchingSearch(result, resultData, flightMeta)) continue;
+      if (!isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
       if (isMomondoFlightPoorItinerary(result)) continue;
       const tripSummary = formatMomondoFlightTripSummary(result, resultData);
       const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
@@ -9112,22 +9369,22 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (url === void 0) return fallbackUrl;
     return parseUrlWithBase(url, "https://www.momondo.no/")?.toString() ?? fallbackUrl;
   }
-  function isMomondoFlightMatchingSearch(result, resultData, flightMeta) {
+  function isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup) {
     const legs = readMomondoFlightLegSummaries(result, resultData);
     const outboundLeg = legs[0];
-    if (outboundLeg === void 0 || !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, resultData, flightMeta.outboundDate)) {
+    if (outboundLeg === void 0 || !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, resultData, airportLookup, flightMeta.outboundDate)) {
       return false;
     }
     if (flightMeta.inboundDate === void 0) return true;
     const inboundLeg = legs[1];
-    return inboundLeg !== void 0 && isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, resultData, flightMeta.inboundDate);
+    return inboundLeg !== void 0 && isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, resultData, airportLookup, flightMeta.inboundDate);
   }
-  function isMomondoFlightLegMatch(leg, origin, destination, resultData, date) {
-    return isMomondoAirportMatchingSearch(leg.origin, origin, resultData) && isMomondoAirportMatchingSearch(leg.destination, destination, resultData) && leg.departureDate === date;
+  function isMomondoFlightLegMatch(leg, origin, destination, resultData, airportLookup, date) {
+    return isMomondoAirportMatchingSearch(leg.origin, origin, resultData, airportLookup) && isMomondoAirportMatchingSearch(leg.destination, destination, resultData, airportLookup) && leg.departureDate === date;
   }
-  function isMomondoAirportMatchingSearch(airport, requestedAirport, resultData) {
+  function isMomondoAirportMatchingSearch(airport, requestedAirport, resultData, airportLookup) {
     if (airport === requestedAirport) return true;
-    return collectMomondoAllowedAirportFilterCodes(resultData, [requestedAirport]).has(airport);
+    return collectMomondoAllowedAirportFilterCodes(resultData, [requestedAirport], airportLookup).has(airport);
   }
   function readMomondoFlightLegSummaries(result, resultData) {
     const segmentsById = isRecord(resultData.segments) ? resultData.segments : {};
@@ -9525,7 +9782,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         const requestOptions = {
           method: init?.method ?? "GET",
           url,
-          timeout: 15e3,
+          timeout: init?.timeoutMs ?? 15e3,
           onload: (response) => {
             resolveValue(parseUserscriptJsonResponse(response));
           },
@@ -9567,7 +9824,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         const requestOptions = {
           method: init?.method ?? "GET",
           url,
-          timeout: 15e3,
+          timeout: init?.timeoutMs ?? 15e3,
           onload: (response) => {
             resolveValue(readUserscriptTextResponse(response));
           },
@@ -13304,6 +13561,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     if (isFlightSearchPriceMatch(priceMatch)) {
       const alternatives2 = priceMatch.alternatives ?? [];
       const details = priceMatch.details ?? priceMatch.shopName;
+      const airportScopeText = formatFlightPriceMatchAirportScopeText(priceMatch);
       const hasLivePriceList = alternatives2.length > 0 && (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
       if (hasLivePriceList) {
         const isCalendarPrice = priceMatch.source === "skyscanner" && priceMatch.shopName === "Skyscanner kalender" || priceMatch.source === "tripcom" && priceMatch.shopName === "Trip.com kalender";
@@ -13313,7 +13571,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
             priceMatch.shopName,
             details !== priceMatch.shopName ? details : void 0,
             `${isCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
-            isCalendarPrice ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.` : "Dato og flyplasser er filtrert til samme søk."
+            isCalendarPrice ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.` : `Dato og ${airportScopeText} er filtrert til samme søk.`
           ].filter((line) => line !== void 0).join("\n"),
           [
             isCalendarPrice ? "Prisgrunnlag" : "Treffliste",
@@ -13325,7 +13583,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return [
         `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
         details,
-        "Åpner prissøk med samme flyplasser, datoer og antall voksne.",
+        `Åpner prissøk med ${airportScopeText}, datoer og antall voksne.`,
         "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden."
       ].join("\n");
     }

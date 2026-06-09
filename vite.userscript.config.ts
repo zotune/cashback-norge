@@ -49,6 +49,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      www.vinmonopolet.no
 // @connect      vinmonopolet.no
 // @connect      open.er-api.com
+// @connect      api.travelpayouts.com
 // @connect      gql.prisradar.no
 // @connect      prisradar.no
 // @connect      www.sesum.no

@@ -50,6 +50,7 @@ type UserscriptHttpResponse = {
   status?: number;
   response?: unknown;
   responseText?: string;
+  responseHeaders?: string;
 };
 
 declare const GM_xmlhttpRequest: undefined | ((options: UserscriptHttpRequestOptions) => unknown);
@@ -237,6 +238,10 @@ type HttpRequestMessage = {
   body?: string;
   credentials?: RequestCredentials;
 };
+type GetTripComSessionMessage = {
+  type: "get-trip-com-session";
+  url: string;
+};
 type OffersForUrlResponse =
   | {
       ok: true;
@@ -282,12 +287,20 @@ type FlightSearchMeta = {
   children: number;
   infants: number;
 };
+type FlightAirportData = {
+  code: string;
+  cityCode: string;
+  iataType: string;
+  flightable: boolean;
+};
+type FlightAirportCodeLookup = Map<string, string[]>;
 type FinnFlightSearchScope = "exact" | "metropolitan";
 type FinnFlightSearchData = {
   searchId: string;
   flightApiUrl: string;
   resultUrl: string;
   resultParams?: URLSearchParams;
+  airportGroups?: Record<string, string[]>;
 };
 type FinnFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
@@ -324,6 +337,11 @@ type TravellinkFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
   durationMinutes?: number;
   meRating?: number;
+};
+type TripComFlightSortOrder = "Price" | "Score";
+type TripComFlightSession = {
+  cid?: string;
+  vid?: string;
 };
 type TripComFlightOfferCandidate = PriceMatchAlternative & {
   productUrl: string;
@@ -393,6 +411,16 @@ type HttpRequestResponse =
       reason: string;
       status?: number;
     };
+type TripComSessionResponse =
+  | {
+      ok: true;
+      cid?: string;
+      vid?: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
 type ProductPageMeta = Omit<GetPriceMatchForProductMessage, "type">;
 const HOST_ID = "cashback-varsler-notice";
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
@@ -405,6 +433,7 @@ const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
 const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
+const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
 const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
 const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
 const FINN_FLIGHT_POLL_ATTEMPTS = 7;
@@ -476,12 +505,15 @@ const TRAVELLINK_COMMON_HEADERS: Record<string, string> = {
 };
 const TRIP_COM_BASE_URL = "https://us.trip.com";
 const TRIP_COM_LOW_PRICE_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/14427/GetLowPriceInCalender`;
-const TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearch`;
+const TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearchSSE`;
 const TRIP_COM_DEFAULT_CURRENCY = "USD";
+const TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS = 30000;
 const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
-  Accept: "application/json",
+  Accept: "text/event-stream, application/json",
   "Content-Type": "application/json;charset=UTF-8",
 };
+let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
+let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
 const TRAVELLINK_SEARCH_QUERY = `
 query searchItinerary($searchItineraryRequest: SearchItineraryRequest!) {
   searchItinerary(searchItineraryRequest: $searchItineraryRequest) {
@@ -874,11 +906,12 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
   const flightMeta = extractFlightSearchMeta(parsedUrl);
   if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
 
+  const airportLookup = await buildFlightAirportLookup(flightMeta);
   const routeTitle = `${flightMeta.origin} -> ${flightMeta.destination}`;
   const fullSearchDetails = [
     formatFlightDateRange(flightMeta),
     formatFlightPassengerText(flightMeta),
-    "samme flyplasser",
+    formatFlightAirportScopeText(flightMeta, airportLookup),
   ].join(", ");
   const cardSearchDetails = formatFlightCardSearchDetails(flightMeta);
 
@@ -903,21 +936,24 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
       : []),
   ];
 
-  const liveOfferFinders: Array<() => Promise<PriceMatchOffer | undefined>> = [
-    () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+  const liveOfferFinders: Array<{
+    sourceName: string;
+    findOffer: () => Promise<PriceMatchOffer | undefined>;
+  }> = [
+    { sourceName: "FINN", findOffer: () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
     ...(ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE
-      ? [() => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      ? [{ sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
-    () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
-    () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails),
+    { sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+    { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) },
     ...(ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE
-      ? [() => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      ? [{ sourceName: "Travellink", findOffer: () => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
     ...(ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE
-      ? [() => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails)]
+      ? [{ sourceName: "Trip.com", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
       : []),
   ];
-  const liveOffers = (await Promise.all(liveOfferFinders.map((findOffer) => safelyFindFlightPriceMatchOffer(findOffer))))
+  const liveOffers = (await Promise.all(liveOfferFinders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, findOffer))))
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   if (liveOffers.length === 0) return staticOffers;
 
@@ -929,11 +965,13 @@ async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
 }
 
 async function safelyFindFlightPriceMatchOffer(
+  sourceName: string,
   findOffer: () => Promise<PriceMatchOffer | undefined>,
 ): Promise<PriceMatchOffer | undefined> {
   try {
     return await findOffer();
-  } catch {
+  } catch (error) {
+    console.warn(`[Cashback Norge] Kunne ikke hente flypris fra ${sourceName}.`, error);
     return undefined;
   }
 }
@@ -1488,6 +1526,84 @@ function isFlightSearchPassengerMatchSupported(flightMeta: FlightSearchMeta): bo
   return flightMeta.adults > 0 && flightMeta.youths === 0 && flightMeta.children === 0 && flightMeta.infants === 0;
 }
 
+async function buildFlightAirportLookup(flightMeta: FlightSearchMeta): Promise<FlightAirportCodeLookup> {
+  const lookup: FlightAirportCodeLookup = new Map();
+  const airportData = await fetchFlightAirportData();
+  if (airportData === undefined) return lookup;
+
+  const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
+  const flightableAirports = airportData.filter((airport) => airport.iataType === "airport" && airport.flightable);
+  for (const requestedCode of requestedCodes) {
+    const hasExactAirport = flightableAirports.some((airport) => airport.code === requestedCode);
+    if (hasExactAirport) continue;
+
+    const cityAirports = uniqueStrings(
+      flightableAirports
+        .filter((airport) => airport.cityCode === requestedCode)
+        .map((airport) => airport.code),
+    );
+    if (cityAirports.length > 0) lookup.set(requestedCode, cityAirports);
+  }
+  return lookup;
+}
+
+async function fetchFlightAirportData(): Promise<FlightAirportData[] | undefined> {
+  if (flightAirportDataPromise === undefined) {
+    flightAirportDataPromise = userscriptJsonRequest(TRAVELPAYOUTS_AIRPORTS_URL, {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      timeoutMs: 4000,
+    }).then(readFlightAirportData, () => undefined);
+  }
+  return flightAirportDataPromise;
+}
+
+function readFlightAirportData(value: unknown): FlightAirportData[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const airports: FlightAirportData[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+
+    const code = readIataCodeValue(item.code);
+    const cityCode = readIataCodeValue(item.city_code);
+    const iataType = readStringValue(item.iata_type);
+    if (code === undefined || cityCode === undefined || iataType === undefined) continue;
+
+    airports.push({
+      code,
+      cityCode,
+      iataType,
+      flightable: item.flightable === true,
+    });
+  }
+  return airports.length > 0 ? airports : undefined;
+}
+
+function hasMetropolitanFlightSearchCode(flightMeta: FlightSearchMeta, airportLookup: FlightAirportCodeLookup): boolean {
+  return airportLookup.has(flightMeta.origin) || airportLookup.has(flightMeta.destination);
+}
+
+function formatFlightAirportScopeText(flightMeta: FlightSearchMeta, airportLookup: FlightAirportCodeLookup): string {
+  return hasMetropolitanFlightSearchCode(flightMeta, airportLookup) ? "samme byområde/flyplasser" : "samme flyplasser";
+}
+
+function formatFlightPriceMatchAirportScopeText(priceMatch: PriceMatchOffer): string {
+  return priceMatch.details?.includes("samme byområde/flyplasser") === true
+    ? "samme byområde/flyplasser"
+    : "samme flyplasser";
+}
+
+function collectEquivalentFlightAirportCodes(code: string, airportLookup: FlightAirportCodeLookup): Set<string> {
+  const normalizedCode = code.toUpperCase();
+  return new Set([normalizedCode, ...(airportLookup.get(normalizedCode) ?? [])]);
+}
+
+function listFlightRequestAirportCodes(code: string, airportLookup: FlightAirportCodeLookup): string[] {
+  const normalizedCode = code.toUpperCase();
+  return airportLookup.get(normalizedCode) ?? [normalizedCode];
+}
+
 function buildFlightPriceMatchOffer(input: {
   source: NonNullable<PriceMatchOffer["source"]>;
   sourceName: string;
@@ -1515,6 +1631,7 @@ async function findFinnFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
   const searchData = await fetchFinnFlightSearchData(resultUrl);
@@ -1523,7 +1640,7 @@ async function findFinnFlightPriceMatchOffer(
   const resultData = await pollFinnFlightResults(searchData, flightMeta);
   if (resultData === undefined) return undefined;
 
-  const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta);
+  const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
   const best = candidates[0];
   if (best === undefined) return undefined;
 
@@ -1590,12 +1707,14 @@ function buildFinnFlightSearchDataFromNextData(
   const searchId = readStringValue(searchData?.searchId);
   if (searchId === undefined) return undefined;
   const resultParams = buildFinnFlightResultParamsFromSearchData(searchData);
+  const airportGroups = buildFinnFlightAirportGroupsFromSearchData(searchData);
 
   return {
     searchId,
     flightApiUrl: readStringValue(config?.flightApiUrl) ?? FINN_FLIGHT_API_FALLBACK_URL,
     resultUrl,
     ...(resultParams !== undefined ? { resultParams } : {}),
+    ...(Object.keys(airportGroups).length > 0 ? { airportGroups } : {}),
   };
 }
 
@@ -1616,6 +1735,25 @@ function buildFinnFlightResultParamsFromSearchData(searchData: Record<string, un
     if (value !== undefined && value.length > 0) params.set(key, value);
   }
   return [...params].length > 0 ? params : undefined;
+}
+
+function buildFinnFlightAirportGroupsFromSearchData(searchData: Record<string, unknown>): Record<string, string[]> {
+  const groups: Record<string, string[]> = {};
+  const origin = readIataCodeValue(searchData.origin);
+  const destination = readIataCodeValue(searchData.destination);
+  addFinnFlightAirportGroup(groups, origin, readStringValue(searchData.departureAirportLeg1));
+  addFinnFlightAirportGroup(groups, destination, readStringValue(searchData.arrivalAirportLeg1));
+  addFinnFlightAirportGroup(groups, destination, readStringValue(searchData.departureAirportLeg2));
+  addFinnFlightAirportGroup(groups, origin, readStringValue(searchData.arrivalAirportLeg2));
+  return groups;
+}
+
+function addFinnFlightAirportGroup(groups: Record<string, string[]>, code: string | undefined, value: string | undefined): void {
+  if (code === undefined || value === undefined) return;
+  const airports = uniqueStrings(value.split(",")
+    .map((part) => readIataCodeValue(part))
+    .filter((airport): airport is string => airport !== undefined));
+  if (airports.length > 0) groups[code] = airports;
 }
 
 function parseFinnNextData(html: string): Record<string, unknown> | undefined {
@@ -1670,11 +1808,12 @@ function extractFinnFlightOfferCandidates(
   resultData: Record<string, unknown>,
   searchData: FinnFlightSearchData,
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
 ): FinnFlightOfferCandidate[] {
   const candidates: FinnFlightOfferCandidate[] = [];
 
   for (const trip of readRecordArray(resultData.trips)) {
-    if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData)) continue;
+    if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData, airportLookup)) continue;
 
     const tripSummary = formatFinnFlightTripSummary(trip);
     for (const offer of readRecordArray(trip.offers)) {
@@ -1729,17 +1868,18 @@ function isFinnFlightTripMatchingSearch(
   trip: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
   searchData: FinnFlightSearchData,
+  airportLookup: FlightAirportCodeLookup,
 ): boolean {
   const legs = readRecordArray(trip.legs);
   const outboundLeg = legs[0];
-  if (outboundLeg === undefined || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, searchData, flightMeta.outboundDate)) {
+  if (outboundLeg === undefined || !isFinnFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, searchData, airportLookup, flightMeta.outboundDate)) {
     return false;
   }
 
   if (flightMeta.inboundDate === undefined) return true;
 
   const inboundLeg = legs[1];
-  return inboundLeg !== undefined && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, searchData, flightMeta.inboundDate);
+  return inboundLeg !== undefined && isFinnFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, searchData, airportLookup, flightMeta.inboundDate);
 }
 
 function isFinnFlightLegMatch(
@@ -1747,14 +1887,15 @@ function isFinnFlightLegMatch(
   origin: string,
   destination: string,
   searchData: FinnFlightSearchData,
+  airportLookup: FlightAirportCodeLookup,
   date: string,
 ): boolean {
   const legOrigin = readFinnFlightLegAirport(leg, "legOrigin", "origin");
   const legDestination = readFinnFlightLegAirport(leg, "legDestination", "destination");
   return legOrigin !== undefined &&
     legDestination !== undefined &&
-    isFinnAirportMatchingSearch(legOrigin, origin, searchData) &&
-    isFinnAirportMatchingSearch(legDestination, destination, searchData) &&
+    isFinnAirportMatchingSearch(legOrigin, origin, searchData, airportLookup) &&
+    isFinnAirportMatchingSearch(legDestination, destination, searchData, airportLookup) &&
     readFinnFlightLegDate(leg) === date;
 }
 
@@ -1762,20 +1903,29 @@ function isFinnAirportMatchingSearch(
   airport: string,
   requestedAirport: string,
   searchData: FinnFlightSearchData,
+  airportLookup: FlightAirportCodeLookup,
 ): boolean {
   if (airport === requestedAirport) return true;
-  return collectFinnAllowedAirportCodes(searchData, requestedAirport).has(airport);
+  return collectFinnAllowedAirportCodes(searchData, requestedAirport, airportLookup).has(airport);
 }
 
-function collectFinnAllowedAirportCodes(searchData: FinnFlightSearchData, requestedAirport: string): Set<string> {
-  const allowedAirports = new Set([requestedAirport]);
+function collectFinnAllowedAirportCodes(
+  searchData: FinnFlightSearchData,
+  requestedAirport: string,
+  airportLookup: FlightAirportCodeLookup,
+): Set<string> {
+  const requestedAirports = collectEquivalentFlightAirportCodes(requestedAirport, airportLookup);
+  for (const airport of searchData.airportGroups?.[requestedAirport] ?? []) {
+    requestedAirports.add(airport);
+  }
+  const allowedAirports = new Set(requestedAirports);
   if (searchData.resultParams === undefined) return allowedAirports;
 
   for (const value of searchData.resultParams.values()) {
     const airports = value.split(",")
       .map((part) => readIataCodeValue(part))
       .filter((airport): airport is string => airport !== undefined);
-    if (airports.includes(requestedAirport)) {
+    if (airports.some((airport) => requestedAirports.has(airport))) {
       for (const airport of airports) allowedAirports.add(airport);
     }
   }
@@ -3302,21 +3452,30 @@ async function findTripComFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildTripComFlightSearchUrl(flightMeta);
-  const rates = await fetchNokBaseRates();
-  const listResultData = await userscriptJsonRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
-    method: "POST",
-    headers: TRIP_COM_COMMON_HEADERS,
-    body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta)),
-    credentials: "omit",
-  });
-  const listCandidates = isRecord(listResultData)
-    ? extractTripComListOfferCandidates(listResultData, resultUrl, rates)
+  const ratesPromise = fetchNokBaseRates();
+  const session = await fetchTripComFlightSearchSession(resultUrl);
+
+  const [rates, cheapestResultData, recommendedResultData] = await Promise.all([
+    ratesPromise,
+    fetchTripComFlightListSearch(flightMeta, session, "Price"),
+    fetchTripComFlightListSearch(flightMeta, session, "Score"),
+  ]);
+  const cheapestCandidates = isRecord(cheapestResultData)
+    ? extractTripComListOfferCandidates(cheapestResultData, resultUrl, rates, "billigst")
     : [];
+  const recommendedCandidates = isRecord(recommendedResultData)
+    ? extractTripComListOfferCandidates(recommendedResultData, resultUrl, rates, "anbefalt")
+    : [];
+  const listCandidates = dedupeTripComOfferCandidates([
+    ...cheapestCandidates,
+    ...recommendedCandidates,
+  ]);
 
   const calendarCandidate = listCandidates.length === 0 && flightMeta.inboundDate !== undefined
-    ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates)
+    ? await safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup)
     : undefined;
   const candidates = dedupeTripComOfferCandidates([
     ...listCandidates,
@@ -3342,59 +3501,191 @@ async function findTripComFlightPriceMatchOffer(
   };
 }
 
+async function fetchTripComFlightListSearch(
+  flightMeta: FlightSearchMeta,
+  session: TripComFlightSession,
+  sortOrder: TripComFlightSortOrder,
+): Promise<unknown | undefined> {
+  const text = await userscriptTextRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
+    method: "POST",
+    headers: TRIP_COM_COMMON_HEADERS,
+    body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, session)),
+    credentials: "include",
+    timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
+  });
+  return text !== undefined ? parseTripComSseResponse(text) : undefined;
+}
+
+async function fetchTripComFlightSearchSession(resultUrl: string): Promise<TripComFlightSession> {
+  const userscriptSession = await fetchTripComFlightSearchSessionFromUserscript(resultUrl);
+  if (userscriptSession !== undefined) return userscriptSession;
+
+  if (!isUserscriptRuntime()) {
+    const response = await sendRuntimeMessage<TripComSessionResponse>({
+      type: "get-trip-com-session",
+      url: resultUrl,
+    } satisfies GetTripComSessionMessage);
+    if (isTripComSessionResponse(response)) {
+      return {
+        ...(response.cid !== undefined ? { cid: response.cid } : {}),
+        ...(response.vid !== undefined ? { vid: response.vid } : {}),
+      };
+    }
+  }
+
+  await warmTripComFlightSearchSession(resultUrl);
+  return {};
+}
+
+async function fetchTripComFlightSearchSessionFromUserscript(resultUrl: string): Promise<TripComFlightSession | undefined> {
+  const gmRequest = typeof GM_xmlhttpRequest === "function"
+    ? GM_xmlhttpRequest
+    : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function"
+      ? GM.xmlHttpRequest
+      : undefined;
+  if (gmRequest === undefined) return undefined;
+
+  return new Promise((resolveValue) => {
+    const requestOptions: UserscriptHttpRequestOptions = {
+      method: "GET",
+      url: resultUrl,
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      timeout: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
+      onload: (response) => {
+        resolveValue(readTripComSessionFromResponseHeaders(response.responseHeaders) ?? {});
+      },
+      onerror: () => resolveValue({}),
+      ontimeout: () => resolveValue({}),
+    };
+
+    const maybePromise = gmRequest(requestOptions);
+    if (isPromiseLike(maybePromise)) {
+      maybePromise.then(
+        (response) => resolveValue(isRecord(response) ? readTripComSessionFromResponseHeaders(readStringValue(response.responseHeaders)) ?? {} : {}),
+        () => resolveValue({}),
+      );
+    }
+  });
+}
+
+async function warmTripComFlightSearchSession(resultUrl: string): Promise<void> {
+  try {
+    await userscriptTextRequest(resultUrl, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      credentials: "include",
+    });
+  } catch {
+    // Trip.com may still answer the SSE endpoint without a warmed page session.
+  }
+}
+
+function readTripComSessionFromResponseHeaders(responseHeaders: string | undefined): TripComFlightSession | undefined {
+  const cid = readSetCookieHeaderValue(responseHeaders, "GUID");
+  const vid = readSetCookieHeaderValue(responseHeaders, "UBT_VID");
+  if (cid === undefined && vid === undefined) return undefined;
+  return {
+    ...(cid !== undefined ? { cid } : {}),
+    ...(vid !== undefined ? { vid } : {}),
+  };
+}
+
+function readSetCookieHeaderValue(responseHeaders: string | undefined, cookieName: string): string | undefined {
+  if (responseHeaders === undefined) return undefined;
+  const pattern = new RegExp(`(?:^|\\r?\\n)set-cookie:\\s*${escapeRegExp(cookieName)}=([^;\\r\\n]*)`, "gi");
+  let value: string | undefined;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(responseHeaders)) !== null) {
+    const candidate = match[1]?.trim();
+    if (candidate !== undefined && candidate.length > 0) value = candidate;
+  }
+  return value;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isTripComSessionResponse(value: unknown): value is Extract<TripComSessionResponse, { ok: true }> {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    (value.cid === undefined || typeof value.cid === "string") &&
+    (value.vid === undefined || typeof value.vid === "string")
+  );
+}
+
 async function findTripComCalendarOfferCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   rates: NokBaseRates | undefined,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<TripComFlightOfferCandidate | undefined> {
   const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
     method: "POST",
     headers: TRIP_COM_COMMON_HEADERS,
     body: JSON.stringify(buildTripComLowPricePayload(flightMeta)),
     credentials: "omit",
+    timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
   });
   if (!isRecord(resultData)) return undefined;
 
-  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates);
+  return extractTripComCalendarCandidate(resultData, flightMeta, resultUrl, rates, airportLookup);
 }
 
 async function safelyFindTripComCalendarOfferCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   rates: NokBaseRates | undefined,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<TripComFlightOfferCandidate | undefined> {
   try {
-    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates);
+    return await findTripComCalendarOfferCandidate(flightMeta, resultUrl, rates, airportLookup);
   } catch {
     return undefined;
   }
 }
 
-function buildTripComFlightListSearchPayload(flightMeta: FlightSearchMeta): Record<string, unknown> {
+function buildTripComFlightListSearchPayload(
+  flightMeta: FlightSearchMeta,
+  sortOrder: TripComFlightSortOrder,
+  session: TripComFlightSession,
+): Record<string, unknown> {
   return {
     searchCriteria: {
-      grade: 1,
+      grade: 3,
+      realGrade: 1,
+      tripType: flightMeta.inboundDate !== undefined ? 2 : 1,
+      journeyNo: 1,
       passengerInfoType: {
         adultCount: flightMeta.adults,
         childCount: 0,
         infantCount: 0,
       },
-      tripType: flightMeta.inboundDate !== undefined ? 2 : 1,
-      journeyNo: 1,
       journeyInfoTypes: buildTripComJourneyInfoTypes(flightMeta),
-      token: "",
+      policyId: null,
     },
     sortInfoType: {
-      orderBy: "Score",
+      orderBy: sortOrder,
       direction: true,
       topList: [],
     },
-    filterType: null,
+    filterType: {
+      filterFlagTypes: [],
+      queryItemSettings: [],
+      studentsSelectedStatus: true,
+    },
     tagList: [],
-    flagList: [],
-    abtList: [],
-    searchTrigger: 2,
-    head: buildTripComFlightListSearchHead(),
+    flagList: ["NEED_RESET_SORT", "FullDataCache"],
+    abtList: [
+      { abCode: "250811_IBU_wjrankol", abVersion: "A" },
+      { abCode: "251023_IBU_pricetool", abVersion: "E" },
+      { abCode: "260302_IBU_farecardjc", abVersion: "B" },
+    ],
+    head: buildTripComFlightListSearchHead(session),
   };
 }
 
@@ -3422,28 +3713,75 @@ function buildTripComJourneyInfoTypes(flightMeta: FlightSearchMeta): Array<Recor
   return journeys;
 }
 
-function buildTripComFlightListSearchHead(): Record<string, unknown> {
+function buildTripComFlightListSearchHead(session: TripComFlightSession): Record<string, unknown> {
+  const timestamp = Date.now();
+  const batchId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : String(timestamp);
   return {
-    cid: "",
-    cver: "500",
-    syscode: "PWA",
-    appid: "700021",
+    cid: session.cid ?? "",
+    ctok: "",
+    cver: "3",
+    lang: "01",
+    sid: "8888",
+    syscode: "40",
+    auth: "",
+    xsid: "",
     extension: [
+      { name: "source", value: "ONLINE" },
+      { name: "sotpGroup", value: "Trip" },
       { name: "sotpLocale", value: "en-US" },
       { name: "sotpCurrency", value: TRIP_COM_DEFAULT_CURRENCY },
-      { name: "sotpGroup", value: "Trip" },
-      { name: "project", value: "xtaro" },
-      { name: "deviceType", value: "mobile" },
-      { name: "platformType", value: "web" },
-      { name: "requestSource", value: "release" },
+      { name: "allianceID", value: "0" },
+      { name: "sid", value: "0" },
+      { name: "ouid", value: "" },
+      { name: "uuid" },
+      { name: "useDistributionType", value: "1" },
+      { name: "flt_app_session_transactionId", value: `1-mf-${timestamp}-WEB` },
+      { name: "vid", value: session.vid ?? `${timestamp}.cashbackvarsler` },
+      { name: "pvid", value: "1" },
+      { name: "Flt_SessionId", value: "1" },
+      { name: "channel", value: "EnglishSite" },
+      { name: "x-ua", value: "v=3_os=ONLINE_osv=10.15.7" },
+      { name: "PageId", value: "10320667452" },
+      { name: "clientTime", value: new Date(timestamp).toISOString() },
+      { name: "LowPriceSource", value: "searchForm" },
+      { name: "Flt_BatchId", value: batchId },
+      { name: "BlockTokenTimeout", value: "0" },
+      { name: "full_link_time_scene", value: "pure_list_page" },
+      { name: "xproduct", value: "baggage" },
+      { name: "hotelEntrance", value: "Flight" },
+      { name: "units", value: "METRIC" },
+      { name: "sotpUnit", value: "METRIC" },
     ],
+    Locale: "en-US",
+    Language: "en",
+    Currency: TRIP_COM_DEFAULT_CURRENCY,
+    ClientID: "",
+    appid: "700020",
   };
+}
+
+function parseTripComSseResponse(text: string): Record<string, unknown> | undefined {
+  const records = text
+    .split(/\n\n+/)
+    .flatMap((block) => {
+      const data = block
+        .split(/\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n")
+        .trim();
+      if (data.length === 0 || data === "[DONE]") return [];
+      const parsed = parseJsonValue(data);
+      return isRecord(parsed) ? [parsed] : [];
+    });
+  return records.find((record) => Array.isArray(record.itineraryList)) ?? records[records.length - 1];
 }
 
 function extractTripComListOfferCandidates(
   resultData: Record<string, unknown>,
   resultUrl: string,
   rates: NokBaseRates | undefined,
+  sortLabel: string,
 ): TripComFlightOfferCandidate[] {
   const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
   const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
@@ -3460,7 +3798,7 @@ function extractTripComListOfferCandidates(
           currency,
           productUrl: resultUrl,
           rates,
-          platformParts: [tripSummary],
+          platformParts: [`Trip.com ${sortLabel}`, tripSummary],
         });
       });
     })
@@ -3567,13 +3905,15 @@ function dedupeTripComOfferCandidates(
   for (const candidate of candidates) {
     const key = [
       Math.round(candidate.sortAmount ?? candidate.amount),
-      candidate.platform ?? "",
+      candidate.platform?.replace(/^Trip\.com (?:billigst|anbefalt),\s*/i, "") ?? "",
     ].join("|");
     if (seen.has(key)) continue;
     seen.add(key);
     uniqueCandidates.push(candidate);
   }
-  return uniqueCandidates.slice(0, 20);
+  return uniqueCandidates
+    .sort((a, b) => (a.sortAmount ?? a.amount) - (b.sortAmount ?? b.amount))
+    .slice(0, 20);
 }
 
 function buildTripComLowPricePayload(flightMeta: FlightSearchMeta): Record<string, unknown> {
@@ -3614,6 +3954,7 @@ function extractTripComCalendarCandidate(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
   rates: NokBaseRates | undefined,
+  airportLookup: FlightAirportCodeLookup,
 ): TripComFlightOfferCandidate | undefined {
   const currency = readStringValue(resultData.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
   const calendarItem = readRecordArray(resultData.lowPriceInCalenderDtoInfoList)
@@ -3629,7 +3970,7 @@ function extractTripComCalendarCandidate(
     platformParts: [
       "indikativ kalenderpris",
       flightMeta.inboundDate !== undefined ? "tur/retur" : "én vei",
-      "samme flyplasser",
+      formatFlightAirportScopeText(flightMeta, airportLookup),
     ],
   });
   return candidate !== undefined ? { ...candidate, shopName: "Trip.com kalender" } : undefined;
@@ -3643,8 +3984,6 @@ function isTripComCalendarItemMatchingSearch(
   if (flightMeta.inboundDate === undefined) return true;
   return formatPanFlightsEpochDate(readNumberValue(item.aDate)) === flightMeta.inboundDate;
 }
-
-let nokBaseRatesPromise: Promise<NokBaseRates | undefined> | undefined;
 
 async function fetchNokBaseRates(): Promise<NokBaseRates | undefined> {
   if (nokBaseRatesPromise === undefined) {
@@ -3962,15 +4301,16 @@ async function findMomondoFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = readCurrentMomondoFlightSearchUrl(flightMeta) ?? buildMomondoFlightSearchUrl(flightMeta);
   const searchData = await fetchMomondoFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
-  const resultData = await pollMomondoFlightResults(searchData, flightMeta);
+  const resultData = await pollMomondoFlightResults(searchData, flightMeta, airportLookup);
   if (resultData === undefined) return undefined;
 
-  const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, searchData.resultUrl);
+  const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
   const best = candidates[0];
   if (best === undefined) return undefined;
 
@@ -4016,6 +4356,7 @@ function parseMomondoFormToken(html: string): string | undefined {
 async function pollMomondoFlightResults(
   searchData: MomondoFlightSearchData,
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<Record<string, unknown> | undefined> {
   let latestResult: Record<string, unknown> | undefined;
   let searchId: string | undefined;
@@ -4025,14 +4366,14 @@ async function pollMomondoFlightResults(
     if (attempt > 0) await sleep(MOMONDO_FLIGHT_POLL_INTERVAL_MS);
 
     const requestFilterState = filterState;
-    const value = await requestMomondoFlightPoll(searchData, flightMeta, searchId, requestFilterState);
+    const value = await requestMomondoFlightPoll(searchData, flightMeta, airportLookup, searchId, requestFilterState);
     if (!isRecord(value) || !Array.isArray(value.results)) continue;
 
     latestResult = value;
     searchId = readStringValue(value.searchId) ?? searchId;
 
-    const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, searchData.resultUrl);
-    const nextFilterState = filterState ?? buildMomondoExactAirportFilterState(value, flightMeta);
+    const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl);
+    const nextFilterState = filterState ?? buildMomondoExactAirportFilterState(value, flightMeta, airportLookup);
     if (requestFilterState === undefined && nextFilterState !== undefined) {
       filterState = nextFilterState;
       continue;
@@ -4050,6 +4391,7 @@ async function pollMomondoFlightResults(
 function requestMomondoFlightPoll(
   searchData: MomondoFlightSearchData,
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
   searchId: string | undefined,
   filterState: string | undefined,
 ): Promise<unknown | undefined> {
@@ -4061,13 +4403,14 @@ function requestMomondoFlightPoll(
       "X-CSRF": searchData.formToken,
       "x-kayak-session-error-check": "iris",
     },
-    body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, searchId, filterState, searchData.sortMode)),
+    body: JSON.stringify(buildMomondoFlightPollPayload(flightMeta, airportLookup, searchId, filterState, searchData.sortMode)),
     credentials: "include",
   });
 }
 
 function buildMomondoFlightPollPayload(
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
   searchId: string | undefined,
   filterState: string | undefined,
   sortMode: MomondoFlightSortMode,
@@ -4076,7 +4419,7 @@ function buildMomondoFlightPollPayload(
     ...(filterState !== undefined ? { filterParams: { fs: filterState } } : {}),
     userSearchParams: {
       ...(searchId !== undefined ? { searchId } : {}),
-      legs: buildMomondoFlightRequestLegs(flightMeta),
+      legs: buildMomondoFlightRequestLegs(flightMeta, airportLookup),
       passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
       pageType: "frontDoor",
       sortMode,
@@ -4093,17 +4436,22 @@ function buildMomondoFlightPollPayload(
 function buildMomondoExactAirportFilterState(
   resultData: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
 ): string | undefined {
-  const allowedAirports = collectMomondoAllowedAirportFilterCodes(resultData, [flightMeta.origin, flightMeta.destination]);
+  const allowedAirports = collectMomondoAllowedAirportFilterCodes(resultData, [flightMeta.origin, flightMeta.destination], airportLookup);
   const excludedAirports = [...collectMomondoAirportFilterCodes(resultData)]
     .filter((airport) => !allowedAirports.has(airport))
     .sort();
   return excludedAirports.length > 0 ? `airports=-${excludedAirports.join(",")}` : undefined;
 }
 
-function collectMomondoAllowedAirportFilterCodes(resultData: Record<string, unknown>, requestedCodes: string[]): Set<string> {
-  const requestedAirports = new Set(requestedCodes);
-  const allowedAirports = new Set(requestedCodes);
+function collectMomondoAllowedAirportFilterCodes(
+  resultData: Record<string, unknown>,
+  requestedCodes: string[],
+  airportLookup: FlightAirportCodeLookup,
+): Set<string> {
+  const requestedAirports = new Set(requestedCodes.flatMap((code) => [...collectEquivalentFlightAirportCodes(code, airportLookup)]));
+  const allowedAirports = new Set(requestedAirports);
   for (const group of collectMomondoAirportFilterGroups(resultData)) {
     const groupAirports = readRecordArray(isRecord(group.filterData) ? group.filterData.items : undefined)
       .map((item) => readIataCodeValue(item.id))
@@ -4163,35 +4511,40 @@ function collectMomondoAirportFilterCodesFromNode(value: unknown, codes: Set<str
   }
 }
 
-function buildMomondoFlightRequestLegs(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
+function buildMomondoFlightRequestLegs(flightMeta: FlightSearchMeta, airportLookup: FlightAirportCodeLookup): Array<Record<string, unknown>> {
   const legs = [
-    buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate),
+    buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, airportLookup),
   ];
   if (flightMeta.inboundDate !== undefined) {
-    legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate));
+    legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, airportLookup));
   }
   return legs;
 }
 
-function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string): Record<string, unknown> {
+function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string, airportLookup: FlightAirportCodeLookup): Record<string, unknown> {
   return {
-    origin: { locationType: "airports", airports: [origin] },
-    destination: { locationType: "airports", airports: [destination] },
+    origin: buildMomondoFlightRequestPlace(origin, airportLookup),
+    destination: buildMomondoFlightRequestPlace(destination, airportLookup),
     date,
     flex: "exact",
     cabinClass: "economy",
   };
 }
 
+function buildMomondoFlightRequestPlace(code: string, airportLookup: FlightAirportCodeLookup): Record<string, unknown> {
+  return { locationType: "airports", airports: listFlightRequestAirportCodes(code, airportLookup) };
+}
+
 function extractMomondoFlightOfferCandidates(
   resultData: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
   fallbackUrl: string,
 ): MomondoFlightOfferCandidate[] {
   const candidates: MomondoFlightOfferCandidate[] = [];
 
   for (const result of readRecordArray(resultData.results)) {
-    if (!isMomondoFlightMatchingSearch(result, resultData, flightMeta)) continue;
+    if (!isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
     if (isMomondoFlightPoorItinerary(result)) continue;
 
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
@@ -4335,12 +4688,13 @@ function isMomondoFlightMatchingSearch(
   result: Record<string, unknown>,
   resultData: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
 ): boolean {
   const legs = readMomondoFlightLegSummaries(result, resultData);
   const outboundLeg = legs[0];
   if (
     outboundLeg === undefined ||
-    !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, resultData, flightMeta.outboundDate)
+    !isMomondoFlightLegMatch(outboundLeg, flightMeta.origin, flightMeta.destination, resultData, airportLookup, flightMeta.outboundDate)
   ) {
     return false;
   }
@@ -4349,7 +4703,7 @@ function isMomondoFlightMatchingSearch(
 
   const inboundLeg = legs[1];
   return inboundLeg !== undefined &&
-    isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, resultData, flightMeta.inboundDate);
+    isMomondoFlightLegMatch(inboundLeg, flightMeta.destination, flightMeta.origin, resultData, airportLookup, flightMeta.inboundDate);
 }
 
 function isMomondoFlightLegMatch(
@@ -4357,10 +4711,11 @@ function isMomondoFlightLegMatch(
   origin: string,
   destination: string,
   resultData: Record<string, unknown>,
+  airportLookup: FlightAirportCodeLookup,
   date: string,
 ): boolean {
-  return isMomondoAirportMatchingSearch(leg.origin, origin, resultData) &&
-    isMomondoAirportMatchingSearch(leg.destination, destination, resultData) &&
+  return isMomondoAirportMatchingSearch(leg.origin, origin, resultData, airportLookup) &&
+    isMomondoAirportMatchingSearch(leg.destination, destination, resultData, airportLookup) &&
     leg.departureDate === date;
 }
 
@@ -4368,9 +4723,10 @@ function isMomondoAirportMatchingSearch(
   airport: string,
   requestedAirport: string,
   resultData: Record<string, unknown>,
+  airportLookup: FlightAirportCodeLookup,
 ): boolean {
   if (airport === requestedAirport) return true;
-  return collectMomondoAllowedAirportFilterCodes(resultData, [requestedAirport]).has(airport);
+  return collectMomondoAllowedAirportFilterCodes(resultData, [requestedAirport], airportLookup).has(airport);
 }
 
 function readMomondoFlightLegSummaries(
@@ -4888,6 +5244,7 @@ async function userscriptJsonRequest(
     headers?: Record<string, string>;
     body?: string;
     credentials?: RequestCredentials;
+    timeoutMs?: number;
   },
 ): Promise<unknown | undefined> {
   const gmRequest = typeof GM_xmlhttpRequest === "function"
@@ -4901,7 +5258,7 @@ async function userscriptJsonRequest(
       const requestOptions: UserscriptHttpRequestOptions = {
         method: init?.method ?? "GET",
         url,
-        timeout: 15000,
+        timeout: init?.timeoutMs ?? 15000,
         onload: (response) => {
           resolveValue(parseUserscriptJsonResponse(response));
         },
@@ -4947,6 +5304,7 @@ async function userscriptTextRequest(
     headers?: Record<string, string>;
     body?: string;
     credentials?: RequestCredentials;
+    timeoutMs?: number;
   },
 ): Promise<string | undefined> {
   const gmRequest = typeof GM_xmlhttpRequest === "function"
@@ -4960,7 +5318,7 @@ async function userscriptTextRequest(
       const requestOptions: UserscriptHttpRequestOptions = {
         method: init?.method ?? "GET",
         url,
-        timeout: 15000,
+        timeout: init?.timeoutMs ?? 15000,
         onload: (response) => {
           resolveValue(readUserscriptTextResponse(response));
         },
@@ -9250,6 +9608,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
   if (isFlightSearchPriceMatch(priceMatch)) {
     const alternatives = priceMatch.alternatives ?? [];
     const details = priceMatch.details ?? priceMatch.shopName;
+    const airportScopeText = formatFlightPriceMatchAirportScopeText(priceMatch);
     const hasLivePriceList = alternatives.length > 0 &&
       (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
 
@@ -9264,7 +9623,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
           `${isCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
           isCalendarPrice
             ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.`
-            : "Dato og flyplasser er filtrert til samme søk.",
+            : `Dato og ${airportScopeText} er filtrert til samme søk.`,
         ].filter((line): line is string => line !== undefined).join("\n"),
         [
           isCalendarPrice ? "Prisgrunnlag" : "Treffliste",
@@ -9277,7 +9636,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
     return [
       `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
       details,
-      "Åpner prissøk med samme flyplasser, datoer og antall voksne.",
+      `Åpner prissøk med ${airportScopeText}, datoer og antall voksne.`,
       "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden.",
     ].join("\n");
   }
