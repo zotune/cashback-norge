@@ -35,10 +35,89 @@ const lykoMessage: GetPriceMatchForProductMessage = {
   organizationName: "Lyko",
 };
 
+// Sony WH-1000XM6: korte kanoniske titler hos Godpris/Klarna («WH-1000XM6 - Black»)
+// ble tidligere avvist av signal-overlapp-kravet, og sølv feilmatchet LinkBuds Fit.
+// Forventet: godpris + klarna matcher riktig fargevariant, aldri LinkBuds/WF-1000XM6.
+const sonyBlackMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.komplett.no/product/1323734/tv-lyd-bilde/hodetelefoner-tilbehoer/hodetelefoner/sony-wh-1000xm6-traadloese-hodetelefoner-over-ear-sort",
+  searchTerm: "Sony WH-1000XM6 trådløse hodetelefoner, Over-Ear (sort)",
+  productPageClue: true,
+  price: 3990,
+  currency: "NOK",
+  codes: ["1323734", "WH1000XM6B.CE7", "4548736162617"],
+  organizationName: "Komplett",
+};
+
+const sonySilverMessage: GetPriceMatchForProductMessage = {
+  ...sonyBlackMessage,
+  url: "https://www.komplett.no/product/1323735/tv-lyd-bilde/hodetelefoner-tilbehoer/hodetelefoner/sony-wh-1000xm6-traadloese-hodetelefoner-over-ear-soelv",
+  searchTerm: "Sony WH-1000XM6 trådløse hodetelefoner, Over-Ear (sølv)",
+  // EAN slik spec-tabell-høsteren i content.ts finner den på produktsiden.
+  codes: ["WH1000XM6S.CE7", "4548736162662"],
+};
+
+const sonySandstoneMessage: GetPriceMatchForProductMessage = {
+  ...sonyBlackMessage,
+  url: "https://www.komplett.no/product/1323736/tv-lyd-bilde/hodetelefoner-tilbehoer/hodetelefoner/sony-wh-1000xm6-traadloese-hodetelefoner-over-ear-sandstone",
+  searchTerm: "Sony WH-1000XM6 trådløse hodetelefoner, Over-Ear (Sandstone)",
+  codes: ["4548736176850"],
+};
+
+// Prisjakt-/csmegastore-sider har 8-sifrede produkt-ID-er i URL-en som tidligere
+// ble feiltolket som EAN-8 og forgiftet kodesøkene (Hansgrohe/KS Tools-feilmatchene).
+// Forventet: aldri Hansgrohe/KS Tools/iPhone 17e/Osmo Action 6 i resultatene.
+const roborockPrisjaktMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.prisjakt.no/product.php?p=16151403",
+  searchTerm: "Roborock Saros 20 Sonic Complete",
+  productPageClue: true,
+  price: 9990,
+  currency: "NOK",
+  organizationName: "VVSkupp",
+};
+
+const iphonePrisjaktMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.prisjakt.no/product.php?p=14969878",
+  searchTerm: "Apple iPhone 17 5G 8GB RAM 256GB",
+  productPageClue: true,
+  price: 10358,
+  currency: "NOK",
+  organizationName: "Linné Elektronik",
+};
+
+const djiCsMegastoreMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.csmegastore.no/i/24656085/dji-osmo-action-4-standard-combo",
+  searchTerm: "DJI Osmo Action 4 Standard Combo",
+  productPageClue: true,
+  price: 2990,
+  currency: "NOK",
+  organizationName: "CS MEGASTORE",
+};
+
+const iphoneCsMegastoreMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.csmegastore.no/i/24678529/apple-iphone-17-256gb-white",
+  searchTerm: "Apple iPhone 17 256GB White",
+  productPageClue: true,
+  price: 10416,
+  currency: "NOK",
+  organizationName: "CS MEGASTORE",
+};
+
 for (const [label, message] of [
   ["komplett", komplettMessage],
   ["komplett (entity-searchTerm)", komplettDirtyMessage],
   ["lyko", lykoMessage],
+  ["sony svart", sonyBlackMessage],
+  ["sony sølv", sonySilverMessage],
+  ["sony sandstone", sonySandstoneMessage],
+  ["roborock @ prisjakt", roborockPrisjaktMessage],
+  ["iphone 17 @ prisjakt", iphonePrisjaktMessage],
+  ["dji osmo action 4 @ csmegastore", djiCsMegastoreMessage],
+  ["iphone 17 hvit @ csmegastore", iphoneCsMegastoreMessage],
 ] as const) {
   console.log(`\n=== ${label}`);
   for (const [source, finder] of [

@@ -53,38 +53,44 @@ export async function findGodprisPriceMatch(
   ]);
   const anchor = buildProductMatchAnchor(message);
 
+  const visitedProductIds = new Set<string>();
   for (const query of searchQueries) {
-    const productId = await fetchGodprisProductId(query, requestJson, anchor);
-    if (productId === undefined) continue;
+    // Prøv alle godkjente kandidater i scorerekkefølge, ikke bare den beste:
+    // første kandidat kan ha utilgjengelig side eller feile variant-guarden.
+    const productIds = await fetchGodprisProductIds(query, requestJson, anchor);
+    for (const productId of productIds) {
+      if (visitedProductIds.has(productId)) continue;
+      visitedProductIds.add(productId);
 
-    const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
-      headers: { "Accept": "text/html,application/xhtml+xml" },
-    });
-    const offer = html !== undefined ? readGodprisProductPage(html, productId, anchor) : undefined;
-    if (offer !== undefined) return offer;
+      const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
+        headers: { "Accept": "text/html,application/xhtml+xml" },
+      });
+      const offer = html !== undefined ? readGodprisProductPage(html, productId, anchor) : undefined;
+      if (offer !== undefined) return offer;
+    }
   }
 
   return undefined;
 }
 
-async function fetchGodprisProductId(
+async function fetchGodprisProductIds(
   query: string,
   requestJson: JsonRequest,
   anchor: ProductMatchAnchor,
-): Promise<string | undefined> {
+): Promise<string[]> {
   const normalizedQuery = query.trim();
-  if (normalizedQuery.length < 4) return undefined;
+  if (normalizedQuery.length < 4) return [];
 
   const params = new URLSearchParams({ q: normalizedQuery });
   const value = await requestJson(`https://godpris.no/api/product/search?${params.toString()}`, {
     headers: { "Accept": "application/json" },
   });
-  if (!isPlainRecord(value) || !Array.isArray(value.results)) return undefined;
+  if (!isPlainRecord(value) || !Array.isArray(value.results)) return [];
 
   // Kodesøk (GTIN/MPN) skal fortsatt tittelvalideres mot sidens egen tittel.
   const isCodeQuery = isLikelyGtin(normalizedQuery) || isLikelyMpn(normalizedQuery);
   const matchAnchor = isCodeQuery ? anchor : { ...anchor, searchTerm: normalizedQuery };
-  let bestMatch: { id: string; score: number } | undefined;
+  const matches: Array<{ id: string; score: number }> = [];
   for (const result of value.results) {
     if (!isPlainRecord(result)) continue;
     const id = readStringLike(result.id);
@@ -97,14 +103,15 @@ async function fetchGodprisProductId(
       title !== undefined ? scoreProductCandidateMatch(matchAnchor, { title, brand }) : 0,
       groupTitle !== undefined ? scoreProductCandidateMatch(matchAnchor, { title: groupTitle, brand }) : 0,
     );
-    if (bestMatch === undefined || score > bestMatch.score) {
-      bestMatch = { id, score };
+    if (score >= MIN_PRODUCT_MATCH_SCORE) {
+      matches.push({ id, score });
     }
   }
 
-  return bestMatch !== undefined && bestMatch.score >= MIN_PRODUCT_MATCH_SCORE
-    ? bestMatch.id
-    : undefined;
+  return matches
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 3)
+    .map((match) => match.id);
 }
 
 function readGodprisProductPage(

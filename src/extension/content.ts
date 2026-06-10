@@ -788,7 +788,7 @@ function installDynamicProductPageRefresh(): void {
         ].join("|")
         : productMeta === undefined
           ? ""
-          : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent].join("|");
+          : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
         requestCurrentOffers();
@@ -6196,7 +6196,11 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   const titleMeta = document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content.trim();
   const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
   const h1 = document.querySelector("h1")?.textContent?.trim();
-  const codes = uniqueStrings([...collectProductCodes(productLdJson), ...collectProductCodesFromUrl(parsedUrl)]);
+  const codes = uniqueStrings([
+    ...collectProductCodes(productLdJson),
+    ...collectProductCodesFromSpecificationRows(),
+    ...collectProductCodesFromUrl(parsedUrl),
+  ]);
   const productPageClue =
     isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
@@ -6579,8 +6583,28 @@ function collectProductCodes(product: Record<string, unknown> | undefined): stri
   return [...codes];
 }
 
+// Kun 12-14 sifre (EAN-13/UPC/GTIN-14): 8-sifrede tall i URL-er er som regel
+// interne produkt-ID-er (prisjakt p=, csmegastore /i/…) og forgifter kodesøkene.
 function collectProductCodesFromUrl(parsedUrl: URL): string[] {
-  return uniqueStrings(`${parsedUrl.pathname} ${parsedUrl.search}`.match(/\b\d{8,14}\b/g) ?? []);
+  return uniqueStrings(`${parsedUrl.pathname} ${parsedUrl.search}`.match(/\b\d{12,14}\b/g) ?? []);
+}
+
+// Mange butikker viser EAN/GTIN kun i spesifikasjonstabellen (<th>EAN</th><td>…</td>
+// eller <dt>/<dd>), ikke i JSON-LD. GTIN gir eksakte treff hos prissammenlignerne.
+function collectProductCodesFromSpecificationRows(): string[] {
+  const codes = new Set<string>();
+  for (const labelElement of document.querySelectorAll("th, dt")) {
+    const label = labelElement.textContent?.trim() ?? "";
+    if (!/^(?:ean|gtin(?:8|12|13|14)?|strekkode|barcode)\b/i.test(label)) continue;
+
+    const valueElement = labelElement.tagName === "DT"
+      ? labelElement.nextElementSibling
+      : labelElement.closest("tr")?.querySelector("td");
+    const value = valueElement?.textContent?.match(/\b(?:\d{8}|\d{12,14})\b/)?.[0];
+    if (value !== undefined) codes.add(value);
+    if (codes.size >= 3) break;
+  }
+  return [...codes];
 }
 
 function readProductPackageQuantity(

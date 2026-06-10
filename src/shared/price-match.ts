@@ -10,6 +10,7 @@ import {
 import { findGodprisPriceMatch } from "./godpris-price-match.js";
 import {
   buildProductMatchAnchor,
+  hasMatchingModelNumberToken,
   hasProductVariantConflict,
 } from "./product-match.js";
 import {
@@ -131,6 +132,7 @@ export async function findPriceMatches(
   const allowedOffers = offers
     .filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms))
     .filter((offer) => hasContextualVolumeMatching(offer) || !hasProductVariantConflict(variantAnchor, offer.productName))
+    .filter((offer) => isPriceMatchOfferPricePlausible(offer, message))
     .filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
 
   if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
@@ -152,6 +154,24 @@ function withoutProductVariantConflict(
 ): PriceMatchOffer | undefined {
   if (offer === undefined || hasContextualVolumeMatching(offer)) return offer;
   return hasProductVariantConflict(variantAnchor, offer.productName) ? undefined : offer;
+}
+
+// Et tilbud langt under sidens egen pris er oftere en feilmatch enn et kupp:
+// da kreves sterkere bevis (felles modellnummer eller nær-eksakt tittel) før vi viser det.
+const SUSPICIOUSLY_CHEAP_PRICE_RATIO = 0.6;
+const SUSPICIOUSLY_CHEAP_MIN_TITLE_SCORE = 0.6;
+const PRICE_PLAUSIBILITY_SOURCES = new Set(["godpris", "klarna", "prisradar"]);
+
+function isPriceMatchOfferPricePlausible(
+  offer: PriceMatchOffer,
+  message: GetPriceMatchForProductMessage,
+): boolean {
+  if (offer.source === undefined || !PRICE_PLAUSIBILITY_SOURCES.has(offer.source)) return true;
+  if (message.price === undefined || message.price <= 0) return true;
+  if (offer.amount >= message.price * SUSPICIOUSLY_CHEAP_PRICE_RATIO) return true;
+
+  return hasMatchingModelNumberToken(message.searchTerm, offer.productName) ||
+    scoreProductTitleAgainstSearchTerm(message.searchTerm, offer.productName) >= SUSPICIOUSLY_CHEAP_MIN_TITLE_SCORE;
 }
 
 function isSupplementalPriceMatchOfferAligned(

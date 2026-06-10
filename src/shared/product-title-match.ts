@@ -6,15 +6,27 @@ const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
 
 const CANONICAL_MATCH_TOKENS = new Map<string, string>([
   ["black", "svart"],
+  ["blue", "bla"],
+  ["brown", "brun"],
   ["carbon", "svart"],
   ["controller", "kontroller"],
   ["controllers", "kontroller"],
   ["gamepad", "kontroller"],
   ["gamepads", "kontroller"],
+  ["gold", "gull"],
+  ["gray", "gra"],
+  ["green", "gronn"],
+  ["grey", "gra"],
   ["joypad", "kontroller"],
+  ["orange", "oransje"],
+  ["pink", "rosa"],
+  ["purple", "lilla"],
+  ["red", "rod"],
+  ["silver", "solv"],
   ["wireless", "tradlos"],
   ["sort", "svart"],
   ["white", "hvit"],
+  ["yellow", "gul"],
 ]);
 
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
@@ -53,7 +65,7 @@ export function scoreProductTitleMatch(query: string, title: string): number {
   let matchedWeight = 0;
   let totalWeight = 0;
   for (const token of queryTokens) {
-    const weight = token.length >= 6 ? 2 : token.length >= 4 ? 1.5 : 1;
+    const weight = isModelNumberLikeToken(token) ? 3 : token.length >= 6 ? 2 : token.length >= 4 ? 1.5 : 1;
     totalWeight += weight;
     if (titleTokens.has(token)) {
       matchedWeight += weight;
@@ -85,10 +97,21 @@ function hasProductTitleSignalOverlap(query: string, title: string): boolean {
 }
 
 function isProductSignalToken(token: string): boolean {
+  if (isModelNumberLikeToken(token)) return true;
   return token.length >= 6 &&
     /[a-z]/.test(token) &&
     !/\d/.test(token) &&
     !GENERIC_PRODUCT_SIGNAL_TOKENS.has(token);
+}
+
+// Modellnumre ("1000xm6", "rld35ga") er det mest produktidentifiserende vi har:
+// de teller som signal-tokens og vektes høyest i scoringen.
+function isModelNumberLikeToken(token: string): boolean {
+  return token.length >= 4 && /[a-z]/.test(token) && /\d/.test(token) && !isMeasurementUnitLikeToken(token);
+}
+
+function isMeasurementUnitLikeToken(token: string): boolean {
+  return /^\d+(?:[.,]\d+)?(?:ml|cl|dl|l|g|gr|kg|mg|gb|tb|mb|mm|cm|m|km|w|kw|wh|kwh|mah|hz|khz|ghz|v|a|ah|stk|pk|pcs|fps|tommer|tum|in)$/.test(token);
 }
 
 function buildProductTitleBaseCandidates(searchTerm: string): string[] {

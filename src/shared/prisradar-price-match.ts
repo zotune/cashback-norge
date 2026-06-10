@@ -2,7 +2,7 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
-import { hasModelNumberConflict } from "./product-match.js";
+import { hasModelNumberConflict, hasNumericModelConflict } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 
 type TextRequest = (
@@ -520,7 +520,8 @@ function isCompatiblePrisradarProductVariant(title: string, anchorTerms: string[
   const titleVariant = extractHardVariantGroups(title);
   return anchorTerms.every((anchorTerm) =>
     !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant) &&
-    !hasModelNumberConflict(anchorTerm, title));
+    !hasModelNumberConflict(anchorTerm, title) &&
+    !hasNumericModelConflict(anchorTerm, title));
 }
 
 type HardVariantGroups = {
@@ -597,7 +598,7 @@ function extractMultipackVariants(normalizedValue: string, tokens: Set<string>):
 }
 
 const CONDITION_VARIANT_TOKENS = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
-const COLOR_VARIANT_TOKENS = new Set(["hvit", "svart", "rod", "bla", "gronn", "gul", "rosa", "lilla", "solv", "gull", "gra", "brun", "oransje"]);
+const COLOR_VARIANT_TOKENS = new Set(["hvit", "svart", "rod", "bla", "gronn", "gul", "rosa", "lilla", "solv", "gull", "gra", "brun", "oransje", "beige", "sandstone"]);
 const STORAGE_ACCESSORY_TOKENS = new Set(["ssd", "nvme", "pcie", "heatsink", "harddisk", "lagring", "storage", "memory", "minne"]);
 const SEARCH_NOISE_TOKENS = new Set(["tradlos", "kablet", "wired", "gaming", "bluetooth", "usb", "usbc", "wifi"]);
 const GENERIC_PATH_SEGMENTS = new Set([

@@ -4,7 +4,6 @@ import type {
 } from "./extension-messages.js";
 import {
   buildProductMatchAnchor,
-  hasProductVariantConflict,
   isLikelyGtin,
   pickBestProductCandidate,
   type ProductMatchAnchor,
@@ -17,6 +16,7 @@ const KLARNA_OFFERS_URL = "https://www.klarna.com/no/api/product-detail-edge-res
 const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
 const BAD_AVAILABILITY_STATUSES = new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST", "TEMPORARILY_UNAVAILABLE"]);
 const BAD_STOCK_STATUSES = new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
+const CODE_QUERY_MIN_MATCH_SCORE = 0.3;
 
 export async function findKlarnaPriceMatch(
   message: GetPriceMatchForProductMessage,
@@ -102,10 +102,11 @@ async function fetchKlarnaProduct(
     }
   }
 
-  // Kodesøk (GTIN) treffer eksakt hos Klarna; tekstsøk må tittelvalideres så vi
-  // ikke tar første-og-beste irrelevante produkt fra suggest-API-et.
+  // Kodesøk (GTIN) treffer eksakt hos Klarna, men en feilhøstet kode gir eksakt
+  // feil produkt — også kodetreff må ligne på sidens tittel (lavere terskel,
+  // siden GTIN-treff kan ha annet språk/kortform).
   if (isCodeQuery) {
-    return candidates.find((candidate) => !hasProductVariantConflict(anchor, candidate.name));
+    return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }), CODE_QUERY_MIN_MATCH_SCORE);
   }
 
   return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }));

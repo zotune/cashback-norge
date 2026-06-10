@@ -113,7 +113,114 @@ export function hasProductVariantConflict(anchor: ProductMatchAnchor, candidateT
   return hasPackageQuantityConflict(anchor, candidateTitle) ||
     hasStorageSizeConflict(anchor.searchTerm, candidateTitle) ||
     hasModelNumberConflict(anchor.searchTerm, candidateTitle) ||
-    hasModelTierConflict(anchor.searchTerm, candidateTitle);
+    hasNumericModelConflict(anchor.searchTerm, candidateTitle) ||
+    hasModelTierConflict(anchor.searchTerm, candidateTitle) ||
+    hasColorVariantConflict(anchor.searchTerm, candidateTitle);
+}
+
+// "Osmo Action 4" vs "Osmo Action 6" og "iPhone 17" vs "iPhone 17e" er ulike
+// produkter selv om resten av tittelen er identisk: frittstående småtall
+// (og tall med kort bokstavsuffiks) må overlappe når begge titler har dem.
+// Tall fulgt av enhetsord ("45 mm", "75 ml") og desimaler/multipacker holdes utenfor.
+const NUMERIC_MODEL_UNIT_WORDS = new Set([
+  "a", "ah", "ar", "cl", "cm", "dl", "fps", "g", "gb", "ghz", "gr", "h", "hz", "in", "kg",
+  "khz", "km", "kw", "kwh", "l", "m", "mah", "mb", "mg", "ml", "mm", "pack", "pakke",
+  "pakning", "pakninger", "pcs", "pk", "prosent", "stk", "t", "tb", "timer", "tommer", "tum",
+  "v", "w", "wh", "x", "år",
+]);
+const NUMERIC_MODEL_SPEC_TOKENS = new Set(["2k", "4k", "8k", "3g", "4g", "5g"]);
+
+export function hasNumericModelConflict(anchorText: string, candidateTitle: string): boolean {
+  const anchorNumbers = readNumericModelTokens(anchorText);
+  if (anchorNumbers.size === 0) return false;
+
+  const candidateNumbers = readNumericModelTokens(candidateTitle);
+  if (candidateNumbers.size === 0) return false;
+
+  return ![...anchorNumbers].some((number) => candidateNumbers.has(number));
+}
+
+function readNumericModelTokens(text: string): Set<string> {
+  const normalized = text
+    .toLowerCase()
+    .replace(/\d+[.,]\d+/g, " ")
+    .replace(/\b\d+\s*x\s*\d+/g, " ")
+    .replace(/\d+\s*%/g, " ");
+  const tokens = normalized.split(/[^a-z0-9æøå]+/).filter((token) => token.length > 0);
+
+  const numbers = new Set<string>();
+  for (const [index, token] of tokens.entries()) {
+    if (/^\d{1,3}$/.test(token)) {
+      const nextToken = tokens[index + 1];
+      if (nextToken === undefined || !NUMERIC_MODEL_UNIT_WORDS.has(nextToken)) {
+        numbers.add(token);
+      }
+      continue;
+    }
+    if (/^\d{1,3}[a-z]{1,2}$/.test(token) && !isUnitLikeToken(token) && !NUMERIC_MODEL_SPEC_TOKENS.has(token)) {
+      numbers.add(token);
+    }
+  }
+  return numbers;
+}
+
+// "WH-1000XM6 (sort)" vs "WH-1000XM6 Sandstone" er ulike varianter: når begge
+// titler oppgir farge må minst én farge være felles. Engelske fargenavn
+// normaliseres til norsk før sammenligning.
+const COLOR_VARIANT_TOKEN_GROUPS = new Map<string, string>([
+  ["beige", "beige"],
+  ["bla", "bla"],
+  ["black", "svart"],
+  ["blue", "bla"],
+  ["brown", "brun"],
+  ["brun", "brun"],
+  ["carbon", "svart"],
+  ["gold", "gull"],
+  ["gra", "gra"],
+  ["graphite", "gra"],
+  ["gray", "gra"],
+  ["green", "gronn"],
+  ["grey", "gra"],
+  ["gronn", "gronn"],
+  ["gul", "gul"],
+  ["gull", "gull"],
+  ["hvit", "hvit"],
+  ["lilla", "lilla"],
+  ["navy", "bla"],
+  ["orange", "oransje"],
+  ["oransje", "oransje"],
+  ["pink", "rosa"],
+  ["purple", "lilla"],
+  ["red", "rod"],
+  ["rod", "rod"],
+  ["rosa", "rosa"],
+  ["sandstone", "sandstone"],
+  ["silver", "solv"],
+  ["solv", "solv"],
+  ["sort", "svart"],
+  ["svart", "svart"],
+  ["violet", "lilla"],
+  ["white", "hvit"],
+  ["yellow", "gul"],
+]);
+
+export function hasColorVariantConflict(anchorText: string, candidateTitle: string): boolean {
+  const anchorColors = readColorVariantTokens(anchorText);
+  if (anchorColors.size === 0) return false;
+
+  const candidateColors = readColorVariantTokens(candidateTitle);
+  if (candidateColors.size === 0) return false;
+
+  return ![...anchorColors].some((color) => candidateColors.has(color));
+}
+
+function readColorVariantTokens(text: string): Set<string> {
+  const colors = new Set<string>();
+  for (const token of tokenizeBrandText(text)) {
+    const color = COLOR_VARIANT_TOKEN_GROUPS.get(token);
+    if (color !== undefined) colors.add(color);
+  }
+  return colors;
 }
 
 // "S26" vs "S26 Ultra" og "iPhone 15 Pro" vs "iPhone 15 Pro Max" er ulike produkter:
@@ -137,20 +244,64 @@ export function hasModelNumberConflict(anchorText: string, candidateTitle: strin
   if (anchorModels.length === 0) return false;
 
   const candidateModels = readModelNumberTokens(candidateTitle);
-  if (candidateModels.length === 0) return false;
+  // Heller ingen match enn feil match: har ankeret et utvetydig modellnummer,
+  // er en kandidat helt uten modellnummer ("LinkBuds Fit") ikke samme produkt.
+  if (candidateModels.length === 0) return anchorModels.some(isStrongModelNumberToken);
 
-  return !anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
+  // "WH-1000XM6" vs "WF-1000XM6" deler sifferdelen, men prefikset skiller
+  // produktseriene: har begge sider bokstavprefiksede modellnumre, må de matche.
+  const anchorPrefixedModels = anchorModels.filter(isLetterPrefixedModelToken);
+  const candidatePrefixedModels = candidateModels.filter(isLetterPrefixedModelToken);
+  if (
+    anchorPrefixedModels.length > 0 &&
+    candidatePrefixedModels.length > 0 &&
+    !hasCompatibleModelNumberPair(anchorPrefixedModels, candidatePrefixedModels)
+  ) {
+    return true;
+  }
+
+  return !hasCompatibleModelNumberPair(anchorModels, candidateModels);
+}
+
+export function hasMatchingModelNumberToken(anchorText: string, candidateTitle: string): boolean {
+  const anchorModels = readModelNumberTokens(anchorText);
+  const candidateModels = readModelNumberTokens(candidateTitle);
+  return anchorModels.length > 0 && candidateModels.length > 0 &&
+    hasCompatibleModelNumberPair(anchorModels, candidateModels);
+}
+
+function hasCompatibleModelNumberPair(anchorModels: string[], candidateModels: string[]): boolean {
+  return anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
     return anchorModel === candidateModel ||
       (anchorModel.length >= 3 && candidateModel.includes(anchorModel)) ||
       (candidateModel.length >= 3 && anchorModel.includes(candidateModel));
   }));
 }
 
+// Korte koder som "4k", "5g" og "ps5" er for generiske til å kreve gjenfunn hos kandidaten.
+function isStrongModelNumberToken(token: string): boolean {
+  return token.length >= 4 && !GENERIC_SPEC_TOKENS.has(token);
+}
+
+function isLetterPrefixedModelToken(token: string): boolean {
+  return /^[a-z]/.test(token) && isStrongModelNumberToken(token);
+}
+
+const GENERIC_SPEC_TOKENS = new Set(["wifi5", "wifi6", "wifi7", "usb2", "usb3", "usb4", "hdmi2", "bt50"]);
+
 function readModelNumberTokens(text: string): string[] {
-  return uniqueStrings(text
+  const bareTokens = text
     .split(/[^A-Za-z0-9]+/)
     .map((token) => token.toLowerCase())
-    .filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token)));
+    .filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token));
+  // "WH-1000XM6" og "WH 1000XM6" normaliseres til "wh1000xm6" slik at serieprefikset
+  // blir del av modellnummeret uansett skrivemåte. Spesifikasjonspar som
+  // "RAM 256GB" (tallresten er en enhet) er ikke modellnumre.
+  const joinedTokens = [...text.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)]
+    .filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase()))
+    .map((match) => `${match[1]}${match[2]}`.toLowerCase())
+    .filter((token) => !isUnitLikeToken(token));
+  return uniqueStrings([...bareTokens, ...joinedTokens]);
 }
 
 // "75ml", "128gb", "47mm" osv. er varianter (dekkes av mengde-/lagringssjekkene), ikke modellnumre.
