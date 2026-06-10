@@ -9,6 +9,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import { decodeHtmlEntities } from "../shared/product-match";
 import {
   readPackageQuantityFromText,
   readPackageQuantityFromValue,
@@ -680,39 +681,41 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "enhver.no",
   "kassal.app",
 ]);
-installOfferActivationClickTracker();
-chrome.runtime.onMessage.addListener((message) => {
-  if (isNoticeBlockedHost(CURRENT_HOST)) {
-    clearNotice();
-    return;
-  }
+function startContentScript(): void {
+  installOfferActivationClickTracker();
+  chrome.runtime.onMessage.addListener((message) => {
+    if (isNoticeBlockedHost(CURRENT_HOST)) {
+      clearNotice();
+      return;
+    }
 
-  if (isCashbackFoundMessage(message)) {
-    requestCurrentOffers();
-    return;
-  }
-  if (isCashbackNoneMessage(message)) {
-    requestCurrentOffers();
-    return;
-  }
-  if (isRecord(message) && message.type === "toggle-notice") {
-    chrome.storage.local.get(HIDDEN_HOSTS_KEY, (result: Record<string, unknown>) => {
-      const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
-      const isHidden = hidden.includes(CURRENT_HOST);
-      if (isHidden) {
-        const next = hidden.filter((h) => h !== CURRENT_HOST);
-        chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: next });
-        requestCurrentOffers();
-      } else {
-        chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: [...hidden, CURRENT_HOST] });
-        clearNotice();
-      }
-    });
-  }
-});
-requestCurrentOffers();
-installDynamicProductPageRefresh();
-installPanFlightsAutoSearch();
+    if (isCashbackFoundMessage(message)) {
+      requestCurrentOffers();
+      return;
+    }
+    if (isCashbackNoneMessage(message)) {
+      requestCurrentOffers();
+      return;
+    }
+    if (isRecord(message) && message.type === "toggle-notice") {
+      chrome.storage.local.get(HIDDEN_HOSTS_KEY, (result: Record<string, unknown>) => {
+        const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
+        const isHidden = hidden.includes(CURRENT_HOST);
+        if (isHidden) {
+          const next = hidden.filter((h) => h !== CURRENT_HOST);
+          chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: next });
+          requestCurrentOffers();
+        } else {
+          chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: [...hidden, CURRENT_HOST] });
+          clearNotice();
+        }
+      });
+    }
+  });
+  requestCurrentOffers();
+  installDynamicProductPageRefresh();
+  installPanFlightsAutoSearch();
+}
 function renderNoticeWithStoredState(
   offers: CashbackOffer[],
   priceMatches: PriceMatchOffer[] = [],
@@ -6489,12 +6492,22 @@ function readLdJsonEntries(): unknown[] {
   const entries: unknown[] = [];
   for (const script of document.querySelectorAll<HTMLScriptElement>('script[type="application/ld+json"]')) {
     try {
-      entries.push(JSON.parse(script.textContent ?? ""));
+      entries.push(decodeLdJsonStrings(JSON.parse(script.textContent ?? "")));
     } catch {
       // Ignore malformed site metadata.
     }
   }
   return entries;
+}
+
+// Enkelte butikker (f.eks. Komplett) HTML-koder tekst inne i JSON-LD ("Robotst&#xF8;vsuger").
+function decodeLdJsonStrings(value: unknown): unknown {
+  if (typeof value === "string") return decodeHtmlEntities(value);
+  if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
+  }
+  return value;
 }
 
 function findTypedLdJson(value: unknown, type: string): Record<string, unknown> | undefined {
@@ -10702,3 +10715,5 @@ function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot)
     tooltip.classList.remove("visible");
   });
 }
+
+startContentScript();

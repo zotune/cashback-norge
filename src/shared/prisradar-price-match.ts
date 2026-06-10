@@ -2,6 +2,7 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
+import { hasModelNumberConflict } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 
 type TextRequest = (
@@ -517,7 +518,9 @@ function hasUnrequestedConditionVariant(queryTokens: string[], titleTokens: Set<
 
 function isCompatiblePrisradarProductVariant(title: string, anchorTerms: string[]): boolean {
   const titleVariant = extractHardVariantGroups(title);
-  return anchorTerms.every((anchorTerm) => !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant));
+  return anchorTerms.every((anchorTerm) =>
+    !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant) &&
+    !hasModelNumberConflict(anchorTerm, title));
 }
 
 type HardVariantGroups = {

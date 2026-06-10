@@ -2,6 +2,13 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
+import {
+  buildProductMatchAnchor,
+  hasProductVariantConflict,
+  isLikelyGtin,
+  pickBestProductCandidate,
+  type ProductMatchAnchor,
+} from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 
 const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
@@ -33,9 +40,10 @@ export async function findKlarnaPriceMatch(
     ...(message.codes ?? []).filter(isLikelyGtin),
     message.searchTerm,
   ]);
+  const anchor = buildProductMatchAnchor(message);
 
   for (const query of searchQueries) {
-    const product = await fetchKlarnaProduct(query, requestJson);
+    const product = await fetchKlarnaProduct(query, requestJson, anchor, isLikelyGtin(query));
     if (product === undefined) continue;
 
     const offer = await fetchKlarnaOfferForProduct(product, requestJson);
@@ -64,6 +72,8 @@ type KlarnaOffer = {
 async function fetchKlarnaProduct(
   query: string,
   requestJson: JsonRequest,
+  anchor: ProductMatchAnchor,
+  isCodeQuery: boolean,
 ): Promise<KlarnaProduct | undefined> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 4 || normalizedQuery.length > 100) return undefined;
@@ -74,6 +84,7 @@ async function fetchKlarnaProduct(
   });
   if (!isPlainRecord(value) || !Array.isArray(value.products)) return undefined;
 
+  const candidates: KlarnaProduct[] = [];
   for (const product of value.products) {
     if (!isPlainRecord(product)) continue;
     const id = readStringLike(product.id);
@@ -83,15 +94,21 @@ async function fetchKlarnaProduct(
     const currency = readStringLike(lowestPrice?.currency);
     const outOfStock = product.outOfStock === true;
     if (id !== undefined && name !== undefined && path !== undefined && currency === "NOK" && !outOfStock) {
-      return {
+      candidates.push({
         id,
         name,
         productUrl: `${KLARNA_PRODUCT_URL}${path}`,
-      };
+      });
     }
   }
 
-  return undefined;
+  // Kodesøk (GTIN) treffer eksakt hos Klarna; tekstsøk må tittelvalideres så vi
+  // ikke tar første-og-beste irrelevante produkt fra suggest-API-et.
+  if (isCodeQuery) {
+    return candidates.find((candidate) => !hasProductVariantConflict(anchor, candidate.name));
+  }
+
+  return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }));
 }
 
 async function fetchKlarnaOfferForProduct(
@@ -267,11 +284,6 @@ function readNumberLike(value: unknown): number | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function isLikelyGtin(value: string): boolean {
-  const normalized = value.trim();
-  return /^(?:\d{8}|\d{12,14})$/.test(normalized);
 }
 
 function uniqueStrings(values: Array<string | undefined>): string[] {

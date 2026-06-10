@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781035082
+// @version      1781093161
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -494,7 +494,7 @@
     const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
     const separatorPrefixCandidates = PRODUCT_TITLE_BASE_MATCH_SEPARATORS.map((separator) => normalizedSearchTerm.split(separator)[0]);
     const buyTitleMatch = normalizedSearchTerm.match(/^(?:kj\u00f8p|kjop|buy)\s+(.+?)\s+(?:hos|at)\s+.+$/i);
-    return uniqueStrings$d([
+    return uniqueStrings$e([
       normalizedSearchTerm,
       ...separatorPrefixCandidates,
       buyTitleMatch?.[1]
@@ -502,7 +502,7 @@
   }
   function tokenizeMatchText$1(value) {
     const normalizedValue = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "");
-    return uniqueStrings$d(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
+    return uniqueStrings$e(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
   }
   function normalizeMatchToken$1(value) {
     const normalized = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
@@ -517,7 +517,7 @@
   function transliterateNorwegianCharacters$5(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
   }
-  function uniqueStrings$d(values) {
+  function uniqueStrings$e(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
@@ -864,7 +864,7 @@
     });
   }
   function readGameTitleCandidates$2(message, slug) {
-    return uniqueStrings$c([
+    return uniqueStrings$d([
       ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants$2),
       ...readGameTitleCandidateVariants$2(message.searchTerm),
       readSteamProductName$1(message),
@@ -877,7 +877,7 @@
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$c([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$d([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function itadGameInfoUrl(slug) {
     return `${ISTHEREANYDEAL_ORIGIN}/game/${encodeURIComponent(normalizeSlug(slug))}/info/`;
@@ -1017,7 +1017,7 @@
   }
   function readItadDealPlatform(value) {
     const platformNames = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-    const names = uniqueStrings$c(platformNames.filter((item) => typeof item === "string").map((item) => item.trim()).filter((item) => item.length > 0));
+    const names = uniqueStrings$d(platformNames.filter((item) => typeof item === "string").map((item) => item.trim()).filter((item) => item.length > 0));
     return names.length > 0 ? names.join(", ") : void 0;
   }
   function readItadPrice(value) {
@@ -1115,7 +1115,7 @@
   function isRecord$4(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  function uniqueStrings$c(values) {
+  function uniqueStrings$d(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
@@ -1200,11 +1200,11 @@
   function buildAllKeyShopPageUrlCandidates(message, titleCandidates) {
     const directUrls = [message.url, message.productUrl].filter((url) => url !== void 0 && isAllKeyShopProductUrl(url));
     const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
-    const slugUrls = uniqueStrings$b([
+    const slugUrls = uniqueStrings$c([
       epicSlug,
       ...titleCandidates.map(toAllKeyShopSlug)
     ]).map((slug) => `${ALLKEYSHOP_BLOG_ORIGIN}/buy-${encodeURIComponent(slug)}-cd-key-compare-prices/`);
-    return uniqueStrings$b([...directUrls, ...slugUrls]);
+    return uniqueStrings$c([...directUrls, ...slugUrls]);
   }
   function readAllKeyShopData(html) {
     const gamePageTrans = readAssignedJsonObject(html, "gamePageTrans");
@@ -1403,7 +1403,7 @@
     return titleCandidates.some((candidate) => scoreProductTitleAgainstSearchTerm(candidate, title) >= 0.72);
   }
   function readGameTitleCandidates$1(message) {
-    return uniqueStrings$b([
+    return uniqueStrings$c([
       ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants$1),
       ...readGameTitleCandidateVariants$1(message.searchTerm),
       readSteamProductName(message),
@@ -1417,7 +1417,7 @@
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:on|i|p\u00e5)\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store)$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$b([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$c([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function humanizeSlug(value) {
     return value.replace(/[-_]+/g, " ");
@@ -1491,7 +1491,7 @@
     const amount = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value.replace(",", ".")) : Number.NaN;
     return Number.isFinite(amount) && amount >= 0 ? amount : void 0;
   }
-  function uniqueStrings$b(values) {
+  function uniqueStrings$c(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function stripTags$1(value) {
@@ -1603,14 +1603,14 @@
       urls.push(`${GG_DEALS_ORIGIN}/steam/app/${steamAppId}/`);
     }
     const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
-    const slugs = uniqueStrings$a([
+    const slugs = uniqueStrings$b([
       epicSlug,
       ...readGameTitleCandidates(message).map(toGgDealsSlug)
     ]);
     for (const slug of slugs) {
       if (slug.length > 0) urls.push(`${GG_DEALS_ORIGIN}/game/${encodeURIComponent(slug)}/`);
     }
-    return uniqueStrings$a(urls);
+    return uniqueStrings$b(urls);
   }
   function buildGgDealsOffer(message, data, fallbackUrl) {
     const alternatives = readGgDealsPriceBuckets(data).sort((first, second) => first.amount - second.amount).map(toPriceMatchAlternative);
@@ -1736,7 +1736,7 @@
     return candidates.some((candidate) => scoreProductTitleAgainstSearchTerm(candidate, title) >= 0.72);
   }
   function readGameTitleCandidates(message) {
-    return uniqueStrings$a([
+    return uniqueStrings$b([
       ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants),
       ...readGameTitleCandidateVariants(message.searchTerm)
     ]).filter((candidate) => candidate.length >= 2 && candidate.length <= 120);
@@ -1747,7 +1747,7 @@
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$a([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$b([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function readGameProductName(message) {
     return readGameTitleCandidates(message)[0];
@@ -1774,7 +1774,7 @@
   function toGgDealsSlug(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   }
-  function uniqueStrings$a(values) {
+  function uniqueStrings$b(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function stripTags(value) {
@@ -1881,7 +1881,7 @@
         const kilos = formatPackageAmount(quantity.amount / 1e3);
         labels.push(`${kilos}kg`, `${kilos} kg`);
       }
-      return uniqueStrings$9(labels);
+      return uniqueStrings$a(labels);
     }
     if (quantity.unit === "ml") {
       const milliliters = formatPackageAmount(quantity.amount);
@@ -1894,10 +1894,10 @@
         const centiliters = formatPackageAmount(quantity.amount / 10);
         labels.push(`${centiliters}cl`, `${centiliters} cl`);
       }
-      return uniqueStrings$9(labels);
+      return uniqueStrings$a(labels);
     }
     const pieces = formatPackageAmount(quantity.amount);
-    return uniqueStrings$9([`${pieces}stk`, `${pieces} stk`, `${pieces}pk`, `${pieces} pk`]);
+    return uniqueStrings$a([`${pieces}stk`, `${pieces} stk`, `${pieces}pk`, `${pieces} pk`]);
   }
   function isLikelyGroceryPriceMatchContext(...rawUrls) {
     return rawUrls.some((rawUrl) => {
@@ -1957,20 +1957,14 @@
   function transliterateNorwegianCharacters$4(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
   }
-  function uniqueStrings$9(values) {
+  function uniqueStrings$a(values) {
     return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
   }
   function isPlainRecord$7(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
-  const MIN_PRODUCT_TITLE_MATCH_SCORE = 0.45;
-  const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
-    "discontinued",
-    "not_available",
-    "not_in_stock",
-    "out_of_stock"
-  ]);
+  const MIN_PRODUCT_MATCH_SCORE = 0.45;
+  const STORAGE_SIZE_PATTERN = /\b(\d+(?:[.,]\d+)?)\s*(tb|gb)\b/gi;
   const BRAND_MATCH_GROUPS = [
     ["apple"],
     ["google", "pixel"],
@@ -1979,27 +1973,183 @@
     ["samsung"],
     ["sony", "playstation"]
   ];
-  async function findGodprisPriceMatch(message, requestJson = fetchJson$5, requestText = fetchText$4) {
+  const NAMED_HTML_ENTITIES = /* @__PURE__ */ new Map([
+    ["amp", "&"],
+    ["quot", '"'],
+    ["apos", "'"],
+    ["nbsp", " "],
+    ["shy", ""],
+    ["aring", "å"],
+    ["Aring", "Å"],
+    ["aelig", "æ"],
+    ["AElig", "Æ"],
+    ["oslash", "ø"],
+    ["Oslash", "Ø"],
+    ["auml", "ä"],
+    ["Auml", "Ä"],
+    ["ouml", "ö"],
+    ["Ouml", "Ö"],
+    ["uuml", "ü"],
+    ["Uuml", "Ü"],
+    ["eacute", "é"],
+    ["Eacute", "É"],
+    ["egrave", "è"],
+    ["deg", "°"],
+    ["trade", "™"],
+    ["reg", "®"],
+    ["copy", "©"]
+  ]);
+  function buildProductMatchAnchor(message) {
+    const packageQuantity = message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
+    return {
+      searchTerm: message.searchTerm,
+      ...packageQuantity !== void 0 ? { packageQuantity } : {}
+    };
+  }
+  function scoreProductCandidateMatch(anchor, candidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
+    const candidateTitles = uniqueStrings$9([
+      candidate.brand !== void 0 && !candidate.title.toLowerCase().includes(candidate.brand.toLowerCase()) ? `${candidate.brand} ${candidate.title}` : void 0,
+      candidate.title
+    ]);
+    let bestScore = 0;
+    for (const title of candidateTitles) {
+      if (hasProductVariantConflict(anchor, title)) continue;
+      if (!isLikelySameProductTitle(anchor.searchTerm, title, minimumScore)) continue;
+      const score = scoreProductTitleAgainstSearchTerm(anchor.searchTerm, title);
+      bestScore = Math.max(bestScore, hasBrandConflict(anchor.searchTerm, candidate.brand) ? score * 0.3 : score);
+    }
+    return bestScore;
+  }
+  function pickBestProductCandidate(anchor, candidates, readCandidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
+    let best;
+    for (const candidate of candidates) {
+      const info = readCandidate(candidate);
+      if (info === void 0) continue;
+      const score = scoreProductCandidateMatch(anchor, info, minimumScore);
+      if (score >= minimumScore && (best === void 0 || score > best.score)) {
+        best = { candidate, score };
+      }
+    }
+    return best?.candidate;
+  }
+  function hasProductVariantConflict(anchor, candidateTitle) {
+    return hasPackageQuantityConflict(anchor, candidateTitle) || hasStorageSizeConflict(anchor.searchTerm, candidateTitle) || hasModelNumberConflict(anchor.searchTerm, candidateTitle) || hasModelTierConflict(anchor.searchTerm, candidateTitle);
+  }
+  const MODEL_TIER_TOKENS = /* @__PURE__ */ new Set(["ultra", "pro", "plus", "max", "mini", "lite", "air", "xl", "fe"]);
+  function hasModelTierConflict(anchorText, candidateTitle) {
+    const anchorTiers = readModelTierTokens(anchorText);
+    const candidateTiers = readModelTierTokens(candidateTitle);
+    return anchorTiers.size !== candidateTiers.size || ![...anchorTiers].every((tier) => candidateTiers.has(tier));
+  }
+  function readModelTierTokens(text) {
+    return new Set(tokenizeBrandText(text).filter((token) => MODEL_TIER_TOKENS.has(token)));
+  }
+  function hasModelNumberConflict(anchorText, candidateTitle) {
+    const anchorModels = readModelNumberTokens(anchorText);
+    if (anchorModels.length === 0) return false;
+    const candidateModels = readModelNumberTokens(candidateTitle);
+    if (candidateModels.length === 0) return false;
+    return !anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
+      return anchorModel === candidateModel || anchorModel.length >= 3 && candidateModel.includes(anchorModel) || candidateModel.length >= 3 && anchorModel.includes(candidateModel);
+    }));
+  }
+  function readModelNumberTokens(text) {
+    return uniqueStrings$9(text.split(/[^A-Za-z0-9]+/).map((token) => token.toLowerCase()).filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token)));
+  }
+  function isUnitLikeToken(token) {
+    return /^\d+(?:[.,]\d+)?(?:ml|cl|dl|l|g|gr|kg|mg|gb|tb|mb|mm|cm|m|km|w|kw|wh|kwh|mah|hz|khz|ghz|v|a|ah|stk|pk|pcs|fps|tommer|tum|in)$/.test(token);
+  }
+  function hasPackageQuantityConflict(anchor, candidateTitle) {
+    const expectedQuantity = anchor.packageQuantity ?? readPackageQuantityFromText(anchor.searchTerm);
+    if (expectedQuantity === void 0) return false;
+    const candidateQuantity = readPackageQuantityFromText(candidateTitle);
+    return candidateQuantity !== void 0 && !isSamePackageQuantity(expectedQuantity, candidateQuantity);
+  }
+  function hasStorageSizeConflict(anchorText, candidateTitle) {
+    const anchorSizes = readStorageSizesGb(anchorText);
+    if (anchorSizes.length === 0) return false;
+    const candidateSizes = readStorageSizesGb(candidateTitle);
+    if (candidateSizes.length === 0) return false;
+    return !anchorSizes.some((size) => candidateSizes.includes(size));
+  }
+  function readStorageSizesGb(text) {
+    const sizes = /* @__PURE__ */ new Set();
+    for (const match of text.matchAll(STORAGE_SIZE_PATTERN)) {
+      const amount = Number.parseFloat((match[1] ?? "").replace(",", "."));
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      sizes.add((match[2] ?? "").toLowerCase() === "tb" ? amount * 1024 : amount);
+    }
+    return [...sizes];
+  }
+  function hasBrandConflict(anchorText, candidateBrand) {
+    if (candidateBrand === void 0) return false;
+    const anchorTokens = new Set(tokenizeBrandText(anchorText));
+    const brandTokens = new Set(tokenizeBrandText(candidateBrand));
+    if (anchorTokens.size === 0 || brandTokens.size === 0) return false;
+    const anchorBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => anchorTokens.has(token)));
+    if (anchorBrandGroups.length === 0) return false;
+    return !anchorBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
+  }
+  function isLikelyGtin$5(value) {
+    return /^(?:\d{8}|\d{12,14})$/.test(value.trim());
+  }
+  function isLikelyMpn(value) {
+    const normalized = value.trim();
+    if (normalized.length < 5 || normalized.length > 40 || isLikelyGtin$5(normalized)) return false;
+    return /^[A-Za-z0-9][A-Za-z0-9._/ -]*$/.test(normalized) && /[A-Za-z]/.test(normalized) && /\d/.test(normalized);
+  }
+  function decodeHtmlEntities(value) {
+    if (!value.includes("&")) return value;
+    return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity) => {
+      if (entity.startsWith("#")) {
+        const isHex = entity[1] === "x" || entity[1] === "X";
+        const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+        return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : match;
+      }
+      return NAMED_HTML_ENTITIES.get(entity) ?? NAMED_HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
+    });
+  }
+  function tokenizeBrandText(value) {
+    return uniqueStrings$9(value.split(/[^A-Za-z0-9ÆØÅæøå]+/).map(normalizeBrandToken).filter((token) => token !== void 0 && token.length >= 2));
+  }
+  function normalizeBrandToken(value) {
+    const normalized = value.replace(/[Ææ]/g, "ae").replace(/[Øø]/g, "o").replace(/[Åå]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    return normalized.length > 0 ? normalized : void 0;
+  }
+  function uniqueStrings$9(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
+  const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
+    "discontinued",
+    "not_available",
+    "not_in_stock",
+    "out_of_stock"
+  ]);
+  async function findGodprisPriceMatch(message, requestJson = fetchJson$5, requestText = fetchText$4, options = {}) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
+    const codes = message.codes ?? [];
     const searchQueries = uniqueStrings$8([
-      ...(message.codes ?? []).filter(isLikelyGtin$6),
-      message.searchTerm
+      ...codes.filter(isLikelyGtin$5),
+      ...codes.filter(isLikelyMpn),
+      message.searchTerm,
+      ...options.anchorSearchTerms ?? []
     ]);
-    const packageQuantity = getMessagePackageQuantity$3(message);
+    const anchor = buildProductMatchAnchor(message);
     for (const query of searchQueries) {
-      const productId = await fetchGodprisProductId(query, requestJson, message.searchTerm, packageQuantity);
+      const productId = await fetchGodprisProductId(query, requestJson, anchor);
       if (productId === void 0) continue;
       const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
         headers: { "Accept": "text/html,application/xhtml+xml" }
       });
-      const offer = html !== void 0 ? readGodprisProductPage(html, productId, packageQuantity) : void 0;
+      const offer = html !== void 0 ? readGodprisProductPage(html, productId, anchor) : void 0;
       if (offer !== void 0) return offer;
     }
     return void 0;
   }
-  async function fetchGodprisProductId(query, requestJson, titleHint, packageQuantity) {
+  async function fetchGodprisProductId(query, requestJson, anchor) {
     const normalizedQuery = query.trim();
     if (normalizedQuery.length < 4) return void 0;
     const params = new URLSearchParams({ q: normalizedQuery });
@@ -2007,7 +2157,8 @@
       headers: { "Accept": "application/json" }
     });
     if (!isPlainRecord$6(value) || !Array.isArray(value.results)) return void 0;
-    const isCodeQuery = isLikelyGtin$6(normalizedQuery);
+    const isCodeQuery = isLikelyGtin$5(normalizedQuery) || isLikelyMpn(normalizedQuery);
+    const matchAnchor = isCodeQuery ? anchor : { ...anchor, searchTerm: normalizedQuery };
     let bestMatch;
     for (const result of value.results) {
       if (!isPlainRecord$6(result)) continue;
@@ -2016,34 +2167,17 @@
       const title = readStringLike$5(result.title);
       const groupTitle = readStringLike$5(result.group_title);
       const brand = readStringLike$5(result.brand);
-      const matchQuery = isCodeQuery && titleHint !== void 0 ? titleHint : normalizedQuery;
       const score = Math.max(
-        scoreGodprisProductMatch(matchQuery, uniqueStrings$8([brand, title]).join(" "), brand, packageQuantity),
-        scoreGodprisProductMatch(matchQuery, title ?? "", brand, packageQuantity),
-        scoreGodprisProductMatch(matchQuery, groupTitle ?? "", brand, packageQuantity)
+        title !== void 0 ? scoreProductCandidateMatch(matchAnchor, { title, brand }) : 0,
+        groupTitle !== void 0 ? scoreProductCandidateMatch(matchAnchor, { title: groupTitle, brand }) : 0
       );
       if (bestMatch === void 0 || score > bestMatch.score) {
         bestMatch = { id, score };
       }
     }
-    return bestMatch !== void 0 && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE ? bestMatch.id : void 0;
+    return bestMatch !== void 0 && bestMatch.score >= MIN_PRODUCT_MATCH_SCORE ? bestMatch.id : void 0;
   }
-  function scoreGodprisProductMatch(query, title, brand, packageQuantity) {
-    if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
-    if (!isGodprisPackageQuantityCompatible(packageQuantity, title)) return 0;
-    const score = scoreProductTitleAgainstSearchTerm(query, title);
-    return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
-  }
-  function hasGodprisBrandConflict(query, brand) {
-    if (brand === void 0) return false;
-    const queryTokens = new Set(tokenizeGodprisBrandText(query));
-    const brandTokens = new Set(tokenizeGodprisBrandText(brand));
-    if (queryTokens.size === 0 || brandTokens.size === 0) return false;
-    const queryBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => queryTokens.has(token)));
-    if (queryBrandGroups.length === 0) return false;
-    return !queryBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
-  }
-  function readGodprisProductPage(html, fallbackProductId, packageQuantity) {
+  function readGodprisProductPage(html, fallbackProductId, anchor) {
     const page = readGodprisDataPage(html);
     const props = isPlainRecord$6(page?.props) ? page.props : void 0;
     const product = isPlainRecord$6(props?.product) ? props.product : void 0;
@@ -2053,7 +2187,7 @@
     const rawProductName = readStringLike$5(product.title) ?? readStringLike$5(product.name);
     const productBrand = readStringLike$5(product.brand);
     const productName = withLeadingBrand$1(rawProductName, productBrand) ?? "Godpris-produkt";
-    if (!isGodprisPackageQuantityCompatible(packageQuantity, productName)) return void 0;
+    if (hasProductVariantConflict(anchor, productName)) return void 0;
     const offers = prices.map(readGodprisOffer).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
     const best = offers[0];
     if (best === void 0) return void 0;
@@ -2070,14 +2204,6 @@
         price: offer.price
       }))
     };
-  }
-  function getMessagePackageQuantity$3(message) {
-    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
-  }
-  function isGodprisPackageQuantityCompatible(expectedQuantity, productName) {
-    if (expectedQuantity === void 0) return true;
-    const productQuantity = readPackageQuantityFromText(productName);
-    return productQuantity === void 0 || isSamePackageQuantity(expectedQuantity, productQuantity);
   }
   function readGodprisDataPage(html) {
     const match = html.match(/<div id="app" data-page="([^"]*)"/);
@@ -2148,19 +2274,8 @@
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
   }
-  function tokenizeGodprisBrandText(value) {
-    return uniqueStrings$8(value.split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/).map(normalizeGodprisBrandToken).filter((token) => token !== void 0 && token.length >= 2));
-  }
-  function normalizeGodprisBrandToken(value) {
-    const normalized = value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-    return normalized.length > 0 ? normalized : void 0;
-  }
   function uniqueStrings$8(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
-  }
-  function isLikelyGtin$6(value) {
-    const normalized = value.trim();
-    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
   function isPlainRecord$6(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -2342,12 +2457,12 @@
   }
   function readLikelyGtin$1(value) {
     const normalized = value?.replace(/\D/g, "");
-    return normalized !== void 0 && isLikelyGtin$5(normalized) ? normalized : void 0;
+    return normalized !== void 0 && isLikelyGtin$4(normalized) ? normalized : void 0;
   }
   function getLikelyGtins$2(codes) {
-    return uniqueStrings$7((codes ?? []).map((code) => code.replace(/\D/g, "")).filter(isLikelyGtin$5));
+    return uniqueStrings$7((codes ?? []).map((code) => code.replace(/\D/g, "")).filter(isLikelyGtin$4));
   }
-  function isLikelyGtin$5(value) {
+  function isLikelyGtin$4(value) {
     return /^\d{8,14}$/.test(value);
   }
   function readStringLike$4(value) {
@@ -2677,12 +2792,12 @@
   }
   function readLikelyGtin(value) {
     const normalized = value?.replace(/\D/g, "");
-    return normalized !== void 0 && isLikelyGtin$4(normalized) ? normalized : void 0;
+    return normalized !== void 0 && isLikelyGtin$3(normalized) ? normalized : void 0;
   }
   function getLikelyGtins$1(codes) {
-    return uniqueStrings$6((codes ?? []).map((code) => code.replace(/\D/g, "")).filter(isLikelyGtin$4));
+    return uniqueStrings$6((codes ?? []).map((code) => code.replace(/\D/g, "")).filter(isLikelyGtin$3));
   }
-  function isLikelyGtin$4(value) {
+  function isLikelyGtin$3(value) {
     return /^\d{8,14}$/.test(value);
   }
   function readStringLike$3(value) {
@@ -2745,18 +2860,19 @@
       if (directOffer !== void 0) return directOffer;
     }
     const searchQueries = uniqueStrings$5([
-      ...(message.codes ?? []).filter(isLikelyGtin$3),
+      ...(message.codes ?? []).filter(isLikelyGtin$5),
       message.searchTerm
     ]);
+    const anchor = buildProductMatchAnchor(message);
     for (const query of searchQueries) {
-      const product = await fetchKlarnaProduct(query, requestJson);
+      const product = await fetchKlarnaProduct(query, requestJson, anchor, isLikelyGtin$5(query));
       if (product === void 0) continue;
       const offer = await fetchKlarnaOfferForProduct(product, requestJson);
       if (offer !== void 0) return offer;
     }
     return void 0;
   }
-  async function fetchKlarnaProduct(query, requestJson) {
+  async function fetchKlarnaProduct(query, requestJson, anchor, isCodeQuery) {
     const normalizedQuery = query.trim();
     if (normalizedQuery.length < 4 || normalizedQuery.length > 100) return void 0;
     const params = new URLSearchParams({ q: normalizedQuery });
@@ -2764,6 +2880,7 @@
       headers: { "Accept": "application/json" }
     });
     if (!isPlainRecord$3(value) || !Array.isArray(value.products)) return void 0;
+    const candidates = [];
     for (const product of value.products) {
       if (!isPlainRecord$3(product)) continue;
       const id = readStringLike$2(product.id);
@@ -2773,14 +2890,17 @@
       const currency = readStringLike$2(lowestPrice?.currency);
       const outOfStock = product.outOfStock === true;
       if (id !== void 0 && name !== void 0 && path !== void 0 && currency === "NOK" && !outOfStock) {
-        return {
+        candidates.push({
           id,
           name,
           productUrl: `${KLARNA_PRODUCT_URL}${path}`
-        };
+        });
       }
     }
-    return void 0;
+    if (isCodeQuery) {
+      return candidates.find((candidate) => !hasProductVariantConflict(anchor, candidate.name));
+    }
+    return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }));
   }
   async function fetchKlarnaOfferForProduct(product, requestJson) {
     const params = new URLSearchParams({
@@ -2924,10 +3044,6 @@
     if (typeof value !== "string") return void 0;
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(parsed) ? parsed : void 0;
-  }
-  function isLikelyGtin$3(value) {
-    const normalized = value.trim();
-    return /^(?:\d{8}|\d{12,14})$/.test(normalized);
   }
   function uniqueStrings$5(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
@@ -3605,7 +3721,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isCompatiblePrisradarProductVariant(title, anchorTerms) {
     const titleVariant = extractHardVariantGroups(title);
-    return anchorTerms.every((anchorTerm) => !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant));
+    return anchorTerms.every((anchorTerm) => !hasConflictingHardVariant(extractHardVariantGroups(anchorTerm), titleVariant) && !hasModelNumberConflict(anchorTerm, title));
   }
   function hasConflictingHardVariant(anchor, title) {
     return setsConflict(anchor.durations, title.durations) || setsConflict(anchor.sizes, title.sizes) || hasMissingRequiredSizeConflict(anchor.sizes, title.sizes) || hasMultipackConflict(anchor.multipacks, title.multipacks) || setsConflict(anchor.platforms, title.platforms) || setsConflict(anchor.colors, title.colors) || hasUnrequestedStorageAccessoryConflict(anchor, title);
@@ -5054,14 +5170,22 @@ query SearchSuggestions($query: String!, $category: Int) {
     const anchorOffers = [prisjaktOffer, klarnaOffer].filter((offer) => offer !== void 0);
     const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
     const canUsePrisradarOffer = anchorOffersMatchCurrentPage || isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl);
-    const relaxedPrisradarOffer = prisradarOffer === void 0 && anchorOffersMatchCurrentPage ? await findPrisradarPriceMatch(message, requestJson, requestText, {
-      allowLooseTextSearch: true,
-      anchorSearchTerms: anchorOffers.map((offer) => offer.productName)
-    }) : void 0;
+    const variantAnchor = buildProductMatchAnchor(message);
+    const validGodprisOffer = withoutProductVariantConflict(godprisOffer, variantAnchor);
+    const validPrisradarOffer = withoutProductVariantConflict(prisradarOffer, variantAnchor);
+    const [relaxedPrisradarOffer, relaxedGodprisOffer] = await Promise.all([
+      validPrisradarOffer === void 0 && anchorOffersMatchCurrentPage ? ignorePriceMatchFailure(findPrisradarPriceMatch(message, requestJson, requestText, {
+        allowLooseTextSearch: true,
+        anchorSearchTerms: anchorOffers.map((offer) => offer.productName)
+      })) : void 0,
+      validGodprisOffer === void 0 && anchorOffersMatchCurrentPage ? ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText, {
+        anchorSearchTerms: anchorOffers.map((offer) => offer.productName)
+      })) : void 0
+    ]);
     const offers = [
       ...anchorOffers,
-      godprisOffer,
-      canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : void 0,
+      validGodprisOffer ?? relaxedGodprisOffer,
+      canUsePrisradarOffer ? validPrisradarOffer ?? relaxedPrisradarOffer : void 0,
       isthereanydealOffer,
       taxfreeOffer,
       sesumOffer,
@@ -5072,11 +5196,18 @@ query SearchSuggestions($query: String!, $category: Int) {
       message.searchTerm,
       ...anchorOffers.map((offer) => offer.productName)
     ]);
-    const allowedOffers = offers.filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms)).filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
+    const allowedOffers = offers.filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms)).filter((offer) => hasContextualVolumeMatching(offer) || !hasProductVariantConflict(variantAnchor, offer.productName)).filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
     return sortPriceMatchOffers(allowedOffers);
+  }
+  function hasContextualVolumeMatching(offer) {
+    return offer.source === "taxfree" || offer.source === "vinmonopolet";
+  }
+  function withoutProductVariantConflict(offer, variantAnchor) {
+    if (offer === void 0 || hasContextualVolumeMatching(offer)) return offer;
+    return hasProductVariantConflict(variantAnchor, offer.productName) ? void 0 : offer;
   }
   function isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms) {
     if (offer.source !== "godpris" && offer.source !== "prisradar") return true;
@@ -7109,13 +7240,16 @@ query SearchSuggestions($query: String!, $category: Int) {
   const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
-  const FLIGHT_TOOLTIP_MAX_ROWS = 10;
+  const FLIGHT_TOOLTIP_MAX_ROWS = 6;
   const FLIGHT_OFFER_CANDIDATE_LIMIT = 10;
+  const TOOLTIP_MAX_LINES = 35;
   const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
   const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
   const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
   const FINN_FLIGHT_POLL_ATTEMPTS = 7;
+  const FINN_FLIGHT_REFRESH_POLL_ATTEMPTS = 2;
   const FINN_FLIGHT_POLL_INTERVAL_MS = 1100;
+  const FLIGHT_PRICE_MATURATION_DELAYS_MS = [1e3, 2e3, 4e3, 8e3, 16e3, 16e3, 16e3];
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
   const MOMONDO_FLIGHT_DYNAMIC_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/dynamic/flights/poll";
   const MOMONDO_FLIGHT_V2_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
@@ -7430,14 +7564,18 @@ query SearchSuggestions($query: String!, $category: Int) {
   function hasBlockedHostname(blockedHosts, hostname) {
     return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
   }
+  let renderGeneration = 0;
   async function renderCurrentContext() {
+    const generation = ++renderGeneration;
     const [offers, priceMatches, regionPrices] = await Promise.all([
       getCurrentOffers().catch(() => []),
       getPriceMatchesForCurrentPage().catch(() => []),
       getRegionPricesForCurrentPage().catch(() => void 0)
     ]);
+    if (generation !== renderGeneration) return;
     if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
       renderNoticeWithStoredState(offers, priceMatches, regionPrices);
+      scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
       return;
     }
     clearNotice();
@@ -7488,10 +7626,16 @@ query SearchSuggestions($query: String!, $category: Int) {
     return [];
   }
   async function findFlightPriceMatchOffers() {
+    const session = await buildFlightPriceMatchSession();
+    if (session === void 0) return [];
+    const liveOffers = await runFlightLiveOfferFinders(session.liveOfferFinders);
+    return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
+  }
+  async function buildFlightPriceMatchSession() {
     const parsedUrl = parseUrl(window.location.href);
-    if (parsedUrl === void 0) return [];
+    if (parsedUrl === void 0) return void 0;
     const flightMeta = extractFlightSearchMeta(parsedUrl);
-    if (flightMeta === void 0 || !isFlightSearchPassengerMatchSupported(flightMeta)) return [];
+    if (flightMeta === void 0 || !isFlightSearchPassengerMatchSupported(flightMeta)) return void 0;
     const airportLookup = await buildFlightAirportLookup(flightMeta);
     const routeTitle = `${flightMeta.origin} → ${flightMeta.destination}`;
     const fullSearchDetails = [
@@ -7512,20 +7656,66 @@ query SearchSuggestions($query: String!, $category: Int) {
       ...[]
     ];
     const liveOfferFinders = [
-      { sourceName: "FINN", findOffer: () => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+      { source: "finnreise", sourceName: "FINN", findOffer: (options) => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, options) },
       ...[],
-      { sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
-      { sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+      { source: "momondo", sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+      { source: "skyscanner", sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
       ...[],
-      ...[{ sourceName: "Trip", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
+      ...[{ source: "tripcom", sourceName: "Trip", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
     ];
-    const liveOffers = (await Promise.all(liveOfferFinders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, findOffer)))).filter((offer) => offer !== void 0);
+    return { staticOffers, liveOfferFinders };
+  }
+  async function runFlightLiveOfferFinders(finders, options) {
+    return (await Promise.all(finders.map(({ sourceName, findOffer }) => safelyFindFlightPriceMatchOffer(sourceName, () => findOffer(options))))).filter((offer) => offer !== void 0);
+  }
+  function mergeFlightPriceMatchOffers(staticOffers, liveOffers) {
     if (liveOffers.length === 0) return staticOffers;
     const liveSources = new Set(liveOffers.map((offer) => offer.source));
     return [
       ...liveOffers,
       ...staticOffers.filter((offer) => !liveSources.has(offer.source))
     ].sort(comparePriceMatchesBySortAmount);
+  }
+  function scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices) {
+    if (!priceMatches.some((offer) => offer.searchIncomplete === true)) return;
+    void matureFlightPriceMatches(generation, offers, priceMatches, regionPrices).catch(() => void 0);
+  }
+  async function matureFlightPriceMatches(generation, offers, priceMatches, regionPrices) {
+    let currentMatches = priceMatches;
+    for (const delayMs of FLIGHT_PRICE_MATURATION_DELAYS_MS) {
+      await sleep(delayMs);
+      if (generation !== renderGeneration) return;
+      const incompleteSources = new Set(
+        currentMatches.filter((offer) => offer.searchIncomplete === true).map((offer) => offer.source)
+      );
+      if (incompleteSources.size === 0) return;
+      const session = await buildFlightPriceMatchSession();
+      if (session === void 0) return;
+      const refreshedOffers = await runFlightLiveOfferFinders(
+        session.liveOfferFinders.filter((finder) => incompleteSources.has(finder.source)),
+        { refresh: true }
+      );
+      if (generation !== renderGeneration) return;
+      if (refreshedOffers.length === 0) continue;
+      const mergedRefreshedOffers = refreshedOffers.map((offer) => {
+        if (offer.searchIncomplete !== true) return offer;
+        const previous = currentMatches.find((match) => match.source === offer.source);
+        return previous !== void 0 && (previous.sortAmount ?? previous.amount) < (offer.sortAmount ?? offer.amount) ? previous : offer;
+      });
+      const refreshedSources = new Set(mergedRefreshedOffers.map((offer) => offer.source));
+      const nextMatches = [
+        ...mergedRefreshedOffers,
+        ...currentMatches.filter((offer) => !refreshedSources.has(offer.source))
+      ].sort(comparePriceMatchesBySortAmount);
+      const changed = JSON.stringify(nextMatches) !== JSON.stringify(currentMatches);
+      currentMatches = nextMatches;
+      if (changed) renderNoticeWithStoredState(offers, currentMatches, regionPrices);
+    }
+    if (generation !== renderGeneration) return;
+    if (currentMatches.some((offer) => offer.searchIncomplete === true)) {
+      currentMatches = currentMatches.map(({ searchIncomplete: _searchIncomplete, ...offer }) => offer);
+      renderNoticeWithStoredState(offers, currentMatches, regionPrices);
+    }
   }
   async function safelyFindFlightPriceMatchOffer(sourceName, findOffer) {
     try {
@@ -8085,15 +8275,16 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: input.productUrl
     };
   }
-  async function findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
+  async function findFinnFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup, options) {
     const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
     const searchData = await fetchFinnFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
-    const resultData = await pollFinnFlightResults(searchData, flightMeta);
+    const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true);
     if (resultData === void 0) return void 0;
     const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
     const best = candidates[0];
     if (best === void 0) return void 0;
+    const progress = readNumberValue(resultData.progress);
     return {
       source: "finnreise",
       sourceName: "FINN",
@@ -8108,6 +8299,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: searchData.resultUrl,
       offerUrl: best.productUrl,
       ...best.durationText !== void 0 ? { durationText: best.durationText } : {},
+      ...progress !== void 0 && progress < 100 ? { searchIncomplete: true } : {},
       alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate)
     };
   }
@@ -8193,11 +8385,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
   }
-  async function pollFinnFlightResults(searchData, flightMeta) {
+  async function pollFinnFlightResults(searchData, flightMeta, quickRefresh = false) {
     let latestResult;
     let progress = 0;
-    for (let attempt = 0; attempt < FINN_FLIGHT_POLL_ATTEMPTS; attempt++) {
-      await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
+    const maxAttempts = quickRefresh ? FINN_FLIGHT_REFRESH_POLL_ATTEMPTS : FINN_FLIGHT_POLL_ATTEMPTS;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!quickRefresh || attempt > 0) await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
       const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress);
       const value = await userscriptJsonRequest(resultUrl, {
         headers: { Accept: "application/json" },
@@ -8895,7 +9088,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-    const candidates = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
+    const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;
     return {
@@ -8912,6 +9105,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: resultUrl,
       offerUrl: resultUrl,
       ...candidate.durationText !== void 0 ? { durationText: candidate.durationText } : {},
+      ...searchComplete ? {} : { searchIncomplete: true },
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
   }
@@ -8925,8 +9119,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       promise: fetchUncachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup)
     };
     entry.promise.then(
-      (candidates) => {
-        entry.expiresAt = Date.now() + (candidates.length > 0 ? SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS);
+      (result) => {
+        entry.expiresAt = result.searchComplete ? Date.now() + (result.candidates.length > 0 ? SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS : SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS) : Date.now();
       },
       () => {
         if (skyscannerFlightOfferCache.get(cacheKey) === entry) skyscannerFlightOfferCache.delete(cacheKey);
@@ -8936,10 +9130,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     return entry.promise;
   }
   async function fetchUncachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup) {
-    const apiCandidates = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
-    if (apiCandidates.length > 0) return apiCandidates;
+    const apiResult = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
+    if (apiResult.candidates.length > 0) return apiResult;
     const calendarCandidate = await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl);
-    return calendarCandidate !== void 0 ? [calendarCandidate] : [];
+    return {
+      candidates: calendarCandidate !== void 0 ? [calendarCandidate] : [],
+      searchComplete: apiResult.searchComplete
+    };
   }
   function buildSkyscannerFlightOfferCacheKey(flightMeta, airportLookup) {
     return [
@@ -8953,13 +9150,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
       fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination")
     ]);
-    if (originPlace === void 0 || destinationPlace === void 0) return [];
+    if (originPlace === void 0 || destinationPlace === void 0) return { candidates: [], searchComplete: true };
     const headers = buildSkyscannerWebSearchHeaders(resultUrl);
     let latestResult = await requestSkyscannerFlightSearch(
       buildSkyscannerFlightSearchPayload(flightMeta, originPlace, destinationPlace),
       headers
     );
-    if (latestResult === void 0) return [];
+    if (latestResult === void 0) return { candidates: [], searchComplete: true };
     for (let attempt = 0; attempt < SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS; attempt++) {
       const context = isRecord(latestResult.context) ? latestResult.context : void 0;
       const status = readStringValue(context?.status)?.toLowerCase();
@@ -8969,7 +9166,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       const pollResult = await pollSkyscannerFlightSearch(sessionId, headers);
       if (pollResult !== void 0) latestResult = pollResult;
     }
-    return extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl);
+    const finalContext = isRecord(latestResult.context) ? latestResult.context : void 0;
+    const finalStatus = readStringValue(finalContext?.status)?.toLowerCase();
+    return {
+      candidates: extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl),
+      searchComplete: finalStatus === void 0 || finalStatus === "complete"
+    };
   }
   function requestSkyscannerFlightSearch(payload, headers) {
     return userscriptJsonRequest(SKYSCANNER_WEB_UNIFIED_SEARCH_ENDPOINT, {
@@ -9437,6 +9639,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       sortAmount: visibleBestPrice
     };
     const displayedCandidates = visibleBestPrice === void 0 ? candidates : [displayedBest, ...candidates.slice(1)];
+    const searchIncomplete = readStringValue(resultData.status) !== "complete" && resultData.isTopResultsRankingStable !== true;
     return {
       source: "momondo",
       sourceName: "momondo",
@@ -9451,6 +9654,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       productUrl: searchData.resultUrl,
       offerUrl: displayedBest.productUrl,
       ...displayedBest.durationText !== void 0 ? { durationText: displayedBest.durationText } : {},
+      ...searchIncomplete ? { searchIncomplete: true } : {},
       alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate)
     };
   }
@@ -10546,11 +10750,19 @@ query SearchSuggestions($query: String!, $category: Int) {
     const entries = [];
     for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
       try {
-        entries.push(JSON.parse(script.textContent ?? ""));
+        entries.push(decodeLdJsonStrings(JSON.parse(script.textContent ?? "")));
       } catch {
       }
     }
     return entries;
+  }
+  function decodeLdJsonStrings(value) {
+    if (typeof value === "string") return decodeHtmlEntities(value);
+    if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
+    if (isRecord(value)) {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
+    }
+    return value;
   }
   function findTypedLdJson(value, type) {
     if (Array.isArray(value)) {
@@ -12068,6 +12280,20 @@ query SearchSuggestions($query: String!, $category: Int) {
       justify-self: end;
       white-space: nowrap;
     }
+    .price-match-card--updating {
+      animation: price-match-updating-sweep 1.8s linear infinite;
+      background-image: linear-gradient(90deg, rgba(58, 125, 85, 0) 0%, rgba(58, 125, 85, 0.14) 50%, rgba(58, 125, 85, 0) 100%);
+      background-repeat: no-repeat;
+      background-size: 45% 100%;
+    }
+    @keyframes price-match-updating-sweep {
+      0% {
+        background-position: -100% 0;
+      }
+      100% {
+        background-position: 200% 0;
+      }
+    }
     .codes-list {
       display: flex;
       flex-direction: column;
@@ -12235,6 +12461,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .offer-tooltip-list li {
       padding-left: 2px;
+    }
+    .offer-tooltip-more {
+      color: #9aa7b0;
+      font-style: italic;
     }
     .offer-tooltip.visible {
       display: block;
@@ -13481,7 +13711,28 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     }
   }
   function setTooltipContent(tooltip, parts) {
-    const sections = parts.flatMap((part) => part.split(/\n{2,}/)).map(createTooltipSection).filter((section) => section !== void 0);
+    const sectionParts = parts.flatMap((part) => part.split(/\n{2,}/));
+    const sections = [];
+    let lineCount = 0;
+    let truncated = false;
+    for (const part of sectionParts) {
+      const partLines = part.split("\n").map((line) => line.trim()).filter(Boolean).length;
+      if (partLines === 0) continue;
+      if (lineCount + partLines > TOOLTIP_MAX_LINES && sections.length > 0) {
+        truncated = true;
+        break;
+      }
+      const section = createTooltipSection(part);
+      if (section === void 0) continue;
+      sections.push(section);
+      lineCount += partLines;
+    }
+    if (truncated) {
+      const moreSection = document.createElement("div");
+      moreSection.className = "offer-tooltip-section offer-tooltip-more";
+      moreSection.textContent = "… se resten hos kilden";
+      sections.push(moreSection);
+    }
     tooltip.replaceChildren(...sections);
   }
   function createTooltipSection(part) {
@@ -13821,6 +14072,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     priceMatchPrice.className = "price-match-price";
     const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" ? readCurrentMomondoVisibleBestPriceForCurrentPage() : void 0;
     priceMatchPrice.textContent = currentMomondoVisibleBestPrice === void 0 ? priceMatch.price : formatNokFlightPrice(currentMomondoVisibleBestPrice);
+    if (priceMatch.searchIncomplete === true) {
+      priceMatchCard.classList.add("price-match-card--updating");
+      priceMatchCard.title = "Søket pågår fortsatt – prisen kan bli oppdatert";
+    }
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);

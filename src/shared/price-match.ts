@@ -9,6 +9,10 @@ import {
 } from "./ggdeals-price-match.js";
 import { findGodprisPriceMatch } from "./godpris-price-match.js";
 import {
+  buildProductMatchAnchor,
+  hasProductVariantConflict,
+} from "./product-match.js";
+import {
   findIsthereanydealPriceMatch,
   isItadGameStoreProductUrl,
 } from "./isthereanydeal-price-match.js";
@@ -93,16 +97,26 @@ export async function findPriceMatches(
     anchorOffersMatchCurrentPage ||
     isKnownPriceMatchSourceProductUrl(message.url) ||
     isKnownPriceMatchSourceProductUrl(message.productUrl);
-  const relaxedPrisradarOffer = prisradarOffer === undefined && anchorOffersMatchCurrentPage
-    ? await findPrisradarPriceMatch(message, requestJson, requestText, {
-      allowLooseTextSearch: true,
-      anchorSearchTerms: anchorOffers.map((offer) => offer.productName),
-    })
-    : undefined;
+  const variantAnchor = buildProductMatchAnchor(message);
+  const validGodprisOffer = withoutProductVariantConflict(godprisOffer, variantAnchor);
+  const validPrisradarOffer = withoutProductVariantConflict(prisradarOffer, variantAnchor);
+  const [relaxedPrisradarOffer, relaxedGodprisOffer] = await Promise.all([
+    validPrisradarOffer === undefined && anchorOffersMatchCurrentPage
+      ? ignorePriceMatchFailure(findPrisradarPriceMatch(message, requestJson, requestText, {
+        allowLooseTextSearch: true,
+        anchorSearchTerms: anchorOffers.map((offer) => offer.productName),
+      }))
+      : undefined,
+    validGodprisOffer === undefined && anchorOffersMatchCurrentPage
+      ? ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText, {
+        anchorSearchTerms: anchorOffers.map((offer) => offer.productName),
+      }))
+      : undefined,
+  ]);
   const offers = [
     ...anchorOffers,
-    godprisOffer,
-    canUsePrisradarOffer ? prisradarOffer ?? relaxedPrisradarOffer : undefined,
+    validGodprisOffer ?? relaxedGodprisOffer,
+    canUsePrisradarOffer ? validPrisradarOffer ?? relaxedPrisradarOffer : undefined,
     isthereanydealOffer,
     taxfreeOffer,
     sesumOffer,
@@ -116,6 +130,7 @@ export async function findPriceMatches(
   ]);
   const allowedOffers = offers
     .filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms))
+    .filter((offer) => hasContextualVolumeMatching(offer) || !hasProductVariantConflict(variantAnchor, offer.productName))
     .filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
 
   if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
@@ -123,6 +138,20 @@ export async function findPriceMatches(
   }
 
   return sortPriceMatchOffers(allowedOffers);
+}
+
+// Taxfree/Vinmonopolet matcher allerede eksplisitt på volum (volumeMl), og
+// produktnavnene bruker andre volum-konvensjoner enn vanlige butikktitler.
+function hasContextualVolumeMatching(offer: PriceMatchOffer): boolean {
+  return offer.source === "taxfree" || offer.source === "vinmonopolet";
+}
+
+function withoutProductVariantConflict(
+  offer: PriceMatchOffer | undefined,
+  variantAnchor: ReturnType<typeof buildProductMatchAnchor>,
+): PriceMatchOffer | undefined {
+  if (offer === undefined || hasContextualVolumeMatching(offer)) return offer;
+  return hasProductVariantConflict(variantAnchor, offer.productName) ? undefined : offer;
 }
 
 function isSupplementalPriceMatchOfferAligned(

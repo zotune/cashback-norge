@@ -3,14 +3,14 @@ import type {
   PriceMatchOffer,
 } from "./extension-messages.js";
 import {
-  isSamePackageQuantity,
-  readPackageQuantityFromText,
-  type ProductPackageQuantity,
-} from "./grocery-price-match-utils.js";
-import {
-  isLikelySameProductTitle,
-  scoreProductTitleAgainstSearchTerm,
-} from "./product-title-match.js";
+  buildProductMatchAnchor,
+  hasProductVariantConflict,
+  isLikelyGtin,
+  isLikelyMpn,
+  scoreProductCandidateMatch,
+  MIN_PRODUCT_MATCH_SCORE,
+  type ProductMatchAnchor,
+} from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 
 type TextRequest = (
@@ -23,45 +23,44 @@ type TextRequest = (
 ) => Promise<string | undefined>;
 
 const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
-const MIN_PRODUCT_TITLE_MATCH_SCORE = 0.45;
 const BAD_AVAILABILITY_STATUSES = new Set([
   "discontinued",
   "not_available",
   "not_in_stock",
   "out_of_stock",
 ]);
-const BRAND_MATCH_GROUPS = [
-  ["apple"],
-  ["google", "pixel"],
-  ["microsoft", "xbox"],
-  ["nintendo"],
-  ["samsung"],
-  ["sony", "playstation"],
-];
+
+export type GodprisPriceMatchOptions = {
+  anchorSearchTerms?: string[];
+};
 
 export async function findGodprisPriceMatch(
   message: GetPriceMatchForProductMessage,
   requestJson: JsonRequest = fetchJson,
   requestText: TextRequest = fetchText,
+  options: GodprisPriceMatchOptions = {},
 ): Promise<PriceMatchOffer | undefined> {
   if (!message.productPageClue && message.searchTerm.trim().length < 8) {
     return undefined;
   }
 
+  const codes = message.codes ?? [];
   const searchQueries = uniqueStrings([
-    ...(message.codes ?? []).filter(isLikelyGtin),
+    ...codes.filter(isLikelyGtin),
+    ...codes.filter(isLikelyMpn),
     message.searchTerm,
+    ...(options.anchorSearchTerms ?? []),
   ]);
-  const packageQuantity = getMessagePackageQuantity(message);
+  const anchor = buildProductMatchAnchor(message);
 
   for (const query of searchQueries) {
-    const productId = await fetchGodprisProductId(query, requestJson, message.searchTerm, packageQuantity);
+    const productId = await fetchGodprisProductId(query, requestJson, anchor);
     if (productId === undefined) continue;
 
     const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, {
       headers: { "Accept": "text/html,application/xhtml+xml" },
     });
-    const offer = html !== undefined ? readGodprisProductPage(html, productId, packageQuantity) : undefined;
+    const offer = html !== undefined ? readGodprisProductPage(html, productId, anchor) : undefined;
     if (offer !== undefined) return offer;
   }
 
@@ -71,8 +70,7 @@ export async function findGodprisPriceMatch(
 async function fetchGodprisProductId(
   query: string,
   requestJson: JsonRequest,
-  titleHint?: string,
-  packageQuantity?: ProductPackageQuantity,
+  anchor: ProductMatchAnchor,
 ): Promise<string | undefined> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 4) return undefined;
@@ -83,7 +81,9 @@ async function fetchGodprisProductId(
   });
   if (!isPlainRecord(value) || !Array.isArray(value.results)) return undefined;
 
-  const isCodeQuery = isLikelyGtin(normalizedQuery);
+  // Kodesøk (GTIN/MPN) skal fortsatt tittelvalideres mot sidens egen tittel.
+  const isCodeQuery = isLikelyGtin(normalizedQuery) || isLikelyMpn(normalizedQuery);
+  const matchAnchor = isCodeQuery ? anchor : { ...anchor, searchTerm: normalizedQuery };
   let bestMatch: { id: string; score: number } | undefined;
   for (const result of value.results) {
     if (!isPlainRecord(result)) continue;
@@ -93,51 +93,24 @@ async function fetchGodprisProductId(
     const title = readStringLike(result.title);
     const groupTitle = readStringLike(result.group_title);
     const brand = readStringLike(result.brand);
-    const matchQuery = isCodeQuery && titleHint !== undefined ? titleHint : normalizedQuery;
     const score = Math.max(
-      scoreGodprisProductMatch(matchQuery, uniqueStrings([brand, title]).join(" "), brand, packageQuantity),
-      scoreGodprisProductMatch(matchQuery, title ?? "", brand, packageQuantity),
-      scoreGodprisProductMatch(matchQuery, groupTitle ?? "", brand, packageQuantity),
+      title !== undefined ? scoreProductCandidateMatch(matchAnchor, { title, brand }) : 0,
+      groupTitle !== undefined ? scoreProductCandidateMatch(matchAnchor, { title: groupTitle, brand }) : 0,
     );
     if (bestMatch === undefined || score > bestMatch.score) {
       bestMatch = { id, score };
     }
   }
 
-  return bestMatch !== undefined && bestMatch.score >= MIN_PRODUCT_TITLE_MATCH_SCORE
+  return bestMatch !== undefined && bestMatch.score >= MIN_PRODUCT_MATCH_SCORE
     ? bestMatch.id
     : undefined;
-}
-
-function scoreGodprisProductMatch(
-  query: string,
-  title: string,
-  brand: string | undefined,
-  packageQuantity: ProductPackageQuantity | undefined,
-): number {
-  if (!isLikelySameProductTitle(query, title, MIN_PRODUCT_TITLE_MATCH_SCORE)) return 0;
-  if (!isGodprisPackageQuantityCompatible(packageQuantity, title)) return 0;
-
-  const score = scoreProductTitleAgainstSearchTerm(query, title);
-  return hasGodprisBrandConflict(query, brand) ? score * 0.3 : score;
-}
-
-function hasGodprisBrandConflict(query: string, brand: string | undefined): boolean {
-  if (brand === undefined) return false;
-  const queryTokens = new Set(tokenizeGodprisBrandText(query));
-  const brandTokens = new Set(tokenizeGodprisBrandText(brand));
-  if (queryTokens.size === 0 || brandTokens.size === 0) return false;
-
-  const queryBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => queryTokens.has(token)));
-  if (queryBrandGroups.length === 0) return false;
-
-  return !queryBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
 }
 
 function readGodprisProductPage(
   html: string,
   fallbackProductId: string,
-  packageQuantity: ProductPackageQuantity | undefined,
+  anchor: ProductMatchAnchor,
 ): PriceMatchOffer | undefined {
   const page = readGodprisDataPage(html);
   const props = isPlainRecord(page?.props) ? page.props : undefined;
@@ -149,7 +122,7 @@ function readGodprisProductPage(
   const rawProductName = readStringLike(product.title) ?? readStringLike(product.name);
   const productBrand = readStringLike(product.brand);
   const productName = withLeadingBrand(rawProductName, productBrand) ?? "Godpris-produkt";
-  if (!isGodprisPackageQuantityCompatible(packageQuantity, productName)) return undefined;
+  if (hasProductVariantConflict(anchor, productName)) return undefined;
 
   const offers = prices
     .map(readGodprisOffer)
@@ -171,21 +144,6 @@ function readGodprisProductPage(
       price: offer.price,
     })),
   };
-}
-
-function getMessagePackageQuantity(message: GetPriceMatchForProductMessage): ProductPackageQuantity | undefined {
-  return message.packageAmount !== undefined && message.packageUnit !== undefined
-    ? { amount: message.packageAmount, unit: message.packageUnit }
-    : undefined;
-}
-
-function isGodprisPackageQuantityCompatible(
-  expectedQuantity: ProductPackageQuantity | undefined,
-  productName: string,
-): boolean {
-  if (expectedQuantity === undefined) return true;
-  const productQuantity = readPackageQuantityFromText(productName);
-  return productQuantity === undefined || isSamePackageQuantity(expectedQuantity, productQuantity);
 }
 
 function readGodprisDataPage(html: string): Record<string, unknown> | undefined {
@@ -273,32 +231,8 @@ function readNumberLike(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function tokenizeGodprisBrandText(value: string): string[] {
-  return uniqueStrings(value
-    .split(/[^A-Za-z0-9\u00C6\u00D8\u00C5\u00E6\u00F8\u00E5]+/)
-    .map(normalizeGodprisBrandToken)
-    .filter((token): token is string => token !== undefined && token.length >= 2));
-}
-
-function normalizeGodprisBrandToken(value: string): string | undefined {
-  const normalized = value
-    .replace(/[\u00C6\u00E6]/g, "ae")
-    .replace(/[\u00D8\u00F8]/g, "o")
-    .replace(/[\u00C5\u00E5]/g, "a")
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^A-Za-z0-9]/g, "")
-    .toLowerCase();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
 function uniqueStrings(values: Array<string | undefined>): string[] {
   return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => value !== undefined && value.length > 0))];
-}
-
-function isLikelyGtin(value: string): boolean {
-  const normalized = value.trim();
-  return /^(?:\d{8}|\d{12,14})$/.test(normalized);
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
