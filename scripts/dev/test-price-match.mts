@@ -107,6 +107,32 @@ const iphoneCsMegastoreMessage: GetPriceMatchForProductMessage = {
   organizationName: "CS MEGASTORE",
 };
 
+// Pixel 10-bundle hos Komplett: "10a" så ut som enhet (10 ampere) og slapp forbi
+// tallmodell-guarden, så Prisradar viste Pixel 10a til 4490. Forventet: aldri 10a/Pro/XL.
+const pixel10KomplettMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.komplett.no/product/1340671/mobil-tablets-klokker/mobiltelefoner/google-pixel-10-128gb-obsidian",
+  searchTerm: "Google Pixel 10 128GB (Obsidian)",
+  productPageClue: true,
+  price: 6490,
+  currency: "NOK",
+  codes: ["1340671", "K078846Z279-BNDL"],
+  organizationName: "Komplett",
+};
+
+// Pixel 10 Pro XL-bundle: Prisjakt kjenner verken bundle-URL-en eller bundle-EAN,
+// så URL-/kodesøk feiler — fritekst-fallbacken skal finne p=15031511 (og ikke Pro/Fold).
+const pixel10ProXlKomplettMessage: GetPriceMatchForProductMessage = {
+  type: "get-price-match-for-product",
+  url: "https://www.komplett.no/product/1340662/mobil-tablets-klokker/mobiltelefoner/google-pixel-10-pro-xl-256gb-obsidian",
+  searchTerm: "Google Pixel 10 Pro XL 256GB (Obsidian)",
+  productPageClue: true,
+  price: 12990,
+  currency: "NOK",
+  codes: ["1340662"],
+  organizationName: "Komplett",
+};
+
 for (const [label, message] of [
   ["komplett", komplettMessage],
   ["komplett (entity-searchTerm)", komplettDirtyMessage],
@@ -118,6 +144,8 @@ for (const [label, message] of [
   ["iphone 17 @ prisjakt", iphonePrisjaktMessage],
   ["dji osmo action 4 @ csmegastore", djiCsMegastoreMessage],
   ["iphone 17 hvit @ csmegastore", iphoneCsMegastoreMessage],
+  ["pixel 10 @ komplett", pixel10KomplettMessage],
+  ["pixel 10 pro xl @ komplett", pixel10ProXlKomplettMessage],
 ] as const) {
   console.log(`\n=== ${label}`);
   for (const [source, finder] of [

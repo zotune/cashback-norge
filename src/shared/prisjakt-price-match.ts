@@ -2,6 +2,10 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
+import {
+  buildProductMatchAnchor,
+  pickBestProductCandidate,
+} from "./product-match.js";
 
 export type JsonRequest = (
   url: string,
@@ -76,7 +80,24 @@ export async function findPrisjaktPriceMatch(
     return codeSearchOffer;
   }
 
+  const titleSearchOffer = await fetchPrisjaktSearchByTitle(message, requestJson);
+  if (titleSearchOffer !== undefined && isNorwegianPriceMatchOffer(titleSearchOffer)) {
+    return titleSearchOffer;
+  }
+
   return undefined;
+}
+
+// URL-oppslag og GTIN dekker ikke alt (f.eks. bundle-sider med egne EAN/URL-er):
+// fritekstsøket validerer kandidatene mot sidens tittel med felles variant-guards.
+async function fetchPrisjaktSearchByTitle(
+  message: GetPriceMatchForProductMessage,
+  requestJson: JsonRequest,
+): Promise<PriceMatchOffer | undefined> {
+  const products = await fetchPrisjaktSearchProducts(message.searchTerm, requestJson);
+  const anchor = buildProductMatchAnchor(message);
+  const product = pickBestProductCandidate(anchor, products, (candidate) => ({ title: candidate.name }));
+  return product !== undefined ? fetchBestNativePrisjaktOffer(product, requestJson) : undefined;
 }
 
 async function fetchNativePrisjaktPriceMatch(
@@ -284,8 +305,26 @@ async function fetchPrisjaktSearch(
   const offer = readBestPrisjaktOffer(value);
   if (offer !== undefined) return offer;
 
-  const product = readFirstPrisjaktSearchProduct(value);
+  const product = readPrisjaktSearchProducts(value)[0];
   return product !== undefined ? fetchBestNativePrisjaktOffer(product, requestJson) : undefined;
+}
+
+async function fetchPrisjaktSearchProducts(
+  searchTerm: string,
+  requestJson: JsonRequest,
+): Promise<NativePrisjaktProduct[]> {
+  const normalizedSearchTerm = searchTerm.trim();
+  if (normalizedSearchTerm.length < 8) return [];
+
+  const params = new URLSearchParams({
+    term: normalizedSearchTerm,
+    market: "NO",
+    includePromotionDetails: "true",
+  });
+  const value = await requestJson(`https://browser-extension-backend.cloud.pji.nu/v1/search?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+  return readPrisjaktSearchProducts(value);
 }
 
 async function fetchPrisjaktSearchByCodes(
@@ -300,22 +339,23 @@ async function fetchPrisjaktSearchByCodes(
   return undefined;
 }
 
-function readFirstPrisjaktSearchProduct(value: unknown): NativePrisjaktProduct | undefined {
-  if (!isPlainRecord(value)) return undefined;
+function readPrisjaktSearchProducts(value: unknown): NativePrisjaktProduct[] {
+  if (!isPlainRecord(value)) return [];
   const details = Array.isArray(value.details) ? value.details : [];
+  const products: NativePrisjaktProduct[] = [];
   for (const detail of details) {
     if (!isPlainRecord(detail) || !isPlainRecord(detail.product)) continue;
     const id = readNumberLike(detail.product.id);
     const name = typeof detail.product.name === "string" ? detail.product.name : undefined;
     if (id !== undefined && name !== undefined) {
-      return {
+      products.push({
         id,
         name,
         productUrl: `https://www.prisjakt.no/product.php?p=${encodeURIComponent(String(id))}`,
-      };
+      });
     }
   }
-  return undefined;
+  return products;
 }
 
 function readBestPrisjaktOffer(value: unknown): PriceMatchOffer | undefined {

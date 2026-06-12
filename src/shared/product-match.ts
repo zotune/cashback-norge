@@ -131,16 +131,36 @@ const NUMERIC_MODEL_UNIT_WORDS = new Set([
 const NUMERIC_MODEL_SPEC_TOKENS = new Set(["2k", "4k", "8k", "3g", "4g", "5g"]);
 
 export function hasNumericModelConflict(anchorText: string, candidateTitle: string): boolean {
-  const anchorNumbers = readNumericModelTokens(anchorText);
-  if (anchorNumbers.size === 0) return false;
+  const anchorTokens = readNumericModelTokens(anchorText);
+  const candidateTokens = readNumericModelTokens(candidateTitle);
 
-  const candidateNumbers = readNumericModelTokens(candidateTitle);
-  if (candidateNumbers.size === 0) return false;
+  if (
+    hasUnitSuffixModelConflict(anchorTokens, candidateTokens) ||
+    hasUnitSuffixModelConflict(candidateTokens, anchorTokens)
+  ) {
+    return true;
+  }
 
-  return ![...anchorNumbers].some((number) => candidateNumbers.has(number));
+  if (anchorTokens.numbers.size === 0 || candidateTokens.numbers.size === 0) return false;
+  return ![...anchorTokens.numbers].some((number) => candidateTokens.numbers.has(number));
 }
 
-function readNumericModelTokens(text: string): Set<string> {
+// "Pixel 10" vs "Pixel 10a": "10a" tolkes normalt som enhet (10 ampere) og holdes
+// utenfor modelltallene, men når motparten har samme grunntall som frittstående
+// modelltall er bokstavsuffikset en variantmarkør, ikke en enhet.
+function hasUnitSuffixModelConflict(first: NumericModelTokens, second: NumericModelTokens): boolean {
+  return [...first.unitSuffixed.entries()].some(([token, base]) => {
+    return !first.numbers.has(base) && second.numbers.has(base) && !second.unitSuffixed.has(token);
+  });
+}
+
+type NumericModelTokens = {
+  numbers: Set<string>;
+  // Tall med tvetydig énbokstavs enhetssuffiks ("10a", "18v"): token -> grunntall.
+  unitSuffixed: Map<string, string>;
+};
+
+function readNumericModelTokens(text: string): NumericModelTokens {
   const normalized = text
     .toLowerCase()
     .replace(/\d+[.,]\d+/g, " ")
@@ -149,6 +169,7 @@ function readNumericModelTokens(text: string): Set<string> {
   const tokens = normalized.split(/[^a-z0-9æøå]+/).filter((token) => token.length > 0);
 
   const numbers = new Set<string>();
+  const unitSuffixed = new Map<string, string>();
   for (const [index, token] of tokens.entries()) {
     if (/^\d{1,3}$/.test(token)) {
       const nextToken = tokens[index + 1];
@@ -157,11 +178,17 @@ function readNumericModelTokens(text: string): Set<string> {
       }
       continue;
     }
-    if (/^\d{1,3}[a-z]{1,2}$/.test(token) && !isUnitLikeToken(token) && !NUMERIC_MODEL_SPEC_TOKENS.has(token)) {
+    if (NUMERIC_MODEL_SPEC_TOKENS.has(token)) continue;
+    if (/^\d{1,3}[a-z]{1,2}$/.test(token) && !isUnitLikeToken(token)) {
       numbers.add(token);
+      continue;
+    }
+    const unitSuffixMatch = /^(\d{1,3})[a-z]$/.exec(token);
+    if (unitSuffixMatch?.[1] !== undefined && isUnitLikeToken(token)) {
+      unitSuffixed.set(token, unitSuffixMatch[1]);
     }
   }
-  return numbers;
+  return { numbers, unitSuffixed };
 }
 
 // "WH-1000XM6 (sort)" vs "WH-1000XM6 Sandstone" er ulike varianter: når begge
@@ -225,7 +252,7 @@ function readColorVariantTokens(text: string): Set<string> {
 
 // "S26" vs "S26 Ultra" og "iPhone 15 Pro" vs "iPhone 15 Pro Max" er ulike produkter:
 // tier-ordene må være de samme i begge titler.
-const MODEL_TIER_TOKENS = new Set(["ultra", "pro", "plus", "max", "mini", "lite", "air", "xl", "fe"]);
+const MODEL_TIER_TOKENS = new Set(["ultra", "pro", "plus", "max", "mini", "lite", "air", "xl", "fe", "fold", "flip"]);
 
 export function hasModelTierConflict(anchorText: string, candidateTitle: string): boolean {
   const anchorTiers = readModelTierTokens(anchorText);
