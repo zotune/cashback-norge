@@ -278,6 +278,7 @@ type PriceMatchAlternative = {
   shippingPrice?: string;
   totalPrice?: string;
 };
+type FlightCabinClass = "economy" | "premium" | "business" | "first";
 type FlightSearchMeta = {
   origin: string;
   destination: string;
@@ -287,6 +288,16 @@ type FlightSearchMeta = {
   youths: number;
   children: number;
   infants: number;
+  cabinClass?: FlightCabinClass;
+  // 0 = kun direkte; undefined = alle.
+  maxStops?: number;
+  includeCabinBag?: boolean;
+  includeCheckedBag?: boolean;
+};
+type FlightSearchFilterState = {
+  maxStops?: number;
+  includeCabinBag?: boolean;
+  includeCheckedBag?: boolean;
 };
 type FlightAirportData = {
   code: string;
@@ -1000,6 +1011,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
   const fullSearchDetails = [
     formatFlightDateRange(flightMeta),
     formatFlightPassengerText(flightMeta),
+    ...formatFlightSearchFilterDetails(flightMeta),
     formatFlightAirportScopeText(flightMeta, airportLookup),
   ].join(", ");
   const cardSearchDetails = formatFlightCardSearchDetails(flightMeta);
@@ -1135,7 +1147,7 @@ async function safelyFindFlightPriceMatchOffer(
 }
 
 function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
-  return extractSasFlightSearchMeta(parsedUrl) ??
+  const meta = extractSasFlightSearchMeta(parsedUrl) ??
     extractFinnFlightSearchMeta(parsedUrl) ??
     extractPanFlightsFlightSearchMeta(parsedUrl) ??
     extractMomondoFlightSearchMeta(parsedUrl) ??
@@ -1144,6 +1156,91 @@ function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
     extractTripComFlightSearchMeta(parsedUrl) ??
     extractStoredFlightSearchMeta(parsedUrl) ??
     extractVisibleFlightSearchMeta(parsedUrl);
+  return meta !== undefined ? withVisibleFlightSearchFilters(meta) : undefined;
+}
+
+// Filtre som siden ikke speiler i URL-en (finn.no-bagasje/stopp m.fl.) leses fra
+// de synlige filterkontrollene; URL-utledede verdier vinner over DOM-tilstanden.
+function withVisibleFlightSearchFilters(meta: FlightSearchMeta): FlightSearchMeta {
+  const filters = readVisibleFlightSearchFilterState();
+  return {
+    ...meta,
+    ...(meta.maxStops === undefined && filters.maxStops !== undefined ? { maxStops: filters.maxStops } : {}),
+    ...(meta.includeCabinBag === undefined && filters.includeCabinBag === true ? { includeCabinBag: true } : {}),
+    ...(meta.includeCheckedBag === undefined && filters.includeCheckedBag === true ? { includeCheckedBag: true } : {}),
+  };
+}
+
+// Leser bagasje-/stoppfiltre fra synlige checkboxer/radioer ("1 stk. innsjekket
+// bagasje", "Maks 1 stopp", "Direkte"). Kalles kun på gjenkjente flysøk-sider.
+function readVisibleFlightSearchFilterState(): FlightSearchFilterState {
+  const state: FlightSearchFilterState = {};
+  const stopChoiceCounts: number[] = [];
+  let hasUncappedStopChoice = false;
+
+  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="checkbox"], input[type="radio"]')).slice(0, 500);
+  for (const input of inputs) {
+    const label = readFlightFilterInputLabel(input);
+    if (label === undefined || label.length === 0 || label.length > 60) continue;
+
+    if (input.type === "radio") {
+      if (!input.checked) continue;
+      const maxStopsMatch = label.match(/^maks\.?\s*(\d)\s*stopp\b/i) ?? label.match(/^(?:max|opp?\s*til|up\s*to)\.?\s*(\d)\s*stops?\b/i);
+      const maxStops = readNonNegativeIntegerValue(maxStopsMatch?.[1]);
+      if (maxStops !== undefined) {
+        state.maxStops = maxStops;
+      } else if (/^(?:kun\s+)?direkte(?:fly)?$|^nonstop(?:\s+only)?$|^direct(?:\s+only)?$/i.test(label)) {
+        state.maxStops = 0;
+      }
+      continue;
+    }
+
+    if (/h[åa]ndbagasje|kabinbagasje|cabin\s*bag|carry-?on/i.test(label) && !/ikke|uten|no\s/i.test(label)) {
+      if (input.checked) state.includeCabinBag = true;
+      continue;
+    }
+    if (/innsjekket|checked\s*bag/i.test(label) && !/ikke|uten|no\s/i.test(label)) {
+      if (input.checked) state.includeCheckedBag = true;
+      continue;
+    }
+
+    // momondo-stil stoppvalg som checkbox-gruppe ("Direkte", "1 stopp", "2+ stopp"):
+    // ingen avkrysset = alle; "2+"-valget gjør filteret ubegrenset oppover.
+    if (/^(?:kun\s+)?direkte$|^nonstop$/i.test(label)) {
+      if (input.checked) stopChoiceCounts.push(0);
+      continue;
+    }
+    const stopChoiceMatch = label.match(/^(\d)(\+)?\s*stopp?s?\b/i);
+    if (stopChoiceMatch?.[1] !== undefined) {
+      if (input.checked) {
+        if (stopChoiceMatch[2] === "+") hasUncappedStopChoice = true;
+        else stopChoiceCounts.push(Number.parseInt(stopChoiceMatch[1], 10));
+      }
+    }
+  }
+
+  if (state.maxStops === undefined && !hasUncappedStopChoice && stopChoiceCounts.length > 0) {
+    state.maxStops = Math.max(...stopChoiceCounts);
+  }
+  return state;
+}
+
+function readFlightFilterInputLabel(input: HTMLInputElement): string | undefined {
+  const label = input.labels?.[0]?.innerText ??
+    input.getAttribute("aria-label") ??
+    input.closest("label")?.innerText;
+  return label?.replace(/\s+/g, " ").trim();
+}
+
+function readFlightCabinClassValue(value: unknown): FlightCabinClass | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase().replace(/[^a-zæøå]/g, "");
+  if (normalized.length === 0) return undefined;
+  if (/^(?:economy|okonomi|økonomi|ekonomi)$/.test(normalized)) return "economy";
+  if (normalized.includes("premium")) return "premium";
+  if (normalized.includes("business")) return "business";
+  if (/^first(?:class)?$|f[oø]rsteklasse/.test(normalized)) return "first";
+  return undefined;
 }
 
 function extractSasFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -1202,6 +1299,7 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
   ]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
 
+  const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
   return normalizeFlightSearchMeta({
     origin,
     destination,
@@ -1211,6 +1309,7 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
     youths: 0,
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
   });
 }
 
@@ -1252,9 +1351,11 @@ function readPanFlightsPlaceIataCode(value: string | undefined): string | undefi
   return readIataCodeValue(sid2CodesMatch?.[1]?.split(",")[0]);
 }
 
+const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?(?:\/(?:economy|premium|business|first))?\/?$/i;
+
 function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-  if (hostname !== "momondo.no" || !/^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?\/?$/i.test(parsedUrl.pathname)) {
+  if (hostname !== "momondo.no" || !MOMONDO_FLIGHT_SEARCH_PATH_PATTERN.test(parsedUrl.pathname)) {
     return undefined;
   }
 
@@ -1265,6 +1366,8 @@ function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
   const destination = readIataCodeValue(routeParts?.[1]);
   const outboundDate = readIsoDateValue(parts[2]);
   const inboundDate = readIsoDateValue(parts[3]);
+  // Kabinklassen er et eget path-segment etter datoene (".../2026-07-25/business").
+  const cabinClass = readFlightCabinClassValue(parts[parts.length - 1]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
 
   return normalizeFlightSearchMeta({
@@ -1276,6 +1379,7 @@ function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     youths: 0,
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
   });
 }
 
@@ -1290,6 +1394,8 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
   const inboundDate = readSkyscannerPathDate(parts[flightsIndex + 4]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
 
+  const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinclass"));
+  const prefersDirect = parsedUrl.searchParams.get("preferdirects") === "true";
   return normalizeFlightSearchMeta({
     origin,
     destination,
@@ -1303,6 +1409,8 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
       readNonNegativeIntegerValue(parsedUrl.searchParams.get("childrenv2")) ??
       0,
     infants: 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...(prefersDirect ? { maxStops: 0 } : {}),
   });
 }
 
@@ -1361,6 +1469,8 @@ function extractTripComFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     : undefined;
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
 
+  const cabinClass = readTripComCabinClassParam(parsedUrl.searchParams.get("class"));
+  const nonstopOnly = /^on$/i.test(parsedUrl.searchParams.get("nonstoponly") ?? "");
   return normalizeFlightSearchMeta({
     origin,
     destination,
@@ -1370,7 +1480,20 @@ function extractTripComFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     youths: 0,
     children: 0,
     infants: 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...(nonstopOnly ? { maxStops: 0 } : {}),
   });
+}
+
+// Trip.coms class-param er en bokstavkode: y=economy, s=premium economy, c=business, f=first.
+function readTripComCabinClassParam(value: string | null): FlightCabinClass | undefined {
+  switch (value?.trim().toLowerCase()) {
+    case "y": return "economy";
+    case "s": return "premium";
+    case "c": return "business";
+    case "f": return "first";
+    default: return readFlightCabinClassValue(value);
+  }
 }
 
 function isSkyscannerFlightSearchPage(parsedUrl: URL): boolean {
@@ -1670,6 +1793,10 @@ function normalizeFlightSearchMeta(meta: FlightSearchMeta): FlightSearchMeta | u
     youths: Math.max(0, Math.trunc(meta.youths)),
     children: Math.max(0, Math.trunc(meta.children)),
     infants: Math.max(0, Math.trunc(meta.infants)),
+    ...(meta.cabinClass !== undefined ? { cabinClass: meta.cabinClass } : {}),
+    ...(meta.maxStops !== undefined ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {}),
+    ...(meta.includeCabinBag === true ? { includeCabinBag: true } : {}),
+    ...(meta.includeCheckedBag === true ? { includeCheckedBag: true } : {}),
   };
   return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : undefined;
 }
@@ -1984,13 +2111,20 @@ function extractFinnFlightOfferCandidates(
   for (const trip of readRecordArray(resultData.trips)) {
     if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData, airportLookup)) continue;
 
+    const legs = readRecordArray(trip.legs);
+    if (exceedsFlightMaxStops(flightMeta, legs.map(readFinnFlightLegStopCount))) continue;
+
     const tripSummary = formatFinnFlightTripSummary(trip);
-    const durationText = formatFlightLegDurationsText(
-      readRecordArray(trip.legs).map((leg) => readNumberValue(leg.duration)),
+    const durationText = formatFlightLegDurationsWithStopsText(
+      legs.map((leg) => ({
+        durationMinutes: readNumberValue(leg.duration),
+        stopCount: readFinnFlightLegStopCount(leg),
+      })),
     );
     // Én rad per reise (som FINNs egen liste); offers[0] er prisen FINN viser på kortet.
     const offer = readRecordArray(trip.offers)[0];
     if (offer === undefined) continue;
+    if (!isFinnFlightOfferMatchingBaggage(offer, flightMeta)) continue;
 
     const amount = readNumberValue(offer.priceAmount);
     const shopName = readStringValue(offer.brand);
@@ -2016,6 +2150,14 @@ function extractFinnFlightOfferCandidates(
 
   return rankFinnFlightOfferCandidates(dedupeFinnFlightOfferCandidates(candidates))
     .slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+}
+
+// Bagasjefilter valgt på opprinnelsessiden: sammenlign kun priser der bagasjen
+// faktisk er inkludert — en pris uten innsjekket bagasje er ikke samme produkt.
+function isFinnFlightOfferMatchingBaggage(offer: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+  if (flightMeta.includeCabinBag === true && readStringValue(offer.handLuggage) !== "included") return false;
+  if (flightMeta.includeCheckedBag === true && readStringValue(offer.checkedLuggage) !== "included") return false;
+  return true;
 }
 
 function dedupeFinnFlightOfferCandidates(candidates: FinnFlightOfferCandidate[]): FinnFlightOfferCandidate[] {
@@ -2155,7 +2297,8 @@ function buildFinnFlightSearchUrl(
 ): string {
   const params = new URLSearchParams({
     adults: String(flightMeta.adults),
-    cabinType: "economy",
+    // finn aksepterer economy|premium|business|first (verifisert mot søkeskjemaet).
+    cabinType: flightMeta.cabinClass ?? "economy",
     requestedDepartureDate: flightMeta.outboundDate,
     requestedDestination: `${flightMeta.destination}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
     requestedOrigin: `${flightMeta.origin}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
@@ -2716,14 +2859,14 @@ function buildPanFlightsFlightSearchPayload(
     adults: String(flightMeta.adults),
     children: "0",
     infants: "0",
-    class: "Y",
-    carryons: 0,
-    checkedluggages: 0,
+    class: buildPanFlightsCabinClass(flightMeta),
+    carryons: flightMeta.includeCabinBag === true ? 1 : 0,
+    checkedluggages: flightMeta.includeCheckedBag === true ? 1 : 0,
     airlines: "",
     airports: "",
     endairports: "",
     stopovers: "",
-    maxstops: variant.maxStops,
+    maxstops: flightMeta.maxStops !== undefined ? Math.min(variant.maxStops, flightMeta.maxStops) : variant.maxStops,
     useragent: navigator.userAgent,
     devicetype: "PC",
     bundle: JSON.stringify({ addc: "1" }),
@@ -2734,6 +2877,15 @@ function buildPanFlightsFlightSearchPayload(
     user_ip: "127.0.0.1",
     version: variant.version,
   };
+}
+
+function buildPanFlightsCabinClass(flightMeta: FlightSearchMeta): string {
+  switch (flightMeta.cabinClass) {
+    case "premium": return "S";
+    case "business": return "C";
+    case "first": return "F";
+    default: return "Y";
+  }
 }
 
 function extractPanFlightsOfferCandidates(
@@ -3118,11 +3270,11 @@ function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
   const params = new URLSearchParams({
     adults: String(flightMeta.adults),
     adultsv2: String(flightMeta.adults),
-    cabinclass: "economy",
+    cabinclass: buildSkyscannerCabinClass(flightMeta).toLowerCase().replace(/_/g, ""),
     childrenv2: "",
     inboundaltsenabled: "false",
     outboundaltsenabled: "false",
-    preferdirects: "false",
+    preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
     rtn: flightMeta.inboundDate !== undefined ? "1" : "0",
   });
   return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
@@ -3260,9 +3412,9 @@ function buildTravellinkRecoverSearchPayload(
       numAdults: flightMeta.adults,
       numChildren: 0,
       numInfants: 0,
-      cabinClass: "TOURIST",
+      cabinClass: buildTravellinkCabinClass(flightMeta),
       mainAirportsOnly: false,
-      directFlightsOnly: false,
+      directFlightsOnly: flightMeta.maxStops === 0,
       resident: false,
       searchMainProductType: "FLIGHT",
       airlinesCodes: [],
@@ -3322,7 +3474,7 @@ function buildTravellinkSearchGraphqlPayload(
           numAdults: flightMeta.adults,
           numChildren: 0,
           numInfants: 0,
-          cabinClass: "TOURIST",
+          cabinClass: buildTravellinkCabinClass(flightMeta),
           externalSelection: null,
           segments,
           excludeCarriers: false,
@@ -3331,6 +3483,15 @@ function buildTravellinkSearchGraphqlPayload(
     },
     operationName: "searchItinerary",
   };
+}
+
+function buildTravellinkCabinClass(flightMeta: FlightSearchMeta): string {
+  switch (flightMeta.cabinClass) {
+    case "premium": return "PREMIUM_ECONOMY";
+    case "business": return "BUSINESS";
+    case "first": return "FIRST";
+    default: return "TOURIST";
+  }
 }
 
 function buildTravellinkSearchSegment(
@@ -3359,6 +3520,7 @@ function extractTravellinkOfferCandidates(
   for (const itinerary of readRecordArray(searchData.itineraries)) {
     const legs = readTravellinkFlightLegSummaries(itinerary, searchData);
     if (!isTravellinkFlightMatchingSearch(legs, flightMeta)) continue;
+    if (exceedsFlightMaxStops(flightMeta, legs.map((leg) => leg.stopCount))) continue;
 
     const fee = readTravellinkStandardFee(itinerary);
     if (fee === undefined) continue;
@@ -3610,16 +3772,25 @@ function buildTripComFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     acity: flightMeta.destination.toLowerCase(),
     ddate: flightMeta.outboundDate,
     triptype: flightMeta.inboundDate !== undefined ? "rt" : "ow",
-    class: "y",
+    class: buildTripComCabinClassParam(flightMeta),
     lowpricesource: "searchform",
     quantity: String(flightMeta.adults),
     searchboxarg: "t",
-    nonstoponly: "off",
+    nonstoponly: flightMeta.maxStops === 0 ? "on" : "off",
     locale: "en-US",
     curr: TRIP_COM_DEFAULT_CURRENCY,
   });
   if (flightMeta.inboundDate !== undefined) params.set("rdate", flightMeta.inboundDate);
   return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
+}
+
+function buildTripComCabinClassParam(flightMeta: FlightSearchMeta): string {
+  switch (flightMeta.cabinClass) {
+    case "premium": return "s";
+    case "business": return "c";
+    case "first": return "f";
+    default: return "y";
+  }
 }
 
 async function findTripComFlightPriceMatchOffer(
@@ -3628,24 +3799,29 @@ async function findTripComFlightPriceMatchOffer(
   searchDetails: string,
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
+  // List-API-et har ikke verifisert kabinstøtte — heller ingen Trip-rad enn
+  // economy-priser presentert som premium/business/first.
+  if (flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy") return undefined;
+
   const resultUrl = buildTripComFlightSearchUrl(flightMeta);
   const session = readTripComSessionFromCurrentPage();
   const ratesPromise = fetchNokBaseRates();
 
   // Ett søk med Trip.coms egen "Recommended"-sortering (Score); rekkefølgen i
   // itineraryList er verifisert lik nettsidens synlige liste.
+  const useLowestPriceFallbacks = !hasFlightSearchResultFilters(flightMeta);
   const [rates, resultData, calendarCandidate] = await Promise.all([
     ratesPromise,
     fetchTripComFlightListSearch(flightMeta, session, "Score", 3),
-    flightMeta.inboundDate !== undefined
+    flightMeta.inboundDate !== undefined && useLowestPriceFallbacks
       ? ratesPromise.then((rates) => safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup, rates))
       : Promise.resolve(undefined),
   ]);
 
   let candidates = isRecord(resultData)
-    ? extractTripComListOfferCandidates(resultData, resultUrl, rates)
+    ? extractTripComListOfferCandidates(resultData, resultUrl, rates, flightMeta)
     : [];
-  if (candidates.length === 0 && isRecord(resultData)) {
+  if (candidates.length === 0 && isRecord(resultData) && useLowestPriceFallbacks) {
     const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
     const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const lowestPriceCandidate = extractTripComBasicLowestPriceCandidate(basicInfo, resultUrl, rates, currency, "anbefalt");
@@ -3882,6 +4058,7 @@ function extractTripComListOfferCandidates(
   resultData: Record<string, unknown>,
   resultUrl: string,
   rates: NokBaseRates | undefined,
+  flightMeta: FlightSearchMeta,
 ): TripComFlightOfferCandidate[] {
   const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
   const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
@@ -3895,6 +4072,8 @@ function extractTripComListOfferCandidates(
       if (amount === undefined) return undefined;
 
       const journeys = readRecordArray(itinerary.journeyList);
+      if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return undefined;
+
       const candidate = toTripComOfferCandidate({
         amount,
         currency,
@@ -3904,11 +4083,18 @@ function extractTripComListOfferCandidates(
       });
       if (candidate === undefined) return undefined;
 
-      const durationText = formatFlightLegDurationsText(journeys.map((journey) => readNumberValue(journey.duration)));
+      const durationText = formatFlightLegDurationsWithStopsText(journeys.map((journey) => ({
+        durationMinutes: readNumberValue(journey.duration),
+        stopCount: readTripComJourneyStopCount(journey),
+      })));
       return durationText !== undefined ? { ...candidate, durationText } : candidate;
     })
     .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined);
   return dedupeTripComOfferCandidates(candidates).slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+}
+
+function readTripComJourneyStopCount(journey: Record<string, unknown>): number {
+  return Math.max(0, readRecordArray(journey.transSectionList).length - 1);
 }
 
 function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
@@ -4219,7 +4405,7 @@ async function fetchUncachedSkyscannerFlightOfferCandidates(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<SkyscannerFlightOfferSearchResult> {
   const apiResult = await fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup);
-  if (apiResult.candidates.length > 0) return apiResult;
+  if (apiResult.candidates.length > 0 || hasFlightSearchResultFilters(flightMeta)) return apiResult;
 
   const calendarCandidate = await fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl);
   return {
@@ -4330,11 +4516,20 @@ function buildSkyscannerFlightSearchPayload(
   }
 
   return {
-    cabinClass: "ECONOMY",
+    cabinClass: buildSkyscannerCabinClass(flightMeta),
     childAges: [],
     adults: flightMeta.adults,
     legs,
   };
+}
+
+function buildSkyscannerCabinClass(flightMeta: FlightSearchMeta): string {
+  switch (flightMeta.cabinClass) {
+    case "premium": return "PREMIUM_ECONOMY";
+    case "business": return "BUSINESS";
+    case "first": return "FIRST";
+    default: return "ECONOMY";
+  }
 }
 
 function buildSkyscannerFlightSearchLeg(
@@ -4371,13 +4566,14 @@ function extractSkyscannerFlightSearchCandidates(
     if (!isSkyscannerFlightMatchingSearch(result, flightMeta, airportLookup)) continue;
     if (result.isSelfTransfer === true && result.isProtectedSelfTransfer !== true) continue;
 
+    const legSummaries = readSkyscannerFlightLegSummaries(result);
+    if (exceedsFlightMaxStops(flightMeta, legSummaries.map((leg) => leg.stopCount))) continue;
+
     const score = readNumberValue(result.score);
     const tripSummary = formatSkyscannerFlightTripSummary(result);
     const tags = readSkyscannerResultTags(result);
     const tagSummary = tags.includes("cheapest") ? "billigst" : undefined;
-    const durationText = formatFlightLegDurationsText(
-      readSkyscannerFlightLegSummaries(result).map((leg) => leg.durationMinutes),
-    );
+    const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
     const platform = [tripSummary, tagSummary]
       .filter((part): part is string => part !== undefined && part.length > 0)
       .join(", ");
@@ -4826,6 +5022,7 @@ function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     `${flightMeta.origin}-${flightMeta.destination}`,
     flightMeta.outboundDate,
     flightMeta.inboundDate,
+    flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : undefined,
   ].filter((part): part is string => part !== undefined);
   const params = new URLSearchParams({ sort: MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
   if (flightMeta.adults !== 1) {
@@ -4852,7 +5049,8 @@ function isSameFlightSearchMeta(left: FlightSearchMeta, right: FlightSearchMeta)
     left.adults === right.adults &&
     left.youths === right.youths &&
     left.children === right.children &&
-    left.infants === right.infants;
+    left.infants === right.infants &&
+    (left.cabinClass ?? "economy") === (right.cabinClass ?? "economy");
 }
 
 function readMomondoFlightSortMode(url: string): MomondoFlightSortMode | undefined {
@@ -4911,7 +5109,7 @@ function readCurrentMomondoVisiblePriceKey(): string {
 
 function isMomondoFlightSearchPage(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-  return hostname === "momondo.no" && /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?\/?$/i.test(parsedUrl.pathname);
+  return hostname === "momondo.no" && MOMONDO_FLIGHT_SEARCH_PATH_PATTERN.test(parsedUrl.pathname);
 }
 
 function readMomondoVisibleNokAmounts(value: string): number[] {
@@ -5084,6 +5282,9 @@ function buildMomondoFlightDynamicPollPayload(
       sortMode,
     },
     searchMetaData: {
+      // Som i v2-payloaden: uten denne svarer API-et med per-person-priser,
+      // som ikke kan sammenlignes med FINNs totaler ved flere reisende.
+      priceMode: "total",
       pageNumber: 1,
       searchTypes: [],
       ...(searchId !== undefined ? { skipResultsInSecondPhase: false } : {}),
@@ -5196,40 +5397,42 @@ function collectMomondoAirportFilterCodesFromNode(value: unknown, codes: Set<str
 
 function buildMomondoFlightRequestLegs(flightMeta: FlightSearchMeta, airportLookup: FlightAirportCodeLookup): Array<Record<string, unknown>> {
   const legs = [
-    buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, airportLookup),
+    buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, airportLookup, flightMeta.cabinClass),
   ];
   if (flightMeta.inboundDate !== undefined) {
-    legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, airportLookup));
+    legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, airportLookup, flightMeta.cabinClass));
   }
   return legs;
 }
 
 function buildMomondoFlightDynamicRequestLegs(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
   const legs = [
-    buildMomondoFlightDynamicRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate),
+    buildMomondoFlightDynamicRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, flightMeta.cabinClass),
   ];
   if (flightMeta.inboundDate !== undefined) {
-    legs.push(buildMomondoFlightDynamicRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate));
+    legs.push(buildMomondoFlightDynamicRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, flightMeta.cabinClass));
   }
   return legs;
 }
 
-function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string, airportLookup: FlightAirportCodeLookup): Record<string, unknown> {
+function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string, airportLookup: FlightAirportCodeLookup, cabinClass: FlightCabinClass | undefined): Record<string, unknown> {
   return {
     origin: buildMomondoFlightRequestPlace(origin, airportLookup),
     destination: buildMomondoFlightRequestPlace(destination, airportLookup),
     date,
     flex: "exact",
-    cabinClass: "economy",
+    cabinClass: cabinClass ?? "economy",
   };
 }
 
-function buildMomondoFlightDynamicRequestLeg(origin: string, destination: string, date: string): Record<string, unknown> {
+function buildMomondoFlightDynamicRequestLeg(origin: string, destination: string, date: string, cabinClass: FlightCabinClass | undefined): Record<string, unknown> {
   return {
     origin: buildMomondoFlightDynamicRequestPlace(origin),
     destination: buildMomondoFlightDynamicRequestPlace(destination),
     date,
     flex: "exact",
+    // Dynamic-API-et bruker economy implisitt; feltet sendes kun når noe annet er valgt.
+    ...(cabinClass !== undefined && cabinClass !== "economy" ? { cabinClass } : {}),
   };
 }
 
@@ -5270,12 +5473,15 @@ function collectMomondoFlightOfferCandidates(
     if (requireMatchingSearch && !isMomondoFlightMatchingSearch(result, resultData, flightMeta, airportLookup)) continue;
     if (isMomondoFlightPoorItinerary(result)) continue;
 
+    const legSummaries = readMomondoFlightLegSummaries(result, resultData);
+    if (exceedsFlightMaxStops(flightMeta, legSummaries.map((leg) => leg.stopCount))) continue;
+
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
-    const durationText = formatFlightLegDurationsText(
-      readMomondoFlightLegSummaries(result, resultData).map((leg) => leg.durationMinutes),
-    );
+    const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
     const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
-    const bookingOptions = readRecordArray(result.bookingOptions).filter(isMomondoBookingOptionAvailable);
+    const bookingOptions = readRecordArray(result.bookingOptions)
+      .filter(isMomondoBookingOptionAvailable)
+      .filter((bookingOption) => isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta));
     const useDisplayPrices = bookingOptions.some((bookingOption) => {
       return readMomondoBookingOptionDisplayAmount(bookingOption) !== undefined;
     });
@@ -5577,6 +5783,20 @@ function formatMomondoFlightClock(value: string | undefined): string | undefined
   return value?.match(/T(\d{2}):(\d{2})/)?.slice(1, 3).join(":");
 }
 
+// Bagasjefilter fra opprinnelsessiden: forkast tilbud der momondo eksplisitt sier
+// at bagasjen ikke er inkludert ("Ukjent" beholdes — heller usikker enn borte).
+function isMomondoBookingOptionMatchingBaggage(bookingOption: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+  if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+
+  const fees = isRecord(bookingOption.fees) ? bookingOption.fees : undefined;
+  const isExcluded = (value: string | undefined): boolean => {
+    return value !== undefined && /ikke\s+inkl|not\s+included/i.test(value.replace(/<[^>]*>/g, " "));
+  };
+  if (flightMeta.includeCabinBag === true && isExcluded(readStringValue(fees?.carryOnDisplay))) return false;
+  if (flightMeta.includeCheckedBag === true && isExcluded(readStringValue(fees?.checkedBagDisplay))) return false;
+  return true;
+}
+
 function formatMomondoFlightLuggageSummary(bookingOption: Record<string, unknown>): string | undefined {
   const fees = isRecord(bookingOption.fees) ? bookingOption.fees : undefined;
   const carryOn = formatMomondoLuggageValue(readStringValue(fees?.carryOnDisplay));
@@ -5814,6 +6034,37 @@ function formatFlightLegDurationsText(durationsMinutes: Array<number | undefined
   return parts.join("/");
 }
 
+// Varighet + stopp på kortet ("11t 35m/12t 10m · 1/0 stopp"); stopprekkefølgen
+// speiler leg-rekkefølgen i varighetsteksten.
+function formatFlightLegDurationsWithStopsText(
+  legs: Array<{ durationMinutes?: number | undefined; stopCount?: number | undefined }>,
+): string | undefined {
+  const durationsText = formatFlightLegDurationsText(legs.map((leg) => leg.durationMinutes));
+  if (durationsText === undefined) return undefined;
+
+  const stopCounts = legs.map((leg) => leg.stopCount);
+  if (stopCounts.some((stopCount) => stopCount === undefined)) return durationsText;
+  const stopsText = stopCounts.every((stopCount) => stopCount === 0)
+    ? "direkte"
+    : `${stopCounts.join("/")} stopp`;
+  return `${durationsText} · ${stopsText}`;
+}
+
+function exceedsFlightMaxStops(flightMeta: FlightSearchMeta, stopCounts: Array<number | undefined>): boolean {
+  if (flightMeta.maxStops === undefined) return false;
+  const maxStops = flightMeta.maxStops;
+  return stopCounts.some((stopCount) => stopCount !== undefined && stopCount > maxStops);
+}
+
+// Kalender-/laveste-pris-fallbackene er rute-laveste economy-priser uten
+// stopp-/bagasjeinfo; med aktive filtre ville de undergrave sammenligningen.
+function hasFlightSearchResultFilters(flightMeta: FlightSearchMeta): boolean {
+  return flightMeta.maxStops !== undefined ||
+    flightMeta.includeCabinBag === true ||
+    flightMeta.includeCheckedBag === true ||
+    (flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy");
+}
+
 function formatFlightCarriersByLeg(carriersPerLeg: string[][]): string | undefined {
   const legTexts = carriersPerLeg
     .map((carriers) => uniqueStrings(carriers).join("+"))
@@ -5916,9 +6167,39 @@ function formatFlightPassengerText(flightMeta: FlightSearchMeta): string {
   return flightMeta.adults === 1 ? "1 voksen" : `${flightMeta.adults} voksne`;
 }
 
+function formatFlightCabinClassText(flightMeta: FlightSearchMeta): string | undefined {
+  switch (flightMeta.cabinClass) {
+    case "premium": return "Premium Economy";
+    case "business": return "Business";
+    case "first": return "First Class";
+    default: return undefined;
+  }
+}
+
+function formatFlightStopsFilterText(flightMeta: FlightSearchMeta): string | undefined {
+  if (flightMeta.maxStops === undefined) return undefined;
+  return flightMeta.maxStops === 0 ? "kun direkte" : `maks ${flightMeta.maxStops} stopp`;
+}
+
+function formatFlightBaggageFilterText(flightMeta: FlightSearchMeta): string | undefined {
+  const parts = [
+    flightMeta.includeCabinBag === true ? "håndbagasje" : undefined,
+    flightMeta.includeCheckedBag === true ? "innsjekket bagasje" : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.length > 0 ? `m/${parts.join(" + ")}` : undefined;
+}
+
+function formatFlightSearchFilterDetails(flightMeta: FlightSearchMeta): string[] {
+  return [
+    formatFlightCabinClassText(flightMeta),
+    formatFlightStopsFilterText(flightMeta),
+    formatFlightBaggageFilterText(flightMeta),
+  ].filter((part): part is string => part !== undefined);
+}
+
 function formatFlightCardSearchDetails(flightMeta: FlightSearchMeta): string {
   const tripType = flightMeta.inboundDate === undefined ? "En vei" : "Tur/retur";
-  return `${tripType}, ${formatFlightPassengerText(flightMeta)}`;
+  return [tripType, formatFlightPassengerText(flightMeta), ...formatFlightSearchFilterDetails(flightMeta)].join(", ");
 }
 
 function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
@@ -5931,6 +6212,10 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
     flightMeta.youths,
     flightMeta.children,
     flightMeta.infants,
+    flightMeta.cabinClass ?? "",
+    flightMeta.maxStops ?? "",
+    flightMeta.includeCabinBag === true ? "hb" : "",
+    flightMeta.includeCheckedBag === true ? "cb" : "",
   ].join("|");
 }
 
