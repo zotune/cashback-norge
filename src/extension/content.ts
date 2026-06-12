@@ -3807,16 +3807,17 @@ async function findTripComFlightPriceMatchOffer(
   const session = readTripComSessionFromCurrentPage();
   const ratesPromise = fetchNokBaseRates();
 
-  // Ett søk med Trip.coms egen "Recommended"-sortering (Score); rekkefølgen i
+  // Søk med Trip.coms egen "Recommended"-sortering (Score); rekkefølgen i
   // itineraryList er verifisert lik nettsidens synlige liste.
   const useLowestPriceFallbacks = !hasFlightSearchResultFilters(flightMeta);
-  const [rates, resultData, calendarCandidate] = await Promise.all([
+  const [rates, listResult, calendarCandidate] = await Promise.all([
     ratesPromise,
-    fetchTripComFlightListSearch(flightMeta, session, "Score", 3),
+    pollTripComFlightListSearch(flightMeta, session, "Score", 3),
     flightMeta.inboundDate !== undefined && useLowestPriceFallbacks
       ? ratesPromise.then((rates) => safelyFindTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup, rates))
       : Promise.resolve(undefined),
   ]);
+  const resultData = listResult.resultData;
 
   let candidates = isRecord(resultData)
     ? extractTripComListOfferCandidates(resultData, resultUrl, rates, flightMeta)
@@ -3847,8 +3848,56 @@ async function findTripComFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(listResult.stable ? {} : { searchIncomplete: true }),
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
+}
+
+const TRIP_COM_LIST_POLL_ATTEMPTS = 3;
+const TRIP_COM_LIST_POLL_INTERVAL_MS = 2500;
+
+// FlightListSearchSSE svarer med et ufullstendig standard-prisbatch når søkecachen
+// er kald (færre itinerærer og høyere priser enn nettsiden viser, jf. BGO-OSL
+// 39 stk @ 217 USD mot sidens 58 stk @ 151 USD). Siden selv re-spør til resultatet
+// er stabilt — gjør det samme: poll til to påfølgende svar er like, og behold
+// svaret med flest itinerærer. Ustabilt resultat flagges så modningsrundene
+// henter på nytt.
+async function pollTripComFlightListSearch(
+  flightMeta: FlightSearchMeta,
+  session: TripComFlightSession,
+  sortOrder: TripComFlightSortOrder,
+  grade: TripComFlightSearchGrade,
+): Promise<{ resultData: Record<string, unknown> | undefined; stable: boolean }> {
+  let best: Record<string, unknown> | undefined;
+  let previousKey: string | undefined;
+
+  for (let attempt = 0; attempt < TRIP_COM_LIST_POLL_ATTEMPTS; attempt++) {
+    if (attempt > 0) await sleep(TRIP_COM_LIST_POLL_INTERVAL_MS);
+
+    const value = await fetchTripComFlightListSearch(flightMeta, session, sortOrder, grade);
+    if (!isRecord(value)) continue;
+
+    if (best === undefined || readTripComListItineraryCount(value) > readTripComListItineraryCount(best)) {
+      best = value;
+    }
+    const key = readTripComListResultKey(value);
+    if (previousKey !== undefined && key === previousKey) {
+      return { resultData: best, stable: true };
+    }
+    previousKey = key;
+  }
+
+  return { resultData: best, stable: best === undefined };
+}
+
+function readTripComListItineraryCount(resultData: Record<string, unknown>): number {
+  return Array.isArray(resultData.itineraryList) ? resultData.itineraryList.length : 0;
+}
+
+function readTripComListResultKey(resultData: Record<string, unknown>): string {
+  const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : undefined;
+  const lowestPrice = isRecord(basicInfo?.lowestPrice) ? basicInfo.lowestPrice : undefined;
+  return `${readTripComListItineraryCount(resultData)}|${readPositiveNumberValue(lowestPrice?.totalPrice) ?? ""}`;
 }
 
 // Trip.com krever en "vid" på formatet <ms-timestamp>.<12 alfanumeriske tegn>;
