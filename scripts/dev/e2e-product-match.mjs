@@ -53,7 +53,7 @@ try {
         const root = host?.shadowRoot;
         if (!root) return undefined;
         const rows = [...root.querySelectorAll("a")]
-          .filter((link) => /prisjakt|godpris|klarna\.com|prisradar|sesum|enhver|kassal/i.test(link.href))
+          .filter((link) => /prisjakt|godpris|klarna\.com|prisradar|sesum|enhver|kassal|google\.com\/search/i.test(link.href))
           .map((link) => `${link.textContent?.trim().replace(/\s+/g, " ")} :: ${link.href}`);
         return { text: root.textContent ?? "", rows };
       });

@@ -61,7 +61,7 @@ const readFlightPanel = () => page.evaluate(() => {
   const root = host?.shadowRoot;
   if (!root) return undefined;
   const cards = [...root.querySelectorAll("a")]
-    .filter((link) => /finn\.no\/reise|momondo\.no|skyscanner|trip\.com|panflights|travellink/i.test(link.href))
+    .filter((link) => /finn\.no\/reise|momondo\.no|skyscanner|trip\.com|panflights|travellink|google\.com\/travel/i.test(link.href))
     .map((link) => ({
       text: link.textContent?.trim().replace(/\s+/g, " ") ?? "",
       title: link.getAttribute("title") ?? "",

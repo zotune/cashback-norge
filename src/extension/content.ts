@@ -249,7 +249,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom";
+  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -965,14 +965,44 @@ async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
     ...productMeta,
   };
   if (isUserscriptRuntime()) {
-    return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
+    return withGoogleShoppingOffer(await findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest), productMeta.searchTerm);
   }
 
   const response = await sendRuntimeMessage<PriceMatchForProductResponse>(message);
   if (response !== undefined && isPriceMatchForProductResponse(response) && response.ok) {
-    return response.offers ?? (response.offer !== undefined ? [response.offer] : []);
+    return withGoogleShoppingOffer(response.offers ?? (response.offer !== undefined ? [response.offer] : []), productMeta.searchTerm);
   }
   return [];
+}
+
+// Ren deeplink nederst i panelet — vi henter aldri priser fra Google. Vises kun
+// når en annen kilde har funnet noe (som prisradar-gatingen: et bekreftet treff
+// først), og aldri på Googles egne sider.
+function withGoogleShoppingOffer(offers: PriceMatchOffer[], searchTerm: string): PriceMatchOffer[] {
+  if (offers.length === 0) return offers;
+
+  const hostname = parseUrl(window.location.href)?.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname === undefined || hostname === "google.com" || hostname.startsWith("google.") || hostname.endsWith(".google.com")) {
+    return offers;
+  }
+
+  const params = new URLSearchParams({ udm: "28", q: searchTerm, hl: "no", gl: "no" });
+  return [
+    ...offers,
+    {
+      source: "googleshopping",
+      sourceName: "Google Shopping",
+      matchedExactProduct: true,
+      details: `Søk: ${searchTerm}`,
+      shopName: "Sammenlign selv",
+      price: "Sjekk pris",
+      amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+      sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+      currency: "NOK",
+      productName: searchTerm,
+      productUrl: `https://www.google.com/search?${params.toString()}`,
+    },
+  ];
 }
 
 type FlightOfferFindOptions = {
@@ -1035,6 +1065,18 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
         fullSearchDetails,
       })]
       : []),
+    // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
+    // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
+    ...(isGoogleFlightsSearchPage(parsedUrl)
+      ? []
+      : [buildFlightPriceMatchOffer({
+        source: "googleflights",
+        sourceName: "Google Flights",
+        productUrl: buildGoogleFlightsSearchUrl(flightMeta),
+        routeTitle,
+        cardSearchDetails,
+        fullSearchDetails,
+      })]),
   ];
 
   const liveOfferFinders: FlightLiveOfferFinder[] = [
@@ -1154,6 +1196,7 @@ function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
     extractSkyscannerFlightSearchMeta(parsedUrl) ??
     extractTravellinkFlightSearchMeta(parsedUrl) ??
     extractTripComFlightSearchMeta(parsedUrl) ??
+    extractGoogleFlightsSearchMeta(parsedUrl) ??
     extractStoredFlightSearchMeta(parsedUrl) ??
     extractVisibleFlightSearchMeta(parsedUrl);
   return meta !== undefined ? withVisibleFlightSearchFilters(meta) : undefined;
@@ -1804,7 +1847,9 @@ function normalizeFlightSearchMeta(meta: FlightSearchMeta): FlightSearchMeta | u
 function isOpaqueFlightSearchPage(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return (hostname === "shop.lufthansa.com" && /^\/booking\/availability\/\d+\/?$/i.test(parsedUrl.pathname)) ||
-    (hostname === "booking.norwegian.com" && /^\/booking\/flight\/\d+\/?$/i.test(parsedUrl.pathname));
+    (hostname === "booking.norwegian.com" && /^\/booking\/flight\/\d+\/?$/i.test(parsedUrl.pathname)) ||
+    // Byvalg i Google Flights gir tfs uten IATA-koder — synlig tekst tar over.
+    isGoogleFlightsSearchPage(parsedUrl);
 }
 
 function isFlightSearchPassengerMatchSupported(flightMeta: FlightSearchMeta): boolean {
@@ -2286,6 +2331,7 @@ function shouldUseFinnMetropolitanSearchForCurrentPage(): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return isPanFlightsSearchPage(parsedUrl) ||
     isSkyscannerFlightSearchPage(parsedUrl) ||
+    isGoogleFlightsSearchPage(parsedUrl) ||
     hostname === "momondo.no" ||
     hostname === "travellink.no" ||
     hostname.endsWith("trip.com");
@@ -3258,6 +3304,212 @@ function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
   const params = new URLSearchParams({ v2, order: "quality", [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1" });
   return `https://panflights.no/nb/${path}/?${params.toString()}`;
+}
+
+// Google Flights' q=-parameter forstår kun rute+datoer (kabin/passasjerer/stopp i
+// fritekst knekker parsingen). tfs=-parameteren er en base64url-protobuf som bærer
+// alt: legs (felt 3: dato f2, maks stopp f5, fra f13.f2, til f14.f2), passasjerer
+// (felt 8, 1=voksen), kabin (felt 9: 1=economy 2=premium 3=business 4=first) og
+// turtype (felt 19: 1=tur/retur 2=én vei). Bagasje finnes ikke i skjemaet.
+function buildGoogleFlightsSearchUrl(flightMeta: FlightSearchMeta): string {
+  const params = new URLSearchParams({
+    tfs: buildGoogleFlightsTfsParam(flightMeta),
+    hl: "nb",
+    curr: "NOK",
+  });
+  return `https://www.google.com/travel/flights?${params.toString()}`;
+}
+
+function buildGoogleFlightsTfsParam(flightMeta: FlightSearchMeta): string {
+  const bytes: number[] = [
+    ...encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.outboundDate, flightMeta.origin, flightMeta.destination, flightMeta.maxStops)),
+    ...(flightMeta.inboundDate !== undefined
+      ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops))
+      : []),
+  ];
+  for (let index = 0; index < flightMeta.adults; index++) {
+    bytes.push(...encodeProtoVarintField(8, 1));
+  }
+  bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
+  bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== undefined ? 1 : 2));
+  return encodeBase64Url(bytes);
+}
+
+function encodeGoogleFlightsLeg(date: string, origin: string, destination: string, maxStops: number | undefined): number[] {
+  return [
+    ...encodeProtoStringField(2, date),
+    ...(maxStops !== undefined ? encodeProtoVarintField(5, maxStops) : []),
+    ...encodeProtoBytesField(13, encodeProtoStringField(2, origin.toUpperCase())),
+    ...encodeProtoBytesField(14, encodeProtoStringField(2, destination.toUpperCase())),
+  ];
+}
+
+function readGoogleFlightsSeatValue(flightMeta: FlightSearchMeta): number {
+  switch (flightMeta.cabinClass) {
+    case "premium": return 2;
+    case "business": return 3;
+    case "first": return 4;
+    default: return 1;
+  }
+}
+
+function isGoogleFlightsSearchPage(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return (hostname === "google.com" || hostname.startsWith("google.") || hostname.endsWith(".google.com")) &&
+    /^\/travel\/flights/i.test(parsedUrl.pathname);
+}
+
+function extractGoogleFlightsSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  if (!isGoogleFlightsSearchPage(parsedUrl)) return undefined;
+  const tfs = parsedUrl.searchParams.get("tfs");
+  if (tfs === null || tfs.length === 0) return undefined;
+  return decodeGoogleFlightsTfsParam(tfs);
+}
+
+function decodeGoogleFlightsTfsParam(tfs: string): FlightSearchMeta | undefined {
+  const bytes = decodeBase64Url(tfs);
+  if (bytes === undefined) return undefined;
+
+  const fields = readProtoFields(bytes);
+  const legs = fields
+    .filter((field) => field.fieldNumber === 3 && field.value instanceof Uint8Array)
+    .map((field) => {
+      const legFields = readProtoFields(field.value as Uint8Array);
+      return {
+        date: readIsoDateValue(readProtoStringField(legFields, 2)),
+        maxStops: readProtoVarintField(legFields, 5),
+        origin: readGoogleFlightsAirportCode(legFields, 13),
+        destination: readGoogleFlightsAirportCode(legFields, 14),
+      };
+    });
+  const outbound = legs[0];
+  if (outbound?.date === undefined || outbound.origin === undefined || outbound.destination === undefined) {
+    return undefined;
+  }
+
+  const passengerValues = fields
+    .filter((field) => field.fieldNumber === 8 && typeof field.value === "number")
+    .map((field) => field.value as number);
+  const adults = passengerValues.filter((value) => value === 1).length;
+  const seat = readProtoVarintField(fields, 9);
+  const cabinClass: FlightCabinClass | undefined = seat === 2 ? "premium" : seat === 3 ? "business" : seat === 4 ? "first" : undefined;
+
+  return normalizeFlightSearchMeta({
+    origin: outbound.origin,
+    destination: outbound.destination,
+    outboundDate: outbound.date,
+    ...(legs[1]?.date !== undefined ? { inboundDate: legs[1].date } : {}),
+    adults: Math.max(1, adults),
+    youths: 0,
+    // Ikke-voksne passasjerer støttes ikke i sammenligningen — la meta forkastes.
+    children: passengerValues.some((value) => value !== 1) ? 1 : 0,
+    infants: 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...(outbound.maxStops !== undefined && outbound.maxStops > 0 ? { maxStops: outbound.maxStops } : {}),
+  });
+}
+
+// Byvalg i Google Flights gir knowledge-graph-tokens ("/m/05l64") i stedet for
+// IATA — da gir vi opp tfs-dekodingen og lar synlig-tekst-fallbacken ta over.
+function readGoogleFlightsAirportCode(fields: ProtoField[], fieldNumber: number): string | undefined {
+  const message = fields.find((field) => field.fieldNumber === fieldNumber && field.value instanceof Uint8Array);
+  if (message === undefined) return undefined;
+  return readIataCodeValue(readProtoStringField(readProtoFields(message.value as Uint8Array), 2));
+}
+
+type ProtoField = { fieldNumber: number; value: number | Uint8Array };
+
+function readProtoFields(bytes: Uint8Array): ProtoField[] {
+  const fields: ProtoField[] = [];
+  let offset = 0;
+  const readVarint = (): number | undefined => {
+    let result = 0;
+    let shift = 0;
+    while (offset < bytes.length && shift <= 49) {
+      const byte = bytes[offset++] ?? 0;
+      result += (byte & 0x7f) * 2 ** shift;
+      if ((byte & 0x80) === 0) return result;
+      shift += 7;
+    }
+    return undefined;
+  };
+
+  while (offset < bytes.length) {
+    const tag = readVarint();
+    if (tag === undefined) break;
+    const wireType = tag & 7;
+    const fieldNumber = Math.floor(tag / 8);
+    if (wireType === 0) {
+      const value = readVarint();
+      if (value === undefined) break;
+      fields.push({ fieldNumber, value });
+    } else if (wireType === 2) {
+      const length = readVarint();
+      if (length === undefined || offset + length > bytes.length) break;
+      fields.push({ fieldNumber, value: bytes.slice(offset, offset + length) });
+      offset += length;
+    } else if (wireType === 5) {
+      offset += 4;
+    } else if (wireType === 1) {
+      offset += 8;
+    } else {
+      break;
+    }
+  }
+  return fields;
+}
+
+function readProtoStringField(fields: ProtoField[], fieldNumber: number): string | undefined {
+  const field = fields.find((candidate) => candidate.fieldNumber === fieldNumber && candidate.value instanceof Uint8Array);
+  if (field === undefined) return undefined;
+  try {
+    return new TextDecoder().decode(field.value as Uint8Array);
+  } catch {
+    return undefined;
+  }
+}
+
+function readProtoVarintField(fields: ProtoField[], fieldNumber: number): number | undefined {
+  const field = fields.find((candidate) => candidate.fieldNumber === fieldNumber && typeof candidate.value === "number");
+  return field !== undefined ? field.value as number : undefined;
+}
+
+function encodeProtoVarint(value: number): number[] {
+  const bytes: number[] = [];
+  let remaining = Math.max(0, Math.trunc(value));
+  do {
+    const byte = remaining % 128;
+    remaining = Math.floor(remaining / 128);
+    bytes.push(remaining > 0 ? byte | 0x80 : byte);
+  } while (remaining > 0);
+  return bytes;
+}
+
+function encodeProtoVarintField(fieldNumber: number, value: number): number[] {
+  return [...encodeProtoVarint(fieldNumber * 8), ...encodeProtoVarint(value)];
+}
+
+function encodeProtoStringField(fieldNumber: number, value: string): number[] {
+  const encoded = [...new TextEncoder().encode(value)];
+  return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(encoded.length), ...encoded];
+}
+
+function encodeProtoBytesField(fieldNumber: number, bytes: number[]): number[] {
+  return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(bytes.length), ...bytes];
+}
+
+function encodeBase64Url(bytes: number[]): string {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeBase64Url(value: string): Uint8Array | undefined {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  } catch {
+    return undefined;
+  }
 }
 
 function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
@@ -8068,6 +8320,11 @@ function renderNotice(
       background: #006471;
       color: #ffffff;
     }
+    .provider-google {
+      background: #ffffff;
+      border: 1px solid #dadce0;
+      color: #1a73e8;
+    }
     .provider-tripcom {
       background: #2563eb;
       color: #ffffff;
@@ -10792,6 +11049,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "allkeyshop") return "allkeyshop";
   if (priceMatch.source === "taxfree") return "taxfree";
   if (priceMatch.source === "vinmonopolet") return "vinmonopolet";
+  if (priceMatch.source === "googleflights" || priceMatch.source === "googleshopping") return "google";
   return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
@@ -10813,6 +11071,8 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";
   if (priceMatch.source === "taxfree") return "Tax Free";
   if (priceMatch.source === "vinmonopolet") return "Vinmonopolet";
+  if (priceMatch.source === "googleflights") return "Google Flights";
+  if (priceMatch.source === "googleshopping") return "Google Shopping";
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
