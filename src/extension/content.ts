@@ -991,11 +991,11 @@ function withGoogleShoppingOffer(offers: PriceMatchOffer[], searchTerm: string):
     ...offers,
     {
       source: "googleshopping",
-      sourceName: "Google Shopping",
+      sourceName: "Google",
       matchedExactProduct: true,
       details: `Søk: ${searchTerm}`,
       shopName: "Sammenlign selv",
-      price: "Sjekk pris",
+      price: "?",
       amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       currency: "NOK",
@@ -1071,7 +1071,8 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       ? []
       : [buildFlightPriceMatchOffer({
         source: "googleflights",
-        sourceName: "Google Flights",
+        sourceName: "Google",
+        priceLabel: "?",
         productUrl: buildGoogleFlightsSearchUrl(flightMeta),
         routeTitle,
         cardSearchDetails,
@@ -1946,6 +1947,7 @@ function buildFlightPriceMatchOffer(input: {
   routeTitle: string;
   cardSearchDetails: string;
   fullSearchDetails: string;
+  priceLabel?: string;
 }): PriceMatchOffer {
   return {
     source: input.source,
@@ -1953,7 +1955,7 @@ function buildFlightPriceMatchOffer(input: {
     details: input.fullSearchDetails,
     matchedExactProduct: true,
     shopName: input.cardSearchDetails,
-    price: "Sjekk pris",
+    price: input.priceLabel ?? "Sjekk pris",
     amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
     sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
     currency: "NOK",
@@ -6764,11 +6766,35 @@ function sendRuntimeMessage<T>(message: unknown): Promise<T | undefined> {
   });
 }
 
+// Google Shopping-søk (udm=28/tbm=shop): ankre på søkestrengen (q) — produktpanelets
+// DOM er obfuskert og ustabil, men q er det brukeren faktisk sammenligner. Treffene
+// tittelvalideres mot q av de vanlige guardene.
+function extractGoogleShoppingSearchMeta(parsedUrl: URL): ProductPageMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  const isGoogleHost = hostname === "google.com" || hostname.startsWith("google.") || hostname.endsWith(".google.com");
+  if (!isGoogleHost || !/^\/search\/?$/i.test(parsedUrl.pathname)) return undefined;
+  if (parsedUrl.searchParams.get("udm") !== "28" && parsedUrl.searchParams.get("tbm") !== "shop") return undefined;
+
+  const query = parsedUrl.searchParams.get("q")?.trim().replace(/\s+/g, " ");
+  // Énords-søk («løpesko») er for svake ankre for produktmatching.
+  if (query === undefined || query.length < 8 || query.split(" ").length < 2) return undefined;
+
+  return {
+    url: window.location.href,
+    searchTerm: query,
+    productPageClue: true,
+    organizationName: "Google Shopping",
+  };
+}
+
 function extractProductPageMeta(): ProductPageMeta | undefined {
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined || (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:")) {
     return undefined;
   }
+
+  const googleShoppingMeta = extractGoogleShoppingSearchMeta(parsedUrl);
+  if (googleShoppingMeta !== undefined) return googleShoppingMeta;
   const normalizedHostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   if (hasBlockedHostname(PRICE_MATCH_SOURCE_HOSTS, normalizedHostname) && !isKnownPriceMatchSourceProductPage(parsedUrl)) {
     return undefined;

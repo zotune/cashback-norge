@@ -325,6 +325,11 @@ function isKnownPriceMatchSourceProductUrl(rawUrl: string | undefined): boolean 
       return (pathname === "/product.php" && url.searchParams.has("p")) || /^\/produkt(?:er)?\//.test(pathname);
     }
 
+    // Google Shopping-søk er en sammenligningskontekst på linje med prisjakt/klarna.
+    if (hostname === "google.com" || hostname.endsWith(".google.com") || hostname.startsWith("google.")) {
+      return pathname === "/search" && (url.searchParams.get("udm") === "28" || url.searchParams.get("tbm") === "shop");
+    }
+
     if (hostname.endsWith("godpris.no")) return /^\/produkt\/[^/]+\/?$/.test(pathname);
     if (hostname.endsWith("tax-free.no")) return /^\/(?:no\/)?product\d+(?:\/|$)/.test(pathname);
     if (hostname.endsWith("vinmonopolet.no")) return /\/p\/\d+(?:\/|$)/.test(pathname);
