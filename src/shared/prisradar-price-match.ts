@@ -88,6 +88,7 @@ export async function findPrisradarPriceMatch(
     requestJson,
     requestText,
     uniqueStrings([message.searchTerm, ...(options.anchorSearchTerms ?? [])]),
+    message,
   );
 }
 
@@ -137,6 +138,7 @@ async function fetchLoosePrisradarOfferForQueries(
   requestJson: JsonRequest,
   requestText: TextRequest,
   anchorTerms: string[],
+  message?: GetPriceMatchForProductMessage,
 ): Promise<PriceMatchOffer | undefined> {
   const candidates = new Map<string, PrisradarProduct>();
 
@@ -156,12 +158,24 @@ async function fetchLoosePrisradarOfferForQueries(
     .filter((product) => isCompatiblePrisradarProductVariant(product.title, anchorTerms))
     .slice(0, 8);
 
+  const merchantKeys = message !== undefined ? getCurrentMerchantKeys(message) : [];
+  const matchedOffers: PrisradarMatchedOffer[] = [];
+  let firstOffer: PriceMatchOffer | undefined;
   for (const product of rankedProducts) {
     const offer = await fetchPrisradarOfferForUrl(product.productUrl, requestText);
-    if (offer !== undefined) return offer;
+    if (offer === undefined) continue;
+    if (message === undefined || merchantKeys.length === 0) return offer;
+
+    firstOffer ??= offer;
+    const displayOffer = preferCurrentMerchantWhenTiedForBest(offer, merchantKeys);
+    const merchantPriceDistance = getMerchantPriceDistance(displayOffer, merchantKeys, message.price);
+    if (merchantPriceDistance !== undefined) {
+      matchedOffers.push({ offer: { ...displayOffer, matchedCurrentMerchant: true }, product, merchantPriceDistance });
+    }
   }
 
-  return undefined;
+  matchedOffers.sort(comparePrisradarMatchedOffers);
+  return matchedOffers[0]?.offer ?? firstOffer;
 }
 
 async function fetchPrisradarOfferForSlugCandidates(
