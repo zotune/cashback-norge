@@ -6897,6 +6897,8 @@ function hasProductStructuredDataSignal(
 }
 
 function isLikelyProductListingPage(parsedUrl: URL): boolean {
+  if (hasStrongProductishPath(parsedUrl)) return false;
+
   const pathname = parsedUrl.pathname.toLowerCase();
   const listingPath = /(?:^|\/)(?:search|sok|søk|resultat|results|kategori|category|categories|c|collections?|collections|list|listing)(?:\/|$)/i.test(pathname);
   const listingQuery = [...parsedUrl.searchParams.keys()].some((key) => /^(?:q|query|search|sok|søk|keyword|term|category|filter|sort|page)$/i.test(key));
@@ -7042,9 +7044,7 @@ function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
     return true;
   }
 
-  const strongProductishPath =
-    /(?:^|\/)(?:product|produkt|produkter)\/[^/]+/i.test(parsedUrl.pathname) ||
-    /^\/(?:i|p)\/\d+\/[-\w%]+\/?$/i.test(parsedUrl.pathname);
+  const strongProductishPath = hasStrongProductishPath(parsedUrl);
   if (strongProductishPath && (hasVisiblePriceSignal() || hasCommerceActionSignal())) {
     return true;
   }
@@ -7055,6 +7055,11 @@ function isLikelyCommerceProductPage(parsedUrl: URL): boolean {
   if (!productishPath) return false;
 
   return hasVisiblePriceSignal() && hasCommerceActionSignal();
+}
+
+function hasStrongProductishPath(parsedUrl: URL): boolean {
+  return /(?:^|\/)(?:product|produkt|produkter)\/[^/]+/i.test(parsedUrl.pathname) ||
+    /^\/(?:i|p)\/\d+\/[-\w%]+\/?$/i.test(parsedUrl.pathname);
 }
 
 function hasVisiblePriceSignal(): boolean {
