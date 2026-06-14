@@ -281,6 +281,11 @@ h1 {
   color: #6b5330;
 }
 
+.provider-coop {
+  background: #003366;
+  color: #ffffff;
+}
+
 .provider-bob {
   background: #ffffff;
   border: 1px solid #d3e2dc;

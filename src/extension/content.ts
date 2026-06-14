@@ -8459,6 +8459,10 @@ function renderNotice(
       border: 1px solid #c9b896;
       color: #6b5330;
     }
+    .provider-coop {
+      background: #003366;
+      color: #ffffff;
+    }
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;
@@ -9270,41 +9274,7 @@ function renderNotice(
       providerWrap.prepend(adChip);
     }
     offerLabel.append(offerReward);
-    if (currentOffer.discountCode !== undefined) {
-      const code = currentOffer.discountCode;
-      const copyBtn = document.createElement("span");
-      copyBtn.className = "copy-code-btn";
-      copyBtn.innerHTML = COPY_ICON_SVG;
-      const copyTooltip = document.createElement("div");
-      copyTooltip.className = "copy-code-tooltip";
-      copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-      shadowRoot.append(copyTooltip);
-      copyBtn.addEventListener("mouseenter", () => {
-        const rect = copyBtn.getBoundingClientRect();
-        copyTooltip.style.left = `${rect.left + rect.width / 2}px`;
-        copyTooltip.style.top = `${rect.top - 30}px`;
-        copyTooltip.style.transform = "translateX(-50%)";
-        copyTooltip.classList.add("visible");
-      });
-      copyBtn.addEventListener("mouseleave", () => {
-        copyTooltip.classList.remove("visible");
-      });
-      copyBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        navigator.clipboard.writeText(code).then(() => {
-          copyBtn.innerHTML = CHECK_ICON_SVG;
-          copyTooltip.textContent = "Kopiert!";
-          copyTooltip.classList.add("visible");
-          setTimeout(() => {
-            copyBtn.innerHTML = COPY_ICON_SVG;
-            copyTooltip.textContent = `Kopier rabattkode: ${code}`;
-            copyTooltip.classList.remove("visible");
-          }, 1500);
-        });
-      });
-      offerLink.append(offerLabel, copyBtn, providerWrap);
-    } else if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
+    if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
       const warnIcon = document.createElement("span");
       warnIcon.className = "card-only-warn";
       warnIcon.textContent = "⚠";

@@ -306,7 +306,6 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
     props.offer.terms.length > 60 ||
     (props.offer.terms.includes("\n") && props.offer.terms.trim().length > 0);
   const isCardOnly = (CARD_ONLY_PROVIDERS as string[]).includes(props.offer.provider);
-  const [copied, setCopied] = useState(false);
 
   const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(props.offer.reward.trim());
   let rewardText: string;
@@ -317,18 +316,6 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
     rewardText = formatRewardLabel(props.offer.reward, props.offer.provider);
   }
   if (!isNumericReward && props.offer.discountCode !== undefined) rewardText = "?";
-
-  const discountCode = props.offer.discountCode;
-
-  function handleCopyClick(e: React.MouseEvent): void {
-    if (discountCode === undefined) return;
-    e.preventDefault();
-    e.stopPropagation();
-    navigator.clipboard.writeText(discountCode).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
 
   const nonNumericCodeDescription = !isNumericReward && props.offer.discountCode !== undefined
     ? (props.offer.terms || props.offer.reward)
@@ -377,20 +364,6 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
           </p>
           <p className="muted">{props.offer.merchantName}</p>
         </div>
-        {discountCode !== undefined && (
-          <span
-            className="copy-code-btn"
-            title={copied ? "Kopiert!" : `Kopier rabattkode: ${discountCode}`}
-            onClick={handleCopyClick}
-            role="button"
-          >
-            {copied ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            )}
-          </span>
-        )}
       </a>
     </div>
   );
@@ -463,6 +436,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
 
   if (provider === "rabattkode") {
     return "Kode";
+  }
+
+  if (provider === "coop") {
+    return "Coop";
   }
 
   return provider;

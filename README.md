@@ -1,5 +1,12 @@
 # [Cashback Norge](https://cashbacknorge.no)
 
+> **Source available, not open source**
+>
+> This repository is public for transparency and review only.
+> You may not copy, modify, redistribute, publish, sell, or use the code
+> without prior written permission from the copyright holder.
+> See [LICENSE](./LICENSE).
+
 Viser cashback-tilbud automatisk når du handler på nett i Norge.
 
 ## iPhone / iPad
