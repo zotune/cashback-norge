@@ -269,37 +269,44 @@ function normalizeAffiliateLink(affiliateLink: string): string | undefined {
 
 function buildSupportReward(program: PartnerAdsProgram): string {
   const currency = normalizeCurrency(program.feedCurrency) || "kr";
-  const saleReward = extractCommissionReward(program.commission);
-  if (saleReward) return `${saleReward} støtte`;
+  const saleReward = extractCharityCommissionReward(program.commission);
+  if (saleReward) return saleReward;
 
-  const leadReward = extractFixedReward(program.leadRate, currency);
-  if (leadReward) return `${leadReward} støtte`;
+  const leadReward = extractCharityFixedReward(program.leadRate, currency);
+  if (leadReward) return leadReward;
 
-  const clickReward = extractFixedReward(program.clickRate, currency);
-  if (clickReward) return `${clickReward} støtte`;
+  const clickReward = extractCharityFixedReward(program.clickRate, currency);
+  if (clickReward) return clickReward;
 
   const fallbackReward = extractRewardFromRate([
     program.terms,
     program.description,
     program.cashback,
   ].filter(Boolean).join(" "));
-  return fallbackReward ? `${fallbackReward} støtte` : "Støtte";
+  return fallbackReward ? scaleRewardByCharityShare(fallbackReward, currency) : "Veldedighet";
 }
 
-function extractCommissionReward(value: string): string {
-  const explicitReward = extractRewardFromRate(value);
+function extractCharityCommissionReward(value: string): string {
+  const explicitReward = scaleRewardByCharityShare(extractRewardFromRate(value), "kr");
   if (explicitReward) return explicitReward;
 
   const amount = parseBareRateNumber(value);
-  return amount > 0 && amount <= 100 ? `${formatRewardNumber(amount)} %` : "";
+  return amount > 0 && amount <= 100
+    ? formatPercent(amount * CHARITY_SHARE_OF_COMMISSION)
+    : "";
 }
 
-function extractFixedReward(value: string, fallbackCurrency: string): string {
-  const explicitReward = extractRewardFromRate(value);
+function extractCharityFixedReward(value: string, fallbackCurrency: string): string {
+  const explicitReward = scaleRewardByCharityShare(
+    extractRewardFromRate(value),
+    fallbackCurrency,
+  );
   if (explicitReward) return explicitReward;
 
   const amount = parseBareRateNumber(value);
-  return amount > 0 ? `${formatRewardNumber(amount)} ${fallbackCurrency}` : "";
+  return amount > 0
+    ? `${formatRewardNumber(amount * CHARITY_SHARE_OF_COMMISSION)} ${fallbackCurrency}`
+    : "";
 }
 
 function extractRewardFromRate(value: string): string {
@@ -309,6 +316,44 @@ function extractRewardFromRate(value: string): string {
   }
 
   return extractFixedRateReward(value);
+}
+
+function scaleRewardByCharityShare(reward: string, fallbackCurrency: string): string {
+  const percentageRangeMatch = reward.match(/^(\d+(?:[,.]\d+)?)\s*[-–]\s*(\d+(?:[,.]\d+)?)\s*%$/);
+  if (percentageRangeMatch !== null) {
+    const min = parseRewardAmount(percentageRangeMatch[1] ?? "");
+    const max = parseRewardAmount(percentageRangeMatch[2] ?? "");
+    if (min > 0 && max > 0) {
+      return `${formatRewardNumber(min * CHARITY_SHARE_OF_COMMISSION)}-${formatRewardNumber(max * CHARITY_SHARE_OF_COMMISSION)} %`;
+    }
+  }
+
+  const percentageMatch = reward.match(/^(\d+(?:[,.]\d+)?)\s*%$/);
+  if (percentageMatch !== null) {
+    const amount = parseRewardAmount(percentageMatch[1] ?? "");
+    return amount > 0 ? formatPercent(amount * CHARITY_SHARE_OF_COMMISSION) : "";
+  }
+
+  const fixedRangeMatch = reward.match(/^(\d[\d\s.]*(?:[,.]\d+)?)\s*[-–]\s*(\d[\d\s.]*(?:[,.]\d+)?)\s*([A-Z]{3}|kr)$/i);
+  if (fixedRangeMatch !== null) {
+    const min = parseRewardAmount(fixedRangeMatch[1] ?? "");
+    const max = parseRewardAmount(fixedRangeMatch[2] ?? "");
+    const currency = normalizeCurrency(fixedRangeMatch[3] ?? "") || fallbackCurrency;
+    if (min > 0 && max > 0) {
+      return `${formatRewardNumber(min * CHARITY_SHARE_OF_COMMISSION)}-${formatRewardNumber(max * CHARITY_SHARE_OF_COMMISSION)} ${currency}`;
+    }
+  }
+
+  const fixedMatch = reward.match(/^(\d[\d\s.]*(?:[,.]\d+)?)\s*([A-Z]{3}|kr)$/i);
+  if (fixedMatch !== null) {
+    const amount = parseRewardAmount(fixedMatch[1] ?? "");
+    const currency = normalizeCurrency(fixedMatch[2] ?? "") || fallbackCurrency;
+    return amount > 0
+      ? `${formatRewardNumber(amount * CHARITY_SHARE_OF_COMMISSION)} ${currency}`
+      : "";
+  }
+
+  return "";
 }
 
 function parseBareRateNumber(value: string): number {
@@ -387,8 +432,11 @@ function formatPercent(value: number): string {
 function buildTerms(program: PartnerAdsProgram): string {
   const lines = [
     "Annonselenke via Partner-Ads.",
-    "♥ støtter utvikleren direkte, ikke cashback til deg.",
-    buildCharityLine(program),
+    "Dette er ikke cashback utbetalt til deg.",
+    "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
+    `${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen settes av til veldedighet.`,
+    buildCharityExampleLine(program),
+    "Totalen som går til veldedighet oppdateres på cashbacknorge.no.",
   ];
 
   if (program.commission) lines.push(`Provisjon: ${program.commission}.`);
@@ -404,24 +452,24 @@ function buildTerms(program: PartnerAdsProgram): string {
   return uniquePreserveOrder(lines).join("\n");
 }
 
-function buildCharityLine(program: PartnerAdsProgram): string {
+function buildCharityExampleLine(program: PartnerAdsProgram): string {
   const currency = normalizeCurrency(program.feedCurrency) || "kr";
   const commissionPercent = parseBareRateNumber(program.commission);
   if (commissionPercent > 0 && commissionPercent <= 100) {
-    return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen (ca. ${formatPercent(commissionPercent * CHARITY_SHARE_OF_COMMISSION)} av kjøpet).`;
+    return `Denne butikken: ${formatPercent(commissionPercent)} provisjon × ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} = ca. ${formatPercent(commissionPercent * CHARITY_SHARE_OF_COMMISSION)} av kjøpet til veldedighet.`;
   }
 
   const leadAmount = parseBareRateNumber(program.leadRate);
   if (leadAmount > 0) {
-    return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen (ca. ${formatRewardNumber(leadAmount * CHARITY_SHARE_OF_COMMISSION)} ${currency}).`;
+    return `Denne butikken: ${formatRewardNumber(leadAmount)} ${currency} provisjon × ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} = ca. ${formatRewardNumber(leadAmount * CHARITY_SHARE_OF_COMMISSION)} ${currency} til veldedighet.`;
   }
 
   const clickAmount = parseBareRateNumber(program.clickRate);
   if (clickAmount > 0) {
-    return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen (ca. ${formatRewardNumber(clickAmount * CHARITY_SHARE_OF_COMMISSION)} ${currency}).`;
+    return `Denne butikken: ${formatRewardNumber(clickAmount)} ${currency} per klikk × ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} = ca. ${formatRewardNumber(clickAmount * CHARITY_SHARE_OF_COMMISSION)} ${currency} til veldedighet.`;
   }
 
-  return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen doneres.`;
+  return "Eksakt provisjon varierer eller mangler i Partner-Ads-data.";
 }
 
 function cleanText(value: string): string {
