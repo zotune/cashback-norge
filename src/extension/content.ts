@@ -7711,13 +7711,20 @@ function isSpareborsenPageReady(): boolean {
 
 function findSpareborsenHandleButton(): HTMLButtonElement | null {
   for (const button of document.querySelectorAll<HTMLButtonElement>("button")) {
-    const text = button.textContent?.replace(/^Ad\s*/i, "").trim() ?? "";
-    if (text.startsWith("Handle hos") && text.endsWith("→")) {
+    if (isSpareborsenPartnerCtaText(button.textContent)) {
       return button;
     }
   }
 
   return null;
+}
+
+function isSpareborsenPartnerCtaText(value: string | null | undefined): boolean {
+  const text = value?.replace(/^Ad\s*/i, "").trim().replace(/\s+/g, " ") ?? "";
+  return (
+    (text.startsWith("Handle hos") || text.startsWith("Aktiver og gå til")) &&
+    text.endsWith("→")
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -7776,10 +7783,9 @@ function isSpareborsenActivationClick(target: Element): boolean {
   if (getCurrentSpareborsenOfferActivationUrl() === undefined) {
     return false;
   }
-  // The "Handle hos X →" button is a <button> without an <a> wrapper (when logged in)
+  // Partner CTA is a <button> without an <a> wrapper when logged in.
   const clickable = target.closest<HTMLElement>("button");
-  const text = clickable?.textContent?.trim() ?? "";
-  return text.startsWith("Handle hos") && text.endsWith("→");
+  return isSpareborsenPartnerCtaText(clickable?.textContent);
 }
 
 function getCurrentSpareborsenOfferActivationUrl(): string | undefined {
@@ -7798,7 +7804,12 @@ function getCurrentSpareborsenOfferActivationUrl(): string | undefined {
     return undefined;
   }
 
-  return window.location.href;
+  const port = parsedUrl.port.length > 0 ? `:${parsedUrl.port}` : "";
+  const pathname = parsedUrl.pathname.length > 1 && parsedUrl.pathname.endsWith("/")
+    ? parsedUrl.pathname.slice(0, -1)
+    : parsedUrl.pathname;
+
+  return `${parsedUrl.protocol}//${parsedUrl.hostname}${port}${pathname}`;
 }
 
 function isRabbleActivationClick(target: Element): boolean {
