@@ -16,6 +16,7 @@ import type { Logger } from "../logger.js";
 
 const API_URL = "https://www.partner-ads.com/no/programoversigt_xml.php";
 const ENV_KEY = "PARTNER_ADS_API_KEY";
+const CHARITY_SHARE_OF_COMMISSION = 0.1;
 
 export type FetchPartnerAdsInput = {
   apiKey?: string;
@@ -41,6 +42,8 @@ export type PartnerAdsProgram = {
   discountSites: string;
   affiliateLink: string;
   feedLink: string;
+  feedCurrency: string;
+  feedMarket: string;
   status: string;
 };
 
@@ -67,7 +70,7 @@ export async function fetchPartnerAds(
     signal: AbortSignal.timeout(30_000),
   });
 
-  const xml = await response.text();
+  const xml = await readResponseText(response);
   if (response.status === 429) {
     input.logger.warn("Partner-Ads: rate limited by API, skipping for this crawl");
     return [];
@@ -153,6 +156,8 @@ export function parsePartnerAdsProgramOverviewXml(xml: string): PartnerAdsProgra
       discountSites: readXmlTag(block, "rabattsites"),
       affiliateLink: readXmlTag(block, "affiliatelink"),
       feedLink: readXmlTag(block, "feedlink"),
+      feedCurrency: readXmlTag(block, "feedcur"),
+      feedMarket: readXmlTag(block, "feedmarket"),
       status: readXmlTag(block, "status"),
     };
 
@@ -263,13 +268,14 @@ function normalizeAffiliateLink(affiliateLink: string): string | undefined {
 }
 
 function buildSupportReward(program: PartnerAdsProgram): string {
-  const saleReward = extractRewardFromRate(program.commission);
+  const currency = normalizeCurrency(program.feedCurrency) || "kr";
+  const saleReward = extractCommissionReward(program.commission);
   if (saleReward) return `${saleReward} støtte`;
 
-  const leadReward = extractRewardFromRate(program.leadRate);
+  const leadReward = extractFixedReward(program.leadRate, currency);
   if (leadReward) return `${leadReward} støtte`;
 
-  const clickReward = extractRewardFromRate(program.clickRate);
+  const clickReward = extractFixedReward(program.clickRate, currency);
   if (clickReward) return `${clickReward} støtte`;
 
   const fallbackReward = extractRewardFromRate([
@@ -280,6 +286,22 @@ function buildSupportReward(program: PartnerAdsProgram): string {
   return fallbackReward ? `${fallbackReward} støtte` : "Støtte";
 }
 
+function extractCommissionReward(value: string): string {
+  const explicitReward = extractRewardFromRate(value);
+  if (explicitReward) return explicitReward;
+
+  const amount = parseBareRateNumber(value);
+  return amount > 0 && amount <= 100 ? `${formatRewardNumber(amount)} %` : "";
+}
+
+function extractFixedReward(value: string, fallbackCurrency: string): string {
+  const explicitReward = extractRewardFromRate(value);
+  if (explicitReward) return explicitReward;
+
+  const amount = parseBareRateNumber(value);
+  return amount > 0 ? `${formatRewardNumber(amount)} ${fallbackCurrency}` : "";
+}
+
 function extractRewardFromRate(value: string): string {
   const percentageValues = extractPercentageValues(value);
   if (percentageValues.length > 0) {
@@ -287,6 +309,11 @@ function extractRewardFromRate(value: string): string {
   }
 
   return extractFixedRateReward(value);
+}
+
+function parseBareRateNumber(value: string): number {
+  if (!/^\s*\d[\d\s.]*(?:[,.]\d+)?\s*$/.test(value)) return 0;
+  return parseRewardAmount(value);
 }
 
 function extractFixedRateReward(value: string): string {
@@ -353,10 +380,15 @@ function formatRewardNumber(value: number): string {
     : value.toLocaleString("nb-NO", { maximumFractionDigits: 2 }).replace(/[\u00a0\u202f]/g, " ");
 }
 
+function formatPercent(value: number): string {
+  return `${formatRewardNumber(value)} %`;
+}
+
 function buildTerms(program: PartnerAdsProgram): string {
   const lines = [
     "Annonselenke via Partner-Ads.",
     "♥ støtter utvikleren direkte, ikke cashback til deg.",
+    buildCharityLine(program),
   ];
 
   if (program.commission) lines.push(`Provisjon: ${program.commission}.`);
@@ -370,6 +402,26 @@ function buildTerms(program: PartnerAdsProgram): string {
   if (extraTerms) lines.push(truncateText(extraTerms, 280));
 
   return uniquePreserveOrder(lines).join("\n");
+}
+
+function buildCharityLine(program: PartnerAdsProgram): string {
+  const currency = normalizeCurrency(program.feedCurrency) || "kr";
+  const commissionPercent = parseBareRateNumber(program.commission);
+  if (commissionPercent > 0 && commissionPercent <= 100) {
+    return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen (ca. ${formatPercent(commissionPercent * CHARITY_SHARE_OF_COMMISSION)} av kjøpet).`;
+  }
+
+  const leadAmount = parseBareRateNumber(program.leadRate);
+  if (leadAmount > 0) {
+    return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen (ca. ${formatRewardNumber(leadAmount * CHARITY_SHARE_OF_COMMISSION)} ${currency}).`;
+  }
+
+  const clickAmount = parseBareRateNumber(program.clickRate);
+  if (clickAmount > 0) {
+    return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen (ca. ${formatRewardNumber(clickAmount * CHARITY_SHARE_OF_COMMISSION)} ${currency}).`;
+  }
+
+  return `Veldedighet: ${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen doneres.`;
 }
 
 function cleanText(value: string): string {
@@ -401,4 +453,21 @@ function cleanMerchantName(value: string): string {
     .replace(/\s+/g, " ")
     .replace(/\s+\|\s+Partner-Ads$/i, "")
     .trim();
+}
+
+async function readResponseText(response: Response): Promise<string> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const charsetMatch = contentType.match(/\bcharset=([^;\s]+)/i);
+  const charset = charsetMatch?.[1]?.trim().toLowerCase();
+  const arrayBuffer = await response.arrayBuffer();
+
+  if (
+    charset === "iso-8859-1" ||
+    charset === "latin1" ||
+    charset === "windows-1252"
+  ) {
+    return new TextDecoder("iso-8859-1").decode(arrayBuffer);
+  }
+
+  return new TextDecoder("utf-8").decode(arrayBuffer);
 }
