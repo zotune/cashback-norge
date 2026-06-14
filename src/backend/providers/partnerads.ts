@@ -433,7 +433,9 @@ function buildTerms(program: PartnerAdsProgram): string {
   const lines = [
     "Annonselenke via Partner-Ads.",
     "Dette er ikke cashback utbetalt til deg.",
+    "Det koster deg ingenting ekstra å bruke lenken.",
     "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
+    "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",
     `${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen settes av til veldedighet.`,
     buildCharityExampleLine(program),
     "Totalen som går til veldedighet oppdateres på cashbacknorge.no.",

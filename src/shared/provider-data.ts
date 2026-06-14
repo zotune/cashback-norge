@@ -94,7 +94,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   unidays: { bg: "#00b140", fg: "#ffffff" },
   unio: { bg: "#ffffff", fg: "#6b5330" },
   coop: { bg: "#003366", fg: "#ffffff" },
-  cbn: { bg: "#f7d7e6", fg: "#8f164f" },
+  cbn: { bg: "#ffe4e6", fg: "#be123c" },
 };
 
 export type BonusCard = {

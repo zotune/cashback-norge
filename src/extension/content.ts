@@ -8451,8 +8451,8 @@ function renderNotice(
       color: #ffffff;
     }
     .provider-cbn {
-      background: #f7d7e6;
-      color: #8f164f;
+      background: #ffe4e6;
+      color: #be123c;
     }
     .provider-unio {
       background: #ffffff;
