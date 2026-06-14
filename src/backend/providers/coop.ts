@@ -38,7 +38,6 @@ type CoopManualOffer = {
   merchantName?: string;
   domains?: string[];
   reward?: string;
-  discountCode?: string;
   terms?: string[];
 };
 
@@ -80,25 +79,22 @@ const MANUAL_OFFERS: Record<string, CoopManualOffer> = {
     merchantName: "Riksteatret",
     domains: ["riksteatret.no"],
     reward: "50-100 kr",
-    discountCode: "Coopteater",
     terms: [
       "Krever Coop-medlemskap.",
       "50 kr avslag på barne- og danseforestillinger.",
       "100 kr avslag på voksenforestillinger.",
-      "Rabattkode: Coopteater.",
-      "Vis medlemskort ved kjøp i luke eller bruk rabattkode på riksteatret.no.",
+      "Vis medlemskort ved kjøp i luke eller bruk Coop-fordelen på riksteatret.no.",
     ],
   },
   "coop-billetten": {
     merchantName: "Coop-billetten",
     domains: ["toppserien.no", "eliteserien.no"],
     reward: "50-100 kr",
-    discountCode: "coopmedlem",
     terms: [
       "Krever Coop-medlemskap.",
       "Maks 100 kr voksenbillett og 50 kr barnebillett på Toppserien og Eliteserien.",
-      "Promokode: coopmedlem.",
-      "Kjøpes i klubbens digitale billettløsning; vis Coop-medlemskort ved inngang.",
+      "Kjøpes i klubbens digitale billettløsning via Coop-fordelen.",
+      "Vis Coop-medlemskort ved inngang.",
     ],
   },
   hotellkupp: {
@@ -191,7 +187,6 @@ export async function crawlCoop(input: CrawlCoopInput): Promise<CashbackOffer[]>
       continue;
     }
 
-    const discountCode = manual?.discountCode ?? extractDiscountCode(text);
     const sourceUrl = new URL(summary.url, BASE_URL).toString();
 
     offers.push({
@@ -201,8 +196,7 @@ export async function crawlCoop(input: CrawlCoopInput): Promise<CashbackOffer[]>
       reward,
       sourceUrl,
       activationUrl: sourceUrl,
-      terms: buildTerms(summary, textLines, manual, discountCode),
-      ...(discountCode !== undefined ? { discountCode } : {}),
+      terms: buildTerms(summary, textLines, manual),
       updatedAt: input.generatedAt,
     });
   }
@@ -369,7 +363,6 @@ function buildTerms(
   summary: CoopPageSummary,
   textLines: string[],
   manual: CoopManualOffer | undefined,
-  discountCode: string | undefined,
 ): string {
   if (manual?.terms !== undefined) {
     return manual.terms.join("\n");
@@ -377,16 +370,13 @@ function buildTerms(
 
   const lines = ["Krever Coop-medlemskap."];
 
-  if (discountCode !== undefined) {
-    lines.push(`Rabattkode: ${discountCode}.`);
-  }
-
   const relevantLines = textLines
     .flatMap(splitSentences)
     .map(cleanHumanText)
     .map(cleanTermLine)
     .filter((line) => line.length > 0)
     .filter((line) => /(?:rabatt|bonus|kode|promokode|medlemskort|bestill|automatisk|gjelder|forutsetter|må|maks|avslag|kombineres|kjøpes)/i.test(line))
+    .filter((line) => !containsExplicitDiscountCodeLine(line))
     .filter((line) => !/^(bli medlem|allerede medlem|logg inn|meld deg inn|les mer|bestill her|les mer og bestill her|logg inn og bestill her)$/i.test(line))
     .filter((line) => !/^coop medlem:?$/i.test(line));
 
@@ -418,26 +408,15 @@ function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
+function containsExplicitDiscountCodeLine(line: string): boolean {
+  return /(?:rabattkode|promokode|promo-kode|kampanjekode)\s*[:«"“]\s*[a-z0-9æøå-]{3,30}/i.test(line);
+}
+
 function addUniqueLine(lines: string[], line: string): void {
   const normalized = line.toLowerCase().replace(/\s+/g, " ");
   if (!lines.some((existing) => existing.toLowerCase().replace(/\s+/g, " ") === normalized)) {
     lines.push(line);
   }
-}
-
-function extractDiscountCode(text: string): string | undefined {
-  const patterns = [
-    /(?:rabattkode|promokode|promo-kode|kampanjekode)\s*[:«"“]?\s*([a-z0-9æøå-]{3,30})[»"”]?/i,
-    /bruk\s+(?:rabattkode|promokode|promo-kode)\s*[«"“]?([a-z0-9æøå-]{3,30})[»"”]?/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    const code = match?.[1]?.replace(/[.,;:!?]+$/, "");
-    if (code !== undefined) return code;
-  }
-
-  return undefined;
 }
 
 function buildMerchantName(summary: CoopPageSummary, domain: string): string {
