@@ -47,6 +47,7 @@ import { fetchUnidays } from "./providers/unidays.js";
 import { crawlStudentTorget } from "./providers/studenttorget.js";
 import { fetchUnio } from "./providers/unio.js";
 import { crawlCoop } from "./providers/coop.js";
+import { fetchPartnerAds } from "./providers/partnerads.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -97,6 +98,7 @@ type CliConfig = {
   skipStudentTorget: boolean;
   skipUnio: boolean;
   skipCoop: boolean;
+  skipPartnerAds: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -159,6 +161,7 @@ async function main(): Promise<void> {
     unidaysOffers,
     unioOffers,
     coopOffers,
+    partnerAdsOffers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : collectOffers({
       fallbackWhenEmpty: true,
@@ -274,6 +277,13 @@ async function main(): Promise<void> {
         generatedAt, logger, overrides: providerOverrides,
       }),
     }),
+    config.skipPartnerAds ? Promise.resolve([]) : collectOffers({
+      label: "Partner-Ads",
+      provider: "cbn",
+      run: () => fetchPartnerAds({
+        generatedAt, logger,
+      }),
+    }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -290,6 +300,7 @@ async function main(): Promise<void> {
     ...sparebank1Offers,
     ...spareborsenOffers,
     ...coopOffers,
+    ...partnerAdsOffers,
     ...utdanningibergenOffers,
     ...unioOffers,
     ...manualOffers,
@@ -470,6 +481,7 @@ async function main(): Promise<void> {
     ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...dnbOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
     ...sparebank1Offers, ...spareborsenOffers, ...coopOffers, ...manualOffers,
+    ...partnerAdsOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
     ...teknaOffers, ...nitoOffers,
@@ -486,7 +498,7 @@ async function main(): Promise<void> {
     }),
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...studentTorgetOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...studentTorgetOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -585,6 +597,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipStudentTorget: args.includes("--skip-studenttorget"),
     skipUnio: args.includes("--skip-unio"),
     skipCoop: args.includes("--skip-coop"),
+    skipPartnerAds: args.includes("--skip-partnerads"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",

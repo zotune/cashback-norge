@@ -66,13 +66,13 @@ export function calculateCashback(offer: RewardOffer, amount: number): string {
     const pctMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
     if (pctMatch !== null) {
       const pct = Number.parseFloat(pctMatch[1]?.replace(",", ".") ?? "0");
-      return `${formatKr(amount * pct / 100)} kr til gode formål`;
+      return `${formatKr(amount * pct / 100)} kr støtte`;
     }
 
     const fixedKrMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
     if (fixedKrMatch !== null) {
       const fixedKr = Number.parseFloat(fixedKrMatch[1]?.replace(",", ".") ?? "0");
-      return `${formatKr(fixedKr)} kr til gode formål`;
+      return `${formatKr(fixedKr)} kr støtte`;
     }
 
     return "";
