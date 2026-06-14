@@ -8,7 +8,7 @@ import {
 import { formatPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
-const API_URL = "https://spareborsen.no/api/partners?limit=200";
+const API_URL = "https://spareborsen.no/api/partners?limit=500";
 const BASE_URL = "https://spareborsen.no";
 
 type SpareborsenSegment = {
