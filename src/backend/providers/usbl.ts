@@ -33,6 +33,7 @@ const SKIP_HOSTNAMES = new Set([
   "facebook.com",
   "instagram.com",
   "linkedin.com",
+  "adtraction.com",
   "policy.app.cookieinformation.com",
   "iplookup.services.relatude.com",
   "magicwidget.socialboards.com",
@@ -122,7 +123,10 @@ export async function crawlUsbl(input: CrawlUsblInput): Promise<CashbackOffer[]>
 
     if (domains.length === 0) {
       for (const lookupName of lookupNamesForEntry(entry)) {
-        domains = lookupDomains(input.domainLookup, lookupName);
+        domains = selectDomainsForEntry(
+          entry.name,
+          lookupDomains(input.domainLookup, lookupName).filter((domain) => !isSkippedHostname(domain)),
+        );
         if (domains.length > 0) {
           lookupCount++;
           break;
@@ -356,13 +360,13 @@ function addPercentageValue(values: number[], rawValue: string | undefined): voi
 function extractUsblKrReward(text: string): string {
   const values: number[] = [];
   const patterns = [
-    /\bspar\s+kr\.?\s*(\d[\d\s]*)\s*(?:[,.-]\s*[-–]?)?/gi,
+    /\bspare?\s+(?:opptil\s+)?(?:kr\.?\s*)?(\d[\d\s.]*)\s*(?:kr|kroner)?\s*(?:[,.-]\s*[-–]?)?/gi,
     /\bkr\.?\s*(\d[\d\s]*)\s*(?:[,.-]\s*[-–]?)?\s+(?:i\s+)?(?:rabatt|avslag)\b/gi,
   ];
 
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) {
-      const value = Number.parseInt((match[1] ?? "").replace(/\s+/g, ""), 10);
+      const value = Number.parseInt((match[1] ?? "").replace(/[\s.]+/g, ""), 10);
       if (Number.isFinite(value) && value > 0) values.push(value);
     }
   }
@@ -370,7 +374,9 @@ function extractUsblKrReward(text: string): string {
   if (values.length === 0) return "";
   const min = Math.min(...values);
   const max = Math.max(...values);
-  return min === max ? `${formatKrNumber(max)} kr` : `${formatKrNumber(min)}-${formatKrNumber(max)} kr`;
+  return min === max
+    ? `${formatKrNumber(max)} kr totalsum`
+    : `${formatKrNumber(min)}-${formatKrNumber(max)} kr totalsum`;
 }
 
 function collectExternalUrls(props: unknown, html: string, renderedHtml: string): string[] {
