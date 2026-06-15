@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781528704
+// @version      1781530064
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -14735,7 +14735,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const rewardAmountSort = secondReward.amount - firstReward.amount;
       if (rewardAmountSort !== 0) return rewardAmountSort;
       if (firstIsSupport !== secondIsSupport) {
-        return firstIsSupport ? 1 : -1;
+        return firstIsSupport ? -1 : 1;
       }
       const merchantSort = firstOffer.merchantName.localeCompare(secondOffer.merchantName);
       if (merchantSort !== 0) return merchantSort;

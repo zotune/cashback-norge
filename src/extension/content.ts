@@ -10827,7 +10827,7 @@ function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     const rewardAmountSort = secondReward.amount - firstReward.amount;
     if (rewardAmountSort !== 0) return rewardAmountSort;
     if (firstIsSupport !== secondIsSupport) {
-      return firstIsSupport ? 1 : -1;
+      return firstIsSupport ? -1 : 1;
     }
     const merchantSort = firstOffer.merchantName.localeCompare(secondOffer.merchantName);
     if (merchantSort !== 0) return merchantSort;

@@ -1003,7 +1003,7 @@ function compareOffers(a, b) {
   const bSupport = b.provider === "cbn";
   const pctSort = getMaxPct(b) - getMaxPct(a);
   if (pctSort !== 0) return pctSort;
-  if (aSupport !== bSupport) return aSupport ? 1 : -1;
+  if (aSupport !== bSupport) return aSupport ? -1 : 1;
   return (PROVIDER_NAMES[a.provider] || a.provider).localeCompare(PROVIDER_NAMES[b.provider] || b.provider, "nb");
 }
 

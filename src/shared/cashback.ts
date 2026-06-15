@@ -391,7 +391,7 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     }
 
     if (firstIsSupport !== secondIsSupport) {
-      return firstIsSupport ? 1 : -1;
+      return firstIsSupport ? -1 : 1;
     }
 
     const merchantSort = firstOffer.merchantName.localeCompare(
