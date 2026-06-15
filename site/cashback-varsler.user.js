@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781526456
+// @version      1781526664
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -11681,6 +11681,18 @@ query SearchSuggestions($query: String!, $category: Int) {
   function shouldMarkOfferClick(offer) {
     return offer.provider === "cbn";
   }
+  function shouldShowAffiliateDisclosure(offer) {
+    return offer.provider === "nettbonus" || offer.provider === "spareborsen" || offer.provider === "cbn";
+  }
+  function addAffiliateDisclosure(providerWrap) {
+    const providerBadge = providerWrap.querySelector(".provider-badge");
+    const adChip = makeAdChip();
+    if (providerBadge !== null) {
+      providerWrap.insertBefore(adChip, providerBadge);
+      return;
+    }
+    providerWrap.append(adChip);
+  }
   function installOfferActivationClickTracker() {
     document.addEventListener("click", (event) => {
       if (event.defaultPrevented || event.button !== 0) {
@@ -13394,9 +13406,8 @@ query SearchSuggestions($query: String!, $category: Int) {
           void markOfferActivated(currentOffer.provider, currentOffer.activationUrl);
         });
       }
-      if (currentOffer.provider === "nettbonus" || currentOffer.provider === "spareborsen") {
-        const adChip = makeAdChip();
-        providerWrap.prepend(adChip);
+      if (shouldShowAffiliateDisclosure(currentOffer)) {
+        addAffiliateDisclosure(providerWrap);
       }
       offerLabel.append(offerReward);
       if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {

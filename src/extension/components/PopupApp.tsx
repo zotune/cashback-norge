@@ -317,6 +317,7 @@ export function PopupApp(): ReactElement {
 
 const CARD_ONLY_PROVIDERS = ["sparebank1", "remember"];
 const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
+const AFFILIATE_DISCLOSURE_PROVIDERS = ["nettbonus", "spareborsen", "cbn"];
 
 function OfferRow(props: { offer: CashbackOffer; amount: number; activated: boolean; onActivate: (offer: CashbackOffer) => void }): ReactElement {
   const hasBreakdown = props.offer.provider === "cbn" ||
@@ -372,6 +373,9 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
                   </span>
                 </span>
               )}
+              {shouldShowAffiliateDisclosure(props.offer) && (
+                <span className="ad-chip">Ad</span>
+              )}
               <span className={`provider-badge provider-${props.offer.provider}`}>
                 {formatProviderName(props.offer.provider)}
               </span>
@@ -392,6 +396,10 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
 
 function shouldMarkOfferClick(offer: CashbackOffer): boolean {
   return offer.provider === "cbn";
+}
+
+function shouldShowAffiliateDisclosure(offer: CashbackOffer): boolean {
+  return (AFFILIATE_DISCLOSURE_PROVIDERS as string[]).includes(offer.provider);
 }
 
 function formatProviderName(provider: CashbackOffer["provider"]): string {

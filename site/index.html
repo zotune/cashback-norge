@@ -1193,10 +1193,11 @@ function render(query) {
       const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText;
       const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
       const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="app-chip">App</span>` : "";
+      const adChipHtml = ["nettbonus", "spareborsen", "cbn"].includes(o.provider) ? `<span class="ad-chip">Ad</span>` : "";
       const bestClass = idx === 0 ? " offer--best" : "";
       return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
         <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
-        ${warnIconHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span>
+        ${warnIconHtml}<span style="display:inline-flex;align-items:center;gap:6px;">${adChipHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span></span>
       </a></span>`;
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);

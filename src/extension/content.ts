@@ -7406,6 +7406,21 @@ function shouldMarkOfferClick(offer: CashbackOffer): boolean {
   return offer.provider === "cbn";
 }
 
+function shouldShowAffiliateDisclosure(offer: CashbackOffer): boolean {
+  return offer.provider === "nettbonus" || offer.provider === "spareborsen" || offer.provider === "cbn";
+}
+
+function addAffiliateDisclosure(providerWrap: HTMLSpanElement): void {
+  const providerBadge = providerWrap.querySelector(".provider-badge");
+  const adChip = makeAdChip();
+  if (providerBadge !== null) {
+    providerWrap.insertBefore(adChip, providerBadge);
+    return;
+  }
+
+  providerWrap.append(adChip);
+}
+
 function installOfferActivationClickTracker(): void {
   document.addEventListener("click", (event) => {
     if (event.defaultPrevented || event.button !== 0) {
@@ -9298,9 +9313,8 @@ function renderNotice(
         void markOfferActivated(currentOffer.provider, currentOffer.activationUrl);
       });
     }
-    if (currentOffer.provider === "nettbonus" || currentOffer.provider === "spareborsen") {
-      const adChip = makeAdChip();
-      providerWrap.prepend(adChip);
+    if (shouldShowAffiliateDisclosure(currentOffer)) {
+      addAffiliateDisclosure(providerWrap);
     }
     offerLabel.append(offerReward);
     if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
