@@ -140,7 +140,7 @@ h1 {
 .provider-wrap {
   align-items: center;
   display: inline-flex;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
 }
 

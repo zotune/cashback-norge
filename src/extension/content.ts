@@ -7413,6 +7413,7 @@ function shouldShowAffiliateDisclosure(offer: CashbackOffer): boolean {
 function addAffiliateDisclosure(providerWrap: HTMLSpanElement): void {
   const providerBadge = providerWrap.querySelector(".provider-badge");
   const adChip = makeAdChip();
+  adChip.style.marginRight = "0";
   if (providerBadge !== null) {
     providerWrap.insertBefore(adChip, providerBadge);
     return;
@@ -8221,7 +8222,7 @@ function renderNotice(
     .provider-wrap {
       align-items: center;
       display: inline-flex;
-      gap: 5px;
+      gap: 8px;
       grid-column: 3;
       justify-content: flex-end;
       min-width: 0;
