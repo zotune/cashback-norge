@@ -1,15 +1,21 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
+import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
+  isRecord,
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
 import { formatPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
-const API_URL = "https://spareborsen.no/api/partners?limit=500";
+const API_URLS = [
+  "https://spareborsen.no/api/partners?limit=500",
+  "https://www.spareborsen.no/api/partners?limit=500",
+];
 const BASE_URL = "https://spareborsen.no";
+const MAX_FETCH_ATTEMPTS = 3;
 
 type SpareborsenSegment = {
   name: string;
@@ -39,23 +45,7 @@ export async function fetchSpareborsen(
 ): Promise<CashbackOffer[]> {
   input.logger.info("Sparebørsen: fetching partners...");
 
-  const response = await fetch(API_URL, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(`Sparebørsen API returned ${response.status}`);
-  }
-
-  const json = (await response.json()) as {
-    success: boolean;
-    data: { partners: SpareborsenPartner[] };
-  };
-  if (!json.success) {
-    throw new Error("Sparebørsen API returned success=false");
-  }
-
-  const partners = json.data.partners.filter((p) => p.active);
+  const partners = (await fetchPartners(input.logger)).filter((p) => p.active);
   input.logger.info(`Sparebørsen: ${partners.length} active partners`);
 
   const offers: CashbackOffer[] = [];
@@ -90,6 +80,63 @@ export async function fetchSpareborsen(
 
   input.logger.info(`Sparebørsen: produced ${offers.length} offers`);
   return uniqueOffers(offers);
+}
+
+async function fetchPartners(logger: Logger): Promise<SpareborsenPartner[]> {
+  const errors: string[] = [];
+
+  for (const url of API_URLS) {
+    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+      try {
+        const response = await gotScraping(url, {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "CashbackNorgeCrawler/1.0",
+          },
+          http2: false,
+          responseType: "json",
+          throwHttpErrors: false,
+          timeout: { request: 30_000 },
+        });
+
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw new Error(
+            `returned ${response.statusCode}: ${response.statusMessage}`,
+          );
+        }
+
+        return readPartnersResponse(response.body);
+      } catch (error) {
+        const message = formatError(error);
+        errors.push(`${url} attempt ${attempt}/${MAX_FETCH_ATTEMPTS}: ${message}`);
+        if (attempt < MAX_FETCH_ATTEMPTS) {
+          logger.warn(
+            `Sparebørsen: ${message}; retrying ${url} (${attempt + 1}/${MAX_FETCH_ATTEMPTS})`,
+          );
+          await sleep(1_000 * attempt);
+        }
+      }
+    }
+  }
+
+  throw new Error(`Sparebørsen API failed: ${errors.join("; ")}`);
+}
+
+function readPartnersResponse(value: unknown): SpareborsenPartner[] {
+  if (!isRecord(value) || typeof value.success !== "boolean") {
+    throw new Error("returned unexpected data format");
+  }
+
+  if (value.success !== true) {
+    throw new Error("returned success=false");
+  }
+
+  const data = isRecord(value.data) ? value.data : undefined;
+  if (!Array.isArray(data?.partners)) {
+    throw new Error("returned unexpected partners data");
+  }
+
+  return data.partners as SpareborsenPartner[];
 }
 
 function extractDomain(websiteUrl: string): string | null {
@@ -132,4 +179,12 @@ function buildTerms(partner: SpareborsenPartner): string {
   });
 
   return lines.join("\n");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolveValue) => setTimeout(resolveValue, ms));
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
