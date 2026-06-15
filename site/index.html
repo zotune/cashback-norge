@@ -297,6 +297,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-utdanningibergen { background: #ffffff; color: #000000; border: 1px solid #ccc; }
 .badge-unidays { background: #00b140; color: #ffffff; }
 .badge-unio { background: #ffffff; color: #6b5330; border: 1px solid #c9b896; }
+.badge-coop { background: #003366; color: #ffffff; }
 .badge-studenttorget { background: #009fe3; color: #fff; }
 .badge-cbn { background: #f7d7e6; color: #8f164f; }
 .empty {
@@ -910,6 +911,10 @@ a.merchant-name:hover { text-decoration: underline; }
 <script src="shared-data.js"></script>
 <script>
 const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES } = window.SHARED;
+const SITE_PROVIDER_REFERRAL_URLS = {
+  nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
+  spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
+};
 
 const CRYPTO_SUBSCRIPTIONS = {
   "spotify.com": "Spotify",
@@ -1007,9 +1012,17 @@ function compareOffers(a, b) {
   return (PROVIDER_NAMES[a.provider] || a.provider).localeCompare(PROVIDER_NAMES[b.provider] || b.provider, "nb");
 }
 
+function getSiteOfferUrl(o) {
+  const referralUrl = SITE_PROVIDER_REFERRAL_URLS[o.provider];
+  if (referralUrl) return referralUrl;
+  return o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
+}
+
 function normalizeName(name) {
   let n = name
     .replace(/\s*Direct Deals$/i, "")
+    .replace(/\s+(?:NO|SE|DK|FI|EU|UK|US)\s*[-–]\s*AFF$/i, "")
+    .replace(/\s*[-–]\s*AFF$/i, "")
     .replace(/\.com$/i, "")
     .replace(/\.no$/i, "")
     .replace(/\.se$/i, "")
@@ -1188,7 +1201,7 @@ function render(query) {
     const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
     if (cashbackOffers.length === 0 && codeOffers.length === 0) return "";
     const offerHtml = cashbackOffers.map((o, idx) => {
-      const url = o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
+      const url = getSiteOfferUrl(o);
       const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
       const label = calculatedLabel || formatCompactReward(o);
       const fullReward = formatReward(o);
