@@ -38,6 +38,9 @@ jobs:
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
           SCRAPERAPI_KEY2: ${{ secrets.SCRAPERAPI_KEY2 }}
           PARTNER_ADS_API_KEY: ${{ secrets.PARTNER_ADS_API_KEY }}
+          TRADETRACKER_CUSTOMER_ID: ${{ secrets.TRADETRACKER_CUSTOMER_ID }}
+          TRADETRACKER_PASSPHRASE: ${{ secrets.TRADETRACKER_PASSPHRASE }}
+          TRADETRACKER_API_KEY: ${{ secrets.TRADETRACKER_API_KEY }}
 
       - name: Commit updated index
         run: |

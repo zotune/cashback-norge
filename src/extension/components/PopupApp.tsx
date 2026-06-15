@@ -365,6 +365,9 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
           <p className="muted">{props.offer.merchantName}</p>
         </div>
       </a>
+      {tooltipContent !== null && (
+        <div className="offer-tooltip">{tooltipContent}</div>
+      )}
     </div>
   );
 }
