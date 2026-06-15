@@ -1,8 +1,15 @@
+import {
+  convertToNok,
+  normalizeCurrencyForExchange,
+  type NokBaseRates,
+} from "./exchange-rates.js";
+
 export const EB_PER_TRUMF_KR = 13.5;
 
 type RewardOffer = {
   provider: string;
   reward: string;
+  rewardSortValueNok?: number;
 };
 
 export function formatRewardLabel(reward: string, provider: string): string {
@@ -29,6 +36,12 @@ function isGenericMembershipReward(reward: string): boolean {
 
 export function formatCompactRewardLabel(offer: RewardOffer): string | undefined {
   const label = formatRewardLabel(offer.reward, offer.provider);
+  const fixedReward = readFixedRewardMax(label);
+  const rewardSortValueNok = readRewardSortValueNok(offer);
+
+  if (fixedReward !== undefined && rewardSortValueNok !== undefined && !isNokCurrency(fixedReward.currency)) {
+    return formatApproxKr(rewardSortValueNok);
+  }
 
   if (/\d+(?:[,.]\d+)?\s*kr\s*\/\s*/i.test(label) && label.includes("+")) {
     return label.replace(/\s+/g, " ");
@@ -69,10 +82,14 @@ export function calculateCashback(offer: RewardOffer, amount: number): string {
       return `${formatKr(amount * pct / 100)} kr støtte`;
     }
 
-    const fixedKrMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
-    if (fixedKrMatch !== null) {
-      const fixedKr = Number.parseFloat(fixedKrMatch[1]?.replace(",", ".") ?? "0");
-      return `${formatKr(fixedKr)} kr støtte`;
+    const fixedReward = readFixedRewardMax(offer.reward);
+    if (fixedReward !== undefined) {
+      const rewardSortValueNok = readRewardSortValueNok(offer);
+      if (rewardSortValueNok !== undefined && !isNokCurrency(fixedReward.currency)) {
+        return `${formatApproxKr(rewardSortValueNok)} støtte`;
+      }
+
+      return `${formatFixedReward(fixedReward.amount, fixedReward.currency)} støtte`;
     }
 
     return "";
@@ -152,6 +169,7 @@ export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): numb
 
 export function getMaxRewardPercent(offer: RewardOffer): number {
   const reward = offer.reward.trim();
+  const rewardSortValueNok = readRewardSortValueNok(offer);
   const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
   if (rangeMatch !== null) {
     return Number.parseFloat((rangeMatch[2] ?? "0").replace(",", "."));
@@ -178,7 +196,83 @@ export function getMaxRewardPercent(offer: RewardOffer): number {
     return Number.parseFloat((krSingleMatch[1] ?? "0").replace(",", ".")) / 1000;
   }
 
+  const fixedReward = readFixedRewardMax(reward);
+  if (fixedReward !== undefined) {
+    return (rewardSortValueNok ?? fixedReward.amount) / 1000;
+  }
+
   return 0;
+}
+
+export function addFixedRewardSortValues<T extends RewardOffer>(
+  offers: T[],
+  rates: NokBaseRates,
+): T[] {
+  return offers.map((offer) => {
+    const fixedReward = readFixedRewardMax(offer.reward);
+    if (fixedReward === undefined || isNokCurrency(fixedReward.currency)) return offer;
+
+    const nokValue = convertToNok(fixedReward.amount, fixedReward.currency, rates);
+    if (nokValue === undefined) return offer;
+
+    return {
+      ...offer,
+      rewardSortValueNok: roundSortValue(nokValue),
+    };
+  });
+}
+
+function readFixedRewardMax(reward: string): { amount: number; currency: string } | undefined {
+  const currencyPattern = "(?:kr|NOK|SEK|DKK|EUR|USD|GBP)";
+  const rangePattern = new RegExp(`\\d[\\d\\s]*(?:[,.]\\d+)?\\s*[-–]\\s*(\\d[\\d\\s]*(?:[,.]\\d+)?)\\s*(${currencyPattern})\\b`, "i");
+  const rangeMatch = reward.match(rangePattern);
+  if (rangeMatch !== null) {
+    const amount = parseRewardNumber(rangeMatch[1] ?? "");
+    const currency = normalizeFixedCurrency(rangeMatch[2] ?? "");
+    if (amount > 0 && currency !== "") return { amount, currency };
+  }
+
+  const singlePattern = new RegExp(`(\\d[\\d\\s]*(?:[,.]\\d+)?)\\s*(${currencyPattern})\\b`, "i");
+  const singleMatch = reward.match(singlePattern);
+  if (singleMatch !== null) {
+    const amount = parseRewardNumber(singleMatch[1] ?? "");
+    const currency = normalizeFixedCurrency(singleMatch[2] ?? "");
+    if (amount > 0 && currency !== "") return { amount, currency };
+  }
+
+  return undefined;
+}
+
+function parseRewardNumber(value: string): number {
+  const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeFixedCurrency(value: string): string {
+  const upper = value.trim().toUpperCase();
+  return upper === "KR" ? "kr" : upper;
+}
+
+function formatFixedReward(amount: number, currency: string): string {
+  return `${formatKr(amount)} ${currency}`;
+}
+
+function formatApproxKr(amount: number): string {
+  return `~${formatKr(Math.round(amount))} kr`;
+}
+
+function readRewardSortValueNok(offer: RewardOffer): number | undefined {
+  return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok)
+    ? offer.rewardSortValueNok
+    : undefined;
+}
+
+function isNokCurrency(currency: string): boolean {
+  return normalizeCurrencyForExchange(currency) === "NOK";
+}
+
+function roundSortValue(value: number): number {
+  return Number(value.toFixed(4));
 }
 
 export function formatBreakdownWithAmounts(terms: string, amount: number): string {

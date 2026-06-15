@@ -13,6 +13,12 @@ import {
   parseEpicGamesProductSlug,
 } from "./isthereanydeal-price-match.js";
 import {
+  convertToNok,
+  fetchNokBaseRates,
+  STATIC_NOK_BASE_RATES,
+  type NokBaseRates,
+} from "./exchange-rates.js";
+import {
   scoreProductTitleAgainstSearchTerm,
 } from "./product-title-match.js";
 import type {
@@ -63,29 +69,11 @@ type AllKeyShopOffer = {
   voucherCode?: string;
 };
 
-type NokBaseRates = {
-  rates: Record<string, number>;
-};
-
 type AllKeyShopHtmlRequestInit = Parameters<TextRequest>[1];
 
 const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
 const ALLKEYSHOP_BLOG_ORIGIN = `${ALLKEYSHOP_ORIGIN}/blog`;
-const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
 const MAX_ALLKEYSHOP_ALTERNATIVES = 8;
-const STATIC_NOK_BASE_RATES: NokBaseRates = {
-  rates: {
-    AUD: 0.15,
-    CAD: 0.148,
-    DKK: 0.686,
-    EUR: 0.092,
-    GBP: 0.079,
-    NOK: 1,
-    PLN: 0.39,
-    SEK: 1,
-    USD: 0.106,
-  },
-};
 const ALLKEYSHOP_HTML_REQUESTS: AllKeyShopHtmlRequestInit[] = [
   {
     headers: { "Accept": "text/html,application/xhtml+xml" },
@@ -342,31 +330,6 @@ function formatAllKeyShopTooltipDetails(offer: AllKeyShopOffer): string | undefi
     offer.voucherCode !== undefined ? `kode ${offer.voucherCode}` : undefined,
   ].filter((detail): detail is string => detail !== undefined && detail.length > 0);
   return details.length > 0 ? details.join(", ") : undefined;
-}
-
-async function fetchNokBaseRates(requestJson: JsonRequest): Promise<NokBaseRates | undefined> {
-  const value = await requestJson(EXCHANGE_RATES_URL, {
-    headers: { "Accept": "application/json" },
-  });
-  if (!isRecord(value) || value.result !== "success" || !isRecord(value.rates)) return undefined;
-
-  const rates: Record<string, number> = {};
-  for (const [currency, rate] of Object.entries(value.rates)) {
-    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
-      rates[currency.toUpperCase()] = rate;
-    }
-  }
-
-  return Object.keys(rates).length > 0 ? { rates } : undefined;
-}
-
-function convertToNok(amount: number, currency: string, rates: NokBaseRates): number | undefined {
-  const normalizedCurrency = currency.toUpperCase();
-  if (normalizedCurrency === "NOK") return amount;
-
-  const rate = rates.rates[normalizedCurrency];
-  if (typeof rate !== "number" || rate <= 0) return undefined;
-  return amount / rate;
 }
 
 function readPlatformScope(message: GetPriceMatchForProductMessage): string[] {

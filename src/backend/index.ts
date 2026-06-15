@@ -7,6 +7,13 @@ import {
   isCashbackIndex,
   uniqueOffers,
 } from "../shared/cashback.js";
+import {
+  fetchNokBaseRates,
+  STATIC_NOK_BASE_RATES,
+} from "../shared/exchange-rates.js";
+import {
+  addFixedRewardSortValues,
+} from "../shared/reward-calculation.js";
 import { buildDomainLookup } from "./domain-lookup.js";
 import { readDomainRedirects } from "./domain-redirects.js";
 import { readJsonFile, writeJsonFile } from "./json-file.js";
@@ -50,6 +57,7 @@ import { crawlCoop } from "./providers/coop.js";
 import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
 import { fetchAwin } from "./providers/awin.js";
+import { fetchAddrevenue } from "./providers/addrevenue.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -103,6 +111,7 @@ type CliConfig = {
   skipPartnerAds: boolean;
   skipTradeTracker: boolean;
   skipAwin: boolean;
+  skipAddrevenue: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -168,6 +177,7 @@ async function main(): Promise<void> {
     partnerAdsOffers,
     tradeTrackerOffers,
     awinOffers,
+    addrevenueOffers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : collectOffers({
       fallbackWhenEmpty: true,
@@ -304,6 +314,13 @@ async function main(): Promise<void> {
         generatedAt, logger,
       }),
     }),
+    config.skipAddrevenue ? Promise.resolve([]) : collectOffers({
+      label: "Addrevenue",
+      provider: "cbn",
+      run: () => fetchAddrevenue({
+        generatedAt, logger,
+      }),
+    }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -323,6 +340,7 @@ async function main(): Promise<void> {
     ...partnerAdsOffers,
     ...tradeTrackerOffers,
     ...awinOffers,
+    ...addrevenueOffers,
     ...utdanningibergenOffers,
     ...unioOffers,
     ...manualOffers,
@@ -506,6 +524,7 @@ async function main(): Promise<void> {
     ...partnerAdsOffers,
     ...tradeTrackerOffers,
     ...awinOffers,
+    ...addrevenueOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
     ...teknaOffers, ...nitoOffers,
@@ -522,7 +541,14 @@ async function main(): Promise<void> {
     }),
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...studentTorgetOffers]);
+  const exchangeRates = await fetchNokBaseRates();
+  logger.info(exchangeRates === undefined
+    ? "Exchange rates: using static fallback for fixed reward sorting"
+    : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
+  const offers = uniqueOffers(addFixedRewardSortValues(
+    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...studentTorgetOffers],
+    exchangeRates ?? STATIC_NOK_BASE_RATES,
+  ));
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -624,6 +650,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipPartnerAds: args.includes("--skip-partnerads"),
     skipTradeTracker: args.includes("--skip-tradetracker"),
     skipAwin: args.includes("--skip-awin"),
+    skipAddrevenue: args.includes("--skip-addrevenue"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",

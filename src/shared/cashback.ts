@@ -9,6 +9,7 @@ export type CashbackOffer = {
   merchantName: string;
   domains: string[];
   reward: string;
+  rewardSortValueNok?: number;
   sourceUrl: string;
   activationUrl: string;
   terms: string;
@@ -42,6 +43,8 @@ export function isCashbackOffer(value: unknown): value is CashbackOffer {
     Array.isArray(value.domains) &&
     value.domains.every((domain) => typeof domain === "string") &&
     typeof value.reward === "string" &&
+    (value.rewardSortValueNok === undefined ||
+      (typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok))) &&
     typeof value.sourceUrl === "string" &&
     typeof value.activationUrl === "string" &&
     typeof value.terms === "string" &&
@@ -316,8 +319,8 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
     // Keep the offer with the best reward value; prefer range over single when equal
-    const newVal = parseRewardValue(offer.reward);
-    const existingVal = existing !== undefined ? parseRewardValue(existing.reward) : null;
+    const newVal = parseRewardValue(offer);
+    const existingVal = existing !== undefined ? parseRewardValue(existing) : null;
     const isRange = offer.reward.includes("-");
     const isBetterReward = existingVal === null ||
       rewardKindRank(newVal.kind) > rewardKindRank(existingVal.kind) ||
@@ -375,8 +378,8 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     const firstIsSupport = firstOffer.provider === "cbn";
     const secondIsSupport = secondOffer.provider === "cbn";
 
-    const firstReward = parseRewardValue(firstOffer.reward);
-    const secondReward = parseRewardValue(secondOffer.reward);
+    const firstReward = parseRewardValue(firstOffer);
+    const secondReward = parseRewardValue(secondOffer);
     const rewardKindSort =
       rewardKindRank(secondReward.kind) - rewardKindRank(firstReward.kind);
 
@@ -411,7 +414,12 @@ type RewardValue = {
   amount: number;
 };
 
-function parseRewardValue(reward: string): RewardValue {
+function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
+  const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
+  const rewardSortValueNok = typeof offerOrReward === "string"
+    ? undefined
+    : readRewardSortValueNok(offerOrReward);
+
   const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d+(?:[,.]\d+)?)\s*%/);
   const percentageMatch = rangeMatch
     ? [null, rangeMatch[1]]
@@ -442,21 +450,23 @@ function parseRewardValue(reward: string): RewardValue {
     };
   }
 
-  const krRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+  const fixedRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
 
-  if (krRangeMatch !== null) {
+  if (fixedRangeMatch !== null) {
     return {
       kind: "fixed",
-      amount: parseLocalizedNumber((krRangeMatch[1] ?? "0").replace(/\s/g, "")),
+      amount: rewardSortValueNok ??
+        parseLocalizedNumber((fixedRangeMatch[1] ?? "0").replace(/\s/g, "")),
     };
   }
 
-  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
 
   if (fixedMatch !== null) {
     return {
       kind: "fixed",
-      amount: parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
+      amount: rewardSortValueNok ??
+        parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
     };
   }
 
@@ -478,6 +488,12 @@ function parseRewardValue(reward: string): RewardValue {
 function parseLocalizedNumber(value: string): number {
   const parsedValue = Number.parseFloat(value.replace(",", "."));
   return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function readRewardSortValueNok(offer: CashbackOffer): number | undefined {
+  return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok)
+    ? offer.rewardSortValueNok
+    : undefined;
 }
 
 function rewardKindRank(kind: RewardValue["kind"]): number {

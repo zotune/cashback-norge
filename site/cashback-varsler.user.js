@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781530064
+// @version      1781534946
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -245,6 +245,53 @@
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
     { text: "Sparebørsen: 50 kr settes inn med en gang du registrerer deg", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
   ];
+  const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
+  const STATIC_NOK_BASE_RATES = {
+    rates: {
+      AUD: 0.15,
+      CAD: 0.148,
+      DKK: 0.686,
+      EUR: 0.092,
+      GBP: 0.079,
+      NOK: 1,
+      PLN: 0.39,
+      SEK: 1,
+      USD: 0.106
+    }
+  };
+  async function fetchNokBaseRates$1(requestJson = fetchJson$9) {
+    const value = await requestJson(EXCHANGE_RATES_URL$1, {
+      headers: { "Accept": "application/json" }
+    });
+    if (!isRecord$6(value) || value.result !== "success" || !isRecord$6(value.rates)) return void 0;
+    const rates = {};
+    for (const [currency, rate] of Object.entries(value.rates)) {
+      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+        rates[currency.toUpperCase()] = rate;
+      }
+    }
+    return Object.keys(rates).length > 0 ? { rates } : void 0;
+  }
+  function convertToNok$1(amount, currency, rates) {
+    const normalizedCurrency = normalizeCurrencyForExchange(currency);
+    if (normalizedCurrency === "NOK") return amount;
+    const rate = rates.rates[normalizedCurrency];
+    if (typeof rate !== "number" || rate <= 0) return void 0;
+    return amount / rate;
+  }
+  function normalizeCurrencyForExchange(currency) {
+    const normalized = currency.trim().toUpperCase();
+    if (normalized === "KR") return "NOK";
+    return normalized;
+  }
+  async function fetchJson$9(url, init) {
+    const response = await fetch(url, init);
+    if (!response.ok) return void 0;
+    return response.json();
+  }
+  function isRecord$6(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
   const EB_PER_TRUMF_KR = 13.5;
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
@@ -264,6 +311,11 @@
   }
   function formatCompactRewardLabel(offer) {
     const label = formatRewardLabel(offer.reward, offer.provider);
+    const fixedReward = readFixedRewardMax(label);
+    const rewardSortValueNok = readRewardSortValueNok$1(offer);
+    if (fixedReward !== void 0 && rewardSortValueNok !== void 0 && !isNokCurrency(fixedReward.currency)) {
+      return formatApproxKr(rewardSortValueNok);
+    }
     if (/\d+(?:[,.]\d+)?\s*kr\s*\/\s*/i.test(label) && label.includes("+")) {
       return label.replace(/\s+/g, " ");
     }
@@ -295,10 +347,13 @@
         const pct = Number.parseFloat(pctMatch2[1]?.replace(",", ".") ?? "0");
         return `${formatKr(amount * pct / 100)} kr støtte`;
       }
-      const fixedKrMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*kr/i);
-      if (fixedKrMatch !== null) {
-        const fixedKr = Number.parseFloat(fixedKrMatch[1]?.replace(",", ".") ?? "0");
-        return `${formatKr(fixedKr)} kr støtte`;
+      const fixedReward = readFixedRewardMax(offer.reward);
+      if (fixedReward !== void 0) {
+        const rewardSortValueNok = readRewardSortValueNok$1(offer);
+        if (rewardSortValueNok !== void 0 && !isNokCurrency(fixedReward.currency)) {
+          return `${formatApproxKr(rewardSortValueNok)} støtte`;
+        }
+        return `${formatFixedReward(fixedReward.amount, fixedReward.currency)} støtte`;
       }
       return "";
     }
@@ -338,6 +393,44 @@
       return `${formatKr(kr)} kr`;
     }
     return "";
+  }
+  function readFixedRewardMax(reward) {
+    const currencyPattern = "(?:kr|NOK|SEK|DKK|EUR|USD|GBP)";
+    const rangePattern = new RegExp(`\\d[\\d\\s]*(?:[,.]\\d+)?\\s*[-–]\\s*(\\d[\\d\\s]*(?:[,.]\\d+)?)\\s*(${currencyPattern})\\b`, "i");
+    const rangeMatch = reward.match(rangePattern);
+    if (rangeMatch !== null) {
+      const amount = parseRewardNumber(rangeMatch[1] ?? "");
+      const currency = normalizeFixedCurrency(rangeMatch[2] ?? "");
+      if (amount > 0 && currency !== "") return { amount, currency };
+    }
+    const singlePattern = new RegExp(`(\\d[\\d\\s]*(?:[,.]\\d+)?)\\s*(${currencyPattern})\\b`, "i");
+    const singleMatch = reward.match(singlePattern);
+    if (singleMatch !== null) {
+      const amount = parseRewardNumber(singleMatch[1] ?? "");
+      const currency = normalizeFixedCurrency(singleMatch[2] ?? "");
+      if (amount > 0 && currency !== "") return { amount, currency };
+    }
+    return void 0;
+  }
+  function parseRewardNumber(value) {
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  function normalizeFixedCurrency(value) {
+    const upper = value.trim().toUpperCase();
+    return upper === "KR" ? "kr" : upper;
+  }
+  function formatFixedReward(amount, currency) {
+    return `${formatKr(amount)} ${currency}`;
+  }
+  function formatApproxKr(amount) {
+    return `~${formatKr(Math.round(amount))} kr`;
+  }
+  function readRewardSortValueNok$1(offer) {
+    return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok) ? offer.rewardSortValueNok : void 0;
+  }
+  function isNokCurrency(currency) {
+    return normalizeCurrencyForExchange(currency) === "NOK";
   }
   function formatBreakdownWithAmounts(terms, amount) {
     return terms.split("\n").map((line) => {
@@ -1140,21 +1233,7 @@
   }
   const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
   const ALLKEYSHOP_BLOG_ORIGIN = `${ALLKEYSHOP_ORIGIN}/blog`;
-  const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
   const MAX_ALLKEYSHOP_ALTERNATIVES = 8;
-  const STATIC_NOK_BASE_RATES = {
-    rates: {
-      AUD: 0.15,
-      CAD: 0.148,
-      DKK: 0.686,
-      EUR: 0.092,
-      GBP: 0.079,
-      NOK: 1,
-      PLN: 0.39,
-      SEK: 1,
-      USD: 0.106
-    }
-  };
   const ALLKEYSHOP_HTML_REQUESTS = [
     {
       headers: { "Accept": "text/html,application/xhtml+xml" },
@@ -1344,26 +1423,6 @@
       offer.voucherCode !== void 0 ? `kode ${offer.voucherCode}` : void 0
     ].filter((detail) => detail !== void 0 && detail.length > 0);
     return details.length > 0 ? details.join(", ") : void 0;
-  }
-  async function fetchNokBaseRates$1(requestJson) {
-    const value = await requestJson(EXCHANGE_RATES_URL$1, {
-      headers: { "Accept": "application/json" }
-    });
-    if (!isRecord$5(value) || value.result !== "success" || !isRecord$5(value.rates)) return void 0;
-    const rates = {};
-    for (const [currency, rate] of Object.entries(value.rates)) {
-      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
-        rates[currency.toUpperCase()] = rate;
-      }
-    }
-    return Object.keys(rates).length > 0 ? { rates } : void 0;
-  }
-  function convertToNok$1(amount, currency, rates) {
-    const normalizedCurrency = currency.toUpperCase();
-    if (normalizedCurrency === "NOK") return amount;
-    const rate = rates.rates[normalizedCurrency];
-    if (typeof rate !== "number" || rate <= 0) return void 0;
-    return amount / rate;
   }
   function readPlatformScope(message) {
     if (isSteamAppProductUrl(message.url) || isSteamAppProductUrl(message.productUrl)) {
@@ -13419,7 +13478,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       const offerLabel = document.createElement("span");
       offerLabel.className = "offer-label";
       const offerReward = document.createElement("span");
-      offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
+      offerReward.textContent = formatCompactRewardLabel(currentOffer) ?? formatRewardLabel(currentOffer.reward, currentOffer.provider);
       rewardLabels.push({ element: offerReward, offer: currentOffer });
       const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
       if (shouldMarkOfferClick(currentOffer)) {
@@ -13464,9 +13523,9 @@ query SearchSuggestions($query: String!, $category: Int) {
       for (const { element, offer: offer2 } of rewardLabels) {
         if (amount > 0) {
           const result = calculateCashback(offer2, amount);
-          element.textContent = result !== "" ? result : formatRewardLabel(offer2.reward, offer2.provider);
+          element.textContent = result !== "" ? result : formatCompactRewardLabel(offer2) ?? formatRewardLabel(offer2.reward, offer2.provider);
         } else {
-          element.textContent = formatRewardLabel(offer2.reward, offer2.provider);
+          element.textContent = formatCompactRewardLabel(offer2) ?? formatRewardLabel(offer2.reward, offer2.provider);
         }
       }
       for (const { element, offer: offer2 } of tooltipElements) {
@@ -14714,8 +14773,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const codeSuffix = offer.discountCode !== void 0 ? `:${offer.discountCode}` : "";
       const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
       const existing = byKey.get(key);
-      const newVal = parseRewardValue(offer.reward);
-      const existingVal = existing !== void 0 ? parseRewardValue(existing.reward) : null;
+      const newVal = parseRewardValue(offer);
+      const existingVal = existing !== void 0 ? parseRewardValue(existing) : null;
       const isRange = offer.reward.includes("-");
       const isBetterReward = existingVal === null || rewardKindRank(newVal.kind) > rewardKindRank(existingVal.kind) || newVal.kind === existingVal.kind && newVal.amount > existingVal.amount;
       if (existing === void 0 || isBetterReward || newVal.amount === existingVal.amount && isRange && !existing.reward.includes("-")) {
@@ -14728,8 +14787,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return [...offers].sort((firstOffer, secondOffer) => {
       const firstIsSupport = firstOffer.provider === "cbn";
       const secondIsSupport = secondOffer.provider === "cbn";
-      const firstReward = parseRewardValue(firstOffer.reward);
-      const secondReward = parseRewardValue(secondOffer.reward);
+      const firstReward = parseRewardValue(firstOffer);
+      const secondReward = parseRewardValue(secondOffer);
       const rewardKindSort = rewardKindRank(secondReward.kind) - rewardKindRank(firstReward.kind);
       if (rewardKindSort !== 0) return rewardKindSort;
       const rewardAmountSort = secondReward.amount - firstReward.amount;
@@ -14742,7 +14801,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       return firstOffer.provider.localeCompare(secondOffer.provider);
     });
   }
-  function parseRewardValue(reward) {
+  function parseRewardValue(offerOrReward) {
+    const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
+    const rewardSortValueNok = typeof offerOrReward === "string" ? void 0 : readRewardSortValueNok(offerOrReward);
     const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
     const percentageMatch = rangeMatch ? [null, rangeMatch[1]] : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
     if (percentageMatch !== null) {
@@ -14765,18 +14826,18 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         amount: parseLocalizedNumber(unitMatch[1] ?? "0")
       };
     }
-    const krRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
-    if (krRangeMatch !== null) {
+    const fixedRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
+    if (fixedRangeMatch !== null) {
       return {
         kind: "fixed",
-        amount: parseLocalizedNumber((krRangeMatch[1] ?? "0").replace(/\s/g, ""))
+        amount: rewardSortValueNok ?? parseLocalizedNumber((fixedRangeMatch[1] ?? "0").replace(/\s/g, ""))
       };
     }
-    const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+    const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
     if (fixedMatch !== null) {
       return {
         kind: "fixed",
-        amount: parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, ""))
+        amount: rewardSortValueNok ?? parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, ""))
       };
     }
     const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
@@ -14794,6 +14855,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   function parseLocalizedNumber(value) {
     const parsedValue = Number.parseFloat(value.replace(",", "."));
     return Number.isFinite(parsedValue) ? parsedValue : 0;
+  }
+  function readRewardSortValueNok(offer) {
+    return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok) ? offer.rewardSortValueNok : void 0;
   }
   function rewardKindRank(kind) {
     if (kind === "percentage") return 4;

@@ -7,6 +7,7 @@ import {
 import {
   calculateCashback,
   EB_PER_TRUMF_KR,
+  formatCompactRewardLabel,
   formatKr,
   formatRewardLabel,
 } from "../../shared/reward-calculation.js";
@@ -329,9 +330,12 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
   let rewardText: string;
   if (props.amount > 0) {
     const result = calculateCashback(props.offer, props.amount);
-    rewardText = result !== "" ? result : formatRewardLabel(props.offer.reward, props.offer.provider);
+    rewardText = result !== ""
+      ? result
+      : formatCompactRewardLabel(props.offer) ?? formatRewardLabel(props.offer.reward, props.offer.provider);
   } else {
-    rewardText = formatRewardLabel(props.offer.reward, props.offer.provider);
+    rewardText = formatCompactRewardLabel(props.offer) ??
+      formatRewardLabel(props.offer.reward, props.offer.provider);
   }
   if (!isNumericReward && props.offer.discountCode !== undefined) rewardText = "?";
 

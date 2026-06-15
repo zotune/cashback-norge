@@ -186,6 +186,7 @@ type CashbackOffer = {
   merchantName: string;
   domains: string[];
   reward: string;
+  rewardSortValueNok?: number;
   sourceUrl: string;
   activationUrl: string;
   terms: string;
@@ -9333,7 +9334,8 @@ function renderNotice(
     const offerLabel = document.createElement("span");
     offerLabel.className = "offer-label";
     const offerReward = document.createElement("span");
-    offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
+    offerReward.textContent = formatCompactRewardLabel(currentOffer) ??
+      formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
     const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
     if (shouldMarkOfferClick(currentOffer)) {
@@ -9378,9 +9380,12 @@ function renderNotice(
     for (const { element, offer } of rewardLabels) {
       if (amount > 0) {
         const result = calculateCashback(offer, amount);
-        element.textContent = result !== "" ? result : formatRewardLabel(offer.reward, offer.provider);
+        element.textContent = result !== ""
+          ? result
+          : formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
       } else {
-        element.textContent = formatRewardLabel(offer.reward, offer.provider);
+        element.textContent = formatCompactRewardLabel(offer) ??
+          formatRewardLabel(offer.reward, offer.provider);
       }
     }
     for (const { element, offer } of tooltipElements) {
@@ -10802,8 +10807,8 @@ function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
     const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
     const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
-    const newVal = parseRewardValue(offer.reward);
-    const existingVal = existing !== undefined ? parseRewardValue(existing.reward) : null;
+    const newVal = parseRewardValue(offer);
+    const existingVal = existing !== undefined ? parseRewardValue(existing) : null;
     const isRange = offer.reward.includes("-");
     const isBetterReward = existingVal === null ||
       rewardKindRank(newVal.kind) > rewardKindRank(existingVal.kind) ||
@@ -10819,8 +10824,8 @@ function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     const firstIsSupport = firstOffer.provider === "cbn";
     const secondIsSupport = secondOffer.provider === "cbn";
 
-    const firstReward = parseRewardValue(firstOffer.reward);
-    const secondReward = parseRewardValue(secondOffer.reward);
+    const firstReward = parseRewardValue(firstOffer);
+    const secondReward = parseRewardValue(secondOffer);
     const rewardKindSort =
       rewardKindRank(secondReward.kind) - rewardKindRank(firstReward.kind);
     if (rewardKindSort !== 0) return rewardKindSort;
@@ -10838,7 +10843,12 @@ type RewardValue = {
   kind: "percentage" | "fixed" | "unit" | "points" | "unknown";
   amount: number;
 };
-function parseRewardValue(reward: string): RewardValue {
+function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
+  const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
+  const rewardSortValueNok = typeof offerOrReward === "string"
+    ? undefined
+    : readRewardSortValueNok(offerOrReward);
+
   const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
   const percentageMatch = rangeMatch
     ? [null, rangeMatch[1]]
@@ -10863,18 +10873,20 @@ function parseRewardValue(reward: string): RewardValue {
       amount: parseLocalizedNumber(unitMatch[1] ?? "0"),
     };
   }
-  const krRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
-  if (krRangeMatch !== null) {
+  const fixedRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
+  if (fixedRangeMatch !== null) {
     return {
       kind: "fixed",
-      amount: parseLocalizedNumber((krRangeMatch[1] ?? "0").replace(/\s/g, "")),
+      amount: rewardSortValueNok ??
+        parseLocalizedNumber((fixedRangeMatch[1] ?? "0").replace(/\s/g, "")),
     };
   }
-  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr/i);
+  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
   if (fixedMatch !== null) {
     return {
       kind: "fixed",
-      amount: parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
+      amount: rewardSortValueNok ??
+        parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
     };
   }
   const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
@@ -10892,6 +10904,12 @@ function parseRewardValue(reward: string): RewardValue {
 function parseLocalizedNumber(value: string): number {
   const parsedValue = Number.parseFloat(value.replace(",", "."));
   return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function readRewardSortValueNok(offer: CashbackOffer): number | undefined {
+  return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok)
+    ? offer.rewardSortValueNok
+    : undefined;
 }
 function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "percentage") return 4;
