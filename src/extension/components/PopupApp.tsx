@@ -12,8 +12,10 @@ import {
 } from "../../shared/reward-calculation.js";
 import {
   type ActivationContext,
+  getOfferActivationKey,
   getLastActivatedOfferKey,
   isOfferActivated,
+  markOfferActivatedForContext,
   readActivatedOffersForContext,
 } from "../activation-state.js";
 
@@ -109,6 +111,20 @@ export function PopupApp(): ReactElement {
   const mainOffers = state.offers.filter((o) => o.provider !== "curve");
   const curveOffer = state.offers.find((o) => o.provider === "curve");
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
+  const markOfferActivated = (offer: CashbackOffer): void => {
+    if (activeTabContext === undefined || !shouldMarkOfferClick(offer)) {
+      return;
+    }
+
+    const activationKey = getOfferActivationKey(offer);
+    if (activationKey === undefined) {
+      return;
+    }
+
+    const activatedAt = Date.now();
+    setActivatedOffers((current) => ({ ...current, [activationKey]: activatedAt }));
+    void markOfferActivatedForContext(activeTabContext, offer.provider, offer.activationUrl, activatedAt);
+  };
 
   const normalizedHostname = state.hostname.replace(/^www\./, "").toLowerCase();
   const revolutSub = REVOLUT_SUBSCRIPTIONS[normalizedHostname];
@@ -152,6 +168,7 @@ export function PopupApp(): ReactElement {
               offer={offer}
               amount={amount}
               activated={isOfferActivated(offer, activeOfferKey)}
+              onActivate={markOfferActivated}
             />
           );
         })}
@@ -301,7 +318,7 @@ export function PopupApp(): ReactElement {
 const CARD_ONLY_PROVIDERS = ["sparebank1", "remember"];
 const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
 
-function OfferRow(props: { offer: CashbackOffer; amount: number; activated: boolean }): ReactElement {
+function OfferRow(props: { offer: CashbackOffer; amount: number; activated: boolean; onActivate: (offer: CashbackOffer) => void }): ReactElement {
   const hasBreakdown = props.offer.provider === "cbn" ||
     props.offer.terms.length > 60 ||
     (props.offer.terms.includes("\n") && props.offer.terms.trim().length > 0);
@@ -337,6 +354,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
         href={props.offer.provider === "trumf" || props.offer.provider === "klarna" ? props.offer.sourceUrl : props.offer.activationUrl}
         target="_blank"
         rel="noreferrer"
+        onClick={() => props.onActivate(props.offer)}
       >
         <div>
           <p className="merchant">
@@ -370,6 +388,10 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
       )}
     </div>
   );
+}
+
+function shouldMarkOfferClick(offer: CashbackOffer): boolean {
+  return offer.provider === "cbn";
 }
 
 function formatProviderName(provider: CashbackOffer["provider"]): string {

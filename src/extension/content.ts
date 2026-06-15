@@ -7361,26 +7361,49 @@ function createProviderBadgeWithActivation(
   providerBadge.textContent = formatProviderName(offer.provider);
 
   if (isOfferActivated(offer, activeOfferKey)) {
-    const activationBadge = document.createElement("span");
-    activationBadge.className = "activation-badge";
-    activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
-    activationBadge.innerHTML = CHECK_ICON_SVG;
-    const activationTooltip = document.createElement("div");
-    activationTooltip.className = "status-tooltip";
-    activationTooltip.textContent = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
-    shadowRoot.append(activationTooltip);
-    activationBadge.addEventListener("mouseenter", () => {
-      positionStatusTooltipAbovePanel(activationTooltip, activationBadge, shadowRoot);
-      activationTooltip.classList.add("visible");
-    });
-    activationBadge.addEventListener("mouseleave", () => {
-      activationTooltip.classList.remove("visible");
-    });
-    providerWrap.append(activationBadge);
+    providerWrap.append(createActivationBadge(offer, shadowRoot));
   }
   providerWrap.append(providerBadge);
 
   return providerWrap;
+}
+
+function createActivationBadge(
+  offer: CashbackOffer,
+  shadowRoot: ShadowRoot,
+): HTMLSpanElement {
+  const activationBadge = document.createElement("span");
+  activationBadge.className = "activation-badge";
+  activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
+  activationBadge.innerHTML = CHECK_ICON_SVG;
+  const activationTooltip = document.createElement("div");
+  activationTooltip.className = "status-tooltip";
+  activationTooltip.textContent = `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`;
+  shadowRoot.append(activationTooltip);
+  activationBadge.addEventListener("mouseenter", () => {
+    positionStatusTooltipAbovePanel(activationTooltip, activationBadge, shadowRoot);
+    activationTooltip.classList.add("visible");
+  });
+  activationBadge.addEventListener("mouseleave", () => {
+    activationTooltip.classList.remove("visible");
+  });
+  return activationBadge;
+}
+
+function showOfferActivated(
+  offer: CashbackOffer,
+  providerWrap: HTMLSpanElement,
+  shadowRoot: ShadowRoot,
+): void {
+  if (providerWrap.querySelector(".activation-badge") !== null) {
+    return;
+  }
+
+  providerWrap.prepend(createActivationBadge(offer, shadowRoot));
+}
+
+function shouldMarkOfferClick(offer: CashbackOffer): boolean {
+  return offer.provider === "cbn";
 }
 
 function installOfferActivationClickTracker(): void {
@@ -9269,6 +9292,12 @@ function renderNotice(
     offerReward.textContent = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     rewardLabels.push({ element: offerReward, offer: currentOffer });
     const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
+    if (shouldMarkOfferClick(currentOffer)) {
+      offerLink.addEventListener("click", () => {
+        showOfferActivated(currentOffer, providerWrap, shadowRoot);
+        void markOfferActivated(currentOffer.provider, currentOffer.activationUrl);
+      });
+    }
     if (currentOffer.provider === "nettbonus" || currentOffer.provider === "spareborsen") {
       const adChip = makeAdChip();
       providerWrap.prepend(adChip);
