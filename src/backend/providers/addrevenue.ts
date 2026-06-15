@@ -397,27 +397,16 @@ function buildTerms(
   const lines = [
     "Annonselenke via Addrevenue.",
     "Dette er ikke cashback utbetalt til deg.",
-    "Tallet i listen viser provisjonen CashbackNorge kan få, ikke cashback til deg.",
+    "Tallet viser provisjonen CashbackNorge kan få.",
     "Det koster deg ingenting ekstra å bruke lenken.",
-    "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
-    "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",
     `${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen settes av til veldedighet.`,
     buildCharityExampleLine(programs),
-    "Totalen som går til veldedighet oppdateres på cashbacknorge.no.",
+    "Resten går til drift og videreutvikling av CashbackNorge.",
+    "Veldedighetstotalen oppdateres på cashbacknorge.no.",
   ];
 
-  const commissionSummary = buildCommissionSummary(programs);
-  if (commissionSummary) lines.push(commissionSummary);
-  if (advertiser?.categoryId) lines.push(`Kategori hos Addrevenue: ${formatCategory(advertiser.categoryId)}.`);
-  if (advertiser?.policyCashbackReward) lines.push(`Cashback-policy hos Addrevenue: ${advertiser.policyCashbackReward}.`);
-  if (advertiser?.policyCouponRebate) lines.push(`Rabattkode-policy hos Addrevenue: ${advertiser.policyCouponRebate}.`);
-  if (advertiser?.policyPaidAds) lines.push(`Paid ads-policy hos Addrevenue: ${advertiser.policyPaidAds}.`);
-
   const description = cleanText(market?.presentation ?? market?.shortDescription ?? advertiser?.shortDescription ?? "");
-  if (description) lines.push(truncateText(description, 280));
-  if (relation.advertiserName && relation.advertiserName !== readMerchantName(relation, advertiser, market)) {
-    lines.push(`Annonsør hos Addrevenue: ${relation.advertiserName}.`);
-  }
+  if (description) lines.push(truncateText(description, 220));
 
   return uniquePreserveOrder(lines).join("\n");
 }

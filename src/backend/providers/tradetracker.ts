@@ -751,24 +751,13 @@ function buildTerms(
   const lines = [
     "Annonselenke via TradeTracker.",
     "Dette er ikke cashback utbetalt til deg.",
-    "Tallet i listen viser provisjonen CashbackNorge kan få, ikke cashback til deg.",
+    "Tallet viser provisjonen CashbackNorge kan få.",
     "Det koster deg ingenting ekstra å bruke lenken.",
-    "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
-    "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",
     `${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen settes av til veldedighet.`,
     buildCharityExampleLine(commission),
-    "Totalen som går til veldedighet oppdateres på cashbacknorge.no.",
+    "Resten går til drift og videreutvikling av CashbackNorge.",
+    "Veldedighetstotalen oppdateres på cashbacknorge.no.",
   ];
-
-  const commissionSummary = buildCommissionSummary(commission);
-  if (commissionSummary) lines.push(commissionSummary);
-  if (campaign.category) lines.push(`Kategori: ${campaign.category}.`);
-  if (campaign.policyCashbackStatus) {
-    lines.push(`Cashback-policy hos TradeTracker: ${campaign.policyCashbackStatus}.`);
-  }
-  if (campaign.policyDiscountCodeStatus) {
-    lines.push(`Rabattkode-policy hos TradeTracker: ${campaign.policyDiscountCodeStatus}.`);
-  }
 
   const descriptions = [
     campaign.campaignDescription,
@@ -777,7 +766,7 @@ function buildTerms(
     campaign.characteristics,
   ].map(cleanText).filter(Boolean);
   const extraText = uniquePreserveOrder(descriptions).join(" ");
-  if (extraText) lines.push(truncateText(extraText, 280));
+  if (extraText) lines.push(truncateText(extraText, 220));
 
   return uniquePreserveOrder(lines).join("\n");
 }

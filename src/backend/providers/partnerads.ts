@@ -392,24 +392,16 @@ function buildTerms(program: PartnerAdsProgram): string {
   const lines = [
     "Annonselenke via Partner-Ads.",
     "Dette er ikke cashback utbetalt til deg.",
-    "Tallet i listen viser provisjonen CashbackNorge kan få, ikke cashback til deg.",
+    "Tallet viser provisjonen CashbackNorge kan få.",
     "Det koster deg ingenting ekstra å bruke lenken.",
-    "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
-    "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",
     `${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen settes av til veldedighet.`,
     buildCharityExampleLine(program),
-    "Totalen som går til veldedighet oppdateres på cashbacknorge.no.",
+    "Resten går til drift og videreutvikling av CashbackNorge.",
+    "Veldedighetstotalen oppdateres på cashbacknorge.no.",
   ];
 
-  if (program.commission) lines.push(`Provisjon: ${program.commission}.`);
-  if (program.leadRate) lines.push(`Lead: ${program.leadRate}.`);
-  if (program.clickRate) lines.push(`Klikk: ${program.clickRate}.`);
-  if (program.category) lines.push(`Kategori: ${program.category}.`);
-  if (program.cashback) lines.push(`Cashbackstatus hos Partner-Ads: ${program.cashback}.`);
-  if (program.discountSites) lines.push(`Rabattnettsteder: ${program.discountSites}.`);
-
   const extraTerms = cleanText(program.terms || program.description);
-  if (extraTerms) lines.push(truncateText(extraTerms, 280));
+  if (extraTerms) lines.push(truncateText(extraTerms, 220));
 
   return uniquePreserveOrder(lines).join("\n");
 }

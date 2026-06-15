@@ -364,31 +364,16 @@ function buildTerms(
   const lines = [
     "Annonselenke via Awin.",
     "Dette er ikke cashback utbetalt til deg.",
-    "Tallet i listen viser provisjonen CashbackNorge kan få, ikke cashback til deg.",
+    "Tallet viser provisjonen CashbackNorge kan få.",
     "Det koster deg ingenting ekstra å bruke lenken.",
-    "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
-    "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",
     `${formatPercent(CHARITY_SHARE_OF_COMMISSION * 100)} av provisjonen settes av til veldedighet.`,
     buildCharityExampleLine(details.commissionRange ?? [], commissionGroups),
-    "Totalen som går til veldedighet oppdateres på cashbacknorge.no.",
+    "Resten går til drift og videreutvikling av CashbackNorge.",
+    "Veldedighetstotalen oppdateres på cashbacknorge.no.",
   ];
 
-  const commissionSummary = buildCommissionSummary(details.commissionRange ?? [], commissionGroups);
-  if (commissionSummary) lines.push(commissionSummary);
-  if (programme.primarySector) lines.push(`Kategori: ${programme.primarySector}.`);
-  if (programme.primaryRegion?.name) lines.push(`Region: ${programme.primaryRegion.name}.`);
-  if (details.kpi?.conversionRate !== undefined) {
-    lines.push(`Konverteringsrate hos Awin: ${formatPercent(details.kpi.conversionRate)}.`);
-  }
-  if (details.kpi?.approvalPercentage !== undefined) {
-    lines.push(`Godkjenningsrate hos Awin: ${formatPercent(details.kpi.approvalPercentage)}.`);
-  }
-  if (details.kpi?.averagePaymentTime) {
-    lines.push(`Gjennomsnittlig betalingstid hos Awin: ${details.kpi.averagePaymentTime} dager.`);
-  }
-
   const description = cleanText(programme.description ?? "");
-  if (description) lines.push(truncateText(description, 280));
+  if (description) lines.push(truncateText(description, 220));
 
   return uniquePreserveOrder(lines).join("\n");
 }
