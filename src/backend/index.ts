@@ -49,6 +49,7 @@ import { fetchUnio } from "./providers/unio.js";
 import { crawlCoop } from "./providers/coop.js";
 import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
+import { fetchAwin } from "./providers/awin.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -101,6 +102,7 @@ type CliConfig = {
   skipCoop: boolean;
   skipPartnerAds: boolean;
   skipTradeTracker: boolean;
+  skipAwin: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -165,6 +167,7 @@ async function main(): Promise<void> {
     coopOffers,
     partnerAdsOffers,
     tradeTrackerOffers,
+    awinOffers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : collectOffers({
       fallbackWhenEmpty: true,
@@ -294,6 +297,13 @@ async function main(): Promise<void> {
         generatedAt, logger,
       }),
     }),
+    config.skipAwin ? Promise.resolve([]) : collectOffers({
+      label: "Awin",
+      provider: "cbn",
+      run: () => fetchAwin({
+        generatedAt, logger,
+      }),
+    }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -312,6 +322,7 @@ async function main(): Promise<void> {
     ...coopOffers,
     ...partnerAdsOffers,
     ...tradeTrackerOffers,
+    ...awinOffers,
     ...utdanningibergenOffers,
     ...unioOffers,
     ...manualOffers,
@@ -494,6 +505,7 @@ async function main(): Promise<void> {
     ...sparebank1Offers, ...spareborsenOffers, ...coopOffers, ...manualOffers,
     ...partnerAdsOffers,
     ...tradeTrackerOffers,
+    ...awinOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
     ...teknaOffers, ...nitoOffers,
@@ -510,7 +522,7 @@ async function main(): Promise<void> {
     }),
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
-  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...studentTorgetOffers]);
+  const offers = uniqueOffers([...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...studentTorgetOffers]);
 
   const offersWithoutReward = offers.filter((o) => !o.reward);
   if (offersWithoutReward.length > 0) {
@@ -611,6 +623,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipCoop: args.includes("--skip-coop"),
     skipPartnerAds: args.includes("--skip-partnerads"),
     skipTradeTracker: args.includes("--skip-tradetracker"),
+    skipAwin: args.includes("--skip-awin"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",

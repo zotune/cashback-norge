@@ -269,13 +269,13 @@ function normalizeAffiliateLink(affiliateLink: string): string | undefined {
 
 function buildSupportReward(program: PartnerAdsProgram): string {
   const currency = normalizeCurrency(program.feedCurrency) || "kr";
-  const saleReward = extractCharityCommissionReward(program.commission);
+  const saleReward = extractCommissionReward(program.commission);
   if (saleReward) return saleReward;
 
-  const leadReward = extractCharityFixedReward(program.leadRate, currency);
+  const leadReward = extractFixedReward(program.leadRate, currency);
   if (leadReward) return leadReward;
 
-  const clickReward = extractCharityFixedReward(program.clickRate, currency);
+  const clickReward = extractFixedReward(program.clickRate, currency);
   if (clickReward) return clickReward;
 
   const fallbackReward = extractRewardFromRate([
@@ -283,29 +283,26 @@ function buildSupportReward(program: PartnerAdsProgram): string {
     program.description,
     program.cashback,
   ].filter(Boolean).join(" "));
-  return fallbackReward ? scaleRewardByCharityShare(fallbackReward, currency) : "Veldedighet";
+  return fallbackReward || "Veldedighet";
 }
 
-function extractCharityCommissionReward(value: string): string {
-  const explicitReward = scaleRewardByCharityShare(extractRewardFromRate(value), "kr");
+function extractCommissionReward(value: string): string {
+  const explicitReward = extractRewardFromRate(value);
   if (explicitReward) return explicitReward;
 
   const amount = parseBareRateNumber(value);
   return amount > 0 && amount <= 100
-    ? formatPercent(amount * CHARITY_SHARE_OF_COMMISSION)
+    ? formatPercent(amount)
     : "";
 }
 
-function extractCharityFixedReward(value: string, fallbackCurrency: string): string {
-  const explicitReward = scaleRewardByCharityShare(
-    extractRewardFromRate(value),
-    fallbackCurrency,
-  );
+function extractFixedReward(value: string, fallbackCurrency: string): string {
+  const explicitReward = extractRewardFromRate(value);
   if (explicitReward) return explicitReward;
 
   const amount = parseBareRateNumber(value);
   return amount > 0
-    ? `${formatRewardNumber(amount * CHARITY_SHARE_OF_COMMISSION)} ${fallbackCurrency}`
+    ? `${formatRewardNumber(amount)} ${fallbackCurrency}`
     : "";
 }
 
@@ -316,44 +313,6 @@ function extractRewardFromRate(value: string): string {
   }
 
   return extractFixedRateReward(value);
-}
-
-function scaleRewardByCharityShare(reward: string, fallbackCurrency: string): string {
-  const percentageRangeMatch = reward.match(/^(\d+(?:[,.]\d+)?)\s*[-–]\s*(\d+(?:[,.]\d+)?)\s*%$/);
-  if (percentageRangeMatch !== null) {
-    const min = parseRewardAmount(percentageRangeMatch[1] ?? "");
-    const max = parseRewardAmount(percentageRangeMatch[2] ?? "");
-    if (min > 0 && max > 0) {
-      return `${formatRewardNumber(min * CHARITY_SHARE_OF_COMMISSION)}-${formatRewardNumber(max * CHARITY_SHARE_OF_COMMISSION)} %`;
-    }
-  }
-
-  const percentageMatch = reward.match(/^(\d+(?:[,.]\d+)?)\s*%$/);
-  if (percentageMatch !== null) {
-    const amount = parseRewardAmount(percentageMatch[1] ?? "");
-    return amount > 0 ? formatPercent(amount * CHARITY_SHARE_OF_COMMISSION) : "";
-  }
-
-  const fixedRangeMatch = reward.match(/^(\d[\d\s.]*(?:[,.]\d+)?)\s*[-–]\s*(\d[\d\s.]*(?:[,.]\d+)?)\s*([A-Z]{3}|kr)$/i);
-  if (fixedRangeMatch !== null) {
-    const min = parseRewardAmount(fixedRangeMatch[1] ?? "");
-    const max = parseRewardAmount(fixedRangeMatch[2] ?? "");
-    const currency = normalizeCurrency(fixedRangeMatch[3] ?? "") || fallbackCurrency;
-    if (min > 0 && max > 0) {
-      return `${formatRewardNumber(min * CHARITY_SHARE_OF_COMMISSION)}-${formatRewardNumber(max * CHARITY_SHARE_OF_COMMISSION)} ${currency}`;
-    }
-  }
-
-  const fixedMatch = reward.match(/^(\d[\d\s.]*(?:[,.]\d+)?)\s*([A-Z]{3}|kr)$/i);
-  if (fixedMatch !== null) {
-    const amount = parseRewardAmount(fixedMatch[1] ?? "");
-    const currency = normalizeCurrency(fixedMatch[2] ?? "") || fallbackCurrency;
-    return amount > 0
-      ? `${formatRewardNumber(amount * CHARITY_SHARE_OF_COMMISSION)} ${currency}`
-      : "";
-  }
-
-  return "";
 }
 
 function parseBareRateNumber(value: string): number {
@@ -433,6 +392,7 @@ function buildTerms(program: PartnerAdsProgram): string {
   const lines = [
     "Annonselenke via Partner-Ads.",
     "Dette er ikke cashback utbetalt til deg.",
+    "Tallet i listen viser provisjonen CashbackNorge kan få, ikke cashback til deg.",
     "Det koster deg ingenting ekstra å bruke lenken.",
     "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
     "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",

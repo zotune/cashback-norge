@@ -715,7 +715,7 @@ function buildSupportReward(commission: TradeTrackerCommission): string {
     ...(commission.products ?? []).map((product) => product.saleCommissionVariable),
   ]).filter((value) => value > 0 && value <= 100);
   if (salePercentValues.length > 0) {
-    return formatPercentRange(scaleValues(salePercentValues, CHARITY_SHARE_OF_COMMISSION));
+    return formatPercentRange(salePercentValues);
   }
 
   const saleFixedValues = uniqueNumbers([
@@ -723,7 +723,7 @@ function buildSupportReward(commission: TradeTrackerCommission): string {
     ...(commission.products ?? []).map((product) => product.saleCommissionFixed),
   ]).filter((value) => value > 0);
   if (saleFixedValues.length > 0) {
-    return `${formatNumberRange(scaleValues(saleFixedValues, CHARITY_SHARE_OF_COMMISSION))} kr`;
+    return `${formatNumberRange(saleFixedValues)} kr`;
   }
 
   const leadValues = uniqueNumbers([
@@ -732,13 +732,13 @@ function buildSupportReward(commission: TradeTrackerCommission): string {
     ...(commission.products ?? []).map((product) => product.leadCommission),
   ]).filter((value) => value > 0);
   if (leadValues.length > 0) {
-    return `${formatNumberRange(scaleValues(leadValues, CHARITY_SHARE_OF_COMMISSION))} kr`;
+    return `${formatNumberRange(leadValues)} kr`;
   }
 
   const clickValues = uniqueNumbers([commission.clickCommission])
     .filter((value) => value > 0);
   if (clickValues.length > 0) {
-    return `${formatNumberRange(scaleValues(clickValues, CHARITY_SHARE_OF_COMMISSION))} kr`;
+    return `${formatNumberRange(clickValues)} kr`;
   }
 
   return "Veldedighet";
@@ -751,6 +751,7 @@ function buildTerms(
   const lines = [
     "Annonselenke via TradeTracker.",
     "Dette er ikke cashback utbetalt til deg.",
+    "Tallet i listen viser provisjonen CashbackNorge kan få, ikke cashback til deg.",
     "Det koster deg ingenting ekstra å bruke lenken.",
     "Når kjøpet spores, får CashbackNorge provisjon fra annonsøren.",
     "Resten av provisjonen går til drift og videreutvikling av CashbackNorge.",

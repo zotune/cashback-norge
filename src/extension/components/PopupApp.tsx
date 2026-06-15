@@ -317,7 +317,7 @@ export function PopupApp(): ReactElement {
 
 const CARD_ONLY_PROVIDERS = ["sparebank1", "remember"];
 const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
-const AFFILIATE_DISCLOSURE_PROVIDERS = ["nettbonus", "spareborsen", "cbn"];
+const AFFILIATE_DISCLOSURE_PROVIDERS = ["nettbonus", "spareborsen"];
 
 function OfferRow(props: { offer: CashbackOffer; amount: number; activated: boolean; onActivate: (offer: CashbackOffer) => void }): ReactElement {
   const hasBreakdown = props.offer.provider === "cbn" ||
@@ -375,6 +375,12 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
               )}
               {shouldShowAffiliateDisclosure(props.offer) && (
                 <span className="ad-chip">Ad</span>
+              )}
+              {props.offer.provider === "cbn" && (
+                <span className="support-chip">Støtt oss</span>
+              )}
+              {props.offer.provider === "cbn" && (
+                <span className="charity-chip">10% til veldedighet</span>
               )}
               <span className={`provider-badge provider-${props.offer.provider}`}>
                 {formatProviderName(props.offer.provider)}

@@ -41,6 +41,9 @@ jobs:
           TRADETRACKER_CUSTOMER_ID: ${{ secrets.TRADETRACKER_CUSTOMER_ID }}
           TRADETRACKER_PASSPHRASE: ${{ secrets.TRADETRACKER_PASSPHRASE }}
           TRADETRACKER_API_KEY: ${{ secrets.TRADETRACKER_API_KEY }}
+          AWIN_PUBLISHER_ID: ${{ secrets.AWIN_PUBLISHER_ID }}
+          AWIN_ACCESS_TOKEN: ${{ secrets.AWIN_ACCESS_TOKEN }}
+          AWIN_API_KEY: ${{ secrets.AWIN_API_KEY }}
 
       - name: Commit updated index
         run: |

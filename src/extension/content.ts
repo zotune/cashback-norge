@@ -7334,6 +7334,20 @@ function makeAdChip(): HTMLSpanElement {
   return chip;
 }
 
+function makeSupportChip(): HTMLSpanElement {
+  const chip = document.createElement("span");
+  chip.textContent = "Støtt oss";
+  chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
+  return chip;
+}
+
+function makeCharityChip(): HTMLSpanElement {
+  const chip = document.createElement("span");
+  chip.textContent = "10% til veldedighet";
+  chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
+  return chip;
+}
+
 function getCodeSourceProvider(codeOffer: CashbackOffer): string | undefined {
   if (codeOffer.provider !== "rabattkode") {
     return codeOffer.provider;
@@ -7410,8 +7424,22 @@ function shouldShowAffiliateDisclosure(offer: CashbackOffer): boolean {
   return offer.provider === "nettbonus" || offer.provider === "spareborsen" || offer.provider === "cbn";
 }
 
-function addAffiliateDisclosure(providerWrap: HTMLSpanElement): void {
+function addAffiliateDisclosure(
+  providerWrap: HTMLSpanElement,
+  offer: CashbackOffer,
+): void {
   const providerBadge = providerWrap.querySelector(".provider-badge");
+  if (offer.provider === "cbn") {
+    if (providerBadge !== null) {
+      providerWrap.insertBefore(makeSupportChip(), providerBadge);
+      providerWrap.insertBefore(makeCharityChip(), providerBadge);
+      return;
+    }
+
+    providerWrap.append(makeSupportChip(), makeCharityChip());
+    return;
+  }
+
   const adChip = makeAdChip();
   adChip.style.marginRight = "0";
   if (providerBadge !== null) {
@@ -9315,7 +9343,7 @@ function renderNotice(
       });
     }
     if (shouldShowAffiliateDisclosure(currentOffer)) {
-      addAffiliateDisclosure(providerWrap);
+      addAffiliateDisclosure(providerWrap, currentOffer);
     }
     offerLabel.append(offerReward);
     if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
@@ -10246,7 +10274,7 @@ function renderNotice(
     else supportLink.style.cssText = "flex:1;text-align:center;";
     support.append(supportLink, logoLink);
     const disclosure = document.createElement("p");
-    disclosure.textContent = "Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
+    disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
     panel.append(topLine, body, support, disclosure);
   } else {
@@ -10791,10 +10819,6 @@ function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     const firstIsSupport = firstOffer.provider === "cbn";
     const secondIsSupport = secondOffer.provider === "cbn";
 
-    if (firstIsSupport !== secondIsSupport) {
-      return firstIsSupport ? 1 : -1;
-    }
-
     const firstReward = parseRewardValue(firstOffer.reward);
     const secondReward = parseRewardValue(secondOffer.reward);
     const rewardKindSort =
@@ -10802,6 +10826,9 @@ function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     if (rewardKindSort !== 0) return rewardKindSort;
     const rewardAmountSort = secondReward.amount - firstReward.amount;
     if (rewardAmountSort !== 0) return rewardAmountSort;
+    if (firstIsSupport !== secondIsSupport) {
+      return firstIsSupport ? 1 : -1;
+    }
     const merchantSort = firstOffer.merchantName.localeCompare(secondOffer.merchantName);
     if (merchantSort !== 0) return merchantSort;
     return firstOffer.provider.localeCompare(secondOffer.provider);

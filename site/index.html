@@ -827,6 +827,20 @@ a.merchant-name:hover { text-decoration: underline; }
   white-space: nowrap;
   flex-shrink: 0;
 }
+.support-chip,
+.charity-chip {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #78909c;
+  border: 1px solid #78909c;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 14px;
+  vertical-align: middle;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .badge-sas-amex { background: #00005c; color: #fff; }
 .badge-norwegian { background: #d81939; color: #fff; }
 .badge-lunar { background: #2bb24c; color: #fff; }
@@ -839,7 +853,7 @@ a.merchant-name:hover { text-decoration: underline; }
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
   <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://github.com/zotune/cashback-norge" target="_blank">GitHub</a></p>
-  <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter utvikleren direkte.</p>
+  <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
   <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -987,8 +1001,10 @@ function getMaxPct(o) {
 function compareOffers(a, b) {
   const aSupport = a.provider === "cbn";
   const bSupport = b.provider === "cbn";
+  const pctSort = getMaxPct(b) - getMaxPct(a);
+  if (pctSort !== 0) return pctSort;
   if (aSupport !== bSupport) return aSupport ? 1 : -1;
-  return getMaxPct(b) - getMaxPct(a);
+  return (PROVIDER_NAMES[a.provider] || a.provider).localeCompare(PROVIDER_NAMES[b.provider] || b.provider, "nb");
 }
 
 function normalizeName(name) {
@@ -1193,11 +1209,12 @@ function render(query) {
       const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText;
       const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
       const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="app-chip">App</span>` : "";
-      const adChipHtml = ["nettbonus", "spareborsen", "cbn"].includes(o.provider) ? `<span class="ad-chip">Ad</span>` : "";
+      const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="ad-chip">Ad</span>` : "";
+      const supportChipHtml = o.provider === "cbn" ? `<span class="support-chip">Støtt oss</span><span class="charity-chip">10% til veldedighet</span>` : "";
       const bestClass = idx === 0 ? " offer--best" : "";
       return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
         <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
-        ${warnIconHtml}<span style="display:inline-flex;align-items:center;gap:6px;">${adChipHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span></span>
+        ${warnIconHtml}<span style="display:inline-flex;align-items:center;gap:6px;">${adChipHtml}${supportChipHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span></span>
       </a></span>`;
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);

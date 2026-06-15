@@ -158,6 +158,21 @@ h1 {
   white-space: nowrap;
 }
 
+.support-chip,
+.charity-chip {
+  border: 1px solid #78909c;
+  border-radius: 3px;
+  color: #78909c;
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  padding: 0 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .activation-badge {
   align-items: center;
   background: #eaf7ef;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781527374
+// @version      1781528704
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -11631,6 +11631,18 @@ query SearchSuggestions($query: String!, $category: Int) {
     chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
     return chip;
   }
+  function makeSupportChip() {
+    const chip = document.createElement("span");
+    chip.textContent = "Støtt oss";
+    chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
+    return chip;
+  }
+  function makeCharityChip() {
+    const chip = document.createElement("span");
+    chip.textContent = "10% til veldedighet";
+    chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
+    return chip;
+  }
   function getCodeSourceProvider(codeOffer) {
     if (codeOffer.provider !== "rabattkode") {
       return codeOffer.provider;
@@ -11684,8 +11696,17 @@ query SearchSuggestions($query: String!, $category: Int) {
   function shouldShowAffiliateDisclosure(offer) {
     return offer.provider === "nettbonus" || offer.provider === "spareborsen" || offer.provider === "cbn";
   }
-  function addAffiliateDisclosure(providerWrap) {
+  function addAffiliateDisclosure(providerWrap, offer) {
     const providerBadge = providerWrap.querySelector(".provider-badge");
+    if (offer.provider === "cbn") {
+      if (providerBadge !== null) {
+        providerWrap.insertBefore(makeSupportChip(), providerBadge);
+        providerWrap.insertBefore(makeCharityChip(), providerBadge);
+        return;
+      }
+      providerWrap.append(makeSupportChip(), makeCharityChip());
+      return;
+    }
     const adChip = makeAdChip();
     adChip.style.marginRight = "0";
     if (providerBadge !== null) {
@@ -13408,7 +13429,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         });
       }
       if (shouldShowAffiliateDisclosure(currentOffer)) {
-        addAffiliateDisclosure(providerWrap);
+        addAffiliateDisclosure(providerWrap, currentOffer);
       }
       offerLabel.append(offerReward);
       if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
@@ -14314,7 +14335,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       else supportLink.style.cssText = "flex:1;text-align:center;";
       support.append(supportLink, logoLink);
       const disclosure = document.createElement("p");
-      disclosure.textContent = "Ad er affiliatelenker. ♥ støtter utvikleren direkte.";
+      disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
       disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
       panel.append(topLine, body, support, disclosure);
     } else {
@@ -14707,15 +14728,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return [...offers].sort((firstOffer, secondOffer) => {
       const firstIsSupport = firstOffer.provider === "cbn";
       const secondIsSupport = secondOffer.provider === "cbn";
-      if (firstIsSupport !== secondIsSupport) {
-        return firstIsSupport ? 1 : -1;
-      }
       const firstReward = parseRewardValue(firstOffer.reward);
       const secondReward = parseRewardValue(secondOffer.reward);
       const rewardKindSort = rewardKindRank(secondReward.kind) - rewardKindRank(firstReward.kind);
       if (rewardKindSort !== 0) return rewardKindSort;
       const rewardAmountSort = secondReward.amount - firstReward.amount;
       if (rewardAmountSort !== 0) return rewardAmountSort;
+      if (firstIsSupport !== secondIsSupport) {
+        return firstIsSupport ? 1 : -1;
+      }
       const merchantSort = firstOffer.merchantName.localeCompare(secondOffer.merchantName);
       if (merchantSort !== 0) return merchantSort;
       return firstOffer.provider.localeCompare(secondOffer.provider);

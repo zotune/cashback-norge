@@ -375,10 +375,6 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     const firstIsSupport = firstOffer.provider === "cbn";
     const secondIsSupport = secondOffer.provider === "cbn";
 
-    if (firstIsSupport !== secondIsSupport) {
-      return firstIsSupport ? 1 : -1;
-    }
-
     const firstReward = parseRewardValue(firstOffer.reward);
     const secondReward = parseRewardValue(secondOffer.reward);
     const rewardKindSort =
@@ -392,6 +388,10 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
 
     if (rewardAmountSort !== 0) {
       return rewardAmountSort;
+    }
+
+    if (firstIsSupport !== secondIsSupport) {
+      return firstIsSupport ? 1 : -1;
     }
 
     const merchantSort = firstOffer.merchantName.localeCompare(

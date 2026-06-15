@@ -151,8 +151,6 @@ export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): numb
 }
 
 export function getMaxRewardPercent(offer: RewardOffer): number {
-  if (offer.provider === "cbn") return 0;
-
   const reward = offer.reward.trim();
   const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
   if (rangeMatch !== null) {
