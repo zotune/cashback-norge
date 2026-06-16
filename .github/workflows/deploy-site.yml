@@ -36,8 +36,8 @@ jobs:
       - name: Prepare pages content
         run: |
           mkdir _site
+          cp -R site/* _site/
           cp data/cashback-index.json _site/cashback-index.json
-          cp site/* _site/
 
       - uses: actions/upload-pages-artifact@v3
         with:
