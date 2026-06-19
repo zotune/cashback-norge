@@ -904,6 +904,12 @@ a.merchant-name:hover { text-decoration: underline; }
   </div>
   <div class="results"></div>
   <div class="az-bar" id="az-bar"></div>
+  <footer class="footer" style="margin-bottom:56px;">
+    <nav style="margin-bottom:6px;">
+      <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a> · <a class="js-email" data-u="c" data-d="adoretunes.com" data-keep-text href="#">Kontakt</a>
+    </nav>
+    <div>© 2026 Cashback Norge · Uavhengig cashback-oversikt for norske nettbutikker</div>
+  </footer>
 </div>
 <div class="fixed-footer">
   <div class="tip-line"></div>
@@ -2027,6 +2033,13 @@ async function checkAdblockByDom() {
 }
 
 checkAdblock();
+
+// Assemble contact email at runtime so harvesters can't scrape it from the source
+for (const el of document.querySelectorAll("a.js-email")) {
+  const addr = el.dataset.u + "@" + el.dataset.d;
+  el.href = "mailto:" + addr;
+  if (!("keepText" in el.dataset)) el.textContent = addr;
+}
 </script>
 </body>
 </html>

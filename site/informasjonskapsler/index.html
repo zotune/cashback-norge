@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informasjonskapsler (cookies) · Cashback Norge</title>
+<meta name="description" content="Slik bruker Cashback Norge informasjonskapsler (cookies), og hvordan affiliate-nettverk sporer cashback.">
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f7faf8;
+  color: #172026;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 680px; margin: 0 auto; padding: 32px 24px 56px; }
+.back { display: inline-flex; align-items: center; gap: 6px; color: #3a7d55; text-decoration: none; font-size: 14px; font-weight: 600; margin-bottom: 24px; }
+.back:hover { text-decoration: underline; }
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.brand img { width: 44px; height: 44px; }
+.brand h1 { font-size: 24px; }
+.card { background: #fff; border: 1px solid #d6e1dc; border-radius: 12px; padding: 24px 26px; }
+h2 { font-size: 17px; margin: 26px 0 8px; }
+h2:first-child { margin-top: 0; }
+p { margin-bottom: 12px; color: #2c3a40; }
+a { color: #3a7d55; }
+ul { margin: 0 0 12px 20px; color: #2c3a40; }
+li { margin-bottom: 6px; }
+.contact-box { background: #f0f6f2; border: 1px solid #cfe3d8; border-radius: 10px; padding: 14px 16px; margin: 6px 0 2px; }
+.contact-box a { font-weight: 700; }
+.updated { color: #8a9a92; font-size: 12px; margin-top: 28px; }
+footer.pagefoot { text-align: center; margin-top: 36px; font-size: 12px; color: #8a9a92; }
+footer.pagefoot a { color: #5d6b71; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Tilbake til Cashback Norge</a>
+  <div class="brand">
+    <img src="/favicon.png" alt="">
+    <h1>Informasjonskapsler</h1>
+  </div>
+  <div class="card">
+    <h2>Hva er informasjonskapsler?</h2>
+    <p>Informasjonskapsler («cookies») er små tekstfiler som lagres på enheten din når du besøker et nettsted. De brukes blant annet til å huske innstillinger og til å registrere hvor en handel kom fra.</p>
+
+    <h2>Hvilke informasjonskapsler bruker cashbacknorge.no?</h2>
+    <p>Selve nettstedet <strong>cashbacknorge.no setter ingen sporings- eller markedsføringscookies</strong>, og vi bruker ingen analyseverktøy som Google Analytics. Vi lagrer kun nødvendige innstillinger lokalt i nettleseren din (via <em>localStorage</em>), for eksempel hvilke valg du har gjort i oversikten. Disse dataene blir værende på din enhet og sendes ikke til oss.</p>
+
+    <h2>Tredjeparts informasjonskapsler (cashback-sporing)</h2>
+    <p>Når du klikker på en cashback- eller rabattlenke og blir sendt videre til en nettbutikk eller et affiliate-nettverk – for eksempel Tradedoubler, Awin, Adtraction, Partner-ads, TradeTracker og Adservice/Addrevenue, med flere – kan disse partnerne sette sine egne informasjonskapsler.</p>
+    <p>Disse brukes til å registrere at kjøpet ditt kom fra Cashback Norge, slik at riktig cashback og provisjon kan spores. Vi har ikke kontroll over disse informasjonskapslene, og de reguleres av hver enkelt partners egen personvern- og cookie-erklæring.</p>
+
+    <h2>Slik administrerer du informasjonskapsler</h2>
+    <p>Du kan når som helst slette eller blokkere informasjonskapsler i innstillingene til nettleseren din. Vær oppmerksom på at hvis du blokkerer tredjeparts informasjonskapsler, kan det føre til at cashback ikke blir sporet og registrert.</p>
+    <ul>
+      <li>Chrome: Innstillinger → Personvern og sikkerhet → Informasjonskapsler</li>
+      <li>Safari: Innstillinger → Personvern</li>
+      <li>Firefox: Innstillinger → Personvern og sikkerhet</li>
+    </ul>
+
+    <h2>Kontakt</h2>
+    <p>Har du spørsmål om hvordan vi bruker informasjonskapsler?</p>
+    <div class="contact-box">
+      E-post: <a class="js-email" data-u="c" data-d="adoretunes.com" href="#">c [at] adoretunes [dot] com</a>
+    </div>
+
+    <p class="updated">Sist oppdatert: 19. juni 2026</p>
+  </div>
+  <footer class="pagefoot">
+    <a href="/">Hjem</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
+  </footer>
+</div>
+<script>
+// Assemble contact email at runtime so harvesters can't scrape it from the source
+for (const el of document.querySelectorAll("a.js-email")) {
+  const addr = el.dataset.u + "@" + el.dataset.d;
+  el.href = "mailto:" + addr;
+  if (!("keepText" in el.dataset)) el.textContent = addr;
+}
+</script>
+</body>
+</html>

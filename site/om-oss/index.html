@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Om oss · Cashback Norge</title>
+<meta name="description" content="Om Cashback Norge – en uavhengig, gratis tjeneste som samler cashback-tilbud og rabattkoder for norske nettbutikker.">
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f7faf8;
+  color: #172026;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 680px; margin: 0 auto; padding: 32px 24px 56px; }
+.back { display: inline-flex; align-items: center; gap: 6px; color: #3a7d55; text-decoration: none; font-size: 14px; font-weight: 600; margin-bottom: 24px; }
+.back:hover { text-decoration: underline; }
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.brand img { width: 44px; height: 44px; }
+.brand h1 { font-size: 24px; }
+.card { background: #fff; border: 1px solid #d6e1dc; border-radius: 12px; padding: 24px 26px; }
+h2 { font-size: 17px; margin: 26px 0 8px; }
+h2:first-child { margin-top: 0; }
+p { margin-bottom: 12px; color: #2c3a40; }
+a { color: #3a7d55; }
+ul { margin: 0 0 12px 20px; color: #2c3a40; }
+li { margin-bottom: 6px; }
+.contact-box { background: #f0f6f2; border: 1px solid #cfe3d8; border-radius: 10px; padding: 14px 16px; margin: 6px 0 2px; }
+.contact-box a { font-weight: 700; }
+.updated { color: #8a9a92; font-size: 12px; margin-top: 28px; }
+footer.pagefoot { text-align: center; margin-top: 36px; font-size: 12px; color: #8a9a92; }
+footer.pagefoot a { color: #5d6b71; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Tilbake til Cashback Norge</a>
+  <div class="brand">
+    <img src="/favicon.png" alt="">
+    <h1>Om oss</h1>
+  </div>
+  <div class="card">
+    <h2>Hva er Cashback Norge?</h2>
+    <p>Cashback Norge er en uavhengig, gratis tjeneste som samler cashback-tilbud, rabattkoder og bonusordninger for norske nettbutikker på ett sted. Målet er å hjelpe norske forbrukere med å finne den beste tilgjengelige cashbacken før de handler på nett.</p>
+    <p>Vi henter og oppdaterer tilbud daglig, og presenterer dem i en enkel oversikt – både her på nettsiden, som <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank" rel="noreferrer">Chrome-utvidelse</a> og som brukerskript for andre nettlesere.</p>
+
+    <h2>Hvordan tjener vi penger?</h2>
+    <p>Når du klikker deg videre til en nettbutikk via en av lenkene våre, kan vi motta en provisjon (affiliate-inntekt) fra butikken eller cashback-nettverket. Dette påvirker <strong>ikke</strong> prisen du betaler. Lenker som er annonser eller affiliate-lenker er merket med «Ad» i oversikten.</p>
+    <p>En andel av inntektene går til veldedighet.</p>
+
+    <h2>Uavhengighet</h2>
+    <p>Vi er ikke eid av eller tilknyttet noen enkelt nettbutikk, bank eller cashback-leverandør. Vi sammenligner tilbud på tvers av flere nettverk slik at du kan velge det beste for ditt kjøp.</p>
+
+    <h2>Kontakt oss</h2>
+    <p>Har du spørsmål, tilbakemeldinger eller forslag? Vi svarer gjerne på e-post:</p>
+    <div class="contact-box">
+      E-post: <a class="js-email" data-u="c" data-d="adoretunes.com" href="#">c [at] adoretunes [dot] com</a>
+    </div>
+
+    <p class="updated">Sist oppdatert: 19. juni 2026</p>
+  </div>
+  <footer class="pagefoot">
+    <a href="/">Hjem</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
+  </footer>
+</div>
+<script>
+// Assemble contact email at runtime so harvesters can't scrape it from the source
+for (const el of document.querySelectorAll("a.js-email")) {
+  const addr = el.dataset.u + "@" + el.dataset.d;
+  el.href = "mailto:" + addr;
+  if (!("keepText" in el.dataset)) el.textContent = addr;
+}
+</script>
+</body>
+</html>
