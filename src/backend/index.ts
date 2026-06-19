@@ -280,8 +280,11 @@ async function main(): Promise<void> {
       }),
     }),
     config.skipUnio ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
       label: "Unio",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       provider: "unio",
+      reusePreviousOnFailure: true,
       run: () => fetchUnio({
         generatedAt, logger,
       }),

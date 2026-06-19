@@ -48,6 +48,14 @@ export async function fetchUnio(
     throw new Error(`Unio API returned ${response.status}`);
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const body = await response.text();
+    throw new Error(
+      `Unio API returned ${contentType || "unknown content type"}: ${formatBodyPreview(body)}`,
+    );
+  }
+
   const pages = (await response.json()) as WpPage[];
   input.logger.info(`Unio: ${pages.length} benefit pages found`);
 
@@ -65,6 +73,10 @@ export async function fetchUnio(
 
   input.logger.info(`Unio: produced ${offers.length} offers`);
   return uniqueOffers(offers);
+}
+
+function formatBodyPreview(body: string): string {
+  return body.replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 function parsePageOffer(
