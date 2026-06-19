@@ -58,6 +58,7 @@ import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
 import { fetchAwin } from "./providers/awin.js";
 import { fetchAddrevenue } from "./providers/addrevenue.js";
+import { fetchOrion } from "./providers/orion.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -112,6 +113,7 @@ type CliConfig = {
   skipTradeTracker: boolean;
   skipAwin: boolean;
   skipAddrevenue: boolean;
+  skipOrion: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -178,6 +180,7 @@ async function main(): Promise<void> {
     tradeTrackerOffers,
     awinOffers,
     addrevenueOffers,
+    orionOffers,
   ] = await Promise.all([
     config.skipKlarna ? Promise.resolve([]) : collectOffers({
       fallbackWhenEmpty: true,
@@ -324,6 +327,13 @@ async function main(): Promise<void> {
         generatedAt, logger,
       }),
     }),
+    config.skipOrion ? Promise.resolve([]) : collectOffers({
+      label: "Orion",
+      provider: "cbn",
+      run: () => fetchOrion({
+        generatedAt, logger,
+      }),
+    }),
   ]);
   logger.info(`Norskfamilie: ${norskfamilieOffers.length} offers`);
 
@@ -344,6 +354,7 @@ async function main(): Promise<void> {
     ...tradeTrackerOffers,
     ...awinOffers,
     ...addrevenueOffers,
+    ...orionOffers,
     ...utdanningibergenOffers,
     ...unioOffers,
     ...manualOffers,
@@ -528,6 +539,7 @@ async function main(): Promise<void> {
     ...tradeTrackerOffers,
     ...awinOffers,
     ...addrevenueOffers,
+    ...orionOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
     ...teknaOffers, ...nitoOffers,
@@ -549,7 +561,7 @@ async function main(): Promise<void> {
     ? "Exchange rates: using static fallback for fixed reward sorting"
     : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
   const offers = uniqueOffers(addFixedRewardSortValues(
-    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...studentTorgetOffers],
+    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...studentTorgetOffers],
     exchangeRates ?? STATIC_NOK_BASE_RATES,
   ));
 
@@ -654,6 +666,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipTradeTracker: args.includes("--skip-tradetracker"),
     skipAwin: args.includes("--skip-awin"),
     skipAddrevenue: args.includes("--skip-addrevenue"),
+    skipOrion: args.includes("--skip-orion"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
