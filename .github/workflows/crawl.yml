@@ -47,6 +47,7 @@ jobs:
           ADDREVENUE_API_KEY: ${{ secrets.ADDREVENUE_API_KEY }}
           ADDREVENUE_API_TOKEN: ${{ secrets.ADDREVENUE_API_TOKEN }}
           ADDREVENUE_CHANNEL_ID: ${{ secrets.ADDREVENUE_CHANNEL_ID }}
+          ORION_API_KEY: ${{ secrets.ORION_API_KEY }}
 
       - name: Commit updated index
         run: |
