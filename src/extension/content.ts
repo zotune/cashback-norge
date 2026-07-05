@@ -267,6 +267,8 @@ type PriceMatchOffer = {
   alternatives?: PriceMatchAlternative[];
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
+  // Hotelltreff gjenbruker fly-kildene (finnreise/skyscanner/momondo) men trenger egen tooltip-tekst.
+  travelKind?: "hotel";
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -790,7 +792,8 @@ function installDynamicProductPageRefresh(): void {
       }
 
       const flightMeta = extractFlightSearchMeta(currentUrl);
-      const productMeta = flightMeta === undefined ? extractProductPageMeta() : undefined;
+      const hotelMeta = flightMeta === undefined ? extractHotelSearchMeta(currentUrl) : undefined;
+      const productMeta = flightMeta === undefined && hotelMeta === undefined ? extractProductPageMeta() : undefined;
       const metaKey = flightMeta !== undefined
         ? [
           buildFlightSearchMetaKey(flightMeta),
@@ -798,9 +801,11 @@ function installDynamicProductPageRefresh(): void {
           isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
           isMomondoFlightSearchPage(currentUrl) ? readCurrentMomondoVisiblePriceKey() : "",
         ].join("|")
-        : productMeta === undefined
-          ? ""
-          : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
+        : hotelMeta !== undefined
+          ? buildHotelSearchMetaKey(hotelMeta)
+          : productMeta === undefined
+            ? ""
+            : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
         requestCurrentOffers();
@@ -958,6 +963,9 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
 async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
   const flightOffers = await findFlightPriceMatchOffers();
   if (flightOffers.length > 0) return flightOffers;
+
+  const hotelOffers = await findHotelPriceMatchOffers();
+  if (hotelOffers.length > 0) return hotelOffers;
 
   const productMeta = extractProductPageMeta();
   if (productMeta === undefined) return [];
@@ -1142,7 +1150,7 @@ async function matureFlightPriceMatches(
     );
     if (incompleteSources.size === 0) return;
 
-    const session = await buildFlightPriceMatchSession();
+    const session = await buildFlightPriceMatchSession() ?? await buildHotelPriceMatchSession();
     if (session === undefined) return;
     const refreshedOffers = await runFlightLiveOfferFinders(
       session.liveOfferFinders.filter((finder) => incompleteSources.has(finder.source)),
@@ -6298,6 +6306,1268 @@ function compactIsoDate(value: string): string {
   return value.replace(/-/g, "");
 }
 
+// ---------------------------------------------------------------------------
+// Hotellprissammenligning. Samme arkitektur som flyene: meta fra URL/DOM →
+// live-finders per kilde → felles panel. Kildene svarer med totalpris for hele
+// oppholdet inkl. skatter/avgifter (verifisert mot synlige sider 2026-07-05);
+// vi sammenligner billigste tilgjengelige rom for samme datoer/gjester/rom.
+// ---------------------------------------------------------------------------
+
+type HotelSearchMeta = {
+  // Satt = spesifikk hotellside; ellers destinasjonssøk.
+  hotelName?: string;
+  destinationName?: string;
+  checkIn: string;
+  checkOut: string;
+  adults: number;
+  childAges: number[];
+  // Siden oppgir barn uten aldre e.l. — da kan ikke kildene søke likt, og vi viser ingenting.
+  hasUnknownChildren?: boolean;
+  rooms: number;
+  // Frokostfilter aktivt på siden: vis kun deeplenker, aldri priser som ignorerer filteret.
+  breakfastOnly?: boolean;
+  finnHotelId?: string;
+  finnPlaceId?: string;
+  skyscannerHotelId?: string;
+  skyscannerEntityId?: string;
+  momondoHid?: string;
+  momondoPlaceId?: string;
+};
+type HotelOfferQuote = {
+  provider: string;
+  totalAmount: number;
+  roomName?: string;
+};
+type HotelOfferPollResult = {
+  quotes: HotelOfferQuote[];
+  searchComplete: boolean;
+};
+type VioHotelInfo = {
+  hotelId: string;
+  hotelName: string;
+  cityName?: string;
+};
+type SkyscannerHotelSuggestion = {
+  entityId: string;
+  name: string;
+  cityName?: string;
+  isHotel: boolean;
+};
+type MomondoHotelPlace = {
+  hid: string;
+  placeId?: string;
+  hotelName: string;
+  cityName?: string;
+};
+
+const VIO_SAPI_BASE_URL = "https://d3ky5oye7kybzk.cloudfront.net";
+// Statisk nettstedsnøkkel fra Vio/finn-bundelen; SAPI svarer 401 uten.
+const VIO_SAPI_API_KEY = "vio_website_8f7d6e5c4b3a2d1e0f9c8b7a6d5e4f3c";
+const VIO_HOTEL_OFFER_POLL_ATTEMPTS = 7;
+const VIO_HOTEL_OFFER_REFRESH_POLL_ATTEMPTS = 2;
+const VIO_HOTEL_OFFER_POLL_INTERVAL_MS = 1100;
+const SKYSCANNER_HOTEL_AUTOSUGGEST_BASE_URL = "https://www.skyscanner.no/g/autosuggest-search/api/v1/search-hotel/NO/nb-NO/";
+const SKYSCANNER_HOTEL_DETAIL_PRICE_ENDPOINT = "https://www.skyscanner.no/g/hotel-unified-bff/v1/HotelDetailPrice";
+const SKYSCANNER_HOTEL_POLL_ATTEMPTS = 8;
+const SKYSCANNER_HOTEL_REFRESH_POLL_ATTEMPTS = 2;
+const SKYSCANNER_HOTEL_POLL_INTERVAL_MS = 1200;
+// hotel-unified-bff svarer 400 uten x-user-agent.
+const SKYSCANNER_HOTEL_BFF_HEADERS: Record<string, string> = {
+  Accept: "application/json",
+  "Content-Type": "application/json",
+  "x-user-agent": "M;B2B;web",
+};
+const MOMONDO_SMARTY_ENDPOINT = "https://www.momondo.no/mvm/smartyv2/search";
+const MOMONDO_HOTEL_RATES_ENDPOINT = "https://www.momondo.no/i/api/search/dynamic/hotels/rates";
+const HOTEL_RESOLUTION_CACHE_TTL_MS = 30 * 60 * 1000;
+const HOTEL_EMPTY_RESOLUTION_CACHE_TTL_MS = 90 * 1000;
+// Generiske ord som ikke skiller hoteller fra hverandre ved navnematching.
+const HOTEL_NAME_STOPWORDS = new Set([
+  "hotel", "hotell", "hotels", "hoteller", "the", "by", "and", "og", "de", "la", "le", "el", "resort", "spa",
+]);
+
+const vioHotelAnchorCache = new Map<string, TimedPromiseCacheEntry<VioHotelInfo | undefined>>();
+const skyscannerHotelSuggestionCache = new Map<string, TimedPromiseCacheEntry<SkyscannerHotelSuggestion[] | undefined>>();
+const momondoHotelSmartyCache = new Map<string, TimedPromiseCacheEntry<Array<Record<string, unknown>> | undefined>>();
+
+async function findHotelPriceMatchOffers(): Promise<PriceMatchOffer[]> {
+  const session = await buildHotelPriceMatchSession();
+  if (session === undefined) return [];
+
+  const liveOffers = await runFlightLiveOfferFinders(session.liveOfferFinders);
+  return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
+}
+
+async function buildHotelPriceMatchSession(): Promise<FlightPriceMatchSession | undefined> {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return undefined;
+
+  const extractedMeta = extractHotelSearchMeta(parsedUrl);
+  if (extractedMeta === undefined || !isHotelSearchGuestMatchSupported(extractedMeta)) return undefined;
+
+  const meta = await resolveHotelSearchMetaNames(extractedMeta);
+  if (meta === undefined) return undefined;
+
+  const stayTitle = meta.hotelName ?? (meta.destinationName !== undefined ? `Hoteller: ${meta.destinationName}` : undefined);
+  if (stayTitle === undefined) return undefined;
+  const searchDetails = formatHotelSearchDetails(meta);
+  const currentSource = readHotelSourceForHost(parsedUrl);
+  // Deeplenke-modus: destinasjonssøk (ingen enkelt-hotellpris å sammenligne) eller
+  // aktivt frokostfilter (kildeprisene ville ignorere filteret).
+  const deeplinkOnly = meta.hotelName === undefined || meta.breakfastOnly === true;
+
+  const liveOfferFinders: FlightLiveOfferFinder[] = [];
+  if (!deeplinkOnly || currentSource !== "finnreise") {
+    liveOfferFinders.push({
+      source: "finnreise",
+      sourceName: "FINN",
+      findOffer: (options?: FlightOfferFindOptions) => findFinnHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options),
+    });
+  }
+  if (!deeplinkOnly || currentSource !== "skyscanner") {
+    liveOfferFinders.push({
+      source: "skyscanner",
+      sourceName: "Skyscanner",
+      findOffer: (options?: FlightOfferFindOptions) => findSkyscannerHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options),
+    });
+  }
+  if (!deeplinkOnly || currentSource !== "momondo") {
+    liveOfferFinders.push({
+      source: "momondo",
+      sourceName: "momondo",
+      findOffer: (options?: FlightOfferFindOptions) => findMomondoHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options),
+    });
+  }
+  return { staticOffers: [], liveOfferFinders };
+}
+
+function readHotelSourceForHost(parsedUrl: URL): PriceMatchOffer["source"] | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname === "hotell.finn.no") return "finnreise";
+  if (hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname.endsWith(".skyscanner.net")) return "skyscanner";
+  if (hostname === "momondo.no") return "momondo";
+  return undefined;
+}
+
+function isHotelSearchGuestMatchSupported(meta: HotelSearchMeta): boolean {
+  return meta.adults >= 1 && meta.adults <= 9 &&
+    meta.rooms >= 1 && meta.rooms <= 4 &&
+    meta.childAges.length === 0 && meta.hasUnknownChildren !== true &&
+    countHotelStayNights(meta) >= 1;
+}
+
+function countHotelStayNights(meta: HotelSearchMeta): number {
+  const checkIn = new Date(`${meta.checkIn}T00:00:00Z`).getTime();
+  const checkOut = new Date(`${meta.checkOut}T00:00:00Z`).getTime();
+  if (Number.isNaN(checkIn) || Number.isNaN(checkOut)) return 0;
+  return Math.round((checkOut - checkIn) / (24 * 60 * 60 * 1000));
+}
+
+function formatHotelSearchDetails(meta: HotelSearchMeta): string {
+  const nights = countHotelStayNights(meta);
+  return [
+    `${formatFlightDate(meta.checkIn)} - ${formatFlightDate(meta.checkOut)}`,
+    nights === 1 ? "1 natt" : `${nights} netter`,
+    meta.adults === 1 ? "1 voksen" : `${meta.adults} voksne`,
+    meta.rooms === 1 ? "1 rom" : `${meta.rooms} rom`,
+    ...(meta.breakfastOnly === true ? ["frokostfilter (velges hos kilden)"] : []),
+  ].join(", ");
+}
+
+function buildHotelSearchMetaKey(meta: HotelSearchMeta): string {
+  return [
+    "hotel",
+    meta.hotelName ?? "",
+    meta.destinationName ?? "",
+    meta.checkIn,
+    meta.checkOut,
+    meta.adults,
+    meta.childAges.join(","),
+    meta.hasUnknownChildren === true ? "uc" : "",
+    meta.rooms,
+    meta.breakfastOnly === true ? "bf" : "",
+    meta.finnHotelId ?? "",
+    meta.finnPlaceId ?? "",
+    meta.skyscannerHotelId ?? "",
+    meta.skyscannerEntityId ?? "",
+    meta.momondoHid ?? "",
+    meta.momondoPlaceId ?? "",
+  ].join("|");
+}
+
+// finn-sidene (Vio-SPA) har ikke navn i URL-en; slå opp via SAPI slik at de
+// andre kildene kan matches på navn.
+async function resolveHotelSearchMetaNames(meta: HotelSearchMeta): Promise<HotelSearchMeta | undefined> {
+  if (meta.hotelName === undefined && meta.finnHotelId !== undefined) {
+    const hotel = await fetchVioHotelInfoById(meta.finnHotelId);
+    if (hotel === undefined) return undefined;
+    return {
+      ...meta,
+      hotelName: hotel.hotelName,
+      ...(meta.destinationName === undefined && hotel.cityName !== undefined ? { destinationName: hotel.cityName } : {}),
+    };
+  }
+
+  if (meta.hotelName === undefined && meta.destinationName === undefined && meta.finnPlaceId !== undefined) {
+    const placeName = await fetchVioPlaceNameById(meta.finnPlaceId, meta);
+    if (placeName === undefined) return undefined;
+    return { ...meta, destinationName: placeName };
+  }
+
+  if (meta.hotelName === undefined && meta.destinationName === undefined) return undefined;
+  return meta;
+}
+
+// --------------------------- Meta fra URL/DOM ------------------------------
+
+function extractHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  return extractSkyscannerHotelSearchMeta(parsedUrl) ??
+    extractFinnHotelSearchMeta(parsedUrl) ??
+    extractMomondoHotelSearchMeta(parsedUrl) ??
+    extractBookingHotelSearchMeta(parsedUrl);
+}
+
+function extractSkyscannerHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "skyscanner.no" && hostname !== "skyscanner.net" && !hostname.endsWith(".skyscanner.net")) {
+    return undefined;
+  }
+
+  const checkIn = readIsoDateParam(parsedUrl, "checkin");
+  const checkOut = readIsoDateParam(parsedUrl, "checkout");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const adults = readNonNegativeIntegerParam(parsedUrl, "adults", 2);
+  const rooms = readNonNegativeIntegerParam(parsedUrl, "rooms", 1);
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+  const breakfastOnly = parsedUrl.searchParams.get("meal_plan") === "breakfast_included";
+
+  const base = {
+    checkIn,
+    checkOut,
+    adults,
+    childAges: [] as number[],
+    ...(childCount > 0 ? { hasUnknownChildren: true } : {}),
+    rooms,
+    ...(breakfastOnly ? { breakfastOnly: true } : {}),
+  };
+
+  const segments = parsedUrl.pathname.split("/").filter((segment) => segment.length > 0);
+  const hotelSegmentIndex = segments.findIndex((segment) => /^ht-\d+$/i.test(segment));
+  if (hotelSegmentIndex > 0) {
+    const hotelId = segments[hotelSegmentIndex]?.slice(3);
+    const hotelName = readHotelNameFromSlug(segments[hotelSegmentIndex - 1]);
+    if (hotelId === undefined || hotelName === undefined) return undefined;
+    const destinationSlug = segments
+      .slice(0, hotelSegmentIndex - 1)
+      .reverse()
+      .find((segment) => /-(?:hotels|hoteller)$/i.test(segment));
+    const destinationName = readHotelNameFromSlug(destinationSlug?.replace(/-(?:hotels|hoteller)$/i, ""));
+    const searchEntityId = readDigitsParam(parsedUrl, "search_entity_id");
+    return {
+      ...base,
+      hotelName,
+      ...(destinationName !== undefined ? { destinationName } : {}),
+      skyscannerHotelId: hotelId,
+      ...(searchEntityId !== undefined ? { skyscannerEntityId: searchEntityId } : {}),
+    };
+  }
+
+  const entityId = readDigitsParam(parsedUrl, "entity_id");
+  if (entityId === undefined || !/\/(?:hotels|hoteller)\//i.test(`${parsedUrl.pathname}/`)) return undefined;
+  const destinationName = readVisibleHotelDestinationName();
+  return {
+    ...base,
+    ...(destinationName !== undefined ? { destinationName } : {}),
+    skyscannerEntityId: entityId,
+  };
+}
+
+function extractFinnHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "hotell.finn.no") return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "checkIn");
+  const checkOut = readIsoDateParam(parsedUrl, "checkOut");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const occupancy = parseVioRoomsParam(parsedUrl.searchParams.get("rooms"));
+  const base = {
+    checkIn,
+    checkOut,
+    adults: occupancy.adults,
+    childAges: occupancy.childAges,
+    ...(occupancy.hasUnknownChildren ? { hasUnknownChildren: true } : {}),
+    rooms: occupancy.rooms,
+  };
+
+  const hotelId = parsedUrl.pathname.match(/^\/Hotel\/(\d+)(?:\/|$)/i)?.[1];
+  if (hotelId !== undefined) {
+    // Navnet løses opp via SAPI /hotel i resolveHotelSearchMetaNames.
+    return { ...base, finnHotelId: hotelId };
+  }
+
+  if (!/^\/Hotel\/Search\/?$/i.test(parsedUrl.pathname)) return undefined;
+  const placeId = readDigitsParam(parsedUrl, "placeId");
+  if (placeId === undefined) return undefined;
+  return { ...base, finnPlaceId: placeId };
+}
+
+function extractMomondoHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "momondo.no" || !parsedUrl.pathname.startsWith("/hotel-search/")) return undefined;
+
+  const segments = parsedUrl.pathname
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.split(";")[0] ?? segment);
+  const locationSegment = segments[1];
+  if (locationSegment === undefined) return undefined;
+
+  const checkIn = segments.find((segment) => /^\d{4}-\d{2}-\d{2}$/.test(segment));
+  const checkOut = segments.filter((segment) => /^\d{4}-\d{2}-\d{2}$/.test(segment))[1];
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  let adults = 2;
+  let rooms = 1;
+  let hasUnknownChildren = false;
+  for (const segment of segments) {
+    const adultsMatch = segment.match(/^(\d+)adults$/i);
+    if (adultsMatch?.[1] !== undefined) adults = Number.parseInt(adultsMatch[1], 10);
+    const roomsMatch = segment.match(/^(\d+)rooms$/i);
+    if (roomsMatch?.[1] !== undefined) rooms = Number.parseInt(roomsMatch[1], 10);
+    if (/child/i.test(segment)) hasUnknownChildren = true;
+  }
+
+  const base = {
+    checkIn,
+    checkOut,
+    adults,
+    childAges: [] as number[],
+    ...(hasUnknownChildren ? { hasUnknownChildren: true } : {}),
+    rooms,
+  };
+
+  const decodedLocation = tryDecodeUriComponent(locationSegment);
+  const hotelMatch = decodedLocation.match(/^(.+?)(?:,([^,]+?))?-p(\d+)-h(\d+)-details$/i);
+  if (hotelMatch !== null) {
+    const hotelName = readHotelNameFromSlug(hotelMatch[1]);
+    const destinationName = readHotelNameFromSlug(hotelMatch[2]);
+    if (hotelName === undefined || hotelMatch[3] === undefined || hotelMatch[4] === undefined) return undefined;
+    return {
+      ...base,
+      hotelName,
+      ...(destinationName !== undefined ? { destinationName } : {}),
+      momondoPlaceId: hotelMatch[3],
+      momondoHid: hotelMatch[4],
+    };
+  }
+
+  const placeMatch = decodedLocation.match(/^(.+?)-p(\d+)$/i);
+  if (placeMatch === null || placeMatch[1] === undefined || placeMatch[2] === undefined) return undefined;
+  const destinationName = readHotelNameFromSlug(placeMatch[1].split(",")[0]);
+  if (destinationName === undefined) return undefined;
+  return {
+    ...base,
+    destinationName,
+    momondoPlaceId: placeMatch[2],
+  };
+}
+
+function extractBookingHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "booking.com" && !hostname.endsWith(".booking.com")) return undefined;
+  if (!/^\/hotel\/[a-z]{2}\/[^/]+\.html$/i.test(parsedUrl.pathname)) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "checkin");
+  const checkOut = readIsoDateParam(parsedUrl, "checkout");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const adults = readNonNegativeIntegerParam(parsedUrl, "group_adults", 2);
+  const rooms = readNonNegativeIntegerParam(parsedUrl, "no_rooms", 1);
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "group_children", 0);
+  const childAges = parsedUrl.searchParams.getAll("age")
+    .map((value) => readNonNegativeIntegerValue(value))
+    .filter((age): age is number => age !== undefined);
+
+  const hotelLdJson = findHotelLdJson();
+  const hotelName = readStringValue(hotelLdJson?.name) ?? readBookingVisibleHotelName();
+  if (hotelName === undefined) return undefined;
+  const address = isRecord(hotelLdJson?.address) ? hotelLdJson.address : undefined;
+  const destinationName = readStringValue(address?.addressLocality)?.split(",")[0]?.trim();
+
+  return {
+    hotelName,
+    ...(destinationName !== undefined && destinationName.length > 0 ? { destinationName } : {}),
+    checkIn,
+    checkOut,
+    adults,
+    childAges: childCount > 0 ? childAges : [],
+    ...(childCount > 0 && childAges.length !== childCount ? { hasUnknownChildren: true } : {}),
+    rooms,
+  };
+}
+
+function findHotelLdJson(): Record<string, unknown> | undefined {
+  for (const entry of readLdJsonEntries()) {
+    const hotel = findTypedLdJson(entry, "Hotel");
+    if (hotel !== undefined) return hotel;
+  }
+  return undefined;
+}
+
+function readBookingVisibleHotelName(): string | undefined {
+  const heading = document.querySelector<HTMLElement>('h2[data-testid="title"], [data-testid="property-header"] h2, #hp_hotel_name');
+  const name = heading?.innerText.replace(/\s+/g, " ").trim();
+  return name !== undefined && name.length >= 3 && name.length <= 120 ? name : undefined;
+}
+
+// «Hoteller i Bergen»-overskrift/tittel på søkesider uten navn i URL-en.
+function readVisibleHotelDestinationName(): string | undefined {
+  const candidates = [
+    document.querySelector("h1")?.textContent ?? "",
+    document.title,
+  ];
+  for (const candidate of candidates) {
+    const match = candidate.match(/hotell?e?r?\s+i\s+(.+?)(?:\s*[-–—|·].*)?$/i) ?? candidate.match(/hotels?\s+in\s+(.+?)(?:\s*[-–—|·].*)?$/i);
+    const name = match?.[1]?.trim();
+    if (name !== undefined && name.length >= 2 && name.length <= 60) return name;
+  }
+
+  // Skyscanner-søket har generisk tittel/ingen h1 — destinasjonen står i
+  // søkefeltet. Feil verdi er ufarlig: kildene krever eksakt navnetreff etterpå.
+  for (const input of Array.from(document.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])')).slice(0, 30)) {
+    const value = input.value.replace(/\s+/g, " ").trim();
+    if (
+      value.length >= 2 && value.length <= 60 &&
+      /\p{L}/u.test(value) && !/\d/.test(value) &&
+      !/voksn|adult|\brom\b|room|natt|night|gjest|guest/i.test(value)
+    ) {
+      return value.split(",")[0]?.trim();
+    }
+  }
+  return undefined;
+}
+
+function readHotelNameFromSlug(slug: string | undefined): string | undefined {
+  if (slug === undefined) return undefined;
+  const name = tryDecodeUriComponent(slug).replace(/[-_+]+/g, " ").replace(/\s+/g, " ").trim();
+  if (name.length < 2 || name.length > 120) return undefined;
+  // Slugger er små bokstaver («scandic bergen city») — tittel-cas dem for visning.
+  return name === name.toLowerCase()
+    ? name.replace(/\p{L}+/gu, (word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
+    : name;
+}
+
+function tryDecodeUriComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function readDigitsParam(parsedUrl: URL, key: string): string | undefined {
+  const value = parsedUrl.searchParams.get(key);
+  return value !== null && /^\d+$/.test(value) ? value : undefined;
+}
+
+// Vio-occupancy («2», «2:4,6», «2|2» = rom-adskilt med |, barnealdre etter :).
+function parseVioRoomsParam(value: string | null): { adults: number; childAges: number[]; rooms: number; hasUnknownChildren: boolean } {
+  if (value === null || value.trim().length === 0) {
+    return { adults: 2, childAges: [], rooms: 1, hasUnknownChildren: false };
+  }
+
+  let adults = 0;
+  const childAges: number[] = [];
+  let hasUnknownChildren = false;
+  const parts = value.split("|");
+  for (const part of parts) {
+    const [adultsPart, agesPart] = part.split(":");
+    const partAdults = readNonNegativeIntegerValue(adultsPart?.trim());
+    if (partAdults === undefined) return { adults: 0, childAges: [], rooms: 0, hasUnknownChildren: true };
+    adults += partAdults;
+    if (agesPart !== undefined && agesPart.trim().length > 0) {
+      for (const ageText of agesPart.split(",")) {
+        const age = readNonNegativeIntegerValue(ageText.trim());
+        if (age === undefined) hasUnknownChildren = true;
+        else childAges.push(age);
+      }
+    }
+  }
+  return { adults, childAges, rooms: parts.length, hasUnknownChildren };
+}
+
+function buildVioRoomsParam(meta: HotelSearchMeta): string {
+  const roomCount = Math.max(1, meta.rooms);
+  const baseAdults = Math.floor(meta.adults / roomCount);
+  const extraAdults = meta.adults % roomCount;
+  const parts: string[] = [];
+  for (let index = 0; index < roomCount; index++) {
+    parts.push(String(baseAdults + (index < extraAdults ? 1 : 0)));
+  }
+  if (meta.childAges.length > 0) {
+    parts[0] = `${parts[0]}:${meta.childAges.join(",")}`;
+  }
+  return parts.join("|");
+}
+
+// --------------------------- Navnematching ---------------------------------
+
+function normalizeHotelNameText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9æøå]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function collectHotelNameTokens(value: string, destinationName: string | undefined): string[] {
+  const destinationTokens = new Set(
+    destinationName !== undefined ? normalizeHotelNameText(destinationName).split(" ") : [],
+  );
+  return normalizeHotelNameText(value)
+    .split(" ")
+    .filter((token) => token.length > 0 && !HOTEL_NAME_STOPWORDS.has(token) && !destinationTokens.has(token));
+}
+
+// Streng matching: signifikante tokens (uten generiske ord og destinasjonsnavn)
+// må være identiske. Heller ingen rad enn feil hotell.
+function isHotelNameMatch(meta: HotelSearchMeta, candidateName: string, candidateCity: string | undefined): boolean {
+  if (meta.hotelName === undefined) return false;
+  if (candidateCity !== undefined && meta.destinationName !== undefined && !isHotelCityMatch(candidateCity, meta.destinationName)) {
+    return false;
+  }
+
+  const targetTokens = collectHotelNameTokens(meta.hotelName, meta.destinationName);
+  const candidateTokens = collectHotelNameTokens(candidateName, meta.destinationName);
+  if (targetTokens.length === 0 || candidateTokens.length === 0) {
+    return normalizeHotelNameText(meta.hotelName) === normalizeHotelNameText(candidateName);
+  }
+  const targetSet = new Set(targetTokens);
+  const candidateSet = new Set(candidateTokens);
+  return targetSet.size === candidateSet.size && [...targetSet].every((token) => candidateSet.has(token));
+}
+
+// Tåler «Bangkok» vs «Bangkok (provins)» og andre inneholder-varianter.
+function isHotelCityMatch(candidateCity: string, destinationName: string): boolean {
+  const normalizedCandidate = normalizeHotelNameText(candidateCity);
+  const normalizedDestination = normalizeHotelNameText(destinationName);
+  if (normalizedCandidate.length === 0 || normalizedDestination.length === 0) return true;
+  return normalizedCandidate === normalizedDestination ||
+    normalizedCandidate.includes(normalizedDestination) ||
+    normalizedDestination.includes(normalizedCandidate);
+}
+
+function buildHotelResolutionQuery(meta: HotelSearchMeta): string {
+  const hotelName = meta.hotelName ?? "";
+  if (meta.destinationName === undefined) return hotelName;
+  const normalizedName = normalizeHotelNameText(hotelName);
+  const destinationTokens = normalizeHotelNameText(meta.destinationName).split(" ");
+  const missingDestination = destinationTokens.some((token) => !normalizedName.includes(token));
+  return missingDestination ? `${hotelName} ${meta.destinationName}` : hotelName;
+}
+
+function formatHotelQuoteAlternatives(quotes: HotelOfferQuote[]): PriceMatchAlternative[] {
+  return quotes.slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT).map((quote) => ({
+    shopName: quote.provider,
+    price: formatNokFlightPrice(quote.totalAmount),
+    amount: quote.totalAmount,
+    sortAmount: quote.totalAmount,
+    currency: "NOK",
+    ...(quote.roomName !== undefined ? { platform: quote.roomName } : {}),
+  }));
+}
+
+function buildHotelPriceMatchOffer(input: {
+  source: NonNullable<PriceMatchOffer["source"]>;
+  sourceName: string;
+  stayTitle: string;
+  searchDetails: string;
+  productUrl: string;
+  quotes?: HotelOfferQuote[];
+  searchIncomplete?: boolean;
+}): PriceMatchOffer {
+  const best = input.quotes?.[0];
+  if (best === undefined) {
+    return {
+      source: input.source,
+      sourceName: input.sourceName,
+      travelKind: "hotel",
+      details: input.searchDetails,
+      matchedExactProduct: true,
+      shopName: input.searchDetails,
+      price: "Sjekk pris",
+      amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+      sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+      currency: "NOK",
+      productName: input.stayTitle,
+      productUrl: input.productUrl,
+    };
+  }
+
+  return {
+    source: input.source,
+    sourceName: input.sourceName,
+    travelKind: "hotel",
+    details: input.searchDetails,
+    matchedExactProduct: true,
+    shopName: best.provider,
+    price: formatNokFlightPrice(best.totalAmount),
+    amount: best.totalAmount,
+    sortAmount: best.totalAmount,
+    currency: "NOK",
+    productName: input.stayTitle,
+    productUrl: input.productUrl,
+    offerUrl: input.productUrl,
+    ...(best.roomName !== undefined ? { durationText: best.roomName } : {}),
+    ...(input.searchIncomplete === true ? { searchIncomplete: true } : {}),
+    alternatives: formatHotelQuoteAlternatives(input.quotes ?? []),
+  };
+}
+
+// ------------------------------ FINN (Vio SAPI) ----------------------------
+
+function buildVioBaseParams(meta: HotelSearchMeta, searchId: string, anonymousId: string): URLSearchParams {
+  return new URLSearchParams({
+    checkIn: meta.checkIn,
+    checkOut: meta.checkOut,
+    rooms: buildVioRoomsParam(meta),
+    currency: "NOK",
+    language: "no",
+    brand: "finn",
+    userCountry: "NO",
+    optimizeRooms: "false",
+    getAllOffers: "true",
+    searchId,
+    anonymousId,
+  });
+}
+
+function vioJsonRequest(path: string, params: URLSearchParams): Promise<unknown | undefined> {
+  return userscriptJsonRequest(`${VIO_SAPI_BASE_URL}${path}?${params.toString()}`, {
+    headers: { Accept: "application/json", "x-api-key": VIO_SAPI_API_KEY },
+    credentials: "omit",
+    timeoutMs: 15000,
+  });
+}
+
+async function fetchVioHotelInfoById(hotelId: string): Promise<VioHotelInfo | undefined> {
+  const params = new URLSearchParams({
+    id: hotelId,
+    language: "no,en",
+    currency: "NOK",
+    attributes: "objectID,hotelName,placeDN,placeDisplayName,navPathInfo",
+  });
+  const value = await vioJsonRequest("/hotel", params);
+  if (!isRecord(value)) return undefined;
+  const hotelName = readStringValue(value.hotelName);
+  if (hotelName === undefined) return undefined;
+  // placeDisplayName starter gjerne med bydel («Bang Chak, Bangkok») — bynavnet
+  // må komme fra navPathInfo, ellers avviser city-sjekken de andre kildene.
+  const cityName = (readVioNavPathCityName(value.navPathInfo) ?? readStringValue(value.placeDisplayName))?.split(",")[0]?.trim();
+  return {
+    hotelId,
+    hotelName,
+    ...(cityName !== undefined && cityName.length > 0 ? { cityName } : {}),
+  };
+}
+
+function readVioNavPathCityName(navPathInfo: unknown): string | undefined {
+  if (!isRecord(navPathInfo) || !isRecord(navPathInfo.city)) return undefined;
+  return readStringValue(navPathInfo.city.name);
+}
+
+async function fetchVioPlaceNameById(placeId: string, meta: HotelSearchMeta): Promise<string | undefined> {
+  const params = buildVioBaseParams(meta, createRandomRequestId(), createRandomRequestId());
+  params.set("placeId", placeId);
+  const value = await vioJsonRequest("/anchor", params);
+  if (!isRecord(value) || !isRecord(value.anchor)) return undefined;
+  return readStringValue(value.anchor.placeDisplayName) ?? readStringValue(value.anchor.placeName);
+}
+
+function fetchCachedVioHotelAnchor(meta: HotelSearchMeta): Promise<VioHotelInfo | undefined> {
+  const query = buildHotelResolutionQuery(meta);
+  return readTimedPromiseCache(vioHotelAnchorCache, query, () => fetchVioHotelAnchor(query, meta));
+}
+
+async function fetchVioHotelAnchor(query: string, meta: HotelSearchMeta): Promise<VioHotelInfo | undefined> {
+  const params = buildVioBaseParams(meta, createRandomRequestId(), createRandomRequestId());
+  params.set("query", query);
+  const value = await vioJsonRequest("/anchor", params);
+  if (!isRecord(value) || value.anchorType !== "hotel" || !isRecord(value.anchor)) return undefined;
+
+  const hotelId = readStringValue(value.anchor.objectID)?.match(/^hotel:(\d+)$/)?.[1];
+  const hotelName = readStringValue(value.anchor.hotelName);
+  if (hotelId === undefined || hotelName === undefined) return undefined;
+  const cityName = (
+    readVioNavPathCityName(value.anchor.navPathInfo) ??
+    readStringValue(value.anchor.placeADN) ??
+    readStringValue(value.anchor.placeDN)
+  )?.split(",")[0]?.trim();
+  return {
+    hotelId,
+    hotelName,
+    ...(cityName !== undefined && cityName.length > 0 ? { cityName } : {}),
+  };
+}
+
+async function resolveVioHotelForMeta(meta: HotelSearchMeta): Promise<VioHotelInfo | undefined> {
+  if (meta.finnHotelId !== undefined) {
+    return { hotelId: meta.finnHotelId, hotelName: meta.hotelName ?? "" };
+  }
+  const anchor = await fetchCachedVioHotelAnchor(meta);
+  if (anchor === undefined || !isHotelNameMatch(meta, anchor.hotelName, anchor.cityName)) return undefined;
+  return anchor;
+}
+
+async function pollVioHotelOffers(
+  hotelId: string,
+  meta: HotelSearchMeta,
+  options?: FlightOfferFindOptions,
+): Promise<HotelOfferPollResult | undefined> {
+  const searchId = createRandomRequestId();
+  const anonymousId = createRandomRequestId();
+  const maxAttempts = options?.refresh === true ? VIO_HOTEL_OFFER_REFRESH_POLL_ATTEMPTS : VIO_HOTEL_OFFER_POLL_ATTEMPTS;
+
+  let latestResult: HotelOfferPollResult | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(VIO_HOTEL_OFFER_POLL_INTERVAL_MS);
+
+    const params = buildVioBaseParams(meta, searchId, anonymousId);
+    params.set("hotelIds", hotelId);
+    params.set("clientRequestId", createRandomRequestId());
+    const value = await vioJsonRequest("/offers/poll", params);
+    if (!isRecord(value)) continue;
+
+    const results = readRecordArray(value.results);
+    const offers = readRecordArray(results.find((result) => readStringValue(result.id) === hotelId)?.offers);
+    const complete = isRecord(value.status) && value.status.complete === true;
+    latestResult = {
+      quotes: collectVioHotelQuotes(offers),
+      searchComplete: complete,
+    };
+    if (complete) break;
+  }
+  return latestResult;
+}
+
+function collectVioHotelQuotes(offers: Array<Record<string, unknown>>): HotelOfferQuote[] {
+  const cheapestByProvider = new Map<string, HotelOfferQuote>();
+  for (const offer of offers) {
+    if (!isRecord(offer.rate)) continue;
+    const base = readNumberValue(offer.rate.base);
+    const taxes = readNumberValue(offer.rate.taxes) ?? 0;
+    const hotelFees = readNumberValue(offer.rate.hotelFees) ?? 0;
+    if (base === undefined || base <= 0) continue;
+    const totalAmount = Math.round(base + taxes + hotelFees);
+
+    const metadata = isRecord(offer.metadata) ? offer.metadata : undefined;
+    const brandInfo = metadata !== undefined && isRecord(metadata.brandInfo) ? metadata.brandInfo : undefined;
+    const provider = readStringValue(brandInfo?.brandName) ?? readStringValue(offer.providerCode) ?? "Ukjent";
+
+    const existing = cheapestByProvider.get(provider);
+    if (existing === undefined || totalAmount < existing.totalAmount) {
+      cheapestByProvider.set(provider, { provider, totalAmount });
+    }
+  }
+  return [...cheapestByProvider.values()].sort((left, right) => left.totalAmount - right.totalAmount);
+}
+
+function buildFinnHotelPageUrl(hotelId: string, meta: HotelSearchMeta): string {
+  const params = new URLSearchParams({
+    checkIn: meta.checkIn,
+    checkOut: meta.checkOut,
+    rooms: buildVioRoomsParam(meta),
+    userCountry: "NO",
+  });
+  return `https://hotell.finn.no/Hotel/${hotelId}/no?${params.toString()}`;
+}
+
+function buildFinnHotelSearchUrl(placeId: string, meta: HotelSearchMeta): string {
+  const params = new URLSearchParams({
+    placeId,
+    checkIn: meta.checkIn,
+    checkOut: meta.checkOut,
+    rooms: buildVioRoomsParam(meta),
+    userSearch: "1",
+  });
+  return `https://hotell.finn.no/Hotel/Search?${params.toString()}`;
+}
+
+async function findFinnHotelPriceMatchOffer(
+  meta: HotelSearchMeta,
+  stayTitle: string,
+  searchDetails: string,
+  deeplinkOnly: boolean,
+  options?: FlightOfferFindOptions,
+): Promise<PriceMatchOffer | undefined> {
+  if (meta.hotelName === undefined) {
+    // Destinasjonssøk: deeplenke til samme søk.
+    const placeId = meta.finnPlaceId ?? await fetchVioPlaceIdByDestination(meta);
+    if (placeId === undefined) return undefined;
+    return buildHotelPriceMatchOffer({
+      source: "finnreise",
+      sourceName: "FINN",
+      stayTitle,
+      searchDetails,
+      productUrl: buildFinnHotelSearchUrl(placeId, meta),
+    });
+  }
+
+  const hotel = await resolveVioHotelForMeta(meta);
+  if (hotel === undefined) return undefined;
+  const productUrl = buildFinnHotelPageUrl(hotel.hotelId, meta);
+  // SAPI-prisene for flerromssøk stemmer ikke med det finn-siden viser
+  // (verifisert 2026-07-05: «2|2» ga ettroms-pris) — kun deeplenke da.
+  if (deeplinkOnly || meta.rooms > 1) {
+    return buildHotelPriceMatchOffer({ source: "finnreise", sourceName: "FINN", stayTitle, searchDetails, productUrl });
+  }
+
+  const pollResult = await pollVioHotelOffers(hotel.hotelId, meta, options);
+  if (pollResult === undefined || pollResult.quotes.length === 0) return undefined;
+  return buildHotelPriceMatchOffer({
+    source: "finnreise",
+    sourceName: "FINN",
+    stayTitle,
+    searchDetails,
+    productUrl,
+    quotes: pollResult.quotes,
+    ...(pollResult.searchComplete ? {} : { searchIncomplete: true }),
+  });
+}
+
+async function fetchVioPlaceIdByDestination(meta: HotelSearchMeta): Promise<string | undefined> {
+  if (meta.destinationName === undefined) return undefined;
+  const params = buildVioBaseParams(meta, createRandomRequestId(), createRandomRequestId());
+  params.set("query", meta.destinationName);
+  const value = await vioJsonRequest("/anchor", params);
+  if (!isRecord(value) || value.anchorType !== "place" || !isRecord(value.anchor)) return undefined;
+  const placeName = readStringValue(value.anchor.placeDisplayName) ?? readStringValue(value.anchor.placeName);
+  if (placeName === undefined || !isHotelCityMatch(placeName, meta.destinationName)) return undefined;
+  return readStringValue(value.anchor.objectID)?.match(/^place:(\d+)$/)?.[1];
+}
+
+// ------------------------------ Skyscanner ---------------------------------
+
+function fetchCachedSkyscannerHotelSuggestions(query: string): Promise<SkyscannerHotelSuggestion[] | undefined> {
+  return readTimedPromiseCache(skyscannerHotelSuggestionCache, query, () => fetchSkyscannerHotelSuggestions(query));
+}
+
+async function fetchSkyscannerHotelSuggestions(query: string): Promise<SkyscannerHotelSuggestion[] | undefined> {
+  const value = await userscriptJsonRequest(`${SKYSCANNER_HOTEL_AUTOSUGGEST_BASE_URL}${encodeURIComponent(query)}`, {
+    headers: { Accept: "application/json" },
+    // Skyscanner-cookies (PerimeterX) må med, som for flyene.
+    credentials: "include",
+    timeoutMs: 15000,
+  });
+  if (!Array.isArray(value)) return undefined;
+
+  const suggestions: SkyscannerHotelSuggestion[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const entityId = readStringValue(item.entity_id);
+    const name = readStringValue(item.entity_name);
+    if (entityId === undefined || name === undefined) continue;
+    const cityName = readStringValue(item.hierarchy)?.split("|")[0]?.trim();
+    suggestions.push({
+      entityId,
+      name,
+      ...(cityName !== undefined && cityName.length > 0 ? { cityName } : {}),
+      isHotel: readStringValue(item.class) === "Hotel",
+    });
+  }
+  return suggestions;
+}
+
+async function resolveSkyscannerHotelIdForMeta(meta: HotelSearchMeta): Promise<string | undefined> {
+  if (meta.skyscannerHotelId !== undefined) return meta.skyscannerHotelId;
+  const suggestions = await fetchCachedSkyscannerHotelSuggestions(buildHotelResolutionQuery(meta));
+  return suggestions?.find((suggestion) => suggestion.isHotel && isHotelNameMatch(meta, suggestion.name, suggestion.cityName))?.entityId;
+}
+
+function buildSkyscannerHotelTravellerContext(meta: HotelSearchMeta): Record<string, unknown> {
+  return {
+    market: "NO",
+    locale: "nb-NO",
+    currency: "NOK",
+    checkinDate: meta.checkIn,
+    checkoutDate: meta.checkOut,
+    adults: meta.adults,
+    childrenAges: meta.childAges,
+    rooms: meta.rooms,
+  };
+}
+
+type SkyscannerHotelDetailPriceResult = HotelOfferPollResult & {
+  detailsPageUrl?: string;
+};
+
+async function pollSkyscannerHotelDetailPrice(
+  hotelId: string,
+  meta: HotelSearchMeta,
+  options?: FlightOfferFindOptions,
+): Promise<SkyscannerHotelDetailPriceResult | undefined> {
+  const payload = {
+    hotelId,
+    entityId: meta.skyscannerEntityId ?? "",
+    filters: [],
+    priceType: "PRICE_TYPE_PER_NIGHT",
+    travellerContext: buildSkyscannerHotelTravellerContext(meta),
+    requestContext: { debug: false },
+    sessionId: createRandomRequestId().replace(/-/g, ""),
+  };
+  const maxAttempts = options?.refresh === true ? SKYSCANNER_HOTEL_REFRESH_POLL_ATTEMPTS : SKYSCANNER_HOTEL_POLL_ATTEMPTS;
+
+  let latestResult: SkyscannerHotelDetailPriceResult | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(SKYSCANNER_HOTEL_POLL_INTERVAL_MS);
+
+    const value = await userscriptJsonRequest(SKYSCANNER_HOTEL_DETAIL_PRICE_ENDPOINT, {
+      method: "POST",
+      headers: SKYSCANNER_HOTEL_BFF_HEADERS,
+      body: JSON.stringify(payload),
+      credentials: "include",
+      timeoutMs: 30000,
+    });
+    if (!isRecord(value)) continue;
+
+    const complete = readStringValue(value.pollingStatus) === "SEARCH_STATUS_COMPLETED";
+    const detailsPageUrl = readStringValue(value.detailsPageUrl);
+    latestResult = {
+      quotes: collectSkyscannerHotelQuotes(readRecordArray(value.offers)),
+      searchComplete: complete,
+      ...(detailsPageUrl !== undefined ? { detailsPageUrl } : {}),
+    };
+    if (complete) break;
+  }
+  return latestResult;
+}
+
+function collectSkyscannerHotelQuotes(offers: Array<Record<string, unknown>>): HotelOfferQuote[] {
+  const cheapestByProvider = new Map<string, HotelOfferQuote>();
+  for (const offer of offers) {
+    const price = isRecord(offer.price) ? offer.price : undefined;
+    // priceWithAllTaxes er totalpris for hele oppholdet; price-feltet er per natt.
+    const totalAmount = readNumberValue(price?.priceWithAllTaxes) ?? readNumberValue(price?.secondaryPrice);
+    if (totalAmount === undefined || totalAmount <= 0) continue;
+    const partner = isRecord(offer.partner) ? offer.partner : undefined;
+    const provider = readStringValue(partner?.name) ?? "Ukjent";
+    const roomName = readStringValue(offer.roomName);
+
+    const roundedAmount = Math.round(totalAmount);
+    const existing = cheapestByProvider.get(provider);
+    if (existing === undefined || roundedAmount < existing.totalAmount) {
+      cheapestByProvider.set(provider, {
+        provider,
+        totalAmount: roundedAmount,
+        ...(roomName !== undefined ? { roomName } : {}),
+      });
+    }
+  }
+  return [...cheapestByProvider.values()].sort((left, right) => left.totalAmount - right.totalAmount);
+}
+
+function buildSkyscannerHotelSearchUrl(entityId: string, meta: HotelSearchMeta): string {
+  const params = new URLSearchParams({
+    entity_id: entityId,
+    checkin: meta.checkIn,
+    checkout: meta.checkOut,
+    adults: String(meta.adults),
+    rooms: String(meta.rooms),
+    ...(meta.breakfastOnly === true ? { meal_plan: "breakfast_included" } : {}),
+  });
+  return `https://www.skyscanner.no/hotels/search?${params.toString()}`;
+}
+
+function appendSkyscannerHotelTravellerParams(detailsPageUrl: string, meta: HotelSearchMeta): string {
+  const parsedUrl = parseUrl(detailsPageUrl);
+  if (parsedUrl === undefined) return detailsPageUrl;
+  parsedUrl.searchParams.set("checkin", meta.checkIn);
+  parsedUrl.searchParams.set("checkout", meta.checkOut);
+  parsedUrl.searchParams.set("adults", String(meta.adults));
+  parsedUrl.searchParams.set("rooms", String(meta.rooms));
+  if (meta.breakfastOnly === true) parsedUrl.searchParams.set("meal_plan", "breakfast_included");
+  return parsedUrl.toString();
+}
+
+async function findSkyscannerHotelPriceMatchOffer(
+  meta: HotelSearchMeta,
+  stayTitle: string,
+  searchDetails: string,
+  deeplinkOnly: boolean,
+  options?: FlightOfferFindOptions,
+): Promise<PriceMatchOffer | undefined> {
+  if (meta.hotelName === undefined) {
+    const entityId = meta.skyscannerEntityId ?? await resolveSkyscannerDestinationEntityId(meta);
+    if (entityId === undefined) return undefined;
+    return buildHotelPriceMatchOffer({
+      source: "skyscanner",
+      sourceName: "Skyscanner",
+      stayTitle,
+      searchDetails,
+      productUrl: buildSkyscannerHotelSearchUrl(entityId, meta),
+    });
+  }
+
+  const hotelId = await resolveSkyscannerHotelIdForMeta(meta);
+  if (hotelId === undefined) return undefined;
+
+  const result = await pollSkyscannerHotelDetailPrice(hotelId, meta, options);
+  if (result === undefined) return undefined;
+  const productUrl = result.detailsPageUrl !== undefined
+    ? appendSkyscannerHotelTravellerParams(result.detailsPageUrl, meta)
+    : undefined;
+  if (productUrl === undefined) return undefined;
+
+  if (deeplinkOnly) {
+    return buildHotelPriceMatchOffer({ source: "skyscanner", sourceName: "Skyscanner", stayTitle, searchDetails, productUrl });
+  }
+  if (result.quotes.length === 0) return undefined;
+  return buildHotelPriceMatchOffer({
+    source: "skyscanner",
+    sourceName: "Skyscanner",
+    stayTitle,
+    searchDetails,
+    productUrl,
+    quotes: result.quotes,
+    ...(result.searchComplete ? {} : { searchIncomplete: true }),
+  });
+}
+
+async function resolveSkyscannerDestinationEntityId(meta: HotelSearchMeta): Promise<string | undefined> {
+  if (meta.destinationName === undefined) return undefined;
+  const suggestions = await fetchCachedSkyscannerHotelSuggestions(meta.destinationName);
+  const normalizedDestination = normalizeHotelNameText(meta.destinationName);
+  return suggestions?.find((suggestion) => !suggestion.isHotel && normalizeHotelNameText(suggestion.name) === normalizedDestination)?.entityId;
+}
+
+// ------------------------------- momondo -----------------------------------
+
+function fetchCachedMomondoSmartyResults(query: string): Promise<Array<Record<string, unknown>> | undefined> {
+  return readTimedPromiseCache(momondoHotelSmartyCache, query, () => fetchMomondoSmartyResults(query));
+}
+
+async function fetchMomondoSmartyResults(query: string): Promise<Array<Record<string, unknown>> | undefined> {
+  const params = new URLSearchParams({
+    f: "j",
+    s: "50",
+    where: query,
+    lc_cc: "NO",
+    lc: "no",
+    sv: "5",
+  });
+  const value = await userscriptJsonRequest(`${MOMONDO_SMARTY_ENDPOINT}?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    credentials: "include",
+    timeoutMs: 15000,
+  });
+  return Array.isArray(value) ? value.filter(isRecord) : undefined;
+}
+
+async function resolveMomondoHotelPlaceForMeta(meta: HotelSearchMeta): Promise<MomondoHotelPlace | undefined> {
+  if (meta.momondoHid !== undefined && meta.hotelName !== undefined) {
+    return {
+      hid: meta.momondoHid,
+      ...(meta.momondoPlaceId !== undefined ? { placeId: meta.momondoPlaceId } : {}),
+      hotelName: meta.hotelName,
+      ...(meta.destinationName !== undefined ? { cityName: meta.destinationName } : {}),
+    };
+  }
+
+  const results = await fetchCachedMomondoSmartyResults(buildHotelResolutionQuery(meta));
+  if (results === undefined) return undefined;
+  for (const item of results) {
+    if (readStringValue(item.loctype) !== "hotel") continue;
+    const hid = readStringValue(item.hid) ?? readStringValue(item.id);
+    const hotelName = readStringValue(item.hotelname) ?? readStringValue(item.name);
+    if (hid === undefined || hotelName === undefined) continue;
+    const cityName = readStringValue(item.cityonly)?.trim();
+    if (!isHotelNameMatch(meta, hotelName, cityName)) continue;
+    const placeId = readStringValue(item.placeID);
+    return {
+      hid,
+      ...(placeId !== undefined ? { placeId } : {}),
+      hotelName,
+      ...(cityName !== undefined && cityName.length > 0 ? { cityName } : {}),
+    };
+  }
+  return undefined;
+}
+
+function slugifyMomondoName(value: string): string {
+  const slug = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug.length > 0 ? slug : "Hotel";
+}
+
+function buildMomondoHotelDetailUrl(place: MomondoHotelPlace, meta: HotelSearchMeta): string {
+  const citySlug = place.cityName !== undefined ? `,${slugifyMomondoName(place.cityName)}` : "";
+  const placePart = place.placeId !== undefined ? `-p${place.placeId}` : "";
+  const roomsPart = meta.rooms > 1 ? `/${meta.rooms}rooms` : "";
+  return `https://www.momondo.no/hotel-search/${slugifyMomondoName(place.hotelName)}${citySlug}${placePart}-h${place.hid}-details/${meta.checkIn}/${meta.checkOut}/${meta.adults}adults${roomsPart}?pm=total`;
+}
+
+function buildMomondoHotelSearchUrl(placeId: string, destinationName: string, meta: HotelSearchMeta): string {
+  const roomsPart = meta.rooms > 1 ? `/${meta.rooms}rooms` : "";
+  return `https://www.momondo.no/hotel-search/${slugifyMomondoName(destinationName)}-p${placeId}/${meta.checkIn}/${meta.checkOut}/${meta.adults}adults${roomsPart}?pm=total`;
+}
+
+async function fetchMomondoHotelRates(
+  place: MomondoHotelPlace,
+  detailUrl: string,
+  meta: HotelSearchMeta,
+): Promise<HotelOfferPollResult | undefined> {
+  // Rates-API-et krever gyldig sesjon + formToken; HTML-hentingen etablerer begge
+  // (samme mønster som momondo-flyene).
+  const html = await userscriptTextRequest(detailUrl, {
+    headers: { Accept: "text/html" },
+    credentials: "include",
+  });
+  if (html === undefined) return undefined;
+  const formToken = parseMomondoFormToken(html);
+  if (formToken === undefined) return undefined;
+
+  const params = new URLSearchParams({
+    hid: place.hid,
+    checkin: meta.checkIn,
+    checkout: meta.checkOut,
+    rooms: String(meta.rooms),
+    adults: String(meta.adults),
+    childAges: meta.childAges.join(","),
+    priceMode: "total",
+  });
+  const value = await userscriptJsonRequest(`${MOMONDO_HOTEL_RATES_ENDPOINT}?${params.toString()}`, {
+    headers: {
+      Accept: "application/json",
+      "X-CSRF": formToken,
+      "x-kayak-session-error-check": "iris",
+    },
+    credentials: "include",
+    timeoutMs: 30000,
+  });
+  if (!isRecord(value)) return undefined;
+
+  return {
+    quotes: collectMomondoHotelQuotes(value),
+    searchComplete: true,
+  };
+}
+
+function collectMomondoHotelQuotes(ratesValue: Record<string, unknown>): HotelOfferQuote[] {
+  const cheapestByProvider = new Map<string, HotelOfferQuote>();
+  const addBookingOption = (option: Record<string, unknown>, roomName: string | undefined): void => {
+    const totalPrice = isRecord(option.totalPrice) ? readNumberValue(option.totalPrice.price) : undefined;
+    if (totalPrice === undefined || totalPrice <= 0) return;
+    const provider = readStringValue(option.localizedProviderName) ?? readStringValue(option.providerCode) ?? "Ukjent";
+    const existing = cheapestByProvider.get(provider);
+    if (existing === undefined || totalPrice < existing.totalAmount) {
+      cheapestByProvider.set(provider, {
+        provider,
+        totalAmount: Math.round(totalPrice),
+        ...(roomName !== undefined ? { roomName } : {}),
+      });
+    }
+  };
+
+  if (isRecord(ratesValue.selectedBookingOption)) {
+    addBookingOption(ratesValue.selectedBookingOption, undefined);
+  }
+  for (const group of readRecordArray(ratesValue.groups)) {
+    for (const row of readRecordArray(group.rows)) {
+      const roomName = readStringValue(row.localizedDescription);
+      for (const option of readRecordArray(row.bookingOptions)) {
+        addBookingOption(option, roomName);
+      }
+    }
+  }
+  return [...cheapestByProvider.values()].sort((left, right) => left.totalAmount - right.totalAmount);
+}
+
+async function findMomondoHotelPriceMatchOffer(
+  meta: HotelSearchMeta,
+  stayTitle: string,
+  searchDetails: string,
+  deeplinkOnly: boolean,
+  _options?: FlightOfferFindOptions,
+): Promise<PriceMatchOffer | undefined> {
+  if (meta.hotelName === undefined) {
+    const place = await resolveMomondoDestinationForMeta(meta);
+    if (place === undefined) return undefined;
+    return buildHotelPriceMatchOffer({
+      source: "momondo",
+      sourceName: "momondo",
+      stayTitle,
+      searchDetails,
+      productUrl: buildMomondoHotelSearchUrl(place.placeId, place.name, meta),
+    });
+  }
+
+  const place = await resolveMomondoHotelPlaceForMeta(meta);
+  if (place === undefined) return undefined;
+  const productUrl = buildMomondoHotelDetailUrl(place, meta);
+  if (deeplinkOnly) {
+    return buildHotelPriceMatchOffer({ source: "momondo", sourceName: "momondo", stayTitle, searchDetails, productUrl });
+  }
+
+  const ratesResult = await fetchMomondoHotelRates(place, productUrl, meta);
+  if (ratesResult === undefined || ratesResult.quotes.length === 0) return undefined;
+  return buildHotelPriceMatchOffer({
+    source: "momondo",
+    sourceName: "momondo",
+    stayTitle,
+    searchDetails,
+    productUrl,
+    quotes: ratesResult.quotes,
+  });
+}
+
+async function resolveMomondoDestinationForMeta(meta: HotelSearchMeta): Promise<{ placeId: string; name: string } | undefined> {
+  if (meta.destinationName === undefined) return undefined;
+  const results = await fetchCachedMomondoSmartyResults(meta.destinationName);
+  if (results === undefined) return undefined;
+  const normalizedDestination = normalizeHotelNameText(meta.destinationName);
+  for (const item of results) {
+    if (readStringValue(item.loctype) === "hotel") continue;
+    const placeId = readStringValue(item.placeID);
+    const name = readStringValue(item.cityonly) ?? readStringValue(item.name);
+    if (placeId === undefined || name === undefined) continue;
+    if (normalizeHotelNameText(name) !== normalizedDestination) continue;
+    return { placeId, name };
+  }
+  return undefined;
+}
+
+function readTimedPromiseCache<T>(
+  cache: Map<string, TimedPromiseCacheEntry<T | undefined>>,
+  key: string,
+  fetchValue: () => Promise<T | undefined>,
+): Promise<T | undefined> {
+  const cachedEntry = cache.get(key);
+  const now = Date.now();
+  if (cachedEntry !== undefined && cachedEntry.expiresAt > now) return cachedEntry.promise;
+
+  const entry: TimedPromiseCacheEntry<T | undefined> = {
+    expiresAt: now + HOTEL_RESOLUTION_CACHE_TTL_MS,
+    promise: fetchValue(),
+  };
+  entry.promise.then(
+    (value) => {
+      if (value === undefined) entry.expiresAt = Date.now() + HOTEL_EMPTY_RESOLUTION_CACHE_TTL_MS;
+    },
+    () => {
+      if (cache.get(key) === entry) cache.delete(key);
+    },
+  );
+  cache.set(key, entry);
+  return entry.promise;
+}
+
 function comparePriceMatchesBySortAmount(
   left: Pick<PriceMatchOffer, "amount" | "sortAmount">,
   right: Pick<PriceMatchOffer, "amount" | "sortAmount">,
@@ -6989,6 +8259,7 @@ function isTaxfreeProductPage(parsedUrl: URL): boolean {
 
 function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
   return extractFlightSearchMeta(parsedUrl) !== undefined ||
+    extractHotelSearchMeta(parsedUrl) !== undefined ||
     isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
     isEpicGamesStoreProductUrl(parsedUrl.toString()) ||
@@ -7000,6 +8271,9 @@ function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return hostname === "sas.no" ||
     hostname === "finn.no" ||
+    hostname === "hotell.finn.no" ||
+    hostname === "booking.com" ||
+    hostname.endsWith(".booking.com") ||
     hostname === "momondo.no" ||
     hostname === "panflights.no" ||
     hostname === "panflights.com" ||
@@ -11177,6 +12451,36 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.travelKind === "hotel") {
+    const alternatives = priceMatch.alternatives ?? [];
+    const details = priceMatch.details ?? priceMatch.shopName;
+    const hasLivePriceList = alternatives.length > 0 &&
+      (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
+
+    if (hasLivePriceList) {
+      return [
+        `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+        [
+          details,
+          `Billigste: ${priceMatch.price} (${priceMatch.shopName})`,
+          "Totalpris for oppholdet inkl. skatter/avgifter, billigste tilgjengelige rom.",
+        ].join("\n"),
+        [
+          "Leverandører",
+          ...alternatives.slice(0, FLIGHT_TOOLTIP_MAX_ROWS).map(formatPriceMatchTooltipOffer),
+        ].join("\n"),
+        "Romtype, frokost og avbestilling må sjekkes hos kilden.",
+      ].join("\n\n");
+    }
+
+    return [
+      `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+      details,
+      "Åpner samme søk med datoer, gjester og rom.",
+      "Romtype, frokost og avbestilling må sjekkes hos kilden.",
+    ].join("\n");
+  }
+
   if (isFlightSearchPriceMatch(priceMatch)) {
     const alternatives = priceMatch.alternatives ?? [];
     const details = priceMatch.details ?? priceMatch.shopName;

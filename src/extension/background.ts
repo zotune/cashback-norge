@@ -176,6 +176,8 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     "open.er-api.com",
     "api.travelpayouts.com",
     "www.finn.no",
+    "hotell.finn.no",
+    "d3ky5oye7kybzk.cloudfront.net",
     "www.momondo.no",
     "www.skyscanner.no",
     "www.skyscanner.net",

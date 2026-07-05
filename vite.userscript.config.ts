@@ -58,6 +58,8 @@ const USERSCRIPT_BANNER = `\
 // @connect      api.enhver.no
 // @connect      kassal.app
 // @connect      www.finn.no
+// @connect      hotell.finn.no
+// @connect      d3ky5oye7kybzk.cloudfront.net
 // @connect      www.momondo.no
 // @connect      www.travellink.no
 // @connect      www.skyscanner.no

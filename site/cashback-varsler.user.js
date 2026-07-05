@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1781534946
+// @version      1783273990
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -38,6 +38,8 @@
 // @connect      api.enhver.no
 // @connect      kassal.app
 // @connect      www.finn.no
+// @connect      hotell.finn.no
+// @connect      d3ky5oye7kybzk.cloudfront.net
 // @connect      www.momondo.no
 // @connect      www.travellink.no
 // @connect      www.skyscanner.no
@@ -7770,13 +7772,14 @@ query SearchSuggestions($query: String!, $category: Int) {
           return;
         }
         const flightMeta = extractFlightSearchMeta(currentUrl);
-        const productMeta = flightMeta === void 0 ? extractProductPageMeta() : void 0;
+        const hotelMeta = flightMeta === void 0 ? extractHotelSearchMeta(currentUrl) : void 0;
+        const productMeta = flightMeta === void 0 && hotelMeta === void 0 ? extractProductPageMeta() : void 0;
         const metaKey = flightMeta !== void 0 ? [
           buildFlightSearchMetaKey(flightMeta),
           isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : "",
           isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
           isMomondoFlightSearchPage(currentUrl) ? readCurrentMomondoVisiblePriceKey() : ""
-        ].join("|") : productMeta === void 0 ? "" : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
+        ].join("|") : hotelMeta !== void 0 ? buildHotelSearchMetaKey(hotelMeta) : productMeta === void 0 ? "" : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
         if (metaKey.length > 0 && metaKey !== latestMetaKey) {
           latestMetaKey = metaKey;
           requestCurrentOffers();
@@ -7903,6 +7906,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   async function getPriceMatchesForCurrentPage() {
     const flightOffers = await findFlightPriceMatchOffers();
     if (flightOffers.length > 0) return flightOffers;
+    const hotelOffers = await findHotelPriceMatchOffers();
+    if (hotelOffers.length > 0) return hotelOffers;
     const productMeta = extractProductPageMeta();
     if (productMeta === void 0) return [];
     const message = {
@@ -8018,7 +8023,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         currentMatches.filter((offer) => offer.searchIncomplete === true).map((offer) => offer.source)
       );
       if (incompleteSources.size === 0) return;
-      const session = await buildFlightPriceMatchSession();
+      const session = await buildFlightPriceMatchSession() ?? await buildHotelPriceMatchSession();
       if (session === void 0) return;
       const refreshedOffers = await runFlightLiveOfferFinders(
         session.liveOfferFinders.filter((finder) => incompleteSources.has(finder.source)),
@@ -10923,6 +10928,989 @@ query SearchSuggestions($query: String!, $category: Int) {
   function compactIsoDate(value) {
     return value.replace(/-/g, "");
   }
+  const VIO_SAPI_BASE_URL = "https://d3ky5oye7kybzk.cloudfront.net";
+  const VIO_SAPI_API_KEY = "vio_website_8f7d6e5c4b3a2d1e0f9c8b7a6d5e4f3c";
+  const VIO_HOTEL_OFFER_POLL_ATTEMPTS = 7;
+  const VIO_HOTEL_OFFER_REFRESH_POLL_ATTEMPTS = 2;
+  const VIO_HOTEL_OFFER_POLL_INTERVAL_MS = 1100;
+  const SKYSCANNER_HOTEL_AUTOSUGGEST_BASE_URL = "https://www.skyscanner.no/g/autosuggest-search/api/v1/search-hotel/NO/nb-NO/";
+  const SKYSCANNER_HOTEL_DETAIL_PRICE_ENDPOINT = "https://www.skyscanner.no/g/hotel-unified-bff/v1/HotelDetailPrice";
+  const SKYSCANNER_HOTEL_POLL_ATTEMPTS = 8;
+  const SKYSCANNER_HOTEL_REFRESH_POLL_ATTEMPTS = 2;
+  const SKYSCANNER_HOTEL_POLL_INTERVAL_MS = 1200;
+  const SKYSCANNER_HOTEL_BFF_HEADERS = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "x-user-agent": "M;B2B;web"
+  };
+  const MOMONDO_SMARTY_ENDPOINT = "https://www.momondo.no/mvm/smartyv2/search";
+  const MOMONDO_HOTEL_RATES_ENDPOINT = "https://www.momondo.no/i/api/search/dynamic/hotels/rates";
+  const HOTEL_RESOLUTION_CACHE_TTL_MS = 30 * 60 * 1e3;
+  const HOTEL_EMPTY_RESOLUTION_CACHE_TTL_MS = 90 * 1e3;
+  const HOTEL_NAME_STOPWORDS = /* @__PURE__ */ new Set([
+    "hotel",
+    "hotell",
+    "hotels",
+    "hoteller",
+    "the",
+    "by",
+    "and",
+    "og",
+    "de",
+    "la",
+    "le",
+    "el",
+    "resort",
+    "spa"
+  ]);
+  const vioHotelAnchorCache = /* @__PURE__ */ new Map();
+  const skyscannerHotelSuggestionCache = /* @__PURE__ */ new Map();
+  const momondoHotelSmartyCache = /* @__PURE__ */ new Map();
+  async function findHotelPriceMatchOffers() {
+    const session = await buildHotelPriceMatchSession();
+    if (session === void 0) return [];
+    const liveOffers = await runFlightLiveOfferFinders(session.liveOfferFinders);
+    return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
+  }
+  async function buildHotelPriceMatchSession() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0) return void 0;
+    const extractedMeta = extractHotelSearchMeta(parsedUrl);
+    if (extractedMeta === void 0 || !isHotelSearchGuestMatchSupported(extractedMeta)) return void 0;
+    const meta = await resolveHotelSearchMetaNames(extractedMeta);
+    if (meta === void 0) return void 0;
+    const stayTitle = meta.hotelName ?? (meta.destinationName !== void 0 ? `Hoteller: ${meta.destinationName}` : void 0);
+    if (stayTitle === void 0) return void 0;
+    const searchDetails = formatHotelSearchDetails(meta);
+    const currentSource = readHotelSourceForHost(parsedUrl);
+    const deeplinkOnly = meta.hotelName === void 0 || meta.breakfastOnly === true;
+    const liveOfferFinders = [];
+    if (!deeplinkOnly || currentSource !== "finnreise") {
+      liveOfferFinders.push({
+        source: "finnreise",
+        sourceName: "FINN",
+        findOffer: (options) => findFinnHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options)
+      });
+    }
+    if (!deeplinkOnly || currentSource !== "skyscanner") {
+      liveOfferFinders.push({
+        source: "skyscanner",
+        sourceName: "Skyscanner",
+        findOffer: (options) => findSkyscannerHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options)
+      });
+    }
+    if (!deeplinkOnly || currentSource !== "momondo") {
+      liveOfferFinders.push({
+        source: "momondo",
+        sourceName: "momondo",
+        findOffer: (options) => findMomondoHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly)
+      });
+    }
+    return { staticOffers: [], liveOfferFinders };
+  }
+  function readHotelSourceForHost(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname === "hotell.finn.no") return "finnreise";
+    if (hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname.endsWith(".skyscanner.net")) return "skyscanner";
+    if (hostname === "momondo.no") return "momondo";
+    return void 0;
+  }
+  function isHotelSearchGuestMatchSupported(meta) {
+    return meta.adults >= 1 && meta.adults <= 9 && meta.rooms >= 1 && meta.rooms <= 4 && meta.childAges.length === 0 && meta.hasUnknownChildren !== true && countHotelStayNights(meta) >= 1;
+  }
+  function countHotelStayNights(meta) {
+    const checkIn = (/* @__PURE__ */ new Date(`${meta.checkIn}T00:00:00Z`)).getTime();
+    const checkOut = (/* @__PURE__ */ new Date(`${meta.checkOut}T00:00:00Z`)).getTime();
+    if (Number.isNaN(checkIn) || Number.isNaN(checkOut)) return 0;
+    return Math.round((checkOut - checkIn) / (24 * 60 * 60 * 1e3));
+  }
+  function formatHotelSearchDetails(meta) {
+    const nights = countHotelStayNights(meta);
+    return [
+      `${formatFlightDate(meta.checkIn)} - ${formatFlightDate(meta.checkOut)}`,
+      nights === 1 ? "1 natt" : `${nights} netter`,
+      meta.adults === 1 ? "1 voksen" : `${meta.adults} voksne`,
+      meta.rooms === 1 ? "1 rom" : `${meta.rooms} rom`,
+      ...meta.breakfastOnly === true ? ["frokostfilter (velges hos kilden)"] : []
+    ].join(", ");
+  }
+  function buildHotelSearchMetaKey(meta) {
+    return [
+      "hotel",
+      meta.hotelName ?? "",
+      meta.destinationName ?? "",
+      meta.checkIn,
+      meta.checkOut,
+      meta.adults,
+      meta.childAges.join(","),
+      meta.hasUnknownChildren === true ? "uc" : "",
+      meta.rooms,
+      meta.breakfastOnly === true ? "bf" : "",
+      meta.finnHotelId ?? "",
+      meta.finnPlaceId ?? "",
+      meta.skyscannerHotelId ?? "",
+      meta.skyscannerEntityId ?? "",
+      meta.momondoHid ?? "",
+      meta.momondoPlaceId ?? ""
+    ].join("|");
+  }
+  async function resolveHotelSearchMetaNames(meta) {
+    if (meta.hotelName === void 0 && meta.finnHotelId !== void 0) {
+      const hotel = await fetchVioHotelInfoById(meta.finnHotelId);
+      if (hotel === void 0) return void 0;
+      return {
+        ...meta,
+        hotelName: hotel.hotelName,
+        ...meta.destinationName === void 0 && hotel.cityName !== void 0 ? { destinationName: hotel.cityName } : {}
+      };
+    }
+    if (meta.hotelName === void 0 && meta.destinationName === void 0 && meta.finnPlaceId !== void 0) {
+      const placeName = await fetchVioPlaceNameById(meta.finnPlaceId, meta);
+      if (placeName === void 0) return void 0;
+      return { ...meta, destinationName: placeName };
+    }
+    if (meta.hotelName === void 0 && meta.destinationName === void 0) return void 0;
+    return meta;
+  }
+  function extractHotelSearchMeta(parsedUrl) {
+    return extractSkyscannerHotelSearchMeta(parsedUrl) ?? extractFinnHotelSearchMeta(parsedUrl) ?? extractMomondoHotelSearchMeta(parsedUrl) ?? extractBookingHotelSearchMeta(parsedUrl);
+  }
+  function extractSkyscannerHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "skyscanner.no" && hostname !== "skyscanner.net" && !hostname.endsWith(".skyscanner.net")) {
+      return void 0;
+    }
+    const checkIn = readIsoDateParam(parsedUrl, "checkin");
+    const checkOut = readIsoDateParam(parsedUrl, "checkout");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const adults = readNonNegativeIntegerParam(parsedUrl, "adults", 2);
+    const rooms = readNonNegativeIntegerParam(parsedUrl, "rooms", 1);
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+    const breakfastOnly = parsedUrl.searchParams.get("meal_plan") === "breakfast_included";
+    const base = {
+      checkIn,
+      checkOut,
+      adults,
+      childAges: [],
+      ...childCount > 0 ? { hasUnknownChildren: true } : {},
+      rooms,
+      ...breakfastOnly ? { breakfastOnly: true } : {}
+    };
+    const segments = parsedUrl.pathname.split("/").filter((segment) => segment.length > 0);
+    const hotelSegmentIndex = segments.findIndex((segment) => /^ht-\d+$/i.test(segment));
+    if (hotelSegmentIndex > 0) {
+      const hotelId = segments[hotelSegmentIndex]?.slice(3);
+      const hotelName = readHotelNameFromSlug(segments[hotelSegmentIndex - 1]);
+      if (hotelId === void 0 || hotelName === void 0) return void 0;
+      const destinationSlug = segments.slice(0, hotelSegmentIndex - 1).reverse().find((segment) => /-(?:hotels|hoteller)$/i.test(segment));
+      const destinationName2 = readHotelNameFromSlug(destinationSlug?.replace(/-(?:hotels|hoteller)$/i, ""));
+      const searchEntityId = readDigitsParam(parsedUrl, "search_entity_id");
+      return {
+        ...base,
+        hotelName,
+        ...destinationName2 !== void 0 ? { destinationName: destinationName2 } : {},
+        skyscannerHotelId: hotelId,
+        ...searchEntityId !== void 0 ? { skyscannerEntityId: searchEntityId } : {}
+      };
+    }
+    const entityId = readDigitsParam(parsedUrl, "entity_id");
+    if (entityId === void 0 || !/\/(?:hotels|hoteller)\//i.test(`${parsedUrl.pathname}/`)) return void 0;
+    const destinationName = readVisibleHotelDestinationName();
+    return {
+      ...base,
+      ...destinationName !== void 0 ? { destinationName } : {},
+      skyscannerEntityId: entityId
+    };
+  }
+  function extractFinnHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "hotell.finn.no") return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "checkIn");
+    const checkOut = readIsoDateParam(parsedUrl, "checkOut");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const occupancy = parseVioRoomsParam(parsedUrl.searchParams.get("rooms"));
+    const base = {
+      checkIn,
+      checkOut,
+      adults: occupancy.adults,
+      childAges: occupancy.childAges,
+      ...occupancy.hasUnknownChildren ? { hasUnknownChildren: true } : {},
+      rooms: occupancy.rooms
+    };
+    const hotelId = parsedUrl.pathname.match(/^\/Hotel\/(\d+)(?:\/|$)/i)?.[1];
+    if (hotelId !== void 0) {
+      return { ...base, finnHotelId: hotelId };
+    }
+    if (!/^\/Hotel\/Search\/?$/i.test(parsedUrl.pathname)) return void 0;
+    const placeId = readDigitsParam(parsedUrl, "placeId");
+    if (placeId === void 0) return void 0;
+    return { ...base, finnPlaceId: placeId };
+  }
+  function extractMomondoHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "momondo.no" || !parsedUrl.pathname.startsWith("/hotel-search/")) return void 0;
+    const segments = parsedUrl.pathname.split("/").filter((segment) => segment.length > 0).map((segment) => segment.split(";")[0] ?? segment);
+    const locationSegment = segments[1];
+    if (locationSegment === void 0) return void 0;
+    const checkIn = segments.find((segment) => /^\d{4}-\d{2}-\d{2}$/.test(segment));
+    const checkOut = segments.filter((segment) => /^\d{4}-\d{2}-\d{2}$/.test(segment))[1];
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    let adults = 2;
+    let rooms = 1;
+    let hasUnknownChildren = false;
+    for (const segment of segments) {
+      const adultsMatch = segment.match(/^(\d+)adults$/i);
+      if (adultsMatch?.[1] !== void 0) adults = Number.parseInt(adultsMatch[1], 10);
+      const roomsMatch = segment.match(/^(\d+)rooms$/i);
+      if (roomsMatch?.[1] !== void 0) rooms = Number.parseInt(roomsMatch[1], 10);
+      if (/child/i.test(segment)) hasUnknownChildren = true;
+    }
+    const base = {
+      checkIn,
+      checkOut,
+      adults,
+      childAges: [],
+      ...hasUnknownChildren ? { hasUnknownChildren: true } : {},
+      rooms
+    };
+    const decodedLocation = tryDecodeUriComponent(locationSegment);
+    const hotelMatch = decodedLocation.match(/^(.+?)(?:,([^,]+?))?-p(\d+)-h(\d+)-details$/i);
+    if (hotelMatch !== null) {
+      const hotelName = readHotelNameFromSlug(hotelMatch[1]);
+      const destinationName2 = readHotelNameFromSlug(hotelMatch[2]);
+      if (hotelName === void 0 || hotelMatch[3] === void 0 || hotelMatch[4] === void 0) return void 0;
+      return {
+        ...base,
+        hotelName,
+        ...destinationName2 !== void 0 ? { destinationName: destinationName2 } : {},
+        momondoPlaceId: hotelMatch[3],
+        momondoHid: hotelMatch[4]
+      };
+    }
+    const placeMatch = decodedLocation.match(/^(.+?)-p(\d+)$/i);
+    if (placeMatch === null || placeMatch[1] === void 0 || placeMatch[2] === void 0) return void 0;
+    const destinationName = readHotelNameFromSlug(placeMatch[1].split(",")[0]);
+    if (destinationName === void 0) return void 0;
+    return {
+      ...base,
+      destinationName,
+      momondoPlaceId: placeMatch[2]
+    };
+  }
+  function extractBookingHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "booking.com" && !hostname.endsWith(".booking.com")) return void 0;
+    if (!/^\/hotel\/[a-z]{2}\/[^/]+\.html$/i.test(parsedUrl.pathname)) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "checkin");
+    const checkOut = readIsoDateParam(parsedUrl, "checkout");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const adults = readNonNegativeIntegerParam(parsedUrl, "group_adults", 2);
+    const rooms = readNonNegativeIntegerParam(parsedUrl, "no_rooms", 1);
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "group_children", 0);
+    const childAges = parsedUrl.searchParams.getAll("age").map((value) => readNonNegativeIntegerValue(value)).filter((age) => age !== void 0);
+    const hotelLdJson = findHotelLdJson();
+    const hotelName = readStringValue(hotelLdJson?.name) ?? readBookingVisibleHotelName();
+    if (hotelName === void 0) return void 0;
+    const address = isRecord(hotelLdJson?.address) ? hotelLdJson.address : void 0;
+    const destinationName = readStringValue(address?.addressLocality)?.split(",")[0]?.trim();
+    return {
+      hotelName,
+      ...destinationName !== void 0 && destinationName.length > 0 ? { destinationName } : {},
+      checkIn,
+      checkOut,
+      adults,
+      childAges: childCount > 0 ? childAges : [],
+      ...childCount > 0 && childAges.length !== childCount ? { hasUnknownChildren: true } : {},
+      rooms
+    };
+  }
+  function findHotelLdJson() {
+    for (const entry of readLdJsonEntries()) {
+      const hotel = findTypedLdJson(entry, "Hotel");
+      if (hotel !== void 0) return hotel;
+    }
+    return void 0;
+  }
+  function readBookingVisibleHotelName() {
+    const heading = document.querySelector('h2[data-testid="title"], [data-testid="property-header"] h2, #hp_hotel_name');
+    const name = heading?.innerText.replace(/\s+/g, " ").trim();
+    return name !== void 0 && name.length >= 3 && name.length <= 120 ? name : void 0;
+  }
+  function readVisibleHotelDestinationName() {
+    const candidates = [
+      document.querySelector("h1")?.textContent ?? "",
+      document.title
+    ];
+    for (const candidate of candidates) {
+      const match = candidate.match(/hotell?e?r?\s+i\s+(.+?)(?:\s*[-–—|·].*)?$/i) ?? candidate.match(/hotels?\s+in\s+(.+?)(?:\s*[-–—|·].*)?$/i);
+      const name = match?.[1]?.trim();
+      if (name !== void 0 && name.length >= 2 && name.length <= 60) return name;
+    }
+    for (const input of Array.from(document.querySelectorAll('input[type="text"], input:not([type])')).slice(0, 30)) {
+      const value = input.value.replace(/\s+/g, " ").trim();
+      if (value.length >= 2 && value.length <= 60 && /\p{L}/u.test(value) && !/\d/.test(value) && !/voksn|adult|\brom\b|room|natt|night|gjest|guest/i.test(value)) {
+        return value.split(",")[0]?.trim();
+      }
+    }
+    return void 0;
+  }
+  function readHotelNameFromSlug(slug) {
+    if (slug === void 0) return void 0;
+    const name = tryDecodeUriComponent(slug).replace(/[-_+]+/g, " ").replace(/\s+/g, " ").trim();
+    if (name.length < 2 || name.length > 120) return void 0;
+    return name === name.toLowerCase() ? name.replace(/\p{L}+/gu, (word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`) : name;
+  }
+  function tryDecodeUriComponent(value) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  function readDigitsParam(parsedUrl, key) {
+    const value = parsedUrl.searchParams.get(key);
+    return value !== null && /^\d+$/.test(value) ? value : void 0;
+  }
+  function parseVioRoomsParam(value) {
+    if (value === null || value.trim().length === 0) {
+      return { adults: 2, childAges: [], rooms: 1, hasUnknownChildren: false };
+    }
+    let adults = 0;
+    const childAges = [];
+    let hasUnknownChildren = false;
+    const parts = value.split("|");
+    for (const part of parts) {
+      const [adultsPart, agesPart] = part.split(":");
+      const partAdults = readNonNegativeIntegerValue(adultsPart?.trim());
+      if (partAdults === void 0) return { adults: 0, childAges: [], rooms: 0, hasUnknownChildren: true };
+      adults += partAdults;
+      if (agesPart !== void 0 && agesPart.trim().length > 0) {
+        for (const ageText of agesPart.split(",")) {
+          const age = readNonNegativeIntegerValue(ageText.trim());
+          if (age === void 0) hasUnknownChildren = true;
+          else childAges.push(age);
+        }
+      }
+    }
+    return { adults, childAges, rooms: parts.length, hasUnknownChildren };
+  }
+  function buildVioRoomsParam(meta) {
+    const roomCount = Math.max(1, meta.rooms);
+    const baseAdults = Math.floor(meta.adults / roomCount);
+    const extraAdults = meta.adults % roomCount;
+    const parts = [];
+    for (let index = 0; index < roomCount; index++) {
+      parts.push(String(baseAdults + (index < extraAdults ? 1 : 0)));
+    }
+    if (meta.childAges.length > 0) {
+      parts[0] = `${parts[0]}:${meta.childAges.join(",")}`;
+    }
+    return parts.join("|");
+  }
+  function normalizeHotelNameText(value) {
+    return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9æøå]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function collectHotelNameTokens(value, destinationName) {
+    const destinationTokens = new Set(
+      destinationName !== void 0 ? normalizeHotelNameText(destinationName).split(" ") : []
+    );
+    return normalizeHotelNameText(value).split(" ").filter((token) => token.length > 0 && !HOTEL_NAME_STOPWORDS.has(token) && !destinationTokens.has(token));
+  }
+  function isHotelNameMatch(meta, candidateName, candidateCity) {
+    if (meta.hotelName === void 0) return false;
+    if (candidateCity !== void 0 && meta.destinationName !== void 0 && !isHotelCityMatch(candidateCity, meta.destinationName)) {
+      return false;
+    }
+    const targetTokens = collectHotelNameTokens(meta.hotelName, meta.destinationName);
+    const candidateTokens = collectHotelNameTokens(candidateName, meta.destinationName);
+    if (targetTokens.length === 0 || candidateTokens.length === 0) {
+      return normalizeHotelNameText(meta.hotelName) === normalizeHotelNameText(candidateName);
+    }
+    const targetSet = new Set(targetTokens);
+    const candidateSet = new Set(candidateTokens);
+    return targetSet.size === candidateSet.size && [...targetSet].every((token) => candidateSet.has(token));
+  }
+  function isHotelCityMatch(candidateCity, destinationName) {
+    const normalizedCandidate = normalizeHotelNameText(candidateCity);
+    const normalizedDestination = normalizeHotelNameText(destinationName);
+    if (normalizedCandidate.length === 0 || normalizedDestination.length === 0) return true;
+    return normalizedCandidate === normalizedDestination || normalizedCandidate.includes(normalizedDestination) || normalizedDestination.includes(normalizedCandidate);
+  }
+  function buildHotelResolutionQuery(meta) {
+    const hotelName = meta.hotelName ?? "";
+    if (meta.destinationName === void 0) return hotelName;
+    const normalizedName = normalizeHotelNameText(hotelName);
+    const destinationTokens = normalizeHotelNameText(meta.destinationName).split(" ");
+    const missingDestination = destinationTokens.some((token) => !normalizedName.includes(token));
+    return missingDestination ? `${hotelName} ${meta.destinationName}` : hotelName;
+  }
+  function formatHotelQuoteAlternatives(quotes) {
+    return quotes.slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT).map((quote) => ({
+      shopName: quote.provider,
+      price: formatNokFlightPrice(quote.totalAmount),
+      amount: quote.totalAmount,
+      sortAmount: quote.totalAmount,
+      currency: "NOK",
+      ...quote.roomName !== void 0 ? { platform: quote.roomName } : {}
+    }));
+  }
+  function buildHotelPriceMatchOffer(input) {
+    const best = input.quotes?.[0];
+    if (best === void 0) {
+      return {
+        source: input.source,
+        sourceName: input.sourceName,
+        travelKind: "hotel",
+        details: input.searchDetails,
+        matchedExactProduct: true,
+        shopName: input.searchDetails,
+        price: "Sjekk pris",
+        amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+        sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+        currency: "NOK",
+        productName: input.stayTitle,
+        productUrl: input.productUrl
+      };
+    }
+    return {
+      source: input.source,
+      sourceName: input.sourceName,
+      travelKind: "hotel",
+      details: input.searchDetails,
+      matchedExactProduct: true,
+      shopName: best.provider,
+      price: formatNokFlightPrice(best.totalAmount),
+      amount: best.totalAmount,
+      sortAmount: best.totalAmount,
+      currency: "NOK",
+      productName: input.stayTitle,
+      productUrl: input.productUrl,
+      offerUrl: input.productUrl,
+      ...best.roomName !== void 0 ? { durationText: best.roomName } : {},
+      ...input.searchIncomplete === true ? { searchIncomplete: true } : {},
+      alternatives: formatHotelQuoteAlternatives(input.quotes ?? [])
+    };
+  }
+  function buildVioBaseParams(meta, searchId, anonymousId) {
+    return new URLSearchParams({
+      checkIn: meta.checkIn,
+      checkOut: meta.checkOut,
+      rooms: buildVioRoomsParam(meta),
+      currency: "NOK",
+      language: "no",
+      brand: "finn",
+      userCountry: "NO",
+      optimizeRooms: "false",
+      getAllOffers: "true",
+      searchId,
+      anonymousId
+    });
+  }
+  function vioJsonRequest(path, params) {
+    return userscriptJsonRequest(`${VIO_SAPI_BASE_URL}${path}?${params.toString()}`, {
+      headers: { Accept: "application/json", "x-api-key": VIO_SAPI_API_KEY },
+      credentials: "omit",
+      timeoutMs: 15e3
+    });
+  }
+  async function fetchVioHotelInfoById(hotelId) {
+    const params = new URLSearchParams({
+      id: hotelId,
+      language: "no,en",
+      currency: "NOK",
+      attributes: "objectID,hotelName,placeDN,placeDisplayName,navPathInfo"
+    });
+    const value = await vioJsonRequest("/hotel", params);
+    if (!isRecord(value)) return void 0;
+    const hotelName = readStringValue(value.hotelName);
+    if (hotelName === void 0) return void 0;
+    const cityName = (readVioNavPathCityName(value.navPathInfo) ?? readStringValue(value.placeDisplayName))?.split(",")[0]?.trim();
+    return {
+      hotelId,
+      hotelName,
+      ...cityName !== void 0 && cityName.length > 0 ? { cityName } : {}
+    };
+  }
+  function readVioNavPathCityName(navPathInfo) {
+    if (!isRecord(navPathInfo) || !isRecord(navPathInfo.city)) return void 0;
+    return readStringValue(navPathInfo.city.name);
+  }
+  async function fetchVioPlaceNameById(placeId, meta) {
+    const params = buildVioBaseParams(meta, createRandomRequestId(), createRandomRequestId());
+    params.set("placeId", placeId);
+    const value = await vioJsonRequest("/anchor", params);
+    if (!isRecord(value) || !isRecord(value.anchor)) return void 0;
+    return readStringValue(value.anchor.placeDisplayName) ?? readStringValue(value.anchor.placeName);
+  }
+  function fetchCachedVioHotelAnchor(meta) {
+    const query = buildHotelResolutionQuery(meta);
+    return readTimedPromiseCache(vioHotelAnchorCache, query, () => fetchVioHotelAnchor(query, meta));
+  }
+  async function fetchVioHotelAnchor(query, meta) {
+    const params = buildVioBaseParams(meta, createRandomRequestId(), createRandomRequestId());
+    params.set("query", query);
+    const value = await vioJsonRequest("/anchor", params);
+    if (!isRecord(value) || value.anchorType !== "hotel" || !isRecord(value.anchor)) return void 0;
+    const hotelId = readStringValue(value.anchor.objectID)?.match(/^hotel:(\d+)$/)?.[1];
+    const hotelName = readStringValue(value.anchor.hotelName);
+    if (hotelId === void 0 || hotelName === void 0) return void 0;
+    const cityName = (readVioNavPathCityName(value.anchor.navPathInfo) ?? readStringValue(value.anchor.placeADN) ?? readStringValue(value.anchor.placeDN))?.split(",")[0]?.trim();
+    return {
+      hotelId,
+      hotelName,
+      ...cityName !== void 0 && cityName.length > 0 ? { cityName } : {}
+    };
+  }
+  async function resolveVioHotelForMeta(meta) {
+    if (meta.finnHotelId !== void 0) {
+      return { hotelId: meta.finnHotelId, hotelName: meta.hotelName ?? "" };
+    }
+    const anchor = await fetchCachedVioHotelAnchor(meta);
+    if (anchor === void 0 || !isHotelNameMatch(meta, anchor.hotelName, anchor.cityName)) return void 0;
+    return anchor;
+  }
+  async function pollVioHotelOffers(hotelId, meta, options) {
+    const searchId = createRandomRequestId();
+    const anonymousId = createRandomRequestId();
+    const maxAttempts = options?.refresh === true ? VIO_HOTEL_OFFER_REFRESH_POLL_ATTEMPTS : VIO_HOTEL_OFFER_POLL_ATTEMPTS;
+    let latestResult;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) await sleep(VIO_HOTEL_OFFER_POLL_INTERVAL_MS);
+      const params = buildVioBaseParams(meta, searchId, anonymousId);
+      params.set("hotelIds", hotelId);
+      params.set("clientRequestId", createRandomRequestId());
+      const value = await vioJsonRequest("/offers/poll", params);
+      if (!isRecord(value)) continue;
+      const results = readRecordArray(value.results);
+      const offers = readRecordArray(results.find((result) => readStringValue(result.id) === hotelId)?.offers);
+      const complete = isRecord(value.status) && value.status.complete === true;
+      latestResult = {
+        quotes: collectVioHotelQuotes(offers),
+        searchComplete: complete
+      };
+      if (complete) break;
+    }
+    return latestResult;
+  }
+  function collectVioHotelQuotes(offers) {
+    const cheapestByProvider = /* @__PURE__ */ new Map();
+    for (const offer of offers) {
+      if (!isRecord(offer.rate)) continue;
+      const base = readNumberValue(offer.rate.base);
+      const taxes = readNumberValue(offer.rate.taxes) ?? 0;
+      const hotelFees = readNumberValue(offer.rate.hotelFees) ?? 0;
+      if (base === void 0 || base <= 0) continue;
+      const totalAmount = Math.round(base + taxes + hotelFees);
+      const metadata = isRecord(offer.metadata) ? offer.metadata : void 0;
+      const brandInfo = metadata !== void 0 && isRecord(metadata.brandInfo) ? metadata.brandInfo : void 0;
+      const provider = readStringValue(brandInfo?.brandName) ?? readStringValue(offer.providerCode) ?? "Ukjent";
+      const existing = cheapestByProvider.get(provider);
+      if (existing === void 0 || totalAmount < existing.totalAmount) {
+        cheapestByProvider.set(provider, { provider, totalAmount });
+      }
+    }
+    return [...cheapestByProvider.values()].sort((left, right) => left.totalAmount - right.totalAmount);
+  }
+  function buildFinnHotelPageUrl(hotelId, meta) {
+    const params = new URLSearchParams({
+      checkIn: meta.checkIn,
+      checkOut: meta.checkOut,
+      rooms: buildVioRoomsParam(meta),
+      userCountry: "NO"
+    });
+    return `https://hotell.finn.no/Hotel/${hotelId}/no?${params.toString()}`;
+  }
+  function buildFinnHotelSearchUrl(placeId, meta) {
+    const params = new URLSearchParams({
+      placeId,
+      checkIn: meta.checkIn,
+      checkOut: meta.checkOut,
+      rooms: buildVioRoomsParam(meta),
+      userSearch: "1"
+    });
+    return `https://hotell.finn.no/Hotel/Search?${params.toString()}`;
+  }
+  async function findFinnHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options) {
+    if (meta.hotelName === void 0) {
+      const placeId = meta.finnPlaceId ?? await fetchVioPlaceIdByDestination(meta);
+      if (placeId === void 0) return void 0;
+      return buildHotelPriceMatchOffer({
+        source: "finnreise",
+        sourceName: "FINN",
+        stayTitle,
+        searchDetails,
+        productUrl: buildFinnHotelSearchUrl(placeId, meta)
+      });
+    }
+    const hotel = await resolveVioHotelForMeta(meta);
+    if (hotel === void 0) return void 0;
+    const productUrl = buildFinnHotelPageUrl(hotel.hotelId, meta);
+    if (deeplinkOnly || meta.rooms > 1) {
+      return buildHotelPriceMatchOffer({ source: "finnreise", sourceName: "FINN", stayTitle, searchDetails, productUrl });
+    }
+    const pollResult = await pollVioHotelOffers(hotel.hotelId, meta, options);
+    if (pollResult === void 0 || pollResult.quotes.length === 0) return void 0;
+    return buildHotelPriceMatchOffer({
+      source: "finnreise",
+      sourceName: "FINN",
+      stayTitle,
+      searchDetails,
+      productUrl,
+      quotes: pollResult.quotes,
+      ...pollResult.searchComplete ? {} : { searchIncomplete: true }
+    });
+  }
+  async function fetchVioPlaceIdByDestination(meta) {
+    if (meta.destinationName === void 0) return void 0;
+    const params = buildVioBaseParams(meta, createRandomRequestId(), createRandomRequestId());
+    params.set("query", meta.destinationName);
+    const value = await vioJsonRequest("/anchor", params);
+    if (!isRecord(value) || value.anchorType !== "place" || !isRecord(value.anchor)) return void 0;
+    const placeName = readStringValue(value.anchor.placeDisplayName) ?? readStringValue(value.anchor.placeName);
+    if (placeName === void 0 || !isHotelCityMatch(placeName, meta.destinationName)) return void 0;
+    return readStringValue(value.anchor.objectID)?.match(/^place:(\d+)$/)?.[1];
+  }
+  function fetchCachedSkyscannerHotelSuggestions(query) {
+    return readTimedPromiseCache(skyscannerHotelSuggestionCache, query, () => fetchSkyscannerHotelSuggestions(query));
+  }
+  async function fetchSkyscannerHotelSuggestions(query) {
+    const value = await userscriptJsonRequest(`${SKYSCANNER_HOTEL_AUTOSUGGEST_BASE_URL}${encodeURIComponent(query)}`, {
+      headers: { Accept: "application/json" },
+      // Skyscanner-cookies (PerimeterX) må med, som for flyene.
+      credentials: "include",
+      timeoutMs: 15e3
+    });
+    if (!Array.isArray(value)) return void 0;
+    const suggestions = [];
+    for (const item of value) {
+      if (!isRecord(item)) continue;
+      const entityId = readStringValue(item.entity_id);
+      const name = readStringValue(item.entity_name);
+      if (entityId === void 0 || name === void 0) continue;
+      const cityName = readStringValue(item.hierarchy)?.split("|")[0]?.trim();
+      suggestions.push({
+        entityId,
+        name,
+        ...cityName !== void 0 && cityName.length > 0 ? { cityName } : {},
+        isHotel: readStringValue(item.class) === "Hotel"
+      });
+    }
+    return suggestions;
+  }
+  async function resolveSkyscannerHotelIdForMeta(meta) {
+    if (meta.skyscannerHotelId !== void 0) return meta.skyscannerHotelId;
+    const suggestions = await fetchCachedSkyscannerHotelSuggestions(buildHotelResolutionQuery(meta));
+    return suggestions?.find((suggestion) => suggestion.isHotel && isHotelNameMatch(meta, suggestion.name, suggestion.cityName))?.entityId;
+  }
+  function buildSkyscannerHotelTravellerContext(meta) {
+    return {
+      market: "NO",
+      locale: "nb-NO",
+      currency: "NOK",
+      checkinDate: meta.checkIn,
+      checkoutDate: meta.checkOut,
+      adults: meta.adults,
+      childrenAges: meta.childAges,
+      rooms: meta.rooms
+    };
+  }
+  async function pollSkyscannerHotelDetailPrice(hotelId, meta, options) {
+    const payload = {
+      hotelId,
+      entityId: meta.skyscannerEntityId ?? "",
+      filters: [],
+      priceType: "PRICE_TYPE_PER_NIGHT",
+      travellerContext: buildSkyscannerHotelTravellerContext(meta),
+      requestContext: { debug: false },
+      sessionId: createRandomRequestId().replace(/-/g, "")
+    };
+    const maxAttempts = options?.refresh === true ? SKYSCANNER_HOTEL_REFRESH_POLL_ATTEMPTS : SKYSCANNER_HOTEL_POLL_ATTEMPTS;
+    let latestResult;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) await sleep(SKYSCANNER_HOTEL_POLL_INTERVAL_MS);
+      const value = await userscriptJsonRequest(SKYSCANNER_HOTEL_DETAIL_PRICE_ENDPOINT, {
+        method: "POST",
+        headers: SKYSCANNER_HOTEL_BFF_HEADERS,
+        body: JSON.stringify(payload),
+        credentials: "include",
+        timeoutMs: 3e4
+      });
+      if (!isRecord(value)) continue;
+      const complete = readStringValue(value.pollingStatus) === "SEARCH_STATUS_COMPLETED";
+      const detailsPageUrl = readStringValue(value.detailsPageUrl);
+      latestResult = {
+        quotes: collectSkyscannerHotelQuotes(readRecordArray(value.offers)),
+        searchComplete: complete,
+        ...detailsPageUrl !== void 0 ? { detailsPageUrl } : {}
+      };
+      if (complete) break;
+    }
+    return latestResult;
+  }
+  function collectSkyscannerHotelQuotes(offers) {
+    const cheapestByProvider = /* @__PURE__ */ new Map();
+    for (const offer of offers) {
+      const price = isRecord(offer.price) ? offer.price : void 0;
+      const totalAmount = readNumberValue(price?.priceWithAllTaxes) ?? readNumberValue(price?.secondaryPrice);
+      if (totalAmount === void 0 || totalAmount <= 0) continue;
+      const partner = isRecord(offer.partner) ? offer.partner : void 0;
+      const provider = readStringValue(partner?.name) ?? "Ukjent";
+      const roomName = readStringValue(offer.roomName);
+      const roundedAmount = Math.round(totalAmount);
+      const existing = cheapestByProvider.get(provider);
+      if (existing === void 0 || roundedAmount < existing.totalAmount) {
+        cheapestByProvider.set(provider, {
+          provider,
+          totalAmount: roundedAmount,
+          ...roomName !== void 0 ? { roomName } : {}
+        });
+      }
+    }
+    return [...cheapestByProvider.values()].sort((left, right) => left.totalAmount - right.totalAmount);
+  }
+  function buildSkyscannerHotelSearchUrl(entityId, meta) {
+    const params = new URLSearchParams({
+      entity_id: entityId,
+      checkin: meta.checkIn,
+      checkout: meta.checkOut,
+      adults: String(meta.adults),
+      rooms: String(meta.rooms),
+      ...meta.breakfastOnly === true ? { meal_plan: "breakfast_included" } : {}
+    });
+    return `https://www.skyscanner.no/hotels/search?${params.toString()}`;
+  }
+  function appendSkyscannerHotelTravellerParams(detailsPageUrl, meta) {
+    const parsedUrl = parseUrl(detailsPageUrl);
+    if (parsedUrl === void 0) return detailsPageUrl;
+    parsedUrl.searchParams.set("checkin", meta.checkIn);
+    parsedUrl.searchParams.set("checkout", meta.checkOut);
+    parsedUrl.searchParams.set("adults", String(meta.adults));
+    parsedUrl.searchParams.set("rooms", String(meta.rooms));
+    if (meta.breakfastOnly === true) parsedUrl.searchParams.set("meal_plan", "breakfast_included");
+    return parsedUrl.toString();
+  }
+  async function findSkyscannerHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, options) {
+    if (meta.hotelName === void 0) {
+      const entityId = meta.skyscannerEntityId ?? await resolveSkyscannerDestinationEntityId(meta);
+      if (entityId === void 0) return void 0;
+      return buildHotelPriceMatchOffer({
+        source: "skyscanner",
+        sourceName: "Skyscanner",
+        stayTitle,
+        searchDetails,
+        productUrl: buildSkyscannerHotelSearchUrl(entityId, meta)
+      });
+    }
+    const hotelId = await resolveSkyscannerHotelIdForMeta(meta);
+    if (hotelId === void 0) return void 0;
+    const result = await pollSkyscannerHotelDetailPrice(hotelId, meta, options);
+    if (result === void 0) return void 0;
+    const productUrl = result.detailsPageUrl !== void 0 ? appendSkyscannerHotelTravellerParams(result.detailsPageUrl, meta) : void 0;
+    if (productUrl === void 0) return void 0;
+    if (deeplinkOnly) {
+      return buildHotelPriceMatchOffer({ source: "skyscanner", sourceName: "Skyscanner", stayTitle, searchDetails, productUrl });
+    }
+    if (result.quotes.length === 0) return void 0;
+    return buildHotelPriceMatchOffer({
+      source: "skyscanner",
+      sourceName: "Skyscanner",
+      stayTitle,
+      searchDetails,
+      productUrl,
+      quotes: result.quotes,
+      ...result.searchComplete ? {} : { searchIncomplete: true }
+    });
+  }
+  async function resolveSkyscannerDestinationEntityId(meta) {
+    if (meta.destinationName === void 0) return void 0;
+    const suggestions = await fetchCachedSkyscannerHotelSuggestions(meta.destinationName);
+    const normalizedDestination = normalizeHotelNameText(meta.destinationName);
+    return suggestions?.find((suggestion) => !suggestion.isHotel && normalizeHotelNameText(suggestion.name) === normalizedDestination)?.entityId;
+  }
+  function fetchCachedMomondoSmartyResults(query) {
+    return readTimedPromiseCache(momondoHotelSmartyCache, query, () => fetchMomondoSmartyResults(query));
+  }
+  async function fetchMomondoSmartyResults(query) {
+    const params = new URLSearchParams({
+      f: "j",
+      s: "50",
+      where: query,
+      lc_cc: "NO",
+      lc: "no",
+      sv: "5"
+    });
+    const value = await userscriptJsonRequest(`${MOMONDO_SMARTY_ENDPOINT}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+      timeoutMs: 15e3
+    });
+    return Array.isArray(value) ? value.filter(isRecord) : void 0;
+  }
+  async function resolveMomondoHotelPlaceForMeta(meta) {
+    if (meta.momondoHid !== void 0 && meta.hotelName !== void 0) {
+      return {
+        hid: meta.momondoHid,
+        ...meta.momondoPlaceId !== void 0 ? { placeId: meta.momondoPlaceId } : {},
+        hotelName: meta.hotelName,
+        ...meta.destinationName !== void 0 ? { cityName: meta.destinationName } : {}
+      };
+    }
+    const results = await fetchCachedMomondoSmartyResults(buildHotelResolutionQuery(meta));
+    if (results === void 0) return void 0;
+    for (const item of results) {
+      if (readStringValue(item.loctype) !== "hotel") continue;
+      const hid = readStringValue(item.hid) ?? readStringValue(item.id);
+      const hotelName = readStringValue(item.hotelname) ?? readStringValue(item.name);
+      if (hid === void 0 || hotelName === void 0) continue;
+      const cityName = readStringValue(item.cityonly)?.trim();
+      if (!isHotelNameMatch(meta, hotelName, cityName)) continue;
+      const placeId = readStringValue(item.placeID);
+      return {
+        hid,
+        ...placeId !== void 0 ? { placeId } : {},
+        hotelName,
+        ...cityName !== void 0 && cityName.length > 0 ? { cityName } : {}
+      };
+    }
+    return void 0;
+  }
+  function slugifyMomondoName(value) {
+    const slug = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return slug.length > 0 ? slug : "Hotel";
+  }
+  function buildMomondoHotelDetailUrl(place, meta) {
+    const citySlug = place.cityName !== void 0 ? `,${slugifyMomondoName(place.cityName)}` : "";
+    const placePart = place.placeId !== void 0 ? `-p${place.placeId}` : "";
+    const roomsPart = meta.rooms > 1 ? `/${meta.rooms}rooms` : "";
+    return `https://www.momondo.no/hotel-search/${slugifyMomondoName(place.hotelName)}${citySlug}${placePart}-h${place.hid}-details/${meta.checkIn}/${meta.checkOut}/${meta.adults}adults${roomsPart}?pm=total`;
+  }
+  function buildMomondoHotelSearchUrl(placeId, destinationName, meta) {
+    const roomsPart = meta.rooms > 1 ? `/${meta.rooms}rooms` : "";
+    return `https://www.momondo.no/hotel-search/${slugifyMomondoName(destinationName)}-p${placeId}/${meta.checkIn}/${meta.checkOut}/${meta.adults}adults${roomsPart}?pm=total`;
+  }
+  async function fetchMomondoHotelRates(place, detailUrl, meta) {
+    const html = await userscriptTextRequest(detailUrl, {
+      headers: { Accept: "text/html" },
+      credentials: "include"
+    });
+    if (html === void 0) return void 0;
+    const formToken = parseMomondoFormToken(html);
+    if (formToken === void 0) return void 0;
+    const params = new URLSearchParams({
+      hid: place.hid,
+      checkin: meta.checkIn,
+      checkout: meta.checkOut,
+      rooms: String(meta.rooms),
+      adults: String(meta.adults),
+      childAges: meta.childAges.join(","),
+      priceMode: "total"
+    });
+    const value = await userscriptJsonRequest(`${MOMONDO_HOTEL_RATES_ENDPOINT}?${params.toString()}`, {
+      headers: {
+        Accept: "application/json",
+        "X-CSRF": formToken,
+        "x-kayak-session-error-check": "iris"
+      },
+      credentials: "include",
+      timeoutMs: 3e4
+    });
+    if (!isRecord(value)) return void 0;
+    return {
+      quotes: collectMomondoHotelQuotes(value),
+      searchComplete: true
+    };
+  }
+  function collectMomondoHotelQuotes(ratesValue) {
+    const cheapestByProvider = /* @__PURE__ */ new Map();
+    const addBookingOption = (option, roomName) => {
+      const totalPrice = isRecord(option.totalPrice) ? readNumberValue(option.totalPrice.price) : void 0;
+      if (totalPrice === void 0 || totalPrice <= 0) return;
+      const provider = readStringValue(option.localizedProviderName) ?? readStringValue(option.providerCode) ?? "Ukjent";
+      const existing = cheapestByProvider.get(provider);
+      if (existing === void 0 || totalPrice < existing.totalAmount) {
+        cheapestByProvider.set(provider, {
+          provider,
+          totalAmount: Math.round(totalPrice),
+          ...roomName !== void 0 ? { roomName } : {}
+        });
+      }
+    };
+    if (isRecord(ratesValue.selectedBookingOption)) {
+      addBookingOption(ratesValue.selectedBookingOption, void 0);
+    }
+    for (const group of readRecordArray(ratesValue.groups)) {
+      for (const row of readRecordArray(group.rows)) {
+        const roomName = readStringValue(row.localizedDescription);
+        for (const option of readRecordArray(row.bookingOptions)) {
+          addBookingOption(option, roomName);
+        }
+      }
+    }
+    return [...cheapestByProvider.values()].sort((left, right) => left.totalAmount - right.totalAmount);
+  }
+  async function findMomondoHotelPriceMatchOffer(meta, stayTitle, searchDetails, deeplinkOnly, _options) {
+    if (meta.hotelName === void 0) {
+      const place2 = await resolveMomondoDestinationForMeta(meta);
+      if (place2 === void 0) return void 0;
+      return buildHotelPriceMatchOffer({
+        source: "momondo",
+        sourceName: "momondo",
+        stayTitle,
+        searchDetails,
+        productUrl: buildMomondoHotelSearchUrl(place2.placeId, place2.name, meta)
+      });
+    }
+    const place = await resolveMomondoHotelPlaceForMeta(meta);
+    if (place === void 0) return void 0;
+    const productUrl = buildMomondoHotelDetailUrl(place, meta);
+    if (deeplinkOnly) {
+      return buildHotelPriceMatchOffer({ source: "momondo", sourceName: "momondo", stayTitle, searchDetails, productUrl });
+    }
+    const ratesResult = await fetchMomondoHotelRates(place, productUrl, meta);
+    if (ratesResult === void 0 || ratesResult.quotes.length === 0) return void 0;
+    return buildHotelPriceMatchOffer({
+      source: "momondo",
+      sourceName: "momondo",
+      stayTitle,
+      searchDetails,
+      productUrl,
+      quotes: ratesResult.quotes
+    });
+  }
+  async function resolveMomondoDestinationForMeta(meta) {
+    if (meta.destinationName === void 0) return void 0;
+    const results = await fetchCachedMomondoSmartyResults(meta.destinationName);
+    if (results === void 0) return void 0;
+    const normalizedDestination = normalizeHotelNameText(meta.destinationName);
+    for (const item of results) {
+      if (readStringValue(item.loctype) === "hotel") continue;
+      const placeId = readStringValue(item.placeID);
+      const name = readStringValue(item.cityonly) ?? readStringValue(item.name);
+      if (placeId === void 0 || name === void 0) continue;
+      if (normalizeHotelNameText(name) !== normalizedDestination) continue;
+      return { placeId, name };
+    }
+    return void 0;
+  }
+  function readTimedPromiseCache(cache, key, fetchValue) {
+    const cachedEntry = cache.get(key);
+    const now = Date.now();
+    if (cachedEntry !== void 0 && cachedEntry.expiresAt > now) return cachedEntry.promise;
+    const entry = {
+      expiresAt: now + HOTEL_RESOLUTION_CACHE_TTL_MS,
+      promise: fetchValue()
+    };
+    entry.promise.then(
+      (value) => {
+        if (value === void 0) entry.expiresAt = Date.now() + HOTEL_EMPTY_RESOLUTION_CACHE_TTL_MS;
+      },
+      () => {
+        if (cache.get(key) === entry) cache.delete(key);
+      }
+    );
+    cache.set(key, entry);
+    return entry.promise;
+  }
   function comparePriceMatchesBySortAmount(left, right) {
     return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
   }
@@ -11437,11 +12425,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(parsedUrl.pathname);
   }
   function isDynamicPriceMatchProductPage(parsedUrl) {
-    return extractFlightSearchMeta(parsedUrl) !== void 0 || isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isSteamAppProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString());
+    return extractFlightSearchMeta(parsedUrl) !== void 0 || extractHotelSearchMeta(parsedUrl) !== void 0 || isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isSteamAppProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString());
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "sas.no" || hostname === "finn.no" || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "sas.no" || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
@@ -15088,6 +16076,32 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {
+    if (priceMatch.travelKind === "hotel") {
+      const alternatives2 = priceMatch.alternatives ?? [];
+      const details = priceMatch.details ?? priceMatch.shopName;
+      const hasLivePriceList = alternatives2.length > 0 && (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
+      if (hasLivePriceList) {
+        return [
+          `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+          [
+            details,
+            `Billigste: ${priceMatch.price} (${priceMatch.shopName})`,
+            "Totalpris for oppholdet inkl. skatter/avgifter, billigste tilgjengelige rom."
+          ].join("\n"),
+          [
+            "Leverandører",
+            ...alternatives2.slice(0, FLIGHT_TOOLTIP_MAX_ROWS).map(formatPriceMatchTooltipOffer)
+          ].join("\n"),
+          "Romtype, frokost og avbestilling må sjekkes hos kilden."
+        ].join("\n\n");
+      }
+      return [
+        `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+        details,
+        "Åpner samme søk med datoer, gjester og rom.",
+        "Romtype, frokost og avbestilling må sjekkes hos kilden."
+      ].join("\n");
+    }
     if (isFlightSearchPriceMatch(priceMatch)) {
       const alternatives2 = priceMatch.alternatives ?? [];
       const details = priceMatch.details ?? priceMatch.shopName;
