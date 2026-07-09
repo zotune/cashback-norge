@@ -54,6 +54,7 @@ import { fetchUnidays } from "./providers/unidays.js";
 import { crawlStudentTorget } from "./providers/studenttorget.js";
 import { fetchUnio } from "./providers/unio.js";
 import { crawlCoop } from "./providers/coop.js";
+import { crawlElkjop } from "./providers/elkjop.js";
 import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
 import { fetchAwin } from "./providers/awin.js";
@@ -109,6 +110,7 @@ type CliConfig = {
   skipStudentTorget: boolean;
   skipUnio: boolean;
   skipCoop: boolean;
+  skipElkjop: boolean;
   skipPartnerAds: boolean;
   skipTradeTracker: boolean;
   skipAwin: boolean;
@@ -133,6 +135,7 @@ type CliConfig = {
   sparebank1StartUrl: string;
   studentkortetStartUrl: string;
   nettbonusStartUrl: string;
+  elkjopStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -382,6 +385,7 @@ async function main(): Promise<void> {
     nettbonusOffers,
     rabbleOffers,
     studentTorgetOffers,
+    elkjopOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : collectOffers({
       label: "Trumf",
@@ -528,6 +532,17 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
       }),
     }),
+    config.skipElkjop ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Elkjøp",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "elkjop",
+      reusePreviousOnFailure: true,
+      run: () => crawlElkjop({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides, startUrl: config.elkjopStartUrl,
+      }),
+    }),
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
@@ -542,7 +557,7 @@ async function main(): Promise<void> {
     ...orionOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
-    ...teknaOffers, ...nitoOffers,
+    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers,
     ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
   ]);
@@ -561,7 +576,7 @@ async function main(): Promise<void> {
     ? "Exchange rates: using static fallback for fixed reward sorting"
     : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
   const offers = uniqueOffers(addFixedRewardSortValues(
-    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...studentTorgetOffers],
+    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...studentTorgetOffers, ...elkjopOffers],
     exchangeRates ?? STATIC_NOK_BASE_RATES,
   ));
 
@@ -662,6 +677,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipStudentTorget: args.includes("--skip-studenttorget"),
     skipUnio: args.includes("--skip-unio"),
     skipCoop: args.includes("--skip-coop"),
+    skipElkjop: args.includes("--skip-elkjop"),
     skipPartnerAds: args.includes("--skip-partnerads"),
     skipTradeTracker: args.includes("--skip-tradetracker"),
     skipAwin: args.includes("--skip-awin"),
@@ -722,6 +738,9 @@ function readCliConfig(args: string[]): CliConfig {
     nettbonusStartUrl:
       readArgumentValue(args, "--nettbonus-start-url") ??
       "https://nettbonus.no/private/category/all",
+    elkjopStartUrl:
+      readArgumentValue(args, "--elkjop-start-url") ??
+      "https://www.elkjop.no/kundeklubb/partner-tilbud",
   };
 }
 

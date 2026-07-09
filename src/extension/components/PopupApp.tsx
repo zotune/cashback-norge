@@ -485,6 +485,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Coop";
   }
 
+  if (provider === "elkjop") {
+    return "Elkjøp";
+  }
+
   return provider;
 }
 

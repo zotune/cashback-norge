@@ -91,6 +91,11 @@ export function extractKrReward(text: string): string {
     const n = parseKrNumber(m[1] ?? "");
     if (n > 0) sparValues.push(n);
   }
+  const sparDashPattern = /(?:(?:spar\s+)?opptil|spar)\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:,-|[-–](?!\s*(?:\d|%)))/gi;
+  for (const m of cleanedText.matchAll(sparDashPattern)) {
+    const n = parseKrNumber(m[1] ?? "");
+    if (n > 0) sparValues.push(n);
+  }
   if (sparValues.length > 0) {
     return formatKrReward(sparValues);
   }

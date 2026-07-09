@@ -9805,6 +9805,11 @@ function renderNotice(
       background: #003366;
       color: #ffffff;
     }
+    .provider-elkjop {
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #1f1b5c;
+    }
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;
