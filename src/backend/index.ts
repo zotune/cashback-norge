@@ -136,6 +136,7 @@ type CliConfig = {
   studentkortetStartUrl: string;
   nettbonusStartUrl: string;
   elkjopStartUrl: string;
+  elkjopProxyUrls: string[];
 };
 
 async function main(): Promise<void> {
@@ -540,7 +541,8 @@ async function main(): Promise<void> {
       reusePreviousOnFailure: true,
       run: () => crawlElkjop({
         domainLookup, generatedAt, logger,
-        overrides: providerOverrides, startUrl: config.elkjopStartUrl,
+        overrides: providerOverrides, proxyUrls: config.elkjopProxyUrls,
+        startUrl: config.elkjopStartUrl,
       }),
     }),
   ]);
@@ -741,6 +743,7 @@ function readCliConfig(args: string[]): CliConfig {
     elkjopStartUrl:
       readArgumentValue(args, "--elkjop-start-url") ??
       "https://www.elkjop.no/kundeklubb/partner-tilbud",
+    elkjopProxyUrls: buildScraperApiProxyUrls(),
   };
 }
 

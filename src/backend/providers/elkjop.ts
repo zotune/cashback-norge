@@ -69,13 +69,14 @@ export type CrawlElkjopInput = {
   generatedAt: string;
   logger: Logger;
   overrides: ProviderOverrides;
+  proxyUrls?: string[];
   startUrl: string;
 };
 
 export async function crawlElkjop(input: CrawlElkjopInput): Promise<CashbackOffer[]> {
   input.logger.info(`Elkjøp: fetching customer club partner benefits from ${input.startUrl}`);
 
-  const html = await fetchHtml(input.startUrl);
+  const html = await fetchHtml(input.startUrl, input.proxyUrls ?? [], input.logger);
   const rawOffers = extractElkjopOffers(html);
   input.logger.info(`Elkjøp: found ${rawOffers.length} partner benefit cards`);
 
@@ -341,20 +342,42 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  const attempts = buildFetchAttempts(url);
+async function fetchHtml(
+  url: string,
+  proxyUrls: string[],
+  logger: Logger,
+): Promise<string> {
+  const attempts = buildFetchAttempts(url, proxyUrls);
   let lastFailure = "no response";
 
   for (let index = 0; index < attempts.length; index++) {
     const attempt = attempts[index]!;
-    const response = await gotScraping(attempt.url, {
-      responseType: "text",
-      throwHttpErrors: false,
-      timeout: { request: 30_000 },
-      ...(attempt.headerGeneratorOptions === undefined
-        ? {}
-        : { headerGeneratorOptions: attempt.headerGeneratorOptions }),
-    });
+
+    if (attempt.proxyLabel !== undefined) {
+      logger.info(`Elkjøp: blocked (${lastFailure}), retrying via ${attempt.proxyLabel}`);
+    }
+
+    let response;
+    try {
+      response = await gotScraping(attempt.url, {
+        responseType: "text",
+        throwHttpErrors: false,
+        timeout: { request: attempt.proxyUrl === undefined ? 30_000 : 70_000 },
+        ...(attempt.proxyUrl === undefined
+          ? {}
+          : {
+            proxyUrl: attempt.proxyUrl,
+            // ScraperAPI terminates TLS with its own certificate in proxy mode.
+            https: { rejectUnauthorized: false },
+          }),
+        ...(attempt.headerGeneratorOptions === undefined
+          ? {}
+          : { headerGeneratorOptions: attempt.headerGeneratorOptions }),
+      });
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : "request failed";
+      continue;
+    }
 
     if (
       response.statusCode >= 200 &&
@@ -384,20 +407,30 @@ type FetchAttempt = {
     devices: Array<"desktop">;
     operatingSystems: Array<"windows">;
   };
+  proxyUrl?: string;
+  proxyLabel?: string;
 };
 
-function buildFetchAttempts(url: string): FetchAttempt[] {
+function buildFetchAttempts(url: string, proxyUrls: string[]): FetchAttempt[] {
+  const browserHeaderGeneratorOptions = {
+    browsers: [{ name: "chrome" as const, minVersion: 120 }],
+    devices: ["desktop" as const],
+    operatingSystems: ["windows" as const],
+  };
+
   return [
     { url },
     { url: appendQueryParameter(url, "utm_source", "cashbacknorge") },
     {
       url,
-      headerGeneratorOptions: {
-        browsers: [{ name: "chrome", minVersion: 120 }],
-        devices: ["desktop"],
-        operatingSystems: ["windows"],
-      },
+      headerGeneratorOptions: browserHeaderGeneratorOptions,
     },
+    ...proxyUrls.map((proxyUrl, index) => ({
+      url,
+      headerGeneratorOptions: browserHeaderGeneratorOptions,
+      proxyUrl,
+      proxyLabel: `proxy ${index + 1}/${proxyUrls.length}`,
+    })),
   ];
 }
 
