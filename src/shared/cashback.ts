@@ -214,7 +214,7 @@ function getAlternateTldDomains(domain: string): string[] {
   if (parts.length !== 2) return [];
   const tld = `.${parts[1]}`;
   if (!COMMON_TLDS.includes(tld)) return [];
-  const baseName = parts[0];
+  const baseName = parts[0] ?? "";
   if (ALTERNATE_TLD_COLLISIONS.has(baseName)) return [];
   return COMMON_TLDS
     .filter((t) => t !== tld)

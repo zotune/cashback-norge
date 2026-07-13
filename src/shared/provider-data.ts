@@ -96,7 +96,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   unidays: { bg: "#00b140", fg: "#ffffff" },
   unio: { bg: "#ffffff", fg: "#6b5330" },
   coop: { bg: "#003366", fg: "#ffffff" },
-  elkjop: { bg: "#ffffff", fg: "#1f1b5c" },
+  elkjop: { bg: "#1d1b58", fg: "#ffffff" },
   cbn: { bg: "#ffe4e6", fg: "#be123c" },
 };
 
