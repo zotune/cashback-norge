@@ -205,12 +205,17 @@ export function findOffersForHostname(
 const COMMON_TLDS = [".com", ".no", ".se", ".dk", ".fi", ".eu"];
 const CC_SUBDOMAINS = ["no", "se", "dk", "fi", "de", "fr", "es", "it", "nl", "uk", "us", "eu"];
 
+// Same brand name, unrelated companies: never treat these as alternate TLDs
+// of each other (kiwi.no is a grocery chain, kiwi.com sells flights).
+const ALTERNATE_TLD_COLLISIONS = new Set(["kiwi"]);
+
 function getAlternateTldDomains(domain: string): string[] {
   const parts = domain.split(".");
   if (parts.length !== 2) return [];
   const tld = `.${parts[1]}`;
   if (!COMMON_TLDS.includes(tld)) return [];
   const baseName = parts[0];
+  if (ALTERNATE_TLD_COLLISIONS.has(baseName)) return [];
   return COMMON_TLDS
     .filter((t) => t !== tld)
     .map((t) => `${baseName}${t}`);
