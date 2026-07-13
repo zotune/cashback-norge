@@ -48,6 +48,15 @@ jobs:
           ADDREVENUE_API_TOKEN: ${{ secrets.ADDREVENUE_API_TOKEN }}
           ADDREVENUE_CHANNEL_ID: ${{ secrets.ADDREVENUE_CHANNEL_ID }}
           ORION_API_KEY: ${{ secrets.ORION_API_KEY }}
+          DAISYCON_CLIENT_ID: ${{ secrets.DAISYCON_CLIENT_ID }}
+          DAISYCON_CLIENT_SECRET: ${{ secrets.DAISYCON_CLIENT_SECRET }}
+          DAISYCON_PUBLISHER_ID: ${{ secrets.DAISYCON_PUBLISHER_ID }}
+          DAISYCON_MEDIA_ID: ${{ secrets.DAISYCON_MEDIA_ID }}
+          # Static secret works: Daisycon issues a new refresh token on each
+          # refresh but keeps the old one valid, so no rotation persistence is
+          # needed. If the token ever expires, the provider skips with a
+          # warning; re-run scripts/dev/daisycon-auth.mjs and update the secret.
+          DAISYCON_REFRESH_TOKEN: ${{ secrets.DAISYCON_REFRESH_TOKEN }}
 
       - name: Commit updated index
         run: |
