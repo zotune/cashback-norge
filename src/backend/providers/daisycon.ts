@@ -289,9 +289,9 @@ async function persistRotatedRefreshToken(
     // fall through to the warning below
   }
 
-  logger.warn(
-    "Daisycon: refresh token rotated but no DAISYCON_REFRESH_TOKEN_FILE or .env entry to persist it;" +
-      " the next run will need re-authorization",
+  logger.info(
+    "Daisycon: rotated refresh token not persisted (no DAISYCON_REFRESH_TOKEN_FILE or .env entry);" +
+      " the configured token remains valid",
   );
 }
 
