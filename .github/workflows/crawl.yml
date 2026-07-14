@@ -52,11 +52,33 @@ jobs:
           DAISYCON_CLIENT_SECRET: ${{ secrets.DAISYCON_CLIENT_SECRET }}
           DAISYCON_PUBLISHER_ID: ${{ secrets.DAISYCON_PUBLISHER_ID }}
           DAISYCON_MEDIA_ID: ${{ secrets.DAISYCON_MEDIA_ID }}
-          # Static secret works: Daisycon issues a new refresh token on each
-          # refresh but keeps the old one valid, so no rotation persistence is
-          # needed. If the token ever expires, the provider skips with a
-          # warning; re-run scripts/dev/daisycon-auth.mjs and update the secret.
           DAISYCON_REFRESH_TOKEN: ${{ secrets.DAISYCON_REFRESH_TOKEN }}
+          DAISYCON_REFRESH_TOKEN_FILE: ${{ runner.temp }}/daisycon-refresh-token.txt
+          TRADEDOUBLER_API_KEY: ${{ secrets.TRADEDOUBLER_API_KEY }}
+          TRADEDOUBLER_CLIENT_SECRET: ${{ secrets.TRADEDOUBLER_CLIENT_SECRET }}
+          TRADEDOUBLER_USERNAME: ${{ secrets.TRADEDOUBLER_USERNAME }}
+          TRADEDOUBLER_PASSWORD: ${{ secrets.TRADEDOUBLER_PASSWORD }}
+          TRADEDOUBLER_SOURCE_ID: ${{ secrets.TRADEDOUBLER_SOURCE_ID }}
+
+      # Daisycon invalidates used refresh tokens after a short grace period,
+      # so the rotated token must be written back to the secret. Needs a
+      # fine-grained PAT with Secrets write access (DAISYCON_SECRETS_PAT);
+      # the default GITHUB_TOKEN cannot update repository secrets.
+      - name: Persist rotated Daisycon refresh token
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.DAISYCON_SECRETS_PAT }}
+          TOKEN_FILE: ${{ runner.temp }}/daisycon-refresh-token.txt
+        run: |
+          if [ ! -s "$TOKEN_FILE" ]; then
+            echo "No rotated token to persist"
+          elif [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Daisycon refresh token rotated but DAISYCON_SECRETS_PAT is not set; the next run will fail to authenticate"
+          else
+            gh secret set DAISYCON_REFRESH_TOKEN --repo "$GITHUB_REPOSITORY" < "$TOKEN_FILE"
+            echo "DAISYCON_REFRESH_TOKEN secret updated"
+          fi
+          rm -f "$TOKEN_FILE"
 
       - name: Commit updated index
         run: |

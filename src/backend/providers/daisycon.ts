@@ -1,8 +1,9 @@
 // Daisycon Publisher API data is fetched via OAuth (refresh token grant), but
 // only public program metadata and affiliate click links are written to the
-// index. Daisycon issues a rotated refresh token on every refresh but keeps
-// the old one valid, so the DAISYCON_REFRESH_TOKEN secret can stay static in
-// CI; local runs persist the newest token to .env (or DAISYCON_REFRESH_TOKEN_FILE).
+// index. Daisycon rotates the refresh token on every refresh and invalidates
+// the old one after a short grace period (~30 min), so the rotated token MUST
+// be persisted: to DAISYCON_REFRESH_TOKEN_FILE in CI (written back to the
+// GitHub secret by the workflow) or .env locally.
 // One-time authorization: node scripts/dev/daisycon-auth.mjs
 import { readFile, writeFile } from "node:fs/promises";
 import {
