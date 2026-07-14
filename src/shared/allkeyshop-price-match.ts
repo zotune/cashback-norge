@@ -100,14 +100,14 @@ export async function findAllKeyShopPriceMatch(
 
   const platformScope = readPlatformScope(message);
   const titleCandidates = readGameTitleCandidates(message);
-  const offers = page.data.prices
+  const offers = dropImplausiblyCheapOffers(page.data.prices
     .filter((price) => price.dispo === undefined || price.dispo > 0)
     .filter((price) => price.account !== true)
     .filter((price) => isActivationPlatformAllowed(price.activationPlatform, platformScope))
     .filter((price) => isAllKeyShopEditionAllowed(page.data.editions.get(price.edition ?? ""), titleCandidates))
     .map((price) => toAllKeyShopOffer(price, page.data.currency, page.data.editions, page.data.regions, rates))
     .filter((offer): offer is AllKeyShopOffer => offer !== undefined)
-    .sort((first, second) => first.amount - second.amount);
+    .sort((first, second) => first.amount - second.amount));
 
   const best = offers[0];
   if (best === undefined) return undefined;
@@ -296,6 +296,26 @@ function toAllKeyShopOffer(
     ...(edition !== undefined ? { edition } : {}),
     ...(price.voucherCode !== undefined ? { voucherCode: price.voucherCode } : {}),
   };
+}
+
+const MIN_PLAUSIBLE_OFFER_NOK = 2;
+const OUTLIER_MEDIAN_FRACTION = 0.05;
+
+/**
+ * AllKeyShop lists unreleased games with 0.01–0.03 placeholder prices, and the
+ * feed occasionally carries single listings far below every other shop. Offers
+ * under 2 kr, or under 5% of the median offer, are noise — never a real key.
+ */
+function dropImplausiblyCheapOffers(offers: AllKeyShopOffer[]): AllKeyShopOffer[] {
+  if (offers.length === 0) return offers;
+
+  const amounts = offers.map((offer) => offer.amount).sort((first, second) => first - second);
+  const median = amounts[Math.floor(amounts.length / 2)] ?? 0;
+  const threshold = Math.max(
+    MIN_PLAUSIBLE_OFFER_NOK,
+    offers.length >= 3 ? median * OUTLIER_MEDIAN_FRACTION : 0,
+  );
+  return offers.filter((offer) => offer.amount >= threshold);
 }
 
 function pickAllKeyShopPayableAmount(price: AllKeyShopRawPrice): number {

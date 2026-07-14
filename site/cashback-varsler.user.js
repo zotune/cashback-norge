@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784048141
+// @version      1784049379
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -1256,7 +1256,7 @@
     const rates = await fetchNokBaseRates$1(requestJson) ?? STATIC_NOK_BASE_RATES;
     const platformScope = readPlatformScope(message);
     const titleCandidates = readGameTitleCandidates$1(message);
-    const offers = page.data.prices.filter((price) => price.dispo === void 0 || price.dispo > 0).filter((price) => price.account !== true).filter((price) => isActivationPlatformAllowed(price.activationPlatform, platformScope)).filter((price) => isAllKeyShopEditionAllowed(page.data.editions.get(price.edition ?? ""), titleCandidates)).map((price) => toAllKeyShopOffer(price, page.data.currency, page.data.editions, page.data.regions, rates)).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount);
+    const offers = dropImplausiblyCheapOffers(page.data.prices.filter((price) => price.dispo === void 0 || price.dispo > 0).filter((price) => price.account !== true).filter((price) => isActivationPlatformAllowed(price.activationPlatform, platformScope)).filter((price) => isAllKeyShopEditionAllowed(page.data.editions.get(price.edition ?? ""), titleCandidates)).map((price) => toAllKeyShopOffer(price, page.data.currency, page.data.editions, page.data.regions, rates)).filter((offer) => offer !== void 0).sort((first, second) => first.amount - second.amount));
     const best = offers[0];
     if (best === void 0) return void 0;
     const productName = page.data.title ?? titleCandidates[0] ?? "PC-spill";
@@ -1398,6 +1398,18 @@
       ...edition !== void 0 ? { edition } : {},
       ...price.voucherCode !== void 0 ? { voucherCode: price.voucherCode } : {}
     };
+  }
+  const MIN_PLAUSIBLE_OFFER_NOK = 2;
+  const OUTLIER_MEDIAN_FRACTION = 0.05;
+  function dropImplausiblyCheapOffers(offers) {
+    if (offers.length === 0) return offers;
+    const amounts = offers.map((offer) => offer.amount).sort((first, second) => first - second);
+    const median = amounts[Math.floor(amounts.length / 2)] ?? 0;
+    const threshold = Math.max(
+      MIN_PLAUSIBLE_OFFER_NOK,
+      offers.length >= 3 ? median * OUTLIER_MEDIAN_FRACTION : 0
+    );
+    return offers.filter((offer) => offer.amount >= threshold);
   }
   function pickAllKeyShopPayableAmount(price) {
     const payableAmounts = [
