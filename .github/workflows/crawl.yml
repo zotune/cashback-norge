@@ -56,7 +56,7 @@ jobs:
           DAISYCON_REFRESH_TOKEN_FILE: ${{ runner.temp }}/daisycon-refresh-token.txt
           TRADEDOUBLER_API_KEY: ${{ secrets.TRADEDOUBLER_API_KEY }}
           TRADEDOUBLER_CLIENT_SECRET: ${{ secrets.TRADEDOUBLER_CLIENT_SECRET }}
-          TRADEDOUBLER_USERNAME: ${{ secrets.TRADEDOUBLER_USERNAME }}
+          TRADEDOUBLER_USER: ${{ secrets.TRADEDOUBLER_USER }}
           TRADEDOUBLER_PASSWORD: ${{ secrets.TRADEDOUBLER_PASSWORD }}
           TRADEDOUBLER_SOURCE_ID: ${{ secrets.TRADEDOUBLER_SOURCE_ID }}
 
