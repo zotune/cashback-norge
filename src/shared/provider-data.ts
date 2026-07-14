@@ -33,6 +33,8 @@ export const PROVIDER_NAMES: Record<string, string> = {
   unio: "Unio",
   coop: "Coop",
   elkjop: "Elkjøp",
+  akademikerne: "Akademikerne+",
+  huseierne: "Huseierne",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -62,6 +64,8 @@ export const PROVIDER_TIPS: Record<string, string> = {
   unio: "Unio medlemsfordeler.\nKrever medlemskap i et Unio-forbund.\nOppgi rabattkode eller vis medlemsbevis.",
   coop: "Coop medlemsfordeler.\nKrever Coop-medlemskap.\nBruk rabattkode eller aktiver via Coop-siden der det kreves.",
   elkjop: "Elkjøps Kundeklubb.\nKrever gratis kundeklubbmedlemskap.\nAktiver eller hent kode via Elkjøp.",
+  akademikerne: "Akademikerne Pluss medlemsfordeler.\nKrever medlemskap i en tilknyttet fagforening.\nAktiver via akademikernepluss.no eller A+-appen.",
+  huseierne: "Huseiernes medlemsfordeler.\nKrever Huseierne-medlemskap.\nVis medlemskort eller hent rabattkode via huseierne.no.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -97,6 +101,8 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   unio: { bg: "#ffffff", fg: "#6b5330" },
   coop: { bg: "#003366", fg: "#ffffff" },
   elkjop: { bg: "#1d1b58", fg: "#ffffff" },
+  akademikerne: { bg: "#fff7f0", fg: "#113063" },
+  huseierne: { bg: "#ffffff", fg: "#0f1a18" },
   cbn: { bg: "#ffe4e6", fg: "#be123c" },
 };
 
@@ -170,7 +176,6 @@ export const SUPPORT_LINKS = [
   { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
   { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
   { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
-  { text: "JujuKrypto: 100 kr gratis i NOK", emoji: "₿", url: "https://jujukrypto.no/referral/L1BsViuhUjJhvngHiroC", affiliate: true },
   { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
   { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
   { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },

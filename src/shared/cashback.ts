@@ -2,7 +2,7 @@ import { normalizeRewardLabel } from "./reward.js";
 
 const EB_PER_TRUMF_KR = 13.5;
 
-export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "bate" | "tobb" | "logbuy" | "naf" | "tekna" | "nito" | "sparebank1" | "studentkortet" | "nettbonus" | "spenn" | "spareborsen" | "rabble" | "dreams" | "utdanningibergen" | "unidays" | "cbn" | "studenttorget" | "unio" | "coop" | "elkjop";
+export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "bate" | "tobb" | "logbuy" | "naf" | "tekna" | "nito" | "sparebank1" | "studentkortet" | "nettbonus" | "spenn" | "spareborsen" | "rabble" | "dreams" | "utdanningibergen" | "unidays" | "cbn" | "studenttorget" | "unio" | "coop" | "elkjop" | "akademikerne" | "huseierne";
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -29,7 +29,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "bate" || value === "tobb" || value === "logbuy" || value === "naf" || value === "tekna" || value === "nito" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "spenn" || value === "spareborsen" || value === "rabble" || value === "dreams" || value === "utdanningibergen" || value === "unidays" || value === "cbn" || value === "studenttorget" || value === "unio" || value === "coop" || value === "elkjop";
+  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "bate" || value === "tobb" || value === "logbuy" || value === "naf" || value === "tekna" || value === "nito" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "spenn" || value === "spareborsen" || value === "rabble" || value === "dreams" || value === "utdanningibergen" || value === "unidays" || value === "cbn" || value === "studenttorget" || value === "unio" || value === "coop" || value === "elkjop" || value === "akademikerne" || value === "huseierne";
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {

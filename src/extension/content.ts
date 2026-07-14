@@ -9810,6 +9810,16 @@ function renderNotice(
       border: 1px solid #d3e2dc;
       color: #1f1b5c;
     }
+    .provider-akademikerne {
+      background: #fff7f0;
+      border: 1px solid #e8d9c8;
+      color: #113063;
+    }
+    .provider-huseierne {
+      background: #ffffff;
+      border: 1px solid #d5ddd9;
+      color: #0f1a18;
+    }
     .provider-sas-amex {
       background: #00005c;
       color: #ffffff;

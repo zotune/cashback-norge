@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1783273990
+// @version      1784048141
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -164,7 +164,10 @@
     unidays: "UNiDAYS",
     cbn: "♥",
     unio: "Unio",
-    coop: "Coop"
+    coop: "Coop",
+    elkjop: "Elkjøp",
+    akademikerne: "Akademikerne+",
+    huseierne: "Huseierne"
   };
   const FREE_CARDS = [
     {
@@ -241,7 +244,6 @@
     { text: "Tibber strøm: 500 kr i Tibber Store eller 6 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
     { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
-    { text: "JujuKrypto: 100 kr gratis i NOK", emoji: "₿", url: "https://jujukrypto.no/referral/L1BsViuhUjJhvngHiroC", affiliate: true },
     { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
     { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
@@ -13670,6 +13672,21 @@ query SearchSuggestions($query: String!, $category: Int) {
     .provider-coop {
       background: #003366;
       color: #ffffff;
+    }
+    .provider-elkjop {
+      background: #ffffff;
+      border: 1px solid #d3e2dc;
+      color: #1f1b5c;
+    }
+    .provider-akademikerne {
+      background: #fff7f0;
+      border: 1px solid #e8d9c8;
+      color: #113063;
+    }
+    .provider-huseierne {
+      background: #ffffff;
+      border: 1px solid #d5ddd9;
+      color: #0f1a18;
     }
     .provider-sas-amex {
       background: #00005c;

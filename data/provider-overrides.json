@@ -2225,5 +2225,15 @@
   "dreams": {},
   "utdanningibergen": {},
   "unidays": {},
-  "elkjop": {}
+  "elkjop": {},
+  "akademikerne": {
+    "kaffedeal": [
+      "narvesen.no"
+    ],
+    "vaskeladden": [
+      "vaskeladden.com",
+      "vaskeladden.no"
+    ]
+  },
+  "huseierne": {}
 }

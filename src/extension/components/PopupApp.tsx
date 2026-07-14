@@ -489,6 +489,14 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Elkjøp";
   }
 
+  if (provider === "akademikerne") {
+    return "Akademikerne+";
+  }
+
+  if (provider === "huseierne") {
+    return "Huseierne";
+  }
+
   return provider;
 }
 
