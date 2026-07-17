@@ -6875,29 +6875,41 @@ function extractAgodaHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefine
   };
 }
 
-// agoda-destinasjonssøk: /<locale>/search?checkIn&checkOut&adults&children&rooms&textToSearch=By.
+// agoda-søkesider: /<locale>/search?checkIn&checkOut&adults&children&rooms&textToSearch=….
+// Med selectedproperty/hotel-param er textToSearch et hotellnavn (→ live prismatch),
+// ellers en destinasjon (→ deeplenker). checkOut kan mangle — utledes fra los.
 function extractAgodaHotelSearchResultsMeta(parsedUrl: URL): HotelSearchMeta | undefined {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   if (hostname !== "agoda.com" && !hostname.endsWith(".agoda.com")) return undefined;
   if (!/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?search\/?$/i.test(parsedUrl.pathname)) return undefined;
 
   const checkIn = readLooseIsoDateParam(parsedUrl, "checkIn");
-  const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut");
-  if (checkIn === undefined || checkOut === undefined) return undefined;
+  if (checkIn === undefined) return undefined;
+  const los = readNonNegativeIntegerParam(parsedUrl, "los", 0);
+  const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut") ?? (los > 0 ? addDaysToIsoDate(checkIn, los) : undefined);
+  if (checkOut === undefined) return undefined;
 
-  const destinationName = parsedUrl.searchParams.get("textToSearch")?.split(",")[0]?.trim();
-  if (destinationName === undefined || destinationName.length === 0) return undefined;
+  const textToSearch = parsedUrl.searchParams.get("textToSearch")?.trim();
+  if (textToSearch === undefined || textToSearch.length === 0) return undefined;
 
   const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
-  return {
-    destinationName,
+  const base = {
     checkIn,
     checkOut,
     adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
-    childAges: [],
+    childAges: [] as number[],
     ...(childCount > 0 ? { hasUnknownChildren: true } : {}),
     rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1),
   };
+
+  const propertyId = readDigitsParam(parsedUrl, "selectedproperty") ?? readDigitsParam(parsedUrl, "hotel");
+  if (propertyId !== undefined) {
+    return { ...base, hotelName: textToSearch };
+  }
+
+  const destinationName = textToSearch.split(",")[0]?.trim();
+  if (destinationName === undefined || destinationName.length === 0) return undefined;
+  return { ...base, destinationName };
 }
 
 // booking-destinasjonssøk: /searchresults*.html?ss=By&checkin&checkout&group_adults&no_rooms.
