@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784049379
+// @version      1784321761
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -11087,7 +11087,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return meta;
   }
   function extractHotelSearchMeta(parsedUrl) {
-    return extractSkyscannerHotelSearchMeta(parsedUrl) ?? extractFinnHotelSearchMeta(parsedUrl) ?? extractMomondoHotelSearchMeta(parsedUrl) ?? extractBookingHotelSearchMeta(parsedUrl);
+    return extractSkyscannerHotelSearchMeta(parsedUrl) ?? extractFinnHotelSearchMeta(parsedUrl) ?? extractMomondoHotelSearchMeta(parsedUrl) ?? extractBookingHotelSearchMeta(parsedUrl) ?? extractBookingHotelSearchResultsMeta(parsedUrl) ?? extractHotelsComHotelSearchMeta(parsedUrl) ?? extractExpediaHotelSearchMeta(parsedUrl) ?? extractExpediaHotelSearchResultsMeta(parsedUrl) ?? extractAgodaHotelSearchMeta(parsedUrl) ?? extractAgodaHotelSearchResultsMeta(parsedUrl) ?? extractTripcomHotelSearchMeta(parsedUrl) ?? extractTripcomHotelListMeta(parsedUrl);
   }
   function extractSkyscannerHotelSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -11238,6 +11238,237 @@ query SearchSuggestions($query: String!, $category: Int) {
       rooms
     };
   }
+  function readExpediaHotelOccupancy(parsedUrl) {
+    let adults = 0;
+    const childAges = [];
+    let rooms = 0;
+    let hasUnknownChildren = false;
+    for (const [key, value] of parsedUrl.searchParams) {
+      if (!/^rm\d+$/i.test(key)) continue;
+      rooms++;
+      const roomAdults = value.match(/^a(\d+)/i)?.[1];
+      if (roomAdults === void 0) return void 0;
+      adults += Number.parseInt(roomAdults, 10);
+      for (const childMatch of value.matchAll(/:c(\d+)?/gi)) {
+        const age = readNonNegativeIntegerValue(childMatch[1] ?? "");
+        if (age !== void 0) childAges.push(age);
+        else hasUnknownChildren = true;
+      }
+    }
+    if (rooms === 0) {
+      rooms = 1;
+      adults = 2;
+    }
+    return { adults, childAges, rooms, hasUnknownChildren };
+  }
+  function extractHotelsComHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "hotels.com" && !hostname.endsWith(".hotels.com")) return void 0;
+    const slug = parsedUrl.pathname.match(/^\/ho\d+\/([^/]+)/i)?.[1];
+    if (slug === void 0) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "chkin");
+    const checkOut = readIsoDateParam(parsedUrl, "chkout");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const occupancy = readExpediaHotelOccupancy(parsedUrl);
+    if (occupancy === void 0) return void 0;
+    const destinationName = parsedUrl.searchParams.get("destination")?.split(",")[0]?.trim();
+    const hotelName = readStringValue(findHotelLdJson()?.name) ?? readVisibleHotelHeadingName() ?? stripTrailingDestinationTokens(readHotelNameFromSlug(slug), parsedUrl.searchParams.get("destination"));
+    if (hotelName === void 0) return void 0;
+    return {
+      hotelName,
+      ...destinationName !== void 0 && destinationName.length > 0 ? { destinationName } : {},
+      checkIn,
+      checkOut,
+      adults: occupancy.adults,
+      childAges: occupancy.childAges,
+      ...occupancy.hasUnknownChildren ? { hasUnknownChildren: true } : {},
+      rooms: occupancy.rooms
+    };
+  }
+  function extractExpediaHotelSearchMeta(parsedUrl) {
+    if (!isExpediaHotelHostname(parsedUrl)) return void 0;
+    const slug = parsedUrl.pathname.match(/-Hotels-([^/]+?)\.h\d+\.Hotel-Information/i)?.[1];
+    if (slug === void 0) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "chkin");
+    const checkOut = readIsoDateParam(parsedUrl, "chkout");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const occupancy = readExpediaHotelOccupancy(parsedUrl);
+    if (occupancy === void 0) return void 0;
+    const destinationName = parsedUrl.searchParams.get("destination")?.split(",")[0]?.trim();
+    const hotelName = readStringValue(findHotelLdJson()?.name) ?? readVisibleHotelHeadingName() ?? readHotelNameFromSlug(slug);
+    if (hotelName === void 0) return void 0;
+    return {
+      hotelName,
+      ...destinationName !== void 0 && destinationName.length > 0 ? { destinationName } : {},
+      checkIn,
+      checkOut,
+      adults: occupancy.adults,
+      childAges: occupancy.childAges,
+      ...occupancy.hasUnknownChildren ? { hasUnknownChildren: true } : {},
+      rooms: occupancy.rooms
+    };
+  }
+  function extractExpediaHotelSearchResultsMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    const isExpediaFamily = hostname === "hotels.com" || hostname.endsWith(".hotels.com") || isExpediaHotelHostname(parsedUrl);
+    if (!isExpediaFamily || !/^\/Hotel-Search\/?$/i.test(parsedUrl.pathname)) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "startDate") ?? readIsoDateParam(parsedUrl, "d1");
+    const checkOut = readIsoDateParam(parsedUrl, "endDate") ?? readIsoDateParam(parsedUrl, "d2");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const destinationName = parsedUrl.searchParams.get("destination")?.split(",")[0]?.trim();
+    if (destinationName === void 0 || destinationName.length === 0) return void 0;
+    const childrenParam = parsedUrl.searchParams.get("children");
+    return {
+      destinationName,
+      checkIn,
+      checkOut,
+      adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
+      childAges: [],
+      ...childrenParam !== null && childrenParam.length > 0 && childrenParam !== "0" ? { hasUnknownChildren: true } : {},
+      rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1)
+    };
+  }
+  function isExpediaHotelHostname(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return /(?:^|\.)expedia\.(?:com|no)$/.test(hostname);
+  }
+  function extractAgodaHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "agoda.com" && !hostname.endsWith(".agoda.com")) return void 0;
+    const pathMatch = parsedUrl.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?([^/]+)\/hotel\/([^/]+)\.html$/i);
+    if (pathMatch === null || pathMatch[1] === void 0 || pathMatch[2] === void 0) return void 0;
+    const checkIn = readLooseIsoDateParam(parsedUrl, "checkIn");
+    if (checkIn === void 0) return void 0;
+    const los = readNonNegativeIntegerParam(parsedUrl, "los", 0);
+    const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut") ?? (los > 0 ? addDaysToIsoDate(checkIn, los) : void 0);
+    if (checkOut === void 0) return void 0;
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+    const childAges = (parsedUrl.searchParams.get("childAges") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value.trim())).filter((age) => age !== void 0);
+    const cityName = readHotelNameFromSlug(pathMatch[2].replace(/-[a-z]{2}$/i, ""));
+    const hotelName = readStringValue(findHotelLdJson()?.name) ?? readVisibleHotelHeadingName() ?? stripTrailingDestinationTokens(readHotelNameFromSlug(pathMatch[1]), cityName ?? null);
+    if (hotelName === void 0) return void 0;
+    return {
+      hotelName,
+      ...cityName !== void 0 ? { destinationName: cityName } : {},
+      checkIn,
+      checkOut,
+      adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
+      childAges: childCount > 0 ? childAges : [],
+      ...childCount > 0 && childAges.length !== childCount ? { hasUnknownChildren: true } : {},
+      rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1)
+    };
+  }
+  function extractAgodaHotelSearchResultsMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "agoda.com" && !hostname.endsWith(".agoda.com")) return void 0;
+    if (!/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?search\/?$/i.test(parsedUrl.pathname)) return void 0;
+    const checkIn = readLooseIsoDateParam(parsedUrl, "checkIn");
+    const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const destinationName = parsedUrl.searchParams.get("textToSearch")?.split(",")[0]?.trim();
+    if (destinationName === void 0 || destinationName.length === 0) return void 0;
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+    return {
+      destinationName,
+      checkIn,
+      checkOut,
+      adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
+      childAges: [],
+      ...childCount > 0 ? { hasUnknownChildren: true } : {},
+      rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1)
+    };
+  }
+  function extractBookingHotelSearchResultsMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "booking.com" && !hostname.endsWith(".booking.com")) return void 0;
+    if (!/^\/searchresults[^/]*\.html$/i.test(parsedUrl.pathname)) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "checkin");
+    const checkOut = readIsoDateParam(parsedUrl, "checkout");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const destinationName = parsedUrl.searchParams.get("ss")?.split(",")[0]?.trim();
+    if (destinationName === void 0 || destinationName.length === 0) return void 0;
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "group_children", 0);
+    return {
+      destinationName,
+      checkIn,
+      checkOut,
+      adults: readNonNegativeIntegerParam(parsedUrl, "group_adults", 2),
+      childAges: [],
+      ...childCount > 0 ? { hasUnknownChildren: true } : {},
+      rooms: readNonNegativeIntegerParam(parsedUrl, "no_rooms", 1)
+    };
+  }
+  function extractTripcomHotelListMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "trip.com" && !hostname.endsWith(".trip.com")) return void 0;
+    if (!/^\/hotels\/list\/?$/i.test(parsedUrl.pathname)) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "checkIn");
+    const checkOut = readIsoDateParam(parsedUrl, "checkOut");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const destinationName = (parsedUrl.searchParams.get("cityName") ?? parsedUrl.searchParams.get("searchWord"))?.split(",")[0]?.trim();
+    if (destinationName === void 0 || destinationName.length === 0) return void 0;
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+    return {
+      destinationName,
+      checkIn,
+      checkOut,
+      adults: readNonNegativeIntegerParam(parsedUrl, "adult", 2),
+      childAges: [],
+      ...childCount > 0 ? { hasUnknownChildren: true } : {},
+      rooms: readNonNegativeIntegerParam(parsedUrl, "crn", 1)
+    };
+  }
+  function readLooseIsoDateParam(parsedUrl, key) {
+    const value = parsedUrl.searchParams.get(key)?.trim();
+    const match = value?.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (match === null || match === void 0) return void 0;
+    return readIsoDateValue(`${match[1]}-${match[2]?.padStart(2, "0")}-${match[3]?.padStart(2, "0")}`);
+  }
+  function addDaysToIsoDate(isoDate, days) {
+    const time = (/* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`)).getTime();
+    if (Number.isNaN(time)) return void 0;
+    return new Date(time + days * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+  }
+  function extractTripcomHotelSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "trip.com" && !hostname.endsWith(".trip.com")) return void 0;
+    if (!parsedUrl.pathname.startsWith("/hotels/")) return void 0;
+    if (!/\/detail\b|-detail-/i.test(parsedUrl.pathname)) return void 0;
+    const checkIn = readIsoDateParam(parsedUrl, "checkIn");
+    const checkOut = readIsoDateParam(parsedUrl, "checkOut");
+    if (checkIn === void 0 || checkOut === void 0) return void 0;
+    const adults = readNonNegativeIntegerParam(parsedUrl, "adult", 2);
+    const rooms = readNonNegativeIntegerParam(parsedUrl, "crn", 1);
+    const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+    const childAges = (parsedUrl.searchParams.get("ages") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value.trim())).filter((age) => age !== void 0);
+    const hotelName = readStringValue(findHotelLdJson()?.name) ?? readVisibleHotelHeadingName();
+    if (hotelName === void 0) return void 0;
+    const destinationName = parsedUrl.searchParams.get("cityEnName")?.trim();
+    return {
+      hotelName,
+      ...destinationName !== void 0 && destinationName.length > 0 ? { destinationName } : {},
+      checkIn,
+      checkOut,
+      adults,
+      childAges: childCount > 0 ? childAges : [],
+      ...childCount > 0 && childAges.length !== childCount ? { hasUnknownChildren: true } : {},
+      rooms
+    };
+  }
+  function stripTrailingDestinationTokens(name, destination) {
+    if (name === void 0 || destination === null) return name;
+    const destinationTokens = new Set(normalizeHotelNameText(destination).split(" ").filter((token) => token.length > 0));
+    if (destinationTokens.size === 0) return name;
+    const words = name.split(" ");
+    while (words.length > 1 && destinationTokens.has(normalizeHotelNameText(words[words.length - 1] ?? ""))) {
+      words.pop();
+    }
+    return words.join(" ");
+  }
+  function readVisibleHotelHeadingName() {
+    const heading = document.querySelector("h1")?.innerText.replace(/\s+/g, " ").trim();
+    return heading !== void 0 && heading.length >= 3 && heading.length <= 120 ? heading : void 0;
+  }
   function findHotelLdJson() {
     for (const entry of readLdJsonEntries()) {
       const hotel = findTypedLdJson(entry, "Hotel");
@@ -11358,10 +11589,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     const missingDestination = destinationTokens.some((token) => !normalizedName.includes(token));
     return missingDestination ? `${hotelName} ${meta.destinationName}` : hotelName;
   }
-  function formatHotelQuoteAlternatives(quotes) {
+  function formatHotelQuoteAlternatives(quotes, nights) {
     return quotes.slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT).map((quote) => ({
       shopName: quote.provider,
-      price: formatNokFlightPrice(quote.totalAmount),
+      price: nights !== void 0 && nights >= 1 ? `${formatNokFlightPrice(quote.totalAmount / nights)}/natt (${formatNokFlightPrice(quote.totalAmount)} totalt)` : formatNokFlightPrice(quote.totalAmount),
       amount: quote.totalAmount,
       sortAmount: quote.totalAmount,
       currency: "NOK",
@@ -11386,6 +11617,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         productUrl: input.productUrl
       };
     }
+    const nights = input.nights !== void 0 && input.nights >= 1 ? input.nights : void 0;
     return {
       source: input.source,
       sourceName: input.sourceName,
@@ -11393,16 +11625,15 @@ query SearchSuggestions($query: String!, $category: Int) {
       details: input.searchDetails,
       matchedExactProduct: true,
       shopName: best.provider,
-      price: formatNokFlightPrice(best.totalAmount),
+      price: formatNokFlightPrice(nights !== void 0 ? best.totalAmount / nights : best.totalAmount),
       amount: best.totalAmount,
       sortAmount: best.totalAmount,
       currency: "NOK",
       productName: input.stayTitle,
       productUrl: input.productUrl,
       offerUrl: input.productUrl,
-      ...best.roomName !== void 0 ? { durationText: best.roomName } : {},
       ...input.searchIncomplete === true ? { searchIncomplete: true } : {},
-      alternatives: formatHotelQuoteAlternatives(input.quotes ?? [])
+      alternatives: formatHotelQuoteAlternatives(input.quotes ?? [], nights)
     };
   }
   function buildVioBaseParams(meta, searchId, anonymousId) {
@@ -11571,6 +11802,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       searchDetails,
       productUrl,
       quotes: pollResult.quotes,
+      nights: countHotelStayNights(meta),
       ...pollResult.searchComplete ? {} : { searchIncomplete: true }
     });
   }
@@ -11732,6 +11964,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       searchDetails,
       productUrl,
       quotes: result.quotes,
+      nights: countHotelStayNights(meta),
       ...result.searchComplete ? {} : { searchIncomplete: true }
     });
   }
@@ -11888,7 +12121,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       stayTitle,
       searchDetails,
       productUrl,
-      quotes: ratesResult.quotes
+      quotes: ratesResult.quotes,
+      nights: countHotelStayNights(meta)
     });
   }
   async function resolveMomondoDestinationForMeta(meta) {
@@ -12443,7 +12677,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "sas.no" || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "sas.no" || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "hotels.com" || hostname.endsWith(".hotels.com") || hostname === "expedia.com" || hostname.endsWith(".expedia.com") || hostname === "expedia.no" || hostname.endsWith(".expedia.no") || hostname === "agoda.com" || hostname.endsWith(".agoda.com") || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;
@@ -16114,8 +16348,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
           [
             details,
-            `Billigste: ${priceMatch.price} (${priceMatch.shopName})`,
-            "Totalpris for oppholdet inkl. skatter/avgifter, billigste tilgjengelige rom."
+            `Billigste: ${alternatives2[0]?.price ?? priceMatch.price} — ${priceMatch.shopName}`,
+            "Snittpris per natt; totalpris inkl. skatter/avgifter, billigste tilgjengelige rom."
           ].join("\n"),
           [
             "Leverandører",

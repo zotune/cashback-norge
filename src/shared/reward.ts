@@ -48,7 +48,13 @@ export function normalizeRewardLabel(reward: string): string {
     });
 }
 
-export function extractKrReward(text: string): string {
+export type KrRewardOptions = {
+  // false = beløpene er bonus/rabatt (cashback/kuponger), aldri en pris kunden betaler;
+  // posisjonerte beløp får da ikke «totalsum»-suffikset.
+  totalsum?: boolean;
+};
+
+export function extractKrReward(text: string, options?: KrRewardOptions): string {
   const cleanedText = stripOrdinaryPriceParentheticals(text);
 
   // Split into sentences/clauses and look for ones containing rabatt/avslag
@@ -100,7 +106,12 @@ export function extractKrReward(text: string): string {
     return formatKrReward(sparValues);
   }
 
-  return extractPositionedKrReward(cleanedText);
+  return extractPositionedKrReward(cleanedText, options?.totalsum !== false);
+}
+
+// Helt gratis = totalpris 0 kr; samme representasjon på tvers av providere.
+export function extractGratisReward(text: string): string {
+  return /\bgratis\b/i.test(text) ? "0 kr totalsum" : "";
 }
 
 function stripOrdinaryPriceParentheticals(text: string): string {
@@ -112,7 +123,7 @@ function hasExcludedKrPrefix(text: string, amountIndex: number): boolean {
   return /(?:^|[\s(])(?:fra|minst|minimum|over)\s+(?:kr\s*)?$/i.test(beforeAmount);
 }
 
-function extractPositionedKrReward(text: string): string {
+function extractPositionedKrReward(text: string, totalsum: boolean): string {
   const fixedValues: number[] = [];
   const hourlyValues: number[] = [];
   const positionedAmountPattern =
@@ -143,7 +154,8 @@ function extractPositionedKrReward(text: string): string {
   }
 
   if (fixedValues.length > 0) {
-    return `${formatKrReward(fixedValues)} totalsum`;
+    const formatted = formatKrReward(fixedValues);
+    return totalsum ? `${formatted} totalsum` : formatted;
   }
 
   if (hourlyValues.length > 0) {

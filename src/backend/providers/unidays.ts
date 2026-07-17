@@ -140,7 +140,7 @@ export async function fetchUnidays(
 
 
       const rewardRaw = benefit.name.trim();
-      let reward = extractPercentageReward(rewardRaw) || extractKrReward(rewardRaw);
+      let reward = extractPercentageReward(rewardRaw) || extractKrReward(rewardRaw, { totalsum: false });
       if (!reward) reward = "?";
 
       offers.push({

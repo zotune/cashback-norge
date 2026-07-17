@@ -239,7 +239,7 @@ function buildReward(listReward: string, detail?: RabbleDetail): string {
       const pctReward = extractPercentageReward(allValues);
       if (pctReward) return pctReward;
 
-      const krReward = extractKrReward(allValues);
+      const krReward = extractKrReward(allValues, { totalsum: false });
       if (krReward) return krReward;
 
       // Direct values like "50 kr" or "3%"
@@ -254,7 +254,7 @@ function buildReward(listReward: string, detail?: RabbleDetail): string {
   const pctReward = extractPercentageReward(source);
   if (pctReward) return pctReward;
 
-  const krReward = extractKrReward(source);
+  const krReward = extractKrReward(source, { totalsum: false });
   if (krReward) return krReward;
 
   // Direct kr match for simple cases like "50 kr"

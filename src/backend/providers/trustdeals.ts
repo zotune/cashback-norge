@@ -196,7 +196,7 @@ function stripMerchantSuffix(value: string): string {
 }
 
 function extractReward(title: string): string {
-  const reward = extractPercentageReward(title) || extractKrReward(title);
+  const reward = extractPercentageReward(title) || extractKrReward(title, { totalsum: false });
   if (reward !== "") return reward;
   if (/gratis\s+frakt/i.test(title)) return "Gratis frakt";
   return title;

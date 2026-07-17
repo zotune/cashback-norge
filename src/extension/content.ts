@@ -6524,7 +6524,15 @@ function extractHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
   return extractSkyscannerHotelSearchMeta(parsedUrl) ??
     extractFinnHotelSearchMeta(parsedUrl) ??
     extractMomondoHotelSearchMeta(parsedUrl) ??
-    extractBookingHotelSearchMeta(parsedUrl);
+    extractBookingHotelSearchMeta(parsedUrl) ??
+    extractBookingHotelSearchResultsMeta(parsedUrl) ??
+    extractHotelsComHotelSearchMeta(parsedUrl) ??
+    extractExpediaHotelSearchMeta(parsedUrl) ??
+    extractExpediaHotelSearchResultsMeta(parsedUrl) ??
+    extractAgodaHotelSearchMeta(parsedUrl) ??
+    extractAgodaHotelSearchResultsMeta(parsedUrl) ??
+    extractTripcomHotelSearchMeta(parsedUrl) ??
+    extractTripcomHotelListMeta(parsedUrl);
 }
 
 function extractSkyscannerHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
@@ -6708,6 +6716,309 @@ function extractBookingHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefi
   };
 }
 
+// Expedia-occupancy (hotels.com/expedia): rm1=a2, rm2=a2:c5:c7 (a<voksne>, :c<barnealder> per barn).
+function readExpediaHotelOccupancy(parsedUrl: URL): { adults: number; childAges: number[]; rooms: number; hasUnknownChildren: boolean } | undefined {
+  let adults = 0;
+  const childAges: number[] = [];
+  let rooms = 0;
+  let hasUnknownChildren = false;
+  for (const [key, value] of parsedUrl.searchParams) {
+    if (!/^rm\d+$/i.test(key)) continue;
+    rooms++;
+    const roomAdults = value.match(/^a(\d+)/i)?.[1];
+    if (roomAdults === undefined) return undefined;
+    adults += Number.parseInt(roomAdults, 10);
+    for (const childMatch of value.matchAll(/:c(\d+)?/gi)) {
+      const age = readNonNegativeIntegerValue(childMatch[1] ?? "");
+      if (age !== undefined) childAges.push(age);
+      else hasUnknownChildren = true;
+    }
+  }
+  if (rooms === 0) {
+    rooms = 1;
+    adults = 2;
+  }
+  return { adults, childAges, rooms, hasUnknownChildren };
+}
+
+// hotels.com-hotellsider: /ho<id>/<navn-slug>/?chkin&chkout&rm1=a2[:c5...]&destination=By, Land
+function extractHotelsComHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "hotels.com" && !hostname.endsWith(".hotels.com")) return undefined;
+
+  const slug = parsedUrl.pathname.match(/^\/ho\d+\/([^/]+)/i)?.[1];
+  if (slug === undefined) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "chkin");
+  const checkOut = readIsoDateParam(parsedUrl, "chkout");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const occupancy = readExpediaHotelOccupancy(parsedUrl);
+  if (occupancy === undefined) return undefined;
+
+  const destinationName = parsedUrl.searchParams.get("destination")?.split(",")[0]?.trim();
+  const hotelName = readStringValue(findHotelLdJson()?.name) ??
+    readVisibleHotelHeadingName() ??
+    stripTrailingDestinationTokens(readHotelNameFromSlug(slug), parsedUrl.searchParams.get("destination"));
+  if (hotelName === undefined) return undefined;
+
+  return {
+    hotelName,
+    ...(destinationName !== undefined && destinationName.length > 0 ? { destinationName } : {}),
+    checkIn,
+    checkOut,
+    adults: occupancy.adults,
+    childAges: occupancy.childAges,
+    ...(occupancy.hasUnknownChildren ? { hasUnknownChildren: true } : {}),
+    rooms: occupancy.rooms,
+  };
+}
+
+// expedia-hotellsider: /<By>-Hotels-<Navn>.h<id>.Hotel-Information?chkin&chkout&rm1=a2.
+function extractExpediaHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  if (!isExpediaHotelHostname(parsedUrl)) return undefined;
+
+  const slug = parsedUrl.pathname.match(/-Hotels-([^/]+?)\.h\d+\.Hotel-Information/i)?.[1];
+  if (slug === undefined) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "chkin");
+  const checkOut = readIsoDateParam(parsedUrl, "chkout");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const occupancy = readExpediaHotelOccupancy(parsedUrl);
+  if (occupancy === undefined) return undefined;
+
+  const destinationName = parsedUrl.searchParams.get("destination")?.split(",")[0]?.trim();
+  const hotelName = readStringValue(findHotelLdJson()?.name) ??
+    readVisibleHotelHeadingName() ??
+    readHotelNameFromSlug(slug);
+  if (hotelName === undefined) return undefined;
+
+  return {
+    hotelName,
+    ...(destinationName !== undefined && destinationName.length > 0 ? { destinationName } : {}),
+    checkIn,
+    checkOut,
+    adults: occupancy.adults,
+    childAges: occupancy.childAges,
+    ...(occupancy.hasUnknownChildren ? { hasUnknownChildren: true } : {}),
+    rooms: occupancy.rooms,
+  };
+}
+
+// hotels.com/expedia-destinasjonssøk: /Hotel-Search?destination&startDate&endDate&adults&rooms.
+function extractExpediaHotelSearchResultsMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  const isExpediaFamily = hostname === "hotels.com" || hostname.endsWith(".hotels.com") || isExpediaHotelHostname(parsedUrl);
+  if (!isExpediaFamily || !/^\/Hotel-Search\/?$/i.test(parsedUrl.pathname)) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "startDate") ?? readIsoDateParam(parsedUrl, "d1");
+  const checkOut = readIsoDateParam(parsedUrl, "endDate") ?? readIsoDateParam(parsedUrl, "d2");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const destinationName = parsedUrl.searchParams.get("destination")?.split(",")[0]?.trim();
+  if (destinationName === undefined || destinationName.length === 0) return undefined;
+
+  const childrenParam = parsedUrl.searchParams.get("children");
+  return {
+    destinationName,
+    checkIn,
+    checkOut,
+    adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
+    childAges: [],
+    ...(childrenParam !== null && childrenParam.length > 0 && childrenParam !== "0" ? { hasUnknownChildren: true } : {}),
+    rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1),
+  };
+}
+
+function isExpediaHotelHostname(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return /(?:^|\.)expedia\.(?:com|no)$/.test(hostname);
+}
+
+// agoda-hotellsider: /<locale>/<hotell-slug>/hotel/<by-cc>.html?checkIn&los&adults&children&rooms.
+// checkIn kan være «2026-08-3» (uten nullpadding); checkOut mangler ofte — utledes fra los (netter).
+function extractAgodaHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "agoda.com" && !hostname.endsWith(".agoda.com")) return undefined;
+
+  const pathMatch = parsedUrl.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?([^/]+)\/hotel\/([^/]+)\.html$/i);
+  if (pathMatch === null || pathMatch[1] === undefined || pathMatch[2] === undefined) return undefined;
+
+  const checkIn = readLooseIsoDateParam(parsedUrl, "checkIn");
+  if (checkIn === undefined) return undefined;
+  const los = readNonNegativeIntegerParam(parsedUrl, "los", 0);
+  const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut") ?? (los > 0 ? addDaysToIsoDate(checkIn, los) : undefined);
+  if (checkOut === undefined) return undefined;
+
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+  const childAges = (parsedUrl.searchParams.get("childAges") ?? "")
+    .split(",")
+    .map((value) => readNonNegativeIntegerValue(value.trim()))
+    .filter((age): age is number => age !== undefined);
+
+  const cityName = readHotelNameFromSlug(pathMatch[2].replace(/-[a-z]{2}$/i, ""));
+  const hotelName = readStringValue(findHotelLdJson()?.name) ??
+    readVisibleHotelHeadingName() ??
+    stripTrailingDestinationTokens(readHotelNameFromSlug(pathMatch[1]), cityName ?? null);
+  if (hotelName === undefined) return undefined;
+
+  return {
+    hotelName,
+    ...(cityName !== undefined ? { destinationName: cityName } : {}),
+    checkIn,
+    checkOut,
+    adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
+    childAges: childCount > 0 ? childAges : [],
+    ...(childCount > 0 && childAges.length !== childCount ? { hasUnknownChildren: true } : {}),
+    rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1),
+  };
+}
+
+// agoda-destinasjonssøk: /<locale>/search?checkIn&checkOut&adults&children&rooms&textToSearch=By.
+function extractAgodaHotelSearchResultsMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "agoda.com" && !hostname.endsWith(".agoda.com")) return undefined;
+  if (!/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?search\/?$/i.test(parsedUrl.pathname)) return undefined;
+
+  const checkIn = readLooseIsoDateParam(parsedUrl, "checkIn");
+  const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const destinationName = parsedUrl.searchParams.get("textToSearch")?.split(",")[0]?.trim();
+  if (destinationName === undefined || destinationName.length === 0) return undefined;
+
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+  return {
+    destinationName,
+    checkIn,
+    checkOut,
+    adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
+    childAges: [],
+    ...(childCount > 0 ? { hasUnknownChildren: true } : {}),
+    rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1),
+  };
+}
+
+// booking-destinasjonssøk: /searchresults*.html?ss=By&checkin&checkout&group_adults&no_rooms.
+function extractBookingHotelSearchResultsMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "booking.com" && !hostname.endsWith(".booking.com")) return undefined;
+  if (!/^\/searchresults[^/]*\.html$/i.test(parsedUrl.pathname)) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "checkin");
+  const checkOut = readIsoDateParam(parsedUrl, "checkout");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const destinationName = parsedUrl.searchParams.get("ss")?.split(",")[0]?.trim();
+  if (destinationName === undefined || destinationName.length === 0) return undefined;
+
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "group_children", 0);
+  return {
+    destinationName,
+    checkIn,
+    checkOut,
+    adults: readNonNegativeIntegerParam(parsedUrl, "group_adults", 2),
+    childAges: [],
+    ...(childCount > 0 ? { hasUnknownChildren: true } : {}),
+    rooms: readNonNegativeIntegerParam(parsedUrl, "no_rooms", 1),
+  };
+}
+
+// trip.com-destinasjonssøk: /hotels/list?cityName=By&checkIn&checkOut&adult&children&crn.
+function extractTripcomHotelListMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "trip.com" && !hostname.endsWith(".trip.com")) return undefined;
+  if (!/^\/hotels\/list\/?$/i.test(parsedUrl.pathname)) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "checkIn");
+  const checkOut = readIsoDateParam(parsedUrl, "checkOut");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const destinationName = (parsedUrl.searchParams.get("cityName") ?? parsedUrl.searchParams.get("searchWord"))?.split(",")[0]?.trim();
+  if (destinationName === undefined || destinationName.length === 0) return undefined;
+
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+  return {
+    destinationName,
+    checkIn,
+    checkOut,
+    adults: readNonNegativeIntegerParam(parsedUrl, "adult", 2),
+    childAges: [],
+    ...(childCount > 0 ? { hasUnknownChildren: true } : {}),
+    rooms: readNonNegativeIntegerParam(parsedUrl, "crn", 1),
+  };
+}
+
+// «2026-8-3» → «2026-08-03» (agoda nullpadder ikke datoene sine).
+function readLooseIsoDateParam(parsedUrl: URL, key: string): string | undefined {
+  const value = parsedUrl.searchParams.get(key)?.trim();
+  const match = value?.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match === null || match === undefined) return undefined;
+  return readIsoDateValue(`${match[1]}-${match[2]?.padStart(2, "0")}-${match[3]?.padStart(2, "0")}`);
+}
+
+function addDaysToIsoDate(isoDate: string, days: number): string | undefined {
+  const time = new Date(`${isoDate}T00:00:00Z`).getTime();
+  if (Number.isNaN(time)) return undefined;
+  return new Date(time + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// trip.com-hotellsider: /hotels/detail/?hotelId&checkIn&checkOut&adult&children&ages&crn&cityEnName.
+// Navnet finnes ikke i URL-en — leses fra LD-JSON/h1.
+function extractTripcomHotelSearchMeta(parsedUrl: URL): HotelSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "trip.com" && !hostname.endsWith(".trip.com")) return undefined;
+  if (!parsedUrl.pathname.startsWith("/hotels/")) return undefined;
+  if (!/\/detail\b|-detail-/i.test(parsedUrl.pathname)) return undefined;
+
+  const checkIn = readIsoDateParam(parsedUrl, "checkIn");
+  const checkOut = readIsoDateParam(parsedUrl, "checkOut");
+  if (checkIn === undefined || checkOut === undefined) return undefined;
+
+  const adults = readNonNegativeIntegerParam(parsedUrl, "adult", 2);
+  const rooms = readNonNegativeIntegerParam(parsedUrl, "crn", 1);
+  const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
+  const childAges = (parsedUrl.searchParams.get("ages") ?? "")
+    .split(",")
+    .map((value) => readNonNegativeIntegerValue(value.trim()))
+    .filter((age): age is number => age !== undefined);
+
+  const hotelName = readStringValue(findHotelLdJson()?.name) ?? readVisibleHotelHeadingName();
+  if (hotelName === undefined) return undefined;
+  const destinationName = parsedUrl.searchParams.get("cityEnName")?.trim();
+
+  return {
+    hotelName,
+    ...(destinationName !== undefined && destinationName.length > 0 ? { destinationName } : {}),
+    checkIn,
+    checkOut,
+    adults,
+    childAges: childCount > 0 ? childAges : [],
+    ...(childCount > 0 && childAges.length !== childCount ? { hasUnknownChildren: true } : {}),
+    rooms,
+  };
+}
+
+// Slugger på hotels.com har by/land limt på slutten («…-hotel-shanghai-china») —
+// fjern destinasjonstokens bakfra så navnematchingen og tittelen blir rene.
+function stripTrailingDestinationTokens(name: string | undefined, destination: string | null): string | undefined {
+  if (name === undefined || destination === null) return name;
+  const destinationTokens = new Set(normalizeHotelNameText(destination).split(" ").filter((token) => token.length > 0));
+  if (destinationTokens.size === 0) return name;
+  const words = name.split(" ");
+  while (words.length > 1 && destinationTokens.has(normalizeHotelNameText(words[words.length - 1] ?? ""))) {
+    words.pop();
+  }
+  return words.join(" ");
+}
+
+// Hotellnavnet i sidens h1 — brukes der URL-en ikke har (rent) navn.
+function readVisibleHotelHeadingName(): string | undefined {
+  const heading = document.querySelector("h1")?.innerText.replace(/\s+/g, " ").trim();
+  return heading !== undefined && heading.length >= 3 && heading.length <= 120 ? heading : undefined;
+}
+
 function findHotelLdJson(): Record<string, unknown> | undefined {
   for (const entry of readLdJsonEntries()) {
     const hotel = findTypedLdJson(entry, "Hotel");
@@ -6870,10 +7181,12 @@ function buildHotelResolutionQuery(meta: HotelSearchMeta): string {
   return missingDestination ? `${hotelName} ${meta.destinationName}` : hotelName;
 }
 
-function formatHotelQuoteAlternatives(quotes: HotelOfferQuote[]): PriceMatchAlternative[] {
+function formatHotelQuoteAlternatives(quotes: HotelOfferQuote[], nights?: number): PriceMatchAlternative[] {
   return quotes.slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT).map((quote) => ({
     shopName: quote.provider,
-    price: formatNokFlightPrice(quote.totalAmount),
+    price: nights !== undefined && nights >= 1
+      ? `${formatNokFlightPrice(quote.totalAmount / nights)}/natt (${formatNokFlightPrice(quote.totalAmount)} totalt)`
+      : formatNokFlightPrice(quote.totalAmount),
     amount: quote.totalAmount,
     sortAmount: quote.totalAmount,
     currency: "NOK",
@@ -6888,6 +7201,7 @@ function buildHotelPriceMatchOffer(input: {
   searchDetails: string;
   productUrl: string;
   quotes?: HotelOfferQuote[];
+  nights?: number;
   searchIncomplete?: boolean;
 }): PriceMatchOffer {
   const best = input.quotes?.[0];
@@ -6908,6 +7222,9 @@ function buildHotelPriceMatchOffer(input: {
     };
   }
 
+  // Raden viser snittpris per natt (sammenlignbar med sidens egne priser); totalprisen
+  // ligger fortsatt i amount/sortAmount (sortering) og i tooltipen. Romnavn kun i tooltipen.
+  const nights = input.nights !== undefined && input.nights >= 1 ? input.nights : undefined;
   return {
     source: input.source,
     sourceName: input.sourceName,
@@ -6915,16 +7232,15 @@ function buildHotelPriceMatchOffer(input: {
     details: input.searchDetails,
     matchedExactProduct: true,
     shopName: best.provider,
-    price: formatNokFlightPrice(best.totalAmount),
+    price: formatNokFlightPrice(nights !== undefined ? best.totalAmount / nights : best.totalAmount),
     amount: best.totalAmount,
     sortAmount: best.totalAmount,
     currency: "NOK",
     productName: input.stayTitle,
     productUrl: input.productUrl,
     offerUrl: input.productUrl,
-    ...(best.roomName !== undefined ? { durationText: best.roomName } : {}),
     ...(input.searchIncomplete === true ? { searchIncomplete: true } : {}),
-    alternatives: formatHotelQuoteAlternatives(input.quotes ?? []),
+    alternatives: formatHotelQuoteAlternatives(input.quotes ?? [], nights),
   };
 }
 
@@ -7135,6 +7451,7 @@ async function findFinnHotelPriceMatchOffer(
     searchDetails,
     productUrl,
     quotes: pollResult.quotes,
+    nights: countHotelStayNights(meta),
     ...(pollResult.searchComplete ? {} : { searchIncomplete: true }),
   });
 }
@@ -7333,6 +7650,7 @@ async function findSkyscannerHotelPriceMatchOffer(
     searchDetails,
     productUrl,
     quotes: result.quotes,
+    nights: countHotelStayNights(meta),
     ...(result.searchComplete ? {} : { searchIncomplete: true }),
   });
 }
@@ -7524,6 +7842,7 @@ async function findMomondoHotelPriceMatchOffer(
     searchDetails,
     productUrl,
     quotes: ratesResult.quotes,
+    nights: countHotelStayNights(meta),
   });
 }
 
@@ -8274,6 +8593,14 @@ function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
     hostname === "hotell.finn.no" ||
     hostname === "booking.com" ||
     hostname.endsWith(".booking.com") ||
+    hostname === "hotels.com" ||
+    hostname.endsWith(".hotels.com") ||
+    hostname === "expedia.com" ||
+    hostname.endsWith(".expedia.com") ||
+    hostname === "expedia.no" ||
+    hostname.endsWith(".expedia.no") ||
+    hostname === "agoda.com" ||
+    hostname.endsWith(".agoda.com") ||
     hostname === "momondo.no" ||
     hostname === "panflights.no" ||
     hostname === "panflights.com" ||
@@ -12473,12 +12800,13 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
       (priceMatch.sortAmount ?? priceMatch.amount) < FLIGHT_STATIC_PRICE_SORT_AMOUNT;
 
     if (hasLivePriceList) {
+      // Rad og leverandørliste viser snittpris per natt; totalen står i parentes per rad.
       return [
         `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
         [
           details,
-          `Billigste: ${priceMatch.price} (${priceMatch.shopName})`,
-          "Totalpris for oppholdet inkl. skatter/avgifter, billigste tilgjengelige rom.",
+          `Billigste: ${alternatives[0]?.price ?? priceMatch.price} — ${priceMatch.shopName}`,
+          "Snittpris per natt; totalpris inkl. skatter/avgifter, billigste tilgjengelige rom.",
         ].join("\n"),
         [
           "Leverandører",

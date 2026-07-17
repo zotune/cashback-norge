@@ -532,7 +532,7 @@ function extractReward(containerText: string, title: string): string {
 }
 
 function findRewardValue(text: string): string | undefined {
-  const reward = extractPercentageReward(text) || extractKrReward(text);
+  const reward = extractPercentageReward(text) || extractKrReward(text, { totalsum: false });
   return reward !== "" ? reward : undefined;
 }
 

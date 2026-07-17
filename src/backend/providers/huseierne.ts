@@ -9,7 +9,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractGratisReward, extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
@@ -283,7 +283,8 @@ function extractHuseierneReward(text: string): string {
   if (kr) return kr;
 
   if (/\bmedlemspris(?:er)?\b/i.test(text)) return "Medlemspris";
-  if (/\bgratis\b/i.test(text)) return "Gratis";
+  const gratis = extractGratisReward(text);
+  if (gratis) return gratis;
   if (/\brabatt/i.test(text)) return "Rabatt";
 
   return "";

@@ -10,6 +10,7 @@ import {
   uniqueStrings,
 } from "../../shared/cashback.js";
 import {
+  extractGratisReward,
   extractKrReward,
   extractPercentageReward,
   formatPercentageReward,
@@ -315,8 +316,7 @@ function extractBateReward(text: string): string {
   const kr = extractKrReward(text);
   if (kr) return kr;
 
-  if (/\bgratis\b/i.test(text)) return "0 kr totalsum";
-  return "";
+  return extractGratisReward(text);
 }
 
 function extractStructuredPercentageReward(text: string): string {

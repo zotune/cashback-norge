@@ -361,7 +361,7 @@ function extractTrumfBenefitReward(
   const pctReward = extractPercentageReward(focusedText);
   if (pctReward !== "") return pctReward;
 
-  const krReward = extractKrReward(focusedText).replace(/\s+totalsum$/i, "");
+  const krReward = extractKrReward(focusedText, { totalsum: false });
   if (krReward !== "") return krReward;
 
   return "Medlemsfordel";
@@ -507,7 +507,7 @@ function extractReward($: TrumfCheerio): string {
   }
 
   const text = normalizeWhitespace($("body").text());
-  return extractPercentageReward(text) || extractKrReward(text);
+  return extractPercentageReward(text) || extractKrReward(text, { totalsum: false });
 }
 
 function extractTerms($: TrumfCheerio): string {

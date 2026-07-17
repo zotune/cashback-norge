@@ -356,7 +356,7 @@ function isReusableDiscountCode(code: string): boolean {
 }
 
 function extractReward(title: string): string {
-  const reward = extractPercentageReward(title) || extractKrReward(title);
+  const reward = extractPercentageReward(title) || extractKrReward(title, { totalsum: false });
   if (reward !== "") return reward;
   if (/gratis/i.test(title)) return "Gratis";
   return title;

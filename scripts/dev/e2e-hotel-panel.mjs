@@ -3,7 +3,7 @@
 // root og sidens egen synlige toppris, slik at billigste-pris kan verifiseres.
 //
 // Bruk:
-//   node scripts/dev/e2e-hotel-panel.mjs [--target skyscannerhotel|finnhotel|momondohotel|booking|skyscannersearch|finnsearch|momondosearch] [--url <URL>]
+//   node scripts/dev/e2e-hotel-panel.mjs [--target skyscannerhotel|finnhotel|momondohotel|booking|hotelscom|tripcom|agodahotel|expediahotel|skyscannersearch|finnsearch|momondosearch|agodasearch|expediasearch|hotelscomsearch|bookingsearch|triplist] [--url <URL>]
 // Husk `pnpm run build:extension` først.
 
 import { createRequire } from "node:module";
@@ -26,6 +26,15 @@ const TARGET_URLS = {
   finnhotel: "https://hotell.finn.no/Hotel/1878462/no?checkIn=2026-08-13&checkOut=2026-08-21&rooms=2&currency=NOK&lang=no&locale=no&userCountry=NO",
   momondohotel: "https://www.momondo.no/hotel-search/Carlton-Hotel-Bangkok-Sukhumvit,Bangkok-p18056-h5948637-details/2026-08-28/2026-08-31/2adults?pm=total",
   booking: "https://www.booking.com/hotel/th/carlton-bangkok-sukhumvit.html?checkin=2026-08-28&checkout=2026-08-31&group_adults=2&no_rooms=1&group_children=0",
+  hotelscom: "https://www.hotels.com/ho419194/renaissance-shanghai-caohejing-hotel-shanghai-china/?chkin=2026-08-28&chkout=2026-08-31&rm1=a2&destination=Shanghai%2C+China",
+  tripcom: "https://www.trip.com/hotels/detail/?cityEnName=Shanghai&hotelId=65568600&checkIn=2026-08-28&checkOut=2026-08-31&adult=2&children=0&crn=1&curr=NOK&locale=en-XX",
+  agodahotel: "https://www.agoda.com/en-gb/starr-hotel-shanghai/hotel/shanghai-cn.html?adults=2&children=0&rooms=1&checkIn=2026-08-28&los=3&currencyCode=NOK&travellerType=1",
+  agodasearch: "https://www.agoda.com/en-gb/search?city=3987&checkIn=2026-08-28&checkOut=2026-08-31&rooms=1&adults=2&children=0&currency=NOK&textToSearch=Shanghai",
+  expediahotel: "https://www.expedia.com/Shanghai-Hotels-Renaissance-Shanghai-Caohejing-Hotel.h5389992.Hotel-Information?chkin=2026-08-28&chkout=2026-08-31&rm1=a2&destination=Shanghai%2C+China",
+  expediasearch: "https://www.expedia.com/Hotel-Search?destination=Shanghai%2C%20China&regionId=3145&startDate=2026-08-28&endDate=2026-08-31&adults=2&rooms=1&sort=RECOMMENDED",
+  hotelscomsearch: "https://www.hotels.com/Hotel-Search?regionId=3145&sort=RECOMMENDED&startDate=2026-08-28&endDate=2026-08-31&destination=Shanghai%2C+China",
+  bookingsearch: "https://www.booking.com/searchresults.en-gb.html?ss=Shanghai%2C+Shanghai+Area%2C+China&dest_id=-1924465&dest_type=city&checkin=2026-08-28&checkout=2026-08-31&group_adults=2&no_rooms=1&group_children=0",
+  triplist: "https://www.trip.com/hotels/list?city=2&cityName=Shanghai&checkIn=2026-08-28&checkOut=2026-08-31&crn=1&adult=2&children=0&searchWord=Shanghai",
   skyscannersearch: "https://www.skyscanner.no/hotels/search?entity_id=27538759&checkin=2026-09-09&checkout=2026-09-17&adults=2&rooms=1",
   finnsearch: "https://hotell.finn.no/Hotel/Search?placeId=57663&checkIn=2026-08-13&checkOut=2026-08-21&rooms=2&userSearch=1",
   momondosearch: "https://www.momondo.no/hotel-search/Bangkok,Thailand-p18056/2026-08-28/2026-08-31/2adults",
@@ -82,6 +91,14 @@ const readHotelPanel = () => page.evaluate(() => {
   }));
 });
 
+const readHotelTooltips = () => page.evaluate(() => {
+  const root = document.getElementById("cashback-varsler-notice")?.shadowRoot;
+  if (!root) return [];
+  return [...root.querySelectorAll(".offer-tooltip")]
+    .map((el) => el.textContent?.trim().replace(/\s+/g, " ") ?? "")
+    .filter((text) => /natt|Leverandører|Åpner samme søk/i.test(text));
+});
+
 const dumpPanel = async (label, budgetMs) => {
   const startedAt = Date.now();
   let cards;
@@ -99,6 +116,9 @@ const dumpPanel = async (label, budgetMs) => {
   }
   for (const card of cards) {
     console.log("  ", card.text, card.title ? `[${card.title}]` : "", "::", card.href.slice(0, 160));
+  }
+  for (const tooltip of await readHotelTooltips()) {
+    console.log("  tooltip:", tooltip.slice(0, 400));
   }
 };
 

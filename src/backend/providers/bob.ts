@@ -10,7 +10,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractGratisReward, extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -539,11 +539,7 @@ function extractBobReward(text: string): string {
     return "2 for 1";
   }
 
-  if (/\bgratis\b/i.test(normalized)) {
-    return "Gratis";
-  }
-
-  return "";
+  return extractGratisReward(normalized);
 }
 
 function extractRelevantPercentageReward(text: string): string {

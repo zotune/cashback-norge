@@ -230,7 +230,7 @@ function buildReward(listReward: string, bonusDetails?: string): string {
   if (pctReward) return pctReward;
 
   // Try kr reward
-  const krReward = extractKrReward(source);
+  const krReward = extractKrReward(source, { totalsum: false });
   if (krReward) return krReward;
 
   // Direct kr match for simple cases like "200kr" or "200 kr"

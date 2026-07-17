@@ -121,8 +121,8 @@ function extractDomain(link: string): string | null {
 function buildReward(d: Discount): string {
   if (d.discount_type === "%" && d.discount > 0) return `${d.discount} %`;
   if (d.discount_type === "NOK" && d.discount > 0) return `${d.discount} kr`;
-  if (d.discount_type === "fastpris" && d.discount === 0) return "Gratis";
-  if (d.discount_type === "fastpris" && d.discount > 0) return `${d.discount} kr`;
+  if (d.discount_type === "fastpris" && d.discount === 0) return "0 kr totalsum";
+  if (d.discount_type === "fastpris" && d.discount > 0) return `${d.discount} kr totalsum`;
   // Hvis vi ikke vet hva rabatten er, vis bare '?'
   return "?";
 }
