@@ -246,3 +246,45 @@ function formatLocalizedNumber(value: string): string {
 function parseRewardNumber(value: string | undefined): number {
   return Number.parseFloat((value ?? "0").replace(",", "."));
 }
+
+// Felles utvinning av belønning fra fritekst-beskrivelser av medlemsfordeler
+// (boligbyggelag og medlemsforeninger): prosent foretrekkes, deretter kr,
+// medlemspris og gratis.
+export function extractBenefitReward(text: string): string {
+  if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
+
+  const oreLitre = extractOreLitreReward(text);
+  if (oreLitre) return oreLitre;
+
+  const rewardText = relevantBenefitRewardText(text);
+  const percentage = extractPercentageReward(rewardText);
+  if (percentage) return percentage;
+
+  const kr = extractKrReward(rewardText);
+  if (kr) return kr;
+
+  if (/\bmedlemspris(?:er)?\b/i.test(text)) return "Medlemspris";
+  const gratis = extractGratisReward(text);
+  if (gratis) return gratis;
+  if (/\brabatt/i.test(text)) return "Rabatt";
+
+  return "";
+}
+
+export function relevantBenefitRewardText(text: string): string {
+  return text
+    .split(/[\n.;]+/)
+    .map((line) => line.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim())
+    .filter((line) => {
+      // Price-list lines ("Medlemspris: 10 625 kroner") state prices, not discounts.
+      if (/^(?:medlemspris|vanlig pris|ordinær pris|pris)\s*:/i.test(line)) return false;
+
+      // "Hva får du?"-lists render as bare lines like "10 % på Ekornes"
+      // or "AUBO-kjøkken: 25 % rabatt".
+      if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s+(?:på|hos|i)\b|$)/i.test(line)) return true;
+
+      return /\b(?:rabatt(?:er)?|medlemsrabatt|besparelse|avslag|spar|tilbud|medlemspris(?:er)?|bonus)\b/i.test(line) ||
+        /\bhalv\s+pris\b/i.test(line);
+    })
+    .join("\n");
+}

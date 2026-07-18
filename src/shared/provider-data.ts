@@ -39,6 +39,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   huseierne: "Huseierne",
   santander: "Santander",
   norwegian: "Norwegian",
+  vestbo: "Vestbo",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -72,6 +73,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   huseierne: "Huseiernes medlemsfordeler.\nKrever Huseierne-medlemskap.\nVis medlemskort eller hent rabattkode via huseierne.no.",
   santander: "Santander-kredittkort.\nKrever kredittkort fra Santander.\nAktiver tilbudet via santander.dealpass.no.",
   norwegian: "Norwegian Reward.\nGratis fordelsprogram.\nTjen CashPoints via partnersiden på norwegian.com.\n1 CashPoint = 1 kr på Norwegian-kjøp.",
+  vestbo: "Vestbo medlemsfordeler.\nKrever Vestbo-medlemskap.\nVis digitalt medlemskort via vestbo.no.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: string }> = {
@@ -111,6 +113,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: 
   huseierne: { bg: "#ffffff", fg: "#0f1a18", border: "#d5ddd9" },
   santander: { bg: "#ffffff", fg: "#ec0000", border: "#ec0000" },
   norwegian: { bg: "#d81939", fg: "#ffffff" },
+  vestbo: { bg: "#ffffff", fg: "#1dc1dd", border: "#1dc1dd" },
   cbn: { bg: "#ffe4e6", fg: "#be123c" },
 };
 

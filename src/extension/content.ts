@@ -9973,6 +9973,11 @@ function renderNotice(
       border: 1px solid #ec0000;
       color: #ec0000;
     }
+    .provider-vestbo {
+      background: #ffffff;
+      border: 1px solid #1dc1dd;
+      color: #1dc1dd;
+    }
     .provider-dnb {
       background: #14555a;
       color: #ffffff;

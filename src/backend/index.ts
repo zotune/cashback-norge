@@ -59,6 +59,7 @@ import { crawlCoop } from "./providers/coop.js";
 import { crawlElkjop } from "./providers/elkjop.js";
 import { fetchAkademikerne } from "./providers/akademikerne.js";
 import { fetchHuseierne } from "./providers/huseierne.js";
+import { fetchVestbo } from "./providers/vestbo.js";
 import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
 import { fetchAwin } from "./providers/awin.js";
@@ -81,6 +82,7 @@ type CliConfig = {
   sasApiUrl: string;
   tfBankApiUrl: string;
   santanderApiUrl: string;
+  vestboApiUrl: string;
   norwegianApiUrl: string;
   norwegianGridListId: number;
   maxRequestsPerCrawl: number;
@@ -90,6 +92,7 @@ type CliConfig = {
   skipSas: boolean;
   skipTfBank: boolean;
   skipSantander: boolean;
+  skipVestbo: boolean;
   skipNorwegian: boolean;
   skipCuponation: boolean;
   skipDnb: boolean;
@@ -184,6 +187,7 @@ async function main(): Promise<void> {
     rememberOffers,
     tfBankOffers,
     santanderOffers,
+    vestboOffers,
     norwegianOffers,
     dnbOffers,
     dnbSupertilbudOffers,
@@ -245,6 +249,17 @@ async function main(): Promise<void> {
         generatedAt, logger, apiUrl: config.santanderApiUrl,
         provider: "santander", label: "Santander",
         siteBaseUrl: "https://santander.dealpass.no",
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipVestbo ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Vestbo",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "vestbo",
+      reusePreviousOnFailure: true,
+      run: () => fetchVestbo({
+        generatedAt, logger, apiUrl: config.vestboApiUrl,
         overrides: providerOverrides,
       }),
     }),
@@ -407,6 +422,7 @@ async function main(): Promise<void> {
     ...rememberOffers,
     ...tfBankOffers,
     ...santanderOffers,
+    ...vestboOffers,
     ...norwegianOffers,
     ...dnbOffers,
     ...dnbSupertilbudOffers,
@@ -637,7 +653,7 @@ async function main(): Promise<void> {
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
   const fullDomainLookup = buildDomainLookup([
-    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...norwegianOffers, ...dnbOffers,
+    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...norwegianOffers, ...dnbOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
     ...sparebank1Offers, ...spareborsenOffers, ...coopOffers, ...manualOffers,
     ...partnerAdsOffers,
@@ -668,7 +684,7 @@ async function main(): Promise<void> {
     ? "Exchange rates: using static fallback for fixed reward sorting"
     : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
   const offers = uniqueOffers(addFixedRewardSortValues(
-    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
+    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
     exchangeRates ?? STATIC_NOK_BASE_RATES,
   ));
 
@@ -732,6 +748,9 @@ function readCliConfig(args: string[]): CliConfig {
     santanderApiUrl:
       readArgumentValue(args, "--santander-api-url") ??
       "https://santander.dealpass.no/ajax/deals",
+    vestboApiUrl:
+      readArgumentValue(args, "--vestbo-api-url") ??
+      "https://vestbo.no/wp-json/wp/v2/pages/9544",
     norwegianApiUrl:
       readArgumentValue(args, "--norwegian-api-url") ??
       "https://www.norwegian.com/api/gridlist",
@@ -751,6 +770,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipSas: args.includes("--skip-sas"),
     skipTfBank: args.includes("--skip-tfbank"),
     skipSantander: args.includes("--skip-santander"),
+    skipVestbo: args.includes("--skip-vestbo"),
     skipNorwegian: args.includes("--skip-norwegian"),
     skipCuponation: args.includes("--skip-cuponation"),
     skipDnb: args.includes("--skip-dnb"),
