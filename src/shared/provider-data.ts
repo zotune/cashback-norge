@@ -40,6 +40,10 @@ export const PROVIDER_NAMES: Record<string, string> = {
   santander: "Santander",
   norwegian: "Norwegian",
   vestbo: "Vestbo",
+  bbl: "BBL",
+  elbilforeningen: "Elbilforeningen",
+  ys: "YS",
+  lofavor: "LOfavør",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -74,6 +78,10 @@ export const PROVIDER_TIPS: Record<string, string> = {
   santander: "Santander-kredittkort.\nKrever kredittkort fra Santander.\nAktiver tilbudet via santander.dealpass.no.",
   norwegian: "Norwegian Reward.\nGratis fordelsprogram.\nTjen CashPoints via partnersiden på norwegian.com.\n1 CashPoint = 1 kr på Norwegian-kjøp.",
   vestbo: "Vestbo medlemsfordeler.\nKrever Vestbo-medlemskap.\nVis digitalt medlemskort via vestbo.no.",
+  bbl: "Boligbyggelagenes fordelsprogram.\nKrever medlemskap i et tilknyttet boligbyggelag.\nRegistrer betalingskort på fordelerformedlemmer.no for automatisk bonus.",
+  elbilforeningen: "Norsk elbilforening.\nKrever medlemskap i Elbilforeningen.\nAktiver via elbil.no/medlemsfordeler.",
+  ys: "YS medlemsfordeler.\nKrever medlemskap i et YS-forbund.\nSe vilkår på ys.no/medlemsfordeler.",
+  lofavor: "LOfavør.\nKrever medlemskap i et LO-forbund.\nSe vilkår på lofavor.no.",
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: string }> = {
@@ -114,6 +122,10 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: 
   santander: { bg: "#ffffff", fg: "#ec0000", border: "#ec0000" },
   norwegian: { bg: "#d81939", fg: "#ffffff" },
   vestbo: { bg: "#ffffff", fg: "#1dc1dd", border: "#1dc1dd" },
+  bbl: { bg: "#1657e2", fg: "#ffffff" },
+  elbilforeningen: { bg: "#003a78", fg: "#ffffff" },
+  ys: { bg: "#006e26", fg: "#ffffff" },
+  lofavor: { bg: "#dc141a", fg: "#ffffff" },
   cbn: { bg: "#ffe4e6", fg: "#be123c" },
 };
 

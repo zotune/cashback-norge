@@ -60,6 +60,10 @@ import { crawlElkjop } from "./providers/elkjop.js";
 import { fetchAkademikerne } from "./providers/akademikerne.js";
 import { fetchHuseierne } from "./providers/huseierne.js";
 import { fetchVestbo } from "./providers/vestbo.js";
+import { fetchBbl } from "./providers/bbl.js";
+import { fetchElbil } from "./providers/elbilforeningen.js";
+import { fetchYs } from "./providers/ys.js";
+import { fetchLofavor } from "./providers/lofavor.js";
 import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
 import { fetchAwin } from "./providers/awin.js";
@@ -83,6 +87,10 @@ type CliConfig = {
   tfBankApiUrl: string;
   santanderApiUrl: string;
   vestboApiUrl: string;
+  bblPageUrl: string;
+  elbilApiUrl: string;
+  ysApiUrl: string;
+  lofavorStartUrl: string;
   norwegianApiUrl: string;
   norwegianGridListId: number;
   maxRequestsPerCrawl: number;
@@ -93,6 +101,10 @@ type CliConfig = {
   skipTfBank: boolean;
   skipSantander: boolean;
   skipVestbo: boolean;
+  skipBbl: boolean;
+  skipElbil: boolean;
+  skipYs: boolean;
+  skipLofavor: boolean;
   skipNorwegian: boolean;
   skipCuponation: boolean;
   skipDnb: boolean;
@@ -188,6 +200,10 @@ async function main(): Promise<void> {
     tfBankOffers,
     santanderOffers,
     vestboOffers,
+    bblOffers,
+    elbilOffers,
+    ysOffers,
+    lofavorOffers,
     norwegianOffers,
     dnbOffers,
     dnbSupertilbudOffers,
@@ -260,6 +276,50 @@ async function main(): Promise<void> {
       reusePreviousOnFailure: true,
       run: () => fetchVestbo({
         generatedAt, logger, apiUrl: config.vestboApiUrl,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipBbl ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "BBL Fordel",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "bbl",
+      reusePreviousOnFailure: true,
+      run: () => fetchBbl({
+        generatedAt, logger, pageUrl: config.bblPageUrl,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipElbil ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Elbilforeningen",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "elbilforeningen",
+      reusePreviousOnFailure: true,
+      run: () => fetchElbil({
+        generatedAt, logger, apiUrl: config.elbilApiUrl,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipYs ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "YS",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "ys",
+      reusePreviousOnFailure: true,
+      run: () => fetchYs({
+        generatedAt, logger, apiUrl: config.ysApiUrl,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipLofavor ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "LO Favør",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "lofavor",
+      reusePreviousOnFailure: true,
+      run: () => fetchLofavor({
+        generatedAt, logger, startUrl: config.lofavorStartUrl,
         overrides: providerOverrides,
       }),
     }),
@@ -423,6 +483,10 @@ async function main(): Promise<void> {
     ...tfBankOffers,
     ...santanderOffers,
     ...vestboOffers,
+    ...bblOffers,
+    ...elbilOffers,
+    ...ysOffers,
+    ...lofavorOffers,
     ...norwegianOffers,
     ...dnbOffers,
     ...dnbSupertilbudOffers,
@@ -653,7 +717,7 @@ async function main(): Promise<void> {
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
   const fullDomainLookup = buildDomainLookup([
-    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...norwegianOffers, ...dnbOffers,
+    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
     ...sparebank1Offers, ...spareborsenOffers, ...coopOffers, ...manualOffers,
     ...partnerAdsOffers,
@@ -684,7 +748,7 @@ async function main(): Promise<void> {
     ? "Exchange rates: using static fallback for fixed reward sorting"
     : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
   const offers = uniqueOffers(addFixedRewardSortValues(
-    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
+    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
     exchangeRates ?? STATIC_NOK_BASE_RATES,
   ));
 
@@ -751,6 +815,18 @@ function readCliConfig(args: string[]): CliConfig {
     vestboApiUrl:
       readArgumentValue(args, "--vestbo-api-url") ??
       "https://vestbo.no/wp-json/wp/v2/pages/9544",
+    bblPageUrl:
+      readArgumentValue(args, "--bbl-page-url") ??
+      "https://fordelerformedlemmer.no/kbbl",
+    elbilApiUrl:
+      readArgumentValue(args, "--elbil-api-url") ??
+      "https://elbil.no/wp-json/wp/v2/membership-benefit",
+    ysApiUrl:
+      readArgumentValue(args, "--ys-api-url") ??
+      "https://ys.no/wp-json/wp/v2/pages?slug=medlemsfordeler&_fields=id,title,content",
+    lofavorStartUrl:
+      readArgumentValue(args, "--lofavor-start-url") ??
+      "https://www.lofavor.no/home",
     norwegianApiUrl:
       readArgumentValue(args, "--norwegian-api-url") ??
       "https://www.norwegian.com/api/gridlist",
@@ -771,6 +847,10 @@ function readCliConfig(args: string[]): CliConfig {
     skipTfBank: args.includes("--skip-tfbank"),
     skipSantander: args.includes("--skip-santander"),
     skipVestbo: args.includes("--skip-vestbo"),
+    skipBbl: args.includes("--skip-bbl"),
+    skipElbil: args.includes("--skip-elbil"),
+    skipYs: args.includes("--skip-ys"),
+    skipLofavor: args.includes("--skip-lofavor"),
     skipNorwegian: args.includes("--skip-norwegian"),
     skipCuponation: args.includes("--skip-cuponation"),
     skipDnb: args.includes("--skip-dnb"),

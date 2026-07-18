@@ -9978,6 +9978,22 @@ function renderNotice(
       border: 1px solid #1dc1dd;
       color: #1dc1dd;
     }
+    .provider-bbl {
+      background: #1657e2;
+      color: #ffffff;
+    }
+    .provider-elbilforeningen {
+      background: #003a78;
+      color: #ffffff;
+    }
+    .provider-ys {
+      background: #006e26;
+      color: #ffffff;
+    }
+    .provider-lofavor {
+      background: #dc141a;
+      color: #ffffff;
+    }
     .provider-dnb {
       background: #14555a;
       color: #ffffff;
