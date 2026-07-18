@@ -979,7 +979,6 @@ async function init() {
     }
   }
   allMerchants.sort((a, b) => a.name.localeCompare(b.name, "nb"));
-  render("");
   setupAzBar();
   const searchEl = document.querySelector(".search");
   const sumEl = document.querySelector(".global-sum");
@@ -990,15 +989,37 @@ async function init() {
     wrap.classList.toggle("has-value", input.value.length > 0);
   };
 
+  // Shareable search links: ?q=strim (or legacy #strim) opens the search
+  // directly; typing keeps the URL in sync via replaceState.
+  const syncUrlToQuery = (query) => {
+    const url = new URL(window.location.href);
+    if (query.length > 0) {
+      url.searchParams.set("q", query);
+    } else {
+      url.searchParams.delete("q");
+    }
+    history.replaceState(null, "", url.toString());
+  };
+
+  const initialQuery = new URLSearchParams(window.location.search).get("q") ?? "";
+  searchEl.value = initialQuery;
+  updateClear(searchEl, searchWrap);
+  render(initialQuery);
+  if (initialQuery.length > 0) {
+    searchEl.scrollIntoView({ block: "center" });
+  }
+
   searchEl.addEventListener("input", (e) => {
     updateClear(e.target, searchWrap);
     render(e.target.value);
+    syncUrlToQuery(e.target.value);
   });
 
   searchWrap.querySelector(".input-clear").addEventListener("click", () => {
     searchEl.value = "";
     updateClear(searchEl, searchWrap);
     render("");
+    syncUrlToQuery("");
     searchEl.focus();
   });
 
