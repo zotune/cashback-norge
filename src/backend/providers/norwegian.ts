@@ -18,6 +18,8 @@ export type FetchNorwegianRewardInput = {
   generatedAt: string;
   logger: Logger;
   overrides: ProviderOverrides;
+  /** ScraperAPI fallback; norwegian.com blocks datacenter IPs */
+  proxyUrls?: string[];
 };
 
 // Partner pages that are Norwegian's own products, not external shops
@@ -32,19 +34,16 @@ export async function fetchNorwegianReward(
   const listUrl = `${input.apiUrl}?languageCode=nb&marketCode=no&gridListId=${input.gridListId}`;
   input.logger.info(`Fetching Norwegian Reward partners from ${listUrl}`);
 
-  const response = await gotScraping(listUrl, {
-    responseType: "json",
-    throwHttpErrors: false,
-    timeout: { request: 30_000 },
-  });
+  const listBody = await fetchWithProxyFallback(listUrl, input);
+  let parsedList: unknown;
 
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw new Error(
-      `Norwegian Reward API returned ${response.statusCode}: ${response.statusMessage}`,
-    );
+  try {
+    parsedList = JSON.parse(listBody);
+  } catch {
+    throw new Error("Norwegian Reward API returned invalid JSON");
   }
 
-  const items = readGridListItems(response.body);
+  const items = readGridListItems(parsedList);
 
   if (items.length === 0) {
     throw new Error("Norwegian Reward API returned no partners");
@@ -83,20 +82,18 @@ async function buildPartnerOffer(
     return undefined;
   }
 
-  const response = await gotScraping(item.url, {
-    responseType: "text",
-    throwHttpErrors: false,
-    timeout: { request: 30_000 },
-  });
+  let body: string;
 
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    input.logger.warn(`Norwegian Reward: ${slug} returned ${response.statusCode}`);
+  try {
+    body = await fetchWithProxyFallback(item.url, input);
+  } catch (error) {
+    input.logger.warn(`Norwegian Reward: ${slug} failed (${error instanceof Error ? error.message : "request failed"})`);
     return undefined;
   }
 
   // The footer repeats generic partner links on every page; only the
   // content above it belongs to this partner.
-  const mainPart = response.body.split(/<footer/i)[0] ?? response.body;
+  const mainPart = body.split(/<footer/i)[0] ?? body;
   const text = stripHtml(mainPart);
 
   const rateMatch = text.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:i\s+)?CashPoints/i);
@@ -118,7 +115,7 @@ async function buildPartnerOffer(
   }
 
   const merchantName = item.heading.trim() !== "" ? item.heading.trim() : slug;
-  const title = readTitle(response.body);
+  const title = readTitle(body);
 
   return {
     provider: "norwegian",
@@ -130,6 +127,55 @@ async function buildPartnerOffer(
     terms: title ?? "",
     updatedAt: input.generatedAt,
   };
+}
+
+// norwegian.com (Akamai) blocks datacenter IPs, so CI runs get 403 on direct
+// requests. ScraperAPI credits are limited: the proxy is only attempted when
+// the direct request fails AND the caller supplied proxy URLs — index.ts only
+// does that when there are no reusable previous offers to fall back to.
+async function fetchWithProxyFallback(
+  url: string,
+  input: FetchNorwegianRewardInput,
+): Promise<string> {
+  const attempts: { proxyUrl?: string; label?: string }[] = [
+    {},
+    ...(input.proxyUrls ?? []).map((proxyUrl, index) => ({
+      proxyUrl,
+      label: `ScraperAPI proxy ${index + 1}`,
+    })),
+  ];
+  let lastFailure = "no response";
+
+  for (const attempt of attempts) {
+    if (attempt.label !== undefined) {
+      input.logger.info(`Norwegian Reward: blocked (${lastFailure}), retrying via ${attempt.label}`);
+    }
+
+    try {
+      const response = await gotScraping(url, {
+        responseType: "text",
+        throwHttpErrors: false,
+        timeout: { request: attempt.proxyUrl === undefined ? 30_000 : 70_000 },
+        ...(attempt.proxyUrl === undefined
+          ? {}
+          : {
+            proxyUrl: attempt.proxyUrl,
+            // ScraperAPI terminates TLS with its own certificate in proxy mode.
+            https: { rejectUnauthorized: false },
+          }),
+      });
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response.body;
+      }
+
+      lastFailure = `${response.statusCode} ${response.statusMessage}`;
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : "request failed";
+    }
+  }
+
+  throw new Error(`Norwegian Reward returned ${lastFailure}`);
 }
 
 function findPartnerDomains(mainPart: string): string[] {
