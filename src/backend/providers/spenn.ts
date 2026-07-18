@@ -137,25 +137,41 @@ export async function fetchSpenn(options: {
     });
   }
 
-  // Fixed sign-up bonuses (e.g. Fortum: "4000 Spenn etter 90 dager") link
-  // straight to the merchant instead of via refunder, so they are handled
-  // separately from the percentage rates above.
-  const seenFixed = new Set<string>();
+  // Offers that link straight to the merchant instead of via refunder:
+  // percentage rates in the description (e.g. BookBeat, Lensway) and fixed
+  // sign-up bonuses (e.g. Fortum: "4000 Spenn etter 90 dager"). Only
+  // Norwegian-market links are considered — the Contentful space also holds
+  // Swedish, Danish and Finnish campaigns.
+  type DirectOffer = { parsed: ParsedRate; isPercent: boolean; link: string };
+  const directBest = new Map<string, DirectOffer>();
 
   for (const item of allItems) {
     const merchantName = item.merchant?.name;
-    if (!merchantName || best.has(merchantName) || seenFixed.has(merchantName)) continue;
+    if (!merchantName || merchantName === "Spenn" || best.has(merchantName)) continue;
 
     const link = item.externalTarget?.link ?? "";
-    if (link.includes("refunder.com")) continue;
+    if (link.includes("refunder.com") || !isNorwegianMarketLink(link)) continue;
 
-    const parsed = parseSpennFixedBonus(item.longDescription ?? "");
+    const desc = item.longDescription ?? "";
+    const percentParsed = parseSpennRate(desc);
+    const parsed = percentParsed ?? parseSpennFixedBonus(`${item.title}\n${desc}`);
     if (!parsed) continue;
 
-    seenFixed.add(merchantName);
-    const cleanLink = link.replace(/[?&]nonce=\{nonce\}\}?/, "").replace(/\{nonce\}/, "");
-    const linkDomain = extractLinkDomain(cleanLink);
-    const domains = linkDomain !== undefined
+    const candidate: DirectOffer = {
+      parsed,
+      isPercent: percentParsed !== undefined,
+      link: cleanTemplateLink(link),
+    };
+    const existing = directBest.get(merchantName);
+    const isBetter = existing === undefined ||
+      (candidate.isPercent && !existing.isPercent) ||
+      (candidate.isPercent === existing.isPercent && parsed.maxVal > existing.parsed.maxVal);
+    if (isBetter) directBest.set(merchantName, candidate);
+  }
+
+  for (const [merchantName, { parsed, link }] of directBest) {
+    const linkDomain = extractLinkDomain(link);
+    const domains = linkDomain !== undefined && linkDomain !== "app.spenngroup.com"
       ? [linkDomain]
       : lookupDomains(domainLookup, merchantName);
 
@@ -165,7 +181,7 @@ export async function fetchSpenn(options: {
       domains,
       reward: parsed.rate,
       sourceUrl: "https://app.spenngroup.com",
-      activationUrl: cleanLink !== "" ? cleanLink : "https://app.spenngroup.com",
+      activationUrl: link !== "" ? link : "https://app.spenngroup.com",
       terms: parsed.terms,
       updatedAt: generatedAt,
     });
@@ -175,26 +191,48 @@ export async function fetchSpenn(options: {
   return offers;
 }
 
-/**
- * Parses fixed bonuses like "4000 Spenn etter 90 dager" from the offer
- * description. 1 Spenn = 10 øre, so 4000 Spenn = 400 kr.
- */
-function parseSpennFixedBonus(desc: string): ParsedRate | undefined {
-  const match = desc.match(/(\d[\d\s.]*)\s*Spenn\s+etter\s+\d+\s*(?:dager|mnd|måneder)/i);
-  if (!match) return undefined;
+function isNorwegianMarketLink(link: string): boolean {
+  const parsed = parseUrl(link.replace(/\{[^}]*\}/g, "x"));
+  if (parsed === undefined) return false;
+  if (parsed.hostname.endsWith(".no")) return true;
+  if (/^\/(no|nb)([/?]|$)/.test(parsed.pathname)) return true;
+  return parsed.hostname === "app.spenngroup.com";
+}
 
-  const spenn = Number.parseInt((match[1] ?? "").replace(/[\s.]/g, ""), 10);
-  if (!Number.isFinite(spenn) || spenn <= 0) return undefined;
+function cleanTemplateLink(link: string): string {
+  const cleaned = link.replace(/[?&][^=&]+=\{[^}]*\}/g, "").replace(/\{[^}]*\}/g, "");
+  // Removing the first query parameter may leave "&" as the separator
+  return !cleaned.includes("?") && cleaned.includes("&")
+    ? cleaned.replace("&", "?")
+    : cleaned;
+}
+
+/**
+ * Parses fixed bonuses like "4000 Spenn etter 90 dager" or
+ * "Få 2000 Spenn som nytt medlem". 1 Spenn = 10 øre, so 4000 Spenn = 400 kr.
+ */
+function parseSpennFixedBonus(text: string): ParsedRate | undefined {
+  const afterMatch = text.match(/(\d[\d\s.]*)\s*Spenn\s+etter\s+\d+\s*(?:dager|mnd|måneder)/i);
+  const welcomeMatch = afterMatch === null
+    ? text.match(/(?:få|tjen|motta)\s+(opptil\s+)?(\d[\d\s.]*)\s*Spenn\b/i)
+    : null;
+  const upTo = welcomeMatch?.[1] !== undefined;
+  const rawValue = afterMatch?.[1] ?? welcomeMatch?.[2];
+  if (rawValue === undefined) return undefined;
+
+  const spenn = Number.parseInt(rawValue.replace(/[\s.]/g, ""), 10);
+  if (!Number.isFinite(spenn) || spenn < 100) return undefined;
 
   const kr = Math.round(spenn / 10);
-  const bonusLines = [...desc.matchAll(/^[-*]\s*(.*\bSpenn\b.*)$/gm)]
+  const rate = upTo ? `opptil ${kr} kr` : `${kr} kr`;
+  const bonusLines = [...text.matchAll(/^[-*]\s*(.*\bSpenn\b.*)$/gm)]
     .map((m) => (m[1] ?? "").trim())
     .filter((line) => line !== "");
   const terms = bonusLines.length > 0
     ? `1 Spenn = 10 øre.\n${bonusLines.join("\n")}`
     : `${spenn} Spenn (1 Spenn = 10 øre).`;
 
-  return { rate: `${kr} kr`, maxVal: kr, terms };
+  return { rate, maxVal: kr, terms };
 }
 
 function extractLinkDomain(link: string): string | undefined {
@@ -330,6 +368,13 @@ function parseSpennRate(
   );
   if (boldMatch) {
     const val = parseFloat((boldMatch[1] ?? "0").replace(",", "."));
+    return { rate: `${fmt(val)} %`, maxVal: val, terms: "" };
+  }
+
+  // Pattern 3: plain "X,Y Spenn per 10 kr" anywhere in the text
+  const plainMatch = desc.match(/(?:opp til )?([\d,]+)\s*Spenn per 10 kr/);
+  if (plainMatch) {
+    const val = parseFloat((plainMatch[1] ?? "0").replace(",", "."));
     return { rate: `${fmt(val)} %`, maxVal: val, terms: "" };
   }
 
