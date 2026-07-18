@@ -106,11 +106,10 @@ async function buildBenefitOffer(
 
   const mainPart = readMainContent(response.body);
   const text = stripHtml(mainPart);
-  const merchantName = readHeading(response.body) ?? readSlugName(url);
   const reward = extractBenefitReward(text);
 
   if (reward === "") {
-    input.logger.info(`LO Favør: no parseable reward for ${merchantName}, skipping`);
+    input.logger.info(`LO Favør: no parseable reward for ${url}, skipping`);
     return undefined;
   }
 
@@ -121,9 +120,11 @@ async function buildBenefitOffer(
     : findPartnerDomains(mainPart);
 
   if (domains.length === 0) {
-    input.logger.info(`LO Favør: no partner domain for ${merchantName}, skipping`);
+    input.logger.info(`LO Favør: no partner domain for ${url}, skipping`);
     return undefined;
   }
+
+  const merchantName = readMerchantName(response.body, url, domains[0] ?? "");
 
   return {
     provider: "lofavor",
@@ -141,6 +142,22 @@ async function buildBenefitOffer(
 // the content before it belongs to this benefit.
 function readMainContent(body: string): string {
   return body.split(/<footer/i)[0] ?? body;
+}
+
+// Category-style headings ("Leiebil", "Strøm") hide the actual merchant and
+// make the site render a separate card; use the partner domain instead.
+const GENERIC_HEADINGS =
+  /^(?:lofavør\s+)?(?:leiebil(?:\s+student)?|strøm|feriereiser|salg av bolig(?:\s+ung)?|advokatbistand|advokatforsikring|begravelsesbyrå.*|ny medlemsfordel.*)$/i;
+
+function readMerchantName(body: string, url: string, domain: string): string {
+  const heading = readHeading(body) ?? readSlugName(url);
+
+  if (!GENERIC_HEADINGS.test(heading.trim())) {
+    return heading;
+  }
+
+  const stem = domain.replace(/\.(?:no|com|net|dk)$/, "");
+  return stem === "" ? heading : stem.charAt(0).toUpperCase() + stem.slice(1);
 }
 
 function readHeading(body: string): string | undefined {

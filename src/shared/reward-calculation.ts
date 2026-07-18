@@ -168,7 +168,8 @@ export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): numb
 }
 
 export function getMaxRewardPercent(offer: RewardOffer): number {
-  const reward = offer.reward.trim();
+  // "opptil 15 %" must rank as 15, not fall through the anchored patterns
+  const reward = offer.reward.trim().replace(/^(?:opptil|inntil|up to)\s+/i, "");
   const rewardSortValueNok = readRewardSortValueNok(offer);
   const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
   if (rangeMatch !== null) {

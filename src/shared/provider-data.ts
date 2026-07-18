@@ -294,4 +294,9 @@ export const MERCHANT_ALIASES: Record<string, string> = {
   "veromoda": "vero moda",
   "bo hos strawberry": "strawberry",
   "fortum strøm": "fortum",
+  "nordic choice": "strawberry",
+  "nordic choice hotels": "strawberry",
+  "strawberry student- og lærlingtilbud": "strawberry",
+  "ice.net": "ice",
+  "lytt og les gratis i 8 uker med nextory og tf bank mastercard": "nextory",
 };

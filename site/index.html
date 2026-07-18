@@ -1062,6 +1062,7 @@ function normalizeName(name) {
     .replace(/\s*Direct Deals$/i, "")
     .replace(/\s+(?:NO|SE|DK|FI|EU|UK|US)\s*[-–]\s*AFF$/i, "")
     .replace(/\s*[-–]\s*AFF$/i, "")
+    .replace(/\s+(?:NO|SE|DK|FI)$/, "")
     .replace(/\.com$/i, "")
     .replace(/\.no$/i, "")
     .replace(/\.se$/i, "")
@@ -1087,15 +1088,18 @@ function groupByMerchant(offers) {
     return DOMAIN_ALIASES[d] || d;
   }
 
-  // Tracking domains that should be excluded from grouping (shared by many unrelated merchants)
-  const domainCount = {};
+  // Tracking domains that should be excluded from grouping (shared by many unrelated merchants).
+  // Count distinct merchant names per domain — a popular shop has many offers but few names,
+  // a tracking/umbrella domain has many different merchants.
+  const domainNames = {};
   for (const o of offers) {
+    const nameKey = normalizeName(o.merchantName).toLowerCase().replace(/[^a-z0-9]/g, "");
     for (const d of (o.domains || [])) {
-      domainCount[d] = (domainCount[d] || 0) + 1;
+      (domainNames[d] = domainNames[d] || new Set()).add(nameKey);
     }
   }
-  const sharedDomains = new Set(Object.keys(domainCount).filter(d =>
-    domainCount[d] > 8 || d.includes("sjv.io") || d.includes("emjcd.com") || d.includes("jdoqocy.com") || d.includes("dpbolvw.net")
+  const sharedDomains = new Set(Object.keys(domainNames).filter(d =>
+    domainNames[d].size > 8 || d.includes("sjv.io") || d.includes("emjcd.com") || d.includes("jdoqocy.com") || d.includes("dpbolvw.net")
   ));
 
   // Union-find: group offers that share a domain
