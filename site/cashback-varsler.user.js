@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784321761
+// @version      1784371409
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -167,7 +167,9 @@
     coop: "Coop",
     elkjop: "Elkjøp",
     akademikerne: "Akademikerne+",
-    huseierne: "Huseierne"
+    huseierne: "Huseierne",
+    santander: "Santander",
+    norwegian: "Norwegian"
   };
   const FREE_CARDS = [
     {
@@ -7897,9 +7899,38 @@ query SearchSuggestions($query: String!, $category: Int) {
     };
     const response = await sendRuntimeMessage(message);
     if (response !== void 0 && isOffersForUrlResponse(response) && response.ok) {
+      applyRuntimeProviderMeta(response.providers);
       if (response.offers.length > 0) return response.offers;
     }
     return readBundledOffersForCurrentUrl();
+  }
+  const RUNTIME_PROVIDER_META = {};
+  function applyRuntimeProviderMeta(providers) {
+    if (providers === void 0) return;
+    for (const [id, meta] of Object.entries(providers)) {
+      if (!/^[a-z0-9-]+$/.test(id) || !isRecord(meta) || typeof meta.name !== "string") continue;
+      RUNTIME_PROVIDER_META[id] = {
+        name: meta.name,
+        ...typeof meta.tip === "string" ? { tip: meta.tip } : {},
+        ...isCssHexColor(meta.bg) ? { bg: meta.bg } : {},
+        ...isCssHexColor(meta.fg) ? { fg: meta.fg } : {},
+        ...isCssHexColor(meta.border) ? { border: meta.border } : {}
+      };
+      PROVIDER_NAMES[id] = meta.name;
+    }
+  }
+  function isCssHexColor(value) {
+    return typeof value === "string" && /^#[0-9a-fA-F]{3,8}$/.test(value);
+  }
+  function buildRuntimeProviderCss() {
+    return Object.entries(RUNTIME_PROVIDER_META).filter(([, meta]) => meta.bg !== void 0 || meta.fg !== void 0).map(([id, meta]) => {
+      const parts = [];
+      if (meta.bg !== void 0) parts.push(`background: ${meta.bg};`);
+      if (meta.fg !== void 0) parts.push(`color: ${meta.fg};`);
+      if (meta.border !== void 0) parts.push(`border: 1px solid ${meta.border};`);
+      return `
+    .provider-${id} { ${parts.join(" ")} }`;
+    }).join("");
   }
   async function readBundledOffersForCurrentUrl() {
     const parsedUrl = parseUrl(window.location.href);
@@ -7912,6 +7943,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (!isCashbackIndex(value)) {
         return [];
       }
+      applyRuntimeProviderMeta(value.providers);
       return findOffersForHostname(value, parsedUrl.hostname);
     } catch {
       return [];
@@ -11363,13 +11395,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (hostname !== "agoda.com" && !hostname.endsWith(".agoda.com")) return void 0;
     if (!/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?search\/?$/i.test(parsedUrl.pathname)) return void 0;
     const checkIn = readLooseIsoDateParam(parsedUrl, "checkIn");
-    const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut");
-    if (checkIn === void 0 || checkOut === void 0) return void 0;
-    const destinationName = parsedUrl.searchParams.get("textToSearch")?.split(",")[0]?.trim();
-    if (destinationName === void 0 || destinationName.length === 0) return void 0;
+    if (checkIn === void 0) return void 0;
+    const los = readNonNegativeIntegerParam(parsedUrl, "los", 0);
+    const checkOut = readLooseIsoDateParam(parsedUrl, "checkOut") ?? (los > 0 ? addDaysToIsoDate(checkIn, los) : void 0);
+    if (checkOut === void 0) return void 0;
+    const textToSearch = parsedUrl.searchParams.get("textToSearch")?.trim();
+    if (textToSearch === void 0 || textToSearch.length === 0) return void 0;
     const childCount = readNonNegativeIntegerParam(parsedUrl, "children", 0);
-    return {
-      destinationName,
+    const base = {
       checkIn,
       checkOut,
       adults: readNonNegativeIntegerParam(parsedUrl, "adults", 2),
@@ -11377,6 +11410,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       ...childCount > 0 ? { hasUnknownChildren: true } : {},
       rooms: readNonNegativeIntegerParam(parsedUrl, "rooms", 1)
     };
+    const propertyId = readDigitsParam(parsedUrl, "selectedproperty") ?? readDigitsParam(parsedUrl, "hotel");
+    if (propertyId !== void 0) {
+      return { ...base, hotelName: textToSearch };
+    }
+    const destinationName = textToSearch.split(",")[0]?.trim();
+    if (destinationName === void 0 || destinationName.length === 0) return void 0;
+    return { ...base, destinationName };
   }
   function extractBookingHotelSearchResultsMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -13703,6 +13743,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       background: #e30613;
       color: #ffffff;
     }
+    .provider-santander {
+      background: #ffffff;
+      border: 1px solid #ec0000;
+      color: #ec0000;
+    }
     .provider-dnb {
       background: #14555a;
       color: #ffffff;
@@ -14613,12 +14658,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       display: block;
     }
   `;
-    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+    style.textContent += buildRuntimeProviderCss();
+    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank" && o.provider !== "santander");
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const priceMatch = priceMatches[0];
     const bestRegionPrice = regionPrices?.prices[0];
     const curveOffer = offers.find((o) => o.provider === "curve");
-    const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank"]);
+    const CARD_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["sparebank1", "remember", "tfbank", "santander"]);
     const APP_ONLY_PROVIDERS = /* @__PURE__ */ new Set(["klarna", "spenn", "dreams"]);
     const CRYPTO_SUBSCRIPTIONS = {
       "spotify.com": "Spotify",

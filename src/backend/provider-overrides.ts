@@ -1,11 +1,21 @@
-import {
-  type CashbackProvider,
-  isCashbackProvider,
-  isRecord,
-} from "../shared/cashback.js";
+import { isRecord } from "../shared/cashback.js";
 import { readJsonFile } from "./json-file.js";
 
-export type ProviderOverrides = Record<CashbackProvider, Record<string, string[]>>;
+type OverrideDomains = Record<string, string[]>;
+
+// Providers whose crawlers read their overrides with dot access; these keys
+// are required in data/provider-overrides.json. Any other provider id can be
+// present and is looked up dynamically (possibly undefined).
+const REQUIRED_OVERRIDE_PROVIDERS = [
+  "trumf", "klarna", "remember", "sas", "tfbank", "obos", "bob", "usbl",
+  "bate", "tobb", "logbuy", "naf", "tekna", "nito",
+] as const;
+
+type RequiredOverrideProvider = (typeof REQUIRED_OVERRIDE_PROVIDERS)[number];
+
+export type ProviderOverrides =
+  & Record<RequiredOverrideProvider, OverrideDomains>
+  & Partial<Record<string, OverrideDomains>>;
 
 export async function readProviderOverrides(
   filePath: string,
@@ -24,28 +34,11 @@ export function isProviderOverrides(value: unknown): value is ProviderOverrides 
     return false;
   }
 
-  if (
-    !isProviderRecord(value.trumf) ||
-    !isProviderRecord(value.klarna) ||
-    !isProviderRecord(value.remember) ||
-    !isProviderRecord(value.sas) ||
-    !isProviderRecord(value.tfbank) ||
-    !isProviderRecord(value.obos) ||
-    !isProviderRecord(value.bob) ||
-    !isProviderRecord(value.usbl) ||
-    !isProviderRecord(value.bate) ||
-    !isProviderRecord(value.tobb) ||
-    !isProviderRecord(value.logbuy) ||
-    !isProviderRecord(value.naf) ||
-    !isProviderRecord(value.tekna) ||
-    !isProviderRecord(value.nito)
-  ) {
+  if (!REQUIRED_OVERRIDE_PROVIDERS.every((provider) => isProviderRecord(value[provider]))) {
     return false;
   }
 
-  return Object.keys(value).every((provider) => {
-    return isCashbackProvider(provider);
-  });
+  return Object.values(value).every(isProviderRecord);
 }
 
 function isProviderRecord(value: unknown): value is Record<string, string[]> {

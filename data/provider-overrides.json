@@ -2235,5 +2235,15 @@
       "vaskeladden.no"
     ]
   },
-  "huseierne": {}
+  "huseierne": {},
+  "santander": {
+    "lensway": [
+      "lensway.no"
+    ]
+  },
+  "norwegian": {
+    "avis": [
+      "avis.no"
+    ]
+  }
 }

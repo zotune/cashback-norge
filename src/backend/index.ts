@@ -14,6 +14,7 @@ import {
 import {
   addFixedRewardSortValues,
 } from "../shared/reward-calculation.js";
+import { buildProviderMeta } from "../shared/provider-data.js";
 import { buildDomainLookup } from "./domain-lookup.js";
 import { readDomainRedirects } from "./domain-redirects.js";
 import { readJsonFile, writeJsonFile } from "./json-file.js";
@@ -23,7 +24,8 @@ import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
-import { fetchTfBank } from "./providers/tfbank.js";
+import { fetchDealpass } from "./providers/dealpass.js";
+import { fetchNorwegianReward } from "./providers/norwegian.js";
 import { crawlTrumf } from "./providers/trumf.js";
 import { crawlCuponation } from "./providers/cuponation.js";
 import { fetchDnb, fetchDnbSupertilbud } from "./providers/dnb.js";
@@ -78,12 +80,17 @@ type CliConfig = {
   trumfStartUrl: string;
   sasApiUrl: string;
   tfBankApiUrl: string;
+  santanderApiUrl: string;
+  norwegianApiUrl: string;
+  norwegianGridListId: number;
   maxRequestsPerCrawl: number;
   skipKlarna: boolean;
   skipRemember: boolean;
   skipTrumf: boolean;
   skipSas: boolean;
   skipTfBank: boolean;
+  skipSantander: boolean;
+  skipNorwegian: boolean;
   skipCuponation: boolean;
   skipDnb: boolean;
   skipCurve: boolean;
@@ -176,6 +183,8 @@ async function main(): Promise<void> {
     klarnaOffers,
     rememberOffers,
     tfBankOffers,
+    santanderOffers,
+    norwegianOffers,
     dnbOffers,
     dnbSupertilbudOffers,
     norskfamilieOffers,
@@ -219,8 +228,35 @@ async function main(): Promise<void> {
     config.skipTfBank ? Promise.resolve([]) : collectOffers({
       label: "TF Bank",
       provider: "tfbank",
-      run: () => fetchTfBank({
+      run: () => fetchDealpass({
         generatedAt, logger, apiUrl: config.tfBankApiUrl,
+        provider: "tfbank", label: "TF Bank",
+        siteBaseUrl: "https://tfbank.dealpass.no",
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipSantander ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Santander",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "santander",
+      reusePreviousOnFailure: true,
+      run: () => fetchDealpass({
+        generatedAt, logger, apiUrl: config.santanderApiUrl,
+        provider: "santander", label: "Santander",
+        siteBaseUrl: "https://santander.dealpass.no",
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipNorwegian ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Norwegian Reward",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "norwegian",
+      reusePreviousOnFailure: true,
+      run: () => fetchNorwegianReward({
+        generatedAt, logger, apiUrl: config.norwegianApiUrl,
+        gridListId: config.norwegianGridListId,
         overrides: providerOverrides,
       }),
     }),
@@ -370,6 +406,8 @@ async function main(): Promise<void> {
     ...klarnaOffers,
     ...rememberOffers,
     ...tfBankOffers,
+    ...santanderOffers,
+    ...norwegianOffers,
     ...dnbOffers,
     ...dnbSupertilbudOffers,
     ...norskfamilieOffers,
@@ -599,7 +637,7 @@ async function main(): Promise<void> {
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
   const fullDomainLookup = buildDomainLookup([
-    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...dnbOffers,
+    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...norwegianOffers, ...dnbOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
     ...sparebank1Offers, ...spareborsenOffers, ...coopOffers, ...manualOffers,
     ...partnerAdsOffers,
@@ -630,7 +668,7 @@ async function main(): Promise<void> {
     ? "Exchange rates: using static fallback for fixed reward sorting"
     : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
   const offers = uniqueOffers(addFixedRewardSortValues(
-    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
+    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
     exchangeRates ?? STATIC_NOK_BASE_RATES,
   ));
 
@@ -648,7 +686,7 @@ async function main(): Promise<void> {
   );
   logger.info(`Domain redirects: ${Object.keys(domainRedirects).length} mappings loaded`);
 
-  const cashbackIndex = buildCashbackIndex(offers, generatedAt, domainRedirects);
+  const cashbackIndex = buildCashbackIndex(offers, generatedAt, domainRedirects, buildProviderMeta());
 
   await writeJsonFile(config.outputPath, cashbackIndex);
   logger.info(
@@ -691,6 +729,17 @@ function readCliConfig(args: string[]): CliConfig {
     tfBankApiUrl:
       readArgumentValue(args, "--tfbank-api-url") ??
       "https://tfbank.dealpass.no/ajax/deals",
+    santanderApiUrl:
+      readArgumentValue(args, "--santander-api-url") ??
+      "https://santander.dealpass.no/ajax/deals",
+    norwegianApiUrl:
+      readArgumentValue(args, "--norwegian-api-url") ??
+      "https://www.norwegian.com/api/gridlist",
+    norwegianGridListId: readPositiveIntegerArgument(
+      args,
+      "--norwegian-gridlist-id",
+      310184,
+    ),
     maxRequestsPerCrawl: readPositiveIntegerArgument(
       args,
       "--max-requests",
@@ -701,6 +750,8 @@ function readCliConfig(args: string[]): CliConfig {
     skipTrumf: args.includes("--skip-trumf"),
     skipSas: args.includes("--skip-sas"),
     skipTfBank: args.includes("--skip-tfbank"),
+    skipSantander: args.includes("--skip-santander"),
+    skipNorwegian: args.includes("--skip-norwegian"),
     skipCuponation: args.includes("--skip-cuponation"),
     skipDnb: args.includes("--skip-dnb"),
     skipCurve: args.includes("--skip-curve"),

@@ -1,6 +1,8 @@
 import {
   type CashbackOffer,
+  type ProviderMeta,
   isCashbackOffer,
+  isProviderMeta,
   isRecord,
 } from "./cashback.js";
 import type {
@@ -14,6 +16,7 @@ import {
 export type CashbackFoundMessage = {
   type: "cashback-found";
   offers: CashbackOffer[];
+  providers?: Record<string, ProviderMeta>;
 };
 
 export type CashbackNoneMessage = {
@@ -66,6 +69,7 @@ export type OffersForUrlResponse =
   | {
       ok: true;
       offers: CashbackOffer[];
+      providers?: Record<string, ProviderMeta>;
     }
   | {
       ok: false;
@@ -147,7 +151,17 @@ export function isCashbackFoundMessage(
     isRecord(value) &&
     value.type === "cashback-found" &&
     Array.isArray(value.offers) &&
-    value.offers.every(isCashbackOffer)
+    value.offers.every(isCashbackOffer) &&
+    isOptionalProviderMetaRecord(value.providers)
+  );
+}
+
+function isOptionalProviderMetaRecord(
+  value: unknown,
+): value is Record<string, ProviderMeta> | undefined {
+  return (
+    value === undefined ||
+    (isRecord(value) && Object.values(value).every(isProviderMeta))
   );
 }
 
@@ -225,7 +239,8 @@ export function isOffersForUrlResponse(
   if (value.ok) {
     return (
       Array.isArray(value.offers) &&
-      value.offers.every(isCashbackOffer)
+      value.offers.every(isCashbackOffer) &&
+      isOptionalProviderMetaRecord(value.providers)
     );
   }
 

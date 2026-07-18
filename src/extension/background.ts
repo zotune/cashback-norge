@@ -124,6 +124,7 @@ async function findOffersForUrl(
   return {
     ok: true,
     offers: findOffersForHostname(cashbackIndex, parsedUrl.hostname),
+    ...(cashbackIndex.providers !== undefined ? { providers: cashbackIndex.providers } : {}),
   };
 }
 
@@ -222,7 +223,13 @@ async function notifyTab(tabId: number, url: string): Promise<void> {
   const cashbackIndex = await ensureIndex();
   const offers = findOffersForHostname(cashbackIndex, parsedUrl.hostname);
   const message: CashbackFoundMessage | CashbackNoneMessage =
-    offers.length > 0 ? { type: "cashback-found", offers } : { type: "cashback-none" };
+    offers.length > 0
+      ? {
+        type: "cashback-found",
+        offers,
+        ...(cashbackIndex.providers !== undefined ? { providers: cashbackIndex.providers } : {}),
+      }
+      : { type: "cashback-none" };
 
   await sendTabMessage(tabId, message);
 }

@@ -1,6 +1,6 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
-import { type CashbackOffer } from "../../shared/cashback.js";
+import { normalizeDomainInput, parseUrl, type CashbackOffer } from "../../shared/cashback.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 
@@ -137,8 +137,71 @@ export async function fetchSpenn(options: {
     });
   }
 
+  // Fixed sign-up bonuses (e.g. Fortum: "4000 Spenn etter 90 dager") link
+  // straight to the merchant instead of via refunder, so they are handled
+  // separately from the percentage rates above.
+  const seenFixed = new Set<string>();
+
+  for (const item of allItems) {
+    const merchantName = item.merchant?.name;
+    if (!merchantName || best.has(merchantName) || seenFixed.has(merchantName)) continue;
+
+    const link = item.externalTarget?.link ?? "";
+    if (link.includes("refunder.com")) continue;
+
+    const parsed = parseSpennFixedBonus(item.longDescription ?? "");
+    if (!parsed) continue;
+
+    seenFixed.add(merchantName);
+    const cleanLink = link.replace(/[?&]nonce=\{nonce\}\}?/, "").replace(/\{nonce\}/, "");
+    const linkDomain = extractLinkDomain(cleanLink);
+    const domains = linkDomain !== undefined
+      ? [linkDomain]
+      : lookupDomains(domainLookup, merchantName);
+
+    offers.push({
+      provider: "spenn",
+      merchantName,
+      domains,
+      reward: parsed.rate,
+      sourceUrl: "https://app.spenngroup.com",
+      activationUrl: cleanLink !== "" ? cleanLink : "https://app.spenngroup.com",
+      terms: parsed.terms,
+      updatedAt: generatedAt,
+    });
+  }
+
   logger.info(`Spenn: ${offers.length} Norwegian cashback offers`);
   return offers;
+}
+
+/**
+ * Parses fixed bonuses like "4000 Spenn etter 90 dager" from the offer
+ * description. 1 Spenn = 10 øre, so 4000 Spenn = 400 kr.
+ */
+function parseSpennFixedBonus(desc: string): ParsedRate | undefined {
+  const match = desc.match(/(\d[\d\s.]*)\s*Spenn\s+etter\s+\d+\s*(?:dager|mnd|måneder)/i);
+  if (!match) return undefined;
+
+  const spenn = Number.parseInt((match[1] ?? "").replace(/[\s.]/g, ""), 10);
+  if (!Number.isFinite(spenn) || spenn <= 0) return undefined;
+
+  const kr = Math.round(spenn / 10);
+  const bonusLines = [...desc.matchAll(/^[-*]\s*(.*\bSpenn\b.*)$/gm)]
+    .map((m) => (m[1] ?? "").trim())
+    .filter((line) => line !== "");
+  const terms = bonusLines.length > 0
+    ? `1 Spenn = 10 øre.\n${bonusLines.join("\n")}`
+    : `${spenn} Spenn (1 Spenn = 10 øre).`;
+
+  return { rate: `${kr} kr`, maxVal: kr, terms };
+}
+
+function extractLinkDomain(link: string): string | undefined {
+  const parsed = parseUrl(link);
+  if (parsed === undefined) return undefined;
+  const hostname = normalizeDomainInput(parsed.hostname);
+  return hostname !== "" ? hostname : undefined;
 }
 
 type ParsedRate = { rate: string; maxVal: number; terms: string };

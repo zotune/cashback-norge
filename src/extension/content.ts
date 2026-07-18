@@ -244,6 +244,7 @@ type OffersForUrlResponse =
   | {
       ok: true;
       offers: CashbackOffer[];
+      providers?: Record<string, unknown>;
     }
   | {
       ok: false;
@@ -936,9 +937,47 @@ async function getCurrentOffers(): Promise<CashbackOffer[]> {
   };
   const response = await sendRuntimeMessage<OffersForUrlResponse>(message);
   if (response !== undefined && isOffersForUrlResponse(response) && response.ok) {
+    applyRuntimeProviderMeta(response.providers);
     if (response.offers.length > 0) return response.offers;
   }
   return readBundledOffersForCurrentUrl();
+}
+
+// Chip metadata delivered with the cashback index, so providers added after
+// this extension build still get correct names and colors.
+type RuntimeProviderMeta = { name: string; tip?: string; bg?: string; fg?: string; border?: string };
+const RUNTIME_PROVIDER_META: Record<string, RuntimeProviderMeta> = {};
+
+function applyRuntimeProviderMeta(providers: Record<string, unknown> | undefined): void {
+  if (providers === undefined) return;
+  for (const [id, meta] of Object.entries(providers)) {
+    if (!/^[a-z0-9-]+$/.test(id) || !isRecord(meta) || typeof meta.name !== "string") continue;
+    RUNTIME_PROVIDER_META[id] = {
+      name: meta.name,
+      ...(typeof meta.tip === "string" ? { tip: meta.tip } : {}),
+      ...(isCssHexColor(meta.bg) ? { bg: meta.bg } : {}),
+      ...(isCssHexColor(meta.fg) ? { fg: meta.fg } : {}),
+      ...(isCssHexColor(meta.border) ? { border: meta.border } : {}),
+    };
+    PROVIDER_NAMES[id] = meta.name;
+  }
+}
+
+function isCssHexColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{3,8}$/.test(value);
+}
+
+function buildRuntimeProviderCss(): string {
+  return Object.entries(RUNTIME_PROVIDER_META)
+    .filter(([, meta]) => meta.bg !== undefined || meta.fg !== undefined)
+    .map(([id, meta]) => {
+      const parts: string[] = [];
+      if (meta.bg !== undefined) parts.push(`background: ${meta.bg};`);
+      if (meta.fg !== undefined) parts.push(`color: ${meta.fg};`);
+      if (meta.border !== undefined) parts.push(`border: 1px solid ${meta.border};`);
+      return `\n    .provider-${id} { ${parts.join(" ")} }`;
+    })
+    .join("");
 }
 async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
   const parsedUrl = parseUrl(window.location.href);
@@ -954,6 +993,7 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
     if (!isCashbackIndex(value)) {
       return [];
     }
+    applyRuntimeProviderMeta((value as { providers?: Record<string, unknown> }).providers);
     return findOffersForHostname(value, parsedUrl.hostname);
   } catch {
     return [];
@@ -9928,6 +9968,11 @@ function renderNotice(
       background: #e30613;
       color: #ffffff;
     }
+    .provider-santander {
+      background: #ffffff;
+      border: 1px solid #ec0000;
+      color: #ec0000;
+    }
     .provider-dnb {
       background: #14555a;
       color: #ffffff;
@@ -10838,12 +10883,13 @@ function renderNotice(
       display: block;
     }
   `;
-  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+  style.textContent += buildRuntimeProviderCss();
+  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank" && o.provider !== "santander");
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const priceMatch = priceMatches[0];
   const bestRegionPrice = regionPrices?.prices[0];
   const curveOffer = offers.find((o) => o.provider === "curve");
-  const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank"]);
+  const CARD_ONLY_PROVIDERS = new Set(["sparebank1", "remember", "tfbank", "santander"]);
   const APP_ONLY_PROVIDERS = new Set(["klarna", "spenn", "dreams"]);
   const CRYPTO_SUBSCRIPTIONS: Record<string, string> = {
     "spotify.com": "Spotify",

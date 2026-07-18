@@ -1,7 +1,8 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
+// Shared crawler for Dealpass-based benefit programs (TF Bank, Santander, ...).
 import { gotScraping } from "crawlee";
-import type { CashbackOffer } from "../../shared/cashback.js";
+import type { CashbackOffer, CashbackProvider } from "../../shared/cashback.js";
 import { normalizeDomainInput, parseUrl } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -21,17 +22,21 @@ type DealpassResponse = {
   summary: { total_deals_available: number };
 };
 
-export type FetchTfBankInput = {
+export type FetchDealpassInput = {
+  provider: CashbackProvider;
+  label: string;
+  /** e.g. "https://tfbank.dealpass.no" */
+  siteBaseUrl: string;
   apiUrl: string;
   generatedAt: string;
   logger: Logger;
   overrides: ProviderOverrides;
 };
 
-export async function fetchTfBank(
-  input: FetchTfBankInput,
+export async function fetchDealpass(
+  input: FetchDealpassInput,
 ): Promise<CashbackOffer[]> {
-  input.logger.info(`Fetching TF Bank deals from ${input.apiUrl}`);
+  input.logger.info(`Fetching ${input.label} deals from ${input.apiUrl}`);
 
   const allDeals: DealpassDeal[] = [];
   let offset = 0;
@@ -47,14 +52,14 @@ export async function fetchTfBank(
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw new Error(
-        `TF Bank API returned ${response.statusCode}: ${response.statusMessage}`,
+        `${input.label} API returned ${response.statusCode}: ${response.statusMessage}`,
       );
     }
 
     const body: unknown = response.body;
 
     if (!isDealpassResponse(body)) {
-      throw new Error("TF Bank API returned unexpected data format");
+      throw new Error(`${input.label} API returned unexpected data format`);
     }
 
     allDeals.push(...body.deals);
@@ -66,7 +71,7 @@ export async function fetchTfBank(
     offset += limit;
   }
 
-  input.logger.info(`Fetched ${allDeals.length} total TF Bank deals`);
+  input.logger.info(`Fetched ${allDeals.length} total ${input.label} deals`);
 
   const offers: CashbackOffer[] = [];
 
@@ -86,19 +91,19 @@ export async function fetchTfBank(
     let finalDomains: string[];
 
     const slug = deal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const overrideDomains = input.overrides.tfbank[slug];
+    const overrideDomains = (input.overrides[input.provider] ?? {})[slug];
 
     if (overrideDomains !== undefined && overrideDomains.length > 0) {
       finalDomains = overrideDomains;
     } else if (isRedirectDomain(domain)) {
-      const resolved = await resolveRedirectDomain(voucherUrl, input.logger);
+      const resolved = await resolveRedirectDomain(voucherUrl, input.label, input.logger);
       finalDomains = resolved !== undefined ? [resolved] : [];
     } else {
       finalDomains = [domain];
     }
 
     if (finalDomains.length === 0) {
-      input.logger.warn(`TF Bank deal has no resolvable domain: ${deal.name} (${voucherUrl})`);
+      input.logger.warn(`${input.label} deal has no resolvable domain: ${deal.name} (${voucherUrl})`);
       continue;
     }
 
@@ -111,7 +116,7 @@ export async function fetchTfBank(
     const merchantName = cleanMerchantName(deal.name);
     const firstDomain = finalDomains[0] ?? deal.name.toLowerCase();
     const searchParam = encodeURIComponent(firstDomain.replace(/\.(no|com|se)$/, ""));
-    const dealUrl = `https://tfbank.dealpass.no/deal/${deal.id}?search=${searchParam}`;
+    const dealUrl = `${input.siteBaseUrl}/deal/${deal.id}?search=${searchParam}`;
 
     const voucherCode = deal.claim?.voucher?.code;
     const discountCode = typeof voucherCode === "string" && voucherCode.trim() !== ""
@@ -119,7 +124,7 @@ export async function fetchTfBank(
       : undefined;
 
     offers.push({
-      provider: "tfbank",
+      provider: input.provider,
       merchantName,
       domains: finalDomains,
       reward: `${discount}%`,
@@ -131,7 +136,7 @@ export async function fetchTfBank(
     });
   }
 
-  input.logger.info(`Found ${offers.length} TF Bank offers with domains`);
+  input.logger.info(`Found ${offers.length} ${input.label} offers with domains`);
   return offers;
 }
 
@@ -165,6 +170,7 @@ function isRedirectDomain(domain: string): boolean {
 
 async function resolveRedirectDomain(
   url: string,
+  label: string,
   logger: Logger,
   maxRedirects = 8,
 ): Promise<string | undefined> {
@@ -206,7 +212,7 @@ async function resolveRedirectDomain(
 
       currentUrl = resolved.toString();
     } catch {
-      logger.warn(`TF Bank: failed to follow redirect for ${currentUrl}`);
+      logger.warn(`${label}: failed to follow redirect for ${currentUrl}`);
       break;
     }
   }

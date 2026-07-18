@@ -303,6 +303,7 @@ a.merchant-name:hover { text-decoration: underline; }
 .badge-akademikerne { background: #fff7f0; border: 1px solid #e8d9c8; color: #113063; }
 .badge-huseierne { background: #ffffff; border: 1px solid #d5ddd9; color: #0f1a18; }
 .badge-rabattkode { background: #fff; border: 1px solid #d3e2dc; color: #333; }
+.badge-santander { background: #ffffff; border: 1px solid #ec0000; color: #ec0000; }
 .badge-cbn { background: #f7d7e6; color: #8f164f; }
 .empty {
   color: #8a9a92;
@@ -938,11 +939,33 @@ let curveDomains = new Set();
 
 let currentAmount = 0;
 
+function applyProviderMeta(providers) {
+  if (!providers || typeof providers !== "object") return;
+  const isColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v);
+  const rules = [];
+  for (const [id, meta] of Object.entries(providers)) {
+    if (!/^[a-z0-9-]+$/.test(id) || !meta || typeof meta.name !== "string") continue;
+    PROVIDER_NAMES[id] = meta.name;
+    if (typeof meta.tip === "string") PROVIDER_TIPS[id] = meta.tip;
+    const parts = [];
+    if (isColor(meta.bg)) parts.push(`background: ${meta.bg};`);
+    if (isColor(meta.fg)) parts.push(`color: ${meta.fg};`);
+    if (isColor(meta.border)) parts.push(`border: 1px solid ${meta.border};`);
+    if (parts.length > 0) rules.push(`.badge-${id} { ${parts.join(" ")} }`);
+  }
+  if (rules.length > 0) {
+    const style = document.createElement("style");
+    style.textContent = rules.join("\n");
+    document.head.appendChild(style);
+  }
+}
+
 async function init() {
   renderTips();
   setupBonusToggle();
   const res = await fetch("cashback-index.json");
   const data = await res.json();
+  applyProviderMeta(data.providers);
   allMerchants = groupByMerchant(data.offers);
   curveDomains = new Set(data.offers.filter(o => o.provider === "curve").flatMap(o => o.domains));
   for (const [domain, name] of Object.entries(CRYPTO_SUBSCRIPTIONS)) {

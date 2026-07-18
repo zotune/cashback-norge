@@ -1,3 +1,5 @@
+import type { ProviderMeta } from "./cashback.js";
+
 export const EB_PER_TRUMF_KR = 13.5;
 
 export const PROVIDER_NAMES: Record<string, string> = {
@@ -35,6 +37,8 @@ export const PROVIDER_NAMES: Record<string, string> = {
   elkjop: "Elkjøp",
   akademikerne: "Akademikerne+",
   huseierne: "Huseierne",
+  santander: "Santander",
+  norwegian: "Norwegian",
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
@@ -66,9 +70,11 @@ export const PROVIDER_TIPS: Record<string, string> = {
   elkjop: "Elkjøps Kundeklubb.\nKrever gratis kundeklubbmedlemskap.\nAktiver eller hent kode via Elkjøp.",
   akademikerne: "Akademikerne Pluss medlemsfordeler.\nKrever medlemskap i en tilknyttet fagforening.\nAktiver via akademikernepluss.no eller A+-appen.",
   huseierne: "Huseiernes medlemsfordeler.\nKrever Huseierne-medlemskap.\nVis medlemskort eller hent rabattkode via huseierne.no.",
+  santander: "Santander-kredittkort.\nKrever kredittkort fra Santander.\nAktiver tilbudet via santander.dealpass.no.",
+  norwegian: "Norwegian Reward.\nGratis fordelsprogram.\nTjen CashPoints via partnersiden på norwegian.com.\n1 CashPoint = 1 kr på Norwegian-kjøp.",
 };
 
-export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
+export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: string }> = {
   crypto: { bg: "#002d74", fg: "#ffffff" },
   remember: { bg: "#111111", fg: "#ff9900" },
   klarna: { bg: "#ffa8cd", fg: "#0b051d" },
@@ -81,12 +87,12 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
   logbuy: { bg: "#d81939", fg: "#ffffff" },
   obos: { bg: "#003087", fg: "#ffffff" },
-  bob: { bg: "#ffffff", fg: "#5b2486" },
+  bob: { bg: "#ffffff", fg: "#5b2486", border: "#d3e2dc" },
   usbl: { bg: "#34413e", fg: "#ffffff" },
-  bate: { bg: "#ffffff", fg: "#ef1c24" },
+  bate: { bg: "#ffffff", fg: "#ef1c24", border: "#ef1c24" },
   tobb: { bg: "#00466b", fg: "#ffffff" },
   naf: { bg: "#FFD100", fg: "#000000" },
-  tekna: { bg: "#ffffff", fg: "#00a3ad" },
+  tekna: { bg: "#ffffff", fg: "#00a3ad", border: "#d3e2dc" },
   nito: { bg: "#c8e6b8", fg: "#003b00" },
   sparebank1: { bg: "#005aa4", fg: "#ffffff" },
   studentkortet: { bg: "#1B2838", fg: "#ffffff" },
@@ -96,15 +102,33 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string }> = {
   spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
   rabble: { bg: "#2d2145", fg: "#f8a6a6" },
   dreams: { bg: "#a389d8", fg: "#1a1a1a" },
-  utdanningibergen: { bg: "#ffffff", fg: "#000000" },
+  utdanningibergen: { bg: "#ffffff", fg: "#000000", border: "#cccccc" },
   unidays: { bg: "#00b140", fg: "#ffffff" },
-  unio: { bg: "#ffffff", fg: "#6b5330" },
+  unio: { bg: "#ffffff", fg: "#6b5330", border: "#c9b896" },
   coop: { bg: "#003366", fg: "#ffffff" },
   elkjop: { bg: "#1d1b58", fg: "#ffffff" },
-  akademikerne: { bg: "#fff7f0", fg: "#113063" },
-  huseierne: { bg: "#ffffff", fg: "#0f1a18" },
+  akademikerne: { bg: "#fff7f0", fg: "#113063", border: "#e8d9c8" },
+  huseierne: { bg: "#ffffff", fg: "#0f1a18", border: "#d5ddd9" },
+  santander: { bg: "#ffffff", fg: "#ec0000", border: "#ec0000" },
+  norwegian: { bg: "#d81939", fg: "#ffffff" },
   cbn: { bg: "#ffe4e6", fg: "#be123c" },
 };
+
+// Chip/badge metadata shipped inside cashback-index.json so that published
+// extensions and the site can render providers added after they were built.
+export function buildProviderMeta(): Record<string, ProviderMeta> {
+  const meta: Record<string, ProviderMeta> = {};
+  for (const [id, name] of Object.entries(PROVIDER_NAMES)) {
+    const tip = PROVIDER_TIPS[id];
+    const colors = PROVIDER_COLORS[id];
+    meta[id] = {
+      name,
+      ...(tip !== undefined ? { tip } : {}),
+      ...(colors !== undefined ? colors : {}),
+    };
+  }
+  return meta;
+}
 
 export type BonusCard = {
   pct: number;
@@ -254,4 +278,5 @@ export const MERCHANT_ALIASES: Record<string, string> = {
   "new vetzoo.no kco v.3 b2b recurring": "vetzoo",
   "veromoda": "vero moda",
   "bo hos strawberry": "strawberry",
+  "fortum strøm": "fortum",
 };

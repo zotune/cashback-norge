@@ -2,7 +2,18 @@ import { normalizeRewardLabel } from "./reward.js";
 
 const EB_PER_TRUMF_KR = 13.5;
 
-export type CashbackProvider = "trumf" | "klarna" | "remember" | "sas" | "tfbank" | "dnb" | "curve" | "rabattkode" | "norskfamilie" | "obos" | "bob" | "usbl" | "bate" | "tobb" | "logbuy" | "naf" | "tekna" | "nito" | "sparebank1" | "studentkortet" | "nettbonus" | "spenn" | "spareborsen" | "rabble" | "dreams" | "utdanningibergen" | "unidays" | "cbn" | "studenttorget" | "unio" | "coop" | "elkjop" | "akademikerne" | "huseierne";
+// Provider ids are open-ended strings so that shipped extensions accept
+// indexes containing providers added after the extension was published.
+// Display metadata for new providers travels in CashbackIndex.providers.
+export type CashbackProvider = string;
+
+export type ProviderMeta = {
+  name: string;
+  tip?: string;
+  bg?: string;
+  fg?: string;
+  border?: string;
+};
 
 export type CashbackOffer = {
   provider: CashbackProvider;
@@ -22,6 +33,7 @@ export type CashbackIndex = {
   generatedAt: string;
   offers: CashbackOffer[];
   domainIndex: Record<string, CashbackOffer[]>;
+  providers?: Record<string, ProviderMeta>;
 };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,7 +41,21 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isCashbackProvider(value: unknown): value is CashbackProvider {
-  return value === "trumf" || value === "klarna" || value === "remember" || value === "sas" || value === "tfbank" || value === "dnb" || value === "curve" || value === "rabattkode" || value === "norskfamilie" || value === "obos" || value === "bob" || value === "usbl" || value === "bate" || value === "tobb" || value === "logbuy" || value === "naf" || value === "tekna" || value === "nito" || value === "sparebank1" || value === "studentkortet" || value === "nettbonus" || value === "spenn" || value === "spareborsen" || value === "rabble" || value === "dreams" || value === "utdanningibergen" || value === "unidays" || value === "cbn" || value === "studenttorget" || value === "unio" || value === "coop" || value === "elkjop" || value === "akademikerne" || value === "huseierne";
+  return typeof value === "string" && value.length > 0;
+}
+
+export function isProviderMeta(value: unknown): value is ProviderMeta {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.name === "string" &&
+    (value.tip === undefined || typeof value.tip === "string") &&
+    (value.bg === undefined || typeof value.bg === "string") &&
+    (value.fg === undefined || typeof value.fg === "string") &&
+    (value.border === undefined || typeof value.border === "string")
+  );
 }
 
 export function isCashbackOffer(value: unknown): value is CashbackOffer {
@@ -62,7 +88,9 @@ export function isCashbackIndex(value: unknown): value is CashbackIndex {
     typeof value.version !== "number" ||
     typeof value.generatedAt !== "string" ||
     !Array.isArray(value.offers) ||
-    !isRecord(value.domainIndex)
+    !isRecord(value.domainIndex) ||
+    (value.providers !== undefined &&
+      !(isRecord(value.providers) && Object.values(value.providers).every(isProviderMeta)))
   ) {
     return false;
   }
@@ -225,6 +253,7 @@ export function buildCashbackIndex(
   offers: CashbackOffer[],
   generatedAt: string,
   domainRedirects: Record<string, string> = {},
+  providers?: Record<string, ProviderMeta>,
 ): CashbackIndex {
   const normalizedOffers = offers.map((offer) => {
     return {
@@ -307,6 +336,7 @@ export function buildCashbackIndex(
     generatedAt,
     offers: sortOffers(uniqueOffers(normalizedOffers)),
     domainIndex,
+    ...(providers !== undefined ? { providers } : {}),
   };
 }
 
