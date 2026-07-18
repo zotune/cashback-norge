@@ -15,7 +15,9 @@ type RewardOffer = {
 export function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
 
-  if (trimmedReward.length === 0 || isGenericMembershipReward(trimmedReward)) return "?";
+  if (trimmedReward.length === 0) return "?";
+  // Generic labels ("Medlemspris") carry more information than "?"
+  if (isGenericMembershipReward(trimmedReward)) return "Medlemspris";
 
   if (provider === "sas") {
     const converted = convertSasToPercent(trimmedReward);

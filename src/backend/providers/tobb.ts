@@ -11,6 +11,7 @@ import {
   uniqueStrings,
 } from "../../shared/cashback.js";
 import {
+  extractBenefitReward,
   extractGratisReward,
   extractKrReward,
   extractOreLitreReward,
@@ -166,7 +167,7 @@ export async function crawlTobb(input: CrawlTobbInput): Promise<CashbackOffer[]>
       provider: "tobb",
       merchantName: merchantNameForEntry(entry.name, domains),
       domains: uniqueStrings(domains),
-      reward: entry.reward || extractTobbReward(entry.terms) || "?",
+      reward: entry.reward || extractTobbReward(entry.terms) || extractBenefitReward(entry.terms) || "?",
       sourceUrl: entry.sourceUrl,
       activationUrl: entry.sourceUrl,
       terms: entry.terms,

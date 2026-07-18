@@ -263,6 +263,18 @@ export function extractBenefitReward(text: string): string {
   const kr = extractKrReward(rewardText);
   if (kr) return kr;
 
+  // Mid-sentence values the positional kr patterns can't see:
+  // "gavekort på kr 750,-", "Tibber Pulse kostnadsfritt … verdi på 995 kroner"
+  const giftMatch = text.match(
+    /(?:gavekort|verdikupong)[^.\n]{0,50}?(?:på|verdt)\s+(?:kr\s*)?(\d[\d\s.]*\d|\d)\s*(?:kr|kroner|,-)/i,
+  ) ?? text.match(/\bverdi\s+på\s+(?:kr\s*)?(\d[\d\s.]*\d|\d)\s*(?:kr|kroner|,-)/i);
+  if (giftMatch !== null) {
+    const amount = Number.parseInt((giftMatch[1] ?? "").replace(/[\s.]/g, ""), 10);
+    if (Number.isFinite(amount) && amount > 0) {
+      return `${amount.toLocaleString("nb-NO").replace(/[  ]/g, " ")} kr`;
+    }
+  }
+
   if (/\bmedlemspris(?:er)?\b/i.test(text)) return "Medlemspris";
   const gratis = extractGratisReward(text);
   if (gratis) return gratis;
@@ -283,7 +295,7 @@ export function relevantBenefitRewardText(text: string): string {
       // or "AUBO-kjøkken: 25 % rabatt".
       if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s+(?:på|hos|i)\b|$)/i.test(line)) return true;
 
-      return /\b(?:rabatt(?:er)?|medlemsrabatt|besparelse|avslag|spar|tilbud|medlemspris(?:er)?|bonus)\b/i.test(line) ||
+      return /\b(?:rabatt(?:er)?|medlemsrabatt|besparelse|avslag|spar|tilbud|medlemspris(?:er)?|bonus|gavekort|kostnadsfritt|verdi)\b/i.test(line) ||
         /\bhalv\s+pris\b/i.test(line);
     })
     .join("\n");

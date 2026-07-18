@@ -121,11 +121,20 @@ async function parseRememberOffer(
     ]);
   }
 
+  const reward = extractReward(store);
+
+  // "Direct Deals" entries without commission data have neither a reward nor
+  // usable domains; they only produce junk "?"-cards on the site.
+  if (reward === "" && domains.length === 0) {
+    logger.info(`re:member: skipping ${store.name} (no reward and no domains)`);
+    return undefined;
+  }
+
   return {
     provider: "remember",
     merchantName: store.name,
     domains,
-    reward: extractReward(store),
+    reward,
     sourceUrl,
     activationUrl: sourceUrl,
     terms: extractTerms(store),

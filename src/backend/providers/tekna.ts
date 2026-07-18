@@ -9,7 +9,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractBenefitReward, extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -308,6 +308,12 @@ function extractTeknaReward(text: string): string {
 
   if (/\bgratis\b/i.test(text)) return "Gratis";
   if (/\bmedlemspris\b/i.test(text)) return "Medlemspris";
+
+  // Last resort before "?": the shared extractor knows more patterns
+  // (gift-card values, "verdi på X kroner", generic labels).
+  const shared = extractBenefitReward(text);
+  if (shared) return shared;
+
   if (hasDiscountWord(text)) return "?";
 
   return "";
