@@ -37,6 +37,7 @@ jobs:
         env:
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
           SCRAPERAPI_KEY2: ${{ secrets.SCRAPERAPI_KEY2 }}
+          SCRAPERAPI_KEY3: ${{ secrets.SCRAPERAPI_KEY3 }}
           PARTNER_ADS_API_KEY: ${{ secrets.PARTNER_ADS_API_KEY }}
           TRADETRACKER_CUSTOMER_ID: ${{ secrets.TRADETRACKER_CUSTOMER_ID }}
           TRADETRACKER_PASSPHRASE: ${{ secrets.TRADETRACKER_PASSPHRASE }}
