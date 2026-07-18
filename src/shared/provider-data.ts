@@ -5,6 +5,7 @@ export const EB_PER_TRUMF_KR = 13.5;
 export const PROVIDER_NAMES: Record<string, string> = {
   trumf: "Trumf",
   klarna: "Klarna",
+  coupert: "Coupert",
   remember: "re:member",
   sas: "SAS",
   tfbank: "TF Bank",
@@ -49,6 +50,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
 export const PROVIDER_TIPS: Record<string, string> = {
   trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
   klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
+  coupert: "Coupert.\nGratis cashback. Logg inn hos Coupert og aktiver cashback før kjøpet.\nFullfør kjøpet på butikkens nettsted.",
   remember: "re:member kredittkort.\nAktiver tilbud i re:member-appen før kjøp.",
   sas: "SAS EuroBonus-poeng.\nAktiver tilbud på SAS sine sider.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
   tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
@@ -88,6 +90,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: 
   crypto: { bg: "#002d74", fg: "#ffffff" },
   remember: { bg: "#111111", fg: "#ff9900" },
   klarna: { bg: "#ffa8cd", fg: "#0b051d" },
+  coupert: { bg: "#f03d30", fg: "#ffffff" },
   trumf: { bg: "#07006b", fg: "#ffffff" },
   sas: { bg: "#00005c", fg: "#ffffff" },
   tfbank: { bg: "#e30613", fg: "#ffffff" },

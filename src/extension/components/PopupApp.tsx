@@ -449,6 +449,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Klarna";
   }
 
+  if (provider === "coupert") {
+    return "Coupert";
+  }
+
   if (provider === "obos") {
     return "OBOS";
   }

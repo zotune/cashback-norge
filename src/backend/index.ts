@@ -5,6 +5,7 @@ import {
   type CashbackOffer,
   type CashbackProvider,
   isCashbackIndex,
+  normalizeDomainInput,
   uniqueOffers,
 } from "../shared/cashback.js";
 import {
@@ -71,6 +72,7 @@ import { fetchAddrevenue } from "./providers/addrevenue.js";
 import { fetchOrion } from "./providers/orion.js";
 import { fetchDaisycon } from "./providers/daisycon.js";
 import { fetchTradedoubler } from "./providers/tradedoubler.js";
+import { fetchCoupert } from "./providers/coupert.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -146,6 +148,7 @@ type CliConfig = {
   skipOrion: boolean;
   skipDaisycon: boolean;
   skipTradedoubler: boolean;
+  skipCoupert: boolean;
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -752,12 +755,52 @@ async function main(): Promise<void> {
     }),
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
+
+  // Phase 5: Coupert is an enrichment source only. It may add cashback to a
+  // domain already selected by the Norwegian sources above, but it must never
+  // expand the catalogue with unrelated stores from Coupert's global index.
+  const offersBeforeCoupert: CashbackOffer[] = [
+    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers,
+  ];
+  const knownCoupertDomains = new Set(
+    offersBeforeCoupert
+      .flatMap((offer) => offer.domains)
+      .map(normalizeDomainInput)
+      .filter((domain) => domain.length > 0),
+  );
+  const collectedCoupertOffers = config.skipCoupert ? [] : await collectOffers({
+    fallbackWhenEmpty: true,
+    label: "Coupert",
+    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+    provider: "coupert",
+    reusePreviousOnFailure: true,
+    run: () => fetchCoupert({
+      generatedAt,
+      knownDomains: knownCoupertDomains,
+      logger,
+    }),
+  });
+  const coupertOffers = collectedCoupertOffers.filter((offer) => {
+    return (
+      offer.discountCode === undefined &&
+      offer.domains.length > 0 &&
+      offer.domains.every((domain) => {
+        return knownCoupertDomains.has(normalizeDomainInput(domain));
+      })
+    );
+  });
+  if (coupertOffers.length !== collectedCoupertOffers.length) {
+    logger.warn(
+      `Coupert: removed ${collectedCoupertOffers.length - coupertOffers.length} stale or out-of-scope offers`,
+    );
+  }
+
   const exchangeRates = await fetchNokBaseRates();
   logger.info(exchangeRates === undefined
     ? "Exchange rates: using static fallback for fixed reward sorting"
     : "Exchange rates: fetched live NOK base rates for fixed reward sorting");
   const offers = uniqueOffers(addFixedRewardSortValues(
-    [...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers],
+    [...offersBeforeCoupert, ...coupertOffers],
     exchangeRates ?? STATIC_NOK_BASE_RATES,
   ));
 
@@ -901,6 +944,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipOrion: args.includes("--skip-orion"),
     skipDaisycon: args.includes("--skip-daisycon"),
     skipTradedoubler: args.includes("--skip-tradedoubler"),
+    skipCoupert: args.includes("--skip-coupert"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
