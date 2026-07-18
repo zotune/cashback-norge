@@ -10884,7 +10884,7 @@ function renderNotice(
     }
   `;
   style.textContent += buildRuntimeProviderCss();
-  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank" && o.provider !== "santander");
+  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const priceMatch = priceMatches[0];
   const bestRegionPrice = regionPrices?.prices[0];
