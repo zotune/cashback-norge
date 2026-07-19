@@ -150,8 +150,7 @@ type CliConfig = {
   skipDaisycon: boolean;
   skipTradedoubler: boolean;
   skipCoupert: boolean;
-  includeRabatta: boolean;
-  rabattaAll: boolean;
+  skipRabatta: boolean;
   rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -179,15 +178,6 @@ type CliConfig = {
 async function main(): Promise<void> {
   const logger = createConsoleLogger();
   const config = readCliConfig(process.argv.slice(2));
-  if (
-    config.includeRabatta &&
-    !config.rabattaAll &&
-    config.rabattaShopSlugs.length === 0
-  ) {
-    throw new Error(
-      "--include-rabatta requires --rabatta-shops <slug,...> or --rabatta-all",
-    );
-  }
   const generatedAt = new Date().toISOString();
   const previousOffersByProvider = await readPreviousOffersByProvider(
     config.outputPath,
@@ -769,19 +759,19 @@ async function main(): Promise<void> {
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
 
-  // Phase 5: Rabatta is intentionally opt-in while the source is evaluated.
-  // Its public Norwegian catalogue provides exact locale-specific shop ids,
-  // so no Swedish, Danish or Finnish variants are accepted by fuzzy search.
-  const rabattaOffers = config.includeRabatta ? await collectOffers({
+  // Phase 5: Rabatta's public Norwegian catalogue provides exact
+  // locale-specific shop ids, so no Swedish, Danish or Finnish variants are
+  // accepted by fuzzy search. --rabatta-shops can restrict local test crawls.
+  const rabattaOffers = config.skipRabatta ? [] : await collectOffers({
     label: "Rabatta",
     run: () => fetchRabatta({
       generatedAt,
       logger,
-      ...(config.rabattaAll
+      ...(config.rabattaShopSlugs.length === 0
         ? {}
         : { shopSlugs: config.rabattaShopSlugs }),
     }),
-  }) : [];
+  });
 
   // Phase 6: Coupert is an enrichment source only. It may add cashback to a
   // domain already selected by the Norwegian sources above, but it must never
@@ -972,8 +962,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipDaisycon: args.includes("--skip-daisycon"),
     skipTradedoubler: args.includes("--skip-tradedoubler"),
     skipCoupert: args.includes("--skip-coupert"),
-    includeRabatta: args.includes("--include-rabatta"),
-    rabattaAll: args.includes("--rabatta-all"),
+    skipRabatta: args.includes("--skip-rabatta"),
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
