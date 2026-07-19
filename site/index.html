@@ -91,30 +91,6 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   justify-content: center;
 }
 .input-wrap.has-value .input-clear { display: flex; }
-.copy-link {
-  display: none;
-  position: absolute;
-  right: 30px;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 4px;
-  line-height: 1;
-}
-.copy-link.copied::after {
-  content: "Kopiert ✓";
-  position: absolute;
-  right: 0;
-  top: -26px;
-  background: #2e7d32;
-  color: #fff;
-  font-size: 11px;
-  border-radius: 6px;
-  padding: 3px 8px;
-  white-space: nowrap;
-}
-.input-wrap.has-value .copy-link { display: flex; }
 .search::-webkit-search-cancel-button { -webkit-appearance: none; }
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .az-section-header {
@@ -905,7 +881,6 @@ a.merchant-name:hover { text-decoration: underline; }
     <div class="input-wrap flex1">
       <input class="search" type="search" placeholder="Søk etter butikk..." autofocus>
       <button class="input-clear" type="button" aria-label="Tøm søk">✕</button>
-      <button class="copy-link" type="button" aria-label="Kopier lenke til dette søket" title="Kopier lenke til dette søket">🔗</button>
     </div>
     <div class="input-wrap">
       <input class="global-sum" type="text" inputmode="decimal" placeholder="Sum">
@@ -1048,18 +1023,6 @@ async function init() {
     searchEl.focus();
   });
 
-  const copyBtn = searchWrap.querySelector(".copy-link");
-  copyBtn.addEventListener("click", async () => {
-    const url = new URL(window.location.origin + "/");
-    url.searchParams.set("q", searchEl.value);
-    try {
-      await navigator.clipboard.writeText(url.toString());
-    } catch {
-      history.replaceState(null, "", url.toString());
-    }
-    copyBtn.classList.add("copied");
-    setTimeout(() => copyBtn.classList.remove("copied"), 1500);
-  });
 
   sumEl.addEventListener("input", (e) => {
     const cleaned = e.target.value.replace(/[^0-9.,]/g, "");
