@@ -54,6 +54,30 @@ export type KrRewardOptions = {
   totalsum?: boolean;
 };
 
+export function extractExplicitTotalPriceReward(text: string): string {
+  const cleanedText = stripOrdinaryPriceParentheticals(text);
+  const values: number[] = [];
+  const patterns = [
+    /\b(?:fast\s+lav\s+)?(?:månedspris|medlemspris|studentpris|kampanjepris|tilbudspris)\s*(?:på|er|:)?\s*(?:kun\s+)?(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
+    /\b(?:basis)?abonnement(?:et)?\s+til\s+kun\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of cleanedText.matchAll(pattern)) {
+      const beforeMatch = cleanedText.slice(
+        Math.max(0, (match.index ?? 0) - 24),
+        match.index ?? 0,
+      );
+      if (/\b(?:førpris|normal|ordinær|vanlig)\s*$/i.test(beforeMatch)) continue;
+
+      const value = parseKrNumber(match[1] ?? "");
+      if (value > 0) addUniqueNumber(values, value);
+    }
+  }
+
+  return values.length === 0 ? "" : `${formatKrReward(values)} totalsum`;
+}
+
 export function extractKrReward(text: string, options?: KrRewardOptions): string {
   const cleanedText = stripOrdinaryPriceParentheticals(text);
 

@@ -9,7 +9,12 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
+import {
+  extractExplicitTotalPriceReward,
+  extractKrReward,
+  extractOreLitreReward,
+  extractPercentageReward,
+} from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -472,6 +477,9 @@ function extractNitoReward(text: string): string {
 
   const percentage = extractPercentageReward(relevant);
   if (percentage) return percentage;
+
+  const explicitTotalPrice = extractExplicitTotalPriceReward(relevant);
+  if (explicitTotalPrice) return explicitTotalPrice;
 
   const kr = extractKrReward(relevant);
   if (kr) return kr;

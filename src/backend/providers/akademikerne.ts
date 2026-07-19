@@ -9,7 +9,13 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractGratisReward, extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
+import {
+  extractExplicitTotalPriceReward,
+  extractGratisReward,
+  extractKrReward,
+  extractOreLitreReward,
+  extractPercentageReward,
+} from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
@@ -138,7 +144,11 @@ export async function fetchAkademikerne(
       merchantName,
       domains: uniqueStrings(domains.flatMap((domain) => merchantDomainsFromHostname(domain))),
       reward: REWARD_BY_SLUG[page.slug] ??
-        (extractAkademikerneReward(`${merchantName}\n${excerpt}\n${text}`, isInsurancePage) || "Medlemsfordel"),
+        (extractAkademikerneReward(
+          `${merchantName}\n${excerpt}\n${text}`,
+          isInsurancePage,
+          excerpt,
+        ) || "Medlemsfordel"),
       sourceUrl: page.link,
       activationUrl: page.link,
       terms: buildTerms(excerpt, text),
@@ -277,7 +287,11 @@ function extractCtaDomains(text: string): string[] {
   return uniqueStrings(domains);
 }
 
-function extractAkademikerneReward(text: string, isInsurancePage: boolean): string {
+function extractAkademikerneReward(
+  text: string,
+  isInsurancePage: boolean,
+  preferredPriceText = "",
+): string {
   if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
 
   const oreLitre = extractOreLitreReward(text);
@@ -286,6 +300,11 @@ function extractAkademikerneReward(text: string, isInsurancePage: boolean): stri
   const rewardText = relevantRewardText(text, isInsurancePage);
   const percentage = extractPercentageReward(rewardText);
   if (percentage) return percentage;
+
+  const explicitTotalPrice =
+    extractExplicitTotalPriceReward(preferredPriceText) ||
+    extractExplicitTotalPriceReward(text);
+  if (explicitTotalPrice) return explicitTotalPrice;
 
   const kr = extractKrReward(rewardText);
   if (kr) return kr;
