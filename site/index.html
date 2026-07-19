@@ -91,6 +91,30 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   justify-content: center;
 }
 .input-wrap.has-value .input-clear { display: flex; }
+.copy-link {
+  display: none;
+  position: absolute;
+  right: 30px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  line-height: 1;
+}
+.copy-link.copied::after {
+  content: "Kopiert ✓";
+  position: absolute;
+  right: 0;
+  top: -26px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.input-wrap.has-value .copy-link { display: flex; }
 .search::-webkit-search-cancel-button { -webkit-appearance: none; }
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .az-section-header {
@@ -881,6 +905,7 @@ a.merchant-name:hover { text-decoration: underline; }
     <div class="input-wrap flex1">
       <input class="search" type="search" placeholder="Søk etter butikk..." autofocus>
       <button class="input-clear" type="button" aria-label="Tøm søk">✕</button>
+      <button class="copy-link" type="button" aria-label="Kopier lenke til dette søket" title="Kopier lenke til dette søket">🔗</button>
     </div>
     <div class="input-wrap">
       <input class="global-sum" type="text" inputmode="decimal" placeholder="Sum">
@@ -1021,6 +1046,19 @@ async function init() {
     render("");
     syncUrlToQuery("");
     searchEl.focus();
+  });
+
+  const copyBtn = searchWrap.querySelector(".copy-link");
+  copyBtn.addEventListener("click", async () => {
+    const url = new URL(window.location.origin + "/");
+    url.searchParams.set("q", searchEl.value);
+    try {
+      await navigator.clipboard.writeText(url.toString());
+    } catch {
+      history.replaceState(null, "", url.toString());
+    }
+    copyBtn.classList.add("copied");
+    setTimeout(() => copyBtn.classList.remove("copied"), 1500);
   });
 
   sumEl.addEventListener("input", (e) => {
@@ -1229,14 +1267,38 @@ function pickBestDomain(domains) {
   return byLen[0];
 }
 
+// Fold case and Nordic/diacritic characters so "bjornborg" finds "Björn Borg"
+// and "sormarka" finds "Sørmarka".
+function foldSearchText(value) {
+  return value
+    .toLowerCase()
+    .replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a")
+    .replace(/ä/g, "a").replace(/ö/g, "o").replace(/ü/g, "u")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function render(query) {
-  const q = query.trim().toLowerCase();
-  const filtered = q.length === 0
-    ? allMerchants
-    : allMerchants.filter(m =>
-        m.name.toLowerCase().includes(q) ||
-        m.domains.some(d => d.includes(q))
-      );
+  const q = foldSearchText(query.trim());
+  const terms = q.split(/\s+/).filter(t => t.length > 0);
+  let filtered;
+  if (terms.length === 0) {
+    filtered = allMerchants;
+  } else {
+    // All words must match name or a domain; rank exact > prefix > substring
+    const scored = [];
+    for (const m of allMerchants) {
+      const name = foldSearchText(m.name);
+      const domains = m.domains.map(foldSearchText);
+      const haystack = name + " " + domains.join(" ");
+      if (!terms.every(t => haystack.includes(t))) continue;
+      let score = 2;
+      if (name === q || domains.some(d => d === q || d.split(".")[0] === q)) score = 0;
+      else if (name.startsWith(q) || domains.some(d => d.startsWith(q))) score = 1;
+      scored.push({ m, score });
+    }
+    scored.sort((a, b) => a.score - b.score || a.m.name.localeCompare(b.m.name, "nb"));
+    filtered = scored.map(s => s.m);
+  }
 
   const countEl = document.querySelector(".count");
   countEl.textContent = q.length > 0
@@ -1250,9 +1312,10 @@ function render(query) {
   }
 
   let prevLetter = null;
+  const showHeaders = q.length === 0;
   container.innerHTML = filtered.map(m => {
     const currentLetter = /^[A-ZÆØÅ]/i.test(m.name) ? m.name.charAt(0).toUpperCase() : '#';
-    const headerHtml = currentLetter !== prevLetter ? `<div class="az-section-header" data-letter="${esc(currentLetter)}">${esc(currentLetter)}</div>` : '';
+    const headerHtml = showHeaders && currentLetter !== prevLetter ? `<div class="az-section-header" data-letter="${esc(currentLetter)}">${esc(currentLetter)}</div>` : '';
     prevLetter = currentLetter;
     const key = m.name.toLowerCase();
     const domain = pickBestDomain(m.domains);
