@@ -352,12 +352,9 @@ function extractTrumfBenefitReward(
   const oreReward = extractOreLitreReward(focusedText);
   if (oreReward !== "") return oreReward;
 
-  const summaryPctReward = extractPercentageReward([
-    summary.title,
-    summary.description,
-  ].join("\n"));
-  if (summaryPctReward !== "") return summaryPctReward;
-
+  // Range over the whole benefit text, not just the headline: Joker's
+  // headline says "6 % på mandager" but the base rate is 1 %, so the honest
+  // label is "1-6 %".
   const pctReward = extractPercentageReward(focusedText);
   if (pctReward !== "") return pctReward;
 
