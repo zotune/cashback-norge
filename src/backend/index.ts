@@ -73,6 +73,7 @@ import { fetchOrion } from "./providers/orion.js";
 import { fetchDaisycon } from "./providers/daisycon.js";
 import { fetchTradedoubler } from "./providers/tradedoubler.js";
 import { fetchCoupert } from "./providers/coupert.js";
+import { fetchRabatta } from "./providers/rabatta.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -149,6 +150,9 @@ type CliConfig = {
   skipDaisycon: boolean;
   skipTradedoubler: boolean;
   skipCoupert: boolean;
+  includeRabatta: boolean;
+  rabattaAll: boolean;
+  rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
   cuponationStartUrl: string;
@@ -175,6 +179,15 @@ type CliConfig = {
 async function main(): Promise<void> {
   const logger = createConsoleLogger();
   const config = readCliConfig(process.argv.slice(2));
+  if (
+    config.includeRabatta &&
+    !config.rabattaAll &&
+    config.rabattaShopSlugs.length === 0
+  ) {
+    throw new Error(
+      "--include-rabatta requires --rabatta-shops <slug,...> or --rabatta-all",
+    );
+  }
   const generatedAt = new Date().toISOString();
   const previousOffersByProvider = await readPreviousOffersByProvider(
     config.outputPath,
@@ -756,11 +769,25 @@ async function main(): Promise<void> {
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
 
-  // Phase 5: Coupert is an enrichment source only. It may add cashback to a
+  // Phase 5: Rabatta is intentionally opt-in while the source is evaluated.
+  // Its public Norwegian catalogue provides exact locale-specific shop ids,
+  // so no Swedish, Danish or Finnish variants are accepted by fuzzy search.
+  const rabattaOffers = config.includeRabatta ? await collectOffers({
+    label: "Rabatta",
+    run: () => fetchRabatta({
+      generatedAt,
+      logger,
+      ...(config.rabattaAll
+        ? {}
+        : { shopSlugs: config.rabattaShopSlugs }),
+    }),
+  }) : [];
+
+  // Phase 6: Coupert is an enrichment source only. It may add cashback to a
   // domain already selected by the Norwegian sources above, but it must never
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
-    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers,
+    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers,
   ];
   const knownCoupertDomains = new Set(
     offersBeforeCoupert
@@ -945,6 +972,9 @@ function readCliConfig(args: string[]): CliConfig {
     skipDaisycon: args.includes("--skip-daisycon"),
     skipTradedoubler: args.includes("--skip-tradedoubler"),
     skipCoupert: args.includes("--skip-coupert"),
+    includeRabatta: args.includes("--include-rabatta"),
+    rabattaAll: args.includes("--rabatta-all"),
+    rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
       "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
@@ -1015,6 +1045,18 @@ function readArgumentValue(args: string[], name: string): string | undefined {
   }
 
   return args[nameIndex + 1];
+}
+
+function readCommaSeparatedArgument(args: string[], name: string): string[] {
+  const rawValue = readArgumentValue(args, name);
+  if (rawValue === undefined) return [];
+
+  return [...new Set(
+    rawValue
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length > 0),
+  )];
 }
 
 function readPositiveIntegerArgument(

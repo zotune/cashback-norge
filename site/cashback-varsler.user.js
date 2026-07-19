@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784371409
+// @version      1784461053
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -136,6 +136,7 @@
   const PROVIDER_NAMES = {
     trumf: "Trumf",
     klarna: "Klarna",
+    coupert: "Coupert",
     remember: "re:member",
     sas: "SAS",
     tfbank: "TF Bank",
@@ -169,7 +170,12 @@
     akademikerne: "Akademikerne+",
     huseierne: "Huseierne",
     santander: "Santander",
-    norwegian: "Norwegian"
+    norwegian: "Norwegian",
+    vestbo: "Vestbo",
+    bbl: "BBL",
+    elbilforeningen: "Elbilforeningen",
+    ys: "YS",
+    lofavor: "LOfavør"
   };
   const FREE_CARDS = [
     {
@@ -301,7 +307,8 @@
   const EB_PER_TRUMF_KR = 13.5;
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
-    if (trimmedReward.length === 0 || isGenericMembershipReward(trimmedReward)) return "?";
+    if (trimmedReward.length === 0) return "?";
+    if (isGenericMembershipReward(trimmedReward)) return "Medlemspris";
     if (provider === "sas") {
       const converted = convertSasToPercent(trimmedReward);
       return converted !== "" ? converted : trimmedReward;
@@ -13748,6 +13755,27 @@ query SearchSuggestions($query: String!, $category: Int) {
       border: 1px solid #ec0000;
       color: #ec0000;
     }
+    .provider-vestbo {
+      background: #ffffff;
+      border: 1px solid #1dc1dd;
+      color: #1dc1dd;
+    }
+    .provider-bbl {
+      background: #1657e2;
+      color: #ffffff;
+    }
+    .provider-elbilforeningen {
+      background: #003a78;
+      color: #ffffff;
+    }
+    .provider-ys {
+      background: #006e26;
+      color: #ffffff;
+    }
+    .provider-lofavor {
+      background: #dc141a;
+      color: #ffffff;
+    }
     .provider-dnb {
       background: #14555a;
       color: #ffffff;
@@ -14659,7 +14687,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   `;
     style.textContent += buildRuntimeProviderCss();
-    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank" && o.provider !== "santander");
+    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const priceMatch = priceMatches[0];
     const bestRegionPrice = regionPrices?.prices[0];
