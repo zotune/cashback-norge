@@ -1,5 +1,11 @@
 // This file extracts only publicly available benefit information from NJFF.
 // Member-only discount codes on Min side are deliberately never collected.
+//
+// NJFF serves these benefits as server-rendered Enonic pages. The public
+// `card-service` referenced by the list page is a generic card paginator and
+// returns unrelated site content, not the benefit carousel or benefit details.
+// Keep the canonical list/detail HTML as the source until NJFF exposes a
+// benefit-specific public API.
 import {
   CheerioCrawler,
   type CheerioCrawlingContext,
@@ -25,8 +31,7 @@ const LABEL_LIST = "list";
 const LABEL_DETAIL = "detail";
 const OFFICIAL_HOSTNAME = "njff.no";
 const OFFICIAL_LIST_PATH = "/medlem/medlemsfordeler";
-const DEFAULT_TERMS =
-  "Krever NJFF-medlemskap. Eventuell rabattkode må hentes på NJFF Min side.";
+const DEFAULT_TERMS = "Krever NJFF-medlemskap.";
 
 const MERCHANT_NAME_BY_SLUG: Record<string, string> = {
   "medlemsfordel-hos-kikkertsalg.no": "Kikkertsalg",
@@ -131,7 +136,20 @@ export async function crawlNjff(input: CrawlNjffInput): Promise<CashbackOffer[]>
   const crawler = new CheerioCrawler({
     maxConcurrency: 4,
     maxRequestsPerCrawl: input.maxRequestsPerCrawl,
-    requestHandler: async ({ $, request, enqueueLinks }) => {
+    preNavigationHooks: [({ request }, gotOptions) => {
+      const allowDetail = request.label === LABEL_DETAIL;
+      if (!isOfficialNjffUrl(request.url, allowDetail)) {
+        throw new Error(`NJFF refused non-official crawl URL: ${request.url}`);
+      }
+      // Do not let an official URL redirect the crawler to another host.
+      gotOptions.followRedirect = false;
+    }],
+    requestHandler: async ({ $, request, response, enqueueLinks }) => {
+      const statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(`NJFF returned ${statusCode} for ${request.url}`);
+      }
+
       if ((request.label ?? LABEL_LIST) === LABEL_LIST) {
         const urls = collectDetailUrls($, input.startUrl);
         input.logger.info(`NJFF: found ${urls.length} public benefit pages`);
@@ -232,6 +250,8 @@ function collectDetailUrls($: NjffCheerio, startUrl: string): string[] {
 
     const slug = slugFromUrl(parsed.toString());
     if (slug === "" || EXCLUDED_SLUGS.has(slug)) return;
+    parsed.search = "";
+    parsed.hash = "";
     urls.push(parsed.toString());
   });
 
@@ -243,6 +263,11 @@ function isOfficialNjffUrl(url: string, allowDetail: boolean): boolean {
   if (
     parsed === undefined ||
     parsed.protocol !== "https:" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.port !== "" ||
+    parsed.search !== "" ||
+    parsed.hash !== "" ||
     normalizeDomainInput(parsed.hostname) !== OFFICIAL_HOSTNAME
   ) {
     return false;
@@ -304,10 +329,15 @@ function buildTerms(text: string): string {
     .map(normalizeText)
     .filter((line) => line.length >= 12 && line.length <= 360)
     .filter((line) => /\b(?:rabatt|medlemspris|tilbud|gjelder|unntak|ordinær|utvalgte)\b/i.test(line))
-    // Codes belong on Min side even if a page happens to render one publicly.
-    .filter((line) => !/\b(?:rabatt)?kode\b/i.test(line));
+    // Activation details remain private even if a page happens to render them.
+    .filter((line) => !containsPrivateInstructions(line));
 
   return uniqueStrings(lines).slice(0, 4).concat(DEFAULT_TERMS).join("\n");
+}
+
+function containsPrivateInstructions(line: string): boolean {
+  return /\b(?:rabatt|kampanje|kupong|medlems|avtale)?kod(?:e|en|er|ene)\b/i.test(line) ||
+    /\b(?:logg(?:e)?\s+inn|login|min(?:\s+|-)?side|medlemsnummer(?:et)?|medlemsnr)\b/i.test(line);
 }
 
 function slugFromUrl(url: string): string {

@@ -1,6 +1,12 @@
 // This file extracts publicly available AMCAR member discounts from AMCAR's
 // official website. Login-only pages and member discount codes are not read.
 import {
+  Configuration,
+  HttpCrawler,
+  MemoryStorage,
+  Request,
+} from "crawlee";
+import {
   type CashbackOffer,
   normalizeDomainInput,
   parseUrl,
@@ -193,23 +199,50 @@ async function fetchPage(url: string): Promise<string> {
     throw new Error(`AMCAR refused non-official URL: ${url}`);
   }
 
-  const response = await fetch(url, {
+  const storage = new MemoryStorage({ persistStorage: false });
+  const crawlerConfig = new Configuration();
+  crawlerConfig.useStorageClient(storage);
+  let html: string | undefined;
+
+  const crawler = new HttpCrawler({
+    maxConcurrency: 1,
+    maxRequestRetries: 2,
+    maxRequestsPerCrawl: 1,
+    requestHandlerTimeoutSecs: 30,
+    preNavigationHooks: [({ request }, options) => {
+      if (!isOfficialPageUrl(request.url)) {
+        throw new Error(`AMCAR refused non-official request URL: ${request.url}`);
+      }
+      // Do not let the HTML request escape AMCAR's one allowlisted page.
+      options.followRedirect = false;
+    }],
+    requestHandler: async ({ body, request, response }) => {
+      const loadedUrl = request.loadedUrl ?? request.url;
+      if (!isOfficialPageUrl(loadedUrl)) {
+        throw new Error(`AMCAR refused non-official response URL: ${loadedUrl}`);
+      }
+
+      const statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(`AMCAR returned ${statusCode} for ${request.url}`);
+      }
+
+      html = Buffer.isBuffer(body) ? body.toString("utf8") : body;
+    },
+  }, crawlerConfig);
+
+  await crawler.run([new Request({
+    url,
     headers: {
       Accept: "text/html,application/xhtml+xml",
       "User-Agent": "CashbackNorge/1.0",
     },
-    redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
-  });
+  })]);
 
-  if (!response.ok) {
-    throw new Error(`AMCAR returned ${response.status} for ${url}`);
+  if (html === undefined) {
+    throw new Error(`AMCAR crawler received no page from ${url}`);
   }
-  if (!isOfficialPageUrl(response.url)) {
-    throw new Error(`AMCAR refused non-official redirect: ${response.url}`);
-  }
-
-  return response.text();
+  return html;
 }
 
 function isOfficialPageUrl(url: string): boolean {

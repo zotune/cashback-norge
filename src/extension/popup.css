@@ -356,9 +356,8 @@ h1 {
 }
 
 .provider-knbf {
-  background: #ffffff;
-  border: 1px solid #d5ddd9;
-  color: #000000;
+  background: #00205b;
+  color: #ffffff;
 }
 
 .provider-njff {
@@ -371,6 +370,21 @@ h1 {
   background: #ffffff;
   border: 1px solid #d5ddd9;
   color: #000000;
+}
+
+.provider-kna {
+  background: #d60929;
+  color: #ffffff;
+}
+
+.provider-syklistforeningen {
+  background: #e61414;
+  color: #ffffff;
+}
+
+.provider-revmatikerforbundet {
+  background: #4fadb9;
+  color: #160809;
 }
 
 .provider-bob {

@@ -1,6 +1,12 @@
 // This file extracts publicly described member benefits from Pensjonistforbundet.
 // It deliberately ignores member-only discount-code fields embedded in Next.js data.
 import {
+  Configuration,
+  HttpCrawler,
+  MemoryStorage,
+  Request,
+} from "crawlee";
+import {
   isRecord,
   type CashbackOffer,
   normalizeDomainInput,
@@ -40,9 +46,16 @@ const MERCHANT_NAME_BY_SLUG: Record<string, string> = {
   "hjelpemidler-til-hus-og-hjem": "Velferdsbutikken",
   "dfds-til-danmark": "Go Nordic Cruiseline",
   "flytevest-redningsselskapet": "Redningsselskapet",
-  "se-film-med-medlemsrabatt": "Filmweb",
+  "se-film-med-medlemsrabatt": "Filmweb Kinoklubb",
   "nyhet-filmweb-kinogavekort": "Filmweb kinogavekort",
   "briller-og-solbriller": "Extra Optical",
+};
+
+// The public Filmweb entry describes Kinoklubben but its CMS button references
+// are not expanded in the list payload. Keep the official storefront explicit
+// so this active offer does not depend on another provider's domain lookup.
+const FALLBACK_DOMAINS_BY_SLUG: Record<string, string[]> = {
+  "se-film-med-medlemsrabatt": ["kinoklubb.no"],
 };
 
 const SKIP_HOSTNAMES = new Set([
@@ -94,6 +107,7 @@ export async function fetchPensjonistforbundet(
   let fromContent = 0;
   let lookedUp = 0;
   let overrideCount = 0;
+  let fallbackCount = 0;
   let closedCount = 0;
 
   for (const benefit of benefits) {
@@ -146,6 +160,13 @@ export async function fetchPensjonistforbundet(
       }
     }
 
+    if (domains.length === 0) {
+      domains = (FALLBACK_DOMAINS_BY_SLUG[slugKey] ?? [])
+        .map(normalizeDomainInput)
+        .filter(isAllowedMerchantHostname);
+      if (domains.length > 0) fallbackCount++;
+    }
+
     domains = uniqueStrings(
       domains.flatMap((domain) => merchantDomainsFromHostname(domain)),
     );
@@ -175,7 +196,7 @@ export async function fetchPensjonistforbundet(
   }
 
   input.logger.info(
-    `Pensjonistforbundet: resolved ${fromContent} via public content, ${lookedUp} via lookup, ${overrideCount} via overrides`,
+    `Pensjonistforbundet: resolved ${fromContent} via public content, ${lookedUp} via lookup, ${overrideCount} via overrides, ${fallbackCount} via safe fallback`,
   );
   input.logger.info(
     `Pensjonistforbundet: produced ${offers.length} offers; skipped ${closedCount} closed entries`,
@@ -188,21 +209,56 @@ async function fetchOfficialPage(url: string): Promise<string> {
     throw new Error(`Pensjonistforbundet refused non-official URL: ${url}`);
   }
 
-  const response = await fetch(url, {
-    headers: { "User-Agent": "CashbackNorge/1.0" },
-    redirect: "manual",
-    signal: AbortSignal.timeout(30_000),
-  });
+  const storage = new MemoryStorage({ persistStorage: false });
+  const crawlerConfig = new Configuration();
+  crawlerConfig.useStorageClient(storage);
+  let html: string | undefined;
 
-  if (!response.ok) {
-    throw new Error(`Pensjonistforbundet returned ${response.status} for ${url}`);
+  const crawler = new HttpCrawler({
+    maxConcurrency: 1,
+    maxRequestRetries: 2,
+    maxRequestsPerCrawl: 1,
+    requestHandlerTimeoutSecs: 30,
+    preNavigationHooks: [({ request }, options) => {
+      if (!isAllowedOfficialUrl(request.url)) {
+        throw new Error(
+          `Pensjonistforbundet refused non-official request URL: ${request.url}`,
+        );
+      }
+      // The crawler must never follow an official page to another network target.
+      options.followRedirect = false;
+    }],
+    requestHandler: async ({ body, request, response }) => {
+      const loadedUrl = request.loadedUrl ?? request.url;
+      if (!isAllowedOfficialUrl(loadedUrl)) {
+        throw new Error(
+          `Pensjonistforbundet returned a non-official response URL: ${loadedUrl}`,
+        );
+      }
+
+      const statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(
+          `Pensjonistforbundet returned ${statusCode} for ${request.url}`,
+        );
+      }
+
+      html = Buffer.isBuffer(body) ? body.toString("utf8") : body;
+    },
+  }, crawlerConfig);
+
+  await crawler.run([new Request({
+    url,
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "User-Agent": "CashbackNorge/1.0",
+    },
+  })]);
+
+  if (html === undefined) {
+    throw new Error(`Pensjonistforbundet crawler received no page from ${url}`);
   }
-
-  if (!isAllowedOfficialUrl(response.url)) {
-    throw new Error(`Pensjonistforbundet returned a non-official response URL: ${response.url}`);
-  }
-
-  return response.text();
+  return html;
 }
 
 function isAllowedOfficialUrl(url: string): boolean {

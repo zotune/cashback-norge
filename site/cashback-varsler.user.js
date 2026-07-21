@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784633213
+// @version      1784635639
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -175,6 +175,9 @@
     knbf: "KNBF",
     njff: "NJFF",
     pensjonistforbundet: "Pensjonistforbundet",
+    kna: "KNA",
+    syklistforeningen: "Syklistforeningen",
+    revmatikerforbundet: "Revmatikerforbundet",
     santander: "Santander",
     norwegian: "Norwegian",
     vestbo: "Vestbo",

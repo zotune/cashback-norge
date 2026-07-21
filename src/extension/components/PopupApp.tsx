@@ -525,6 +525,18 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Pensjonistforbundet";
   }
 
+  if (provider === "kna") {
+    return "KNA";
+  }
+
+  if (provider === "syklistforeningen") {
+    return "Syklistforeningen";
+  }
+
+  if (provider === "revmatikerforbundet") {
+    return "Revmatikerforbundet";
+  }
+
   return provider;
 }
 

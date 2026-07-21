@@ -1,7 +1,13 @@
 // This file contains code to extract publicly available offer data from official websites.
 // No login-only content or discount codes are collected.
 import {
+  Configuration,
+  HttpCrawler,
+  MemoryStorage,
+} from "crawlee";
+import {
   type CashbackOffer,
+  isRecord,
   normalizeDomainInput,
   parseUrl,
   stripHtml,
@@ -17,11 +23,44 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 
 const NATIONAL_LIST_URL = "https://www.huseierforbundet.no/medlemsfordeler";
 const BERGEN_LIST_URL = "https://huseierforening.no/samarbeidspartnere/";
+const NATIONAL_LIST_PAGE_ID = 3366;
+const BERGEN_LIST_PAGE_ID = 559;
+const BERGEN_ABM_PAGE_ID = 5989;
 const DETAIL_CONCURRENCY = 4;
+const WORDPRESS_FIELDS = "id,slug,status,parent,link,title,content";
 const OFFICIAL_HOSTNAMES = new Set([
   "huseierforbundet.no",
   "huseierforening.no",
 ]);
+const LIST_PAGE_ID_BY_HOSTNAME: Record<string, number> = {
+  "huseierforbundet.no": NATIONAL_LIST_PAGE_ID,
+  "huseierforening.no": BERGEN_LIST_PAGE_ID,
+};
+const ALLOWED_SINGLE_PAGE_IDS_BY_HOSTNAME: Record<string, Set<number>> = {
+  "huseierforbundet.no": new Set([NATIONAL_LIST_PAGE_ID]),
+  "huseierforening.no": new Set([BERGEN_LIST_PAGE_ID, BERGEN_ABM_PAGE_ID]),
+};
+
+const NATIONAL_LIST_API_URL = wordpressPageApiUrl(
+  "www.huseierforbundet.no",
+  NATIONAL_LIST_PAGE_ID,
+);
+const NATIONAL_CHILDREN_API_URL = wordpressChildrenApiUrl(
+  "www.huseierforbundet.no",
+  NATIONAL_LIST_PAGE_ID,
+);
+const BERGEN_LIST_API_URL = wordpressPageApiUrl(
+  "huseierforening.no",
+  BERGEN_LIST_PAGE_ID,
+);
+const BERGEN_CHILDREN_API_URL = wordpressChildrenApiUrl(
+  "huseierforening.no",
+  BERGEN_LIST_PAGE_ID,
+);
+const BERGEN_ABM_API_URL = wordpressPageApiUrl(
+  "huseierforening.no",
+  BERGEN_ABM_PAGE_ID,
+);
 
 const NATIONAL_TERMS = "Krever medlemskap i Norges Huseierforbund.";
 const BERGEN_TERMS = "Krever medlemskap i Bergen Huseierforening.";
@@ -95,34 +134,85 @@ type PageLink = {
   text: string;
 };
 
+type WordPressPage = {
+  id: number;
+  slug: string;
+  parent: number;
+  link: string;
+  title: string;
+  content: string;
+};
+
 export async function fetchHuseierforbundet(
   input: FetchHuseierforbundetInput,
 ): Promise<CashbackOffer[]> {
-  input.logger.info("Norges Huseierforbund: fetching public benefit lists...");
+  input.logger.info(
+    "Norges Huseierforbund: fetching public benefits from official WordPress REST APIs...",
+  );
 
-  const listResults = await Promise.allSettled([
-    fetchPage(NATIONAL_LIST_URL),
-    fetchPage(BERGEN_LIST_URL),
-  ]);
+  // Both sites advertise these public wp-json representations in the Link
+  // header of their benefit pages. Fetch the active list pages and their
+  // published children in parallel; no login endpoint or merchant is called.
+  const apiResults = await crawlWordPressApi([
+    NATIONAL_LIST_API_URL,
+    NATIONAL_CHILDREN_API_URL,
+    BERGEN_LIST_API_URL,
+    BERGEN_CHILDREN_API_URL,
+    BERGEN_ABM_API_URL,
+  ], input.logger);
 
   const entries: BenefitEntry[] = [];
-  const nationalHtml = settledValue(listResults[0]);
-  const bergenHtml = settledValue(listResults[1]);
+  const prefetchedDetails: WordPressPage[] = [];
+  const nationalListPage = apiPage(apiResults, NATIONAL_LIST_API_URL);
+  const nationalChildren = apiPages(apiResults, NATIONAL_CHILDREN_API_URL);
+  const bergenListPage = apiPage(apiResults, BERGEN_LIST_API_URL);
+  const bergenChildren = apiPages(apiResults, BERGEN_CHILDREN_API_URL);
+  const bergenAbmPage = apiPage(apiResults, BERGEN_ABM_API_URL);
 
-  if (nationalHtml !== undefined) {
-    entries.push(...extractNationalEntries(nationalHtml));
+  if (nationalListPage !== undefined) {
+    entries.push(...extractNationalEntries(nationalListPage.content));
   } else {
-    input.logger.warn(`Norges Huseierforbund: could not load ${NATIONAL_LIST_URL}`);
+    input.logger.warn(
+      `Norges Huseierforbund: could not load official API ${NATIONAL_LIST_API_URL}`,
+    );
   }
 
-  if (bergenHtml !== undefined) {
-    entries.push(...extractBergenEntries(bergenHtml));
+  if (nationalChildren !== undefined) {
+    prefetchedDetails.push(...nationalChildren);
   } else {
-    input.logger.warn(`Norges Huseierforbund: could not load ${BERGEN_LIST_URL}`);
+    input.logger.warn(
+      `Norges Huseierforbund: could not load official API ${NATIONAL_CHILDREN_API_URL}`,
+    );
+  }
+
+  if (bergenListPage !== undefined) {
+    entries.push(...extractBergenEntries(bergenListPage.content));
+  } else {
+    input.logger.warn(
+      `Norges Huseierforbund: could not load official API ${BERGEN_LIST_API_URL}`,
+    );
+  }
+
+  if (bergenChildren !== undefined) {
+    prefetchedDetails.push(...bergenChildren);
+  } else {
+    input.logger.warn(
+      `Norges Huseierforbund: could not load official API ${BERGEN_CHILDREN_API_URL}`,
+    );
+  }
+
+  if (bergenAbmPage !== undefined) {
+    prefetchedDetails.push(bergenAbmPage);
+  } else {
+    input.logger.warn(
+      `Norges Huseierforbund: could not load official API ${BERGEN_ABM_API_URL}`,
+    );
   }
 
   if (entries.length === 0) {
-    throw new Error("Norges Huseierforbund: official benefit lists contained no offers");
+    throw new Error(
+      "Norges Huseierforbund: official REST benefit lists contained no offers",
+    );
   }
 
   const nationalCount = entries.filter((entry) => entry.source === "national").length;
@@ -131,7 +221,7 @@ export async function fetchHuseierforbundet(
     `Norges Huseierforbund: found ${nationalCount} national and ${bergenCount} Bergen benefit pages`,
   );
 
-  const details = await fetchDetails(entries, input.logger);
+  const details = await resolveApiDetails(entries, prefetchedDetails, input.logger);
   const offers: CashbackOffer[] = [];
   let fromContent = 0;
   let lookedUp = 0;
@@ -190,50 +280,233 @@ export async function fetchHuseierforbundet(
   }
 
   input.logger.info(
-    `Norges Huseierforbund: resolved ${fromContent} via public page content, ${lookedUp} via lookup, ${overrideCount} via overrides`,
+    `Norges Huseierforbund: resolved ${fromContent} via public API content, ${lookedUp} via lookup, ${overrideCount} via overrides`,
   );
-  input.logger.info(`Norges Huseierforbund: produced ${offers.length} offers`);
-  return uniqueOffers(offers);
+  const unique = uniqueOffers(offers);
+  input.logger.info(
+    `Norges Huseierforbund: produced ${unique.length} unique offers from ${offers.length} resolved pages`,
+  );
+  return unique;
 }
 
-function settledValue(
-  result: PromiseSettledResult<string> | undefined,
-): string | undefined {
-  return result?.status === "fulfilled" ? result.value : undefined;
-}
+type WordPressApiValue = WordPressPage | WordPressPage[];
 
-async function fetchPage(url: string): Promise<string> {
-  if (!isOfficialPageUrl(url)) {
-    throw new Error(`Norges Huseierforbund refused non-official URL: ${url}`);
+async function crawlWordPressApi(
+  urls: string[],
+  logger: Logger,
+): Promise<Map<string, WordPressApiValue>> {
+  for (const url of urls) {
+    if (!isAllowedWordPressApiUrl(url)) {
+      throw new Error(`Norges Huseierforbund refused non-allowlisted API URL: ${url}`);
+    }
   }
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "User-Agent": "CashbackNorge/1.0",
+  const values = new Map<string, WordPressApiValue>();
+  const storage = new MemoryStorage({ persistStorage: false });
+  const config = new Configuration();
+  config.useStorageClient(storage);
+
+  const crawler = new HttpCrawler({
+    maxConcurrency: DETAIL_CONCURRENCY,
+    maxRequestRetries: 1,
+    maxRequestsPerCrawl: urls.length,
+    preNavigationHooks: [({ request }, gotOptions) => {
+      if (!isAllowedWordPressApiUrl(request.url)) {
+        throw new Error(
+          `Norges Huseierforbund refused non-allowlisted API URL: ${request.url}`,
+        );
+      }
+      // Never follow an official API URL to a different network target.
+      gotOptions.followRedirect = false;
+    }],
+    requestHandler: async ({ body, request, response }) => {
+      const statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(
+          `Norges Huseierforbund returned ${statusCode} for ${request.url}`,
+        );
+      }
+
+      const loadedUrl = request.loadedUrl ?? request.url;
+      if (!isAllowedWordPressApiUrl(loadedUrl)) {
+        throw new Error(
+          `Norges Huseierforbund refused non-allowlisted API redirect: ${loadedUrl}`,
+        );
+      }
+
+      const rawBody = Buffer.isBuffer(body) ? body.toString("utf8") : String(body);
+      const value: unknown = JSON.parse(rawBody);
+      const parsedValue = parseWordPressApiValue(value, apiHostname(request.url));
+      if (parsedValue === undefined) {
+        throw new Error(`Norges Huseierforbund returned invalid API data from ${request.url}`);
+      }
+      values.set(apiUrlKey(request.url), parsedValue);
     },
-    redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
-  });
+    failedRequestHandler: async ({ request, error }) => {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`Norges Huseierforbund: failed official API ${request.url}: ${message}`);
+    },
+  }, config);
 
-  if (!response.ok) {
-    throw new Error(`Norges Huseierforbund returned ${response.status} for ${url}`);
-  }
+  await crawler.run(urls.map((url) => ({
+    url,
+    uniqueKey: apiUrlKey(url),
+    headers: { Accept: "application/json" },
+  })));
+  return values;
+}
 
-  if (!isOfficialPageUrl(response.url)) {
-    throw new Error(
-      `Norges Huseierforbund refused non-official redirect: ${response.url}`,
-    );
-  }
+function apiPage(
+  values: Map<string, WordPressApiValue>,
+  url: string,
+): WordPressPage | undefined {
+  const value = values.get(apiUrlKey(url));
+  return value !== undefined && !Array.isArray(value) ? value : undefined;
+}
 
-  return response.text();
+function apiPages(
+  values: Map<string, WordPressApiValue>,
+  url: string,
+): WordPressPage[] | undefined {
+  const value = values.get(apiUrlKey(url));
+  return Array.isArray(value) ? value : undefined;
 }
 
 function isOfficialPageUrl(url: string): boolean {
   const parsed = parseUrl(url);
   return parsed !== undefined &&
     parsed.protocol === "https:" &&
+    parsed.username === "" &&
+    parsed.password === "" &&
+    parsed.port === "" &&
     OFFICIAL_HOSTNAMES.has(normalizeDomainInput(parsed.hostname));
+}
+
+function wordpressPageApiUrl(hostname: string, pageId: number): string {
+  const url = new URL(`https://${hostname}/wp-json/wp/v2/pages/${pageId}`);
+  url.searchParams.set("_fields", WORDPRESS_FIELDS);
+  return url.toString();
+}
+
+function wordpressChildrenApiUrl(hostname: string, parentId: number): string {
+  const url = new URL(`https://${hostname}/wp-json/wp/v2/pages`);
+  url.searchParams.set("parent", String(parentId));
+  url.searchParams.set("per_page", "100");
+  url.searchParams.set("_fields", WORDPRESS_FIELDS);
+  return url.toString();
+}
+
+function wordpressSlugApiUrl(hostname: string, slug: string): string {
+  const url = new URL(`https://${hostname}/wp-json/wp/v2/pages`);
+  url.searchParams.set("slug", slug);
+  url.searchParams.set("_fields", WORDPRESS_FIELDS);
+  return url.toString();
+}
+
+function isAllowedWordPressApiUrl(url: string): boolean {
+  const parsed = parseUrl(url);
+  if (
+    parsed === undefined ||
+    parsed.protocol !== "https:" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.port !== "" ||
+    parsed.hash !== ""
+  ) {
+    return false;
+  }
+
+  const hostname = normalizeDomainInput(parsed.hostname);
+  const listPageId = LIST_PAGE_ID_BY_HOSTNAME[hostname];
+  if (listPageId === undefined) return false;
+  if (parsed.searchParams.get("_fields") !== WORDPRESS_FIELDS) return false;
+
+  const singlePageMatch = parsed.pathname.match(/^\/wp-json\/wp\/v2\/pages\/(\d+)$/);
+  const singlePageId = Number(singlePageMatch?.[1]);
+  if (ALLOWED_SINGLE_PAGE_IDS_BY_HOSTNAME[hostname]?.has(singlePageId)) {
+    return hasExactSearchParams(parsed, ["_fields"]);
+  }
+
+  if (parsed.pathname !== "/wp-json/wp/v2/pages") return false;
+
+  const parent = parsed.searchParams.get("parent");
+  if (parent !== null) {
+    return parent === String(listPageId) &&
+      parsed.searchParams.get("per_page") === "100" &&
+      hasExactSearchParams(parsed, ["_fields", "parent", "per_page"]);
+  }
+
+  const slug = parsed.searchParams.get("slug");
+  return slug !== null &&
+    /^[a-z0-9-]+$/.test(slug) &&
+    hasExactSearchParams(parsed, ["_fields", "slug"]);
+}
+
+function hasExactSearchParams(url: URL, expected: string[]): boolean {
+  const keys = [...url.searchParams.keys()];
+  return keys.length === expected.length &&
+    expected.every((key) => url.searchParams.getAll(key).length === 1);
+}
+
+function apiHostname(url: string): string {
+  const parsed = parseUrl(url);
+  if (parsed === undefined) return "";
+  return normalizeDomainInput(parsed.hostname);
+}
+
+function apiUrlKey(url: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.sort();
+  return parsed.toString();
+}
+
+function parseWordPressApiValue(
+  value: unknown,
+  expectedHostname: string,
+): WordPressApiValue | undefined {
+  if (Array.isArray(value)) {
+    const pages = value.map((item) => parseWordPressPage(item, expectedHostname));
+    return pages.some((page) => page === undefined)
+      ? undefined
+      : pages as WordPressPage[];
+  }
+  return parseWordPressPage(value, expectedHostname);
+}
+
+function parseWordPressPage(
+  value: unknown,
+  expectedHostname: string,
+): WordPressPage | undefined {
+  if (!isRecord(value) || !isRecord(value.title) || !isRecord(value.content)) {
+    return undefined;
+  }
+
+  const link = typeof value.link === "string" ? value.link : "";
+  const parsedLink = parseUrl(link);
+  if (
+    !Number.isInteger(value.id) ||
+    typeof value.slug !== "string" ||
+    !/^[a-z0-9-]+$/.test(value.slug) ||
+    value.status !== "publish" ||
+    !Number.isInteger(value.parent) ||
+    typeof value.title.rendered !== "string" ||
+    typeof value.content.rendered !== "string" ||
+    value.content.protected !== false ||
+    parsedLink === undefined ||
+    !isOfficialPageUrl(link) ||
+    normalizeDomainInput(parsedLink.hostname) !== expectedHostname
+  ) {
+    return undefined;
+  }
+
+  return {
+    id: value.id as number,
+    slug: value.slug,
+    parent: value.parent as number,
+    link: canonicalPageUrl(parsedLink),
+    title: normalizeText(stripHtml(value.title.rendered)),
+    content: value.content.rendered,
+  };
 }
 
 function extractNationalEntries(html: string): BenefitEntry[] {
@@ -330,26 +603,45 @@ function trimBergenTeaser(value: string): string {
   return cutIndex === -1 ? value : value.slice(0, cutIndex).trim();
 }
 
-async function fetchDetails(
+async function resolveApiDetails(
   entries: BenefitEntry[],
+  prefetchedPages: WordPressPage[],
   logger: Logger,
 ): Promise<Array<{ entry: BenefitEntry; html: string }>> {
-  const details: Array<{ entry: BenefitEntry; html: string }> = [];
-
-  for (let start = 0; start < entries.length; start += DETAIL_CONCURRENCY) {
-    const batch = entries.slice(start, start + DETAIL_CONCURRENCY);
-    const results = await Promise.all(batch.map(async (entry) => {
-      try {
-        return { entry, html: await fetchPage(entry.sourceUrl) };
-      } catch (error) {
-        logger.warn(`Norges Huseierforbund: failed to fetch ${entry.sourceUrl}: ${String(error)}`);
-        return { entry, html: "" };
-      }
-    }));
-    details.push(...results);
+  const contentByUrl = new Map<string, string>();
+  for (const page of prefetchedPages) {
+    contentByUrl.set(page.link, page.content);
   }
 
-  return details;
+  const missingEntries = entries.filter((entry) => !contentByUrl.has(entry.sourceUrl));
+  const missingApiUrls = uniqueStrings(missingEntries.map((entry) => {
+    const source = parseUrl(entry.sourceUrl);
+    return wordpressSlugApiUrl(source?.hostname ?? "", entry.slug);
+  }));
+
+  if (missingApiUrls.length > 0) {
+    const crawled = await crawlWordPressApi(missingApiUrls, logger);
+    for (const entry of missingEntries) {
+      const source = parseUrl(entry.sourceUrl);
+      if (source === undefined) continue;
+      const apiUrl = wordpressSlugApiUrl(source.hostname, entry.slug);
+      const pages = apiPages(crawled, apiUrl) ?? [];
+      const matchingPage = pages.find((page) => page.link === entry.sourceUrl);
+      if (matchingPage !== undefined) {
+        contentByUrl.set(entry.sourceUrl, matchingPage.content);
+      }
+    }
+  }
+
+  return entries.map((entry) => {
+    const html = contentByUrl.get(entry.sourceUrl) ?? "";
+    if (html === "") {
+      logger.warn(
+        `Norges Huseierforbund: official API had no detail content for ${entry.sourceUrl}`,
+      );
+    }
+    return { entry, html };
+  });
 }
 
 function resolveDomainsFromContent(
@@ -497,7 +789,8 @@ function isUsefulTermsLine(line: string): boolean {
 }
 
 function containsDiscountCode(line: string): boolean {
-  return /\b(?:rabatt|kupong)kod(?:e|en|er)\b|\b(?:min side|mine sider|logg inn)\b/i.test(line);
+  return /\b(?:rabatt|kampanje|kupong|medlems|avtale)?kod(?:e|en|er|ene)\b/i.test(line) ||
+    /\b(?:min(?:\s+|-)?side|mine(?:\s+|-)?sider|logg(?:e)?\s+inn|login|medlemsnummer(?:et)?|medlemsnr)\b/i.test(line);
 }
 
 function isPageNoise(line: string): boolean {
@@ -529,6 +822,7 @@ function extractMainHtml(html: string): string {
 function pageText(html: string): string {
   return stripHtml(
     html
+      .replace(/\[\/?[a-z][^\]]*\]/gi, " ")
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
       .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, " ")

@@ -1,7 +1,14 @@
 // This file extracts publicly available KNBF member benefits.
 // Login instructions and discount codes are deliberately never published.
 import {
+  Configuration,
+  HttpCrawler,
+  MemoryStorage,
+  Request,
+} from "crawlee";
+import {
   type CashbackOffer,
+  isRecord,
   normalizeDomainInput,
   parseUrl,
   stripHtml,
@@ -19,7 +26,10 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 
 const SITE_ORIGIN = "https://www.knbf.no";
 const LIST_URL = `${SITE_ORIGIN}/medlemsfordeler/`;
-const DETAIL_CONCURRENCY = 4;
+const WORDPRESS_API_PATH = "/wp-json/wp/v2/pages";
+const LIST_API_FIELDS = "id,slug,link,title,content";
+const DETAIL_API_FIELDS = "id,parent,slug,link,title,content";
+const LIST_API_URL = createListApiUrl();
 const DEFAULT_TERMS = "Krever medlemskap i Kongelig Norsk Båtforbund (KNBF).";
 
 const MERCHANT_NAME_BY_SLUG: Record<string, string> = {
@@ -94,39 +104,31 @@ type KnbfDetail = KnbfListEntry & {
   publicText: string;
 };
 
-export async function fetchKnbf(input: FetchKnbfInput): Promise<CashbackOffer[]> {
-  input.logger.info("KNBF: fetching public member benefits...");
+type WordPressListPage = {
+  id: number;
+  content: string;
+};
 
-  const listHtml = await fetchOfficialPage(LIST_URL);
-  const entries = extractDetailEntries(listHtml);
+export async function fetchKnbf(input: FetchKnbfInput): Promise<CashbackOffer[]> {
+  input.logger.info("KNBF: fetching public member benefits from WordPress API...");
+
+  const listPage = parseWordPressListPage(await fetchOfficialApiJson(LIST_API_URL));
+  const entries = extractDetailEntries(listPage.content);
   if (entries.length === 0) {
-    throw new Error("KNBF list page contained no public benefit links");
+    throw new Error("KNBF API list page contained no public benefit links");
   }
   input.logger.info(`KNBF: found ${entries.length} public benefit pages`);
 
-  const details: KnbfDetail[] = [];
-  for (let start = 0; start < entries.length; start += DETAIL_CONCURRENCY) {
-    const batch = entries.slice(start, start + DETAIL_CONCURRENCY);
-    const results = await Promise.all(batch.map(async (entry) => {
-      try {
-        const html = await fetchOfficialPage(entry.sourceUrl);
-        const mainHtml = extractMainHtml(html);
-        const title = extractTitle(mainHtml);
-        if (title === "") {
-          throw new Error("page has no title");
-        }
-        return {
-          ...entry,
-          title,
-          mainHtml,
-          publicText: cutPrivateInstructions(extractMainText(mainHtml)),
-        } satisfies KnbfDetail;
-      } catch (error) {
-        input.logger.warn(`KNBF: failed to read ${entry.sourceUrl}: ${String(error)}`);
-        return undefined;
-      }
-    }));
-    details.push(...results.filter((value): value is KnbfDetail => value !== undefined));
+  const detailsUrl = createDetailApiUrl(listPage.id);
+  const details = parseWordPressDetails(
+    await fetchOfficialApiJson(detailsUrl),
+    entries,
+    listPage.id,
+  );
+  if (details.length !== entries.length) {
+    const found = new Set(details.map((detail) => detail.slug));
+    const missing = entries.filter((entry) => !found.has(entry.slug)).map((entry) => entry.slug);
+    throw new Error(`KNBF API omitted active benefit pages: ${missing.join(", ")}`);
   }
 
   const offers: CashbackOffer[] = [];
@@ -194,30 +196,147 @@ export async function fetchKnbf(input: FetchKnbfInput): Promise<CashbackOffer[]>
   return uniqueOffers(offers);
 }
 
-async function fetchOfficialPage(url: string): Promise<string> {
-  if (!isAllowedOfficialUrl(url)) {
-    throw new Error(`KNBF refused non-official URL: ${url}`);
+async function fetchOfficialApiJson(url: string): Promise<unknown> {
+  if (!isAllowedOfficialApiUrl(url)) {
+    throw new Error(`KNBF refused non-allowlisted API URL: ${url}`);
   }
 
-  const response = await fetch(url, {
-    headers: { "User-Agent": "CashbackNorge/1.0" },
-    redirect: "manual",
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(`KNBF returned ${response.status} for ${url}`);
+  const storage = new MemoryStorage({ persistStorage: false });
+  const crawlerConfig = new Configuration();
+  crawlerConfig.useStorageClient(storage);
+  let payload: unknown;
+
+  const crawler = new HttpCrawler({
+    maxConcurrency: 1,
+    maxRequestRetries: 2,
+    maxRequestsPerCrawl: 1,
+    preNavigationHooks: [({ request }, options) => {
+      if (!isAllowedOfficialApiUrl(request.url)) {
+        throw new Error(`KNBF refused non-allowlisted API URL: ${request.url}`);
+      }
+      options.followRedirect = false;
+    }],
+    requestHandler: async ({ json, request, response }) => {
+      const loadedUrl = request.loadedUrl ?? request.url;
+      if (!isAllowedOfficialApiUrl(loadedUrl)) {
+        throw new Error(`KNBF refused non-allowlisted API response URL: ${loadedUrl}`);
+      }
+      const statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(`KNBF API returned HTTP ${statusCode} for ${request.url}`);
+      }
+      payload = json;
+    },
+  }, crawlerConfig);
+
+  await crawler.run([new Request({
+    url,
+    headers: { Accept: "application/json" },
+  })]);
+
+  if (payload === undefined) {
+    throw new Error(`KNBF crawler received no API response from ${url}`);
   }
-  if (!isAllowedOfficialUrl(response.url)) {
-    throw new Error(`KNBF returned a non-official response URL: ${response.url}`);
-  }
-  return response.text();
+  return payload;
 }
 
-function isAllowedOfficialUrl(url: string): boolean {
+function createListApiUrl(): string {
+  const url = new URL(WORDPRESS_API_PATH, SITE_ORIGIN);
+  url.searchParams.set("slug", "medlemsfordeler");
+  url.searchParams.set("_fields", LIST_API_FIELDS);
+  return url.toString();
+}
+
+function createDetailApiUrl(parentId: number): string {
+  const url = new URL(WORDPRESS_API_PATH, SITE_ORIGIN);
+  url.searchParams.set("parent", String(parentId));
+  url.searchParams.set("per_page", "100");
+  url.searchParams.set("_fields", DETAIL_API_FIELDS);
+  return url.toString();
+}
+
+function isAllowedOfficialApiUrl(url: string): boolean {
   const parsed = parseUrl(url);
-  if (parsed === undefined || parsed.origin !== SITE_ORIGIN) return false;
-  return parsed.pathname === "/medlemsfordeler/" ||
-    /^\/medlemsfordeler\/[a-z0-9-]+\/$/i.test(parsed.pathname);
+  if (parsed === undefined || parsed.origin !== SITE_ORIGIN || parsed.pathname !== WORDPRESS_API_PATH) {
+    return false;
+  }
+
+  const keys = [...parsed.searchParams.keys()];
+  const isListRequest = keys.length === 2 &&
+    keys.every((key) => key === "slug" || key === "_fields") &&
+    parsed.searchParams.get("slug") === "medlemsfordeler" &&
+    parsed.searchParams.get("_fields") === LIST_API_FIELDS;
+  if (isListRequest) return true;
+
+  const parent = Number.parseInt(parsed.searchParams.get("parent") ?? "", 10);
+  return keys.length === 3 &&
+    keys.every((key) => key === "parent" || key === "per_page" || key === "_fields") &&
+    Number.isSafeInteger(parent) && parent > 0 &&
+    parsed.searchParams.get("per_page") === "100" &&
+    parsed.searchParams.get("_fields") === DETAIL_API_FIELDS;
+}
+
+function parseWordPressListPage(value: unknown): WordPressListPage {
+  if (!Array.isArray(value)) {
+    throw new Error("KNBF list API returned invalid JSON");
+  }
+  const page = value.find((item) => {
+    return isRecord(item) && item["slug"] === "medlemsfordeler" && item["link"] === LIST_URL;
+  });
+  if (
+    !isRecord(page) ||
+    typeof page["id"] !== "number" ||
+    !Number.isSafeInteger(page["id"]) ||
+    page["id"] <= 0 ||
+    !isRecord(page["content"]) ||
+    typeof page["content"]["rendered"] !== "string"
+  ) {
+    throw new Error("KNBF list API did not return the official overview page");
+  }
+  return { id: page["id"], content: page["content"]["rendered"] };
+}
+
+function parseWordPressDetails(
+  value: unknown,
+  entries: KnbfListEntry[],
+  parentId: number,
+): KnbfDetail[] {
+  if (!Array.isArray(value)) {
+    throw new Error("KNBF detail API returned invalid JSON");
+  }
+
+  const activeBySlug = new Map(entries.map((entry) => [entry.slug, entry]));
+  const detailsBySlug = new Map<string, KnbfDetail>();
+  for (const item of value) {
+    if (!isRecord(item) || typeof item["slug"] !== "string") continue;
+    const entry = activeBySlug.get(item["slug"]);
+    if (entry === undefined) continue;
+    if (
+      item["parent"] !== parentId ||
+      item["link"] !== entry.sourceUrl ||
+      !isRecord(item["title"]) ||
+      typeof item["title"]["rendered"] !== "string" ||
+      !isRecord(item["content"]) ||
+      typeof item["content"]["rendered"] !== "string"
+    ) {
+      continue;
+    }
+
+    const mainHtml = item["content"]["rendered"];
+    const title = normalizeText(stripHtml(item["title"]["rendered"]));
+    if (title === "" || mainHtml === "") continue;
+    detailsBySlug.set(entry.slug, {
+      ...entry,
+      title,
+      mainHtml,
+      publicText: cutPrivateInstructions(extractMainText(mainHtml)),
+    });
+  }
+
+  return entries.flatMap((entry) => {
+    const detail = detailsBySlug.get(entry.slug);
+    return detail === undefined ? [] : [detail];
+  });
 }
 
 function extractDetailEntries(html: string): KnbfListEntry[] {
@@ -240,17 +359,6 @@ function extractDetailEntries(html: string): KnbfListEntry[] {
 function isAllowedDetailUrl(url: URL): boolean {
   return url.origin === SITE_ORIGIN &&
     /^\/medlemsfordeler\/[a-z0-9-]+\/$/i.test(url.pathname);
-}
-
-function extractMainHtml(html: string): string {
-  const match = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
-  if (match === null) throw new Error("KNBF detail page contained no main element");
-  return match[1] ?? "";
-}
-
-function extractTitle(mainHtml: string): string {
-  const match = mainHtml.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
-  return normalizeText(stripHtml(match?.[1] ?? ""));
 }
 
 function extractMainText(mainHtml: string): string {
