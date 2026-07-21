@@ -1,5 +1,5 @@
-// Public member benefits from Skiforeningen's official website. The benefits
-// page is server-rendered HTML, fetched through an allowlisted official URL.
+// Public member benefits from Skiforeningen's official website. Merchants and
+// rewards are read from the live server-rendered page — nothing is hardcoded.
 // No login-only content, member numbers or discount codes are collected.
 import {
   Configuration,
@@ -14,7 +14,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
+import { parseBenefitListPage } from "../benefit-list-page.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -22,30 +22,12 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 const SITE_ORIGIN = "https://www.skiforeningen.no";
 const LIST_URL = `${SITE_ORIGIN}/medlemsskap/ditt-medlemskap/medlemsfordeler/`;
 const DEFAULT_TERMS = "Krever medlemskap i Skiforeningen.";
-
-type BenefitConfig = {
-  key: string;
-  markerHostname: string;
-  merchantName: string;
-  domains: string[];
-  reward: string;
-};
-
-// Rewards are stated next to each partner on the official page; set explicitly
-// because the page lists all partners in one flow.
-const BENEFITS: BenefitConfig[] = [
-  { key: "kollensvevet", markerHostname: "kollensvevet.no", merchantName: "Kollensvevet", domains: ["kollensvevet.no"], reward: "100 kr" },
-  { key: "bull-ski-kajakk", markerHostname: "bull-ski-kajakk.no", merchantName: "Bull Ski og Kajakk", domains: ["bull-ski-kajakk.no"], reward: "20 %" },
-  { key: "repairable", markerHostname: "repairable.no", merchantName: "Repairable", domains: ["repairable.no"], reward: "10 %" },
-  { key: "roseslottet", markerHostname: "roseslottet.no", merchantName: "Roseslottet", domains: ["roseslottet.no"], reward: "20 %" },
-  { key: "sporet-sport", markerHostname: "sporetsport.no", merchantName: "Sporet Sport", domains: ["sporetsport.no"], reward: "Medlemspris" },
-  { key: "kikutstua", markerHostname: "kikutstua.no", merchantName: "Kikutstua", domains: ["kikutstua.no"], reward: "Medlemspris" },
-  { key: "bull-superski", markerHostname: "bullsuperski.no", merchantName: "Bull Superski", domains: ["bullsuperski.no"], reward: "Medlemspris" },
-];
+const OFFICIAL_HOSTNAME = /skiforeningen\.no$/i;
+// Skiforeningen's own booking/video sub-sites, not merchant benefits.
+const OWN_SITES = /(^|\.)sporet\.no$|cvideo\.no/i;
 
 export type FetchSkiforeningenInput = {
   overrides: ProviderOverrides;
-  domainLookup: DomainLookup;
   generatedAt: string;
   logger: Logger;
 };
@@ -55,31 +37,30 @@ export async function fetchSkiforeningen(
 ): Promise<CashbackOffer[]> {
   input.logger.info("Skiforeningen: fetching public member benefits from the official page...");
 
-  const html = (await fetchOfficialPage()).toLowerCase();
+  const html = await fetchOfficialPage();
+  // Each benefit is a <div class="text-container"> card with the reward in its
+  // heading and the partner link in its body.
+  const discovered = parseBenefitListPage(html, OFFICIAL_HOSTNAME, { kind: "divClass", className: "text-container" }, OWN_SITES);
+  if (discovered.length === 0) {
+    throw new Error("Skiforeningen page contained no parseable benefit offers");
+  }
 
   const offers: CashbackOffer[] = [];
-  for (const config of BENEFITS) {
-    if (!html.includes(normalizeDomainInput(config.markerHostname))) {
-      input.logger.warn(`Skiforeningen benefit was not found: ${config.key}`);
-      continue;
-    }
-
-    let domains = (input.overrides.skiforeningen?.[config.key] ?? []).map(normalizeDomainInput);
-    if (domains.length === 0) domains = config.domains.map(normalizeDomainInput);
-    if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, config.merchantName).map(normalizeDomainInput);
-    }
-    domains = uniqueStrings(domains.flatMap((domain) => merchantDomainsFromHostname(domain)));
-    if (domains.length === 0) {
-      input.logger.warn(`Skiforeningen benefit has no domain: ${config.merchantName}`);
-      continue;
-    }
+  for (const item of discovered) {
+    const overrideDomains = input.overrides.skiforeningen?.[item.domain];
+    const domains = uniqueStrings(
+      (overrideDomains !== undefined && overrideDomains.length > 0
+        ? overrideDomains.map(normalizeDomainInput)
+        : [item.domain]
+      ).flatMap((domain) => merchantDomainsFromHostname(domain)),
+    );
+    if (domains.length === 0) continue;
 
     offers.push({
       provider: "skiforeningen",
-      merchantName: config.merchantName,
+      merchantName: item.merchantName,
       domains,
-      reward: config.reward,
+      reward: item.reward,
       sourceUrl: LIST_URL,
       activationUrl: LIST_URL,
       terms: DEFAULT_TERMS,
@@ -87,9 +68,7 @@ export async function fetchSkiforeningen(
     });
   }
 
-  input.logger.info(
-    `Skiforeningen: produced ${offers.length} offers from ${BENEFITS.length} configured benefits`,
-  );
+  input.logger.info(`Skiforeningen: produced ${offers.length} offers from the live page`);
   return uniqueOffers(offers);
 }
 

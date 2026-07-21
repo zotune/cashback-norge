@@ -1,7 +1,6 @@
-// Public member benefits from LHL's official website (Landsforeningen for
-// hjerte- og lungesyke). The benefits page is server-rendered HTML; it is
-// fetched through an allowlisted official URL. No login-only content, member
-// numbers or discount codes are collected.
+// Public member benefits from LHL (Landsforeningen for hjerte- og lungesyke).
+// Merchants and rewards are read from the live server-rendered page — nothing
+// is hardcoded. No login-only content, member numbers or discount codes.
 import {
   Configuration,
   HttpCrawler,
@@ -15,7 +14,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
+import { parseBenefitListPage } from "../benefit-list-page.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -23,30 +22,12 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 const SITE_ORIGIN = "https://www.lhl.no";
 const LIST_URL = `${SITE_ORIGIN}/medlemsfordeler/`;
 const DEFAULT_TERMS = "Krever medlemskap i LHL.";
-
-type BenefitConfig = {
-  key: string;
-  markerHostname: string;
-  merchantName: string;
-  domains: string[];
-  reward: string;
-};
-
-// Rewards are stated next to each partner on the official page. Set explicitly
-// because the page renders all partners in one list, so a text window around
-// one merchant can pick up a neighbour's number.
-const BENEFITS: BenefitConfig[] = [
-  { key: "sats", markerHostname: "sats.no", merchantName: "SATS", domains: ["sats.no"], reward: "15 %" },
-  { key: "farmasiet", markerHostname: "farmasiet.no", merchantName: "Farmasiet", domains: ["farmasiet.no"], reward: "10 %" },
-  { key: "hjemmelegene", markerHostname: "hjemmelegene.no", merchantName: "Hjemmelegene", domains: ["hjemmelegene.no"], reward: "Medlemspris" },
-  { key: "scandic", markerHostname: "scandichotels.com", merchantName: "Scandic Hotels", domains: ["scandichotels.com"], reward: "17 %" },
-  { key: "thon", markerHostname: "thonhotels.no", merchantName: "Thon Hotels", domains: ["thonhotels.no"], reward: "18 %" },
-  { key: "strawberry", markerHostname: "strawberry.no", merchantName: "Strawberry", domains: ["strawberry.no"], reward: "Medlemspris" },
-];
+const OFFICIAL_HOSTNAME = /lhl\.no$/i;
+// Own lottery/shop and fundraising/registry links, not merchant benefits.
+const OWN_SITES = /lhl-lotteriet|strommes24|innsamlingskontroll|fundraisingnorge|frivillighetnorge/i;
 
 export type FetchLhlInput = {
   overrides: ProviderOverrides;
-  domainLookup: DomainLookup;
   generatedAt: string;
   logger: Logger;
 };
@@ -54,34 +35,30 @@ export type FetchLhlInput = {
 export async function fetchLhl(input: FetchLhlInput): Promise<CashbackOffer[]> {
   input.logger.info("LHL: fetching public member benefits from the official page...");
 
-  const html = (await fetchOfficialPage()).toLowerCase();
+  const html = await fetchOfficialPage();
+  // Each benefit is a <div class="badge-card"> with the partner link in a
+  // heading and the reward in the paragraph below.
+  const discovered = parseBenefitListPage(html, OFFICIAL_HOSTNAME, { kind: "divClass", className: "badge-card" }, OWN_SITES);
+  if (discovered.length === 0) {
+    throw new Error("LHL page contained no parseable benefit offers");
+  }
 
   const offers: CashbackOffer[] = [];
-  for (const config of BENEFITS) {
-    // Only emit a benefit still linked on the official page.
-    if (!html.includes(normalizeDomainInput(config.markerHostname))) {
-      input.logger.warn(`LHL benefit was not found: ${config.key}`);
-      continue;
-    }
-
-    let domains = (input.overrides.lhl?.[config.key] ?? []).map(normalizeDomainInput);
-    if (domains.length === 0) domains = config.domains.map(normalizeDomainInput);
-    if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, config.merchantName).map(normalizeDomainInput);
-    }
-    domains = uniqueStrings(
-      domains.flatMap((domain) => merchantDomainsFromHostname(domain)),
+  for (const item of discovered) {
+    const overrideDomains = input.overrides.lhl?.[item.domain];
+    const domains = uniqueStrings(
+      (overrideDomains !== undefined && overrideDomains.length > 0
+        ? overrideDomains.map(normalizeDomainInput)
+        : [item.domain]
+      ).flatMap((domain) => merchantDomainsFromHostname(domain)),
     );
-    if (domains.length === 0) {
-      input.logger.warn(`LHL benefit has no domain: ${config.merchantName}`);
-      continue;
-    }
+    if (domains.length === 0) continue;
 
     offers.push({
       provider: "lhl",
-      merchantName: config.merchantName,
+      merchantName: item.merchantName,
       domains,
-      reward: config.reward,
+      reward: item.reward,
       sourceUrl: LIST_URL,
       activationUrl: LIST_URL,
       terms: DEFAULT_TERMS,
@@ -89,9 +66,7 @@ export async function fetchLhl(input: FetchLhlInput): Promise<CashbackOffer[]> {
     });
   }
 
-  input.logger.info(
-    `LHL: produced ${offers.length} offers from ${BENEFITS.length} configured benefits`,
-  );
+  input.logger.info(`LHL: produced ${offers.length} offers from the live page`);
   return uniqueOffers(offers);
 }
 

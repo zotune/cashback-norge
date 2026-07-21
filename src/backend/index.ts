@@ -922,7 +922,7 @@ async function main(): Promise<void> {
       provider: "kondis",
       reusePreviousOnFailure: true,
       run: () => fetchKondis({
-        domainLookup, generatedAt, logger,
+        generatedAt, logger,
         overrides: providerOverrides,
       }),
     }),

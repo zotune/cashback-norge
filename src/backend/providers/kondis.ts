@@ -1,7 +1,7 @@
-// Public member benefits from Kondis (organisasjon for kondisjonsidrett). The
-// benefits page is server-rendered HTML, fetched through an allowlisted
-// official URL. No login-only content, member numbers or discount codes are
-// collected.
+// Public member benefits from Kondis (organisasjon for kondisjonsidrett).
+// The benefits page is server-rendered HTML, fetched through an allowlisted
+// official URL. Merchants and rewards are read from the live page — nothing is
+// hardcoded. No login-only content, member numbers or discount codes.
 import {
   Configuration,
   HttpCrawler,
@@ -15,7 +15,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
+import { parseBenefitListPage } from "../benefit-list-page.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -23,34 +23,12 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 const SITE_ORIGIN = "https://www.kondis.no";
 const LIST_URL = `${SITE_ORIGIN}/vare-medlemsfordeler`;
 const DEFAULT_TERMS = "Krever medlemskap i Kondis.";
-
-type BenefitConfig = {
-  key: string;
-  markerHostname: string;
-  merchantName: string;
-  domains: string[];
-  reward: string;
-};
-
-// Rewards are stated next to each partner on the official page; set explicitly
-// because the page lists all partners in one flow.
-const BENEFITS: BenefitConfig[] = [
-  { key: "sportienda", markerHostname: "sportienda.com", merchantName: "Sportienda", domains: ["sportienda.com"], reward: "15 %" },
-  { key: "smart4u", markerHostname: "smart4u.no", merchantName: "Smart4u", domains: ["smart4u.no"], reward: "15 %" },
-  { key: "sportsmaster", markerHostname: "sportsmaster.no", merchantName: "Sportsmaster", domains: ["sportsmaster.no"], reward: "15 %" },
-  { key: "ffski", markerHostname: "ffskis.no", merchantName: "FFSki", domains: ["ffskis.no"], reward: "30 %" },
-  { key: "zooca", markerHostname: "zooca.no", merchantName: "Zooca Sport", domains: ["zooca.no"], reward: "15 %" },
-  { key: "recharge-health", markerHostname: "recharge.health", merchantName: "Recharge Health", domains: ["recharge.health"], reward: "15 %" },
-  { key: "lopetrening", markerHostname: "lopetrening.no", merchantName: "Løpetrening.no", domains: ["lopetrening.no"], reward: "15 %" },
-  { key: "pg-treningslab", markerHostname: "pgtreningslab.no", merchantName: "PG Treningslab", domains: ["pgtreningslab.no"], reward: "20 %" },
-  { key: "joule", markerHostname: "joule.no", merchantName: "Joule", domains: ["joule.no"], reward: "400 kr" },
-  { key: "studio-nor", markerHostname: "studio-nor.no", merchantName: "Studio Nor", domains: ["studio-nor.no"], reward: "Medlemspris" },
-  { key: "behandlerverket", markerHostname: "behandlerverket.no", merchantName: "Behandlerverket", domains: ["behandlerverket.no"], reward: "15 %" },
-];
+const OFFICIAL_HOSTNAME = /kondis\.no$/i;
+// Kondis' own event/training sites, not merchant benefits.
+const OWN_SITES = /kondistreninga\.no|kondislopet\.no|100klubben\.no/i;
 
 export type FetchKondisInput = {
   overrides: ProviderOverrides;
-  domainLookup: DomainLookup;
   generatedAt: string;
   logger: Logger;
 };
@@ -58,31 +36,28 @@ export type FetchKondisInput = {
 export async function fetchKondis(input: FetchKondisInput): Promise<CashbackOffer[]> {
   input.logger.info("Kondis: fetching public member benefits from the official page...");
 
-  const html = (await fetchOfficialPage()).toLowerCase();
+  const html = await fetchOfficialPage();
+  const discovered = parseBenefitListPage(html, OFFICIAL_HOSTNAME, OWN_SITES);
+  if (discovered.length === 0) {
+    throw new Error("Kondis page contained no parseable benefit offers");
+  }
 
   const offers: CashbackOffer[] = [];
-  for (const config of BENEFITS) {
-    if (!html.includes(normalizeDomainInput(config.markerHostname))) {
-      input.logger.warn(`Kondis benefit was not found: ${config.key}`);
-      continue;
-    }
-
-    let domains = (input.overrides.kondis?.[config.key] ?? []).map(normalizeDomainInput);
-    if (domains.length === 0) domains = config.domains.map(normalizeDomainInput);
-    if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, config.merchantName).map(normalizeDomainInput);
-    }
-    domains = uniqueStrings(domains.flatMap((domain) => merchantDomainsFromHostname(domain)));
-    if (domains.length === 0) {
-      input.logger.warn(`Kondis benefit has no domain: ${config.merchantName}`);
-      continue;
-    }
+  for (const item of discovered) {
+    const overrideDomains = input.overrides.kondis?.[item.domain];
+    const domains = uniqueStrings(
+      (overrideDomains !== undefined && overrideDomains.length > 0
+        ? overrideDomains.map(normalizeDomainInput)
+        : [item.domain]
+      ).flatMap((domain) => merchantDomainsFromHostname(domain)),
+    );
+    if (domains.length === 0) continue;
 
     offers.push({
       provider: "kondis",
-      merchantName: config.merchantName,
+      merchantName: item.merchantName,
       domains,
-      reward: config.reward,
+      reward: item.reward,
       sourceUrl: LIST_URL,
       activationUrl: LIST_URL,
       terms: DEFAULT_TERMS,
@@ -90,9 +65,7 @@ export async function fetchKondis(input: FetchKondisInput): Promise<CashbackOffe
     });
   }
 
-  input.logger.info(
-    `Kondis: produced ${offers.length} offers from ${BENEFITS.length} configured benefits`,
-  );
+  input.logger.info(`Kondis: produced ${offers.length} offers from the live page`);
   return uniqueOffers(offers);
 }
 
