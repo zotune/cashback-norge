@@ -163,7 +163,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: 
   lhl: { bg: "#ffffff", fg: "#4b1d6f", border: "#4b1d6f" },
   skiforeningen: { bg: "#ffffff", fg: "#0067b1", border: "#0067b1" },
   agrol: { bg: "#ffffff", fg: "#3d3d3d", border: "#c9c9c9" },
-  kondis: { bg: "#ffffff", fg: "#e8500f", border: "#e8500f" },
+  kondis: { bg: "#ffffff", fg: "#8b1a1a", border: "#8b1a1a" },
   santander: { bg: "#ffffff", fg: "#ec0000", border: "#ec0000" },
   norwegian: { bg: "#d81939", fg: "#ffffff" },
   vestbo: { bg: "#ffffff", fg: "#1dc1dd", border: "#1dc1dd" },
