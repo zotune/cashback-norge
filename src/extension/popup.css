@@ -383,8 +383,15 @@ h1 {
 }
 
 .provider-revmatikerforbundet {
-  background: #4fadb9;
-  color: #160809;
+  background: #ffffff;
+  border: 1px solid #2d4f9e;
+  color: #2d4f9e;
+}
+
+.provider-redningsselskapet {
+  background: #ffffff;
+  border: 1px solid #0a2a66;
+  color: #0a2a66;
 }
 
 .provider-bob {

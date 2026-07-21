@@ -537,6 +537,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Revmatikerforbundet";
   }
 
+  if (provider === "redningsselskapet") {
+    return "Redningsselskapet";
+  }
+
   return provider;
 }
 
