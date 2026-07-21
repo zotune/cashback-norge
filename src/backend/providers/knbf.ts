@@ -410,7 +410,7 @@ function sanitizePublicLine(value: string): string {
 function isForbiddenPublicLine(line: string): boolean {
   return /smarte\s*penger|smartepenger\.no/i.test(line) ||
     /\b(?:rabatt\s*kode(?:n)?|rabattkode(?:n)?|kampanjekode(?:n)?|kupongkode(?:n)?|kodeord(?:et)?|koden?)\b/i.test(line) ||
-    /\b(?:min\s+side|havneweb|logg(?:e)?\s+inn)\b/i.test(line);
+    /\b(?:min\s+side|havneweb|logg(?:e)?\s+inn|medlemsnummer(?:et)?)\b/i.test(line);
 }
 
 function lookupNames(merchantName: string, title: string): string[] {
