@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784632100
+// @version      1784633056
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -170,6 +170,9 @@
     akademikerne: "Akademikerne+",
     huseierne: "Huseierne",
     huseierforbundet: "Huseierforbundet",
+    amcar: "AMCAR",
+    horselsforbundet: "Hørselsforbundet",
+    knbf: "KNBF",
     njff: "NJFF",
     pensjonistforbundet: "Pensjonistforbundet",
     santander: "Santander",

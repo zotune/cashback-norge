@@ -344,6 +344,23 @@ h1 {
   color: #0f1a18;
 }
 
+.provider-amcar {
+  background: #c01921;
+  color: #ffffff;
+}
+
+.provider-horselsforbundet {
+  background: #ffffff;
+  border: 1px solid #f1774f;
+  color: #f1774f;
+}
+
+.provider-knbf {
+  background: #ffffff;
+  border: 1px solid #d5ddd9;
+  color: #000000;
+}
+
 .provider-njff {
   background: #ffffff;
   border: 1px solid #003a5d;

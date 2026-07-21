@@ -61,6 +61,9 @@ import { crawlElkjop } from "./providers/elkjop.js";
 import { fetchAkademikerne } from "./providers/akademikerne.js";
 import { fetchHuseierne } from "./providers/huseierne.js";
 import { fetchHuseierforbundet } from "./providers/huseierforbundet.js";
+import { fetchAmcar } from "./providers/amcar.js";
+import { fetchHorselsforbundet } from "./providers/horselsforbundet.js";
+import { fetchKnbf } from "./providers/knbf.js";
 import { crawlNjff } from "./providers/njff.js";
 import { fetchPensjonistforbundet } from "./providers/pensjonistforbundet.js";
 import { fetchVestbo } from "./providers/vestbo.js";
@@ -146,6 +149,9 @@ type CliConfig = {
   skipAkademikerne: boolean;
   skipHuseierne: boolean;
   skipHuseierforbundet: boolean;
+  skipAmcar: boolean;
+  skipHorselsforbundet: boolean;
+  skipKnbf: boolean;
   skipNjff: boolean;
   skipPensjonistforbundet: boolean;
   skipPartnerAds: boolean;
@@ -556,6 +562,9 @@ async function main(): Promise<void> {
     akademikerneOffers,
     huseierneOffers,
     huseierforbundetOffers,
+    amcarOffers,
+    horselsforbundetOffers,
+    knbfOffers,
     njffOffers,
     pensjonistforbundetOffers,
   ] = await Promise.all([
@@ -749,6 +758,39 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
       }),
     }),
+    config.skipAmcar ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "AMCAR",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "amcar",
+      reusePreviousOnFailure: true,
+      run: () => fetchAmcar({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipHorselsforbundet ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Hørselsforbundet",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "horselsforbundet",
+      reusePreviousOnFailure: true,
+      run: () => fetchHorselsforbundet({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipKnbf ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "KNBF",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "knbf",
+      reusePreviousOnFailure: true,
+      run: () => fetchKnbf({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
     config.skipNjff ? Promise.resolve([]) : collectOffers({
       fallbackWhenEmpty: true,
       label: "NJFF",
@@ -788,7 +830,7 @@ async function main(): Promise<void> {
     ...tradedoublerOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
-    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...njffOffers, ...pensjonistforbundetOffers,
+    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers,
     ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
   ]);
@@ -821,7 +863,7 @@ async function main(): Promise<void> {
   // domain already selected by the Norwegian sources above, but it must never
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
-    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...njffOffers, ...pensjonistforbundetOffers,
+    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers,
   ];
   const knownCoupertDomains = new Set(
     offersBeforeCoupert
@@ -999,6 +1041,9 @@ function readCliConfig(args: string[]): CliConfig {
     skipAkademikerne: args.includes("--skip-akademikerne"),
     skipHuseierne: args.includes("--skip-huseierne"),
     skipHuseierforbundet: args.includes("--skip-huseierforbundet"),
+    skipAmcar: args.includes("--skip-amcar"),
+    skipHorselsforbundet: args.includes("--skip-horselsforbundet"),
+    skipKnbf: args.includes("--skip-knbf"),
     skipNjff: args.includes("--skip-njff"),
     skipPensjonistforbundet: args.includes("--skip-pensjonistforbundet"),
     skipPartnerAds: args.includes("--skip-partnerads"),

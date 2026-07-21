@@ -505,6 +505,18 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Huseierforbundet";
   }
 
+  if (provider === "amcar") {
+    return "AMCAR";
+  }
+
+  if (provider === "horselsforbundet") {
+    return "Hørselsforbundet";
+  }
+
+  if (provider === "knbf") {
+    return "KNBF";
+  }
+
   if (provider === "njff") {
     return "NJFF";
   }
