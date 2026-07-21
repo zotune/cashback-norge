@@ -872,11 +872,8 @@ async function main(): Promise<void> {
       }),
     }),
     config.skipRedningsselskapet ? Promise.resolve([]) : collectOffers({
-      fallbackWhenEmpty: true,
       label: "Redningsselskapet",
-      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       provider: "redningsselskapet",
-      reusePreviousOnFailure: true,
       run: () => fetchRedningsselskapet({
         generatedAt, logger,
         overrides: providerOverrides,

@@ -40,7 +40,18 @@ export async function fetchRedningsselskapet(
     "Redningsselskapet: fetching public member benefits from the official REST API...",
   );
 
-  const content = await fetchOfficialContent();
+  // rs.no's WAF times out wp-json requests from datacenter IPs, so this
+  // reliably fails in CI. Degrade to no offers instead of throwing — a single
+  // unreachable org must not crash the whole crawl.
+  let content: string;
+  try {
+    content = await fetchOfficialContent();
+  } catch (error) {
+    input.logger.warn(
+      `Redningsselskapet: could not fetch benefits (${error instanceof Error ? error.message : "unknown"}); skipping`,
+    );
+    return [];
+  }
   // Each benefit is a Gutenberg column (<div class="wp-block-column">) holding
   // the reward text and the partner button.
   const discovered = parseBenefitListPage(content, OFFICIAL_HOSTNAME, { kind: "divClass", className: "wp-block-column" });
