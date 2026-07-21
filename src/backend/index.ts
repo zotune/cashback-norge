@@ -878,7 +878,7 @@ async function main(): Promise<void> {
       provider: "redningsselskapet",
       reusePreviousOnFailure: true,
       run: () => fetchRedningsselskapet({
-        domainLookup, generatedAt, logger,
+        generatedAt, logger,
         overrides: providerOverrides,
       }),
     }),
@@ -889,7 +889,7 @@ async function main(): Promise<void> {
       provider: "lhl",
       reusePreviousOnFailure: true,
       run: () => fetchLhl({
-        domainLookup, generatedAt, logger,
+        generatedAt, logger,
         overrides: providerOverrides,
       }),
     }),
@@ -900,7 +900,7 @@ async function main(): Promise<void> {
       provider: "skiforeningen",
       reusePreviousOnFailure: true,
       run: () => fetchSkiforeningen({
-        domainLookup, generatedAt, logger,
+        generatedAt, logger,
         overrides: providerOverrides,
       }),
     }),

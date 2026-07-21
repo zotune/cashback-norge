@@ -37,7 +37,7 @@ export async function fetchKondis(input: FetchKondisInput): Promise<CashbackOffe
   input.logger.info("Kondis: fetching public member benefits from the official page...");
 
   const html = await fetchOfficialPage();
-  const discovered = parseBenefitListPage(html, OFFICIAL_HOSTNAME, OWN_SITES);
+  const discovered = parseBenefitListPage(html, OFFICIAL_HOSTNAME, { kind: "listItem" }, OWN_SITES);
   if (discovered.length === 0) {
     throw new Error("Kondis page contained no parseable benefit offers");
   }
