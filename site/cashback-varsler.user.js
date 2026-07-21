@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784638946
+// @version      1784639647
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -180,6 +180,8 @@
     revmatikerforbundet: "Revmatikerforbundet",
     redningsselskapet: "Redningsselskapet",
     lhl: "LHL",
+    skiforeningen: "Skiforeningen",
+    agrol: "Agrol",
     santander: "Santander",
     norwegian: "Norwegian",
     vestbo: "Vestbo",

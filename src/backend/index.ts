@@ -71,6 +71,8 @@ import { fetchSyklistforeningen } from "./providers/syklistforeningen.js";
 import { fetchRevmatikerforbundet } from "./providers/revmatikerforbundet.js";
 import { fetchRedningsselskapet } from "./providers/redningsselskapet.js";
 import { fetchLhl } from "./providers/lhl.js";
+import { fetchSkiforeningen } from "./providers/skiforeningen.js";
+import { fetchAgrol } from "./providers/agrol.js";
 import { fetchVestbo } from "./providers/vestbo.js";
 import { fetchBbl } from "./providers/bbl.js";
 import { fetchElbil } from "./providers/elbilforeningen.js";
@@ -164,6 +166,8 @@ type CliConfig = {
   skipRevmatikerforbundet: boolean;
   skipRedningsselskapet: boolean;
   skipLhl: boolean;
+  skipSkiforeningen: boolean;
+  skipAgrol: boolean;
   skipPartnerAds: boolean;
   skipTradeTracker: boolean;
   skipAwin: boolean;
@@ -582,6 +586,8 @@ async function main(): Promise<void> {
     revmatikerforbundetOffers,
     redningsselskapetOffers,
     lhlOffers,
+    skiforeningenOffers,
+    agrolOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : collectOffers({
       label: "Trumf",
@@ -884,6 +890,28 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
       }),
     }),
+    config.skipSkiforeningen ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Skiforeningen",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "skiforeningen",
+      reusePreviousOnFailure: true,
+      run: () => fetchSkiforeningen({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipAgrol ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Agrol",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "agrol",
+      reusePreviousOnFailure: true,
+      run: () => fetchAgrol({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
@@ -900,7 +928,7 @@ async function main(): Promise<void> {
     ...tradedoublerOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
-    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers,
+    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers,
     ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
   ]);
@@ -933,7 +961,7 @@ async function main(): Promise<void> {
   // domain already selected by the Norwegian sources above, but it must never
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
-    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers,
+    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers,
   ];
   const knownCoupertDomains = new Set(
     offersBeforeCoupert
@@ -1121,6 +1149,8 @@ function readCliConfig(args: string[]): CliConfig {
     skipRevmatikerforbundet: args.includes("--skip-revmatikerforbundet"),
     skipRedningsselskapet: args.includes("--skip-redningsselskapet"),
     skipLhl: args.includes("--skip-lhl"),
+    skipSkiforeningen: args.includes("--skip-skiforeningen"),
+    skipAgrol: args.includes("--skip-agrol"),
     skipPartnerAds: args.includes("--skip-partnerads"),
     skipTradeTracker: args.includes("--skip-tradetracker"),
     skipAwin: args.includes("--skip-awin"),

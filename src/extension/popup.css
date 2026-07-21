@@ -400,6 +400,18 @@ h1 {
   color: #4b1d6f;
 }
 
+.provider-skiforeningen {
+  background: #ffffff;
+  border: 1px solid #0067b1;
+  color: #0067b1;
+}
+
+.provider-agrol {
+  background: #ffffff;
+  border: 1px solid #c9c9c9;
+  color: #3d3d3d;
+}
+
 .provider-bob {
   background: #ffffff;
   border: 1px solid #d3e2dc;

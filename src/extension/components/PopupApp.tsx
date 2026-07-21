@@ -545,6 +545,14 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "LHL";
   }
 
+  if (provider === "skiforeningen") {
+    return "Skiforeningen";
+  }
+
+  if (provider === "agrol") {
+    return "Agrol";
+  }
+
   return provider;
 }
 
