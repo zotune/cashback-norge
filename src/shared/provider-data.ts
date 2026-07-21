@@ -154,7 +154,7 @@ export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: 
   syklistforeningen: { bg: "#e61414", fg: "#ffffff" },
   revmatikerforbundet: { bg: "#ffffff", fg: "#2d4f9e", border: "#2d4f9e" },
   redningsselskapet: { bg: "#ffffff", fg: "#0a2a66", border: "#0a2a66" },
-  lhl: { bg: "#be1622", fg: "#ffffff" },
+  lhl: { bg: "#ffffff", fg: "#4b1d6f", border: "#4b1d6f" },
   santander: { bg: "#ffffff", fg: "#ec0000", border: "#ec0000" },
   norwegian: { bg: "#d81939", fg: "#ffffff" },
   vestbo: { bg: "#ffffff", fg: "#1dc1dd", border: "#1dc1dd" },

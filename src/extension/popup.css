@@ -395,8 +395,9 @@ h1 {
 }
 
 .provider-lhl {
-  background: #be1622;
-  color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #4b1d6f;
+  color: #4b1d6f;
 }
 
 .provider-bob {
