@@ -338,6 +338,24 @@ h1 {
   color: #0f1a18;
 }
 
+.provider-huseierforbundet {
+  background: #ffffff;
+  border: 1px solid #d5ddd9;
+  color: #0f1a18;
+}
+
+.provider-njff {
+  background: #ffffff;
+  border: 1px solid #003a5d;
+  color: #003a5d;
+}
+
+.provider-pensjonistforbundet {
+  background: #ffffff;
+  border: 1px solid #d5ddd9;
+  color: #000000;
+}
+
 .provider-bob {
   background: #ffffff;
   border: 1px solid #d3e2dc;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784461053
+// @version      1784632100
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -169,6 +169,9 @@
     elkjop: "Elkjøp",
     akademikerne: "Akademikerne+",
     huseierne: "Huseierne",
+    huseierforbundet: "Huseierforbundet",
+    njff: "NJFF",
+    pensjonistforbundet: "Pensjonistforbundet",
     santander: "Santander",
     norwegian: "Norwegian",
     vestbo: "Vestbo",

@@ -60,6 +60,9 @@ import { crawlCoop } from "./providers/coop.js";
 import { crawlElkjop } from "./providers/elkjop.js";
 import { fetchAkademikerne } from "./providers/akademikerne.js";
 import { fetchHuseierne } from "./providers/huseierne.js";
+import { fetchHuseierforbundet } from "./providers/huseierforbundet.js";
+import { crawlNjff } from "./providers/njff.js";
+import { fetchPensjonistforbundet } from "./providers/pensjonistforbundet.js";
 import { fetchVestbo } from "./providers/vestbo.js";
 import { fetchBbl } from "./providers/bbl.js";
 import { fetchElbil } from "./providers/elbilforeningen.js";
@@ -142,6 +145,9 @@ type CliConfig = {
   skipElkjop: boolean;
   skipAkademikerne: boolean;
   skipHuseierne: boolean;
+  skipHuseierforbundet: boolean;
+  skipNjff: boolean;
+  skipPensjonistforbundet: boolean;
   skipPartnerAds: boolean;
   skipTradeTracker: boolean;
   skipAwin: boolean;
@@ -173,6 +179,7 @@ type CliConfig = {
   nettbonusStartUrl: string;
   elkjopStartUrl: string;
   elkjopProxyUrls: string[];
+  njffStartUrl: string;
 };
 
 async function main(): Promise<void> {
@@ -548,6 +555,9 @@ async function main(): Promise<void> {
     elkjopOffers,
     akademikerneOffers,
     huseierneOffers,
+    huseierforbundetOffers,
+    njffOffers,
+    pensjonistforbundetOffers,
   ] = await Promise.all([
     config.skipTrumf ? Promise.resolve([]) : collectOffers({
       label: "Trumf",
@@ -728,6 +738,40 @@ async function main(): Promise<void> {
         overrides: providerOverrides,
       }),
     }),
+    config.skipHuseierforbundet ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Norges Huseierforbund",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "huseierforbundet",
+      reusePreviousOnFailure: true,
+      run: () => fetchHuseierforbundet({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
+    config.skipNjff ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "NJFF",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "njff",
+      reusePreviousOnFailure: true,
+      run: () => crawlNjff({
+        domainLookup, generatedAt, logger,
+        maxRequestsPerCrawl: config.maxRequestsPerCrawl,
+        overrides: providerOverrides, startUrl: config.njffStartUrl,
+      }),
+    }),
+    config.skipPensjonistforbundet ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Pensjonistforbundet",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "pensjonistforbundet",
+      reusePreviousOnFailure: true,
+      run: () => fetchPensjonistforbundet({
+        domainLookup, generatedAt, logger,
+        overrides: providerOverrides,
+      }),
+    }),
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
@@ -744,7 +788,7 @@ async function main(): Promise<void> {
     ...tradedoublerOffers,
     ...trumfOffers, ...sasOffers, ...kickbackOffers, ...logbuyOffers,
     ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...studentkortetOffers, ...nettbonusOffers,
-    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers,
+    ...teknaOffers, ...nitoOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...njffOffers, ...pensjonistforbundetOffers,
     ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...rabattkodeOffers, ...cuponationOffers, ...trustdealsOffers,
     ...finnkupongkoderOffers,
   ]);
@@ -777,7 +821,7 @@ async function main(): Promise<void> {
   // domain already selected by the Norwegian sources above, but it must never
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
-    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers,
+    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...njffOffers, ...pensjonistforbundetOffers,
   ];
   const knownCoupertDomains = new Set(
     offersBeforeCoupert
@@ -954,6 +998,9 @@ function readCliConfig(args: string[]): CliConfig {
     skipElkjop: args.includes("--skip-elkjop"),
     skipAkademikerne: args.includes("--skip-akademikerne"),
     skipHuseierne: args.includes("--skip-huseierne"),
+    skipHuseierforbundet: args.includes("--skip-huseierforbundet"),
+    skipNjff: args.includes("--skip-njff"),
+    skipPensjonistforbundet: args.includes("--skip-pensjonistforbundet"),
     skipPartnerAds: args.includes("--skip-partnerads"),
     skipTradeTracker: args.includes("--skip-tradetracker"),
     skipAwin: args.includes("--skip-awin"),
@@ -1023,6 +1070,9 @@ function readCliConfig(args: string[]): CliConfig {
       readArgumentValue(args, "--elkjop-start-url") ??
       "https://www.elkjop.no/kundeklubb/partner-tilbud",
     elkjopProxyUrls: buildScraperApiProxyUrls(),
+    njffStartUrl:
+      readArgumentValue(args, "--njff-start-url") ??
+      "https://www.njff.no/medlem/medlemsfordeler",
   };
 }
 
