@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1784639647
+// @version      1784640168
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -182,6 +182,7 @@
     lhl: "LHL",
     skiforeningen: "Skiforeningen",
     agrol: "Agrol",
+    kondis: "Kondis",
     santander: "Santander",
     norwegian: "Norwegian",
     vestbo: "Vestbo",

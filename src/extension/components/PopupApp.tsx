@@ -553,6 +553,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Agrol";
   }
 
+  if (provider === "kondis") {
+    return "Kondis";
+  }
+
   return provider;
 }
 

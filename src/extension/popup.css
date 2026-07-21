@@ -412,6 +412,12 @@ h1 {
   color: #3d3d3d;
 }
 
+.provider-kondis {
+  background: #ffffff;
+  border: 1px solid #e8500f;
+  color: #e8500f;
+}
+
 .provider-bob {
   background: #ffffff;
   border: 1px solid #d3e2dc;
