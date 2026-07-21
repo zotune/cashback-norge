@@ -40,7 +40,6 @@ const BENEFITS: BenefitConfig[] = [
     markerHostname: "helsefysio.no",
     merchantName: "Artroseklubben",
     domains: ["helsefysio.no"],
-    reward: "197 kr/mnd",
   },
   {
     key: "appoteket",
@@ -125,7 +124,6 @@ const BENEFITS: BenefitConfig[] = [
     markerHostname: "ambera.com",
     merchantName: "Ambera",
     domains: ["ambera.com"],
-    reward: "0 kr totalsum",
   },
   {
     key: "mova",
@@ -150,7 +148,6 @@ const BENEFITS: BenefitConfig[] = [
     markerHostname: "ffo.no",
     merchantName: "FFO hotellavtaler",
     domains: ["scandichotels.com", "strawberry.no", "thonhotels.no"],
-    reward: "Medlemspris",
   },
 ];
 

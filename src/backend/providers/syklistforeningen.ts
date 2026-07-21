@@ -44,7 +44,6 @@ const BENEFITS: BenefitConfig[] = [
     matches: /\bBikeMember\b/i,
     merchantName: "BikeMember",
     domains: ["bikemember.no"],
-    reward: "0 kr totalsum",
   },
   {
     key: "ute-depot",
@@ -117,7 +116,6 @@ const BENEFITS: BenefitConfig[] = [
     matches: /\bNeptun Sport\b/i,
     merchantName: "Neptun Sport",
     domains: ["neptunsport.no"],
-    reward: "0 kr totalsum",
   },
   {
     key: "pedalen-bodo",
@@ -142,7 +140,6 @@ const BENEFITS: BenefitConfig[] = [
     matches: /\bAvancia Skedsmokorset\b/i,
     merchantName: "Avancia Skedsmokorset",
     domains: ["avancia.no"],
-    reward: "459 kr/mnd",
   },
   {
     key: "foss-sport-strommen",
