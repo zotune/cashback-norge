@@ -541,6 +541,10 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Redningsselskapet";
   }
 
+  if (provider === "lhl") {
+    return "LHL";
+  }
+
   return provider;
 }
 
