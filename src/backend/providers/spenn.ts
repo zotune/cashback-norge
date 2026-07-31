@@ -11,6 +11,15 @@ const CONTENTFUL_TOKEN = "7M6TKX9Vk0uQzCh16pbokiOlJztMRtJ_EvQPOrPVu4I";
 /** Norway site ID in refunder tracking links */
 const NORWAY_SITE_ID = "4aefb3fa-6549-11ef-be75-0aaed722973b";
 
+/**
+ * Highest percentage rate we trust from the source. Merchants paying a fixed
+ * fee per new customer sometimes show up as a per-10-kr rate anyway — Wolt is
+ * listed at "37,9 Spenn per 10 kr" (= 37,9 %) while the real deal is a one-off
+ * bonus of about a hundred kroner. The highest genuine rate seen is 12 %, so
+ * anything above this ceiling is dropped rather than shown as cashback.
+ */
+const MAX_PLAUSIBLE_PERCENT = 20;
+
 const OFFERS_QUERY = `
   query ($limit: Int!, $skip: Int!, $now: DateTime!) {
     offerCollection(
@@ -113,6 +122,13 @@ export async function fetchSpenn(options: {
     // Prefer refunder page rate; fall back to Contentful description
     const parsed = refunderRates.get(link) ?? parseSpennRate(desc);
     if (!parsed) continue;
+    if (isImplausiblePercent(parsed)) {
+      logger.warn(
+        `Spenn: skipping ${merchantName}, implausible rate ${parsed.rate}` +
+          " (likely a fixed fee expressed per 10 kr)",
+      );
+      continue;
+    }
 
     const existing = best.get(merchantName);
     if (!existing || parsed.maxVal > existing.maxVal) {
@@ -156,6 +172,13 @@ export async function fetchSpenn(options: {
     const percentParsed = parseSpennRate(desc);
     const parsed = percentParsed ?? parseSpennFixedBonus(`${item.title}\n${desc}`);
     if (!parsed) continue;
+    if (isImplausiblePercent(parsed)) {
+      logger.warn(
+        `Spenn: skipping ${merchantName}, implausible rate ${parsed.rate}` +
+          " (likely a fixed fee expressed per 10 kr)",
+      );
+      continue;
+    }
 
     const candidate: DirectOffer = {
       parsed,
@@ -189,6 +212,11 @@ export async function fetchSpenn(options: {
 
   logger.info(`Spenn: ${offers.length} Norwegian cashback offers`);
   return offers;
+}
+
+/** Fixed bonuses are in kroner, so the ceiling only applies to percentages. */
+function isImplausiblePercent(parsed: ParsedRate): boolean {
+  return parsed.rate.endsWith("%") && parsed.maxVal > MAX_PLAUSIBLE_PERCENT;
 }
 
 function isNorwegianMarketLink(link: string): boolean {

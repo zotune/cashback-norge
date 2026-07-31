@@ -19,6 +19,10 @@ const MIN_REQUEST_INTERVAL_MS = 600;
 const PROGRAM_STATUS_ACCEPTED = 3;
 // Bookkeeping tariff events (claims/corrections), not sale commissions
 const IGNORED_TARIFF_EVENTS = /inquiry|adjustment/i;
+// Placeholder tariffs pay "100 % of the registered amount" and carry no rate of
+// their own (Wolt NOR has one named "fixed fee" next to its real 103,5 kr sale
+// tariff). Reading them as a commission rate would claim 100 % of the purchase.
+const PLACEHOLDER_PERCENTAGE_FEE = 100;
 
 const CLIENT_ID_ENV_KEYS = [
   "TRADEDOUBLER_CLIENT_ID",
@@ -368,7 +372,13 @@ function unwrapItems<T>(payload: unknown): T[] {
 function readSaleTariffs(detail: TradedoublerProgramDetail): TradedoublerTariff[] {
   return (detail.segmentTariffs ?? [])
     .flatMap((segment) => segment.tariffs ?? [])
-    .filter((tariff) => !IGNORED_TARIFF_EVENTS.test(tariff.eventName ?? ""));
+    .filter((tariff) => !IGNORED_TARIFF_EVENTS.test(tariff.eventName ?? ""))
+    .filter((tariff) => !isPlaceholderTariff(tariff));
+}
+
+function isPlaceholderTariff(tariff: TradedoublerTariff): boolean {
+  return (tariff.percentageFee ?? 0) >= PLACEHOLDER_PERCENTAGE_FEE &&
+    (tariff.fixedFee ?? 0) === 0;
 }
 
 function selectProgramDomains(detail: TradedoublerProgramDetail): string[] {
