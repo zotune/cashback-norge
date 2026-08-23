@@ -6,6 +6,7 @@ import {
   type CashbackProvider,
   isCashbackIndex,
   normalizeDomainInput,
+  parseUrl,
   uniqueOffers,
 } from "../shared/cashback.js";
 import {
@@ -959,6 +960,13 @@ async function main(): Promise<void> {
   // accepted by fuzzy search. --rabatta-shops can restrict local test crawls.
   const rabattaOffers = config.skipRabatta ? [] : await collectOffers({
     label: "Rabatta",
+    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+    // Rabatta shares the rabattkode provider key with the Rabattkode source,
+    // so the fallback must only reuse the offers that came from rabatta.app.
+    previousOfferFilter: (offer) =>
+      parseUrl(offer.sourceUrl)?.hostname === "rabatta.app",
+    provider: "rabattkode",
+    reusePreviousOnFailure: true,
     run: () => fetchRabatta({
       generatedAt,
       logger,
@@ -1307,6 +1315,7 @@ type CollectProviderOffersOptions = {
   label: string;
   logger: Logger;
   maxPreviousOfferAgeDays?: number;
+  previousOfferFilter?: (offer: CashbackOffer) => boolean;
   previousOffersByProvider: ReadonlyMap<CashbackProvider, CashbackOffer[]>;
   provider?: CashbackProvider;
   reusePreviousOnFailure?: boolean;
@@ -1361,8 +1370,12 @@ function getReusablePreviousOffers(
     return undefined;
   }
 
-  const previousOffers =
+  const providerOffers =
     options.previousOffersByProvider.get(options.provider) ?? [];
+  const offerFilter = options.previousOfferFilter;
+  const previousOffers = offerFilter === undefined
+    ? providerOffers
+    : providerOffers.filter((offer) => offerFilter(offer));
   if (previousOffers.length === 0) {
     throw new Error(
       `${options.label}: ${reason}; no previous offers available for fallback`,

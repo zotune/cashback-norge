@@ -1,6 +1,8 @@
 // Rabatta's public Norwegian shop catalogue is opt-in in the main crawler.
-// The website bundle maps each /no/shops/{slug} page to an exact Norwegian
-// webshop id, which avoids mixing similarly named Nordic shop variants.
+// Each /no/shops/{slug} page inlines the exact Norwegian webshop id in its
+// server-rendered payload, which avoids mixing similarly named Nordic shop
+// variants. The id used to live in the client bundle as a full shop map, but
+// rabatta.app moved that lookup server side in August 2026.
 import {
   isRecord,
   normalizeDomainInput,
@@ -13,18 +15,28 @@ import {
 } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 
-const DEFAULT_SITE_URL = "https://rabatta.app/no";
+const DEFAULT_SHOP_PAGE_BASE_URL = "https://rabatta.app/no/shops";
 const DEFAULT_SITEMAP_URL = "https://rabatta.app/sitemap.xml";
 const DEFAULT_API_BASE_URL = "https://rabatta.app/api";
 const DEFAULT_CONCURRENCY = 4;
 const REQUEST_TIMEOUT_MS = 30_000;
 const JSON_REQUEST_ATTEMPTS = 3;
+// A single renamed field or reshuffled page must not take the whole crawl
+// down, but a wholesale layout change on rabatta.app still has to fail loudly.
+const MIN_RESOLVED_SHOP_RATIO = 0.8;
 const NO_CONTENT_RESPONSE = Symbol("Rabatta no content");
 
 type NorwegianShopConfig = {
   displayName: string;
   slug: string;
   webshopId: number;
+};
+
+type FetchShopConfigsInput = {
+  concurrency: number;
+  logger: Logger;
+  shopPageBaseUrl: string;
+  slugs: string[];
 };
 
 type RabattaCoupon = {
@@ -44,9 +56,9 @@ export type FetchRabattaInput = {
   logger: Logger;
   apiBaseUrl?: string;
   concurrency?: number;
+  shopPageBaseUrl?: string;
   shopSlugs?: Iterable<string>;
   sitemapUrl?: string;
-  siteUrl?: string;
 };
 
 export async function fetchRabatta(
@@ -57,36 +69,38 @@ export async function fetchRabatta(
     throw new Error("concurrency must be a positive integer");
   }
 
-  const siteUrl = input.siteUrl ?? DEFAULT_SITE_URL;
+  const shopPageBaseUrl = stripTrailingSlash(
+    input.shopPageBaseUrl ?? DEFAULT_SHOP_PAGE_BASE_URL,
+  );
   const sitemapUrl = input.sitemapUrl ?? DEFAULT_SITEMAP_URL;
   const apiBaseUrl = stripTrailingSlash(
     input.apiBaseUrl ?? DEFAULT_API_BASE_URL,
   );
   const requestedSlugs = normalizeRequestedSlugs(input.shopSlugs);
 
-  const [sitemapXml, siteHtml] = await Promise.all([
-    fetchText(sitemapUrl),
-    fetchText(siteUrl),
-  ]);
+  const sitemapXml = await fetchText(sitemapUrl);
   const norwegianSlugs = parseNorwegianShopSlugs(sitemapXml);
   if (norwegianSlugs.length === 0) {
     throw new Error("the sitemap contained no Norwegian shop pages");
   }
 
-  const bundleUrl = parseAppBundleUrl(siteHtml, siteUrl);
-  const bundle = await fetchText(bundleUrl);
-  const shopConfigs = parseNorwegianShopConfigs(bundle, norwegianSlugs);
-  validateShopConfigCoverage(shopConfigs, norwegianSlugs);
-  const selectedConfigs = selectShopConfigs(shopConfigs, requestedSlugs);
+  const targetSlugs = selectRequestedSlugs(norwegianSlugs, requestedSlugs);
+  const shopConfigs = await fetchNorwegianShopConfigs({
+    concurrency,
+    logger: input.logger,
+    shopPageBaseUrl,
+    slugs: targetSlugs,
+  });
+  validateShopConfigCoverage(shopConfigs, targetSlugs);
 
   input.logger.info(
-    `Rabatta: testing ${selectedConfigs.length} of ${shopConfigs.length} Norwegian shops`,
+    `Rabatta: testing ${shopConfigs.length} of ${targetSlugs.length} Norwegian shops`,
   );
 
   let completedWebshopRequests = 0;
   let unavailableWebshopRequests = 0;
   const rows = await mapWithConcurrency(
-    selectedConfigs,
+    shopConfigs,
     concurrency,
     async (config): Promise<CashbackOffer[]> => {
       try {
@@ -118,7 +132,7 @@ export async function fetchRabatta(
     },
   );
 
-  if (selectedConfigs.length > 0 && completedWebshopRequests === 0) {
+  if (shopConfigs.length > 0 && completedWebshopRequests === 0) {
     throw new Error("all Norwegian webshop requests failed");
   }
 
@@ -151,78 +165,125 @@ export function parseNorwegianShopSlugs(sitemapXml: string): string[] {
   return [...slugs];
 }
 
-export function parseNorwegianShopConfigs(
-  bundle: string,
-  norwegianSlugs: Iterable<string>,
-): NorwegianShopConfig[] {
-  const configs: NorwegianShopConfig[] = [];
+async function fetchNorwegianShopConfigs(
+  input: FetchShopConfigsInput,
+): Promise<NorwegianShopConfig[]> {
+  const rows = await mapWithConcurrency(
+    input.slugs,
+    input.concurrency,
+    async (slug): Promise<NorwegianShopConfig[]> => {
+      const pageUrl = `${input.shopPageBaseUrl}/${encodeURIComponent(slug)}`;
+      try {
+        const config = parseShopPageConfig(await fetchText(pageUrl), slug);
+        if (config === undefined) {
+          input.logger.warn(
+            `Rabatta: no webshop id in the ${slug} shop page`,
+          );
+          return [];
+        }
+        return [config];
+      } catch (error) {
+        input.logger.warn(
+          `Rabatta: could not read the ${slug} shop page: ${formatError(error)}`,
+        );
+        return [];
+      }
+    },
+  );
 
-  for (const slug of norwegianSlugs) {
-    for (const shopObject of findObjectProperties(bundle, slug)) {
-      const norwegianObject = findObjectProperty(shopObject, "no");
-      if (norwegianObject === undefined) continue;
+  return dedupeShopConfigs(rows.flat(), input.logger);
+}
 
-      const idMatch = norwegianObject.match(/(?:^|[,\{])webshopId:(\d+)/);
-      const rawWebshopId = idMatch?.[1];
-      if (rawWebshopId === undefined) continue;
+export function parseShopPageConfig(
+  html: string,
+  slug: string,
+): NorwegianShopConfig | undefined {
+  const candidates: NorwegianShopConfig[] = [];
 
-      const webshopId = Number.parseInt(rawWebshopId, 10);
-      if (!Number.isSafeInteger(webshopId) || webshopId <= 0) continue;
+  for (const configObject of findObjectProperties(html, "config")) {
+    const idMatch = configObject.match(/(?:^|[,\{])webshopId:(\d+)/);
+    const rawWebshopId = idMatch?.[1];
+    if (rawWebshopId === undefined) continue;
 
-      const displayName =
-        readJavaScriptStringProperty(norwegianObject, "displayName") ??
-        formatMerchantName(slug);
-      configs.push({ displayName, slug, webshopId });
-      break;
-    }
+    const webshopId = Number.parseInt(rawWebshopId, 10);
+    if (!Number.isSafeInteger(webshopId) || webshopId <= 0) continue;
+
+    const displayName =
+      readJavaScriptStringProperty(configObject, "displayName") ??
+      formatMerchantName(slug);
+    const config: NorwegianShopConfig = { displayName, slug, webshopId };
+
+    // A page can embed configs for more than one route match, so prefer the
+    // one that names this shop over the first id that happens to appear.
+    const webshopName = readJavaScriptStringProperty(configObject, "webshopName");
+    if (webshopName?.trim().toLowerCase() === slug) return config;
+
+    candidates.push(config);
   }
 
-  return configs;
+  return candidates[0];
+}
+
+function dedupeShopConfigs(
+  configs: NorwegianShopConfig[],
+  logger: Logger,
+): NorwegianShopConfig[] {
+  const configByWebshopId = new Map<number, NorwegianShopConfig>();
+
+  for (const config of configs) {
+    const existing = configByWebshopId.get(config.webshopId);
+    if (existing === undefined) {
+      configByWebshopId.set(config.webshopId, config);
+      continue;
+    }
+
+    logger.warn(
+      `Rabatta: ${config.slug} and ${existing.slug} both resolved to webshop id ${config.webshopId}; keeping ${existing.slug}`,
+    );
+  }
+
+  return [...configByWebshopId.values()];
 }
 
 function validateShopConfigCoverage(
   configs: NorwegianShopConfig[],
-  norwegianSlugs: string[],
+  targetSlugs: string[],
 ): void {
+  if (targetSlugs.length === 0) return;
+
+  const minimumCount = Math.ceil(targetSlugs.length * MIN_RESOLVED_SHOP_RATIO);
+  if (configs.length > 0 && configs.length >= minimumCount) return;
+
   const configuredSlugs = new Set(configs.map((config) => config.slug));
-  const missingSlugs = norwegianSlugs.filter(
+  const missingSlugs = targetSlugs.filter(
     (slug) => !configuredSlugs.has(slug),
   );
-  if (missingSlugs.length > 0 || configs.length !== norwegianSlugs.length) {
-    throw new Error(
-      `the Rabatta bundle mapped ${configs.length}/${norwegianSlugs.length} Norwegian shops` +
-      (missingSlugs.length === 0 ? "" : `; missing: ${missingSlugs.join(", ")}`),
-    );
-  }
-
-  const webshopIds = new Set(configs.map((config) => config.webshopId));
-  if (webshopIds.size !== configs.length) {
-    throw new Error("the Rabatta bundle contained duplicate Norwegian webshop ids");
-  }
+  throw new Error(
+    `the Rabatta shop pages mapped ${configs.length}/${targetSlugs.length} Norwegian shops; missing: ${formatSlugList(missingSlugs)}`,
+  );
 }
 
-function selectShopConfigs(
-  configs: NorwegianShopConfig[],
-  requestedSlugs: string[] | undefined,
-): NorwegianShopConfig[] {
-  if (requestedSlugs === undefined) return configs;
+function formatSlugList(slugs: string[]): string {
+  const shown = slugs.slice(0, 10);
+  const remaining = slugs.length - shown.length;
+  return shown.join(", ") + (remaining <= 0 ? "" : ` (+${remaining} more)`);
+}
 
-  const configBySlug = new Map(
-    configs.map((config) => [config.slug, config]),
-  );
-  const missingSlugs = requestedSlugs.filter(
-    (slug) => !configBySlug.has(slug),
-  );
+function selectRequestedSlugs(
+  norwegianSlugs: string[],
+  requestedSlugs: string[] | undefined,
+): string[] {
+  if (requestedSlugs === undefined) return norwegianSlugs;
+
+  const knownSlugs = new Set(norwegianSlugs);
+  const missingSlugs = requestedSlugs.filter((slug) => !knownSlugs.has(slug));
   if (missingSlugs.length > 0) {
     throw new Error(
       `unknown Norwegian Rabatta shop slug(s): ${missingSlugs.join(", ")}`,
     );
   }
 
-  return requestedSlugs.flatMap((slug) => {
-    const config = configBySlug.get(slug);
-    return config === undefined ? [] : [config];
-  });
+  return requestedSlugs;
 }
 
 function normalizeRequestedSlugs(
@@ -238,35 +299,17 @@ function normalizeRequestedSlugs(
   return [...slugs];
 }
 
-function parseAppBundleUrl(html: string, siteUrl: string): string {
-  const match = html.match(
-    /<script\b[^>]*\bsrc=["']([^"']*\/assets\/index-[^"']+\.js)["'][^>]*>/i,
-  );
-  const rawUrl = match?.[1];
-  if (rawUrl === undefined) {
-    throw new Error("could not find the Rabatta app bundle");
-  }
-
-  try {
-    return new URL(rawUrl, siteUrl).toString();
-  } catch {
-    throw new Error("the Rabatta app bundle URL was invalid");
-  }
-}
-
-function findObjectProperty(
-  source: string,
-  propertyName: string,
-): string | undefined {
-  return findObjectProperties(source, propertyName)[0];
-}
-
 function findObjectProperties(
   source: string,
   propertyName: string,
 ): string[] {
   const escapedName = escapeRegExp(propertyName);
-  const propertyPattern = new RegExp(`(?:^|[,\\{])${escapedName}:\\{`, "g");
+  // The server-rendered payload assigns shared objects through a `$R[n]=`
+  // reference table before the object literal itself.
+  const propertyPattern = new RegExp(
+    `(?:^|[,\\{])${escapedName}:(?:\\$R\\[\\d+\\]=)?\\{`,
+    "g",
+  );
   const objects: string[] = [];
 
   for (const match of source.matchAll(propertyPattern)) {
