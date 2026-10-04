@@ -31,6 +31,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm run test:backend
+
       - run: pnpm run build:backend
 
       - run: pnpm run crawl
