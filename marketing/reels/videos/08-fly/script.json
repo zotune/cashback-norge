@@ -1,0 +1,7 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Samme fly. *{284 kr|To hundre og åttifire kroner}* billigere.", "gap": 0.25 },
+  { "id": "store", "line": "Jeg søker Oslo – Bergen på momondo.", "gap": 0.2 },
+  { "id": "match", "line": "Cashback Norge sjekker FINN, Skyscanner og Trip samtidig.", "gap": 0.25 },
+  { "id": "rows",  "line": "Momondo: *{909 kr.|ni hundre og ni.}* FINN: *{625 kr.|seks hundre og tjuefem.}*", "gap": 0.3 },
+  { "id": "sum",   "line": "Samme direktefly, tur retur.", "gap": 0.3 },
+  { "id": "cta",   "line": "Fungerer også på SAS og Skyscanner. Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }

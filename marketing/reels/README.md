@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Elleve vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
+Tolv vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -11,6 +11,7 @@ Elleve vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, ka
 | `out/05-chrome-pc.mp4` | Chrome-utvidelsen på PC/Mac (Lyko vs Hair247) | «Handler du på PC/Mac? 💻» |
 | `out/06-matpriser.mp4` | Matpriser (Joker/SPAR mot REMA, Meny) | «Samme ost 🧀 69 kr billigere?» |
 | `out/07-spill.mp4` | Spill: Epic mot Steam | «Samme spill 🎮 380 kr billigere?» |
+| `out/08-fly.mp4` | Fly: momondo mot FINN (Oslo–Bergen) | «Samme fly ✈️ 284 kr billigere?» |
 | `out/09-hotell.mp4` | Hotell på FINN mot Skyscanner | «Samme hotell 🏨 487 kr billigere?» |
 | `out/10-mobil-bonus.mp4` | Mobilbonus (Talkmore/Trumf, frist 13. okt.) | «Bytt mobilabonnement 📱 få 1 500 kr?» |
 | `out/11-medlemsfordeler.mp4` | Fagforening/medlemspriser (SATS) | «Medlem i fagforening? 🤝» |
@@ -51,7 +52,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - `sitefull.mjs <søk>` fanger søk på cashbacknorge.no.
   - `overlay-food.mjs`, `overlay-hotels.mjs`, `overlay-flights.mjs` og `games-capture.mjs` er varianter for mat, hotell, fly og spill. `overlay-flights.mjs` har den mest komplette GM-shimmen (cookies, headere, timeout).
   - `lyko-codes.mjs` fanger stemming og innsending av rabattkoder med Supabase-kallene stubbet, så ingenting lagres.
-  - Fly (08) mangler: sas.no gir blank side i automatisert nettleser.
+  - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).
 
 **Priser og bonuser er øyeblikksbilder fra 6. okt. 2026.** Publiser snart, eller ta nye skjermbilder og render på nytt. Ta vare på skjermbildene i `shots/` som dokumentasjon. Markedsføringsloven § 3 krever at påstander kan dokumenteres.

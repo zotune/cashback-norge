@@ -158,7 +158,7 @@ if (host === 'sas.no') {
   console.log('consent:', await clickConsent(['Godta alle', 'Godta'], 20000));
   await sleep(+(env.PREWAIT || 15000));
 } else {
-  console.log('consent:', await clickConsent(['Godta alle', 'Aksepter alle', 'Tillat alle', 'Accept all', 'Jeg godtar', 'OK'], 10000));
+  console.log('consent:', await clickConsent(['Akseptere alle', 'Godta alle', 'Aksepter alle', 'Tillat alle', 'Accept all', 'Jeg godtar', 'OK'], 10000));
   await sleep(+(env.PREWAIT || 8000));
 }
 if (env.SCROLLTO) { await page.locator(env.SCROLLTO).first().scrollIntoViewIfNeeded().catch(() => {}); await sleep(800); }
