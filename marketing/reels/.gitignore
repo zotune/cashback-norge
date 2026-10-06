@@ -1,0 +1,7 @@
+node_modules/
+.venv/
+build/
+shots/
+out/
+# Skjermbilder av tredjeparts nettsider (produktbilder, logoer, priser) – holdes utenfor det offentlige repoet
+videos/*/assets/

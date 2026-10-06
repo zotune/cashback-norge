@@ -1,0 +1,117 @@
+@font-face { font-family: "Mont"; font-weight: 800; src: url("../node_modules/@fontsource/montserrat/files/montserrat-latin-800-normal.woff2") format("woff2"); }
+@font-face { font-family: "Mont"; font-weight: 900; src: url("../node_modules/@fontsource/montserrat/files/montserrat-latin-900-normal.woff2") format("woff2"); }
+@font-face { font-family: "Mont"; font-weight: 600; src: url("../node_modules/@fontsource/montserrat/files/montserrat-latin-600-normal.woff2") format("woff2"); }
+
+:root {
+  --green: #1f8f5f;
+  --green-hi: #3ee08f;
+  --green-deep: #0a2a1f;
+  --yellow: #ffd84d;
+  --red: #ff3b3b;
+  --ink: #111614;
+  --paper: #ffffff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--green-deep); }
+body { font-family: "Mont", system-ui, sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+
+#stage { position: absolute; inset: 0; overflow: hidden; }
+
+.bg {
+  position: absolute; inset: -10%;
+  background:
+    radial-gradient(60% 40% at 50% 18%, rgba(62, 224, 143, 0.55), transparent 70%),
+    radial-gradient(70% 50% at 85% 95%, rgba(255, 216, 77, 0.18), transparent 70%),
+    linear-gradient(180deg, #0f4a35 0%, #0a2a1f 60%, #071b14 100%);
+}
+.bg-grid {
+  position: absolute; inset: 0; opacity: 0.08;
+  background-image: radial-gradient(#fff 1.4px, transparent 1.6px);
+  background-size: 36px 36px;
+}
+
+/* ---------- phone ---------- */
+#cam { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; will-change: transform; }
+.phone {
+  position: absolute; left: 50%; top: 250px;
+  width: 812px; height: 1724px; margin-left: -406px;
+  border-radius: 118px; background: #0b0b0c; padding: 22px;
+  box-shadow:
+    0 0 0 3px #3b3d40, 0 0 0 7px #17181a,
+    0 60px 120px rgba(0, 0, 0, 0.55), 0 20px 40px rgba(0, 0, 0, 0.35);
+}
+.screen { position: relative; width: 768px; height: 1665px; border-radius: 96px; overflow: hidden; background: #fff; }
+.screen > .layer { position: absolute; left: 0; top: 0; width: 768px; height: 1665px; }
+.screen > .layer img { display: block; width: 100%; height: auto; }
+.island { position: absolute; left: 50%; top: 22px; width: 200px; height: 58px; margin-left: -100px; border-radius: 40px; background: #000; z-index: 30; }
+.statusbar { position: absolute; left: 0; right: 0; top: 0; height: 98px; z-index: 29; display: flex; justify-content: space-between; align-items: center; padding: 14px 72px 0 86px; font: 700 33px/1 -apple-system, system-ui, sans-serif; color: #111; }
+.statusbar .icons { display: flex; gap: 10px; align-items: center; }
+
+/* Ring that highlights a rect inside the screen (screen-px coords) */
+.ring { position: absolute; border-radius: 24px; border: 8px solid var(--red); box-shadow: 0 0 0 6px rgba(255, 59, 59, 0.25), 0 0 40px rgba(255, 59, 59, 0.45); z-index: 25; opacity: 0; }
+.ring.good { border-color: #19c26b; box-shadow: 0 0 0 6px rgba(25, 194, 107, 0.25), 0 0 40px rgba(25, 194, 107, 0.55); }
+
+/* Tap indicator */
+.tap { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); border: 4px solid rgba(0, 0, 0, 0.25); z-index: 26; opacity: 0; }
+
+/* ---------- text ---------- */
+.sticker {
+  font-size: 72px !important;
+  position: absolute; left: 50%;
+  background: #fff; color: var(--ink); border-radius: 34px;
+  padding: 26px 40px 28px; text-align: center; white-space: nowrap;
+  font-weight: 900; font-size: 64px; line-height: 1.08; letter-spacing: -0.5px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 0 6px rgba(255, 255, 255, 0.25);
+  z-index: 60;
+}
+.sticker .hl { background: var(--yellow); border-radius: 14px; padding: 0 12px; }
+.sticker .g { color: var(--green); }
+.sticker small { display: block; font-size: 38px; font-weight: 800; color: #4a5752; margin-top: 8px; letter-spacing: 0; }
+
+.captions { position: absolute; left: 70px; right: 70px; top: 1090px; height: 220px; z-index: 70; display: flex; align-items: center; justify-content: center; }
+.cap-chunk {
+  position: absolute; left: 0; right: 0; text-align: center;
+  font-weight: 900; font-size: 84px; line-height: 1.05; letter-spacing: -1px; text-transform: uppercase;
+  color: #fff; paint-order: stroke fill; -webkit-text-stroke: 16px #000;
+  text-shadow: 0 8px 0 rgba(0, 0, 0, 0.35), 0 12px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+}
+.cap-word { display: inline-block; margin: 0 0.12em; }
+.cap-word.on { color: var(--yellow); }
+.cap-word.emph { color: var(--green-hi); }
+
+.big {
+  position: absolute; left: 0; right: 0; text-align: center; z-index: 65;
+  font-weight: 900; letter-spacing: -3px; color: #fff;
+  paint-order: stroke fill; -webkit-text-stroke: 18px #000;
+  text-shadow: 0 10px 0 rgba(0, 0, 0, 0.35), 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+
+.card {
+  position: absolute; left: 90px; right: 90px; z-index: 64;
+  background: #fff; color: var(--ink); border-radius: 44px; padding: 44px 54px;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.5);
+}
+.card .row { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: 50px; padding: 14px 0; }
+.card .row .lbl { font-weight: 700; color: #4a5752; font-size: 42px; }
+.card .row.bad .val { color: #c22; text-decoration: line-through; text-decoration-thickness: 6px; }
+.card .row.good .val { color: var(--green); }
+.card hr { border: 0; border-top: 4px dashed #d6e1dc; margin: 14px 0; }
+.card .total { text-align: center; font-weight: 900; font-size: 92px; color: var(--green); letter-spacing: -2px; margin-top: 10px; }
+.card .fine { text-align: center; font-size: 26px; font-weight: 600; color: #7c8a84; margin-top: 8px; }
+
+.dim { position: absolute; inset: 0; background: rgba(4, 20, 14, 0.62); z-index: 50; opacity: 0; }
+
+/* ---------- end card ---------- */
+.endcard { position: absolute; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; padding-top: 300px; opacity: 0; }
+.endcard .logo { width: 290px; height: 290px; filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.45)); }
+.endcard .url { margin-top: 30px; font-weight: 900; font-size: 98px; letter-spacing: -2px; color: #fff; text-shadow: 0 8px 30px rgba(0, 0, 0, 0.45); }
+.endcard .url b { color: var(--green-hi); }
+.endcard .tag { margin-top: 18px; font-weight: 800; font-size: 46px; color: #dff7ea; }
+.endcard .pills { margin-top: 46px; display: flex; flex-direction: column; gap: 22px; align-items: center; }
+.pill { background: rgba(255, 255, 255, 0.12); border: 3px solid rgba(255, 255, 255, 0.28); border-radius: 999px; padding: 20px 40px; font-weight: 800; font-size: 46px; color: #fff; white-space: nowrap; }
+.pill.cta { background: var(--yellow); color: var(--ink); border-color: var(--yellow); font-weight: 900; font-size: 54px; box-shadow: 0 16px 40px rgba(255, 216, 77, 0.35); }
+.fineprint { position: absolute; left: 0; right: 0; text-align: center; font-weight: 600; font-size: 26px; color: rgba(255, 255, 255, 0.7); z-index: 90; }
+
+.emoji-burst { position: absolute; z-index: 63; font-size: 110px; opacity: 0; }

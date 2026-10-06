@@ -1,0 +1,14 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook",   "line": "Bytter du strøm *uten* *bonus?* Da gir du bort penger.", "gap": 0.25 },
+    { "id": "search", "line": "Søk opp strømselskapet på Cashback Norge.", "gap": 0.2 },
+    { "id": "fjord",  "line": "Fjordkraft gir *{500 kr|fem hundre kroner}* i Trumf-bonus.", "gap": 0.25 },
+    { "id": "kilden", "line": "Kilden Kraft: *{280 kr.|to hundre og åtti kroner.}*", "gap": 0.25 },
+    { "id": "list",   "line": "Fortum og Tibber gir også bonus akkurat nå.", "gap": 0.3 },
+    { "id": "check",  "line": "Sjekk alltid *påslag* og *vilkår* først.", "gap": 0.3 },
+    { "id": "cta",    "line": "Se alle strømtilbudene gratis på *{cashbacknorge.no|Cashback Norge punktum no.}*" }
+  ]
+}

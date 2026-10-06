@@ -1,0 +1,13 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook",    "line": "Har du denne på *iPhonen* din?", "gap": 0.2 },
+    { "id": "montage", "line": "Den dukker opp automatisk i Safari, og viser *billigere* *pris,* *rabattkoder* og *cashback.*", "gap": 0.2 },
+    { "id": "count",   "line": "I over *{1700|sytten hundre}* nettbutikker.", "gap": 0.3 },
+    { "id": "setup",   "line": "Slik får du den: gå til Cashback Norge, og trykk *iPhone.*", "gap": 0.2 },
+    { "id": "steps",   "line": "Følg stegene, det tar et par minutter.", "gap": 0.3 },
+    { "id": "cta",     "line": "Helt gratis, og uten innlogging. *{cashbacknorge.no|Cashback Norge punktum no.}*" }
+  ]
+}

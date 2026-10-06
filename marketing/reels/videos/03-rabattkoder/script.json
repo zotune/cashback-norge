@@ -1,0 +1,14 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook",   "line": "Slutt å google etter *rabattkoder.*", "gap": 0.25 },
+    { "id": "popup",  "line": "Cashback Norge viser dem automatisk, rett i butikken.", "gap": 0.2 },
+    { "id": "codes",  "line": "Her: *{20 %|tjue prosent}* rabatt hos Lyko.", "gap": 0.1 },
+    { "id": "copy",   "line": "Ett trykk, så er koden *kopiert.*", "gap": 0.25 },
+    { "id": "cash",   "line": "Pluss *cashback* fra flere tjenester.", "gap": 0.2 },
+    { "id": "sum",    "line": "Skriv inn beløpet, så ser du nøyaktig hvor mange *kroner* du sparer.", "gap": 0.3 },
+    { "id": "cta",    "line": "Gratis i Chrome og på iPhone. *{cashbacknorge.no|Cashback Norge punktum no.}*" }
+  ]
+}

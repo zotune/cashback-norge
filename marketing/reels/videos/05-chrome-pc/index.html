@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../shared/reel.css">
+<style>
+  .browser { position: absolute; left: 30px; top: 620px; width: 1020px; border-radius: 22px; overflow: hidden; background: #dfe3e7; box-shadow: 0 50px 110px rgba(0,0,0,.55), 0 0 0 2px rgba(255,255,255,.08); }
+  .bar { height: 92px; display: flex; align-items: center; gap: 18px; padding: 0 22px; background: #e9edf1; }
+  .dots { display: flex; gap: 10px; }
+  .dots i { width: 18px; height: 18px; border-radius: 50%; display: block; }
+  .addr { flex: 1; height: 56px; border-radius: 28px; background: #fff; display: flex; align-items: center; padding: 0 24px; font: 500 28px/1 -apple-system, system-ui, sans-serif; color: #3c4043; white-space: nowrap; overflow: hidden; position: relative; }
+  .addr span { position: absolute; left: 24px; transition: none; }
+  .ext { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: transparent; }
+  .ext img { width: 46px; height: 46px; }
+  .screen.desk { position: relative; width: 1020px; height: 637.5px; overflow: hidden; background: #fff; border-radius: 0; }
+  .screen.desk > .layer { position: absolute; left: 0; top: 0; width: 1020px; height: 637.5px; }
+  .screen.desk > .layer img { width: 100%; display: block; }
+  #panel { left: 15.9px !important; top: 107.6px !important; width: 334.7px !important; height: auto !important; will-change: transform; }
+  #site { opacity: 0; }
+</style>
+<script>window.FRAME = { x: 30, y: 712, k: 1020 / 2560 };</script>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div><div class="bg-grid"></div>
+  <div id="cam">
+    <div class="browser">
+      <div class="bar">
+        <div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+        <div class="addr"><span id="u1">🔒 lyko.com/no/olaplex/olaplex-no3-plus…</span><span id="u2" style="opacity:0">🔒 cashbacknorge.no</span></div>
+        <div class="ext" id="ext"><img src="../../../../site/favicon.png"></div>
+      </div>
+      <div class="screen desk">
+        <div class="layer" id="page"><img src="assets/before.png"></div>
+        <div class="layer" id="panel"><img src="assets/panel.png"></div>
+        <div class="layer" id="site"><img src="assets/site.png"></div>
+      </div>
+    </div>
+  </div>
+  <div class="dim"></div>
+
+  <div class="sticker" id="hook" style="top:300px">Handler du på <span class="hl">PC/Mac</span>? 💻</div>
+  <div class="card" id="card" style="top:300px">
+    <div class="row bad"><span class="lbl">Lyko</span><span class="val">335 kr</span></div>
+    <div class="row good"><span class="lbl">Hair247 (prismatch)</span><span class="val">297 kr</span></div>
+    <div class="fine">Olaplex No.3 100 ml · priser 6. okt. 2026 · frakt kan komme i tillegg</div>
+  </div>
+
+  <div class="captions" style="top:1330px"></div>
+
+  <div class="endcard" id="end">
+    <img class="logo" src="../../../../site/favicon.png">
+    <div class="url">cashback<b>norge</b>.no</div>
+    <div class="tag" id="free">Gratis · ingen innlogging ✅</div>
+    <div class="pills">
+      <div class="pill" id="p1">🧩 Trykk «Chrome-extension»</div>
+      <div class="pill" id="p2">💻 PC og Mac</div>
+      <div class="pill cta" id="p3">👆 Lenke i bio</div>
+    </div>
+  </div>
+</div>
+<script src="../../node_modules/gsap/dist/gsap.min.js"></script>
+<script src="../../shared/reel.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>

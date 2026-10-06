@@ -1,0 +1,14 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook",   "line": "Samme mobil. *{4 300 kr|Fire tusen tre hundre kroner}* billigere. Se her.", "gap": 0.25 },
+    { "id": "elkjop", "line": "Hos Elkjøp koster {Galaxy S26|Galaxy S tjueseks} *{13 490 kr.|tretten tusen fire hundre og nitti kroner.}*", "gap": 0.2 },
+    { "id": "popup",  "line": "Men Cashback Norge viser *prismatch* automatisk:", "gap": 0.08 },
+    { "id": "match",  "line": "samme telefon, *{9 190 kr.|ni tusen etthundre og nitti kroner.}*", "gap": 0.35 },
+    { "id": "saved",  "line": "*{4 300 kr|Fire tusen tre hundre kroner}* spart.", "gap": 0.3 },
+    { "id": "extra",  "line": "Pluss *cashback* og *rabattkoder* – mens du handler.", "gap": 0.3 },
+    { "id": "cta",    "line": "Helt gratis i Chrome og på iPhone. *{cashbacknorge.no|Cashback Norge punktum no.}*" }
+  ]
+}
