@@ -1,0 +1,32 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Er du med i en *fagforening?* Da har du sikkert rabatter du ikke vet om.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Her er jeg på SATS, og Cashback Norge viser medlemsprisene automatisk.",
+      "gap": 0.2
+    },
+    {
+      "id": "rows",
+      "line": "*{15 %|Femten prosent}* med Tekna, Bate eller LHL. *{20 %|Tjue prosent}* for studenter.",
+      "gap": 0.3
+    },
+    {
+      "id": "wall",
+      "line": "Den kjenner fordelene fra LO, YS, Unio, Akademikerne, NITO, OBOS, NAF, og *{30+|over tretti}* andre.",
+      "gap": 0.3,
+      "maxPause": 0.1
+    },
+    {
+      "id": "cta",
+      "line": "Se hva medlemskapet ditt gir deg, gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ]
+}

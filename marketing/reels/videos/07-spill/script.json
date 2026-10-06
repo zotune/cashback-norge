@@ -1,0 +1,6 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Samme spill. Over *{380 kr|tre hundre og åtti kroner}* billigere.", "gap": 0.25 },
+  { "id": "store", "line": "Final Fantasy {VII|sju} Rebirth koster *{549 kr|fem hundre og førtini}* hos Epic.", "gap": 0.2 },
+  { "id": "match", "line": "Cashback Norge viser at Steam har det til rundt *{160 kr.|hundre og seksti.}*", "gap": 0.3 },
+  { "id": "sum",   "line": "Akkurat samme spill.", "gap": 0.3 },
+  { "id": "cta",   "line": "Fungerer på Steam og Epic. Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }

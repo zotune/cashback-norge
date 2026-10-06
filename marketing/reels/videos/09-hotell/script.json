@@ -1,0 +1,6 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Samme hotell, samme natt. *{487 kr|Fire hundre og åttisju kroner}* billigere.", "gap": 0.25 },
+  { "id": "store", "line": "The Thief i Oslo, på FINN: *{4 113 kr.|fire tusen ett hundre og tretten kroner.}*", "gap": 0.2 },
+  { "id": "match", "line": "Cashback Norge sjekker de andre automatisk: *{3 626 kr.|tre tusen seks hundre og tjueseks.}*", "gap": 0.3 },
+  { "id": "sum",   "line": "Nesten *{500 kr|fem hundre kroner}* spart, på én natt.", "gap": 0.3 },
+  { "id": "cta",   "line": "Fungerer på FINN, Booking, Hotels og Skyscanner. Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }

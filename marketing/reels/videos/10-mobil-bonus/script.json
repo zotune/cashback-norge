@@ -1,0 +1,13 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook",   "line": "Visste du at du kan få *{1 500 kr|femten hundre kroner}* for å bytte mobilabonnement?", "gap": 0.25 },
+    { "id": "store",  "line": "Jeg er inne på Talkmore, og Cashback Norge dukker opp med en gang.", "gap": 0.2 },
+    { "id": "trumf",  "line": "*{1 500 kr|Femten hundre kroner}* i Trumf-bonus, hvis du bytter innen *{13. oktober.|trettende oktober.}*", "gap": 0.25 },
+    { "id": "dreams", "line": "Eller *{350 kr|tre hundre og femti}* via Dreams.", "gap": 0.3 },
+    { "id": "list",   "line": "PlussMobil, OneCall og {Ice|Ajs} gir også bonus nå.", "gap": 0.3 },
+    { "id": "cta",    "line": "Søk opp operatøren din gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ]
+}

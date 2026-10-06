@@ -1,0 +1,8 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Samme ost. *{69 kr|Sekstini kroner}* billigere. Se her.", "gap": 0.25 },
+  { "id": "store", "line": "Jarlsberg hos Joker: *{159 kr.|hundre og femtini kroner.}*", "gap": 0.2 },
+  { "id": "match", "line": "Cashback Norge viser at REMA har den til *{90 kr.|nitti.}*", "gap": 0.3 },
+  { "id": "kaffe", "line": "Kaffe: *{59 kr|femtini kroner}* å spare.", "gap": 0.15 },
+  { "id": "kvikk", "line": "Kvikk Lunsj: *{24 kr.|tjuefire.}*", "gap": 0.3 },
+  { "id": "sum",   "line": "*{152 kr|Hundre og femtito kroner}* på tre varer.", "gap": 0.3 },
+  { "id": "cta",   "line": "Fungerer hos Meny, Spar, Joker og Oda. Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }

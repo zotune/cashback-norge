@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Fem vertikale videoer (1080×1920, 30 fps, 18–22 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
+Elleve vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -9,6 +9,12 @@ Fem vertikale videoer (1080×1920, 30 fps, 18–22 s) med norsk voiceover, karao
 | `out/03-rabattkoder.mp4` | Rabattkoder + cashback + Sum-feltet (Lyko) | «Slutt å google rabattkode 🙄» |
 | `out/04-iphone.mp4` | Montasje + oppsett på iPhone/Safari | «Har du denne på iPhonen? 📱👀» |
 | `out/05-chrome-pc.mp4` | Chrome-utvidelsen på PC/Mac (Lyko vs Hair247) | «Handler du på PC/Mac? 💻» |
+| `out/06-matpriser.mp4` | Matpriser (Joker/SPAR mot REMA, Meny) | «Samme ost 🧀 69 kr billigere?» |
+| `out/07-spill.mp4` | Spill: Epic mot Steam | «Samme spill 🎮 380 kr billigere?» |
+| `out/09-hotell.mp4` | Hotell på FINN mot Skyscanner | «Samme hotell 🏨 487 kr billigere?» |
+| `out/10-mobil-bonus.mp4` | Mobilbonus (Talkmore/Trumf, frist 13. okt.) | «Bytt mobilabonnement 📱 få 1 500 kr?» |
+| `out/11-medlemsfordeler.mp4` | Fagforening/medlemspriser (SATS) | «Medlem i fagforening? 🤝» |
+| `out/12-rabattkoder-community.mp4` | Stem på koder og del egne | «Rabattkoden funket ikke… igjen? 😤» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -43,6 +49,9 @@ node render.mjs <navn>                         # full mp4 til out/
   - `overlay.mjs <url> <out.png> <ventetid-ms>` setter inn userscriptet på en ekte butikkside.
   - `lyko.mjs` og `desktop.mjs` fanger Sum-felt, «Kopiert!»-tilstand og desktop.
   - `sitefull.mjs <søk>` fanger søk på cashbacknorge.no.
+  - `overlay-food.mjs`, `overlay-hotels.mjs`, `overlay-flights.mjs` og `games-capture.mjs` er varianter for mat, hotell, fly og spill. `overlay-flights.mjs` har den mest komplette GM-shimmen (cookies, headere, timeout).
+  - `lyko-codes.mjs` fanger stemming og innsending av rabattkoder med Supabase-kallene stubbet, så ingenting lagres.
+  - Fly (08) mangler: sas.no gir blank side i automatisert nettleser.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).
 
 **Priser og bonuser er øyeblikksbilder fra 6. okt. 2026.** Publiser snart, eller ta nye skjermbilder og render på nytt. Ta vare på skjermbildene i `shots/` som dokumentasjon. Markedsføringsloven § 3 krever at påstander kan dokumenteres.

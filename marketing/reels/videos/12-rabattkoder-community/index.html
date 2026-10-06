@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../shared/reel.css">
+<style>
+  .screen .layer.st { opacity: 0; }
+  .label { position: absolute; left: 50%; top: 300px; z-index: 62; background: #fff; color: var(--ink); font-weight: 900; font-size: 60px; padding: 18px 40px; border-radius: 28px; box-shadow: 0 14px 40px rgba(0,0,0,.4); white-space: nowrap; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div><div class="bg-grid"></div>
+  <div id="cam">
+    <div class="phone">
+      <div class="screen">
+        <div class="island"></div>
+        <div class="layer" id="c0"><img src="assets/c0.png"></div>
+        <div class="layer st" id="c1"><img src="assets/c1.png"></div>
+        <div class="layer st" id="c1b"><img src="assets/c1b.png"></div>
+        <div class="layer st" id="c2"><img src="assets/c2.png"></div>
+        <div class="layer st" id="c2b"><img src="assets/c2b.png"></div>
+        <div class="layer st" id="c3"><img src="assets/c3.png"></div>
+        <div class="layer st" id="t1"><img src="assets/t1.png"></div>
+        <div class="layer st" id="t2"><img src="assets/t2.png"></div>
+        <div class="layer st" id="t3"><img src="assets/t3.png"></div>
+        <div class="layer st" id="t4"><img src="assets/t4.png"></div>
+        <div class="layer st" id="t5"><img src="assets/t5.png"></div>
+        <div class="layer st" id="c5"><img src="assets/c5.png"></div>
+      </div>
+    </div>
+  </div>
+  <div class="dim"></div>
+
+  <div class="sticker" id="hook" style="top:300px">Rabattkoden<br><span class="hl">funket ikke</span>… igjen? 😤</div>
+  <div class="label" id="lup">👍 Funker</div>
+  <div class="label" id="ldown">👎 Utgått</div>
+  <div class="label" id="ladd">➕ Del din egen kode</div>
+
+  <div class="captions"></div>
+
+  <div class="endcard" id="end">
+    <img class="logo" src="../../../../site/favicon.png">
+    <div class="url">cashback<b>norge</b>.no</div>
+    <div class="tag" id="free">Gratis · ingen innlogging ✅</div>
+    <div class="pills">
+      <div class="pill" id="p1">🏷️ Koder som faktisk funker</div>
+      <div class="pill" id="p2">🧩 Chrome · 📱 iPhone/iPad</div>
+      <div class="pill cta" id="p3">👆 Lenke i bio</div>
+    </div>
+  </div>
+</div>
+<script src="../../node_modules/gsap/dist/gsap.min.js"></script>
+<script src="../../shared/reel.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>
