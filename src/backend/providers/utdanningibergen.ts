@@ -89,7 +89,7 @@ export async function fetchUtdanningiBergen(
 
     offers.push({
       provider: "utdanningibergen",
-      merchantName: d.business_name,
+      merchantName: d.business_name.replace(/^studentrabatt\s+/i, ""),
       domains: [domain],
       reward,
       sourceUrl,
