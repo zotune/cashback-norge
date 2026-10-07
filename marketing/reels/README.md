@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Tolv vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
+Tretten vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -15,6 +15,7 @@ Tolv vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, kara
 | `out/09-hotell.mp4` | Hotell på FINN mot Skyscanner | «Samme hotell 🏨 487 kr billigere?» |
 | `out/10-mobil-bonus.mp4` | Mobilbonus (Talkmore/Trumf, frist 13. okt.) | «Bytt mobilabonnement 📱 få 1 500 kr?» |
 | `out/11-medlemsfordeler.mp4` | Fagforening/medlemspriser (SATS) | «Medlem i fagforening? 🤝» |
+| `out/13-ps5-regioner.mp4` | PS5-regionpriser + US-gavekort (007 First Light) | «Samme PS5-spill 🎮 187 kr billigere?» |
 | `out/12-rabattkoder-community.mp4` | Stem på koder og del egne | «Rabattkoden funket ikke… igjen? 😤» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
@@ -51,6 +52,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - `lyko.mjs` og `desktop.mjs` fanger Sum-felt, «Kopiert!»-tilstand og desktop.
   - `sitefull.mjs <søk>` fanger søk på cashbacknorge.no.
   - `overlay-food.mjs`, `overlay-hotels.mjs`, `overlay-flights.mjs` og `games-capture.mjs` er varianter for mat, hotell, fly og spill. `overlay-flights.mjs` har den mest komplette GM-shimmen (cookies, headere, timeout).
+  - `ps.mjs <url> <prefix> <Region,...>` fanger PlayStation Store med regionpriser.
   - `lyko-codes.mjs` fanger stemming og innsending av rabattkoder med Supabase-kallene stubbet, så ingenting lagres.
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).

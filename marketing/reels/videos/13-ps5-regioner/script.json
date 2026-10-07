@@ -1,0 +1,9 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Samme PS5-spill. Nesten *{200 kr|to hundre kroner}* billigere.", "gap": 0.25 },
+  { "id": "store", "line": "{007|Double-o-seven} First Light Deluxe koster *{899 kr|åtte hundre og nittini}* i norsk PlayStation Store.", "gap": 0.2 },
+  { "id": "popup", "line": "Cashback Norge viser prisen i alle regioner.", "gap": 0.2 },
+  { "id": "usa",   "line": "I USA: *{765 kr.|sju hundre og sekstifem.}*", "gap": 0.25 },
+  { "id": "gift",  "line": "Og amerikanske PSN-gavekort selges rundt *{7 %|sju prosent}* under pålydende.", "gap": 0.25 },
+  { "id": "sum",   "line": "Det blir *{187 kr|hundre og åttisju kroner}* spart.", "gap": 0.25 },
+  { "id": "how",   "line": "Legg til en amerikansk konto på PS5-en, kjøp der, og spill på din vanlige.", "gap": 0.3 },
+  { "id": "cta",   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }
