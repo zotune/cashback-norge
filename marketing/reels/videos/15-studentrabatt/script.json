@@ -1,0 +1,9 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Student? Da betaler du sannsynligvis for mye.", "gap": 0.25 },
+  { "id": "intro", "line": "Cashback Norge viser studentrabatten automatisk, rett i butikken.", "gap": 0.2 },
+  { "id": "fly",   "line": "Flytoget: *{50 %.|femti prosent.}*", "gap": 0.15 },
+  { "id": "talk",  "line": "Talkmore: *{30 %.|tretti prosent.}*", "gap": 0.15 },
+  { "id": "sams",  "line": "Samsung: *{15 %.|femten prosent.}*", "gap": 0.15 },
+  { "id": "lyko",  "line": "Lyko: *{15 %.|femten prosent.}*", "gap": 0.3 },
+  { "id": "count", "line": "Over *{500|fem hundre}* studentrabatter, fra Studentkortet, StudentTorget, UNiDAYS og flere.", "gap": 0.3 },
+  { "id": "cta",   "line": "Helt gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }
