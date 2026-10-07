@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../shared/reel.css">
+<style>
+  #panel { will-change: transform; }
+  .card h3 { font-weight: 900; font-size: 54px; margin-bottom: 10px; }
+  .card .row .val { font-weight: 900; }
+  .card .row .via { font-size: 28px; font-weight: 700; color: #7c8a84; margin-left: 12px; }
+  .card .row { opacity: 0; }
+  .chip { position: absolute; left: 50%; z-index: 62; background: var(--green); color: #fff; font-weight: 900; font-size: 46px; padding: 16px 34px; border-radius: 999px; box-shadow: 0 14px 40px rgba(0,0,0,.4); white-space: nowrap; display: flex; align-items: center; gap: 14px; }
+  .chip img { width: 58px; height: 58px; }
+  .deadline { position: absolute; left: 50%; z-index: 62; background: var(--red); color: #fff; font-weight: 900; font-size: 50px; padding: 16px 36px; border-radius: 999px; box-shadow: 0 14px 40px rgba(0,0,0,.4); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div><div class="bg-grid"></div>
+  <div id="cam">
+    <div class="phone">
+      <div class="screen">
+        <div class="island"></div>
+        <div class="layer" id="page"><img src="assets/before.png"></div>
+        <div class="layer" id="panel"><img src="assets/panel.png"></div>
+      </div>
+    </div>
+  </div>
+  <div class="dim"></div>
+
+  <div class="sticker" id="hook" style="top:300px">Trener du på EVO? 💪<br>Spar <span class="hl">1 080 kr</span> i året 👀</div>
+  <div class="chip" id="chip" style="top:540px"><img src="../../../../site/favicon.png">Cashback Norge</div>
+  
+
+  <div class="card" id="card" style="top:300px">
+    <h3>💪 EVO per måned</h3>
+    <div class="row"><span class="lbl">Ordinær pris</span><span class="val" style="color:#c22">459 kr</span></div>
+    <div class="row"><span class="lbl">OBOS</span><span class="val">379 kr</span></div>
+    <div class="row"><span class="lbl">NITO · Akademikerne+</span><span class="val">369 kr</span></div>
+    <hr><div class="total">−<span id="saved">1 080</span> kr/år</div>
+    <div class="fine">90 kr × 12 mnd · ingen binding (NITO) · krever medlemskap · per 7. okt. 2026</div>
+  </div>
+  <div class="chip" id="ord" style="top:560px;background:#c22">💪 Ordinær pris: 459 kr/mnd</div>
+  <div class="captions"></div>
+
+  <div class="endcard" id="end">
+    <img class="logo" src="../../../../site/favicon.png">
+    <div class="url">cashback<b>norge</b>.no</div>
+    <div class="tag" id="free">Gratis · ingen innlogging ✅</div>
+    <div class="pills">
+      <div class="pill" id="p1">🤝 Fagforeninger og medlemskap</div>
+      <div class="pill" id="p2">🧩 Chrome · 📱 iPhone/iPad</div>
+      <div class="pill cta" id="p3">👆 Lenke i bio</div>
+    </div>
+  </div>
+</div>
+<script src="../../node_modules/gsap/dist/gsap.min.js"></script>
+<script src="../../shared/reel.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>

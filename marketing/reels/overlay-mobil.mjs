@@ -45,6 +45,13 @@ console.log('PRICES', JSON.stringify(await page.evaluate(() => [...document.quer
 const before = new Set(await page.evaluate(() => [...document.body.children].map((e,i)=>i)));
 await page.addScriptTag({ content: us.replace(/^\/\/ ==UserScript==[\s\S]*?==\/UserScript==/, '') });
 await page.waitForTimeout(+wait);
+if (process.env.COLLAPSE) {
+  for (const label of process.env.COLLAPSE.split(',')) {
+    const ok = await page.locator('#cashback-varsler-notice').evaluate((h, label) => { const el = [...h.shadowRoot.querySelectorAll('button, [role=button], summary, div, span')].filter((e) => (e.innerText || '').replace(/[▼▶⚠\s]/g, '') === label).pop(); if (!el) return false; el.click(); return true; }, label);
+    console.log('COLLAPSE', label, ok);
+  }
+  await page.waitForTimeout(500);
+}
 await page.mouse.move(2, 2);
 await page.waitForTimeout(600);
 await page.screenshot({ path: out });

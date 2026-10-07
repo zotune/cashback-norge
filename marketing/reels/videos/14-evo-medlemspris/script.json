@@ -1,0 +1,7 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Trener du på EVO? Du kan spare over *{1 000 kr|tusen kroner}* i året.", "gap": 0.25 },
+  { "id": "store", "line": "Ordinær pris er *{459 kr|fire hundre og femtini kroner}* i måneden.", "gap": 0.2 },
+  { "id": "popup", "line": "Men Cashback Norge viser medlemsprisene automatisk:", "gap": 0.1 },
+  { "id": "rows",  "line": "*{369 kr|Tre hundre og sekstini}* med NITO eller Akademikerne, *{379 kr|tre hundre og syttini}* med OBOS.", "gap": 0.3 },
+  { "id": "sum",   "line": "Det er *{1 080 kr|tusen og åtti kroner}* spart i året, uten binding.", "gap": 0.3 },
+  { "id": "cta",   "line": "Se hva medlemskapet ditt gir deg, gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }

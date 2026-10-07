@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Tretten vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
+Fjorten vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -16,9 +16,12 @@ Tretten vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, k
 | `out/10-mobil-bonus.mp4` | Mobilbonus (Talkmore/Trumf, frist 13. okt.) | «Bytt mobilabonnement 📱 få 1 500 kr?» |
 | `out/11-medlemsfordeler.mp4` | Fagforening/medlemspriser (SATS) | «Medlem i fagforening? 🤝» |
 | `out/13-ps5-regioner.mp4` | PS5-regionpriser + US-gavekort (007 First Light) | «Samme PS5-spill 🎮 187 kr billigere?» |
+| `out/14-evo-medlemspris.mp4` | EVO Fitness: NITO/Akademikerne+/OBOS-pris | «Trener du på EVO? Spar 1 080 kr i året» |
 | `out/12-rabattkoder-community.mp4` | Stem på koder og del egne | «Rabattkoden funket ikke… igjen? 😤» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
+
+Filer med `--postet-ig-tiktok` i navnet er allerede lagt ut.
 
 ## Hva som ikke ligger i git
 
