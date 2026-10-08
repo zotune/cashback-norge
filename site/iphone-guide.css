@@ -1,108 +1,132 @@
-.iphone-guide { scroll-margin-top: 125px; margin: 14px 0 22px; padding: 18px 16px 14px; border: 1px solid #d6e1dc; border-radius: 18px; background: #fff; }
+.iphone-guide { scroll-margin-top: 125px; margin: 14px 0 22px; padding: 20px 16px 16px; border: 1px solid #d6e1dc; border-radius: 18px; background: #fff; }
 .iphone-guide[hidden] { display: none !important; }
 .guide-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-.guide-heading h2 { font-size: 18px; letter-spacing: -.3px; }
-.guide-heading p { color: #5d6b71; font-size: 12px; margin-top: 4px; }
-.guide-close { border: 0; border-radius: 50%; background: #eef3f0; color: #5d6b71; font: inherit; font-size: 20px; width: 32px; height: 32px; cursor: pointer; flex: 0 0 auto; }
-.guide-steps { display: flex; justify-content: space-between; gap: 6px; margin: 18px 0; }
-.guide-step { position: relative; border: 1px solid #d6e1dc; background: #f7faf8; color: #718179; border-radius: 50%; width: 36px; height: 36px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; flex-shrink: 0; }
-.guide-step[aria-current="step"] { color: #fff; background: #22794f; border-color: #22794f; box-shadow: 0 0 0 4px #e9f4ed; }
-.guide-step.is-complete { background: #e9f4ed; color: #22794f; border-color: #b8d9c5; }
-.guide-slide h3 { font-size: 17px; margin-bottom: 8px; }
-.guide-slides { touch-action: pan-y; }
-.guide-instruction { font-size: 13px; color: #45565d; line-height: 1.65; min-height: 65px; }
+.guide-heading h2 { font-size: 20px; letter-spacing: -.3px; }
+.guide-heading p { color: #5d6b71; font-size: 13px; margin-top: 4px; }
+.guide-close { border: 0; border-radius: 50%; background: #eef3f0; color: #5d6b71; font: inherit; font-size: 22px; width: 44px; height: 44px; cursor: pointer; flex: 0 0 auto; }
+.guide-progress { color: #75847d; font-size: 12px; margin: 16px 0 7px; }
+.guide-slide { flex: 0 0 100%; min-width: 0; }
+.guide-slide h3 { font-size: 20px; line-height: 1.3; margin-bottom: 10px; }
+.guide-slides { overflow: hidden; touch-action: pan-y; user-select: none; cursor: grab; transition: height .3s ease; }
+.guide-track { display: flex; align-items: flex-start; transition: transform .32s cubic-bezier(.22, .68, .2, 1); }
+.guide-slides.is-dragging { cursor: grabbing; }
+.guide-slides.is-dragging .guide-track { transition: none; }
+.guide-dots { display: flex; justify-content: center; flex: 1; min-width: 144px; max-width: 240px; }
+.guide-nav .guide-dot { display: grid; place-items: center; flex: 1; min-width: 24px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }
+.guide-dot span { width: 8px; height: 8px; border-radius: 50%; background: #cedbd3; transition: width .2s ease, background .2s ease; }
+.guide-dot[aria-current="step"] span { width: 22px; border-radius: 6px; background: #22794f; }
+.guide-instruction { font-size: 15px; color: #45565d; line-height: 1.6; }
 .guide-instruction strong { color: #172026; font-weight: 650; }
 .guide-instruction a, .guide-note a { color: #22794f; }
-.guide-note { font-size: 11px; color: #75847d; line-height: 1.55; margin-top: 7px; }
+.guide-note { font-size: 12px; color: #75847d; line-height: 1.55; margin-top: 9px; }
+.guide-note:empty { display: none; }
 .guide-link { display: flex; align-items: center; gap: 8px; background: #eef4f0; border-radius: 9px; padding: 10px; margin-top: 10px; }
-.guide-link code { font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; flex: 1; min-width: 0; user-select: all; }
-.guide-copy { border: 0; border-radius: 7px; background: #fff; color: #22794f; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; min-height: 36px; padding: 6px 9px; }
-.guide-demo { background: #eef4f0; border-radius: 14px; margin-top: 15px; padding: 18px 10px; overflow: hidden; }
-.demo-phone { width: min(100%, 268px); height: 240px; margin: auto; position: relative; border: 6px solid #26342e; border-radius: 25px; box-shadow: 0 8px 16px #1e493c15; overflow: hidden; background: #f5f5f7; color: #1c2226; font-size: 12px; }
+.guide-link code { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; flex: 1; min-width: 0; user-select: all; cursor: text; }
+.guide-copy { border: 0; border-radius: 7px; background: #fff; color: #22794f; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; min-height: 44px; padding: 7px 10px; }
+.guide-demo { background: #eef4f0; border-radius: 14px; margin-top: 18px; padding: 18px 8px; overflow: hidden; }
+.demo-phone { width: min(100%, 300px); height: 284px; margin: auto; position: relative; border: 6px solid #26342e; border-radius: 25px; box-shadow: 0 8px 16px #1e493c15; overflow: hidden; background: #f5f5f7; color: #1c2226; font-size: 13px; }
 .demo-phone * { pointer-events: none; }
 .demo-phone::before { content: ''; display: block; width: 58px; height: 9px; margin: 0 auto; border-radius: 0 0 9px 9px; background: #26342e; }
-.demo-status { display: flex; justify-content: space-between; font-weight: 650; padding: 8px 14px; font-size: 9px; }
-.demo-content { padding: 10px 14px; }
-.demo-content h4 { font-size: 15px; margin-bottom: 14px; }
+.demo-status { display: flex; justify-content: space-between; font-weight: 650; padding: 10px 14px; font-size: 10px; }
+.demo-content { padding: 12px 14px; }
+.demo-content h4 { font-size: 18px; margin-bottom: 14px; }
 .demo-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 10px; padding: 12px 11px; background: #fff; margin-bottom: 8px; }
 .demo-stay { background: #151515; color: #f7f7f7; --demo-accent: #ca46e8; }
 .demo-stay .demo-row { background: #292929; }
-.demo-stay .demo-content { padding-top: 7px; }
+.demo-stay .demo-content { padding-top: 10px; }
+.demo-settings .demo-content { padding-bottom: 70px; }
+.demo-settings .demo-row { min-height: 62px; gap: 10px; }
+.demo-settings .demo-row > span:first-child { max-width: 155px; line-height: 1.4; }
 .demo-stay-logo { display: inline-grid; place-items: center; background: #f0ddf6; color: #aa35cf; border-radius: 9px; width: 35px; height: 35px; font-size: 26px; font-style: italic; font-weight: 850; }
 .demo-app { display: flex; gap: 10px; align-items: center; margin: 26px 0; }
-.demo-app strong { display: block; font-size: 15px; }
-.demo-app small { font-size: 10px; color: #7a858d; }
-.demo-pill { border-radius: 18px; background: #007aff; color: #fff; font-weight: 650; padding: 7px 13px; font-size: 11px; position: relative; }
-.demo-app-store { color: #75847d; margin-bottom: 13px; font-size: 11px; }
+.demo-app strong { display: block; font-size: 16px; }
+.demo-app small { font-size: 11px; color: #7a858d; }
+.demo-pill { border-radius: 18px; background: #007aff; color: #fff; font-weight: 650; padding: 8px 13px; font-size: 12px; position: relative; }
+.demo-app-store { color: #75847d; margin-bottom: 13px; font-size: 12px; }
 .demo-store-line { height: 7px; background: #e4e8eb; margin: 9px 0; width: 82%; border-radius: 4px; }
 .demo-store-line:last-child { width: 58%; }
-.demo-tabs { position: absolute; bottom: 8px; left: 9px; right: 9px; display: flex; justify-content: space-around; border-radius: 18px; padding: 10px 4px; color: #87818d; background: #292929; font-size: 9px; }
+.demo-tabs { position: absolute; bottom: 9px; left: 9px; right: 9px; display: flex; justify-content: space-around; border-radius: 18px; padding: 12px 4px; color: #aaa3af; background: #292929; font-size: 10px; }
 .demo-tab { text-align: center; position: relative; }
 .demo-tab b { display: block; font-size: 17px; line-height: 1.1; margin-bottom: 3px; }
 .demo-tab.selected { color: #d754ed; }
-.demo-small { font-size: 10px; color: #aaa3af; }
-.demo-toggle { display: inline-block; position: relative; background: #727279; width: 35px; height: 21px; border-radius: 20px; flex: 0 0 auto; }
-.demo-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; background: #fff; width: 17px; height: 17px; border-radius: 50%; }
-.demo-toggle.animated { animation: guide-toggle 7s infinite; }
-.demo-toggle.animated::after { animation: guide-toggle-knob 7s infinite; }
+.demo-small { font-size: 11px; color: #aaa3af; }
+.demo-toggle { display: inline-block; position: relative; background: #727279; width: 40px; height: 24px; border-radius: 20px; flex: 0 0 auto; }
+.demo-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; background: #fff; width: 20px; height: 20px; border-radius: 50%; }
+.demo-toggle.animated { animation: guide-toggle 9s infinite; }
+.demo-toggle.animated::after { animation: guide-toggle-knob 9s infinite; }
 .demo-toggle.on { background: #34c759; }
-.demo-toggle.on::after { left: 16px; }
-.demo-address { position: absolute; bottom: 12px; left: 12px; right: 12px; background: #e1e3e6; border-radius: 18px; padding: 10px 12px; display: flex; gap: 9px; align-items: center; font-size: 11px; }
+.demo-toggle.on::after { left: 18px; }
+.demo-address { position: absolute; bottom: 12px; left: 12px; right: 12px; background: #e1e3e6; border-radius: 18px; padding: 12px; display: flex; gap: 9px; align-items: center; font-size: 12px; }
 .demo-menu-icon { display: grid; gap: 2px; width: 15px; position: relative; }
 .demo-menu-icon::before { content: ''; height: 7px; border: 1.5px solid currentColor; border-radius: 2px; }
 .demo-menu-icon::after { content: ''; height: 3px; border-top: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; width: 10px; }
 .demo-sheet { position: absolute; background: #eeeef0; border-radius: 17px 17px 0 0; padding: 12px; left: 0; right: 0; bottom: 0; top: 57px; box-shadow: 0 -5px 15px #00000008; }
-.demo-sheet-title { display: flex; justify-content: space-between; font-size: 11px; font-weight: 650; margin-bottom: 15px; }
+.demo-sheet-title { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; font-weight: 650; margin-bottom: 15px; }
 .demo-sheet-title span { color: #007aff; }
-.demo-search { background: #e0e1e5; border-radius: 7px; font-size: 10px; color: #868b94; padding: 7px 9px; margin-bottom: 10px; }
-.demo-phase { position: absolute; inset: 35px 12px 48px; }
+.demo-search { background: #e0e1e5; border-radius: 7px; font-size: 12px; color: #868b94; padding: 9px; margin-bottom: 12px; }
+.demo-phase { position: absolute; inset: 44px 12px 60px; }
 .demo-phase + .demo-phase { opacity: 0; visibility: hidden; }
 .demo-phase.phase-one { animation: guide-phase-one 9s infinite; }
 .demo-phase.phase-two { animation: guide-phase-two 9s infinite; }
 .demo-phase.phase-three { animation: guide-phase-three 9s infinite; }
 .demo-phase .demo-sheet { top: 14px; bottom: -40px; left: -12px; right: -12px; }
+.demo-stay .demo-phase .demo-sheet { bottom: 0; }
 .demo-add-header { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 650; }
 .demo-plus { font-size: 25px; position: relative; padding: 0 4px; font-weight: 400; }
 .demo-add-sheet { top: 63px; background: #1b1b1b; }
 .demo-add-sheet strong { display: block; margin: 3px 0 11px; }
-.demo-url { background: #292929; color: #e8e8e8; border-radius: 8px; padding: 11px 8px; margin-top: 16px; font-size: 10px; overflow-wrap: anywhere; line-height: 1.6; }
+.demo-url { background: #292929; color: #e8e8e8; border-radius: 8px; padding: 12px 9px; margin-top: 16px; font-size: 12px; overflow-wrap: anywhere; line-height: 1.6; }
 .demo-continue { background: #ca46e8; color: #fff; border-radius: 8px; padding: 10px; text-align: center; margin-top: 12px; font-weight: 650; position: relative; }
-.demo-allow { font-size: 11px; color: #007aff; position: relative; }
+.demo-allow { font-size: 13px; color: #007aff; position: relative; }
 .demo-check { color: #22794f; background: #dff2e6; border-radius: 50%; width: 48px; height: 48px; display: grid; place-items: center; font-size: 26px; margin: 12px auto; }
-.demo-cashback { position: absolute; bottom: 58px; left: 10px; padding: 10px; border-radius: 10px; background: #fff; box-shadow: 0 4px 14px #182d2520; display: flex; gap: 7px; align-items: center; font-size: 10px; animation: guide-benefit 7s infinite; }
+.demo-cashback { position: absolute; bottom: 64px; left: 10px; right: 10px; padding: 12px 10px; border-radius: 10px; background: #fff; box-shadow: 0 4px 14px #182d2520; display: flex; gap: 7px; align-items: center; font-size: 11px; animation: guide-benefit 7s infinite; }
 .demo-cashback img { width: 22px; height: 22px; }
 .demo-cashback strong { display: block; color: #22794f; }
 .demo-tap::after { content: ''; position: absolute; width: 29px; height: 29px; border: 2px solid #22794f; border-radius: 50%; background: #22794f12; top: 50%; left: 65%; transform: translate(-50%, -50%); animation: guide-tap 7s infinite; z-index: 2; }
 .demo-stay .demo-tap::after { border-color: #d754ed; background: #d754ed18; }
 .demo-tap { position: relative; }
-.guide-animation-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 16px; }
-.guide-animation-tools span { color: #839087; font-size: 10px; }
-.guide-animation-tools button { border: 0; background: none; color: #5d6b71; cursor: pointer; font: inherit; font-size: 10px; padding: 5px 0 5px 8px; }
-.guide-nav { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-.guide-nav button, .guide-install { border: 1px solid #d6e1dc; border-radius: 10px; background: #f7faf8; color: #43564d; cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; min-height: 42px; padding: 10px 15px; }
+.demo-phase .demo-tap::after { animation-duration: 3s; }
+.demo-settings .demo-tab::after { animation: guide-settings-tab 9s infinite; }
+.demo-settings .demo-row::after { left: 82%; animation: guide-settings-switch 9s infinite; }
+.guide-animation-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 5px; }
+.guide-animation-tools span { color: #75847d; font-size: 11px; }
+.guide-animation-tools button { border: 0; background: none; color: #5d6b71; cursor: pointer; font: inherit; font-size: 11px; min-height: 36px; padding: 5px 0 5px 8px; }
+.guide-nav { display: flex; gap: 4px; align-items: center; justify-content: space-between; }
+.guide-nav button, .guide-install { border: 1px solid #d6e1dc; border-radius: 10px; background: #f7faf8; color: #43564d; cursor: pointer; font: inherit; font-size: 14px; font-weight: 650; min-height: 46px; padding: 11px 17px; }
+.guide-nav .guide-prev, .guide-nav .guide-next { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; font-size: 22px; flex: 0 0 auto; }
 .guide-nav button:disabled { opacity: .4; cursor: default; }
 .guide-nav .guide-next, .guide-install { background: #22794f; border-color: #22794f; color: #fff; }
 .guide-install { display: inline-block; text-decoration: none; margin-top: 10px; }
-.guide-nav span { color: #8a9890; font-size: 11px; }
 .iphone-guide button:focus-visible, .guide-install:focus-visible { outline: 2px solid #22794f; outline-offset: 3px; }
 .guide-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.iphone-guide.is-paused *, .iphone-guide.is-paused *::after { animation-play-state: paused !important; }
+.iphone-guide.is-paused .demo-phone *, .iphone-guide.is-paused .demo-phone *::after,
+.guide-slide[aria-hidden="true"] .demo-phone *, .guide-slide[aria-hidden="true"] .demo-phone *::after { animation-play-state: paused !important; }
 @keyframes guide-tap { 0%, 12%, 50%, 100% { opacity: 0; } 23%, 35% { opacity: 1; } 40% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); } }
 @keyframes guide-toggle { 0%, 40%, 100% { background: #727279; } 46%, 88% { background: #34c759; } }
-@keyframes guide-toggle-knob { 0%, 40%, 100% { left: 2px; } 46%, 88% { left: 16px; } }
+@keyframes guide-toggle-knob { 0%, 40%, 100% { left: 2px; } 46%, 88% { left: 18px; } }
+@keyframes guide-settings-tab { 0%, 10%, 30%, 100% { opacity: 0; } 16%, 24% { opacity: 1; } }
+@keyframes guide-settings-switch { 0%, 30%, 53%, 100% { opacity: 0; } 36%, 45% { opacity: 1; } }
 @keyframes guide-phase-one { 0%, 29%, 100% { opacity: 1; visibility: visible; } 33%, 96% { opacity: 0; visibility: hidden; } }
 @keyframes guide-phase-two { 0%, 29%, 68%, 100% { opacity: 0; visibility: hidden; } 33%, 64% { opacity: 1; visibility: visible; } }
 @keyframes guide-phase-three { 0%, 64%, 100% { opacity: 0; visibility: hidden; } 68%, 96% { opacity: 1; visibility: visible; } }
 @keyframes guide-benefit { 0%, 20%, 100% { opacity: 0; transform: translateY(8px); } 32%, 88% { opacity: 1; transform: translateY(0); } }
 @media (max-width: 350px) {
-  .guide-step { width: 31px; height: 31px; }
-  .guide-heading h2 { font-size: 17px; }
+  .iphone-guide { padding-left: 12px; padding-right: 12px; }
+  .guide-heading h2 { font-size: 19px; }
+  .guide-heading p { font-size: 12px; }
+  .demo-content { padding-left: 10px; padding-right: 10px; }
+  .demo-app { gap: 7px; }
+  .demo-app strong { font-size: 14px; }
+  .demo-app small { font-size: 10px; }
+  .demo-pill { padding: 8px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .iphone-guide:not(.motion-enabled) .guide-track, .iphone-guide:not(.motion-enabled) .guide-slides,
+  .iphone-guide:not(.motion-enabled) .guide-dot span { transition: none; }
   .iphone-guide:not(.motion-enabled) *, .iphone-guide:not(.motion-enabled) *::after { animation: none !important; }
   .iphone-guide:not(.motion-enabled) .demo-tap::after { display: none; }
   .iphone-guide:not(.motion-enabled) .demo-phase { opacity: 0 !important; visibility: hidden !important; }
   .iphone-guide:not(.motion-enabled) .demo-phase.phase-three { opacity: 1 !important; visibility: visible !important; }
   .iphone-guide:not(.motion-enabled) .demo-toggle.animated { background: #34c759; }
-  .iphone-guide:not(.motion-enabled) .demo-toggle.animated::after { left: 16px; }
+  .iphone-guide:not(.motion-enabled) .demo-toggle.animated::after { left: 18px; }
 }

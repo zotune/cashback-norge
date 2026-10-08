@@ -27,7 +27,7 @@
       instruction: 'Åpne <strong>Stay-appen</strong>. Trykk på <strong>Settings</strong> nederst til høyre. Finn <strong>Silent Userscript Update</strong> under General og slå den på.',
       note: 'Da får du nye versjoner av Cashback Norge automatisk. Navnene inne i Stay er på engelsk.',
       dark: true,
-      demo: `<div class="demo-content"><h4>Settings</h4><div class="demo-small" style="margin:8px 0">GENERAL</div><div class="demo-row"><span>Clear App Cache</span><span>›</span></div><div class="demo-row demo-tap"><span style="font-size:10px">Silent Userscript Update</span><span class="demo-toggle animated"></span></div></div>${tabs('settings')}`,
+      demo: `<div class="demo-settings"><div class="demo-content"><h4>Settings</h4><div class="demo-small" style="margin:18px 0 10px">GENERAL</div><div class="demo-row demo-tap"><span>Silent Userscript Update</span><span class="demo-toggle animated"></span></div></div>${tabs('settings')}</div>`,
     },
     {
       title: "Legg til Cashback Norge",
@@ -57,30 +57,46 @@
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let paused = reducedMotion.matches;
   guide.innerHTML = `<div class="guide-heading"><div><h2>Cashback i Safari</h2><p>Seks små steg med Stay for Safari</p></div><button type="button" class="guide-close" aria-label="Lukk installasjonsguiden">×</button></div>
-    <nav class="guide-steps" aria-label="Installasjonssteg">${steps.map((step, i) => `<button class="guide-step" type="button" data-step="${i}" aria-label="Steg ${i + 1}: ${step.title}" aria-controls="iphone-step-${i}">${i + 1}</button>`).join('')}</nav>
-    <div class="guide-slides">${steps.map((step, i) => `<section class="guide-slide" id="iphone-step-${i}" aria-labelledby="iphone-step-title-${i}" ${i !== current ? 'hidden' : ''}><h3 id="iphone-step-title-${i}">${step.title}</h3><p class="guide-instruction">${step.instruction}</p>${step.extra || ''}${step.note ? `<p class="guide-note">${step.note}</p>` : ''}<div class="guide-demo" aria-hidden="true"><div class="demo-phone ${step.dark ? 'demo-stay' : ''}">${status}${step.demo}</div></div></section>`).join('')}</div>
-    <div class="guide-animation-tools"><span>Forenklet visning · sveip for neste steg</span><button class="guide-animation-toggle" type="button" aria-pressed="${paused}">${paused ? 'Spill animasjon' : 'Pause animasjon'}</button></div>
-    <div class="guide-nav"><button class="guide-prev" type="button">← Tilbake</button><span class="guide-progress"></span><button class="guide-next" type="button">Neste →</button></div><p class="guide-sr" aria-live="polite" id="guide-announcement"></p>`;
+    <p class="guide-progress"></p>
+    <div class="guide-slides" aria-label="Sveip mellom installasjonssteg"><div class="guide-track">${steps.map((step, i) => `<section class="guide-slide" id="iphone-step-${i}" aria-labelledby="iphone-step-title-${i}"><h3 id="iphone-step-title-${i}">${step.title}</h3><p class="guide-instruction">${step.instruction}</p>${step.extra || ''}${step.note ? `<p class="guide-note">${step.note}</p>` : ''}<div class="guide-demo" aria-hidden="true"><div class="demo-phone ${step.dark ? 'demo-stay' : ''}">${status}${step.demo}</div></div></section>`).join('')}</div></div>
+    <div class="guide-animation-tools"><span>Sveip eller bruk pilene</span><button class="guide-animation-toggle" type="button" aria-pressed="${paused}">${paused ? 'Spill animasjon' : 'Pause animasjon'}</button></div>
+    <div class="guide-nav"><button class="guide-prev" type="button" aria-label="Forrige steg" title="Forrige steg">←</button><nav class="guide-dots" aria-label="Installasjonssteg">${steps.map((step, i) => `<button class="guide-dot" type="button" data-step="${i}" aria-label="Steg ${i + 1}: ${step.title}" aria-controls="iphone-step-${i}"><span></span></button>`).join('')}</nav><button class="guide-next" type="button"></button></div><p class="guide-sr" aria-live="polite" id="guide-announcement"></p>`;
   const slides = [...guide.querySelectorAll('.guide-slide')];
-  const stepButtons = [...guide.querySelectorAll('.guide-step')];
+  const stepButtons = [...guide.querySelectorAll('.guide-dot')];
+  const viewport = guide.querySelector('.guide-slides');
+  const track = guide.querySelector('.guide-track');
   const previous = guide.querySelector('.guide-prev');
   const next = guide.querySelector('.guide-next');
+  const positionTrack = (offset = 0) => {
+    track.style.transform = `translate3d(calc(${-current * 100}% + ${offset}px), 0, 0)`;
+  };
+  const fitSlide = () => {
+    if (!guide.hidden) viewport.style.height = `${slides[current].offsetHeight}px`;
+  };
+  // Keep the controls below the active slide as text wraps, fonts load or the phone rotates.
+  const resizeObserver = new ResizeObserver(fitSlide);
+  slides.forEach((slide) => resizeObserver.observe(slide));
   const setStep = (step, announce = true) => {
     current = Math.max(0, Math.min(steps.length - 1, step));
-    slides.forEach((slide, i) => { slide.hidden = i !== current; });
+    slides.forEach((slide, i) => {
+      slide.inert = i !== current;
+      slide.setAttribute('aria-hidden', String(i !== current));
+    });
     stepButtons.forEach((button, i) => {
       if (i === current) button.setAttribute('aria-current', 'step');
       else button.removeAttribute('aria-current');
-      button.classList.toggle('is-complete', i < current);
     });
     // Restart the visual demonstration whenever its step is selected.
     const phone = slides[current].querySelector('.demo-phone');
     phone.replaceWith(phone.cloneNode(true));
     previous.disabled = current === 0;
-    next.textContent = current === steps.length - 1 ? 'Ferdig ✓' : 'Neste →';
-    guide.querySelector('.guide-progress').textContent = `${current + 1} / ${steps.length}`;
+    next.textContent = current === steps.length - 1 ? '✓' : '→';
+    next.setAttribute('aria-label', current === steps.length - 1 ? 'Ferdig, lukk guiden' : 'Neste steg');
+    next.title = current === steps.length - 1 ? 'Ferdig, lukk guiden' : 'Neste steg';
+    guide.querySelector('.guide-progress').textContent = `Steg ${current + 1} av ${steps.length}`;
+    positionTrack();
+    fitSlide();
     if (announce) guide.querySelector('#guide-announcement').textContent = `Steg ${current + 1} av ${steps.length}: ${steps[current].title}`;
-    if (announce && !guide.hidden) guide.scrollIntoView({ block: 'start', behavior: 'auto' });
     try { localStorage.setItem('cashback-iphone-step', String(current)); } catch { /* Optional. */ }
   };
   const setOpen = (open) => {
@@ -110,19 +126,45 @@
       setStep(current + (event.key === 'ArrowRight' ? 1 : -1));
     }
   });
-  let swipeStart;
-  guide.addEventListener('pointerdown', (event) => {
-    swipeStart = event.isPrimary && event.button === 0 && !event.target.closest('a, button, code')
-      ? { x: event.clientX, y: event.clientY } : undefined;
+  let swipe;
+  viewport.addEventListener('pointerdown', (event) => {
+    if (!event.isPrimary || event.button !== 0 || event.target.closest('a, button, code')) return;
+    swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, time: event.timeStamp, dragging: false };
   }, { passive: true });
-  guide.addEventListener('pointerup', (event) => {
-    if (!swipeStart) return;
-    const dx = event.clientX - swipeStart.x;
-    const dy = event.clientY - swipeStart.y;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) setStep(current + (dx < 0 ? 1 : -1));
-    swipeStart = undefined;
+  viewport.addEventListener('pointermove', (event) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    if (!swipe.dragging) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
+      if (Math.abs(dy) >= Math.abs(dx)) { swipe = undefined; return; }
+      swipe.dragging = true;
+      viewport.setPointerCapture(event.pointerId);
+      viewport.classList.add('is-dragging');
+    }
+    const atEdge = (current === 0 && dx > 0) || (current === steps.length - 1 && dx < 0);
+    const limit = viewport.clientWidth * (atEdge ? .18 : 1);
+    const offset = atEdge ? dx * .25 : dx;
+    positionTrack(Math.max(-limit, Math.min(limit, offset)));
   }, { passive: true });
-  guide.addEventListener('pointercancel', () => { swipeStart = undefined; }, { passive: true });
+  const finishSwipe = (event, cancelled = false) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const gesture = swipe;
+    swipe = undefined;
+    viewport.classList.remove('is-dragging');
+    if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    const dx = event.clientX - gesture.x;
+    const distance = Math.abs(dx);
+    const quickSwipe = distance > 24 && distance / Math.max(1, event.timeStamp - gesture.time) > .45;
+    if (!cancelled && gesture.dragging && (distance > Math.max(44, viewport.clientWidth * .18) || quickSwipe)) {
+      setStep(current + (dx < 0 ? 1 : -1));
+    } else {
+      positionTrack();
+    }
+  };
+  viewport.addEventListener('pointerup', (event) => finishSwipe(event), { passive: true });
+  viewport.addEventListener('pointercancel', (event) => finishSwipe(event, true), { passive: true });
+  viewport.addEventListener('lostpointercapture', (event) => finishSwipe(event, true), { passive: true });
   const animationToggle = guide.querySelector('.guide-animation-toggle');
   animationToggle.addEventListener('click', () => {
     paused = !paused;
