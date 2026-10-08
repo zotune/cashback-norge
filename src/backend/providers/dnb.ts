@@ -206,6 +206,47 @@ export async function fetchDnb(
   return offers;
 }
 
+/** This benefit is separate from the ordinary card discounts and Supertilbud. */
+export async function fetchDnbSats(input: FetchDnbInput): Promise<CashbackOffer[]> {
+  input.logger.info(`Fetching DNB SATS benefit from ${input.pageDataUrl}`);
+  const content = await fetchPageContent(input.pageDataUrl, "DNB SATS");
+  const text: string[] = [];
+  const collectText = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(collectText);
+    } else if (isRecord(value)) {
+      for (const [key, child] of Object.entries(value)) {
+        if ((key === "text" || key === "description") && typeof child === "string") {
+          if (child.trim()) text.push(child.trim());
+        } else if (typeof child === "object") {
+          collectText(child);
+        }
+      }
+    }
+  };
+  collectText(content.sections);
+  const reward = text.join(" ").match(/(\d+(?:[,.]\d+)?)\s*%\s*rabatt/i)?.[1];
+  if (!reward) throw new Error("DNB SATS: current discount rate not found");
+  const sourceUrl = "https://www.dnb.no/kundeprogram/fordeler/sats";
+  const bindingTerms = [...new Set(text.filter((part) => /bindingstid|binding\b/i.test(part)))];
+  const offers: CashbackOffer[] = [{
+    provider: "dnb",
+    merchantName: "SATS",
+    domains: ["sats.no"],
+    reward: `${reward} %`,
+    sourceUrl,
+    activationUrl: sourceUrl,
+    terms: [
+      "Gjelder SATS Premium-medlemskap. Krever DNB SAGA eller Private Banking.",
+      "Logg inn i DNB-nettbanken og følg lenken til SATS for å aktivere fordelen.",
+      ...bindingTerms,
+    ].join("\n"),
+    updatedAt: input.generatedAt,
+  }];
+  input.logger.info(`DNB SATS: found ${reward} % on Premium membership`);
+  return offers;
+}
+
 async function fetchPageContent(
   url: string,
   label: string,

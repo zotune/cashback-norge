@@ -12,13 +12,16 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
 ## iPhone / iPad
 
 1. Installer **[Stay for Safari](https://apps.apple.com/no/app/stay-for-safari/id1591620171)** fra App Store
-2. Åpne **[Safari](https://apps.apple.com/no/app/safari/id1146562112)** → trykk **aA** i adressefeltet → **Manage Extensions** → skru på **Stay**
-3. Åpne **[Stay-appen](https://apps.apple.com/no/app/stay-for-safari/id1591620171)** → **Settings** → skru på **Silent Userscript Update**
-4. Åpne **[Stay-appen](https://apps.apple.com/no/app/stay-for-safari/id1591620171)** → **Userscript** → lim inn lenken og trykk **Continue**:
+2. Åpne **Safari** på en nettside → trykk på **sidemenyen** ved adressefeltet (**aA** på eldre iOS) → **Administrer utvidelser / Manage Extensions** → skru på **Stay** → **Ferdig / Done**
+3. Åpne **Stay-appen** → **Settings** nederst til høyre → skru på **Silent Userscript Update** under **General**
+4. I **Stay-appen** → **Userscripts** nederst til venstre → **+** øverst til høyre → **Link** → lim inn lenken og trykk **Continue**:
    ```
    https://cashbacknorge.no/cashback-varsler.user.js
    ```
-5. Åpne **[Safari](https://apps.apple.com/no/app/safari/id1146562112)** igjen og besøk en av butikkene under — Cashback Norge dukker opp nede til venstre på skjermen
+5. Åpne **Safari** igjen → sidemenyen → **Stay** → **Tillat alltid… / Always Allow…** → **Tillat alltid på alle nettsteder / Always Allow on Every Website**. Gå videre hvis dette allerede er gjort i Stay sin egen guide.
+6. Besøk en butikk fra oversikten i **Safari** — Cashback Norge dukker opp nederst til venstre på skjermen.
+
+Se den [visuelle guiden med animasjoner](https://cashbacknorge.no/#iphone-guide). Menynavnene i Stay er på engelsk; Safari følger språket på enheten.
 
 ## Chrome / Firefox (desktop)
 

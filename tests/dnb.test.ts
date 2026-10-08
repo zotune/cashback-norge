@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import { fetchDnb, fetchDnbSupertilbud } from "../src/backend/providers/dnb.js";
+import { fetchDnb, fetchDnbSats, fetchDnbSupertilbud } from "../src/backend/providers/dnb.js";
 
 const generatedAt = "2026-10-08T12:00:00.000Z";
 const logger = { info() {}, warn() {}, error() {} };
@@ -117,6 +117,32 @@ test("active Supertilbud preserve each shop's reward, code and terms", async () 
 test("a month without Supertilbud is a valid empty result", async () => {
   await withPage(flightPage([{ title: "Månedens tilbud", description: "Akkurat nå er det ikke noe Supertilbud." }]), async (pageDataUrl) => {
     assert.deepEqual(await fetchDnbSupertilbud({ pageDataUrl, generatedAt, logger }), []);
+  });
+});
+
+test("the separate SATS benefit includes SAGA eligibility and binding terms without a general DNB code", async () => {
+  const sections = [{ content: [{ children: [{ text: "SATS Premium gir deg 20 % rabatt." }] }] }, {
+    list: [{ content: [{ children: [{ text: "Nye medlemmer må velge 12 måneders bindingstid." }] }] }],
+  }];
+  await withPage(flightPage(sections), async (pageDataUrl) => {
+    const [offer] = await fetchDnbSats({ pageDataUrl, generatedAt, logger });
+    assert.equal(offer?.reward, "20 %");
+    assert.deepEqual(offer?.domains, ["sats.no"]);
+    assert.equal(offer?.discountCode, undefined);
+    assert.equal(offer?.sourceUrl, "https://www.dnb.no/kundeprogram/fordeler/sats");
+    assert.match(offer!.terms, /SAGA eller Private Banking/);
+    assert.match(offer!.terms, /Premium/);
+    assert.match(offer!.terms, /12 måneders bindingstid/);
+    assert.doesNotMatch(offer!.terms, /DNB5437/);
+  });
+});
+
+test("SATS rate changes are fetched, and a missing rate is reported", async () => {
+  await withPage(flightPage([{ description: "Premium gir 25 % rabatt." }]), async (pageDataUrl) => {
+    assert.equal((await fetchDnbSats({ pageDataUrl, generatedAt, logger }))[0]?.reward, "25 %");
+  });
+  await withPage(flightPage([{ description: "Ingen rabatt oppgitt." }]), async (pageDataUrl) => {
+    await assert.rejects(fetchDnbSats({ pageDataUrl, generatedAt, logger }), /current discount rate not found/);
   });
 });
 

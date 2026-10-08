@@ -35,7 +35,7 @@ import { fetchDealpass } from "./providers/dealpass.js";
 import { fetchNorwegianReward } from "./providers/norwegian.js";
 import { crawlTrumf } from "./providers/trumf.js";
 import { crawlCuponation } from "./providers/cuponation.js";
-import { fetchDnb, fetchDnbSupertilbud } from "./providers/dnb.js";
+import { fetchDnb, fetchDnbSats, fetchDnbSupertilbud } from "./providers/dnb.js";
 import { fetchCurve } from "./providers/curve.js";
 import { crawlFinnkupongkoder } from "./providers/finnkupongkoder.js";
 import { crawlKickback } from "./providers/kickback.js";
@@ -394,6 +394,16 @@ async function main(): Promise<void> {
       reusePreviousOnFailure: true,
       run: () => fetchDnb({
         generatedAt, logger, pageDataUrl: config.dnbPageDataUrl,
+      }),
+    }),
+    config.skipDnb ? Promise.resolve([]) : collectOffers({
+      label: "DNB SATS",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      previousOfferFilter: (offer) => offer.sourceUrl === "https://www.dnb.no/kundeprogram/fordeler/sats",
+      provider: "dnb",
+      reusePreviousOnFailure: true,
+      run: () => fetchDnbSats({
+        generatedAt, logger, pageDataUrl: "https://www.dnb.no/kundeprogram/fordeler/sats",
       }),
     }),
     config.skipDnbSupertilbud ? Promise.resolve([]) : collectOffers({
