@@ -386,14 +386,22 @@ async function main(): Promise<void> {
       }),
     }),
     config.skipDnb ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
       label: "DNB",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      previousOfferFilter: (offer) => offer.sourceUrl === "https://www.dnb.no/kundeprogram/fordeler/faste-rabatter",
       provider: "dnb",
+      reusePreviousOnFailure: true,
       run: () => fetchDnb({
         generatedAt, logger, pageDataUrl: config.dnbPageDataUrl,
       }),
     }),
     config.skipDnbSupertilbud ? Promise.resolve([]) : collectOffers({
       label: "DNB Supertilbud",
+      // Monthly promotions must never be revived from an earlier crawl.
+      previousOfferFilter: () => false,
+      provider: "dnb",
+      reusePreviousOnFailure: true,
       run: () => fetchDnbSupertilbud({
         generatedAt, logger, pageDataUrl: config.dnbSupertilbudPageDataUrl,
       }),
@@ -1188,10 +1196,10 @@ function readCliConfig(args: string[]): CliConfig {
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
-      "https://www.dnb.no/web/page-data/kundeprogram/fordeler/faste-rabatter/page-data.json",
+      "https://www.dnb.no/kundeprogram/fordeler/faste-rabatter",
     dnbSupertilbudPageDataUrl:
       readArgumentValue(args, "--dnb-supertilbud-page-data-url") ??
-      "https://www.dnb.no/web/page-data/kundeprogram/fordeler/supertilbud/manedens-tilbud/page-data.json",
+      "https://www.dnb.no/kundeprogram/fordeler/supertilbud/manedens-tilbud",
     cuponationStartUrl:
       readArgumentValue(args, "--cuponation-start-url") ??
       "https://www.cuponation.no/topp-20",

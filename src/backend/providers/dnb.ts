@@ -71,7 +71,8 @@ function buildSuperOfferTerms(sectionTitle: string, item: DnbSuperOfferItem): st
     .trim();
   if (disclaimer) parts.push(disclaimer);
   const code = extractDisclaimerCode(item);
-  parts.push(`Rabattkode: ${code ?? "DNBSUPER75"}. Betal med DNB-kort.`);
+  if (code) parts.push(`Rabattkode: ${code}.`);
+  parts.push("Betal med DNB-kort.");
   return parts.join("\n");
 }
 
@@ -80,21 +81,7 @@ export async function fetchDnbSupertilbud(
 ): Promise<CashbackOffer[]> {
   input.logger.info(`Fetching DNB Supertilbud from ${input.pageDataUrl}`);
 
-  const response = await gotScraping(input.pageDataUrl, {
-    responseType: "json",
-    throwHttpErrors: false,
-    timeout: { request: 30_000 },
-  });
-
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw new Error(`DNB Supertilbud returned ${response.statusCode}`);
-  }
-
-  const body: unknown = response.body;
-  if (!isDnbPageData(body)) throw new Error("DNB Supertilbud: unexpected format");
-
-  const contentJson: unknown = JSON.parse(body.result.data.aemPage.data.content);
-  if (!isContentSections(contentJson)) throw new Error("DNB Supertilbud: no sections");
+  const contentJson = await fetchPageContent(input.pageDataUrl, "DNB Supertilbud");
 
   // Find the superOffer section
   const superSection = contentJson.sections.find(
@@ -172,31 +159,12 @@ export async function fetchDnb(
 ): Promise<CashbackOffer[]> {
   input.logger.info(`Fetching DNB faste rabatter from ${input.pageDataUrl}`);
 
-  const response = await gotScraping(input.pageDataUrl, {
-    responseType: "json",
-    throwHttpErrors: false,
-    timeout: { request: 30_000 },
-  });
-
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw new Error(
-      `DNB page-data returned ${response.statusCode}: ${response.statusMessage}`,
-    );
-  }
-
-  const body: unknown = response.body;
-
-  if (!isDnbPageData(body)) {
-    throw new Error("DNB page-data returned unexpected format");
-  }
-
-  const contentJson: unknown = JSON.parse(body.result.data.aemPage.data.content);
-
-  if (!isContentSections(contentJson)) {
-    throw new Error("DNB content sections have unexpected format");
-  }
+  const contentJson = await fetchPageContent(input.pageDataUrl, "DNB faste rabatter");
+  const discountCode = extractPageDiscountCode(contentJson.sections);
+  if (!discountCode) throw new Error("DNB faste rabatter: no current discount code found");
 
   const discounts = extractCardDiscounts(contentJson.sections);
+  if (discounts.length === 0) throw new Error("DNB faste rabatter: no discount cards found");
   const offers: CashbackOffer[] = [];
 
   for (const discount of discounts) {
@@ -219,7 +187,7 @@ export async function fetchDnb(
     const dnbUrl = "https://www.dnb.no/kundeprogram/fordeler/faste-rabatter";
     const termsParts: string[] = [];
     if (discount.description) termsParts.push(discount.description);
-    termsParts.push("Rabattkode: DNB4935. Betal med DNB-kort.");
+    termsParts.push(`Rabattkode: ${discountCode}. Betal med DNB-kort.`);
 
     offers.push({
       provider: "dnb",
@@ -229,13 +197,95 @@ export async function fetchDnb(
       sourceUrl: dnbUrl,
       activationUrl: dnbUrl,
       terms: termsParts.join("\n"),
-      discountCode: "DNB4935",
+      discountCode,
       updatedAt: input.generatedAt,
     });
   }
 
   input.logger.info(`Found ${offers.length} DNB faste rabatter`);
   return offers;
+}
+
+async function fetchPageContent(
+  url: string,
+  label: string,
+): Promise<{ sections: unknown[] }> {
+  const response = await gotScraping(url, {
+    responseType: "text",
+    throwHttpErrors: false,
+    timeout: { request: 30_000 },
+  });
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`${label} returned ${response.statusCode}: ${response.statusMessage}`);
+  }
+
+  const text = response.body.trim();
+  // Retain support for explicit legacy page-data URL overrides.
+  if (text.startsWith("{")) {
+    const body: unknown = JSON.parse(text);
+    if (isDnbPageData(body)) {
+      const content: unknown = JSON.parse(body.result.data.aemPage.data.content);
+      if (isContentSections(content)) return content;
+    }
+  } else {
+    // DNB now embeds its structured page data in Next.js Flight scripts.
+    // Decode JSON only; never evaluate third-party JavaScript. Flight records
+    // can span multiple script chunks, so join them before parsing records.
+    const chunks: string[] = [];
+    for (const script of text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+      const push = script[1]?.trim().match(/^self\.__next_f\.push\(([\s\S]*)\);?$/);
+      if (!push?.[1]) continue;
+      try {
+        const chunk: unknown = JSON.parse(push[1]);
+        if (Array.isArray(chunk) && chunk[0] === 1 && typeof chunk[1] === "string") {
+          chunks.push(chunk[1]);
+        }
+      } catch {
+        // Ignore non-data scripts rather than executing them.
+      }
+    }
+    for (const record of chunks.join("").split("\n")) {
+      const match = record.match(/^[\da-f]+:(.+)$/i);
+      if (!match?.[1]) continue;
+      try {
+        const content = findPageContent(JSON.parse(match[1]) as unknown);
+        if (content) return content;
+      } catch {
+        // Flight also contains non-JSON records (imports and plain text).
+      }
+    }
+  }
+  throw new Error(`${label}: structured page content not found`);
+}
+
+function findPageContent(value: unknown): { sections: unknown[] } | undefined {
+  if (isRecord(value)) {
+    if (isRecord(value.pageData) && isContentSections(value.pageData.content)) {
+      return value.pageData.content;
+    }
+    for (const child of Object.values(value)) {
+      const content = findPageContent(child);
+      if (content) return content;
+    }
+  } else if (Array.isArray(value)) {
+    for (const child of value) {
+      const content = findPageContent(child);
+      if (content) return content;
+    }
+  }
+  return undefined;
+}
+
+function extractPageDiscountCode(sections: unknown[]): string | undefined {
+  for (const section of sections) {
+    if (!isRecord(section) || !isRecord(section.priceContent)) continue;
+    const { title, price } = section.priceContent;
+    if (typeof title === "string" && /rabattkode/i.test(title) && typeof price === "string") {
+      const code = price.trim();
+      if (/^[A-Z0-9_-]+$/i.test(code)) return code;
+    }
+  }
+  return undefined;
 }
 
 function extractDomainFromUrl(url: string): string | undefined {

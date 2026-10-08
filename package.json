@@ -15,7 +15,7 @@
     "crawl": "tsx src/backend/index.ts && cp data/cashback-index.json site/cashback-index.json && pnpm run build:extension && pnpm run build:site && pnpm run build:userscript",
     "preview:rabatta": "tsx src/scripts/test-rabatta.ts --write-site",
     "test:rabatta": "tsx src/scripts/test-rabatta.ts",
-    "test:backend": "node --import tsx --test tests/provider-offers.test.ts"
+    "test:backend": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "crawlee": "^3.16.0",
