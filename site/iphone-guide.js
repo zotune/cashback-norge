@@ -16,7 +16,6 @@
     return;
   }
   back.href = '../' + location.search;
-  const status = '<div class="demo-status"><span>9:41</span><span>▰ ▰ ●</span></div>';
   const logo = '<span class="demo-stay-logo">S</span>';
   const tabs = (selected) => `<div class="demo-tabs"><span class="demo-tab ${selected === 'scripts' ? 'selected' : ''}"><b>‹/›</b>Userscripts</span><span class="demo-tab"><b>♧</b>Bookmarks</span><span class="demo-tab ${selected === 'settings' ? 'selected demo-tap' : ''}"><b>⚙</b>Settings</span></div>`;
   const address = '<div class="demo-address"><span class="demo-menu-icon"></span><span>cashbacknorge.no</span><span style="margin-left:auto">↻</span></div>';
@@ -60,170 +59,26 @@
       demo: `<div class="demo-content"><h4>Nettbutikk</h4><div class="demo-store-line"></div><div class="demo-store-line"></div><div class="demo-check">✓</div></div><div class="demo-cashback"><img src="../favicon.png" alt=""><span><strong>Cashback Norge</strong>Se fordeler for denne butikken</span></div>${address}`,
     },
   ];
-  let current = 0;
-  try {
-    const saved = Number(localStorage.getItem("cashback-iphone-step"));
-    if (Number.isInteger(saved) && saved >= 0 && saved < steps.length) current = saved;
-  } catch { /* The guide also works when storage is disabled. */ }
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  guide.innerHTML = `<div class="guide-slides" tabindex="0" aria-label="Installasjonssteg">${steps.map((step, i) => `<section class="guide-slide" id="iphone-step-${i}" aria-labelledby="iphone-step-title-${i}"><div class="guide-demo" aria-hidden="true"><div class="demo-phone ${step.dark ? 'demo-stay' : ''}">${status}${step.demo}</div></div><div class="guide-text"><h2 id="iphone-step-title-${i}">${step.title}</h2><p class="guide-instruction">${step.instruction}</p>${step.extra || ''}${step.note ? `<p class="guide-note">${step.note}</p>` : ''}</div></section>`).join('')}</div>
-    <div class="guide-nav"><button class="guide-prev" type="button" aria-label="Forrige steg" title="Forrige steg">←</button><nav class="guide-dots" aria-label="Installasjonssteg">${steps.map((step, i) => `<button class="guide-dot" type="button" data-step="${i}" aria-label="Steg ${i + 1}: ${step.title}" aria-controls="iphone-step-${i}"><span></span></button>`).join('')}</nav><button class="guide-next" type="button"></button></div><p class="guide-sr" aria-live="polite" id="guide-announcement"></p>`;
-  const slides = [...guide.querySelectorAll('.guide-slide')];
-  const stepButtons = [...guide.querySelectorAll('.guide-dot')];
-  const viewport = guide.querySelector('.guide-slides');
-  const previous = guide.querySelector('.guide-prev');
-  const next = guide.querySelector('.guide-next');
-  const announcement = guide.querySelector('#guide-announcement');
-  const clamp = (step) => Math.max(0, Math.min(steps.length - 1, step));
-  let width = viewport.clientWidth;
-  let selected = -1;
-  let requestedStep = null;
-  let scrollFrame = 0;
-  let settleTimer;
-  const fitSlide = () => {
-    const height = `${slides[current].offsetHeight}px`;
-    if (viewport.style.height !== height) viewport.style.height = height;
-  };
-
-  const selectStep = (step, announce = false) => {
-    current = clamp(step);
-    if (selected !== current) {
-      selected = current;
-      slides.forEach((slide, i) => {
-        slide.inert = i !== current;
-        slide.setAttribute('aria-hidden', String(i !== current));
-      });
-      stepButtons.forEach((button, i) => {
-        if (i === current) button.setAttribute('aria-current', 'step');
-        else button.removeAttribute('aria-current');
-      });
-      previous.disabled = current === 0;
-      next.textContent = current === steps.length - 1 ? '✓' : '→';
-      next.setAttribute('aria-label', current === steps.length - 1 ? 'Ferdig, tilbake til butikkene' : 'Neste steg');
-      next.title = next.getAttribute('aria-label');
-      fitSlide();
-      try { localStorage.setItem('cashback-iphone-step', String(current)); } catch { /* Optional. */ }
-    }
-    if (announce) announcement.textContent = `Steg ${current + 1} av ${steps.length}: ${steps[current].title}`;
-  };
-  const goTo = (step, smooth = true) => {
-    const target = clamp(step);
-    if (target !== current && document.activeElement.closest('.guide-slide')) viewport.focus({ preventScroll: true });
-    selectStep(target, smooth);
-    requestedStep = target;
-    viewport.scrollTo({ left: target * width, behavior: smooth && !reducedMotion.matches ? 'smooth' : 'auto' });
-  };
-  const nearestStep = () => clamp(Math.round(viewport.scrollLeft / width));
-  const settle = () => {
-    if (mouseDrag) return;
-    clearTimeout(settleTimer);
-    requestedStep = null;
-    selectStep(nearestStep(), true);
-  };
-  // Touch scrolling and snapping belong to the browser. Only update controls when the step changes.
-  viewport.addEventListener('scroll', () => {
-    if (!scrollFrame) scrollFrame = requestAnimationFrame(() => {
-      scrollFrame = 0;
-      if (requestedStep === null) selectStep(nearestStep());
+  const mount = () => {
+    guide.classList.add('install-guide');
+    window.mountInstallGuide({ guide, steps, storageKey: 'cashback-iphone-step' });
+    document.getElementById('iphone-guide-copy').addEventListener('click', async function () {
+      const status = document.getElementById('guide-copy-status');
+      try {
+        await navigator.clipboard.writeText(SCRIPT_URL);
+        this.textContent = 'Kopiert ✓';
+        status.textContent = 'Lim lenken inn i Stay → Link.';
+      } catch {
+        status.textContent = 'Hold på lenken og velg Kopier, og lim den inn i Stay.';
+      }
     });
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(settle, 180); // Fallback for browsers without scrollend.
-  }, { passive: true });
-  viewport.addEventListener('scrollend', settle);
-  viewport.addEventListener('wheel', () => { requestedStep = null; }, { passive: true });
-  const resizeObserver = new ResizeObserver(() => {
-    const resizedWidth = viewport.clientWidth;
-    if (resizedWidth > 0 && resizedWidth !== width) {
-      width = resizedWidth;
-      goTo(current, false);
-    }
-    fitSlide();
-  });
-  resizeObserver.observe(viewport);
-  slides.forEach((slide) => resizeObserver.observe(slide));
-  stepButtons.forEach((button, i) => button.addEventListener('click', () => goTo(i)));
-  previous.addEventListener('click', () => goTo(current - 1));
-  next.addEventListener('click', () => {
-    if (current < steps.length - 1) goTo(current + 1);
-    else location.assign(back.href);
-  });
-  guide.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-      event.preventDefault();
-      goTo(current + (event.key === 'ArrowRight' ? 1 : -1));
-    }
-  });
-
-  // Mouse dragging is a desktop convenience; never capture or cancel a touch gesture.
-  let mouseDrag;
-  let dragFrame = 0;
-  viewport.addEventListener('pointerdown', (event) => {
-    requestedStep = null;
-    if (event.pointerType !== 'mouse' || !event.isPrimary || event.button !== 0 || event.target.closest('a, button, code')) return;
-    mouseDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, time: event.timeStamp, start: current, left: viewport.scrollLeft, dx: 0, dragging: false };
-  }, { passive: true });
-  viewport.addEventListener('pointermove', (event) => {
-    if (!mouseDrag || event.pointerId !== mouseDrag.id) return;
-    const dx = event.clientX - mouseDrag.x;
-    const dy = event.clientY - mouseDrag.y;
-    if (!mouseDrag.dragging) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
-      if (Math.abs(dy) >= Math.abs(dx)) { mouseDrag = undefined; return; }
-      mouseDrag.dragging = true;
-      viewport.setPointerCapture(event.pointerId);
-      viewport.classList.add('is-dragging');
-    }
-    event.preventDefault();
-    mouseDrag.dx = dx;
-    if (!dragFrame) dragFrame = requestAnimationFrame(() => {
-      dragFrame = 0;
-      if (mouseDrag) viewport.scrollLeft = mouseDrag.left - mouseDrag.dx;
-    });
-  });
-  const finishDrag = (event, cancelled = false) => {
-    if (!mouseDrag || event.pointerId !== mouseDrag.id) return;
-    const gesture = mouseDrag;
-    mouseDrag = undefined;
-    cancelAnimationFrame(dragFrame);
-    dragFrame = 0;
-    viewport.classList.remove('is-dragging');
-    if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
-    if (!gesture.dragging) return;
-    const dx = event.clientX - gesture.x;
-    const distance = Math.abs(dx);
-    const quickSwipe = distance > 24 && distance / Math.max(1, event.timeStamp - gesture.time) > .45;
-    const advance = !cancelled && (distance > Math.max(44, width * .18) || quickSwipe);
-    goTo(advance ? gesture.start + (dx < 0 ? 1 : -1) : gesture.start);
   };
-  viewport.addEventListener('pointerup', (event) => finishDrag(event), { passive: true });
-  viewport.addEventListener('pointercancel', (event) => finishDrag(event, true), { passive: true });
-  viewport.addEventListener('lostpointercapture', (event) => finishDrag(event, true), { passive: true });
-  document.addEventListener('visibilitychange', () => guide.classList.toggle('is-background', document.hidden));
-  window.addEventListener('pagehide', () => {
-    clearTimeout(settleTimer);
-    cancelAnimationFrame(scrollFrame);
-    cancelAnimationFrame(dragFrame);
-    scrollFrame = dragFrame = 0;
-    mouseDrag = undefined;
-    viewport.classList.remove('is-dragging');
-    resizeObserver.disconnect();
-  });
-  window.addEventListener('pageshow', (event) => {
-    if (event.persisted) {
-      resizeObserver.observe(viewport);
-      slides.forEach((slide) => resizeObserver.observe(slide));
-      goTo(current, false);
-    }
-  });
-  document.getElementById('iphone-guide-copy').addEventListener('click', async function () {
-    const status = document.getElementById('guide-copy-status');
-    try {
-      await navigator.clipboard.writeText(SCRIPT_URL);
-      this.textContent = 'Kopiert ✓';
-      status.textContent = 'Lim lenken inn i Stay → Link.';
-    } catch {
-      status.textContent = 'Hold på lenken og velg Kopier, og lim den inn i Stay.';
-    }
-  });
-  goTo(current, false);
+  if (typeof window.mountInstallGuide === 'function') mount();
+  else {
+    // A cached v3 guide page does not yet include the shared carousel script.
+    const script = document.createElement('script');
+    script.src = '../guide-carousel.js?v=1';
+    script.onload = mount;
+    document.head.append(script);
+  }
 })();

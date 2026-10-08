@@ -23,6 +23,18 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
 
 Se den [visuelle guiden med animasjoner](https://cashbacknorge.no/iphone/). Menynavnene i Stay er på engelsk; Safari følger språket på enheten.
 
+## Android (Firefox)
+
+Chrome på Android støtter ikke Chrome Web Store-utvidelser. Automatiske varsler på Android krever en nettleser som støtter userscripts, som Firefox.
+
+1. Installer [Firefox](https://play.google.com/store/apps/details?id=org.mozilla.firefox) og åpne [Android-guiden](https://cashbacknorge.no/android/) i Firefox.
+2. Legg til [Tampermonkey](https://addons.mozilla.org/android/addon/tampermonkey/) i Firefox.
+3. Åpne [Cashback Norge-scriptet](https://cashbacknorge.no/cashback-varsler.user.js) i Firefox og trykk **Installer / Install**.
+4. Automatiske oppdateringer er på som standard i Tampermonkey 5.5: **Settings → Script Update → Check Interval: Every Day**, **Automatic installation** på. Scriptet har både `@updateURL`, `@downloadURL` og en versjon som oppdateres ved bygging.
+5. Besøk en nettbutikk i Firefox. Firefox kan også settes som standardnettleser; varslene kjører fortsatt bare i nettleseren der scriptet er installert.
+
+Oppsettet er kontrollert mot [Mozilla](https://support.mozilla.org/en-US/kb/find-and-install-add-ons-firefox-android), [Tampermonkeys installasjonsguide](https://www.tampermonkey.net/faq.php?q=Q102) og den offisielle Tampermonkey 5.5-pakken fra Mozilla Add-ons. Installasjonsguidene har ikke butikkindeksen og deler en lett karusell.
+
 ## Chrome / Firefox (desktop)
 
 Last ned og installer extensionen manuelt fra `dist/extension/` etter bygging.

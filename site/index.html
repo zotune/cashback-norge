@@ -36,8 +36,28 @@ body {
   border-bottom: 1px solid rgba(216, 227, 222, 0.5);
 }
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
-.subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 20px; }
+.subtitle { color: #5d6b71; font-size: 13px; text-align: center; margin-bottom: 3px; }
 .subtitle a { color: #3a7d55; }
+.update-row { display: flex; align-items: center; justify-content: center; gap: 3px; margin-bottom: 8px; color: #75847d; font-size: 12px; }
+.update-row > span { margin-right: 4px; }
+.social-link { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: #5d6b71; border-radius: 50%; }
+.social-link:hover { color: #22794f; background: #e8f1ec; }
+.social-link svg { width: 17px; height: 17px; }
+.install-links { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+.install-link { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 8px 14px; border: 1px solid; border-radius: 12px; text-decoration: none; font-size: 13px; font-weight: 650; }
+.install-link svg { width: 17px; height: 17px; flex-shrink: 0; }
+.install-chrome { color: #285d9b; background: #eaf2ff; border-color: #cdddf3; }
+.install-iphone { color: #735294; background: #f2eafb; border-color: #ddcbed; }
+.install-link small { font-size: 10px; font-weight: 500; opacity: .8; }
+.install-link:hover { filter: brightness(.97); }
+.install-link:focus-visible, .social-link:focus-visible { outline: 2px solid #22794f; outline-offset: 3px; }
+.android-guide-link { display: flex; width: fit-content; align-items: center; min-height: 32px; margin: -12px auto 12px; color: #5d6b71; font-size: 11px; text-underline-offset: 3px; }
+@media (max-width: 350px) {
+  .install-links { gap: 6px; }
+  .install-link { padding: 8px 7px; font-size: 12px; gap: 5px; }
+  .install-link svg { width: 15px; height: 15px; }
+  .install-link small { font-size: 9px; }
+}
 .search-wrap {
   display: flex;
   gap: 8px;
@@ -909,8 +929,16 @@ a.code-reward { color: inherit; text-decoration: none; }
 <div class="container">
   <img src="favicon.png" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
-  <p class="subtitle">Finn cashback-tilbud for norske nettbutikker</p>
-  <p class="subtitle">Oppdatert daglig · <a href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank">Chrome-extension</a> · <a href="https://instagram.com/cashbacknorge" target="_blank" rel="noopener">Instagram</a> · <a href="https://www.tiktok.com/@cashbacknorge" target="_blank" rel="noopener">TikTok</a></p>
+  <p class="subtitle">Finn cashback-tilbud for norske nettbutikker.</p>
+  <div class="update-row"><span>Oppdatert daglig</span>
+    <a class="social-link" href="https://instagram.com/cashbacknorge" target="_blank" rel="noopener noreferrer" aria-label="Cashback Norge på Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
+    <a class="social-link" href="https://www.tiktok.com/@cashbacknorge" target="_blank" rel="noopener noreferrer" aria-label="Cashback Norge på TikTok" title="TikTok"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 3c.3 2.6 1.8 4 4 4.2v3.1a8.6 8.6 0 0 1-4-1.2v6.8a5.8 5.8 0 1 1-5-5.7v3.2a2.6 2.6 0 1 0 1.8 2.5V3z"/></svg></a>
+  </div>
+  <nav class="install-links" aria-label="Installer cashback-varsler">
+    <a class="install-link install-chrome" href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank" rel="noopener noreferrer" aria-label="Installer i Chrome på PC eller Mac"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.8"/><path d="M12 8.2h8.2M8.7 14 4.5 6.8m9.1 8.7L9.4 20.6"/></svg>Chrome <small>PC/Mac</small></a>
+    <a id="iphone-guide-btn" class="install-link install-iphone" href="iphone/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4m-3 14h2"/></svg>iPhone/iPad</a>
+  </nav>
+  <a id="android-guide-btn" class="android-guide-link" href="android/">Android med Firefox</a>
   <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
@@ -919,7 +947,6 @@ a.code-reward { color: inherit; text-decoration: none; }
       <button class="bonus-toggle" type="button">
         <span class="bonus-toggle-arrow">▶</span> Ekstra cashback
       </button>
-      <a id="iphone-guide-btn" href="iphone/" style="align-items:center;color:#5d6b71;display:flex;font-size:13px;font-weight:600;gap:6px;text-decoration:none;margin-bottom:8px;"><span aria-hidden="true" style="font-size:10px;">▶</span> iPhone/iPad</a>
     </div>
     <div class="count"></div>
   </div>
@@ -1030,7 +1057,12 @@ function syncFilterUrl(push = false) {
   if (url.href !== window.location.href) {
     history[push ? "pushState" : "replaceState"](null, "", url.toString());
   }
-  document.getElementById("iphone-guide-btn").href = "iphone/" + url.search;
+  updateGuideLinks(url.search);
+}
+
+function updateGuideLinks(search) {
+  document.getElementById("iphone-guide-btn").href = "iphone/" + search;
+  document.getElementById("android-guide-btn").href = "android/" + search;
 }
 
 function updateProviderFilter() {
@@ -2167,7 +2199,7 @@ function setupBonusToggle() {
 }
 
 
-document.getElementById("iphone-guide-btn").href = "iphone/" + location.search;
+updateGuideLinks(location.search);
 if (location.hash !== "#iphone-guide") init();
 
 async function checkAdblock() {
