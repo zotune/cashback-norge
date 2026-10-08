@@ -1,5 +1,11 @@
 import type { ProviderMeta } from "./cashback.js";
 
+export function getProviderPageUrl(provider: string): string {
+  const url = new URL("https://cashbacknorge.no/");
+  url.searchParams.set("provider", provider);
+  return url.toString();
+}
+
 export const EB_PER_TRUMF_KR = 13.5;
 
 export const PROVIDER_NAMES: Record<string, string> = {

@@ -92,6 +92,44 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 }
 .input-wrap.has-value .input-clear { display: flex; }
 .search::-webkit-search-cancel-button { -webkit-appearance: none; }
+.provider-picker {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d6e1dc;
+  border-radius: 10px;
+  color: #5d6b71;
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  position: relative;
+  width: 40px;
+}
+.provider-picker:focus-within { outline: 2px solid #1f8f5f; outline-offset: 2px; }
+.provider-picker.is-active { background: #eaf7ef; border-color: #a9d9bd; color: #166b47; }
+.provider-picker svg { pointer-events: none; }
+.provider-picker select { cursor: pointer; height: 100%; inset: 0; opacity: 0; position: absolute; width: 100%; }
+.provider-filter-status { margin-bottom: 8px; }
+.active-provider {
+  align-items: center;
+  background: #f7faf8;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  color: #172026;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+}
+.active-provider:hover { box-shadow: 0 0 0 2px #a9bcb1; }
+.active-provider:focus-visible, .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
+@media (max-width: 380px) {
+  .search-wrap { gap: 6px; }
+  .input-wrap .global-sum { width: 80px; padding-left: 10px; }
+}
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .az-section-header {
   font-size: 13px;
@@ -186,6 +224,10 @@ a.merchant-name:hover { text-decoration: underline; }
   text-decoration: none;
 }
 .offer .offer-reward { flex: 1; }
+.offer-action { align-items: center; align-self: stretch; color: inherit; display: flex; flex: 1; gap: 8px; min-width: 0; text-decoration: none; }
+.provider-filter-link { color: inherit; flex-shrink: 0; text-decoration: none; }
+.provider-filter-link:hover { box-shadow: 0 0 0 2px #a9bcb1; }
+a.code-reward { color: inherit; text-decoration: none; }
 .offer:active { background: #edf2ef; }
 .offer--best { color: #3a7d55; }
 .offer--best:active { background: #edf2ef; }
@@ -882,10 +924,17 @@ a.merchant-name:hover { text-decoration: underline; }
       <input class="search" type="search" placeholder="Søk etter butikk..." autofocus>
       <button class="input-clear" type="button" aria-label="Tøm søk">✕</button>
     </div>
+    <div class="provider-picker" title="Filtrer etter fordelsprogram">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
+      <select id="provider-filter" aria-label="Filtrer etter fordelsprogram"><option value="">Alle fordelsprogrammer</option></select>
+    </div>
     <div class="input-wrap">
       <input class="global-sum" type="text" inputmode="decimal" placeholder="Sum">
       <button class="input-clear" type="button" aria-label="Tøm kjøpesum">✕</button>
     </div>
+  </div>
+  <div class="provider-filter-status" hidden>
+    <button class="active-provider" type="button"><span class="active-provider-name"></span><span aria-hidden="true">×</span></button>
   </div>
   <div class="bonus-chips-portal" style="display:none">
     <div class="chip-group">
@@ -941,8 +990,99 @@ const CRYPTO_SUBSCRIPTIONS = {
 
 let allMerchants = [];
 let curveDomains = new Set();
+let selectedProvider = "";
+let providerCounts = new Map();
 
 let currentAmount = 0;
+
+function getProviderFilterName(provider) {
+  if (provider === "cbn") return "Cashback Norge";
+  if (provider === "crypto") return "Crypto";
+  return PROVIDER_NAMES[provider] || provider;
+}
+
+function getMerchantProviders(merchant) {
+  const providers = new Set();
+  for (const offer of merchant.offers) {
+    if (["rabattkode", "dnb", "tfbank"].includes(offer.provider) && !offer.discountCode) continue;
+    providers.add(offer.provider);
+    const sourceProvider = getCodeSourceProvider(offer);
+    if (sourceProvider) providers.add(sourceProvider);
+  }
+  if (merchant.domains.some(domain => curveDomains.has(domain))) providers.add("curve");
+  if (merchant.domains.some(domain => CRYPTO_SUBSCRIPTIONS[domain])) providers.add("crypto");
+  return providers;
+}
+
+function matchesProvider(offer) {
+  return !selectedProvider || offer.provider === selectedProvider ||
+    (offer.provider === "rabattkode" && getCodeSourceProvider(offer) === selectedProvider);
+}
+
+function getProviderFilterHref(provider) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("provider", provider);
+  url.searchParams.delete("q");
+  return url.pathname + url.search + url.hash;
+}
+
+function providerFilterChip(provider, label = PROVIDER_NAMES[provider] || provider) {
+  const title = `Se alle ${getProviderFilterName(provider)}-fordeler`;
+  return `<a class="badge badge-${esc(provider)} provider-filter-link" href="${esc(getProviderFilterHref(provider))}" data-provider="${esc(provider)}" title="${esc(title)}" aria-label="${esc(title)}">${esc(label)}</a>`;
+}
+
+function syncFilterUrl(push = false) {
+  const url = new URL(window.location.href);
+  const query = document.querySelector(".search").value;
+  if (query) url.searchParams.set("q", query);
+  else url.searchParams.delete("q");
+  if (selectedProvider) url.searchParams.set("provider", selectedProvider);
+  else url.searchParams.delete("provider");
+  if (url.href !== window.location.href) {
+    history[push ? "pushState" : "replaceState"](null, "", url.toString());
+  }
+}
+
+function updateProviderFilter() {
+  const name = getProviderFilterName(selectedProvider);
+  const select = document.getElementById("provider-filter");
+  // Keep a known provider's deep link meaningful even if its offers have expired.
+  if (selectedProvider && ![...select.options].some(option => option.value === selectedProvider)) {
+    select.add(new Option(`${name} (0)`, selectedProvider));
+  }
+  select.value = selectedProvider;
+  document.querySelector(".provider-picker").classList.toggle("is-active", !!selectedProvider);
+  document.querySelector(".provider-picker").title = selectedProvider ? `Fordelsprogram: ${name}` : "Filtrer etter fordelsprogram";
+  document.querySelector(".provider-filter-status").hidden = !selectedProvider;
+  document.querySelector(".active-provider-name").textContent = name;
+  const activeChip = document.querySelector(".active-provider");
+  activeChip.className = `active-provider badge-${selectedProvider}`;
+  activeChip.setAttribute("aria-label", `Fjern ${name}-filter`);
+  document.querySelector(".search").placeholder = selectedProvider ? `Søk i ${name}...` : "Søk etter butikk...";
+}
+
+function setProviderFilter(provider, clearQuery = false) {
+  selectedProvider = provider;
+  const search = document.querySelector(".search");
+  if (clearQuery) search.value = "";
+  search.closest(".input-wrap").classList.toggle("has-value", search.value.length > 0);
+  updateProviderFilter();
+  syncFilterUrl(true);
+  render(search.value);
+}
+
+function readFilterUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const provider = params.get("provider") || "";
+  selectedProvider = /^[a-z0-9-]+$/.test(provider) &&
+    (providerCounts.has(provider) || Object.hasOwn(PROVIDER_NAMES, provider) || provider === "crypto") ? provider : "";
+  const search = document.querySelector(".search");
+  search.value = params.get("q") || "";
+  search.closest(".input-wrap").classList.toggle("has-value", search.value.length > 0);
+  updateProviderFilter();
+  syncFilterUrl();
+  render(search.value);
+}
 
 function applyProviderMeta(providers) {
   if (!providers || typeof providers !== "object") return;
@@ -979,6 +1119,30 @@ async function init() {
     }
   }
   allMerchants.sort((a, b) => a.name.localeCompare(b.name, "nb"));
+  // Count stores once per provider, including benefits shown in the code section.
+  for (const merchant of allMerchants) {
+    merchant.providers = getMerchantProviders(merchant);
+    for (const provider of merchant.providers) {
+      providerCounts.set(provider, (providerCounts.get(provider) || 0) + 1);
+    }
+  }
+  const providerSelect = document.getElementById("provider-filter");
+  [...providerCounts].sort(([a], [b]) => getProviderFilterName(a).localeCompare(getProviderFilterName(b), "nb"))
+    .forEach(([provider, count]) => providerSelect.add(new Option(`${getProviderFilterName(provider)} (${count})`, provider)));
+  providerSelect.addEventListener("change", () => setProviderFilter(providerSelect.value));
+  document.querySelector(".active-provider").addEventListener("click", () => {
+    setProviderFilter("");
+    document.querySelector(".search").focus({ preventScroll: true });
+  });
+  document.querySelector(".results").addEventListener("click", (event) => {
+    const chip = event.target.closest(".provider-filter-link");
+    if (!chip || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    setProviderFilter(chip.dataset.provider, true);
+    document.querySelector(".sticky-header").scrollIntoView({ block: "start" });
+    document.querySelector(".search").focus({ preventScroll: true });
+  });
+  window.addEventListener("popstate", readFilterUrl);
   setupAzBar();
   const searchEl = document.querySelector(".search");
   const sumEl = document.querySelector(".global-sum");
@@ -989,37 +1153,23 @@ async function init() {
     wrap.classList.toggle("has-value", input.value.length > 0);
   };
 
-  // Shareable search links: ?q=strim (or legacy #strim) opens the search
-  // directly; typing keeps the URL in sync via replaceState.
-  const syncUrlToQuery = (query) => {
-    const url = new URL(window.location.href);
-    if (query.length > 0) {
-      url.searchParams.set("q", query);
-    } else {
-      url.searchParams.delete("q");
-    }
-    history.replaceState(null, "", url.toString());
-  };
-
-  const initialQuery = new URLSearchParams(window.location.search).get("q") ?? "";
-  searchEl.value = initialQuery;
-  updateClear(searchEl, searchWrap);
-  render(initialQuery);
-  if (initialQuery.length > 0) {
+  // Provider changes create a history entry; typing updates the current entry.
+  readFilterUrl();
+  if (searchEl.value.length > 0 || selectedProvider) {
     searchEl.scrollIntoView({ block: "center" });
   }
 
   searchEl.addEventListener("input", (e) => {
     updateClear(e.target, searchWrap);
     render(e.target.value);
-    syncUrlToQuery(e.target.value);
+    syncFilterUrl();
   });
 
   searchWrap.querySelector(".input-clear").addEventListener("click", () => {
     searchEl.value = "";
     updateClear(searchEl, searchWrap);
     render("");
-    syncUrlToQuery("");
+    syncFilterUrl();
     searchEl.focus();
   });
 
@@ -1243,13 +1393,14 @@ function foldSearchText(value) {
 function render(query) {
   const q = foldSearchText(query.trim());
   const terms = q.split(/\s+/).filter(t => t.length > 0);
+  const merchants = allMerchants.filter(m => m.providers.size > 0 && (!selectedProvider || m.providers.has(selectedProvider)));
   let filtered;
   if (terms.length === 0) {
-    filtered = allMerchants;
+    filtered = merchants;
   } else {
     // All words must match name or a domain; rank exact > prefix > substring
     const scored = [];
-    for (const m of allMerchants) {
+    for (const m of merchants) {
       const name = foldSearchText(m.name);
       const domains = m.domains.map(foldSearchText);
       const haystack = name + " " + domains.join(" ");
@@ -1264,13 +1415,14 @@ function render(query) {
   }
 
   const countEl = document.querySelector(".count");
+  countEl.setAttribute("aria-live", "polite");
   countEl.textContent = q.length > 0
-    ? `${filtered.length} av ${allMerchants.length} butikker`
-    : `${allMerchants.length} butikker`;
+    ? `${filtered.length} av ${merchants.length} butikker`
+    : `${merchants.length} butikker`;
 
   const container = document.querySelector(".results");
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty">Ingen treff</div>';
+    container.innerHTML = `<div class="empty">${selectedProvider ? `Ingen treff i ${esc(getProviderFilterName(selectedProvider))}. Prøv et annet søk eller fjern filteret.` : "Ingen treff"}</div>`;
     return;
   }
 
@@ -1287,9 +1439,8 @@ function render(query) {
     const iconHtml = hasIcon
       ? `<img class="merchant-icon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
-    const cashbackOffers = m.offers.filter(o => o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
-    const codeOffers = m.offers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
-    if (cashbackOffers.length === 0 && codeOffers.length === 0) return "";
+    const cashbackOffers = m.offers.filter(o => matchesProvider(o) && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+    const codeOffers = m.offers.filter(o => matchesProvider(o) && (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
     const offerHtml = cashbackOffers.map((o, idx) => {
       const url = getSiteOfferUrl(o);
       const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
@@ -1315,21 +1466,21 @@ function render(query) {
       const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="ad-chip">Ad</span>` : "";
       const supportChipHtml = o.provider === "cbn" ? `<span class="support-chip">Støtt oss</span><span class="charity-chip">10% til veldedighet</span>` : "";
       const bestClass = idx === 0 ? " offer--best" : "";
-      return `<span class="offer-wrap">${tooltipHtml}<a class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}" href="${esc(url)}" target="_blank" rel="noreferrer">
+      return `<span class="offer-wrap">${tooltipHtml}<span class="offer${bestClass} ${cardOnly ? "offer-card-only" : ""}"><a class="offer-action" href="${esc(url)}" target="_blank" rel="noreferrer">
         <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
-        ${warnIconHtml}<span style="display:inline-flex;align-items:center;gap:6px;">${adChipHtml}${supportChipHtml}<span class="badge badge-${o.provider}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span></span>
-      </a></span>`;
+        ${warnIconHtml}${adChipHtml}${supportChipHtml}</a>${providerFilterChip(o.provider)}
+      </span></span>`;
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
     const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
-    const cryptoSelectedHtml = cryptoSubName ? (() => {
+    const cryptoSelectedHtml = cryptoSubName && (!selectedProvider || selectedProvider === "crypto") ? (() => {
       const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><a class="offer" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-crypto">Crypto</span></span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="ad-chip">Ad</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
     })() : "";
     const hasCurve = m.domains.some(d => curveDomains.has(d));
-    const curveSelectedHtml = hasCurve ? (() => {
+    const curveSelectedHtml = hasCurve && (!selectedProvider || selectedProvider === "curve") ? (() => {
       const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><a class="offer" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span style="display:inline-flex;align-items:center;gap:6px;"><span class="ad-chip">Ad</span><span class="badge badge-curve">Curve</span></span></a></span>`;
+      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="ad-chip">Ad</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
     })() : "";
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
     const codesHtml = codeOffers.map(o => {
@@ -1341,11 +1492,11 @@ function render(query) {
       const codeTooltipHtml = tooltipText ? `<span class="offer-tooltip">${formatTooltipHtml(tooltipText)}</span>` : "";
       const sourceProvider = getCodeSourceProvider(o);
       const sourceChipHtml = sourceProvider
-        ? `<a class="badge badge-${sourceProvider} code-source-badge" href="${esc(o.sourceUrl || o.activationUrl)}" target="_blank" rel="noreferrer" title="Åpne ${esc(PROVIDER_NAMES[sourceProvider] || sourceProvider)}-tilbudet">${esc(PROVIDER_NAMES[sourceProvider] || sourceProvider)}</a>`
+        ? providerFilterChip(sourceProvider)
         : "";
       return `<div class="code-item-row" data-net="0">
         ${codeTooltipHtml}<div class="code-item">
-          <span class="code-reward" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</span>
+          <a class="code-reward" href="${esc(o.sourceUrl || o.activationUrl)}" target="_blank" rel="noreferrer" title="Åpne tilbudet" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</a>
           <span class="code-copy-group"><span class="code-value">${esc(code)}</span><button class="code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button></span>
           <button class="vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
           <button class="vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
@@ -1367,10 +1518,10 @@ function render(query) {
       </div>
       <div class="offers">${offerHtml}</div>
       ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
-      <div class="codes-inline${codesHtml || hostname ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
+      <div class="codes-inline${selectedProvider && codesHtml ? " open" : ""}${(selectedProvider ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
         <div class="codes-toggle-wrap">
-          <button class="codes-toggle" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
-          <button class="codes-add-icon-btn" type="button"><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="codes-toggle${selectedProvider && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
+          <button class="codes-add-icon-btn" type="button" ${selectedProvider ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
         <div class="codes-items">
           <div class="codes-add-form">
@@ -1563,6 +1714,7 @@ function render(query) {
     // Load DB codes — deferred until section is first expanded
     let dbLoaded = false;
     const loadDbCodes = () => {
+      if (selectedProvider) return; // Community codes have no provider attribution.
       if (dbLoaded) return;
       dbLoaded = true;
       Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {

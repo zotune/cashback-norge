@@ -1,5 +1,6 @@
 import React, { useEffect, useState, type ReactElement } from "react";
 import type { CashbackOffer } from "../../shared/cashback.js";
+import { getProviderPageUrl, PROVIDER_COLORS, PROVIDER_NAMES } from "../../shared/provider-data.js";
 import {
   type GetOffersForUrlMessage,
   isOffersForUrlResponse,
@@ -321,6 +322,7 @@ const CARD_ONLY_TIP = "Betales med kort – kan ikke kombineres med ekstra cashb
 const AFFILIATE_DISCLOSURE_PROVIDERS = ["nettbonus", "spareborsen"];
 
 function OfferRow(props: { offer: CashbackOffer; amount: number; activated: boolean; onActivate: (offer: CashbackOffer) => void }): ReactElement {
+  const providerColors = PROVIDER_COLORS[props.offer.provider];
   const hasBreakdown = props.offer.provider === "cbn" ||
     props.offer.terms.length > 60 ||
     (props.offer.terms.includes("\n") && props.offer.terms.trim().length > 0);
@@ -354,49 +356,61 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
 
   return (
     <div className="offer-wrapper">
-      <a
-        className="offer"
-        href={props.offer.provider === "trumf" || props.offer.provider === "klarna" ? props.offer.sourceUrl : props.offer.activationUrl}
-        target="_blank"
-        rel="noreferrer"
-        onClick={() => props.onActivate(props.offer)}
-      >
-        <div>
-          <p className="merchant">
-            <span>{rewardText}</span>
-            <span
-              className="provider-wrap"
-            >
-              {props.activated && (
-                <span className="activation-badge-wrap">
-                  <span className="activation-badge" aria-label={`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  </span>
-                  <span className="activation-tooltip">
-                    {`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}
-                  </span>
-                </span>
+      <div className="offer">
+        <a
+          className="offer-action"
+          href={props.offer.provider === "trumf" || props.offer.provider === "klarna" ? props.offer.sourceUrl : props.offer.activationUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => props.onActivate(props.offer)}
+        >
+          <div>
+            <p className="merchant">
+              <span>{rewardText}</span>
+              {isCardOnly && (
+                <span className="offer-card-only-warn">⚠</span>
               )}
-              {shouldShowAffiliateDisclosure(props.offer) && (
-                <span className="ad-chip">Ad</span>
-              )}
-              {props.offer.provider === "cbn" && (
-                <span className="support-chip">Støtt oss</span>
-              )}
-              {props.offer.provider === "cbn" && (
-                <span className="charity-chip">10% til veldedighet</span>
-              )}
-              <span className={`provider-badge provider-${props.offer.provider}`}>
-                {formatProviderName(props.offer.provider)}
+            </p>
+            <p className="muted">{props.offer.merchantName}</p>
+          </div>
+        </a>
+        <span className="provider-wrap">
+          {props.activated && (
+            <span className="activation-badge-wrap">
+              <span className="activation-badge" aria-label={`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span className="activation-tooltip">
+                {`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}
               </span>
             </span>
-            {isCardOnly && (
-              <span className="offer-card-only-warn">⚠</span>
-            )}
-          </p>
-          <p className="muted">{props.offer.merchantName}</p>
-        </div>
-      </a>
+          )}
+          {shouldShowAffiliateDisclosure(props.offer) && (
+            <span className="ad-chip">Ad</span>
+          )}
+          {props.offer.provider === "cbn" && (
+            <span className="support-chip">Støtt oss</span>
+          )}
+          {props.offer.provider === "cbn" && (
+            <span className="charity-chip">10% til veldedighet</span>
+          )}
+          <a
+            className={`provider-badge provider-${props.offer.provider} provider-filter-link`}
+            style={{
+              backgroundColor: providerColors?.bg,
+              color: providerColors?.fg,
+              border: providerColors?.border === undefined ? undefined : `1px solid ${providerColors.border}`,
+            }}
+            href={getProviderPageUrl(props.offer.provider)}
+            target="_blank"
+            rel="noreferrer"
+            title={`Se alle ${props.offer.provider === "cbn" ? "Cashback Norge" : formatProviderName(props.offer.provider)}-fordeler`}
+            aria-label={`Se alle ${props.offer.provider === "cbn" ? "Cashback Norge" : formatProviderName(props.offer.provider)}-fordeler`}
+          >
+            {formatProviderName(props.offer.provider)}
+          </a>
+        </span>
+      </div>
       {tooltipContent !== null && (
         <div className="offer-tooltip">{tooltipContent}</div>
       )}
@@ -557,7 +571,7 @@ function formatProviderName(provider: CashbackOffer["provider"]): string {
     return "Kondis";
   }
 
-  return provider;
+  return PROVIDER_NAMES[provider] || provider;
 }
 
 function loadCurrentTabOffers(

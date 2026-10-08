@@ -1,4 +1,4 @@
-import { EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, PROVIDER_NAMES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_NAMES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
 import {
   calculateCashback,
   calculateCashbackMaxKr,
@@ -9024,8 +9024,13 @@ function createProviderBadgeWithActivation(
   const providerWrap = document.createElement("span");
   providerWrap.className = "provider-wrap";
 
-  const providerBadge = document.createElement("span");
-  providerBadge.className = `provider-badge provider-${offer.provider}`;
+  const providerBadge = document.createElement("a");
+  providerBadge.className = `provider-badge provider-${offer.provider} provider-filter-link`;
+  providerBadge.href = getProviderPageUrl(offer.provider);
+  providerBadge.target = "_blank";
+  providerBadge.rel = "noreferrer";
+  providerBadge.title = `Se alle ${offer.provider === "cbn" ? "Cashback Norge" : formatProviderName(offer.provider)}-fordeler`;
+  providerBadge.setAttribute("aria-label", providerBadge.title);
   providerBadge.textContent = formatProviderName(offer.provider);
 
   if (isOfferActivated(offer, activeOfferKey)) {
@@ -9901,6 +9906,20 @@ function renderNotice(
     .offer-link .provider-badge {
       grid-column: 3;
     }
+    .offer-action {
+      align-items: center;
+      align-self: stretch;
+      color: inherit;
+      display: flex;
+      gap: 8px;
+      grid-column: 1 / 3;
+      min-width: 0;
+      text-decoration: none;
+    }
+    .offer-action .offer-label { flex: 1; }
+    .provider-filter-link { color: inherit; text-decoration: none; }
+    .provider-filter-link:hover { box-shadow: 0 0 0 2px #a9bcb1; }
+    .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
     .provider-wrap {
       align-items: center;
       display: inline-flex;
@@ -10697,6 +10716,8 @@ function renderNotice(
       padding: 5px 9px;
     }
     .code-reward {
+      color: inherit;
+      text-decoration: none;
       font-weight: 700;
       white-space: nowrap;
     }
@@ -11020,9 +11041,11 @@ function renderNotice(
   for (const [offerIdx, currentOffer] of mainOffers.entries()) {
     const wrapper = document.createElement("div");
     wrapper.className = "offer-link-wrapper";
+    const offerRow = document.createElement("div");
     const offerLink = document.createElement("a");
     const isBestOffer = offerIdx === 0;
-    offerLink.className = isBestOffer ? "offer-link offer-link--best" : "offer-link";
+    offerRow.className = isBestOffer ? "offer-link offer-link--best" : "offer-link";
+    offerLink.className = "offer-action";
     offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
     offerLink.rel = "noreferrer";
@@ -11047,16 +11070,17 @@ function renderNotice(
       const warnIcon = document.createElement("span");
       warnIcon.className = "card-only-warn";
       warnIcon.textContent = "⚠";
-      offerLink.append(offerLabel, warnIcon, providerWrap);
+      offerLink.append(offerLabel, warnIcon);
     } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
       const appChip = document.createElement("span");
       appChip.className = "app-chip";
       appChip.textContent = "App";
-      offerLink.append(offerLabel, appChip, providerWrap);
+      offerLink.append(offerLabel, appChip);
     } else {
-      offerLink.append(offerLabel, providerWrap);
+      offerLink.append(offerLabel);
     }
-    wrapper.append(offerLink);
+    offerRow.append(offerLink, providerWrap);
+    wrapper.append(offerRow);
     offerList.append(wrapper);
   }
   sumInput.addEventListener("input", () => {
@@ -11633,8 +11657,12 @@ function renderNotice(
     const item = document.createElement("div");
     item.className = "code-item";
     if (dbId !== undefined) item.dataset.codeId = String(dbId);
-    const reward = document.createElement("span");
+    const reward = document.createElement("a");
     reward.className = "code-reward";
+    reward.href = codeOffer.sourceUrl || codeOffer.activationUrl;
+    reward.target = "_blank";
+    reward.rel = "noreferrer";
+    reward.title = "Åpne tilbudet";
     const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(codeOffer.reward.trim());
     if (/%/.test(codeOffer.reward)) {
       reward.dataset.pct = String(parseRewardNum(codeOffer.reward));
@@ -11691,13 +11719,13 @@ function renderNotice(
     const sourceProvider = getCodeSourceProvider(codeOffer);
     if (sourceProvider === undefined) return undefined;
 
-    const sourceUrl = codeOffer.sourceUrl || codeOffer.activationUrl;
     const chip = document.createElement("a");
-    chip.className = `provider-badge provider-${sourceProvider} code-source-badge`;
-    chip.href = sourceUrl;
+    chip.className = `provider-badge provider-${sourceProvider} code-source-badge provider-filter-link`;
+    chip.href = getProviderPageUrl(sourceProvider);
     chip.target = "_blank";
     chip.rel = "noreferrer";
-    chip.title = `Åpne ${formatProviderName(sourceProvider)}-tilbudet`;
+    chip.title = `Se alle ${formatProviderName(sourceProvider)}-fordeler`;
+    chip.setAttribute("aria-label", chip.title);
     chip.textContent = formatProviderName(sourceProvider);
     return chip;
   };
