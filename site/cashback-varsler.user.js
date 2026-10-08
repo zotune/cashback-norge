@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1791456127
+// @version      1791462232
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -14727,7 +14727,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
   `;
     style.textContent += buildRuntimeProviderCss();
-    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && o.provider !== "dnb" && o.provider !== "tfbank");
+    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const priceMatch = priceMatches[0];
     const bestRegionPrice = regionPrices?.prices[0];
