@@ -1,29 +1,28 @@
-.iphone-guide { scroll-margin-top: 125px; margin: 14px 0 22px; padding: 20px 16px 16px; border: 1px solid #d6e1dc; border-radius: 18px; background: #fff; }
-.iphone-guide[hidden] { display: none !important; }
-.guide-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-.guide-heading h2 { font-size: 20px; letter-spacing: -.3px; }
-.guide-heading p { color: #5d6b71; font-size: 13px; margin-top: 4px; }
-.guide-close { border: 0; border-radius: 50%; background: #eef3f0; color: #5d6b71; font: inherit; font-size: 22px; width: 44px; height: 44px; cursor: pointer; flex: 0 0 auto; }
-.guide-progress { color: #75847d; font-size: 12px; margin: 16px 0 7px; }
-.guide-slide { flex: 0 0 100%; min-width: 0; }
-.guide-slide h3 { font-size: 20px; line-height: 1.3; margin-bottom: 10px; }
-.guide-slides { overflow: hidden; touch-action: pan-y; user-select: none; cursor: grab; transition: height .3s ease; }
-.guide-track { display: flex; align-items: flex-start; transition: transform .32s cubic-bezier(.22, .68, .2, 1); }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7faf8; color: #172026; -webkit-font-smoothing: antialiased; }
+.guide-page { max-width: 480px; margin: 0 auto; padding: 8px 16px max(20px, env(safe-area-inset-bottom)); }
+.guide-back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 4px; font-size: 13px; color: #5d6b71; text-decoration: none; }
+.guide-back:hover { text-decoration: underline; }
+.guide-slide { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.guide-slide h2 { font-size: 20px; line-height: 1.3; margin-bottom: 10px; }
+.guide-text { margin: 18px 2px 0; }
+.guide-slides { display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; user-select: none; cursor: grab; }
+.guide-slides::-webkit-scrollbar { display: none; }
 .guide-slides.is-dragging { cursor: grabbing; }
-.guide-slides.is-dragging .guide-track { transition: none; }
+.guide-slides.is-dragging { scroll-snap-type: none; }
 .guide-dots { display: flex; justify-content: center; flex: 1; min-width: 144px; max-width: 240px; }
 .guide-nav .guide-dot { display: grid; place-items: center; flex: 1; min-width: 24px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }
 .guide-dot span { width: 8px; height: 8px; border-radius: 50%; background: #cedbd3; transition: width .2s ease, background .2s ease; }
 .guide-dot[aria-current="step"] span { width: 22px; border-radius: 6px; background: #22794f; }
-.guide-instruction { font-size: 15px; color: #45565d; line-height: 1.6; }
+.guide-instruction { font-size: 16px; color: #45565d; line-height: 1.6; }
 .guide-instruction strong { color: #172026; font-weight: 650; }
-.guide-instruction a, .guide-note a { color: #22794f; }
+.guide-instruction a, .guide-note a { color: #22794f; text-decoration: underline; text-underline-offset: 2px; }
 .guide-note { font-size: 12px; color: #75847d; line-height: 1.55; margin-top: 9px; }
 .guide-note:empty { display: none; }
 .guide-link { display: flex; align-items: center; gap: 8px; background: #eef4f0; border-radius: 9px; padding: 10px; margin-top: 10px; }
 .guide-link code { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; flex: 1; min-width: 0; user-select: all; cursor: text; }
 .guide-copy { border: 0; border-radius: 7px; background: #fff; color: #22794f; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; min-height: 44px; padding: 7px 10px; }
-.guide-demo { background: #eef4f0; border-radius: 14px; margin-top: 18px; padding: 18px 8px; overflow: hidden; }
+.guide-demo { background: #eef4f0; border-radius: 14px; padding: 18px 8px; overflow: hidden; }
 .demo-phone { width: min(100%, 300px); height: 284px; margin: auto; position: relative; border: 6px solid #26342e; border-radius: 25px; box-shadow: 0 8px 16px #1e493c15; overflow: hidden; background: #f5f5f7; color: #1c2226; font-size: 13px; }
 .demo-phone * { pointer-events: none; }
 .demo-phone::before { content: ''; display: block; width: 58px; height: 9px; margin: 0 auto; border-radius: 0 0 9px 9px; background: #26342e; }
@@ -88,18 +87,14 @@
 .demo-phase .demo-tap::after { animation-duration: 3s; }
 .demo-settings .demo-tab::after { animation: guide-settings-tab 9s infinite; }
 .demo-settings .demo-row::after { left: 82%; animation: guide-settings-switch 9s infinite; }
-.guide-animation-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 5px; }
-.guide-animation-tools span { color: #75847d; font-size: 11px; }
-.guide-animation-tools button { border: 0; background: none; color: #5d6b71; cursor: pointer; font: inherit; font-size: 11px; min-height: 36px; padding: 5px 0 5px 8px; }
-.guide-nav { display: flex; gap: 4px; align-items: center; justify-content: space-between; }
-.guide-nav button, .guide-install { border: 1px solid #d6e1dc; border-radius: 10px; background: #f7faf8; color: #43564d; cursor: pointer; font: inherit; font-size: 14px; font-weight: 650; min-height: 46px; padding: 11px 17px; }
+.guide-nav { display: flex; gap: 4px; align-items: center; justify-content: space-between; margin-top: 18px; }
+.guide-nav button { border: 1px solid #d6e1dc; border-radius: 10px; background: #f7faf8; color: #43564d; cursor: pointer; font: inherit; font-size: 14px; font-weight: 650; min-height: 46px; padding: 11px 17px; }
 .guide-nav .guide-prev, .guide-nav .guide-next { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; font-size: 22px; flex: 0 0 auto; }
 .guide-nav button:disabled { opacity: .4; cursor: default; }
-.guide-nav .guide-next, .guide-install { background: #22794f; border-color: #22794f; color: #fff; }
-.guide-install { display: inline-block; text-decoration: none; margin-top: 10px; }
-.iphone-guide button:focus-visible, .guide-install:focus-visible { outline: 2px solid #22794f; outline-offset: 3px; }
+.guide-nav .guide-next { background: #22794f; border-color: #22794f; color: #fff; }
+.guide-back:focus-visible, .guide-slides:focus-visible, .iphone-guide button:focus-visible, .guide-instruction a:focus-visible { outline: 2px solid #22794f; outline-offset: 2px; }
 .guide-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.iphone-guide.is-paused .demo-phone *, .iphone-guide.is-paused .demo-phone *::after,
+.iphone-guide.is-background .demo-phone *, .iphone-guide.is-background .demo-phone *::after,
 .guide-slide[aria-hidden="true"] .demo-phone *, .guide-slide[aria-hidden="true"] .demo-phone *::after { animation-play-state: paused !important; }
 @keyframes guide-tap { 0%, 12%, 50%, 100% { opacity: 0; } 23%, 35% { opacity: 1; } 40% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); } }
 @keyframes guide-toggle { 0%, 40%, 100% { background: #727279; } 46%, 88% { background: #34c759; } }
@@ -111,9 +106,7 @@
 @keyframes guide-phase-three { 0%, 64%, 100% { opacity: 0; visibility: hidden; } 68%, 96% { opacity: 1; visibility: visible; } }
 @keyframes guide-benefit { 0%, 20%, 100% { opacity: 0; transform: translateY(8px); } 32%, 88% { opacity: 1; transform: translateY(0); } }
 @media (max-width: 350px) {
-  .iphone-guide { padding-left: 12px; padding-right: 12px; }
-  .guide-heading h2 { font-size: 19px; }
-  .guide-heading p { font-size: 12px; }
+  .guide-page { padding-left: 12px; padding-right: 12px; }
   .demo-content { padding-left: 10px; padding-right: 10px; }
   .demo-app { gap: 7px; }
   .demo-app strong { font-size: 14px; }
@@ -121,12 +114,11 @@
   .demo-pill { padding: 8px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .iphone-guide:not(.motion-enabled) .guide-track, .iphone-guide:not(.motion-enabled) .guide-slides,
-  .iphone-guide:not(.motion-enabled) .guide-dot span { transition: none; }
-  .iphone-guide:not(.motion-enabled) *, .iphone-guide:not(.motion-enabled) *::after { animation: none !important; }
-  .iphone-guide:not(.motion-enabled) .demo-tap::after { display: none; }
-  .iphone-guide:not(.motion-enabled) .demo-phase { opacity: 0 !important; visibility: hidden !important; }
-  .iphone-guide:not(.motion-enabled) .demo-phase.phase-three { opacity: 1 !important; visibility: visible !important; }
-  .iphone-guide:not(.motion-enabled) .demo-toggle.animated { background: #34c759; }
-  .iphone-guide:not(.motion-enabled) .demo-toggle.animated::after { left: 18px; }
+  .guide-dot span { transition: none; }
+  .iphone-guide *, .iphone-guide *::after { animation: none !important; }
+  .demo-tap::after { display: none; }
+  .demo-phase { opacity: 0 !important; visibility: hidden !important; }
+  .demo-phase.phase-three { opacity: 1 !important; visibility: visible !important; }
+  .demo-toggle.animated { background: #34c759; }
+  .demo-toggle.animated::after { left: 18px; }
 }

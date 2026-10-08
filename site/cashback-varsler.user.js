@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1791462232
+// @version      1791464863
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
 // @match        *://*/*
+// @exclude      *://cashbacknorge.no/*
+// @exclude      *://www.cashbacknorge.no/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM.getValue
@@ -7744,8 +7746,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     "kassal.app"
   ]);
   function startContentScript() {
+    if (isNoticeBlockedHost(CURRENT_HOST)) return;
     installOfferActivationClickTracker();
     chrome.runtime.onMessage.addListener((message) => {
+      if (isNoticeBlockedHost(CURRENT_HOST)) {
+        clearNotice();
+        return;
+      }
       if (isCashbackFoundMessage(message)) {
         requestCurrentOffers();
         return;
@@ -7774,6 +7781,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     installPanFlightsAutoSearch();
   }
   function renderNoticeWithStoredState(offers, priceMatches = [], regionPrices) {
+    if (isNoticeBlockedHost(CURRENT_HOST)) {
+      clearNotice();
+      return;
+    }
     const isUserscript = chrome.runtime.id === void 0;
     chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, REGION_PRICES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
       const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
@@ -7789,6 +7800,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     });
   }
   function requestCurrentOffers() {
+    if (isNoticeBlockedHost(CURRENT_HOST)) {
+      clearNotice();
+      return;
+    }
     void renderCurrentContext();
   }
   function installDynamicProductPageRefresh() {
@@ -7860,6 +7875,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     scheduleRefresh();
+  }
+  function isNoticeBlockedHost(hostname) {
+    return hostname === "cashbacknorge.no";
   }
   function installPanFlightsAutoSearch() {
     const parsedUrl = parseUrl(window.location.href);

@@ -26,6 +26,8 @@ const USERSCRIPT_BANNER = `\
 // @author       zotune
 // @icon         ${PAGES_URL}/favicon.png
 // @match        *://*/*
+// @exclude      *://cashbacknorge.no/*
+// @exclude      *://www.cashbacknorge.no/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM.getValue

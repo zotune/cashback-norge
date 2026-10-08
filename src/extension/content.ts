@@ -697,6 +697,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "kassal.app",
 ]);
 function startContentScript(): void {
+  if (isNoticeBlockedHost(CURRENT_HOST)) return;
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
     if (isNoticeBlockedHost(CURRENT_HOST)) {
@@ -852,7 +853,7 @@ function installDynamicProductPageRefresh(): void {
 }
 
 function isNoticeBlockedHost(hostname: string): boolean {
-  return false;
+  return hostname === "cashbacknorge.no";
 }
 
 function installPanFlightsAutoSearch(): void {

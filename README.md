@@ -21,7 +21,7 @@ Viser cashback-tilbud automatisk når du handler på nett i Norge.
 5. Åpne **Safari** igjen → sidemenyen → **Stay** → **Tillat alltid… / Always Allow…** → **Tillat alltid på alle nettsteder / Always Allow on Every Website**. Gå videre hvis dette allerede er gjort i Stay sin egen guide.
 6. Besøk en butikk fra oversikten i **Safari** — Cashback Norge dukker opp nederst til venstre på skjermen.
 
-Se den [visuelle guiden med animasjoner](https://cashbacknorge.no/#iphone-guide). Menynavnene i Stay er på engelsk; Safari følger språket på enheten.
+Se den [visuelle guiden med animasjoner](https://cashbacknorge.no/iphone/). Menynavnene i Stay er på engelsk; Safari følger språket på enheten.
 
 ## Chrome / Firefox (desktop)
 
