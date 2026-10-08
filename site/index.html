@@ -1096,7 +1096,7 @@ function applyProviderMeta(providers) {
 async function init() {
   renderTips();
   setupBonusToggle();
-  const res = await fetch("cashback-index.json");
+  const res = await fetch("cashback-index.json", { cache: "no-cache" });
   const data = await res.json();
   applyProviderMeta(data.providers);
   allMerchants = groupByMerchant(data.offers);

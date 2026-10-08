@@ -80,7 +80,7 @@
     next.textContent = current === steps.length - 1 ? 'Ferdig ✓' : 'Neste →';
     guide.querySelector('.guide-progress').textContent = `${current + 1} / ${steps.length}`;
     if (announce) guide.querySelector('#guide-announcement').textContent = `Steg ${current + 1} av ${steps.length}: ${steps[current].title}`;
-    if (announce && !guide.hidden) guide.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (announce && !guide.hidden) guide.scrollIntoView({ block: 'start', behavior: 'auto' });
     try { localStorage.setItem('cashback-iphone-step', String(current)); } catch { /* Optional. */ }
   };
   const setOpen = (open) => {
@@ -93,7 +93,7 @@
       document.querySelector('.bonus-toggle').classList.remove('open');
       try { localStorage.setItem('cashback-bonus-open', '0'); } catch { /* Optional. */ }
       setStep(current, false);
-      guide.scrollIntoView({ block: 'start', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+      guide.scrollIntoView({ block: 'start', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
     }
   };
   toggle.addEventListener('click', () => setOpen(guide.hidden || guide.style.display === 'none'));
