@@ -48,10 +48,10 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .install-link svg { width: 17px; height: 17px; flex-shrink: 0; }
 .install-chrome { color: #285d9b; background: #eaf2ff; border-color: #cdddf3; }
 .install-iphone { color: #735294; background: #f2eafb; border-color: #ddcbed; }
+.install-android { color: #28774d; background: #e7f4eb; border-color: #bfdfca; }
 .install-link small { font-size: 10px; font-weight: 500; opacity: .8; }
 .install-link:hover { filter: brightness(.97); }
 .install-link:focus-visible, .social-link:focus-visible { outline: 2px solid #22794f; outline-offset: 3px; }
-.android-guide-link { display: flex; width: fit-content; align-items: center; min-height: 32px; margin: -12px auto 12px; color: #5d6b71; font-size: 11px; text-underline-offset: 3px; }
 @media (max-width: 350px) {
   .install-links { gap: 6px; }
   .install-link { padding: 8px 7px; font-size: 12px; gap: 5px; }
@@ -937,8 +937,8 @@ a.code-reward { color: inherit; text-decoration: none; }
   <nav class="install-links" aria-label="Installer cashback-varsler">
     <a class="install-link install-chrome" href="https://chromewebstore.google.com/detail/jlephlinnjimkglbodkelonjohanlbmh" target="_blank" rel="noopener noreferrer" aria-label="Installer i Chrome på PC eller Mac"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.8"/><path d="M12 8.2h8.2M8.7 14 4.5 6.8m9.1 8.7L9.4 20.6"/></svg>Chrome <small>PC/Mac</small></a>
     <a id="iphone-guide-btn" class="install-link install-iphone" href="iphone/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4m-3 14h2"/></svg>iPhone/iPad</a>
+    <a id="android-guide-btn" class="install-link install-android" href="android/" aria-label="Installer på Android med Firefox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 5-2-3m12 3 2-3M4 10a8 8 0 0 1 16 0zM4 13v6h16v-6M8 19v3m8-3v3M1 12v6m22-6v6"/><circle cx="8" cy="7" r=".7" fill="currentColor" stroke="none"/><circle cx="16" cy="7" r=".7" fill="currentColor" stroke="none"/></svg>Android <small>Firefox</small></a>
   </nav>
-  <a id="android-guide-btn" class="android-guide-link" href="android/">Android med Firefox</a>
   <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
