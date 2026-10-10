@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1791641575
+// @version      1791641813
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=bear-1
@@ -14696,6 +14696,8 @@ ${darkProviderCss}
     }
     .price-match-section,
     .region-prices-section {
+      display: grid;
+      gap: 4px;
       margin-top: -4px;
       padding: 6px 0 4px;
     }
@@ -14708,12 +14710,13 @@ ${darkProviderCss}
       font: inherit;
       font-size: 11px;
       gap: 4px;
+      justify-content: flex-start;
       line-height: 1;
-      margin-bottom: 5px;
+      margin-bottom: 1px;
       padding: 0;
+      text-align: left;
       width: 100%;
     }
-    .price-match-toggle:hover,
     .price-match-toggle-arrow,
     .region-prices-toggle-arrow {
       display: inline-block;
@@ -14776,12 +14779,6 @@ ${darkProviderCss}
     .region-price-card.region-price-card--best .region-price-country,
     .region-price-card.region-price-card--best .region-price-nok {
       color: var(--cbn-accent, #3a7d55);
-    }
-    .price-match-card + .price-match-card,
-    .region-price-card + .region-price-card,
-    .price-match-section .cbn-tooltip-row + .cbn-tooltip-row,
-    .region-prices-section .cbn-tooltip-row + .cbn-tooltip-row {
-      margin-top: 4px;
     }
     .price-match-title,
     .region-price-title {
