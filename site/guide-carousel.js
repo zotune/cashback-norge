@@ -5,7 +5,7 @@ window.mountInstallGuide = ({ guide, steps, storageKey }) => {
   const prefix = guide.id;
   const status = '<div class="demo-status"><span>9:41</span><span>▰ ▰ ●</span></div>';
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  guide.innerHTML = `<div class="guide-slides" tabindex="0" aria-label="Installasjonssteg">${steps.map((step, i) => `<section class="guide-slide" id="${prefix}-step-${i}" aria-labelledby="${prefix}-title-${i}"><div class="guide-demo" aria-hidden="true"><div class="demo-phone ${step.dark ? 'demo-stay' : ''} ${step.phoneClass || ''}">${status}${step.demo}</div></div><div class="guide-text"><h2 id="${prefix}-title-${i}">${step.title}</h2><p class="guide-instruction">${step.instruction}</p>${step.extra || ''}${step.note ? `<p class="guide-note">${step.note}</p>` : ''}</div></section>`).join('')}</div>
+  guide.innerHTML = `<div class="guide-slides" tabindex="0" aria-label="Installasjonssteg">${steps.map((step, i) => `<section class="guide-slide" id="${prefix}-step-${i}" aria-labelledby="${prefix}-title-${i}"><div class="guide-demo" aria-hidden="true"><div class="demo-phone ${step.dark ? 'demo-stay' : ''} ${step.phoneClass || ''}">${status}${step.demo}</div><div class="guide-progress" title="Animasjonen gjentas hvert 9. sekund"><span></span></div></div><div class="guide-text"><h2 id="${prefix}-title-${i}">${step.title}</h2><p class="guide-instruction">${step.instruction}</p>${step.extra || ''}${step.note ? `<p class="guide-note">${step.note}</p>` : ''}</div></section>`).join('')}</div>
     <div class="guide-nav"><button class="guide-prev" type="button" aria-label="Forrige steg" title="Forrige steg">←</button><nav class="guide-dots" aria-label="Installasjonssteg">${steps.map((step, i) => `<button class="guide-dot" type="button" data-step="${i}" aria-label="Steg ${i + 1}: ${step.title}" aria-controls="${prefix}-step-${i}"><span></span></button>`).join('')}</nav><button class="guide-next" type="button"></button></div><p class="guide-sr" aria-live="polite"></p>`;
   const slides = [...guide.querySelectorAll('.guide-slide')];
   const dots = [...guide.querySelectorAll('.guide-dot')];
@@ -167,7 +167,9 @@ window.mountInstallGuide = ({ guide, steps, storageKey }) => {
   viewport.addEventListener('pointerup', (event) => finishDrag(event), { passive: true });
   viewport.addEventListener('pointercancel', (event) => finishDrag(event, true), { passive: true });
   viewport.addEventListener('lostpointercapture', (event) => finishDrag(event, true), { passive: true });
-  document.addEventListener('visibilitychange', () => guide.classList.toggle('is-background', document.hidden));
+  const syncVisibility = () => guide.classList.toggle('is-background', document.hidden);
+  document.addEventListener('visibilitychange', syncVisibility);
+  syncVisibility();
   window.addEventListener('pagehide', () => {
     clearTimeout(settleTimer);
     cancelAnimationFrame(alignFrame);

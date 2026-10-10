@@ -77,7 +77,7 @@
   else {
     // A cached v3 guide page does not yet include the shared carousel script.
     const script = document.createElement('script');
-    script.src = '../guide-carousel.js?v=1';
+    script.src = '../guide-carousel.js?v=2';
     script.onload = mount;
     document.head.append(script);
   }
