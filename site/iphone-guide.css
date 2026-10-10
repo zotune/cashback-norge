@@ -1,7 +1,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7faf8; color: #172026; -webkit-font-smoothing: antialiased; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--cbn-bg, #f7faf8); color: var(--cbn-text, #172026); -webkit-font-smoothing: antialiased; }
 .guide-page { max-width: 480px; margin: 0 auto; padding: 8px 16px max(20px, env(safe-area-inset-bottom)); }
-.guide-back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 4px; font-size: 13px; color: #5d6b71; text-decoration: none; }
+.guide-back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 4px; font-size: 13px; color: var(--cbn-muted, #5d6b71); text-decoration: none; }
 .guide-back:hover { text-decoration: underline; }
 .guide-slide { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
 .guide-slide h2 { font-size: 20px; line-height: 1.3; margin-bottom: 10px; }
@@ -11,20 +11,20 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
 .guide-slides.is-dragging { cursor: grabbing; }
 .guide-slides.is-dragging { scroll-snap-type: none; }
 .guide-dots { display: flex; justify-content: center; flex: 1; min-width: 144px; max-width: 240px; }
-.guide-nav .guide-dot { display: grid; place-items: center; flex: 1; min-width: 24px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }
-.guide-dot span { width: 8px; height: 8px; border-radius: 50%; background: #cedbd3; transition: width .2s ease, background .2s ease; }
-.guide-dot[aria-current="step"] span { width: 22px; border-radius: 6px; background: #22794f; }
-.guide-instruction { font-size: 16px; color: #45565d; line-height: 1.6; }
-.guide-instruction strong { color: #172026; font-weight: 650; }
-.guide-instruction a, .guide-note a { color: #22794f; text-decoration: underline; text-underline-offset: 2px; }
-.guide-note { font-size: 12px; color: #75847d; line-height: 1.55; margin-top: 9px; }
+.guide-nav .guide-dot { display: grid; place-items: center; flex: 1; min-width: 24px; height: 44px; min-height: 44px; padding: 0;  border-radius: 12px; background: none; cursor: pointer; }
+.guide-dot span { width: 8px; height: 8px; border-radius: 50%; background: var(--cbn-plate-down); transition: width .2s ease, background .2s ease; }
+.guide-dot[aria-current="step"] span { width: 22px; border-radius: 6px; background: var(--cbn-accent); }
+.guide-instruction { font-size: 16px; color: var(--cbn-muted, #45565d); line-height: 1.6; }
+.guide-instruction strong { color: var(--cbn-text, #172026); font-weight: 650; }
+.guide-instruction a, .guide-note a { color: var(--cbn-accent, #22794f); text-decoration: underline; text-underline-offset: 2px; }
+.guide-note { font-size: 12px; color: var(--cbn-muted, #75847d); line-height: 1.55; margin-top: 9px; }
 .guide-note:empty { display: none; }
-.guide-link { display: flex; align-items: center; gap: 8px; background: #eef4f0; border-radius: 9px; padding: 10px; margin-top: 10px; }
+.guide-link { display: flex; align-items: center; gap: 8px;   padding: 10px; margin-top: 10px; }
 .guide-link code { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; flex: 1; min-width: 0; user-select: all; cursor: text; }
-.guide-copy { border: 0; border-radius: 7px; background: #fff; color: #22794f; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; min-height: 44px; padding: 7px 10px; }
-.guide-demo { --guide-loop: 9s; position: relative; background: #eef4f0; border-radius: 14px; padding: 18px 8px; overflow: hidden; }
-.guide-progress { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #d5e5db; }
-.guide-progress span { display: block; height: 100%; background: #22794f; transform-origin: left; animation: guide-progress var(--guide-loop) linear infinite; }
+.guide-copy {     font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; min-height: 44px; padding: 7px 10px; }
+.guide-demo { --guide-loop: 9s; position: relative; background: var(--cbn-soft, #eef4f0); border-radius: 14px; padding: 18px 8px; overflow: hidden; }
+.guide-progress { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--cbn-plate); }
+.guide-progress span { display: block; height: 100%; background: var(--cbn-accent); transform-origin: left; animation: guide-progress var(--guide-loop) linear infinite; }
 .demo-phone { width: min(100%, 300px); height: 284px; margin: auto; position: relative; border: 6px solid #26342e; border-radius: 25px; box-shadow: 0 8px 16px #1e493c15; overflow: hidden; background: #f5f5f7; color: #1c2226; font-size: 13px; }
 .demo-phone * { pointer-events: none; }
 .demo-phone::before { content: ''; display: block; width: 58px; height: 9px; margin: 0 auto; border-radius: 0 0 9px 9px; background: #26342e; }
@@ -107,12 +107,11 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
 .demo-settings .demo-tab::after { animation: guide-settings-tab var(--guide-loop) infinite; }
 .demo-settings .demo-row::after { left: 82%; animation: guide-settings-switch var(--guide-loop) infinite; }
 .guide-nav { display: flex; gap: 4px; align-items: center; justify-content: space-between; margin-top: 18px; }
-.guide-nav button { border: 1px solid #d6e1dc; border-radius: 10px; background: #f7faf8; color: #43564d; cursor: pointer; font: inherit; font-size: 14px; font-weight: 650; min-height: 46px; padding: 11px 17px; }
+.guide-nav button { font: inherit; font-size: 14px; font-weight: 650; min-height: 46px; padding: 11px 17px; }
 .guide-nav .guide-prev, .guide-nav .guide-next { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; font-size: 22px; flex: 0 0 auto; }
 .guide-nav button:disabled { opacity: .4; cursor: default; }
-.guide-nav .guide-next { background: #22794f; border-color: #22794f; color: #fff; }
 .guide-back:focus-visible, .guide-slides:focus-visible, .install-guide button:focus-visible, .guide-instruction a:focus-visible { outline: 2px solid #22794f; outline-offset: 2px; }
-.guide-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.guide-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;  }
 .install-guide.is-background .guide-demo *, .install-guide.is-background .guide-demo *::after { animation-play-state: paused !important; }
 /* Re-entering a step starts its demo and progress strip together at zero. */
 .guide-slide[aria-hidden="true"] .guide-demo *, .guide-slide[aria-hidden="true"] .guide-demo *::after { animation: none !important; }

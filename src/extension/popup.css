@@ -1,47 +1,40 @@
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
   min-width: 320px;
-  color: #172026;
-  background: #f7faf8;
+  color: var(--cbn-text, #172026);
+  background: var(--cbn-bg, #f7faf8);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-
 .popup {
   display: grid;
   gap: 12px;
   padding: 16px;
 }
-
 .eyebrow,
 .muted {
-  color: #5d6b71;
+  color: var(--cbn-muted, #5d6b71);
   font-size: 12px;
   line-height: 1.35;
   margin: 0;
   overflow-wrap: anywhere;
 }
-
 h1 {
   font-size: 19px;
   line-height: 1.15;
   margin: 0;
 }
-
 .offers {
   display: grid;
   gap: 6px;
 }
-
 .offer-wrapper {
   position: relative;
 }
-
 .offer-tooltip {
-  background: #1a1a2e;
+  background: var(--cbn-tooltip, #1a1a2e);
   border-radius: 8px;
   bottom: calc(100% + 6px);
   color: #e0e0e0;
@@ -57,23 +50,17 @@ h1 {
   width: max-content;
   z-index: 10;
 }
-
 .offer-wrapper:hover > .offer-tooltip {
   display: block;
 }
-
 .offer-card-only-warn {
-  color: #b0bec5;
+  color: var(--cbn-subtle, #b0bec5);
   cursor: help;
   font-size: 11px;
   margin-left: 4px;
 }
-
 .offer {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #d6e1dc;
-  border-radius: 8px;
   color: inherit;
   display: grid;
   gap: 10px;
@@ -82,42 +69,27 @@ h1 {
   padding: 8px 10px;
   text-decoration: none;
 }
-
 .offer-action { color: inherit; min-width: 0; text-decoration: none; }
 .provider-filter-link { color: inherit; text-decoration: none; }
-.provider-filter-link:hover { box-shadow: 0 0 0 2px #a9bcb1; }
 .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
-
 .popup-header {
   align-items: start;
   display: flex;
   gap: 8px;
   justify-content: space-between;
 }
-
 .sum-input {
-  background: #ffffff;
-  border: 1px solid #d6e1dc;
-  border-radius: 5px;
-  color: #172026;
   font-family: inherit;
   font-size: 12px;
   height: 26px;
-  outline: none;
   padding: 0 6px;
   text-align: right;
   width: 68px;
 }
-
-.sum-input:focus {
-  border-color: #1f8f5f;
-}
-
 .sum-input::placeholder {
-  color: #8a9a92;
+  color: var(--cbn-subtle, #8a9a92);
   font-size: 11px;
 }
-
 .merchant {
   align-items: center;
   display: flex;
@@ -129,7 +101,6 @@ h1 {
   margin: 0 0 3px;
   overflow-wrap: anywhere;
 }
-
 .provider-badge {
   align-items: center;
   border-radius: 5px;
@@ -141,18 +112,14 @@ h1 {
   padding: 0 6px;
   white-space: nowrap;
 }
-
 .provider-wrap {
   align-items: center;
   display: inline-flex;
   gap: 8px;
   min-width: 0;
 }
-
 .ad-chip {
-  border: 1px solid #78909c;
   border-radius: 3px;
-  color: #78909c;
   display: inline-block;
   flex-shrink: 0;
   font-size: 9px;
@@ -162,12 +129,9 @@ h1 {
   vertical-align: middle;
   white-space: nowrap;
 }
-
 .support-chip,
 .charity-chip {
-  border: 1px solid #78909c;
   border-radius: 3px;
-  color: #78909c;
   display: inline-block;
   flex-shrink: 0;
   font-size: 9px;
@@ -177,13 +141,11 @@ h1 {
   vertical-align: middle;
   white-space: nowrap;
 }
-
 .activation-badge {
   align-items: center;
-  background: #eaf7ef;
-  border: 1px solid #a9d9bd;
+  background: var(--cbn-highlight, #eaf7ef);
   border-radius: 4px;
-  color: #166b47;
+  color: var(--cbn-accent, #166b47);
   display: inline-flex;
   flex-shrink: 0;
   height: 18px;
@@ -191,18 +153,15 @@ h1 {
   line-height: 1;
   width: 18px;
 }
-
 .activation-badge-wrap {
   display: inline-flex;
   position: relative;
 }
-
 .activation-badge svg {
   flex-shrink: 0;
 }
-
 .activation-tooltip {
-  background: #1a1a2e;
+  background: var(--cbn-tooltip, #1a1a2e);
   border-radius: 8px;
   bottom: calc(100% + 6px);
   color: #e0e0e0;
@@ -219,267 +178,194 @@ h1 {
   width: max-content;
   z-index: 20;
 }
-
 .activation-badge-wrap:hover .activation-tooltip {
   display: block;
 }
-
 .provider-remember {
   background: #111111;
   color: #ff9900;
 }
-
 .provider-klarna {
   background: #ffa8cd;
   color: #0b051d;
 }
-
 .provider-coupert {
   background: #f03d30;
   color: #ffffff;
 }
-
 .provider-trumf {
   background: #07006b;
   color: #ffffff;
 }
-
 .provider-sas {
   background: #00005c;
   color: #ffffff;
 }
-
 .provider-tfbank {
   background: #e30613;
   color: #ffffff;
 }
-
 .provider-dnb {
   background: #14555a;
   color: #ffffff;
 }
-
 .provider-curve {
   background: #000000;
   color: #ffffff;
 }
-
 .provider-crypto {
   background: #002d74;
   color: #ffffff;
 }
-
 .provider-revolut {
   background: #0666eb;
   color: #ffffff;
 }
-
 .provider-norwegian {
   background: #d81939;
   color: #ffffff;
 }
-
 .provider-sas-amex {
   background: #00005c;
   color: #ffffff;
 }
-
 .provider-lunar {
   background: #2bb24c;
   color: #ffffff;
 }
-
 .provider-sparebank1 {
   background: #005aa4;
   color: #ffffff;
 }
-
 .provider-studentkortet {
   background: #1B2838;
   color: #ffffff;
 }
-
 .provider-studenttorget {
   background: #009fe3;
   color: #ffffff;
 }
-
 .provider-nettbonus {
   background: #5b0f8c;
   color: #ffffff;
 }
-
 .provider-cbn {
   background: #ffe4e6;
   color: #be123c;
 }
-
 .provider-unio {
   background: #ffffff;
-  border: 1px solid #c9b896;
   color: #6b5330;
 }
-
 .provider-coop {
   background: #003366;
   color: #ffffff;
 }
-
 .provider-elkjop {
   background: #ffffff;
-  border: 1px solid #d3e2dc;
   color: #1f1b5c;
 }
-
 .provider-akademikerne {
   background: #fff7f0;
-  border: 1px solid #e8d9c8;
   color: #113063;
 }
-
 .provider-huseierne {
   background: #ffffff;
-  border: 1px solid #d5ddd9;
   color: #0f1a18;
 }
-
 .provider-huseierforbundet {
   background: #ffffff;
-  border: 1px solid #d5ddd9;
   color: #0f1a18;
 }
-
 .provider-amcar {
   background: #c01921;
   color: #ffffff;
 }
-
 .provider-horselsforbundet {
   background: #ffffff;
-  border: 1px solid #f1774f;
   color: #f1774f;
 }
-
 .provider-knbf {
   background: #00205b;
   color: #ffffff;
 }
-
 .provider-njff {
   background: #ffffff;
-  border: 1px solid #003a5d;
   color: #003a5d;
 }
-
 .provider-pensjonistforbundet {
   background: #ffffff;
-  border: 1px solid #d5ddd9;
   color: #000000;
 }
-
 .provider-kna {
   background: #d60929;
   color: #ffffff;
 }
-
 .provider-syklistforeningen {
   background: #e61414;
   color: #ffffff;
 }
-
 .provider-revmatikerforbundet {
   background: #ffffff;
-  border: 1px solid #2d4f9e;
   color: #2d4f9e;
 }
-
 .provider-redningsselskapet {
   background: #ffffff;
-  border: 1px solid #0a2a66;
   color: #0a2a66;
 }
-
 .provider-lhl {
   background: #ffffff;
-  border: 1px solid #4b1d6f;
   color: #4b1d6f;
 }
-
 .provider-skiforeningen {
   background: #ffffff;
-  border: 1px solid #0067b1;
   color: #0067b1;
 }
-
 .provider-agrol {
   background: #ffffff;
-  border: 1px solid #c9c9c9;
   color: #3d3d3d;
 }
-
 .provider-kondis {
   background: #ffffff;
-  border: 1px solid #8b1a1a;
   color: #8b1a1a;
 }
-
 .provider-bob {
   background: #ffffff;
-  border: 1px solid #d3e2dc;
   color: #5b2486;
 }
-
 .provider-usbl {
   background: #34413e;
   color: #ffffff;
 }
-
 .provider-bate {
   background: #ffffff;
-  border: 1px solid #ef1c24;
   color: #ef1c24;
 }
-
 .provider-tobb {
   background: #00466b;
   color: #ffffff;
 }
-
 .provider-tekna {
   background: #ffffff;
-  border: 1px solid #d3e2dc;
   color: #00a3ad;
 }
-
 .provider-nito {
   background: #c8e6b8;
   color: #003b00;
 }
-
 .copy-code-btn {
   align-items: center;
-  color: #1f8f5f;
   cursor: pointer;
   display: inline-flex;
   padding: 4px;
-  border-radius: 4px;
 }
-
-.copy-code-btn:hover {
-  color: #166b47;
-}
-
 .bonus-chips-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
 .bonus-chips-toggle {
   align-items: center;
-  background: none;
-  border: none;
-  color: #5d6b71;
   cursor: pointer;
   display: flex;
   font-size: 11px;
@@ -487,57 +373,42 @@ h1 {
   gap: 4px;
   padding: 0 14px;
 }
-
-.bonus-chips-toggle:hover {
-  color: #172026;
-}
-
 .bonus-chips-toggle-arrow {
   display: inline-block;
   transition: transform 0.2s ease;
 }
-
 .bonus-chips-section.collapsed .bonus-chips-toggle-arrow {
   transform: rotate(-90deg);
 }
-
 .bonus-chips-section.collapsed .bonus-chips {
   display: none;
 }
-
 .bonus-chips {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 0 14px 10px;
 }
-
 .chip-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-
 .chip-group-label {
-  color: #8a9a92;
+  color: var(--cbn-subtle, #8a9a92);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
-
 .chip-group-items {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-
 .bonus-chip {
   align-items: center;
-  background: #f0f4f2;
-  border: 1px solid #d8e3de;
-  border-radius: 20px;
-  color: #172026;
+  color: var(--cbn-text, #172026);
   display: flex;
   justify-content: space-between;
   font-size: 11px;
@@ -548,17 +419,12 @@ h1 {
   text-decoration: none;
   white-space: nowrap;
 }
-
-.bonus-chip:hover {
-  background: #e4ebe7;
-}
-
 .bonus-chip-label {
   font-weight: 800;
 }
-
 .bonus-chip .provider-badge {
   font-size: 9px;
   min-height: 16px;
   padding: 0 5px;
 }
+.popup-actions { display: flex; align-items: center; gap: 6px; }

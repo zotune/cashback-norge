@@ -35,6 +35,9 @@ import {
 } from "../shared/appstoreprice-region-prices";
 import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
+import { bindThemeTarget, installThemeStyles, mountThemeControl } from "../shared/theme";
+import { extensionTheme } from "./theme";
+import { createMutedChip } from "../shared/ui";
 
 type UserscriptHttpRequestOptions = {
   method?: string;
@@ -455,6 +458,7 @@ type HttpRequestResponse =
     };
 type ProductPageMeta = Omit<GetPriceMatchForProductMessage, "type">;
 const HOST_ID = "cashback-varsler-notice";
+let disposeNoticeTheme: (() => void) | undefined;
 const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
 const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
 const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
@@ -975,7 +979,6 @@ function buildRuntimeProviderCss(): string {
       const parts: string[] = [];
       if (meta.bg !== undefined) parts.push(`background: ${meta.bg};`);
       if (meta.fg !== undefined) parts.push(`color: ${meta.fg};`);
-      if (meta.border !== undefined) parts.push(`border: 1px solid ${meta.border};`);
       return `\n    .provider-${id} { ${parts.join(" ")} }`;
     })
     .join("");
@@ -8983,24 +8986,15 @@ function readVinmonopoletUnitPricePerLiter(text: string): number | undefined {
   return Number.isFinite(amount) && amount > 0 ? amount : undefined;
 }
 function makeAdChip(): HTMLSpanElement {
-  const chip = document.createElement("span");
-  chip.textContent = "Ad";
-  chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
-  return chip;
+  return createMutedChip("Ad");
 }
 
 function makeSupportChip(): HTMLSpanElement {
-  const chip = document.createElement("span");
-  chip.textContent = "Støtt oss";
-  chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
-  return chip;
+  return createMutedChip("Støtt oss");
 }
 
 function makeCharityChip(): HTMLSpanElement {
-  const chip = document.createElement("span");
-  chip.textContent = "10% til veldedighet";
-  chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
-  return chip;
+  return createMutedChip("10% til veldedighet");
 }
 
 function getCodeSourceProvider(codeOffer: CashbackOffer): string | undefined {
@@ -9026,7 +9020,7 @@ function createProviderBadgeWithActivation(
   providerWrap.className = "provider-wrap";
 
   const providerBadge = document.createElement("a");
-  providerBadge.className = `provider-badge provider-${offer.provider} provider-filter-link`;
+  providerBadge.className = `cbn-chip provider-badge provider-${offer.provider} provider-filter-link`;
   providerBadge.href = getProviderPageUrl(offer.provider);
   providerBadge.target = "_blank";
   providerBadge.rel = "noreferrer";
@@ -9047,7 +9041,7 @@ function createActivationBadge(
   shadowRoot: ShadowRoot,
 ): HTMLSpanElement {
   const activationBadge = document.createElement("span");
-  activationBadge.className = "activation-badge";
+  activationBadge.className = "cbn-chip activation-badge";
   activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
   activationBadge.innerHTML = CHECK_ICON_SVG;
   const activationTooltip = document.createElement("div");
@@ -9310,7 +9304,7 @@ function rewriteNettbonusLoginTriggers(): boolean {
       clone.removeAttribute("id");
       const adLabel = document.createElement("span");
       adLabel.textContent = "Ad";
-      adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+      adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
       clone.prepend(adLabel);
       loginLink.replaceWith(clone);
       found = true;
@@ -9478,7 +9472,7 @@ function rewriteSpareborsenHandleButton(): boolean {
   link.setAttribute("data-cb-rewrite", "1");
   const adLabel = document.createElement("span");
   adLabel.textContent = "Ad";
-  adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+  adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
   if (!clone.textContent?.trim().startsWith("Ad")) {
     clone.prepend(adLabel);
   }
@@ -9713,7 +9707,6 @@ function renderNotice(
     :host {
       all: initial;
       background: transparent;
-      border: 0;
       bottom: 16px;
       box-sizing: border-box;
       display: block;
@@ -9745,12 +9738,6 @@ function renderNotice(
     }
     .side-tab {
       appearance: none;
-      background: #ffffff;
-      border: 1px solid #c9d7cf;
-      border-left: none;
-      border-radius: 0 8px 8px 0;
-      box-shadow: 2px 4px 12px rgba(11, 25, 34, 0.12);
-      color: #172026;
       cursor: pointer;
       display: flex;
       flex-direction: column;
@@ -9762,9 +9749,6 @@ function renderNotice(
       width: 26px;
       flex-shrink: 0;
       transition: min-height 0.25s ease, padding 0.25s ease;
-    }
-    .side-tab:hover {
-      background: #f7faf8;
     }
     .side-tab-arrow {
       font-size: 16px;
@@ -9780,14 +9764,14 @@ function renderNotice(
       font-size: 11px;
       font-weight: 700;
       white-space: nowrap;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       letter-spacing: 0.02em;
       margin-top: 6px;
       align-items: center;
       gap: 4px;
     }
     .side-tab-reward {
-      color: #172026;
+      color: var(--cbn-text, #172026);
     }
     .side-tab-chip {
       font-size: 10px;
@@ -9808,11 +9792,6 @@ function renderNotice(
     .panel {
       width: min(400px, calc(100vw - 70px));
       max-height: min(80vh, 760px);
-      color: #172026;
-      background: #ffffff;
-      border: 1px solid #c9d7cf;
-      border-radius: 8px;
-      box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
       overflow: hidden auto;
       overscroll-behavior: contain;
       margin-left: 4px;
@@ -9823,16 +9802,11 @@ function renderNotice(
       width: 0;
       opacity: 0;
       margin-left: 0;
-      border-width: 0;
       pointer-events: none;
     }
     .notice.no-transition .panel,
     .notice.no-transition .side-tab {
       transition: none;
-    }
-    .topline {
-      height: 4px;
-      background: linear-gradient(90deg, #1f8f5f, #f4b942);
     }
     .body {
       display: grid;
@@ -9848,28 +9822,19 @@ function renderNotice(
       min-height: 32px;
     }
     .sum-input {
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
-      color: #172026;
       font-family: inherit;
       font-size: 12px;
       height: 26px;
-      outline: none;
       padding: 0 6px;
       text-align: right;
       width: 68px;
     }
-    .sum-input:focus {
-      border-color: #1f8f5f;
-    }
     .sum-input::placeholder {
-      color: #8a9a92;
+      color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
     }
     .site-icon {
       background: #f7faf8;
-      border: 1px solid #d8e3de;
       border-radius: 6px;
       height: 24px;
       object-fit: contain;
@@ -9889,14 +9854,11 @@ function renderNotice(
       gap: 4px;
     }
     .offer-link.offer-link--best {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .offer-link {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       display: grid;
       font-size: 14px;
       gap: 8px;
@@ -9919,7 +9881,6 @@ function renderNotice(
     }
     .offer-action .offer-label { flex: 1; }
     .provider-filter-link { color: inherit; text-decoration: none; }
-    .provider-filter-link:hover { box-shadow: 0 0 0 2px #a9bcb1; }
     .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
     .provider-wrap {
       align-items: center;
@@ -9931,10 +9892,9 @@ function renderNotice(
     }
     .activation-badge {
       align-items: center;
-      background: #eaf7ef;
-      border: 1px solid #a9d9bd;
+      background: var(--cbn-highlight, #eaf7ef);
       border-radius: 4px;
-      color: #166b47;
+      color: var(--cbn-accent, #166b47);
       display: inline-flex;
       flex-shrink: 0;
       height: 18px;
@@ -9990,12 +9950,10 @@ function renderNotice(
     }
     .provider-santander {
       background: #ffffff;
-      border: 1px solid #ec0000;
       color: #ec0000;
     }
     .provider-vestbo {
       background: #ffffff;
-      border: 1px solid #1dc1dd;
       color: #1dc1dd;
     }
     .provider-bbl {
@@ -10052,7 +10010,6 @@ function renderNotice(
     }
     .provider-bob {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #5b2486;
     }
     .provider-usbl {
@@ -10061,7 +10018,6 @@ function renderNotice(
     }
     .provider-bate {
       background: #ffffff;
-      border: 1px solid #ef1c24;
       color: #ef1c24;
     }
     .provider-tobb {
@@ -10074,7 +10030,6 @@ function renderNotice(
     }
     .provider-tekna {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #00a3ad;
     }
     .provider-nito {
@@ -10091,17 +10046,14 @@ function renderNotice(
     }
     .provider-prisradar {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #0c4598;
     }
     .provider-sesum {
       background: #f3f4f6;
-      border: 1px solid #e5e7eb;
       color: #111827;
     }
     .provider-enhver {
       background: #ffffff;
-      border: 1px solid #e5e7eb;
       color: #162333;
     }
     .provider-kassal {
@@ -10114,7 +10066,6 @@ function renderNotice(
     }
     .provider-panflights {
       background: #ffffff;
-      border: 1px solid #d7e5ff;
       color: #1375f7;
     }
     .provider-momondo {
@@ -10131,7 +10082,6 @@ function renderNotice(
     }
     .provider-google {
       background: #ffffff;
-      border: 1px solid #dadce0;
       color: #1a73e8;
     }
     .provider-tripcom {
@@ -10211,7 +10161,6 @@ function renderNotice(
     .provider-utdanningibergen {
       background: #ffffff;
       color: #000000;
-      border: 1px solid #ccc;
     }
     .provider-unidays {
       background: #00b140;
@@ -10223,7 +10172,6 @@ function renderNotice(
     }
     .provider-unio {
       background: #ffffff;
-      border: 1px solid #c9b896;
       color: #6b5330;
     }
     .provider-coop {
@@ -10232,17 +10180,14 @@ function renderNotice(
     }
     .provider-elkjop {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #1f1b5c;
     }
     .provider-akademikerne {
       background: #fff7f0;
-      border: 1px solid #e8d9c8;
       color: #113063;
     }
     .provider-huseierne {
       background: #ffffff;
-      border: 1px solid #d5ddd9;
       color: #0f1a18;
     }
     .provider-sas-amex {
@@ -10255,35 +10200,23 @@ function renderNotice(
     }
     .copy-code-btn {
       align-items: center;
-      color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
       flex-shrink: 0;
       padding: 4px;
-      border-radius: 4px;
       position: relative;
-    }
-    .copy-code-btn:hover {
-      color: #166b47;
     }
     .vote-btn {
       align-items: center;
-      color: #b0c8bc;
       cursor: pointer;
       display: inline-flex;
       gap: 3px;
       padding: 4px;
-      border-radius: 4px;
       font-size: 11px;
       line-height: 1;
-      background: none;
-      border: none;
-    }
-    .vote-btn:hover {
-      color: #1f8f5f;
     }
     .vote-btn.voted {
-      color: #1f8f5f;
+      color: var(--cbn-accent, #1f8f5f);
     }
     .vote-btn.downvoted {
       color: #e05555;
@@ -10294,18 +10227,11 @@ function renderNotice(
     }
     .add-code-btn {
       align-items: center;
-      background: none;
-      border: none;
-      color: #b0c8bc;
       cursor: pointer;
       display: inline-flex;
       margin-left: auto;
       padding: 2px 4px;
-      border-radius: 4px;
       line-height: 1;
-    }
-    .add-code-btn:hover {
-      color: #1f8f5f;
     }
     .add-code-form {
       align-items: center;
@@ -10315,9 +10241,6 @@ function renderNotice(
     }
     .add-code-form-inner {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d0dbd5;
-      border-radius: 6px;
       display: flex;
       flex: 1;
       gap: 4px;
@@ -10325,41 +10248,28 @@ function renderNotice(
       padding: 3px 6px;
     }
     .add-code-input {
-      background: transparent;
-      border: none;
-      color: #172026;
       flex: 1;
       font-size: 12px;
       min-width: 0;
       padding: 4px 2px;
       font-family: inherit;
-      outline: none;
     }
     .add-reward-input {
       flex: 0 0 48px;
-      border-right: 1px solid #d0dbd5;
       padding-right: 6px;
     }
     .add-code-submit {
       align-items: center;
-      background: none;
-      border: none;
-      border-radius: 4px;
-      color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
       padding: 4px;
       flex-shrink: 0;
     }
     .add-code-submit:disabled {
-      color: #b0c8bc;
       cursor: default;
     }
     .add-code-cancel {
       align-items: center;
-      background: none;
-      border: none;
-      color: #8a9ba3;
       cursor: pointer;
       display: inline-flex;
       flex-shrink: 0;
@@ -10369,30 +10279,20 @@ function renderNotice(
       padding: 0;
       width: 22px;
     }
-    .add-code-cancel:hover {
-      color: #172026;
-    }
     .add-code-thanks {
-      color: #1f8f5f;
+      color: var(--cbn-accent, #1f8f5f);
       font-size: 11px;
       margin: 0;
       padding: 4px 0;
     }
     .delete-code-btn {
       align-items: center;
-      background: none;
-      border: none;
-      color: #b0bec5;
       cursor: pointer;
       display: inline-flex;
       padding: 2px 3px;
-      border-radius: 4px;
       flex-shrink: 0;
       font-size: 13px;
       line-height: 1;
-    }
-    .delete-code-btn:hover {
-      color: #e05555;
     }
     .expired-section {
       margin-top: 4px;
@@ -10400,18 +10300,12 @@ function renderNotice(
     }
     .expired-toggle {
       align-items: center;
-      background: none;
-      border: none;
-      color: #8a9ba3;
       cursor: pointer;
       display: flex;
       font-size: 11px;
       gap: 4px;
       padding: 2px 0;
       width: 100%;
-    }
-    .expired-toggle:hover {
-      color: #172026;
     }
     .expired-toggle-arrow {
       display: inline-block;
@@ -10433,7 +10327,7 @@ function renderNotice(
       opacity: 0.55;
     }
     .copy-code-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 6px;
       color: #e0e0e0;
       font-size: 11px;
@@ -10460,7 +10354,7 @@ function renderNotice(
       gap: 4px;
     }
     .chip-group-label {
-      color: #8a9a92;
+      color: var(--cbn-subtle, #8a9a92);
       font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.03em;
@@ -10478,9 +10372,6 @@ function renderNotice(
     .bonus-chips-toggle {
       align-items: center;
       appearance: none;
-      background: none;
-      border: none;
-      color: #8a9a92;
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -10489,9 +10380,6 @@ function renderNotice(
       line-height: 1;
       margin-bottom: 5px;
       padding: 0;
-    }
-    .bonus-chips-toggle:hover {
-      color: #4f5f66;
     }
     .bonus-chips-toggle-arrow {
       display: inline-block;
@@ -10522,9 +10410,6 @@ function renderNotice(
     .codes-toggle {
       align-items: center;
       appearance: none;
-      background: none;
-      border: none;
-      color: #8a9a92;
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -10534,9 +10419,6 @@ function renderNotice(
       margin-bottom: 5px;
       padding: 0;
       width: 100%;
-    }
-    .codes-toggle:hover {
-      color: #4f5f66;
     }
     .codes-toggle-arrow {
       display: inline-block;
@@ -10561,9 +10443,6 @@ function renderNotice(
     .region-prices-toggle {
       align-items: center;
       appearance: none;
-      background: none;
-      border: none;
-      color: #8a9a92;
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -10575,9 +10454,6 @@ function renderNotice(
       width: 100%;
     }
     .price-match-toggle:hover,
-    .region-prices-toggle:hover {
-      color: #4f5f66;
-    }
     .price-match-toggle-arrow,
     .region-prices-toggle-arrow {
       display: inline-block;
@@ -10597,10 +10473,7 @@ function renderNotice(
     .price-match-card,
     .region-price-card {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       display: grid;
       font-size: 12px;
       gap: 8px;
@@ -10640,7 +10513,7 @@ function renderNotice(
     .price-match-card.price-match-card--best .price-match-price,
     .region-price-card.region-price-card--best .region-price-country,
     .region-price-card.region-price-card--best .region-price-nok {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .price-match-card + .price-match-card,
     .region-price-card + .region-price-card {
@@ -10662,19 +10535,19 @@ function renderNotice(
     }
     .price-match-shop,
     .region-price-native {
-      color: #5d6b71;
+      color: var(--cbn-muted, #5d6b71);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .price-match-price,
     .region-price-nok {
-      color: #172026;
+      color: var(--cbn-text, #172026);
       font-weight: 800;
       white-space: nowrap;
     }
     .price-match-duration {
-      color: #5d6b71;
+      color: var(--cbn-muted, #5d6b71);
       font-size: 10px;
       font-weight: 600;
       justify-self: end;
@@ -10706,9 +10579,6 @@ function renderNotice(
     }
     .code-item {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
       display: flex;
       flex: 1;
       font-size: 12px;
@@ -10724,10 +10594,10 @@ function renderNotice(
     }
     .code-item-row--best .code-reward,
     .code-item-row--best .code-value {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .code-value {
-      color: #5d6b71;
+      color: var(--cbn-muted, #5d6b71);
       font-family: monospace;
       font-size: 11px;
       min-width: 0;
@@ -10750,10 +10620,7 @@ function renderNotice(
     }
     .bonus-chip {
       align-items: center;
-      background: #f0f4f2;
-      border: 1px solid #d8e3de;
-      border-radius: 20px;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       display: flex;
       justify-content: space-between;
       font-size: 11px;
@@ -10764,11 +10631,8 @@ function renderNotice(
       text-decoration: none;
       white-space: nowrap;
     }
-    .bonus-chip:hover {
-      background: #e4ebe7;
-    }
     .bonus-chip--best {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .bonus-chip-label {
       font-weight: 800;
@@ -10779,7 +10643,7 @@ function renderNotice(
       padding: 0 5px;
     }
     .bonus-chip-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 8px;
       color: #e0e0e0;
       font-size: 11px;
@@ -10803,7 +10667,7 @@ function renderNotice(
       position: relative;
     }
     .card-only-warn {
-      color: #b0bec5;
+      color: var(--cbn-subtle, #b0bec5);
       cursor: help;
       font-size: 11px;
       line-height: 1;
@@ -10813,8 +10677,6 @@ function renderNotice(
       display: inline-block;
       font-size: 9px;
       font-weight: 600;
-      color: #78909c;
-      border: 1px solid #78909c;
       border-radius: 3px;
       padding: 0 3px;
       margin-right: 4px;
@@ -10824,7 +10686,7 @@ function renderNotice(
       cursor: help;
     }
     .offer-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 8px;
       color: #e0e0e0;
       display: none;
@@ -10878,13 +10740,13 @@ function renderNotice(
       justify-content: space-between;
     }
     .support a {
-      color: #8a9a92;
+      color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
       line-height: 1.35;
       text-decoration: none;
     }
     .support a:hover {
-      color: #4f5f66;
+      color: var(--cbn-muted, #4f5f66);
       text-decoration: underline;
     }
     .support-logo {
@@ -10907,7 +10769,7 @@ function renderNotice(
       vertical-align: middle;
     }
     .status-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 8px;
       color: #e0e0e0;
       display: none;
@@ -10956,7 +10818,7 @@ function renderNotice(
   const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "region");
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
-  sideTab.className = `side-tab side-tab-${sideTabProvider}`;
+  sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
   sideTab.type = "button";
   sideTab.setAttribute("aria-label", "Collapse cashback offers");
   const sideTabArrow = document.createElement("span");
@@ -10969,7 +10831,7 @@ function renderNotice(
     rewardSpan.className = "side-tab-reward";
     rewardSpan.textContent = formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
     const chipSpan = document.createElement("span");
-    chipSpan.className = `side-tab-chip provider-${offer.provider}`;
+    chipSpan.className = `cbn-chip side-tab-chip provider-${offer.provider}`;
     chipSpan.textContent = formatProviderName(offer.provider);
     sideTabText.append(rewardSpan, chipSpan);
   } else if (primaryOffer !== undefined) {
@@ -10980,7 +10842,7 @@ function renderNotice(
     const codeProvider = getCodeSourceProvider(primaryOffer);
     if (codeProvider !== undefined) {
       const chipSpan = document.createElement("span");
-      chipSpan.className = `side-tab-chip provider-${codeProvider}`;
+      chipSpan.className = `cbn-chip side-tab-chip provider-${codeProvider}`;
       chipSpan.textContent = formatProviderName(codeProvider);
       sideTabText.append(chipSpan);
     }
@@ -10989,7 +10851,7 @@ function renderNotice(
     rewardSpan.className = "side-tab-reward";
     rewardSpan.textContent = priceMatch.price;
     const chipSpan = document.createElement("span");
-    chipSpan.className = `side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
+    chipSpan.className = `cbn-chip side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
     chipSpan.textContent = getPriceMatchSourceName(priceMatch);
     sideTabText.append(rewardSpan, chipSpan);
   } else if (bestRegionPrice !== undefined) {
@@ -10997,7 +10859,7 @@ function renderNotice(
     rewardSpan.className = "side-tab-reward";
     rewardSpan.textContent = bestRegionPrice.formattedNok;
     const chipSpan = document.createElement("span");
-    chipSpan.className = "side-tab-chip provider-region";
+    chipSpan.className = "cbn-chip side-tab-chip provider-region";
     chipSpan.textContent = `${bestRegionPrice.flag} Region`;
     sideTabText.append(rewardSpan, chipSpan);
   }
@@ -11008,9 +10870,7 @@ function renderNotice(
   });
   // Main panel
   const panel = document.createElement("div");
-  panel.className = "panel";
-  const topLine = document.createElement("div");
-  topLine.className = "topline";
+  panel.className = "cbn-card panel";
   const body = document.createElement("div");
   body.className = "body";
   const header = document.createElement("div");
@@ -11027,7 +10887,7 @@ function renderNotice(
         : "Regionpriser";
   header.append(siteIcon, title);
   const sumInput = document.createElement("input");
-  sumInput.className = "sum-input";
+  sumInput.className = "cbn-field sum-input";
   sumInput.type = "text";
   sumInput.inputMode = "decimal";
   sumInput.placeholder = "Sum";
@@ -11045,7 +10905,7 @@ function renderNotice(
     const offerRow = document.createElement("div");
     const offerLink = document.createElement("a");
     const isBestOffer = offerIdx === 0;
-    offerRow.className = isBestOffer ? "offer-link offer-link--best" : "offer-link";
+    offerRow.className = isBestOffer ? "cbn-row offer-link offer-link--best" : "cbn-row offer-link";
     offerLink.className = "offer-action";
     offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
@@ -11074,7 +10934,7 @@ function renderNotice(
       offerLink.append(offerLabel, warnIcon);
     } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
       const appChip = document.createElement("span");
-      appChip.className = "app-chip";
+      appChip.className = "cbn-chip cbn-chip--muted app-chip";
       appChip.textContent = "App";
       offerLink.append(offerLabel, appChip);
     } else {
@@ -11148,7 +11008,7 @@ function renderNotice(
   freeGroup.append(freeLabel, freeItems);
   function createBonusChip(card: typeof FREE_CARDS[number], overrideUrl?: string): { chip: HTMLAnchorElement; label: HTMLSpanElement } {
     const chip = document.createElement("a");
-    chip.className = "bonus-chip";
+    chip.className = "cbn-row bonus-chip";
     chip.href = overrideUrl ?? card.url;
     chip.target = "_blank";
     chip.rel = "noreferrer";
@@ -11160,7 +11020,7 @@ function renderNotice(
       : (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
     label.textContent = `+${card.approx ? "~" : ""}${pctStr} %${ebInfo}`;
     const badge = document.createElement("span");
-    badge.className = `provider-badge provider-${card.badge}`;
+    badge.className = `cbn-chip provider-badge provider-${card.badge}`;
     badge.textContent = card.label;
     chip.append(label, badge);
     return { chip, label };
@@ -11187,7 +11047,7 @@ function renderNotice(
   const revolutSub = REVOLUT_SUBSCRIPTIONS[currentHostname];
   if (revolutSub !== undefined) {
     const revolutChip = document.createElement("a");
-    revolutChip.className = "bonus-chip";
+    revolutChip.className = "cbn-row bonus-chip";
     revolutChip.href = "https://revolut.com/referrals?r=FELPJK";
     revolutChip.target = "_blank";
     revolutChip.rel = "noreferrer";
@@ -11195,7 +11055,7 @@ function renderNotice(
     revolutLabel.className = "bonus-chip-label";
     revolutLabel.textContent = "Inkludert";
     const revolutBadge = document.createElement("span");
-    revolutBadge.className = "provider-badge provider-revolut";
+    revolutBadge.className = "cbn-chip provider-badge provider-revolut";
     revolutBadge.textContent = "Revolut";
     revolutChip.append(revolutLabel, revolutBadge);
     premiumItems.append(revolutChip);
@@ -11228,7 +11088,7 @@ function renderNotice(
   let hasSelectedItems = false;
   if (cryptoSub !== undefined) {
     const cryptoChip = document.createElement("a");
-    cryptoChip.className = "bonus-chip";
+    cryptoChip.className = "cbn-row bonus-chip";
     cryptoChip.href = "https://crypto.com/app/ns3fma5hou";
     cryptoChip.target = "_blank";
     cryptoChip.rel = "noreferrer";
@@ -11236,7 +11096,7 @@ function renderNotice(
     cryptoChipLabel.className = "bonus-chip-label";
     cryptoChipLabel.textContent = "3-6 mnd gratis";
     const cryptoBadge = document.createElement("span");
-    cryptoBadge.className = "provider-badge provider-crypto";
+    cryptoBadge.className = "cbn-chip provider-badge provider-crypto";
     cryptoBadge.textContent = "Crypto";
     cryptoChip.append(cryptoChipLabel, cryptoBadge);
     const cryptoAdWrapper = document.createElement("span");
@@ -11255,7 +11115,7 @@ function renderNotice(
     chipsSection.classList.add("collapsed");
   }
   const chipsToggle = document.createElement("button");
-  chipsToggle.className = "bonus-chips-toggle";
+  chipsToggle.className = "cbn-button cbn-button--quiet bonus-chips-toggle";
   chipsToggle.type = "button";
   const chipsToggleArrow = document.createElement("span");
   chipsToggleArrow.className = "bonus-chips-toggle-arrow";
@@ -11277,7 +11137,7 @@ function renderNotice(
 
   // Header row: "▼ Rabattkoder (N)" + "+" button
   const codesToggle = document.createElement("button");
-  codesToggle.className = "codes-toggle";
+  codesToggle.className = "cbn-button cbn-button--quiet codes-toggle";
   codesToggle.type = "button";
   const codesToggleArrow = document.createElement("span");
   codesToggleArrow.className = "codes-toggle-arrow";
@@ -11285,7 +11145,7 @@ function renderNotice(
   const codesToggleText = document.createElement("span");
   codesToggleText.textContent = "Rabattkoder";
   const addCodeBtn = document.createElement("button");
-  addCodeBtn.className = "add-code-btn";
+  addCodeBtn.className = "cbn-button cbn-button--quiet add-code-btn";
   addCodeBtn.type = "button";
   addCodeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
   const addCodeTooltip = document.createElement("div");
@@ -11317,27 +11177,27 @@ function renderNotice(
   addCodeForm.className = "add-code-form";
   addCodeForm.style.display = "none";
   const addRewardInput = document.createElement("input");
-  addRewardInput.className = "add-code-input add-reward-input";
+  addRewardInput.className = "cbn-field add-code-input add-reward-input";
   addRewardInput.type = "number";
   addRewardInput.placeholder = "%";
   addRewardInput.min = "0";
   addRewardInput.max = "100";
   const addCodeInput = document.createElement("input");
-  addCodeInput.className = "add-code-input";
+  addCodeInput.className = "cbn-field add-code-input";
   addCodeInput.type = "text";
   addCodeInput.placeholder = "Kode";
   addCodeInput.maxLength = 30;
   const addCodeSubmit = document.createElement("button");
-  addCodeSubmit.className = "add-code-submit";
+  addCodeSubmit.className = "cbn-button cbn-button--quiet add-code-submit";
   addCodeSubmit.type = "button";
   addCodeSubmit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
   addCodeSubmit.disabled = true;
   const addCodeCancel = document.createElement("button");
-  addCodeCancel.className = "add-code-cancel";
+  addCodeCancel.className = "cbn-button cbn-button--quiet add-code-cancel";
   addCodeCancel.type = "button";
   addCodeCancel.textContent = "\u2715";
   const addCodeFormInner = document.createElement("div");
-  addCodeFormInner.className = "add-code-form-inner";
+  addCodeFormInner.className = "cbn-field-group add-code-form-inner";
   addCodeFormInner.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
   addCodeForm.append(addCodeFormInner);
   const updateSubmitState = (): void => {
@@ -11365,7 +11225,7 @@ function renderNotice(
     codeSpan.className = "code-value";
     codeSpan.textContent = code;
     const copyBtn = document.createElement("span");
-    copyBtn.className = "copy-code-btn";
+    copyBtn.className = "cbn-button cbn-button--quiet copy-code-btn";
     copyBtn.innerHTML = COPY_ICON_SVG;
     const copyTooltip = document.createElement("div");
     copyTooltip.className = "copy-code-tooltip";
@@ -11417,8 +11277,8 @@ function renderNotice(
     const hasProfanity = (text: string): boolean =>
       text.toLowerCase().split(/[^a-z0-9æøå]+/).some((w) => w.length > 0 && PROFANITY_SET.has(w));
     if (hasProfanity(code) || hasProfanity(rawReward)) {
-      addCodeInput.style.borderColor = "#e05555";
-      setTimeout(() => { addCodeInput.style.borderColor = ""; }, 1500);
+      addCodeInput.style.outline = "2px solid #e05555";
+      setTimeout(() => { addCodeInput.style.outline = ""; }, 1500);
       return;
     }
     console.info(`[cashback-varsler] User submitted code for ${CURRENT_HOST}: ${code} (${reward})`);
@@ -11453,7 +11313,7 @@ function renderNotice(
 
     // Add immediately to the list (after addCodeForm, i.e. at the top)
     const item = document.createElement("div");
-    item.className = "code-item";
+    item.className = "cbn-row code-item";
     item.dataset.codeId = "pending";
     const rewardEl = document.createElement("span");
     rewardEl.className = "code-reward";
@@ -11495,7 +11355,7 @@ function renderNotice(
   expiredSection.className = "expired-section collapsed";
   expiredSection.style.display = "none";
   const expiredToggle = document.createElement("button");
-  expiredToggle.className = "expired-toggle";
+  expiredToggle.className = "cbn-button cbn-button--quiet expired-toggle";
   expiredToggle.type = "button";
   const expiredToggleArrow = document.createElement("span");
   expiredToggleArrow.className = "expired-toggle-arrow";
@@ -11510,7 +11370,7 @@ function renderNotice(
 
   const makeDeleteBtn = (codeId: number, row: HTMLElement): HTMLButtonElement => {
     const btn = document.createElement("button");
-    btn.className = "delete-code-btn";
+    btn.className = "cbn-button cbn-button--quiet delete-code-btn";
     btn.type = "button";
     btn.title = "Slett koden din";
     btn.innerHTML = `×`;
@@ -11534,7 +11394,7 @@ function renderNotice(
     let upvoted = initialVote === 1;
     let downvoted = initialVote === -1;
     const upBtn = document.createElement("button");
-    upBtn.className = "vote-btn";
+    upBtn.className = "cbn-button cbn-button--quiet vote-btn";
     upBtn.type = "button";
     upBtn.innerHTML = THUMBS_UP_SVG;
     const upCountEl = document.createElement("span");
@@ -11553,7 +11413,7 @@ function renderNotice(
     });
     upBtn.addEventListener("mouseleave", () => { upTooltip.classList.remove("visible"); });
     const downBtn = document.createElement("button");
-    downBtn.className = "vote-btn";
+    downBtn.className = "cbn-button cbn-button--quiet vote-btn";
     downBtn.type = "button";
     downBtn.innerHTML = THUMBS_DOWN_SVG;
     const downCountEl = document.createElement("span");
@@ -11656,7 +11516,7 @@ function renderNotice(
   ): HTMLDivElement => {
     const code = codeOffer.discountCode ?? "";
     const item = document.createElement("div");
-    item.className = "code-item";
+    item.className = "cbn-row code-item";
     if (dbId !== undefined) item.dataset.codeId = String(dbId);
     const reward = document.createElement("a");
     reward.className = "code-reward";
@@ -11721,7 +11581,7 @@ function renderNotice(
     if (sourceProvider === undefined) return undefined;
 
     const chip = document.createElement("a");
-    chip.className = `provider-badge provider-${sourceProvider} code-source-badge provider-filter-link`;
+    chip.className = `cbn-chip provider-badge provider-${sourceProvider} code-source-badge provider-filter-link`;
     chip.href = getProviderPageUrl(sourceProvider);
     chip.target = "_blank";
     chip.rel = "noreferrer";
@@ -11741,7 +11601,7 @@ function renderNotice(
 
     const displayedRegionPrices = regionPrices.prices;
     const regionPricesToggle = document.createElement("button");
-    regionPricesToggle.className = "region-prices-toggle";
+    regionPricesToggle.className = "cbn-button cbn-button--quiet region-prices-toggle";
     regionPricesToggle.type = "button";
     const regionPricesToggleArrow = document.createElement("span");
     regionPricesToggleArrow.className = "region-prices-toggle-arrow";
@@ -11782,7 +11642,7 @@ function renderNotice(
     }
 
     const priceMatchToggle = document.createElement("button");
-    priceMatchToggle.className = "price-match-toggle";
+    priceMatchToggle.className = "cbn-button cbn-button--quiet price-match-toggle";
     priceMatchToggle.type = "button";
     const priceMatchToggleArrow = document.createElement("span");
     priceMatchToggleArrow.className = "price-match-toggle-arrow";
@@ -11836,7 +11696,7 @@ function renderNotice(
       for (const dbCode of dbCodes) {
         if (shownCodes.has(dbCode.code.toUpperCase())) continue;
         const item = document.createElement("div");
-        item.className = "code-item";
+        item.className = "cbn-row code-item";
         item.dataset.codeId = String(dbCode.id);
         const reward = document.createElement("span");
         reward.className = "code-reward";
@@ -11901,7 +11761,7 @@ function renderNotice(
 
       entries.push({ net, reward: dbCode.reward, render: () => {
         const item = document.createElement("div");
-        item.className = "code-item";
+        item.className = "cbn-row code-item";
         item.dataset.codeId = String(dbCode.id);
         const reward = document.createElement("span");
         reward.className = "code-reward";
@@ -12005,9 +11865,9 @@ function renderNotice(
     const disclosure = document.createElement("p");
     disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
-    panel.append(topLine, body, support, disclosure);
+    panel.append(body, support, disclosure);
   } else {
-    panel.append(topLine, body);
+    panel.append(body);
   }
   notice.append(sideTab, panel);
   // Force reflow after expand transition to fix Safari whitespace bug
@@ -12023,6 +11883,17 @@ function renderNotice(
     sideTab.setAttribute("aria-label", "Expand cashback offers");
   }
   shadowRoot.append(style, notice);
+  installThemeStyles(shadowRoot);
+  const themeSlot = document.createElement("div");
+  themeSlot.className = "theme-slot";
+  const existingFooter = panel.querySelector(".support");
+  const themeFooter = existingFooter ?? document.createElement("div");
+  if (!existingFooter) themeFooter.className = "theme-footer";
+  themeFooter.append(themeSlot);
+  if (!existingFooter) panel.append(themeFooter);
+  const unbindTheme = bindThemeTarget(extensionTheme, host);
+  const unmountTheme = mountThemeControl(extensionTheme, themeSlot, "up");
+  disposeNoticeTheme = () => { unmountTheme(); unbindTheme(); };
   const mountTarget = document.body ?? document.documentElement;
   mountTarget.append(host);
   void detectConflicts(shadowRoot, title);
@@ -12100,6 +11971,8 @@ function renderNotice(
   }, { passive: true });
 }
 function clearNotice(): void {
+  disposeNoticeTheme?.();
+  disposeNoticeTheme = undefined;
   document.getElementById(HOST_ID)?.remove();
 }
 
@@ -12644,7 +12517,7 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
 }
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
-  priceMatchCard.className = "price-match-card";
+  priceMatchCard.className = "cbn-row price-match-card";
   if (isBest) priceMatchCard.classList.add("price-match-card--best");
   priceMatchCard.href = priceMatch.productUrl;
   priceMatchCard.target = "_blank";
@@ -12674,7 +12547,7 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   }
 
   const priceMatchBadge = document.createElement("span");
-  priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
+  priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
 
   const hasDuration = priceMatch.durationText !== undefined && priceMatch.durationText.length > 0;
@@ -12691,7 +12564,7 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
 }
 function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = false): HTMLDivElement {
   const regionPriceCard = document.createElement("div");
-  regionPriceCard.className = "region-price-card";
+  regionPriceCard.className = "cbn-row region-price-card";
   if (isBest) regionPriceCard.classList.add("region-price-card--best");
 
   const regionPriceMain = document.createElement("a");
@@ -12727,7 +12600,7 @@ function buildRegionPriceCard(regionPrice: PlayStationRegionPrice, isBest = fals
     regionPriceActions.className = "region-price-actions";
     for (const secondaryLink of secondaryLinks) {
       const regionPriceAction = document.createElement("a");
-      regionPriceAction.className = `provider-badge provider-${secondaryLink.provider} region-price-action`;
+      regionPriceAction.className = `cbn-chip provider-badge provider-${secondaryLink.provider} region-price-action`;
       regionPriceAction.href = secondaryLink.url;
       regionPriceAction.target = "_blank";
       regionPriceAction.rel = "noreferrer";

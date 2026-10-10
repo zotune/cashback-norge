@@ -42,7 +42,7 @@
     {
       title: "Legg til Cashback Norge",
       instruction: `<a href="${STAY_APP_URL}">Åpne Stay</a>. Trykk <strong>Userscripts</strong> nederst til venstre → <strong>+</strong> øverst til høyre → <strong>Link</strong>. Lim inn lenken under og trykk <strong>Continue</strong>.`,
-      extra: `<div class="guide-link"><code>${SCRIPT_URL}</code><button id="iphone-guide-copy" class="guide-copy" type="button" aria-label="Kopier scriptlenken">Kopier</button></div><p class="guide-note" id="guide-copy-status" role="status"></p>`,
+      extra: `<div class="cbn-row guide-link"><code>${SCRIPT_URL}</code><button id="iphone-guide-copy" class="cbn-button guide-copy" type="button" aria-label="Kopier scriptlenken">Kopier</button></div><p class="guide-note" id="guide-copy-status" role="status"></p>`,
       dark: true,
       demo: `<div class="demo-phase phase-one"><div class="demo-add-header">Userscripts <span class="demo-plus demo-tap">+</span></div><div class="demo-search" style="background:#292929;margin-top:15px">Search</div></div><div class="demo-phase phase-two"><div class="demo-sheet demo-add-sheet"><strong>Add Userscript</strong><div class="demo-row">New Userscript</div><div class="demo-row demo-tap">↗ &nbsp; Link</div></div></div><div class="demo-phase phase-three"><strong>Add with Link</strong><div class="demo-url">${SCRIPT_URL}</div><div class="demo-continue demo-tap">Continue</div></div>${tabs('scripts')}`,
     },

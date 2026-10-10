@@ -1,3 +1,4 @@
+import { ThemeControl } from "./ThemeControl";
 import React, { useEffect, useState, type ReactElement } from "react";
 import type { CashbackOffer } from "../../shared/cashback.js";
 import { getProviderPageUrl, PROVIDER_COLORS, PROVIDER_NAMES } from "../../shared/provider-data.js";
@@ -94,6 +95,7 @@ export function PopupApp(): ReactElement {
   if (state.status === "loading") {
     return (
       <main className="popup">
+        <ThemeControl />
         <p className="eyebrow">Cashback</p>
         <h1>Checking...</h1>
       </main>
@@ -103,6 +105,7 @@ export function PopupApp(): ReactElement {
   if (state.status === "error") {
     return (
       <main className="popup">
+        <ThemeControl />
         <p className="eyebrow">Cashback</p>
         <h1>Not available</h1>
         <p className="muted">{state.message}</p>
@@ -152,15 +155,16 @@ export function PopupApp(): ReactElement {
           <p className="eyebrow">{state.hostname}</p>
           <h1>{mainOffers.length > 0 ? "Cashback offers" : "No cashback"}</h1>
         </div>
-        <input
-          className="sum-input"
+        <div className="popup-actions"><ThemeControl /><input
+          className="cbn-field sum-input"
           type="text"
           inputMode="decimal"
           placeholder="Sum"
+          aria-label="Kjøpesum"
           value={sumInput}
           onChange={(e) => setSumInput(e.target.value.replace(/[^0-9.,]/g, ""))}
           onKeyDown={(e) => { if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault(); }}
-        />
+        /></div>
       </div>
       <div className="offers">
         {mainOffers.map((offer) => {
@@ -177,7 +181,7 @@ export function PopupApp(): ReactElement {
       </div>
       {showExtraCashback && <div className={`bonus-chips-section${chipsCollapsed ? " collapsed" : ""}`}>
         <button
-          className="bonus-chips-toggle"
+          className="cbn-button cbn-button--quiet bonus-chips-toggle"
           type="button"
           onClick={() => {
             const next = !chipsCollapsed;
@@ -193,7 +197,7 @@ export function PopupApp(): ReactElement {
             <span className="chip-group-label">Gratis</span>
             <div className="chip-group-items">
               <a
-                className="bonus-chip"
+                className="cbn-row bonus-chip"
                 href="https://www.americanexpress.com/nb-no/kredittkort/sas-classic/"
                 target="_blank"
                 rel="noreferrer"
@@ -204,10 +208,10 @@ export function PopupApp(): ReactElement {
                     ? `+~${formatKr(amount * 10 / 100 / EB_PER_TRUMF_KR)} kr (~${Math.round(amount * 10 / 100)} EB)`
                     : "+~0,74% (~10 EB/100kr)"}
                 </span>
-                <span className="provider-badge provider-sas-amex">SAS Amex</span>
+                <span className="cbn-chip provider-badge provider-sas-amex">SAS Amex</span>
               </a>
               <a
-                className="bonus-chip"
+                className="cbn-row bonus-chip"
                 href="https://saseurobonusmastercard.no/kortene/mastercard/"
                 target="_blank"
                 rel="noreferrer"
@@ -218,10 +222,10 @@ export function PopupApp(): ReactElement {
                     ? `+~${formatKr(amount * 10 / 100 / EB_PER_TRUMF_KR)} kr (~${Math.round(amount * 10 / 100)} EB)`
                     : "+~0,74% (~10 EB/100kr)"}
                 </span>
-                <span className="provider-badge provider-sas-amex">SAS MC</span>
+                <span className="cbn-chip provider-badge provider-sas-amex">SAS MC</span>
               </a>
               <a
-                className="bonus-chip"
+                className="cbn-row bonus-chip"
                 href="https://www.lunar.app/no/privat/sas-eurobonus"
                 target="_blank"
                 rel="noreferrer"
@@ -232,10 +236,10 @@ export function PopupApp(): ReactElement {
                     ? `+~${formatKr(amount * 8 / 100 / EB_PER_TRUMF_KR)} kr (~${Math.round(amount * 8 / 100)} EB)`
                     : "+~0,59% (~8 EB/100kr)"}
                 </span>
-                <span className="provider-badge provider-lunar">Lunar EB</span>
+                <span className="cbn-chip provider-badge provider-lunar">Lunar EB</span>
               </a>
               <a
-                className="bonus-chip"
+                className="cbn-row bonus-chip"
                 href="https://www.banknorwegian.no/kredittkort/cashback/"
                 target="_blank"
                 rel="noreferrer"
@@ -244,7 +248,7 @@ export function PopupApp(): ReactElement {
                 <span className="bonus-chip-label">
                   {amount > 0 ? `+${formatKr(amount * 0.5 / 100)} kr` : "+0,5 %"}
                 </span>
-                <span className="provider-badge provider-norwegian">Norwegian</span>
+                <span className="cbn-chip provider-badge provider-norwegian">Norwegian</span>
               </a>
             </div>
           </div>}
@@ -253,19 +257,19 @@ export function PopupApp(): ReactElement {
             <div className="chip-group-items">
               {!isCardOnly && revolutSub !== undefined && (
                 <a
-                  className="bonus-chip"
+                  className="cbn-row bonus-chip"
                   href="https://revolut.com/referrals?r=FELPJK"
                   target="_blank"
                   rel="noreferrer"
                   title={`${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`}
                 >
                   <span className="bonus-chip-label">Inkludert</span>
-                  <span className="provider-badge provider-revolut">Revolut</span>
+                  <span className="cbn-chip provider-badge provider-revolut">Revolut</span>
                 </a>
               )}
               {curveOffer !== undefined && (
                 <a
-                  className="bonus-chip"
+                  className="cbn-row bonus-chip"
                   href={curveOffer.activationUrl}
                   target="_blank"
                   rel="noreferrer"
@@ -274,11 +278,11 @@ export function PopupApp(): ReactElement {
                   <span className="bonus-chip-label">
                     {curveKr !== null ? `+${curveKr} kr` : "+1 %"}
                   </span>
-                  <span className="provider-badge provider-curve">Curve Pro</span>
+                  <span className="cbn-chip provider-badge provider-curve">Curve Pro</span>
                 </a>
               )}
               <a
-                className="bonus-chip"
+                className="cbn-row bonus-chip"
                 href="https://crypto.com/app/ns3fma5hou"
                 target="_blank"
                 rel="noreferrer"
@@ -293,10 +297,10 @@ export function PopupApp(): ReactElement {
                     ? `+${cryptoMinKr}-${cryptoMaxKr} kr`
                     : "+2-5 %"}
                 </span>
-                <span className="provider-badge provider-crypto">Crypto</span>
+                <span className="cbn-chip provider-badge provider-crypto">Crypto</span>
               </a>
               <a
-                className="bonus-chip"
+                className="cbn-row bonus-chip"
                 href="https://www.klarna.com/no/medlemskap/"
                 target="_blank"
                 rel="noreferrer"
@@ -307,7 +311,7 @@ export function PopupApp(): ReactElement {
                     ? `+${klarnaMinKr}-${klarnaMaxKr} kr`
                     : "+0,5-1 %"}
                 </span>
-                <span className="provider-badge provider-klarna">Klarna</span>
+                <span className="cbn-chip provider-badge provider-klarna">Klarna</span>
               </a>
             </div>
           </div>
@@ -356,7 +360,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
 
   return (
     <div className="offer-wrapper">
-      <div className="offer">
+      <div className="cbn-row offer">
         <a
           className="offer-action"
           href={props.offer.provider === "trumf" || props.offer.provider === "klarna" ? props.offer.sourceUrl : props.offer.activationUrl}
@@ -377,7 +381,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
         <span className="provider-wrap">
           {props.activated && (
             <span className="activation-badge-wrap">
-              <span className="activation-badge" aria-label={`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}>
+              <span className="cbn-chip activation-badge" aria-label={`${formatProviderName(props.offer.provider)} cashback er aktivert for ${props.offer.merchantName}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </span>
               <span className="activation-tooltip">
@@ -386,20 +390,19 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
             </span>
           )}
           {shouldShowAffiliateDisclosure(props.offer) && (
-            <span className="ad-chip">Ad</span>
+            <span className="cbn-chip cbn-chip--muted ad-chip">Ad</span>
           )}
           {props.offer.provider === "cbn" && (
-            <span className="support-chip">Støtt oss</span>
+            <span className="cbn-chip cbn-chip--muted support-chip">Støtt oss</span>
           )}
           {props.offer.provider === "cbn" && (
-            <span className="charity-chip">10% til veldedighet</span>
+            <span className="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>
           )}
           <a
-            className={`provider-badge provider-${props.offer.provider} provider-filter-link`}
+            className={`cbn-chip provider-badge provider-${props.offer.provider} provider-filter-link`}
             style={{
               backgroundColor: providerColors?.bg,
               color: providerColors?.fg,
-              border: providerColors?.border === undefined ? undefined : `1px solid ${providerColors.border}`,
             }}
             href={getProviderPageUrl(props.offer.provider)}
             target="_blank"

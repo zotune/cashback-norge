@@ -1,6 +1,6 @@
 {
   "name": "cashback-norge",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "build:extension": "vite build --config vite.extension.config.ts",
     "build:extension:store": "pnpm run build:extension && node scripts/build-extension-store.mjs",
     "build:store": "pnpm run build:extension:store",
-    "build:site": "vite build --config vite.site.config.ts",
+    "build:site": "vite build --config vite.site.config.ts && vite build --config vite.theme.config.ts",
     "check": "tsc --project tsconfig.json --noEmit",
     "crawl": "tsx src/backend/index.ts && cp data/cashback-index.json site/cashback-index.json && pnpm run build:extension && pnpm run build:site && pnpm run build:userscript",
     "preview:rabatta": "tsx src/scripts/test-rabatta.ts --write-site",

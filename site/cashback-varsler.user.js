@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1791464863
+// @version      1791640074
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png
@@ -7459,6 +7459,219 @@ query SearchSuggestions($query: String!, $category: Int) {
     "zoophilia",
     "🖕"
   ];
+  const UI_CSS = `
+:root, :host {
+  --cbn-control-radius: 7px; --cbn-card-radius: 10px; --cbn-chip-radius: 4px;
+  --cbn-plate: #eaf0ec; --cbn-plate-hover: #dfe8e2; --cbn-plate-down: #d2ded6;
+  --cbn-field: #eaf0ec; --cbn-on-accent: #fff;
+}
+:root[data-cbn-theme="dark"], :host([data-cbn-theme="dark"]) {
+  --cbn-plate: #262626; --cbn-plate-hover: #333; --cbn-plate-down: #404040;
+  --cbn-field: #202020; --cbn-on-accent: #102016;
+}
+.cbn-button {
+  border: 0; border-radius: var(--cbn-control-radius); box-shadow: none;
+  background: var(--cbn-button-bg, var(--cbn-plate));
+  color: var(--cbn-button-fg, var(--cbn-text));
+  font-family: inherit; cursor: pointer; text-decoration: none;
+  transition: background-color .12s, color .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cbn-button:hover:not(:disabled) { background: color-mix(in srgb, var(--cbn-button-bg, var(--cbn-plate-hover)) 90%, var(--cbn-text) 10%); }
+.cbn-button:active:not(:disabled) { background: color-mix(in srgb, var(--cbn-button-bg, var(--cbn-plate-down)) 82%, var(--cbn-text) 18%); }
+.cbn-button:disabled { opacity: .4; cursor: default; }
+.cbn-button--quiet { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
+.cbn-button--primary { --cbn-button-bg: var(--cbn-accent); --cbn-button-fg: var(--cbn-on-accent); }
+.cbn-button[aria-pressed="true"], .cbn-button.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.cbn-field, .cbn-field-group {
+  border: 0; border-radius: var(--cbn-control-radius); box-shadow: none;
+  background: var(--cbn-field); color: var(--cbn-text); outline: none;
+  transition: background-color .12s;
+}
+.cbn-field:hover, .cbn-field-group:hover { background: var(--cbn-plate); }
+.cbn-field::placeholder { color: var(--cbn-subtle); }
+.cbn-field-group .cbn-field { background: transparent; }
+.cbn-field:focus, .cbn-field-group:focus-within { outline: 2px solid var(--cbn-accent); outline-offset: 1px; }
+.cbn-field-group .cbn-field:focus { outline: none; }
+.cbn-card { border: 0; border-radius: var(--cbn-card-radius); box-shadow: none; background: var(--cbn-surface); }
+.cbn-row { border: 0; border-radius: var(--cbn-control-radius); box-shadow: none; background: var(--cbn-soft); transition: background-color .12s; }
+.cbn-row:hover { background: var(--cbn-hover); }
+.cbn-row:active { background: var(--cbn-plate-down); }
+.cbn-chip { border: 0; border-radius: var(--cbn-chip-radius); box-shadow: none; }
+.cbn-chip[href], button.cbn-chip { transition: filter .12s; }
+.cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
+.cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
+.cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
+.cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .cbn-button, .cbn-field, .cbn-field-group, .cbn-row, .cbn-chip { transition: none; } }
+`;
+  function createMutedChip(label) {
+    const chip = document.createElement("span");
+    chip.className = "cbn-chip cbn-chip--muted";
+    chip.textContent = label;
+    return chip;
+  }
+  const THEME_STORAGE_KEY = "cashback-norge-theme";
+  const normalizeTheme = (value) => value === "light" || value === "dark" ? value : "system";
+  function createThemeStore(options = {}) {
+    const media = options.media ?? window.matchMedia("(prefers-color-scheme: dark)");
+    let preference = normalizeTheme(options.initialPreference);
+    let revision = 0;
+    const listeners = /* @__PURE__ */ new Set();
+    const state = () => ({ preference, resolved: preference === "system" ? media.matches ? "dark" : "light" : preference });
+    const notify = () => listeners.forEach((listener) => listener(state()));
+    const receive = (value) => {
+      revision++;
+      preference = normalizeTheme(value);
+      notify();
+    };
+    media.addEventListener("change", notify);
+    const stopWatching = options.watch?.(receive);
+    if (options.load) {
+      const startedAt = revision;
+      void options.load().then((value) => {
+        if (revision === startedAt) receive(value);
+      }).catch(() => {
+      });
+    }
+    return {
+      state,
+      set(value) {
+        receive(value);
+        try {
+          void Promise.resolve(options.save?.(preference)).catch(() => {
+          });
+        } catch {
+        }
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        listener(state());
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      dispose() {
+        media.removeEventListener("change", notify);
+        stopWatching?.();
+        listeners.clear();
+      }
+    };
+  }
+  const THEME_CSS = `
+:root, :host {
+  color-scheme: light;
+  --cbn-bg: #f7faf8; --cbn-surface: #fff; --cbn-soft: #f7faf8;
+  --cbn-text: #172026; --cbn-muted: #5d6b71; --cbn-subtle: #8a9a92;
+  --cbn-border: #d6e1dc; --cbn-hover: #edf2ef; --cbn-accent: #22794f;
+  --cbn-highlight: #eaf7ef; --cbn-highlight-border: #a9d9bd;
+  --cbn-tooltip: #172026; --cbn-glass: rgba(244,248,246,.7);
+  --cbn-glass-surface: rgba(255,255,255,.92);
+}
+:root[data-cbn-theme="dark"], :host([data-cbn-theme="dark"]) {
+  color-scheme: dark;
+  --cbn-bg: #0f0f0f; --cbn-surface: #181818; --cbn-soft: #222;
+  --cbn-text: #f1f1f1; --cbn-muted: #b3b3b3; --cbn-subtle: #a0a0a0;
+  --cbn-border: #363636; --cbn-hover: #303030; --cbn-accent: #7ddc9f;
+  --cbn-highlight: #193526; --cbn-highlight-border: #376b4b;
+  --cbn-tooltip: #303030; --cbn-glass: rgba(15,15,15,.94);
+  --cbn-glass-surface: rgba(24,24,24,.98);
+}
+.cbn-theme { position: relative; display: inline-flex; flex: 0 0 auto; color: var(--cbn-muted); font: 13px/1.4 ui-sans-serif, system-ui, sans-serif; }
+.cbn-theme button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cbn-theme .cbn-theme-toggle { display: grid; place-items: center; width: 32px; height: 32px; padding: 6px; border-radius: 50%; }
+.cbn-theme-toggle svg { width: 18px; height: 18px; pointer-events: none; }
+.cbn-theme-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 1000; min-width: 156px; padding: 6px; color: var(--cbn-text); text-align: left; }
+.cbn-theme-menu[hidden] { display: none; }
+.cbn-theme-menu strong { display: block; font-size: 11px; font-weight: 600; padding: 5px 9px; color: var(--cbn-muted); }
+.cbn-theme .cbn-theme-option { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 8px 9px; text-align: left; white-space: nowrap; }
+.cbn-theme-option svg { width: 16px; height: 16px; }
+.cbn-theme-option[aria-pressed="true"]::after { content: '✓'; margin-left: auto; }
+.cbn-theme[data-placement="up"] .cbn-theme-menu { top: auto; bottom: calc(100% + 6px); }
+.guide-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.brand > [data-theme-control] { margin-left: auto; }
+.theme-slot { display: flex; align-items: center; }
+.theme-footer { display: flex; justify-content: flex-end; padding: 0 8px 6px; }
+:root[data-cbn-theme="dark"] .install-chrome { --cbn-button-bg: #162338; --cbn-button-fg: #9bc3ff; }
+:root[data-cbn-theme="dark"] .install-iphone { --cbn-button-bg: #291e36; --cbn-button-fg: #d1a9f0; }
+:root[data-cbn-theme="dark"] .install-android { --cbn-button-bg: #193024; --cbn-button-fg: #91dba9; }
+:root[data-cbn-theme="dark"] .adblock-warning { background: #302614; color: #f4cd7c; }
+`;
+  const ICONS = {
+    system: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+    dark: '<path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z"/>'
+  };
+  const svg = (mode) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[mode]}</svg>`;
+  const LABELS = { system: "Følg systemet", light: "Lys", dark: "Mørk" };
+  let nextControl = 0;
+  function bindThemeTarget(store, target) {
+    return store.subscribe(({ resolved }) => {
+      target.dataset.cbnTheme = resolved;
+    });
+  }
+  function mountThemeControl(store, slot, placement = "down") {
+    const control = document.createElement("div");
+    control.className = "cbn-theme";
+    control.dataset.placement = placement;
+    const id = `cbn-theme-menu-${++nextControl}`;
+    control.innerHTML = `<button type="button" class="cbn-theme-toggle cbn-button cbn-button--quiet" aria-expanded="false" aria-controls="${id}"></button><div id="${id}" class="cbn-theme-menu cbn-popover" role="group" aria-label="Utseende" hidden><strong>Utseende</strong>${["system", "light", "dark"].map((mode) => `<button type="button" class="cbn-theme-option cbn-button cbn-button--quiet" data-mode="${mode}" aria-pressed="false">${svg(mode)}${LABELS[mode]}</button>`).join("")}</div>`;
+    const toggle = control.querySelector(".cbn-theme-toggle");
+    const menu = control.querySelector(".cbn-theme-menu");
+    const close = () => {
+      menu.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+    };
+    toggle.addEventListener("click", () => {
+      menu.hidden = !menu.hidden;
+      toggle.setAttribute("aria-expanded", String(!menu.hidden));
+    });
+    control.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        close();
+        toggle.focus();
+        event.stopPropagation();
+      }
+    });
+    control.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
+      store.set(normalizeTheme(button.dataset.mode));
+      close();
+      toggle.focus();
+    }));
+    const outside = (event) => {
+      if (!event.composedPath().includes(control)) close();
+    };
+    document.addEventListener("pointerdown", outside, { passive: true });
+    const unsubscribe = store.subscribe(({ preference, resolved }) => {
+      toggle.innerHTML = svg(preference);
+      const label = `Utseende: ${LABELS[preference]}${preference === "system" ? ` (${resolved === "dark" ? "mørk" : "lys"})` : ""}`;
+      toggle.title = label;
+      toggle.setAttribute("aria-label", label);
+      control.querySelectorAll("[data-mode]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === preference)));
+    });
+    slot.append(control);
+    return () => {
+      unsubscribe();
+      document.removeEventListener("pointerdown", outside);
+      control.remove();
+    };
+  }
+  function installThemeStyles(parent) {
+    const style = document.createElement("style");
+    style.textContent = THEME_CSS + UI_CSS;
+    parent.append(style);
+  }
+  const extensionTheme = createThemeStore({
+    load: () => new Promise((resolve) => chrome.storage.local.get(THEME_STORAGE_KEY, (values) => resolve(values[THEME_STORAGE_KEY]))),
+    save: (preference) => chrome.storage.local.set({ [THEME_STORAGE_KEY]: preference }),
+    watch: (receive) => {
+      const onStorage = (changes, area) => {
+        if (area === "local" && THEME_STORAGE_KEY in changes) receive(changes[THEME_STORAGE_KEY]?.newValue);
+      };
+      chrome.storage.onChanged?.addListener(onStorage);
+      return () => chrome.storage.onChanged?.removeListener(onStorage);
+    }
+  });
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
@@ -7570,6 +7783,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   const CBN_LOGO_B64 = "data:image/png;base64,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";
   const HOST_ID = "cashback-varsler-notice";
+  let disposeNoticeTheme;
   const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
   const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
   const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
@@ -7971,7 +8185,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       const parts = [];
       if (meta.bg !== void 0) parts.push(`background: ${meta.bg};`);
       if (meta.fg !== void 0) parts.push(`color: ${meta.fg};`);
-      if (meta.border !== void 0) parts.push(`border: 1px solid ${meta.border};`);
       return `
     .provider-${id} { ${parts.join(" ")} }`;
     }).join("");
@@ -13005,22 +13218,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     return Number.isFinite(amount) && amount > 0 ? amount : void 0;
   }
   function makeAdChip() {
-    const chip = document.createElement("span");
-    chip.textContent = "Ad";
-    chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 3px;margin-right:6px;vertical-align:middle;line-height:14px;";
-    return chip;
+    return createMutedChip("Ad");
   }
   function makeSupportChip() {
-    const chip = document.createElement("span");
-    chip.textContent = "Støtt oss";
-    chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
-    return chip;
+    return createMutedChip("Støtt oss");
   }
   function makeCharityChip() {
-    const chip = document.createElement("span");
-    chip.textContent = "10% til veldedighet";
-    chip.style.cssText = "display:inline-block;font-size:9px;font-weight:600;color:#78909c;border:1px solid #78909c;border-radius:3px;padding:0 4px;vertical-align:middle;line-height:14px;white-space:nowrap;";
-    return chip;
+    return createMutedChip("10% til veldedighet");
   }
   function getCodeSourceProvider(codeOffer) {
     if (codeOffer.provider !== "rabattkode") {
@@ -13037,7 +13241,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const providerWrap = document.createElement("span");
     providerWrap.className = "provider-wrap";
     const providerBadge = document.createElement("a");
-    providerBadge.className = `provider-badge provider-${offer.provider} provider-filter-link`;
+    providerBadge.className = `cbn-chip provider-badge provider-${offer.provider} provider-filter-link`;
     providerBadge.href = getProviderPageUrl(offer.provider);
     providerBadge.target = "_blank";
     providerBadge.rel = "noreferrer";
@@ -13052,7 +13256,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function createActivationBadge(offer, shadowRoot) {
     const activationBadge = document.createElement("span");
-    activationBadge.className = "activation-badge";
+    activationBadge.className = "cbn-chip activation-badge";
     activationBadge.setAttribute("aria-label", `${formatProviderName(offer.provider)} cashback er aktivert for ${offer.merchantName}`);
     activationBadge.innerHTML = CHECK_ICON_SVG;
     const activationTooltip = document.createElement("div");
@@ -13242,7 +13446,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         clone.removeAttribute("id");
         const adLabel = document.createElement("span");
         adLabel.textContent = "Ad";
-        adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+        adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
         clone.prepend(adLabel);
         loginLink.replaceWith(clone);
         found = true;
@@ -13367,7 +13571,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     link.setAttribute("data-cb-rewrite", "1");
     const adLabel = document.createElement("span");
     adLabel.textContent = "Ad";
-    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border:1px solid #000;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
+    adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
     if (!clone.textContent?.trim().startsWith("Ad")) {
       clone.prepend(adLabel);
     }
@@ -13531,7 +13735,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     :host {
       all: initial;
       background: transparent;
-      border: 0;
       bottom: 16px;
       box-sizing: border-box;
       display: block;
@@ -13563,12 +13766,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .side-tab {
       appearance: none;
-      background: #ffffff;
-      border: 1px solid #c9d7cf;
-      border-left: none;
-      border-radius: 0 8px 8px 0;
-      box-shadow: 2px 4px 12px rgba(11, 25, 34, 0.12);
-      color: #172026;
       cursor: pointer;
       display: flex;
       flex-direction: column;
@@ -13580,9 +13777,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       width: 26px;
       flex-shrink: 0;
       transition: min-height 0.25s ease, padding 0.25s ease;
-    }
-    .side-tab:hover {
-      background: #f7faf8;
     }
     .side-tab-arrow {
       font-size: 16px;
@@ -13598,14 +13792,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       font-size: 11px;
       font-weight: 700;
       white-space: nowrap;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       letter-spacing: 0.02em;
       margin-top: 6px;
       align-items: center;
       gap: 4px;
     }
     .side-tab-reward {
-      color: #172026;
+      color: var(--cbn-text, #172026);
     }
     .side-tab-chip {
       font-size: 10px;
@@ -13626,11 +13820,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     .panel {
       width: min(400px, calc(100vw - 70px));
       max-height: min(80vh, 760px);
-      color: #172026;
-      background: #ffffff;
-      border: 1px solid #c9d7cf;
-      border-radius: 8px;
-      box-shadow: 0 14px 38px rgba(11, 25, 34, 0.2);
       overflow: hidden auto;
       overscroll-behavior: contain;
       margin-left: 4px;
@@ -13641,16 +13830,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       width: 0;
       opacity: 0;
       margin-left: 0;
-      border-width: 0;
       pointer-events: none;
     }
     .notice.no-transition .panel,
     .notice.no-transition .side-tab {
       transition: none;
-    }
-    .topline {
-      height: 4px;
-      background: linear-gradient(90deg, #1f8f5f, #f4b942);
     }
     .body {
       display: grid;
@@ -13666,28 +13850,19 @@ query SearchSuggestions($query: String!, $category: Int) {
       min-height: 32px;
     }
     .sum-input {
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
-      color: #172026;
       font-family: inherit;
       font-size: 12px;
       height: 26px;
-      outline: none;
       padding: 0 6px;
       text-align: right;
       width: 68px;
     }
-    .sum-input:focus {
-      border-color: #1f8f5f;
-    }
     .sum-input::placeholder {
-      color: #8a9a92;
+      color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
     }
     .site-icon {
       background: #f7faf8;
-      border: 1px solid #d8e3de;
       border-radius: 6px;
       height: 24px;
       object-fit: contain;
@@ -13707,14 +13882,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       gap: 4px;
     }
     .offer-link.offer-link--best {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .offer-link {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       display: grid;
       font-size: 14px;
       gap: 8px;
@@ -13737,7 +13909,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .offer-action .offer-label { flex: 1; }
     .provider-filter-link { color: inherit; text-decoration: none; }
-    .provider-filter-link:hover { box-shadow: 0 0 0 2px #a9bcb1; }
     .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
     .provider-wrap {
       align-items: center;
@@ -13749,10 +13920,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .activation-badge {
       align-items: center;
-      background: #eaf7ef;
-      border: 1px solid #a9d9bd;
+      background: var(--cbn-highlight, #eaf7ef);
       border-radius: 4px;
-      color: #166b47;
+      color: var(--cbn-accent, #166b47);
       display: inline-flex;
       flex-shrink: 0;
       height: 18px;
@@ -13808,12 +13978,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-santander {
       background: #ffffff;
-      border: 1px solid #ec0000;
       color: #ec0000;
     }
     .provider-vestbo {
       background: #ffffff;
-      border: 1px solid #1dc1dd;
       color: #1dc1dd;
     }
     .provider-bbl {
@@ -13870,7 +14038,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-bob {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #5b2486;
     }
     .provider-usbl {
@@ -13879,7 +14046,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-bate {
       background: #ffffff;
-      border: 1px solid #ef1c24;
       color: #ef1c24;
     }
     .provider-tobb {
@@ -13892,7 +14058,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-tekna {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #00a3ad;
     }
     .provider-nito {
@@ -13909,17 +14074,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-prisradar {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #0c4598;
     }
     .provider-sesum {
       background: #f3f4f6;
-      border: 1px solid #e5e7eb;
       color: #111827;
     }
     .provider-enhver {
       background: #ffffff;
-      border: 1px solid #e5e7eb;
       color: #162333;
     }
     .provider-kassal {
@@ -13932,7 +14094,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-panflights {
       background: #ffffff;
-      border: 1px solid #d7e5ff;
       color: #1375f7;
     }
     .provider-momondo {
@@ -13949,7 +14110,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-google {
       background: #ffffff;
-      border: 1px solid #dadce0;
       color: #1a73e8;
     }
     .provider-tripcom {
@@ -14029,7 +14189,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     .provider-utdanningibergen {
       background: #ffffff;
       color: #000000;
-      border: 1px solid #ccc;
     }
     .provider-unidays {
       background: #00b140;
@@ -14041,7 +14200,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-unio {
       background: #ffffff;
-      border: 1px solid #c9b896;
       color: #6b5330;
     }
     .provider-coop {
@@ -14050,17 +14208,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .provider-elkjop {
       background: #ffffff;
-      border: 1px solid #d3e2dc;
       color: #1f1b5c;
     }
     .provider-akademikerne {
       background: #fff7f0;
-      border: 1px solid #e8d9c8;
       color: #113063;
     }
     .provider-huseierne {
       background: #ffffff;
-      border: 1px solid #d5ddd9;
       color: #0f1a18;
     }
     .provider-sas-amex {
@@ -14073,35 +14228,23 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .copy-code-btn {
       align-items: center;
-      color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
       flex-shrink: 0;
       padding: 4px;
-      border-radius: 4px;
       position: relative;
-    }
-    .copy-code-btn:hover {
-      color: #166b47;
     }
     .vote-btn {
       align-items: center;
-      color: #b0c8bc;
       cursor: pointer;
       display: inline-flex;
       gap: 3px;
       padding: 4px;
-      border-radius: 4px;
       font-size: 11px;
       line-height: 1;
-      background: none;
-      border: none;
-    }
-    .vote-btn:hover {
-      color: #1f8f5f;
     }
     .vote-btn.voted {
-      color: #1f8f5f;
+      color: var(--cbn-accent, #1f8f5f);
     }
     .vote-btn.downvoted {
       color: #e05555;
@@ -14112,18 +14255,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .add-code-btn {
       align-items: center;
-      background: none;
-      border: none;
-      color: #b0c8bc;
       cursor: pointer;
       display: inline-flex;
       margin-left: auto;
       padding: 2px 4px;
-      border-radius: 4px;
       line-height: 1;
-    }
-    .add-code-btn:hover {
-      color: #1f8f5f;
     }
     .add-code-form {
       align-items: center;
@@ -14133,9 +14269,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .add-code-form-inner {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d0dbd5;
-      border-radius: 6px;
       display: flex;
       flex: 1;
       gap: 4px;
@@ -14143,41 +14276,28 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 3px 6px;
     }
     .add-code-input {
-      background: transparent;
-      border: none;
-      color: #172026;
       flex: 1;
       font-size: 12px;
       min-width: 0;
       padding: 4px 2px;
       font-family: inherit;
-      outline: none;
     }
     .add-reward-input {
       flex: 0 0 48px;
-      border-right: 1px solid #d0dbd5;
       padding-right: 6px;
     }
     .add-code-submit {
       align-items: center;
-      background: none;
-      border: none;
-      border-radius: 4px;
-      color: #1f8f5f;
       cursor: pointer;
       display: inline-flex;
       padding: 4px;
       flex-shrink: 0;
     }
     .add-code-submit:disabled {
-      color: #b0c8bc;
       cursor: default;
     }
     .add-code-cancel {
       align-items: center;
-      background: none;
-      border: none;
-      color: #8a9ba3;
       cursor: pointer;
       display: inline-flex;
       flex-shrink: 0;
@@ -14187,30 +14307,20 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 0;
       width: 22px;
     }
-    .add-code-cancel:hover {
-      color: #172026;
-    }
     .add-code-thanks {
-      color: #1f8f5f;
+      color: var(--cbn-accent, #1f8f5f);
       font-size: 11px;
       margin: 0;
       padding: 4px 0;
     }
     .delete-code-btn {
       align-items: center;
-      background: none;
-      border: none;
-      color: #b0bec5;
       cursor: pointer;
       display: inline-flex;
       padding: 2px 3px;
-      border-radius: 4px;
       flex-shrink: 0;
       font-size: 13px;
       line-height: 1;
-    }
-    .delete-code-btn:hover {
-      color: #e05555;
     }
     .expired-section {
       margin-top: 4px;
@@ -14218,18 +14328,12 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .expired-toggle {
       align-items: center;
-      background: none;
-      border: none;
-      color: #8a9ba3;
       cursor: pointer;
       display: flex;
       font-size: 11px;
       gap: 4px;
       padding: 2px 0;
       width: 100%;
-    }
-    .expired-toggle:hover {
-      color: #172026;
     }
     .expired-toggle-arrow {
       display: inline-block;
@@ -14251,7 +14355,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       opacity: 0.55;
     }
     .copy-code-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 6px;
       color: #e0e0e0;
       font-size: 11px;
@@ -14278,7 +14382,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       gap: 4px;
     }
     .chip-group-label {
-      color: #8a9a92;
+      color: var(--cbn-subtle, #8a9a92);
       font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.03em;
@@ -14296,9 +14400,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     .bonus-chips-toggle {
       align-items: center;
       appearance: none;
-      background: none;
-      border: none;
-      color: #8a9a92;
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -14307,9 +14408,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       line-height: 1;
       margin-bottom: 5px;
       padding: 0;
-    }
-    .bonus-chips-toggle:hover {
-      color: #4f5f66;
     }
     .bonus-chips-toggle-arrow {
       display: inline-block;
@@ -14340,9 +14438,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     .codes-toggle {
       align-items: center;
       appearance: none;
-      background: none;
-      border: none;
-      color: #8a9a92;
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -14352,9 +14447,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       margin-bottom: 5px;
       padding: 0;
       width: 100%;
-    }
-    .codes-toggle:hover {
-      color: #4f5f66;
     }
     .codes-toggle-arrow {
       display: inline-block;
@@ -14379,9 +14471,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     .region-prices-toggle {
       align-items: center;
       appearance: none;
-      background: none;
-      border: none;
-      color: #8a9a92;
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -14393,9 +14482,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       width: 100%;
     }
     .price-match-toggle:hover,
-    .region-prices-toggle:hover {
-      color: #4f5f66;
-    }
     .price-match-toggle-arrow,
     .region-prices-toggle-arrow {
       display: inline-block;
@@ -14415,10 +14501,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     .price-match-card,
     .region-price-card {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       display: grid;
       font-size: 12px;
       gap: 8px;
@@ -14458,7 +14541,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     .price-match-card.price-match-card--best .price-match-price,
     .region-price-card.region-price-card--best .region-price-country,
     .region-price-card.region-price-card--best .region-price-nok {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .price-match-card + .price-match-card,
     .region-price-card + .region-price-card {
@@ -14480,19 +14563,19 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .price-match-shop,
     .region-price-native {
-      color: #5d6b71;
+      color: var(--cbn-muted, #5d6b71);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .price-match-price,
     .region-price-nok {
-      color: #172026;
+      color: var(--cbn-text, #172026);
       font-weight: 800;
       white-space: nowrap;
     }
     .price-match-duration {
-      color: #5d6b71;
+      color: var(--cbn-muted, #5d6b71);
       font-size: 10px;
       font-weight: 600;
       justify-self: end;
@@ -14524,9 +14607,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .code-item {
       align-items: center;
-      background: #f7faf8;
-      border: 1px solid #d8e3de;
-      border-radius: 5px;
       display: flex;
       flex: 1;
       font-size: 12px;
@@ -14542,10 +14622,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .code-item-row--best .code-reward,
     .code-item-row--best .code-value {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .code-value {
-      color: #5d6b71;
+      color: var(--cbn-muted, #5d6b71);
       font-family: monospace;
       font-size: 11px;
       min-width: 0;
@@ -14568,10 +14648,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     .bonus-chip {
       align-items: center;
-      background: #f0f4f2;
-      border: 1px solid #d8e3de;
-      border-radius: 20px;
-      color: #172026;
+      color: var(--cbn-text, #172026);
       display: flex;
       justify-content: space-between;
       font-size: 11px;
@@ -14582,11 +14659,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       text-decoration: none;
       white-space: nowrap;
     }
-    .bonus-chip:hover {
-      background: #e4ebe7;
-    }
     .bonus-chip--best {
-      color: #3a7d55;
+      color: var(--cbn-accent, #3a7d55);
     }
     .bonus-chip-label {
       font-weight: 800;
@@ -14597,7 +14671,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       padding: 0 5px;
     }
     .bonus-chip-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 8px;
       color: #e0e0e0;
       font-size: 11px;
@@ -14621,7 +14695,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       position: relative;
     }
     .card-only-warn {
-      color: #b0bec5;
+      color: var(--cbn-subtle, #b0bec5);
       cursor: help;
       font-size: 11px;
       line-height: 1;
@@ -14631,8 +14705,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       display: inline-block;
       font-size: 9px;
       font-weight: 600;
-      color: #78909c;
-      border: 1px solid #78909c;
       border-radius: 3px;
       padding: 0 3px;
       margin-right: 4px;
@@ -14642,7 +14714,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       cursor: help;
     }
     .offer-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 8px;
       color: #e0e0e0;
       display: none;
@@ -14696,13 +14768,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       justify-content: space-between;
     }
     .support a {
-      color: #8a9a92;
+      color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
       line-height: 1.35;
       text-decoration: none;
     }
     .support a:hover {
-      color: #4f5f66;
+      color: var(--cbn-muted, #4f5f66);
       text-decoration: underline;
     }
     .support-logo {
@@ -14725,7 +14797,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       vertical-align: middle;
     }
     .status-tooltip {
-      background: #1a1a2e;
+      background: var(--cbn-tooltip, #1a1a2e);
       border-radius: 8px;
       color: #e0e0e0;
       display: none;
@@ -14773,7 +14845,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     notice.className = "notice";
     const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : "region");
     const sideTab = document.createElement("button");
-    sideTab.className = `side-tab side-tab-${sideTabProvider}`;
+    sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
     sideTab.setAttribute("aria-label", "Collapse cashback offers");
     const sideTabArrow = document.createElement("span");
@@ -14786,7 +14858,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       rewardSpan.className = "side-tab-reward";
       rewardSpan.textContent = formatCompactRewardLabel(offer) ?? formatRewardLabel(offer.reward, offer.provider);
       const chipSpan = document.createElement("span");
-      chipSpan.className = `side-tab-chip provider-${offer.provider}`;
+      chipSpan.className = `cbn-chip side-tab-chip provider-${offer.provider}`;
       chipSpan.textContent = formatProviderName(offer.provider);
       sideTabText.append(rewardSpan, chipSpan);
     } else if (primaryOffer !== void 0) {
@@ -14797,7 +14869,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       const codeProvider = getCodeSourceProvider(primaryOffer);
       if (codeProvider !== void 0) {
         const chipSpan = document.createElement("span");
-        chipSpan.className = `side-tab-chip provider-${codeProvider}`;
+        chipSpan.className = `cbn-chip side-tab-chip provider-${codeProvider}`;
         chipSpan.textContent = formatProviderName(codeProvider);
         sideTabText.append(chipSpan);
       }
@@ -14806,7 +14878,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       rewardSpan.className = "side-tab-reward";
       rewardSpan.textContent = priceMatch.price;
       const chipSpan = document.createElement("span");
-      chipSpan.className = `side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
+      chipSpan.className = `cbn-chip side-tab-chip provider-${getPriceMatchProviderClass(priceMatch)}`;
       chipSpan.textContent = getPriceMatchSourceName(priceMatch);
       sideTabText.append(rewardSpan, chipSpan);
     } else if (bestRegionPrice !== void 0) {
@@ -14814,7 +14886,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       rewardSpan.className = "side-tab-reward";
       rewardSpan.textContent = bestRegionPrice.formattedNok;
       const chipSpan = document.createElement("span");
-      chipSpan.className = "side-tab-chip provider-region";
+      chipSpan.className = "cbn-chip side-tab-chip provider-region";
       chipSpan.textContent = `${bestRegionPrice.flag} Region`;
       sideTabText.append(rewardSpan, chipSpan);
     }
@@ -14824,9 +14896,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
     });
     const panel = document.createElement("div");
-    panel.className = "panel";
-    const topLine = document.createElement("div");
-    topLine.className = "topline";
+    panel.className = "cbn-card panel";
     const body = document.createElement("div");
     body.className = "body";
     const header = document.createElement("div");
@@ -14837,7 +14907,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Regionpriser";
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
-    sumInput.className = "sum-input";
+    sumInput.className = "cbn-field sum-input";
     sumInput.type = "text";
     sumInput.inputMode = "decimal";
     sumInput.placeholder = "Sum";
@@ -14855,7 +14925,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       const offerRow = document.createElement("div");
       const offerLink = document.createElement("a");
       const isBestOffer = offerIdx === 0;
-      offerRow.className = isBestOffer ? "offer-link offer-link--best" : "offer-link";
+      offerRow.className = isBestOffer ? "cbn-row offer-link offer-link--best" : "cbn-row offer-link";
       offerLink.className = "offer-action";
       offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
       offerLink.target = "_blank";
@@ -14883,7 +14953,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         offerLink.append(offerLabel, warnIcon);
       } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
         const appChip = document.createElement("span");
-        appChip.className = "app-chip";
+        appChip.className = "cbn-chip cbn-chip--muted app-chip";
         appChip.textContent = "App";
         offerLink.append(offerLabel, appChip);
       } else {
@@ -14953,7 +15023,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     freeGroup.append(freeLabel, freeItems);
     function createBonusChip(card, overrideUrl) {
       const chip = document.createElement("a");
-      chip.className = "bonus-chip";
+      chip.className = "cbn-row bonus-chip";
       chip.href = overrideUrl ?? card.url;
       chip.target = "_blank";
       chip.rel = "noreferrer";
@@ -14963,7 +15033,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       const pctStr = card.minPct != null && card.maxPct != null ? `${(card.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}-${(card.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}` : (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
       label.textContent = `+${card.approx ? "~" : ""}${pctStr} %${ebInfo}`;
       const badge = document.createElement("span");
-      badge.className = `provider-badge provider-${card.badge}`;
+      badge.className = `cbn-chip provider-badge provider-${card.badge}`;
       badge.textContent = card.label;
       chip.append(label, badge);
       return { chip, label };
@@ -14989,7 +15059,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const revolutSub = REVOLUT_SUBSCRIPTIONS[currentHostname];
     if (revolutSub !== void 0) {
       const revolutChip = document.createElement("a");
-      revolutChip.className = "bonus-chip";
+      revolutChip.className = "cbn-row bonus-chip";
       revolutChip.href = "https://revolut.com/referrals?r=FELPJK";
       revolutChip.target = "_blank";
       revolutChip.rel = "noreferrer";
@@ -14997,7 +15067,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       revolutLabel.className = "bonus-chip-label";
       revolutLabel.textContent = "Inkludert";
       const revolutBadge = document.createElement("span");
-      revolutBadge.className = "provider-badge provider-revolut";
+      revolutBadge.className = "cbn-chip provider-badge provider-revolut";
       revolutBadge.textContent = "Revolut";
       revolutChip.append(revolutLabel, revolutBadge);
       premiumItems.append(revolutChip);
@@ -15030,7 +15100,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
     let hasSelectedItems = false;
     if (cryptoSub !== void 0) {
       const cryptoChip = document.createElement("a");
-      cryptoChip.className = "bonus-chip";
+      cryptoChip.className = "cbn-row bonus-chip";
       cryptoChip.href = "https://crypto.com/app/ns3fma5hou";
       cryptoChip.target = "_blank";
       cryptoChip.rel = "noreferrer";
@@ -15038,7 +15108,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       cryptoChipLabel.className = "bonus-chip-label";
       cryptoChipLabel.textContent = "3-6 mnd gratis";
       const cryptoBadge = document.createElement("span");
-      cryptoBadge.className = "provider-badge provider-crypto";
+      cryptoBadge.className = "cbn-chip provider-badge provider-crypto";
       cryptoBadge.textContent = "Crypto";
       cryptoChip.append(cryptoChipLabel, cryptoBadge);
       const cryptoAdWrapper = document.createElement("span");
@@ -15058,7 +15128,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       chipsSection.classList.add("collapsed");
     }
     const chipsToggle = document.createElement("button");
-    chipsToggle.className = "bonus-chips-toggle";
+    chipsToggle.className = "cbn-button cbn-button--quiet bonus-chips-toggle";
     chipsToggle.type = "button";
     const chipsToggleArrow = document.createElement("span");
     chipsToggleArrow.className = "bonus-chips-toggle-arrow";
@@ -15077,7 +15147,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       codesSection.classList.add("collapsed");
     }
     const codesToggle = document.createElement("button");
-    codesToggle.className = "codes-toggle";
+    codesToggle.className = "cbn-button cbn-button--quiet codes-toggle";
     codesToggle.type = "button";
     const codesToggleArrow = document.createElement("span");
     codesToggleArrow.className = "codes-toggle-arrow";
@@ -15085,7 +15155,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const codesToggleText = document.createElement("span");
     codesToggleText.textContent = "Rabattkoder";
     const addCodeBtn = document.createElement("button");
-    addCodeBtn.className = "add-code-btn";
+    addCodeBtn.className = "cbn-button cbn-button--quiet add-code-btn";
     addCodeBtn.type = "button";
     addCodeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
     const addCodeTooltip = document.createElement("div");
@@ -15116,27 +15186,27 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     addCodeForm.className = "add-code-form";
     addCodeForm.style.display = "none";
     const addRewardInput = document.createElement("input");
-    addRewardInput.className = "add-code-input add-reward-input";
+    addRewardInput.className = "cbn-field add-code-input add-reward-input";
     addRewardInput.type = "number";
     addRewardInput.placeholder = "%";
     addRewardInput.min = "0";
     addRewardInput.max = "100";
     const addCodeInput = document.createElement("input");
-    addCodeInput.className = "add-code-input";
+    addCodeInput.className = "cbn-field add-code-input";
     addCodeInput.type = "text";
     addCodeInput.placeholder = "Kode";
     addCodeInput.maxLength = 30;
     const addCodeSubmit = document.createElement("button");
-    addCodeSubmit.className = "add-code-submit";
+    addCodeSubmit.className = "cbn-button cbn-button--quiet add-code-submit";
     addCodeSubmit.type = "button";
     addCodeSubmit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     addCodeSubmit.disabled = true;
     const addCodeCancel = document.createElement("button");
-    addCodeCancel.className = "add-code-cancel";
+    addCodeCancel.className = "cbn-button cbn-button--quiet add-code-cancel";
     addCodeCancel.type = "button";
     addCodeCancel.textContent = "✕";
     const addCodeFormInner = document.createElement("div");
-    addCodeFormInner.className = "add-code-form-inner";
+    addCodeFormInner.className = "cbn-field-group add-code-form-inner";
     addCodeFormInner.append(addRewardInput, addCodeInput, addCodeSubmit, addCodeCancel);
     addCodeForm.append(addCodeFormInner);
     const updateSubmitState = () => {
@@ -15163,7 +15233,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       codeSpan.className = "code-value";
       codeSpan.textContent = code;
       const copyBtn = document.createElement("span");
-      copyBtn.className = "copy-code-btn";
+      copyBtn.className = "cbn-button cbn-button--quiet copy-code-btn";
       copyBtn.innerHTML = COPY_ICON_SVG;
       const copyTooltip = document.createElement("div");
       copyTooltip.className = "copy-code-tooltip";
@@ -15216,9 +15286,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       if (code.length === 0) return;
       const hasProfanity = (text) => text.toLowerCase().split(/[^a-z0-9æøå]+/).some((w) => w.length > 0 && PROFANITY_SET.has(w));
       if (hasProfanity(code) || hasProfanity(rawReward)) {
-        addCodeInput.style.borderColor = "#e05555";
+        addCodeInput.style.outline = "2px solid #e05555";
         setTimeout(() => {
-          addCodeInput.style.borderColor = "";
+          addCodeInput.style.outline = "";
         }, 1500);
         return;
       }
@@ -15249,7 +15319,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         }
       });
       const item = document.createElement("div");
-      item.className = "code-item";
+      item.className = "cbn-row code-item";
       item.dataset.codeId = "pending";
       const rewardEl = document.createElement("span");
       rewardEl.className = "code-reward";
@@ -15292,7 +15362,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     expiredSection.className = "expired-section collapsed";
     expiredSection.style.display = "none";
     const expiredToggle = document.createElement("button");
-    expiredToggle.className = "expired-toggle";
+    expiredToggle.className = "cbn-button cbn-button--quiet expired-toggle";
     expiredToggle.type = "button";
     const expiredToggleArrow = document.createElement("span");
     expiredToggleArrow.className = "expired-toggle-arrow";
@@ -15308,7 +15378,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     expiredSection.append(expiredToggle, expiredList);
     const makeDeleteBtn = (codeId, row) => {
       const btn = document.createElement("button");
-      btn.className = "delete-code-btn";
+      btn.className = "cbn-button cbn-button--quiet delete-code-btn";
       btn.type = "button";
       btn.title = "Slett koden din";
       btn.innerHTML = `×`;
@@ -15330,7 +15400,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       let upvoted = initialVote === 1;
       let downvoted = initialVote === -1;
       const upBtn = document.createElement("button");
-      upBtn.className = "vote-btn";
+      upBtn.className = "cbn-button cbn-button--quiet vote-btn";
       upBtn.type = "button";
       upBtn.innerHTML = THUMBS_UP_SVG;
       const upCountEl = document.createElement("span");
@@ -15351,7 +15421,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         upTooltip.classList.remove("visible");
       });
       const downBtn = document.createElement("button");
-      downBtn.className = "vote-btn";
+      downBtn.className = "cbn-button cbn-button--quiet vote-btn";
       downBtn.type = "button";
       downBtn.innerHTML = THUMBS_DOWN_SVG;
       const downCountEl = document.createElement("span");
@@ -15484,7 +15554,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     const buildCrawlerRow = (codeOffer, dbId, initUpvotes = 0, initDownvotes = 0, initialVote = 0) => {
       const code = codeOffer.discountCode ?? "";
       const item = document.createElement("div");
-      item.className = "code-item";
+      item.className = "cbn-row code-item";
       if (dbId !== void 0) item.dataset.codeId = String(dbId);
       const reward = document.createElement("a");
       reward.className = "code-reward";
@@ -15546,7 +15616,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const sourceProvider = getCodeSourceProvider(codeOffer);
       if (sourceProvider === void 0) return void 0;
       const chip = document.createElement("a");
-      chip.className = `provider-badge provider-${sourceProvider} code-source-badge provider-filter-link`;
+      chip.className = `cbn-chip provider-badge provider-${sourceProvider} code-source-badge provider-filter-link`;
       chip.href = getProviderPageUrl(sourceProvider);
       chip.target = "_blank";
       chip.rel = "noreferrer";
@@ -15564,7 +15634,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       }
       const displayedRegionPrices = regionPrices.prices;
       const regionPricesToggle = document.createElement("button");
-      regionPricesToggle.className = "region-prices-toggle";
+      regionPricesToggle.className = "cbn-button cbn-button--quiet region-prices-toggle";
       regionPricesToggle.type = "button";
       const regionPricesToggleArrow = document.createElement("span");
       regionPricesToggleArrow.className = "region-prices-toggle-arrow";
@@ -15602,7 +15672,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         priceMatchSection.classList.add("collapsed");
       }
       const priceMatchToggle = document.createElement("button");
-      priceMatchToggle.className = "price-match-toggle";
+      priceMatchToggle.className = "cbn-button cbn-button--quiet price-match-toggle";
       priceMatchToggle.type = "button";
       const priceMatchToggleArrow = document.createElement("span");
       priceMatchToggleArrow.className = "price-match-toggle-arrow";
@@ -15644,7 +15714,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           for (const dbCode of dbCodes) {
             if (shownCodes.has(dbCode.code.toUpperCase())) continue;
             const item = document.createElement("div");
-            item.className = "code-item";
+            item.className = "cbn-row code-item";
             item.dataset.codeId = String(dbCode.id);
             const reward = document.createElement("span");
             reward.className = "code-reward";
@@ -15699,7 +15769,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
           }
           entries.push({ net, reward: dbCode.reward, render: () => {
             const item = document.createElement("div");
-            item.className = "code-item";
+            item.className = "cbn-row code-item";
             item.dataset.codeId = String(dbCode.id);
             const reward = document.createElement("span");
             reward.className = "code-reward";
@@ -15786,9 +15856,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       const disclosure = document.createElement("p");
       disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
       disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
-      panel.append(topLine, body, support, disclosure);
+      panel.append(body, support, disclosure);
     } else {
-      panel.append(topLine, body);
+      panel.append(body);
     }
     notice.append(sideTab, panel);
     panel.addEventListener("transitionend", (e) => {
@@ -15802,6 +15872,20 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       sideTab.setAttribute("aria-label", "Expand cashback offers");
     }
     shadowRoot.append(style, notice);
+    installThemeStyles(shadowRoot);
+    const themeSlot = document.createElement("div");
+    themeSlot.className = "theme-slot";
+    const existingFooter = panel.querySelector(".support");
+    const themeFooter = existingFooter ?? document.createElement("div");
+    if (!existingFooter) themeFooter.className = "theme-footer";
+    themeFooter.append(themeSlot);
+    if (!existingFooter) panel.append(themeFooter);
+    const unbindTheme = bindThemeTarget(extensionTheme, host);
+    const unmountTheme = mountThemeControl(extensionTheme, themeSlot, "up");
+    disposeNoticeTheme = () => {
+      unmountTheme();
+      unbindTheme();
+    };
     const mountTarget = document.body ?? document.documentElement;
     mountTarget.append(host);
     void detectConflicts(shadowRoot, title);
@@ -15872,6 +15956,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     }, { passive: true });
   }
   function clearNotice() {
+    disposeNoticeTheme?.();
+    disposeNoticeTheme = void 0;
     document.getElementById(HOST_ID)?.remove();
   }
   function attachPriceMatchTooltips(shadowRoot, priceMatches) {
@@ -16258,7 +16344,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
-    priceMatchCard.className = "price-match-card";
+    priceMatchCard.className = "cbn-row price-match-card";
     if (isBest) priceMatchCard.classList.add("price-match-card--best");
     priceMatchCard.href = priceMatch.productUrl;
     priceMatchCard.target = "_blank";
@@ -16281,7 +16367,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       priceMatchCard.title = "Søket pågår fortsatt – prisen kan bli oppdatert";
     }
     const priceMatchBadge = document.createElement("span");
-    priceMatchBadge.className = `provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
+    priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
     const hasDuration = priceMatch.durationText !== void 0 && priceMatch.durationText.length > 0;
     if (hasDuration) {
@@ -16297,7 +16383,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
   }
   function buildRegionPriceCard(regionPrice, isBest = false) {
     const regionPriceCard = document.createElement("div");
-    regionPriceCard.className = "region-price-card";
+    regionPriceCard.className = "cbn-row region-price-card";
     if (isBest) regionPriceCard.classList.add("region-price-card--best");
     const regionPriceMain = document.createElement("a");
     regionPriceMain.className = "region-price-main";
@@ -16328,7 +16414,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       regionPriceActions.className = "region-price-actions";
       for (const secondaryLink of secondaryLinks) {
         const regionPriceAction = document.createElement("a");
-        regionPriceAction.className = `provider-badge provider-${secondaryLink.provider} region-price-action`;
+        regionPriceAction.className = `cbn-chip provider-badge provider-${secondaryLink.provider} region-price-action`;
         regionPriceAction.href = secondaryLink.url;
         regionPriceAction.target = "_blank";
         regionPriceAction.rel = "noreferrer";
