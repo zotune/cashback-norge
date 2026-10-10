@@ -140,10 +140,10 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   border-radius: 9px;
   color: var(--cbn-text);
   cursor: pointer;
-  display: flex;
+  display: grid;
   font: inherit;
-  gap: 10px;
-  justify-content: space-between;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 64px 24px;
   min-height: 42px;
   padding: 6px 8px;
   text-align: left;
@@ -151,10 +151,10 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 }
 .provider-option:hover, .provider-option.is-active { background: var(--cbn-hover); }
 .provider-option[aria-selected="true"] { background: var(--cbn-highlight); }
-.provider-option .badge { flex: 0 1 auto; font-size: 12px; min-height: 24px; padding: 0 9px; }
+.provider-option .badge { font-size: 12px; justify-self: start; max-width: 100%; min-height: 24px; min-width: 0; overflow: hidden; padding: 0 9px; text-overflow: ellipsis; }
 .provider-option-all { background: var(--cbn-highlight); color: var(--cbn-accent); }
-.provider-option-count { color: var(--cbn-muted); flex: 0 0 auto; font-size: 12px; }
-.provider-option-check { color: var(--cbn-accent); flex: 0 0 15px; font-weight: 800; text-align: center; }
+.provider-option-count { color: var(--cbn-muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+.provider-option-check { color: var(--cbn-accent); font-weight: 800; text-align: center; }
 .provider-option-empty { color: var(--cbn-muted); font-size: 13px; padding: 14px 8px; text-align: center; }
 .provider-filter-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .provider-filter-status[hidden] { display: none; }
