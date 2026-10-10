@@ -17,6 +17,32 @@
   }
   back.href = '../' + location.search;
   const logo = '<span class="demo-stay-logo">S</span>';
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const copyWithSelection = (text) => {
+    const field = document.createElement('textarea');
+    field.value = text;
+    field.setAttribute('readonly', '');
+    field.setAttribute('aria-hidden', 'true');
+    field.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:.01;font-size:16px;';
+    document.body.append(field);
+    field.focus({ preventScroll: true });
+    field.select();
+    field.setSelectionRange(0, text.length);
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch { /* Older browsers may block the legacy copy command. */ }
+    field.remove();
+    return copied;
+  };
+  const selectVisibleScriptLink = () => {
+    const link = guide.querySelector('.guide-link code');
+    if (!link) return;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(link);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  };
   const tabs = (selected) => `<div class="demo-tabs"><span class="demo-tab ${selected === 'scripts' ? 'selected' : ''}"><b>‹/›</b>Userscripts</span><span class="demo-tab"><b>♧</b>Bookmarks</span><span class="demo-tab ${selected === 'settings' ? 'selected demo-tap' : ''}"><b>⚙</b>Settings</span></div>`;
   const address = '<div class="demo-address"><span class="demo-menu-icon"></span><span>cashbacknorge.no</span><span style="margin-left:auto">↻</span></div>';
   const steps = [
@@ -64,12 +90,24 @@
     window.mountInstallGuide({ guide, steps, storageKey: 'cashback-iphone-step' });
     document.getElementById('iphone-guide-copy').addEventListener('click', async function () {
       const status = document.getElementById('guide-copy-status');
+      if (isIOS && copyWithSelection(SCRIPT_URL)) {
+        this.textContent = 'Kopiert ✓';
+        status.textContent = 'Lim lenken inn i Stay → Link.';
+        return;
+      }
       try {
+        if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
         await navigator.clipboard.writeText(SCRIPT_URL);
         this.textContent = 'Kopiert ✓';
         status.textContent = 'Lim lenken inn i Stay → Link.';
       } catch {
-        status.textContent = 'Hold på lenken og velg Kopier, og lim den inn i Stay.';
+        if (copyWithSelection(SCRIPT_URL)) {
+          this.textContent = 'Kopiert ✓';
+          status.textContent = 'Lim lenken inn i Stay → Link.';
+        } else {
+          selectVisibleScriptLink();
+          status.textContent = 'Lenken er markert. Trykk og hold på den, velg Kopier, og lim den inn i Stay.';
+        }
       }
     });
   };
