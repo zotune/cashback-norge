@@ -13,13 +13,17 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const doc = root.ownerDocument ?? root as Document;
   const view = doc.defaultView!;
   const targets = new WeakMap<HTMLButtonElement, HTMLElement>();
-  let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null } | undefined;
+  let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean } | undefined;
 
   const close = () => {
     if (!active) return;
-    const { button, tooltip, style } = active;
+    const { button, tooltip, style, topLayer } = active;
     button.setAttribute("aria-expanded", "false");
     tooltip.classList.remove("cbn-tooltip-open", "visible");
+    if (topLayer) {
+      try { (tooltip as HTMLElement & { hidePopover?: () => void }).hidePopover?.(); } catch { /* already closed */ }
+      tooltip.removeAttribute("popover");
+    }
     if (style === null) tooltip.removeAttribute("style"); else tooltip.setAttribute("style", style);
     active = undefined;
   };
@@ -31,14 +35,34 @@ export function createTooltipController(root: Document | ShadowRoot) {
     if (active?.button === button) { close(); return; }
     close();
     const tooltip = targets.get(button)!;
-    active = { button, tooltip, style: tooltip.getAttribute("style") };
+    const style = tooltip.getAttribute("style");
+    const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip");
+    let topLayer = false;
     button.setAttribute("aria-expanded", "true");
     tooltip.classList.add("cbn-tooltip-open");
+    const availableWidth = Math.max(80, doc.documentElement.clientWidth - 16);
     Object.assign(tooltip.style, {
       position: "fixed", left: "8px", top: "8px", bottom: "auto", right: "auto", transform: "none",
-      width: `${Math.min(340, doc.documentElement.clientWidth - 16)}px`, maxWidth: "none", maxHeight: `${Math.max(80, view.innerHeight - 32)}px`,
-      overflowY: "auto", boxSizing: "border-box", whiteSpace: "normal",
+      width: isBonusChipTooltip ? "max-content" : `${Math.min(340, availableWidth)}px`,
+      maxWidth: isBonusChipTooltip ? `${Math.min(320, availableWidth)}px` : "none",
+      maxHeight: `${Math.max(80, view.innerHeight - 32)}px`, overflowY: "auto", boxSizing: "border-box", whiteSpace: "normal", margin: "0",
     });
+    // iOS Safari can paint a shadow-DOM tooltip underneath the host page. A
+    // manual popover enters the browser's top layer, while the normal z-index
+    // path remains available on browsers without the Popover API.
+    if (isBonusChipTooltip) {
+      const popover = tooltip as HTMLElement & { showPopover?: () => void };
+      if (typeof popover.showPopover === "function") {
+        try {
+          tooltip.setAttribute("popover", "manual");
+          popover.showPopover();
+          topLayer = true;
+        } catch {
+          tooltip.removeAttribute("popover");
+        }
+      }
+    }
+    active = { button, tooltip, style, topLayer };
     const rect = tooltip.getBoundingClientRect();
     const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
     tooltip.style.left = `${position.left}px`;
