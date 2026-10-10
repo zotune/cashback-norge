@@ -82,7 +82,7 @@
       title: "Prøv i en nettbutikk",
       instruction: `Besøk for eksempel <a href="https://www.komplett.no/" target="_blank" rel="noopener noreferrer">Komplett.no</a> i <a href="${SAFARI_URL}" target="_blank" rel="noopener noreferrer">Safari</a>. <strong>Cashback Norge</strong> skal dukke opp nederst til venstre.`,
       note: 'Ser du ingenting? Sjekk Activated i Stay og tillatelsen til alle nettsteder.',
-      demo: `<div class="demo-content"><h4>Nettbutikk</h4><div class="demo-store-line"></div><div class="demo-store-line"></div><div class="demo-check">✓</div></div><div class="demo-cashback"><img src="../favicon.png?v=bear-1" alt=""><span><strong>Cashback Norge</strong>Se fordeler for denne butikken</span></div>${address}`,
+      demo: `<div class="demo-content"><h4>Nettbutikk</h4><div class="demo-store-line"></div><div class="demo-store-line"></div><div class="demo-check">✓</div></div><div class="demo-cashback"><img src="../favicon.png?v=quokka-1" alt=""><span><strong>Cashback Norge</strong>Se fordeler for denne butikken</span></div>${address}`,
     },
   ];
   const mount = () => {

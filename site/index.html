@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cashback Norge</title>
 <script src="/theme.js?v=3"></script>
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=bear-1">
-<link rel="icon" type="image/png" href="favicon.png?v=bear-1">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
+<link rel="icon" type="image/png" href="favicon.png?v=quokka-1">
 <script>
 // Keep existing installation links working without loading the store index.
 if (location.hash === "#iphone-guide") location.replace("iphone/" + location.search);
@@ -105,9 +105,59 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   width: 40px;
 }
 .provider-picker.is-active { background: var(--cbn-highlight, #eaf7ef);  color: var(--cbn-accent, #166b47); }
+.provider-picker.is-open { background: var(--cbn-hover); }
 .provider-picker svg { pointer-events: none; }
-.provider-picker select { cursor: pointer; height: 100%; inset: 0; opacity: 0; position: absolute; width: 100%; }
-.provider-filter-status { margin-bottom: 8px; }
+.provider-menu[hidden] { display: none; }
+.provider-menu {
+  background: var(--cbn-surface);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px #0005;
+  color: var(--cbn-text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(480px, calc(100dvh - 24px));
+  overflow: hidden;
+  padding: 10px;
+  position: fixed;
+  width: min(360px, calc(100vw - 24px));
+  z-index: 1000;
+}
+.provider-menu-search { flex: 0 0 42px; font: inherit; font-size: 15px; min-height: 42px; padding: 0 52px 0 36px; width: 100%; }
+.provider-menu-search-wrap { min-height: 42px; position: relative; }
+.provider-search-icon { color: var(--cbn-muted); height: 16px; left: 12px; pointer-events: none; position: absolute; top: 13px; width: 16px; }
+.provider-search-mascot { align-items: center; display: flex; height: 36px; justify-content: center; pointer-events: none; position: absolute; right: 4px; top: 3px; width: 40px; }
+.provider-search-mascot img { height: 36px; object-fit: contain; transform: scaleX(-1); width: 36px; }
+.provider-menu-search-wrap:focus-within .provider-search-mascot { animation: provider-quokka-sniff .25s ease-out 1; }
+@keyframes provider-quokka-sniff { 45% { transform: translateY(-1px) rotate(-1deg); } }
+.provider-menu-hint { align-items: center; color: var(--cbn-muted); display: flex; font-size: 12px; justify-content: space-between; padding: 0 2px; }
+.provider-menu-done { align-self: flex-end; min-height: 34px; padding: 0 12px; }
+.provider-option-list { display: grid; gap: 2px; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.provider-option {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--cbn-text);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 6px 8px;
+  text-align: left;
+  width: 100%;
+}
+.provider-option:hover, .provider-option.is-active { background: var(--cbn-hover); }
+.provider-option[aria-selected="true"] { background: var(--cbn-highlight); }
+.provider-option .badge { flex: 0 1 auto; font-size: 12px; min-height: 24px; padding: 0 9px; }
+.provider-option-all { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.provider-option-count { color: var(--cbn-muted); flex: 0 0 auto; font-size: 12px; }
+.provider-option-check { color: var(--cbn-accent); flex: 0 0 15px; font-weight: 800; text-align: center; }
+.provider-option-empty { color: var(--cbn-muted); font-size: 13px; padding: 14px 8px; text-align: center; }
+.provider-filter-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.provider-filter-status[hidden] { display: none; }
 .active-provider {
   align-items: center;
   background: var(--cbn-soft, #f7faf8);
@@ -367,9 +417,10 @@ a.code-reward { color: inherit; text-decoration: none; }
   max-width: 480px;
   overflow: hidden;
 }
-.fixed-footer .tip-line { justify-content: center; margin-bottom: 0; }
+.fixed-footer .tip-line { gap: 4px; justify-content: center; margin-bottom: 0; }
 @media (max-width: 520px) { .fixed-footer { padding-left: 8px; } }
 .fixed-footer .tip-line .ad-chip { position: static !important; }
+.fixed-footer .tip-line a { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fixed-footer .bonus-section-wrap { display: flex; justify-content: space-between; align-items: center; }
 .fixed-footer .bonus-toggle { margin: 0; }
 .fixed-footer .bonus-toggle-arrow { transform: rotate(0deg); }
@@ -411,6 +462,27 @@ a.code-reward { color: inherit; text-decoration: none; }
   text-decoration: none;
 }
 .tip-line a:hover { text-decoration: underline; }
+.quokka-runner {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  width: 52px;
+  height: 52px;
+  left: calc(50% - 240px - 54px);
+  top: 20vh;
+  object-fit: contain;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity .18s ease;
+}
+.quokka-runner.is-running { opacity: 1; animation: quokka-run .16s ease-in-out infinite alternate; }
+@keyframes quokka-run { to { transform: translateY(calc(-50% - 8px)) rotate(-8deg) scale(1.06); } }
+@media (max-width: 760px) { .quokka-runner { display: none; } }
+@media (prefers-reduced-motion: reduce) { .quokka-runner { animation: none; } }
+.fixed-footer .quokka-love { margin-left: 7px; }
+.fixed-footer .quokka-love img { width: 15px; height: 15px; }
+.fixed-footer .quokka-love--couple img { width: 38px; height: 30px; }
+.fixed-footer .quokka-love-heart { font-size: 10px; }
 .adblock-warning {
   align-items: center;
   background: #fff8e1;
@@ -817,7 +889,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 </head>
 <body>
 <div class="container">
-  <img src="logo.png?v=bear-1" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
+  <img src="logo.png?v=quokka-1" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker.</p>
   <div class="update-row"><span>Oppdatert daglig</span>
@@ -846,17 +918,24 @@ a.code-reward { color: inherit; text-decoration: none; }
       <input class="cbn-field search" type="search" placeholder="Søk etter butikk..." autofocus>
       <button class="cbn-button cbn-button--quiet input-clear" type="button" aria-label="Tøm søk">✕</button>
     </div>
-    <div class="cbn-button provider-picker" title="Filtrer etter fordelsprogram">
+    <button class="cbn-button cbn-button--quiet provider-picker" id="provider-picker" type="button" title="Filtrer etter fordelsprogram" aria-label="Filtrer etter fordelsprogram" aria-haspopup="dialog" aria-controls="provider-menu" aria-expanded="false">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
-      <select id="provider-filter" aria-label="Filtrer etter fordelsprogram"><option value="">Alle fordelsprogrammer</option></select>
-    </div>
+    </button>
     <div class="input-wrap">
       <input class="cbn-field global-sum" type="text" inputmode="decimal" placeholder="Sum">
       <button class="cbn-button cbn-button--quiet input-clear" type="button" aria-label="Tøm kjøpesum">✕</button>
     </div>
   </div>
-  <div class="provider-filter-status" hidden>
-    <button class="cbn-chip active-provider" type="button"><span class="active-provider-name"></span><span aria-hidden="true">×</span></button>
+  <div class="provider-filter-status" id="provider-filter-status" aria-label="Valgte fordelsprogrammer" hidden></div>
+  <div class="provider-menu cbn-card" id="provider-menu" role="dialog" aria-label="Velg fordelsprogram" hidden>
+    <div class="provider-menu-search-wrap">
+      <input class="cbn-field provider-menu-search" id="provider-menu-search" type="search" role="combobox" aria-label="Søk i fordelsprogrammer" aria-autocomplete="list" aria-controls="provider-options" aria-expanded="false" placeholder="Søk i fordelsprogrammer..." autocomplete="off">
+      <svg class="provider-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.3 4.3"></path></svg>
+      <span class="provider-search-mascot" aria-hidden="true"><img src="quokka-mascot.png?v=quokka-1" alt=""></span>
+    </div>
+    <div class="provider-menu-hint">Velg ett eller flere programmer</div>
+    <div class="provider-option-list" id="provider-options" role="listbox" aria-label="Fordelsprogrammer"></div>
+    <button class="cbn-button cbn-button--quiet provider-menu-done" id="provider-menu-done" type="button">Ferdig</button>
   </div>
   <div class="bonus-chips-portal" style="display:none">
     <div class="chip-group">
@@ -881,6 +960,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <div class="fixed-footer">
   <div class="tip-line"></div>
 </div>
+<img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
 const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES } = window.SHARED;
@@ -897,7 +977,7 @@ const CRYPTO_SUBSCRIPTIONS = {
 
 let allMerchants = [];
 let curveDomains = new Set();
-let selectedProvider = "";
+let selectedProviders = new Set();
 let providerCounts = new Map();
 
 let currentAmount = 0;
@@ -906,6 +986,191 @@ function getProviderFilterName(provider) {
   if (provider === "cbn") return "Cashback Norge";
   if (provider === "crypto") return "Crypto";
   return PROVIDER_NAMES[provider] || provider;
+}
+
+function hasProviderFilter() {
+  return selectedProviders.size > 0;
+}
+
+function getSelectedProviderNames() {
+  return [...selectedProviders].map(getProviderFilterName);
+}
+
+let visibleProviderOptions = [];
+let activeProviderOption = -1;
+
+function getProviderOptions() {
+  const options = [
+    { provider: "", name: "Alle fordelsprogrammer", count: allMerchants.length },
+    ...[...providerCounts]
+      .sort(([a], [b]) => getProviderFilterName(a).localeCompare(getProviderFilterName(b), "nb"))
+      .map(([provider, count]) => ({ provider, name: getProviderFilterName(provider), count })),
+  ];
+  return options;
+}
+
+function normalizeProviderSearch(value) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("nb");
+}
+
+function setActiveProviderOption(index) {
+  const options = document.querySelectorAll(".provider-option");
+  activeProviderOption = Math.max(-1, Math.min(visibleProviderOptions.length - 1, index));
+  options.forEach((option, optionIndex) => option.classList.toggle("is-active", optionIndex === activeProviderOption));
+  const search = document.getElementById("provider-menu-search");
+  if (activeProviderOption >= 0) search.setAttribute("aria-activedescendant", `provider-option-${activeProviderOption}`);
+  else search.removeAttribute("aria-activedescendant");
+}
+
+function renderProviderOptions(query = "") {
+  const list = document.getElementById("provider-options");
+  if (!list) return;
+  const normalizedQuery = normalizeProviderSearch(query.trim());
+  visibleProviderOptions = getProviderOptions().filter(option =>
+    normalizeProviderSearch(option.name).includes(normalizedQuery));
+  list.replaceChildren();
+  if (visibleProviderOptions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "provider-option-empty";
+    empty.textContent = "Ingen fordelsprogrammer funnet";
+    list.append(empty);
+    setActiveProviderOption(-1);
+    positionProviderMenu();
+    return;
+  }
+  visibleProviderOptions.forEach((item, index) => {
+    const option = document.createElement("div");
+    option.className = "provider-option";
+    option.id = `provider-option-${index}`;
+    option.setAttribute("role", "option");
+    const selected = item.provider ? selectedProviders.has(item.provider) : !hasProviderFilter();
+    option.setAttribute("aria-selected", String(selected));
+    option.dataset.provider = item.provider;
+    const chip = document.createElement("span");
+    chip.className = item.provider ? `badge badge-${item.provider}` : "badge provider-option-all";
+    chip.textContent = item.name;
+    const count = document.createElement("span");
+    count.className = "provider-option-count";
+    count.textContent = `(${item.count})`;
+    const check = document.createElement("span");
+    check.className = "provider-option-check";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = selected ? "✓" : "";
+    option.append(chip, count, check);
+    list.append(option);
+  });
+  const selectedIndex = visibleProviderOptions.findIndex(option => option.provider && selectedProviders.has(option.provider));
+  setActiveProviderOption(selectedIndex >= 0 ? selectedIndex : 0);
+  positionProviderMenu();
+}
+
+function positionProviderMenu() {
+  const picker = document.getElementById("provider-picker");
+  const menu = document.getElementById("provider-menu");
+  if (!picker || !menu || menu.hidden) return;
+  const anchor = picker.getBoundingClientRect();
+  const width = Math.min(360, window.innerWidth - 24);
+  const left = Math.max(12, Math.min(anchor.left + anchor.width / 2 - width / 2, window.innerWidth - width - 12));
+  const below = window.innerHeight - anchor.bottom - 12;
+  const above = anchor.top - 12;
+  menu.style.maxHeight = `${Math.min(480, window.innerHeight - 24)}px`;
+  const naturalHeight = menu.getBoundingClientRect().height;
+  const openBelow = hasProviderFilter() && above >= naturalHeight
+    ? false
+    : below >= naturalHeight || (below >= above && above < naturalHeight);
+  const availableSpace = Math.max(120, (openBelow ? below : above) - 8);
+  menu.style.maxHeight = `${Math.min(480, availableSpace)}px`;
+  const menuHeight = menu.getBoundingClientRect().height;
+  const top = openBelow ? anchor.bottom + 8 : anchor.top - menuHeight - 8;
+  menu.style.width = `${width}px`;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${Math.max(12, top)}px`;
+}
+
+function closeProviderMenu(restoreFocus = false) {
+  const picker = document.getElementById("provider-picker");
+  const menu = document.getElementById("provider-menu");
+  if (!picker || !menu || menu.hidden) return;
+  menu.hidden = true;
+  picker.classList.remove("is-open");
+  picker.setAttribute("aria-expanded", "false");
+  document.getElementById("provider-menu-search").setAttribute("aria-expanded", "false");
+  if (restoreFocus) picker.focus({ preventScroll: true });
+}
+
+function openProviderMenu() {
+  const picker = document.getElementById("provider-picker");
+  const menu = document.getElementById("provider-menu");
+  const search = document.getElementById("provider-menu-search");
+  if (!picker || !menu || !search) return;
+  menu.hidden = false;
+  picker.classList.add("is-open");
+  picker.setAttribute("aria-expanded", "true");
+  search.setAttribute("aria-expanded", "true");
+  search.value = "";
+  renderProviderOptions();
+  positionProviderMenu();
+  requestAnimationFrame(() => {
+    positionProviderMenu();
+    search.focus({ preventScroll: true });
+  });
+}
+
+function setupProviderPicker() {
+  const picker = document.getElementById("provider-picker");
+  const menu = document.getElementById("provider-menu");
+  const search = document.getElementById("provider-menu-search");
+  const list = document.getElementById("provider-options");
+  document.body.append(menu);
+  renderProviderOptions();
+  const status = document.getElementById("provider-filter-status");
+  picker.addEventListener("click", () => menu.hidden ? openProviderMenu() : closeProviderMenu(true));
+  document.getElementById("provider-menu-done").addEventListener("click", () => closeProviderMenu(true));
+  search.addEventListener("input", () => renderProviderOptions(search.value));
+  search.addEventListener("keydown", event => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActiveProviderOption(activeProviderOption < 0
+        ? (step > 0 ? 0 : visibleProviderOptions.length - 1)
+        : (activeProviderOption + step + visibleProviderOptions.length) % visibleProviderOptions.length);
+      list.querySelector(".provider-option.is-active")?.scrollIntoView({ block: "nearest" });
+    } else if (event.key === "Enter" && visibleProviderOptions.length > 0) {
+      event.preventDefault();
+      const choice = visibleProviderOptions[activeProviderOption < 0 ? 0 : activeProviderOption];
+      toggleProviderFilter(choice.provider);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeProviderMenu(true);
+    } else if (event.key === "Tab") {
+      closeProviderMenu();
+    }
+  });
+  list.addEventListener("pointerover", event => {
+    const option = event.target.closest(".provider-option");
+    if (option) setActiveProviderOption(Number(option.id.slice("provider-option-".length)));
+  });
+  list.addEventListener("click", event => {
+    const option = event.target.closest(".provider-option");
+    if (!option) return;
+    toggleProviderFilter(option.dataset.provider || "");
+  });
+  status.addEventListener("click", event => {
+    const chip = event.target.closest("[data-remove-provider]");
+    if (!chip) return;
+    selectedProviders.delete(chip.dataset.removeProvider);
+    updateProviderFilter();
+    syncFilterUrl(true);
+    render(document.querySelector(".search").value);
+  });
+  document.addEventListener("pointerdown", event => {
+    if (!menu.hidden && !menu.contains(event.target) && !picker.contains(event.target)) closeProviderMenu();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !menu.hidden) closeProviderMenu(true);
+  });
+  window.addEventListener("resize", positionProviderMenu, { passive: true });
+  window.addEventListener("scroll", positionProviderMenu, { passive: true, capture: true });
 }
 
 function getMerchantProviders(merchant) {
@@ -922,13 +1187,14 @@ function getMerchantProviders(merchant) {
 }
 
 function matchesProvider(offer) {
-  return !selectedProvider || offer.provider === selectedProvider ||
-    (offer.provider === "rabattkode" && getCodeSourceProvider(offer) === selectedProvider);
+  return !hasProviderFilter() || selectedProviders.has(offer.provider) ||
+    (offer.provider === "rabattkode" && selectedProviders.has(getCodeSourceProvider(offer)));
 }
 
 function getProviderFilterHref(provider) {
   const url = new URL(window.location.href);
   url.searchParams.set("provider", provider);
+  url.searchParams.delete("providers");
   url.searchParams.delete("q");
   return url.pathname + url.search + url.hash;
 }
@@ -943,8 +1209,10 @@ function syncFilterUrl(push = false) {
   const query = document.querySelector(".search").value;
   if (query) url.searchParams.set("q", query);
   else url.searchParams.delete("q");
-  if (selectedProvider) url.searchParams.set("provider", selectedProvider);
-  else url.searchParams.delete("provider");
+  url.searchParams.delete("provider");
+  url.searchParams.delete("providers");
+  if (selectedProviders.size === 1) url.searchParams.set("provider", [...selectedProviders][0]);
+  else if (selectedProviders.size > 1) url.searchParams.set("providers", [...selectedProviders].sort().join(","));
   if (url.href !== window.location.href) {
     history[push ? "pushState" : "replaceState"](null, "", url.toString());
   }
@@ -957,25 +1225,38 @@ function updateGuideLinks(search) {
 }
 
 function updateProviderFilter() {
-  const name = getProviderFilterName(selectedProvider);
-  const select = document.getElementById("provider-filter");
-  // Keep a known provider's deep link meaningful even if its offers have expired.
-  if (selectedProvider && ![...select.options].some(option => option.value === selectedProvider)) {
-    select.add(new Option(`${name} (0)`, selectedProvider));
+  const names = getSelectedProviderNames();
+  const name = names.length === 1 ? names[0] : names.length > 1 ? `${names.length} fordelsprogrammer` : "";
+  const picker = document.getElementById("provider-picker");
+  picker.classList.toggle("is-active", hasProviderFilter());
+  picker.title = hasProviderFilter() ? `Fordelsprogram: ${names.join(", ")}` : "Filtrer etter fordelsprogram";
+  picker.setAttribute("aria-label", picker.title);
+  const status = document.getElementById("provider-filter-status");
+  status.hidden = !hasProviderFilter();
+  status.replaceChildren();
+  for (const provider of selectedProviders) {
+    const chip = document.createElement("button");
+    const providerName = getProviderFilterName(provider);
+    chip.className = `cbn-chip active-provider badge-${provider}`;
+    chip.type = "button";
+    chip.dataset.removeProvider = provider;
+    chip.setAttribute("aria-label", `Fjern ${providerName}-filter`);
+    const label = document.createElement("span");
+    label.textContent = providerName;
+    const remove = document.createElement("span");
+    remove.setAttribute("aria-hidden", "true");
+    remove.textContent = "×";
+    chip.append(label, remove);
+    status.append(chip);
   }
-  select.value = selectedProvider;
-  document.querySelector(".provider-picker").classList.toggle("is-active", !!selectedProvider);
-  document.querySelector(".provider-picker").title = selectedProvider ? `Fordelsprogram: ${name}` : "Filtrer etter fordelsprogram";
-  document.querySelector(".provider-filter-status").hidden = !selectedProvider;
-  document.querySelector(".active-provider-name").textContent = name;
-  const activeChip = document.querySelector(".active-provider");
-  activeChip.className = `cbn-chip active-provider badge-${selectedProvider}`;
-  activeChip.setAttribute("aria-label", `Fjern ${name}-filter`);
-  document.querySelector(".search").placeholder = selectedProvider ? `Søk i ${name}...` : "Søk etter butikk...";
+  document.querySelector(".search").placeholder = names.length === 1
+    ? `Søk i ${names[0]}...`
+    : names.length > 1 ? "Søk i valgte..." : "Søk etter butikk...";
+  renderProviderOptions(document.getElementById("provider-menu-search")?.value || "");
 }
 
 function setProviderFilter(provider, clearQuery = false) {
-  selectedProvider = provider;
+  selectedProviders = provider ? new Set([provider]) : new Set();
   const search = document.querySelector(".search");
   if (clearQuery) search.value = "";
   search.closest(".input-wrap").classList.toggle("has-value", search.value.length > 0);
@@ -984,11 +1265,21 @@ function setProviderFilter(provider, clearQuery = false) {
   render(search.value);
 }
 
+function toggleProviderFilter(provider) {
+  if (!provider) selectedProviders.clear();
+  else if (selectedProviders.has(provider)) selectedProviders.delete(provider);
+  else selectedProviders.add(provider);
+  updateProviderFilter();
+  syncFilterUrl(true);
+  render(document.querySelector(".search").value);
+}
+
 function readFilterUrl() {
   const params = new URLSearchParams(window.location.search);
-  const provider = params.get("provider") || "";
-  selectedProvider = /^[a-z0-9-]+$/.test(provider) &&
-    (providerCounts.has(provider) || Object.hasOwn(PROVIDER_NAMES, provider) || provider === "crypto") ? provider : "";
+  const isKnownProvider = provider => /^[a-z0-9-]+$/.test(provider) &&
+    (providerCounts.has(provider) || Object.hasOwn(PROVIDER_NAMES, provider) || provider === "crypto");
+  const providers = (params.get("providers") || params.get("provider") || "").split(",").filter(isKnownProvider);
+  selectedProviders = new Set(providers);
   const search = document.querySelector(".search");
   search.value = params.get("q") || "";
   search.closest(".input-wrap").classList.toggle("has-value", search.value.length > 0);
@@ -1038,14 +1329,7 @@ async function init() {
       providerCounts.set(provider, (providerCounts.get(provider) || 0) + 1);
     }
   }
-  const providerSelect = document.getElementById("provider-filter");
-  [...providerCounts].sort(([a], [b]) => getProviderFilterName(a).localeCompare(getProviderFilterName(b), "nb"))
-    .forEach(([provider, count]) => providerSelect.add(new Option(`${getProviderFilterName(provider)} (${count})`, provider)));
-  providerSelect.addEventListener("change", () => setProviderFilter(providerSelect.value));
-  document.querySelector(".active-provider").addEventListener("click", () => {
-    setProviderFilter("");
-    document.querySelector(".search").focus({ preventScroll: true });
-  });
+  setupProviderPicker();
   document.querySelector(".results").addEventListener("click", (event) => {
     const chip = event.target.closest(".provider-filter-link");
     if (!chip || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -1067,7 +1351,7 @@ async function init() {
 
   // Provider changes create a history entry; typing updates the current entry.
   readFilterUrl();
-  if (searchEl.value.length > 0 || selectedProvider) {
+  if (searchEl.value.length > 0 || hasProviderFilter()) {
     searchEl.scrollIntoView({ block: "center" });
   }
 
@@ -1305,7 +1589,8 @@ function foldSearchText(value) {
 function render(query) {
   const q = foldSearchText(query.trim());
   const terms = q.split(/\s+/).filter(t => t.length > 0);
-  const merchants = allMerchants.filter(m => m.providers.size > 0 && (!selectedProvider || m.providers.has(selectedProvider)));
+  const merchants = allMerchants.filter(m => m.providers.size > 0 &&
+    (!hasProviderFilter() || [...selectedProviders].some(provider => m.providers.has(provider))));
   let filtered;
   if (terms.length === 0) {
     filtered = merchants;
@@ -1335,7 +1620,8 @@ function render(query) {
   const container = document.querySelector(".results");
   window.CashbackTooltips.close();
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="empty">${selectedProvider ? `Ingen treff i ${esc(getProviderFilterName(selectedProvider))}. Prøv et annet søk eller fjern filteret.` : "Ingen treff"}</div>`;
+    const providerNames = getSelectedProviderNames().join(", ");
+    container.innerHTML = `<div class="empty">${hasProviderFilter() ? `Ingen treff i ${esc(providerNames)}. Prøv et annet søk eller fjern filteret.` : "Ingen treff"}</div>`;
     return;
   }
 
@@ -1386,12 +1672,12 @@ function render(query) {
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
     const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
-    const cryptoSelectedHtml = cryptoSubName && (!selectedProvider || selectedProvider === "crypto") ? (() => {
+    const cryptoSelectedHtml = cryptoSubName && (!hasProviderFilter() || selectedProviders.has("crypto")) ? (() => {
       const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
       return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
     })() : "";
     const hasCurve = m.domains.some(d => curveDomains.has(d));
-    const curveSelectedHtml = hasCurve && (!selectedProvider || selectedProvider === "curve") ? (() => {
+    const curveSelectedHtml = hasCurve && (!hasProviderFilter() || selectedProviders.has("curve")) ? (() => {
       const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
       return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
     })() : "";
@@ -1431,10 +1717,10 @@ function render(query) {
       </div>
       <div class="offers">${offerHtml}</div>
       ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
-      <div class="codes-inline${selectedProvider && codesHtml ? " open" : ""}${(selectedProvider ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
+      <div class="codes-inline${hasProviderFilter() && codesHtml ? " open" : ""}${(hasProviderFilter() ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
         <div class="codes-toggle-wrap">
-          <button class="cbn-button cbn-button--quiet codes-toggle${selectedProvider && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
-          <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${selectedProvider ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="cbn-button cbn-button--quiet codes-toggle${hasProviderFilter() && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
+          <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${hasProviderFilter() ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
         <div class="codes-items">
           <div class="codes-add-form">
@@ -1628,7 +1914,7 @@ function render(query) {
     // Load DB codes — deferred until section is first expanded
     let dbLoaded = false;
     const loadDbCodes = () => {
-      if (selectedProvider) return; // Community codes have no provider attribution.
+      if (hasProviderFilter()) return; // Community codes have no provider attribution.
       if (dbLoaded) return;
       dbLoaded = true;
       Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
@@ -1947,9 +2233,31 @@ function renderTips() {
   const container = document.querySelector(".tip-line");
   if (pick) {
     const adHtml = pick.affiliate ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span> ' : '';
-    container.innerHTML = `${adHtml}<a href="${esc(pick.url)}" target="_blank" rel="noreferrer">${esc(pick.text)}</a>`;
+    const quokkaLove = '<span class="quokka-love quokka-love--couple" role="img" aria-label="To quokkaer støtter veldedighet sammen"><img src="quokka-couple.png?v=quokka-1" alt=""></span>';
+    container.innerHTML = `${adHtml}<a href="${esc(pick.url)}" target="_blank" rel="noreferrer">${esc(pick.text)}</a>${quokkaLove}`;
   }
 }
+
+function installQuokkaRunner() {
+  const runner = document.querySelector(".quokka-runner");
+  if (!runner || window.matchMedia("(max-width: 760px), (prefers-reduced-motion: reduce)").matches) return;
+  let frame = 0;
+  let hideTimer;
+  const moveWithScroll = () => {
+    frame = 0;
+    const scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const progress = Math.min(1, Math.max(0, window.scrollY / scrollable));
+    const viewportRange = Math.max(0, window.innerHeight * .58);
+    runner.style.top = `${window.innerHeight * .18 + viewportRange * progress}px`;
+    runner.classList.add("is-running");
+    clearTimeout(hideTimer);
+    hideTimer = window.setTimeout(() => runner.classList.remove("is-running"), 650);
+  };
+  window.addEventListener("scroll", () => {
+    if (frame === 0) frame = window.requestAnimationFrame(moveWithScroll);
+  }, { passive: true });
+}
+installQuokkaRunner();
 
 function renderChipGroup(cards, container) {
   container.innerHTML = cards.map(c => {

@@ -1,5 +1,6 @@
-import { UI_CSS } from "./ui";
-import { PROVIDER_COLORS } from "./provider-data";
+import { UI_CSS } from "./ui.js";
+import { PROVIDER_COLORS } from "./provider-data.js";
+import { BRAND_QUOKKA_DATA_URL } from "./brand.js";
 
 export type ThemePreference = "system" | "light" | "dark";
 export const THEME_STORAGE_KEY = "cashback-norge-theme";
@@ -67,6 +68,7 @@ const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) =>
 export const THEME_CSS = `
 :root, :host {
   color-scheme: light;
+  --cbn-quokka-mascot: url("${BRAND_QUOKKA_DATA_URL}");
   --cbn-bg: #f7faf8; --cbn-surface: #fff; --cbn-soft: #f7faf8;
   --cbn-text: #172026; --cbn-muted: #5d6b71; --cbn-subtle: #8a9a92;
   --cbn-border: #d6e1dc; --cbn-hover: #edf2ef; --cbn-accent: #22794f;
@@ -99,6 +101,15 @@ ${darkProviderCss}
 .cbn-theme-option svg { width: 16px; height: 16px; }
 .cbn-theme-option[aria-pressed="true"]::after { content: '✓'; margin-left: auto; }
 .cbn-theme[data-placement="up"] .cbn-theme-menu { top: auto; bottom: calc(100% + 6px); }
+.cbn-quokka-tooltip-anchor { position: relative; }
+.charity-chip::after { content: "♥"; margin-left: 3px; color: #e46e83; font-size: 10px; }
+.quokka-love { display: inline-flex; align-items: center; gap: 0; margin-left: 5px; vertical-align: middle; white-space: nowrap; }
+.quokka-love img { display: block; width: 17px; height: 17px; object-fit: contain; }
+.quokka-love img + img { transform: scaleX(-1); }
+.quokka-love--couple img { width: 42px; height: 32px; object-fit: contain; animation: cbn-quokka-couple 2.4s ease-in-out infinite; }
+.quokka-love-heart { color: #e46e83; font-size: 11px; line-height: 1; animation: cbn-quokka-heart 1.8s ease-in-out infinite; }
+@keyframes cbn-quokka-couple { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.035); } }
+@keyframes cbn-quokka-heart { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.18); } 24% { transform: scale(1); } }
 .guide-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .brand > [data-theme-control] { margin-left: auto; }
 .theme-slot { display: flex; align-items: center; }

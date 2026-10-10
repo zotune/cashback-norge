@@ -1,5 +1,7 @@
 // Touch users get an explicit details button; links keep their normal one-tap action.
 // One delegated controller per page/panel, with no observer or per-button document listeners.
+import { BRAND_QUOKKA_DATA_URL } from "./brand.js";
+
 let nextTooltipId = 0;
 
 export function tooltipPosition(anchor: { left: number; bottom: number; top: number }, width: number, height: number, viewport: { width: number; height: number }) {
@@ -89,6 +91,19 @@ export function createTooltipController(root: Document | ShadowRoot) {
     close,
     add(parent: HTMLElement, tooltip: HTMLElement, label = "Vis vilkår og detaljer") {
       if (parent.querySelector(".cbn-tooltip-trigger")) return;
+      const mascotAnchor = parent.closest<HTMLElement>(".offer-wrap, .offer-link-wrapper, .code-item-row, .tooltip-wrap");
+      mascotAnchor?.classList.add("cbn-quokka-tooltip-anchor");
+      if (!tooltip.querySelector(".cbn-tooltip-mascot")) {
+        tooltip.classList.add("cbn-has-quokka");
+        const mascot = doc.createElement("span");
+        mascot.className = "cbn-tooltip-mascot";
+        mascot.setAttribute("aria-hidden", "true");
+        const image = doc.createElement("img");
+        image.src = BRAND_QUOKKA_DATA_URL;
+        image.alt = "";
+        mascot.append(image);
+        tooltip.prepend(mascot);
+      }
       tooltip.id ||= `cbn-tooltip-${++nextTooltipId}`;
       tooltip.setAttribute("role", "tooltip");
       const button = doc.createElement("button");
@@ -112,7 +127,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     },
     addBeside(anchor: HTMLElement, tooltip: HTMLElement, label?: string) {
       const row = doc.createElement("div");
-      row.className = "cbn-tooltip-row";
+      row.className = "cbn-tooltip-row cbn-quokka-tooltip-anchor";
       anchor.replaceWith(row);
       row.append(anchor);
       if (anchor.classList.contains("bonus-chip")) {

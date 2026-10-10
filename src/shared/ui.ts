@@ -54,13 +54,21 @@ export const UI_CSS = `
 .bonus-chip-brand-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
 .cbn-tooltip-open.cbn-tooltip-open { display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
 .cbn-tooltip-open::after { display: none; }
+.cbn-has-quokka { padding-left: 46px !important; }
+.cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
+.cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
   .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
   .cbn-tooltip-row > .cbn-row, .cbn-tooltip-row > a { flex: 1; min-width: 0; }
   .offer-tooltip:not(.cbn-tooltip-open), .bonus-chip-tooltip:not(.cbn-tooltip-open), .tooltip-wrap > .tooltip:not(.cbn-tooltip-open) { visibility: hidden; pointer-events: none; }
 }
-@media (prefers-reduced-motion: reduce) { .cbn-button, .cbn-field, .cbn-field-group, .cbn-row, .cbn-chip { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .cbn-button, .cbn-field, .cbn-field-group, .cbn-row, .cbn-chip { transition: none; }
+  .quokka-love-heart, .quokka-love--couple img, .side-tab-mascot,
+  .bonus-toggle-quokka img, .bonus-toggle-berries, .cbn-tooltip-mascot,
+  .quokka-runner, .cbn-quokka-tooltip-anchor::before, .cbn-quokka-tooltip-anchor::after { animation: none; }
+}
 `;
 
 export function createMutedChip(label: string): HTMLSpanElement {

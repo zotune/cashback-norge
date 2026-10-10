@@ -38,7 +38,7 @@ import enWords from "naughty-words/en.json";
 import { bindThemeTarget, installThemeStyles, mountThemeControl } from "../shared/theme";
 import { extensionTheme } from "./theme";
 import { createMutedChip } from "../shared/ui";
-import { BRAND_LOGO_DATA_URL } from "../shared/brand";
+import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, type TooltipController } from "../shared/tooltips";
 
 type UserscriptHttpRequestOptions = {
@@ -9753,9 +9753,37 @@ function renderNotice(
       font: inherit;
       min-height: 40px;
       padding: 8px 5px;
+      position: relative;
       width: 26px;
       flex-shrink: 0;
       transition: min-height 0.25s ease, padding 0.25s ease;
+    }
+    .notice.has-fantastic-offer.collapsed .side-tab::after {
+      align-items: center;
+      background: #f3bd3f;
+      border-radius: 50%;
+      color: #251d0e;
+      content: "!";
+      display: grid;
+      font-size: 10px;
+      font-weight: 900;
+      height: 15px;
+      left: 14px;
+      line-height: 1;
+      position: absolute;
+      top: -3px;
+      width: 15px;
+      z-index: 4;
+    }
+    .side-tab-mascot {
+      display: none;
+      height: 38px;
+      left: -5px;
+      object-fit: contain;
+      pointer-events: none;
+      position: absolute;
+      top: -31px;
+      width: 38px;
     }
     .side-tab-arrow {
       font-size: 16px;
@@ -9787,11 +9815,22 @@ function renderNotice(
       border-radius: 4px;
     }
     .notice.collapsed .side-tab {
-      min-height: 80px;
-      padding: 10px 5px;
+      min-height: 112px;
+      padding: 8px 5px;
+      width: 42px;
     }
     .notice.collapsed .side-tab-arrow {
       display: none;
+    }
+    .notice.collapsed .side-tab-mascot {
+      display: block;
+      flex: 0 0 24px;
+      height: 24px;
+      left: auto;
+      margin-bottom: 2px;
+      position: static;
+      transform: none;
+      width: 24px;
     }
     .notice.collapsed .side-tab-text {
       display: flex;
@@ -10222,6 +10261,35 @@ function renderNotice(
       padding: 4px;
       font-size: 11px;
       line-height: 1;
+      position: relative;
+    }
+    .vote-btn::after {
+      background: var(--cbn-quokka-mascot) center / contain no-repeat;
+      content: "";
+      height: 32px;
+      left: 50%;
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      top: -31px;
+      transform: translate(-50%, 4px) scale(.92);
+      transition: opacity .16s ease, transform .16s ease;
+      width: 32px;
+      z-index: 4;
+    }
+    @media (hover: hover) {
+      .vote-btn:hover::after { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    }
+    .vote-btn:focus-visible::after { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    .vote-btn.quokka-cheer::after { animation: quokka-vote .85s ease-out both; }
+    @keyframes quokka-vote {
+      0% { opacity: 0; transform: translate(-50%, 5px) scale(.9); }
+      20%, 68% { opacity: 1; transform: translate(-50%, -2px) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -8px) scale(.96); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .vote-btn::after { transition: none; }
+      .vote-btn.quokka-cheer::after { animation: none; opacity: 1; transform: translate(-50%, 0); }
     }
     .vote-btn.voted {
       color: var(--cbn-accent, #1f8f5f);
@@ -10394,6 +10462,19 @@ function renderNotice(
       font-size: 10px;
       transition: transform 0.15s;
     }
+    .bonus-toggle-quokka {
+      align-items: center;
+      display: inline-flex;
+      height: 30px;
+      margin-left: 3px;
+      position: relative;
+      width: 38px;
+    }
+    .bonus-toggle-quokka img { height: 31px; object-fit: contain; transform: scaleX(-1); width: 31px; }
+    .bonus-toggle-berries { font-size: 10px; letter-spacing: -4px; position: absolute; right: -1px; top: -2px; transform: rotate(14deg); }
+    .bonus-chips-section.collapsed .bonus-toggle-quokka { display: none; }
+    .bonus-chips-section:not(.collapsed) .bonus-toggle-quokka img { animation: quokka-carry 1.2s ease-in-out infinite alternate; }
+    .bonus-chips-section:not(.collapsed) .bonus-toggle-berries { animation: quokka-berries 1s ease-in-out infinite alternate; }
     .bonus-chips-section.collapsed .bonus-chips {
       display: none;
     }
@@ -10675,6 +10756,8 @@ function renderNotice(
     .offer-link-wrapper {
       position: relative;
     }
+    @keyframes quokka-carry { to { transform: scaleX(-1) translateY(-3px) rotate(4deg); } }
+    @keyframes quokka-berries { to { transform: rotate(-10deg) translateY(-3px); } }
     .card-only-warn {
       color: var(--cbn-subtle, #b0bec5);
       cursor: help;
@@ -10825,12 +10908,23 @@ function renderNotice(
   const tooltipControls = createTooltipController(shadowRoot);
   const notice = document.createElement("section");
   notice.className = "notice";
+  const bestReward = offer !== undefined ? parseRewardValue(offer) : undefined;
+  const hasFantasticOffer = offer !== undefined && (
+    (bestReward?.kind === "percentage" && bestReward.amount >= 10) ||
+    (readRewardSortValueNok(offer) ?? 0) >= 250
+  );
+  if (hasFantasticOffer) notice.classList.add("has-fantastic-offer");
   const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "region");
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
   sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
   sideTab.type = "button";
   sideTab.setAttribute("aria-label", "Collapse cashback offers");
+  const sideTabMascot = document.createElement("img");
+  sideTabMascot.className = "side-tab-mascot";
+  sideTabMascot.src = BRAND_QUOKKA_DATA_URL;
+  sideTabMascot.alt = "";
+  sideTabMascot.setAttribute("aria-hidden", "true");
   const sideTabArrow = document.createElement("span");
   sideTabArrow.className = "side-tab-arrow";
   sideTabArrow.textContent = "\u2039"; // ‹
@@ -10873,7 +10967,7 @@ function renderNotice(
     chipSpan.textContent = `${bestRegionPrice.flag} Region`;
     sideTabText.append(rewardSpan, chipSpan);
   }
-  sideTab.append(sideTabArrow, sideTabText);
+  sideTab.append(sideTabMascot, sideTabArrow, sideTabText);
   sideTab.addEventListener("click", () => {
     const isCollapsed = notice.classList.contains("collapsed");
     setCollapsed(notice, sideTab, sideTabArrow, !isCollapsed);
@@ -11132,7 +11226,17 @@ function renderNotice(
   chipsToggleArrow.textContent = "\u25BC";
   const chipsToggleText = document.createElement("span");
   chipsToggleText.textContent = "Ekstra cashback";
-  chipsToggle.append(chipsToggleArrow, chipsToggleText);
+  const bonusQuokka = document.createElement("span");
+  bonusQuokka.className = "bonus-toggle-quokka";
+  bonusQuokka.setAttribute("aria-hidden", "true");
+  const bonusQuokkaImage = document.createElement("img");
+  bonusQuokkaImage.src = BRAND_QUOKKA_DATA_URL;
+  bonusQuokkaImage.alt = "";
+  const bonusBerries = document.createElement("span");
+  bonusBerries.className = "bonus-toggle-berries";
+  bonusBerries.textContent = "🫐🫐🫐";
+  bonusQuokka.append(bonusQuokkaImage, bonusBerries);
+  chipsToggle.append(chipsToggleArrow, chipsToggleText, bonusQuokka);
   chipsToggle.addEventListener("click", () => {
     const isCollapsed = chipsSection.classList.toggle("collapsed");
     chrome.storage.local.set({ [CHIPS_COLLAPSED_KEY]: isCollapsed });
@@ -11397,6 +11501,15 @@ function renderNotice(
 
   const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
   const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
+  const voteMascotTimers = new WeakMap<HTMLButtonElement, number>();
+  const peekVoteQuokka = (button: HTMLButtonElement): void => {
+    const oldTimer = voteMascotTimers.get(button);
+    if (oldTimer !== undefined) window.clearTimeout(oldTimer);
+    button.classList.remove("quokka-cheer");
+    void button.offsetWidth;
+    button.classList.add("quokka-cheer");
+    voteMascotTimers.set(button, window.setTimeout(() => button.classList.remove("quokka-cheer"), 900));
+  };
 
   const attachVoteButtons = (item: HTMLElement, staticCode?: { code: string; reward: string; hostname: string }, initialVote: 1 | -1 | 0 = 0): { upBtn: HTMLButtonElement; downBtn: HTMLButtonElement } => {
     let upvotes = 0;
@@ -11406,6 +11519,7 @@ function renderNotice(
     const upBtn = document.createElement("button");
     upBtn.className = "cbn-button cbn-button--quiet vote-btn";
     upBtn.type = "button";
+    upBtn.setAttribute("aria-label", "Stem opp for at rabattkoden fungerer");
     upBtn.innerHTML = THUMBS_UP_SVG;
     const upCountEl = document.createElement("span");
     upCountEl.className = "vote-count";
@@ -11425,6 +11539,7 @@ function renderNotice(
     const downBtn = document.createElement("button");
     downBtn.className = "cbn-button cbn-button--quiet vote-btn";
     downBtn.type = "button";
+    downBtn.setAttribute("aria-label", "Stem ned for at rabattkoden er utgått");
     downBtn.innerHTML = THUMBS_DOWN_SVG;
     const downCountEl = document.createElement("span");
     downCountEl.className = "vote-count";
@@ -11462,6 +11577,7 @@ function renderNotice(
       }
     };
     upBtn.addEventListener("click", () => {
+      peekVoteQuokka(upBtn);
       userHasVoted = true;
       const codeId = Number(item.dataset.codeId);
       if (upvoted) {
@@ -11488,6 +11604,7 @@ function renderNotice(
       });
     });
     downBtn.addEventListener("click", () => {
+      peekVoteQuokka(downBtn);
       userHasVoted = true;
       const codeId = Number(item.dataset.codeId);
       if (downvoted) {
@@ -11877,6 +11994,15 @@ function renderNotice(
     const disclosure = document.createElement("p");
     disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
+    const quokkaLove = document.createElement("span");
+    quokkaLove.className = "quokka-love quokka-love--couple";
+    quokkaLove.setAttribute("role", "img");
+    quokkaLove.setAttribute("aria-label", "To quokkaer støtter veldedighet sammen");
+    const couple = document.createElement("img");
+    couple.src = BRAND_QUOKKA_COUPLE_DATA_URL;
+    couple.alt = "";
+    quokkaLove.append(couple);
+    disclosure.append(" ", quokkaLove);
     panel.append(body, support, disclosure);
   } else {
     panel.append(body);
@@ -12532,7 +12658,9 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
   priceMatchCard.className = "cbn-row price-match-card";
-  if (isBest) priceMatchCard.classList.add("price-match-card--best");
+  if (isBest) {
+    priceMatchCard.classList.add("price-match-card--best");
+  }
   priceMatchCard.href = priceMatch.productUrl;
   priceMatchCard.target = "_blank";
   priceMatchCard.rel = "noreferrer";
