@@ -24,7 +24,7 @@ const USERSCRIPT_BANNER = `\
 // @version      ${VERSION}
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
-// @icon         ${PAGES_URL}/favicon.png
+// @icon         ${PAGES_URL}/favicon.png?v=bear-1
 // @match        *://*/*
 // @exclude      *://cashbacknorge.no/*
 // @exclude      *://www.cashbacknorge.no/*

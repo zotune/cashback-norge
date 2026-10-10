@@ -10,7 +10,7 @@ installation guides, React popup, shadow DOM panel and generated userscript.
 Keep layout, typography and sizing in the screen's stylesheet. Change fills,
 corners and interaction states here, so all surfaces change together. Installation
 buttons configure `--cbn-button-bg` and `--cbn-button-fg`. Provider chips retain their
-brand fills. Do not add persistent borders; use an outline for input focus and
+brand hues, with pale fills and white lettering softened in dark mode. Do not add persistent borders; use an outline for input focus and
 keyboard focus. The illustrated third-party phone screens retain their real UI.
 
 `theme.ts` supplies the shared light/dark palette, preference store and theme-menu

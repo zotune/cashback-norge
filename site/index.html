@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cashback Norge</title>
-<script src="/theme.js?v=2"></script>
-<link rel="icon" type="image/png" href="favicon.png">
+<script src="/theme.js?v=3"></script>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=bear-1">
+<link rel="icon" type="image/png" href="favicon.png?v=bear-1">
 <script>
 // Keep existing installation links working without loading the store index.
 if (location.hash === "#iphone-guide") location.replace("iphone/" + location.search);
@@ -816,7 +817,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 </head>
 <body>
 <div class="container">
-  <img src="favicon.png" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
+  <img src="logo.png?v=bear-1" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker.</p>
   <div class="update-row"><span>Oppdatert daglig</span>
@@ -829,7 +830,7 @@ a.code-reward { color: inherit; text-decoration: none; }
     <a id="iphone-guide-btn" class="cbn-button install-link install-iphone" href="iphone/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4m-3 14h2"/></svg><span class="install-label">iPhone/iPad<small>Safari</small></span></a>
     <a id="android-guide-btn" class="cbn-button install-link install-android" href="android/" aria-label="Installer på Android med Firefox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 5-2-3m12 3 2-3M4 10a8 8 0 0 1 16 0zM4 13v6h16v-6M8 19v3m8-3v3M1 12v6m22-6v6"/><circle cx="8" cy="7" r=".7" fill="currentColor" stroke="none"/><circle cx="16" cy="7" r=".7" fill="currentColor" stroke="none"/></svg><span class="install-label">Android<small>Firefox</small></span></a>
   </nav>
-  <p style="font-size:11px;color:#8a9a92;text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
+  <p style="font-size:11px;color:var(--cbn-muted);text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <div class="sticky-header">
   <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -1332,6 +1333,7 @@ function render(query) {
     : `${merchants.length} butikker`;
 
   const container = document.querySelector(".results");
+  window.CashbackTooltips.close();
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty">${selectedProvider ? `Ingen treff i ${esc(getProviderFilterName(selectedProvider))}. Prøv et annet søk eller fjern filteret.` : "Ingen treff"}</div>`;
     return;
@@ -1455,6 +1457,7 @@ function render(query) {
     </div>`;
   }).join("");
 
+  window.CashbackTooltips.attach(container);
   if (window._azObserveAll) window._azObserveAll();
 
   // Attach codes toggle handlers
@@ -1976,7 +1979,7 @@ function renderChipGroup(cards, container) {
     return `<span class="tooltip-wrap">
       <span class="tooltip">${esc(c.tip)}</span>
       <a class="cbn-row bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
-        ${rewardText} <span style="display:inline-flex;align-items:center;gap:6px;">${(c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
+        <span class="bonus-chip-label">${rewardText}</span> <span style="display:inline-flex;align-items:center;gap:6px;">${(c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
       </a>
     </span>`;
   }).join("");
@@ -2043,6 +2046,7 @@ function setupAzBar() {
 function renderBonusChips() {
   renderChipGroup(FREE_CARDS, document.getElementById("free-chips"));
   renderChipGroup(PREMIUM_CARDS, document.getElementById("premium-chips"));
+  window.CashbackTooltips.attach(document.querySelector(".bonus-chips-portal"));
 }
 
 function setupBonusToggle() {
@@ -2075,16 +2079,6 @@ function setupBonusToggle() {
     if (dy > 40) closeChips();
   }, { passive: true });
 
-  // Tap-to-show tooltips on mobile (bonus chips only)
-  document.addEventListener("click", (e) => {
-    const wrap = e.target.closest(".tooltip-wrap");
-    document.querySelectorAll(".tooltip-wrap.active").forEach(el => {
-      if (el !== wrap) el.classList.remove("active");
-    });
-    if (wrap) {
-      wrap.classList.toggle("active");
-    }
-  });
 }
 
 

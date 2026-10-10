@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1791640074
+// @version      1791641575
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
-// @icon         https://cashbacknorge.no/favicon.png
+// @icon         https://cashbacknorge.no/favicon.png?v=bear-1
 // @match        *://*/*
 // @exclude      *://cashbacknorge.no/*
 // @exclude      *://www.cashbacknorge.no/*
@@ -197,6 +197,65 @@
     elbilforeningen: "Elbilforeningen",
     ys: "YS",
     lofavor: "LOfavør"
+  };
+  const PROVIDER_COLORS = {
+    crypto: { bg: "#002d74", fg: "#ffffff" },
+    remember: { bg: "#111111", fg: "#ff9900" },
+    klarna: { bg: "#ffa8cd", fg: "#0b051d" },
+    coupert: { bg: "#f03d30", fg: "#ffffff" },
+    trumf: { bg: "#07006b", fg: "#ffffff" },
+    sas: { bg: "#00005c", fg: "#ffffff" },
+    tfbank: { bg: "#e30613", fg: "#ffffff" },
+    dnb: { bg: "#14555a", fg: "#ffffff" },
+    curve: { bg: "#000000", fg: "#ffffff" },
+    rabattkode: { bg: "#e74c3c", fg: "#ffffff" },
+    norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
+    logbuy: { bg: "#d81939", fg: "#ffffff" },
+    obos: { bg: "#003087", fg: "#ffffff" },
+    bob: { bg: "#ffffff", fg: "#5b2486" },
+    usbl: { bg: "#34413e", fg: "#ffffff" },
+    bate: { bg: "#ffffff", fg: "#ef1c24" },
+    tobb: { bg: "#00466b", fg: "#ffffff" },
+    naf: { bg: "#FFD100", fg: "#000000" },
+    tekna: { bg: "#ffffff", fg: "#00a3ad" },
+    nito: { bg: "#c8e6b8", fg: "#003b00" },
+    sparebank1: { bg: "#005aa4", fg: "#ffffff" },
+    studentkortet: { bg: "#1B2838", fg: "#ffffff" },
+    studenttorget: { bg: "#009fe3", fg: "#ffffff" },
+    nettbonus: { bg: "#5b0f8c", fg: "#ffffff" },
+    spenn: { bg: "#E51454", fg: "#ffffff" },
+    spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
+    rabble: { bg: "#2d2145", fg: "#f8a6a6" },
+    dreams: { bg: "#a389d8", fg: "#1a1a1a" },
+    utdanningibergen: { bg: "#ffffff", fg: "#000000" },
+    unidays: { bg: "#00b140", fg: "#ffffff" },
+    unio: { bg: "#ffffff", fg: "#6b5330" },
+    coop: { bg: "#003366", fg: "#ffffff" },
+    elkjop: { bg: "#1d1b58", fg: "#ffffff" },
+    akademikerne: { bg: "#fff7f0", fg: "#113063" },
+    huseierne: { bg: "#ffffff", fg: "#0f1a18" },
+    huseierforbundet: { bg: "#ffffff", fg: "#0f1a18" },
+    amcar: { bg: "#c01921", fg: "#ffffff" },
+    horselsforbundet: { bg: "#ffffff", fg: "#f1774f" },
+    knbf: { bg: "#00205b", fg: "#ffffff" },
+    njff: { bg: "#ffffff", fg: "#003a5d" },
+    pensjonistforbundet: { bg: "#ffffff", fg: "#000000" },
+    kna: { bg: "#d60929", fg: "#ffffff" },
+    syklistforeningen: { bg: "#e61414", fg: "#ffffff" },
+    revmatikerforbundet: { bg: "#ffffff", fg: "#2d4f9e" },
+    redningsselskapet: { bg: "#ffffff", fg: "#0a2a66" },
+    lhl: { bg: "#ffffff", fg: "#4b1d6f" },
+    skiforeningen: { bg: "#ffffff", fg: "#0067b1" },
+    agrol: { bg: "#ffffff", fg: "#3d3d3d" },
+    kondis: { bg: "#ffffff", fg: "#8b1a1a" },
+    santander: { bg: "#ffffff", fg: "#ec0000" },
+    norwegian: { bg: "#d81939", fg: "#ffffff" },
+    vestbo: { bg: "#ffffff", fg: "#1dc1dd" },
+    bbl: { bg: "#1657e2", fg: "#ffffff" },
+    elbilforeningen: { bg: "#003a78", fg: "#ffffff" },
+    ys: { bg: "#006e26", fg: "#ffffff" },
+    lofavor: { bg: "#dc141a", fg: "#ffffff" },
+    cbn: { bg: "#ffe4e6", fg: "#be123c" }
   };
   const FREE_CARDS = [
     {
@@ -7503,6 +7562,20 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
+.cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
+.cbn-tooltip-row { display: contents; }
+.cbn-offer-details { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.bonus-chip.cbn-tooltip-row { display: flex; }
+.bonus-chip-action { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+.bonus-chip-brand-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+.cbn-tooltip-open.cbn-tooltip-open { display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
+.cbn-tooltip-open::after { display: none; }
+@media (hover: none), (pointer: coarse), (max-width: 520px) {
+  .cbn-tooltip-trigger { display: inline-flex; }
+  .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .cbn-tooltip-row > .cbn-row, .cbn-tooltip-row > a { flex: 1; min-width: 0; }
+  .offer-tooltip:not(.cbn-tooltip-open), .bonus-chip-tooltip:not(.cbn-tooltip-open), .tooltip-wrap > .tooltip:not(.cbn-tooltip-open) { visibility: hidden; pointer-events: none; }
+}
 @media (prefers-reduced-motion: reduce) { .cbn-button, .cbn-field, .cbn-field-group, .cbn-row, .cbn-chip { transition: none; } }
 `;
   function createMutedChip(label) {
@@ -7558,6 +7631,19 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     };
   }
+  const darkProviderColors = {
+    ...PROVIDER_COLORS,
+    prisradar: { bg: "#ffffff", fg: "#0c4598" },
+    google: { bg: "#ffffff", fg: "#1a73e8" },
+    panflights: { bg: "#ffffff", fg: "#1375f7" },
+    enhver: { bg: "#ffffff", fg: "#162333" },
+    sesum: { bg: "#f3f4f6", fg: "#111827" }
+  };
+  const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {
+    const pale = ["#ffffff", "#fff7f0", "#f3f4f6"].includes(colors.bg.toLowerCase());
+    const declarations = pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);` : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
+    return declarations ? `:root[data-cbn-theme="dark"] .provider-${id}, :root[data-cbn-theme="dark"] .badge-${id}, :host([data-cbn-theme="dark"]) .provider-${id} {${declarations}}` : "";
+  }).join("\n");
   const THEME_CSS = `
 :root, :host {
   color-scheme: light;
@@ -7570,13 +7656,18 @@ query SearchSuggestions($query: String!, $category: Int) {
 }
 :root[data-cbn-theme="dark"], :host([data-cbn-theme="dark"]) {
   color-scheme: dark;
-  --cbn-bg: #0f0f0f; --cbn-surface: #181818; --cbn-soft: #222;
-  --cbn-text: #f1f1f1; --cbn-muted: #b3b3b3; --cbn-subtle: #a0a0a0;
-  --cbn-border: #363636; --cbn-hover: #303030; --cbn-accent: #7ddc9f;
+  --cbn-bg: #0a0a0a; --cbn-surface: #171717; --cbn-soft: #282828;
+  --cbn-text: #dedede; --cbn-muted: #b7b7b7; --cbn-subtle: #aaa;
+  --cbn-border: #3d3d3d; --cbn-hover: #363636; --cbn-accent: #7ddc9f;
   --cbn-highlight: #193526; --cbn-highlight-border: #376b4b;
-  --cbn-tooltip: #303030; --cbn-glass: rgba(15,15,15,.94);
-  --cbn-glass-surface: rgba(24,24,24,.98);
+  --cbn-tooltip: #363636; --cbn-glass: rgba(10,10,10,.94);
+  --cbn-glass-surface: rgba(23,23,23,.98);
 }
+${darkProviderCss}
+:root[data-cbn-theme="dark"] .cbn-chip--muted, :host([data-cbn-theme="dark"]) .cbn-chip--muted { background: #3b3b3b; color: #c8c8c8; }
+:root[data-cbn-theme="dark"] .app-chip, :host([data-cbn-theme="dark"]) .app-chip { background: #303d4b; color: #bfd0e5; }
+:root[data-cbn-theme="dark"] .ad-chip, :host([data-cbn-theme="dark"]) .ad-chip { background: #40372b; color: #e3c79d; }
+:root[data-cbn-theme="dark"] .offer-card-only-warn, :host([data-cbn-theme="dark"]) .card-only-warn { color: #c7b98e; }
 .cbn-theme { position: relative; display: inline-flex; flex: 0 0 auto; color: var(--cbn-muted); font: 13px/1.4 ui-sans-serif, system-ui, sans-serif; }
 .cbn-theme button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cbn-theme .cbn-theme-toggle { display: grid; place-items: center; width: 32px; height: 32px; padding: 6px; border-radius: 50%; }
@@ -7672,6 +7763,141 @@ query SearchSuggestions($query: String!, $category: Int) {
       return () => chrome.storage.onChanged?.removeListener(onStorage);
     }
   });
+  const BRAND_LOGO_DATA_URL = "data:image/png;base64,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";
+  let nextTooltipId = 0;
+  function tooltipPosition(anchor, width, height, viewport) {
+    const left = Math.max(8, Math.min(anchor.left, viewport.width - width - 8));
+    const below = anchor.bottom + 8;
+    const top = below + height <= viewport.height - 8 ? below : Math.max(8, anchor.top - height - 8);
+    return { left, top };
+  }
+  function createTooltipController(root) {
+    const doc = root.ownerDocument ?? root;
+    const view = doc.defaultView;
+    const targets = /* @__PURE__ */ new WeakMap();
+    let active;
+    const close = () => {
+      if (!active) return;
+      const { button, tooltip, style } = active;
+      button.setAttribute("aria-expanded", "false");
+      tooltip.classList.remove("cbn-tooltip-open", "visible");
+      if (style === null) tooltip.removeAttribute("style");
+      else tooltip.setAttribute("style", style);
+      active = void 0;
+    };
+    const onClick = (event) => {
+      const button = event.target.closest(".cbn-tooltip-trigger");
+      if (!button || !targets.has(button)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (active?.button === button) {
+        close();
+        return;
+      }
+      close();
+      const tooltip = targets.get(button);
+      active = { button, tooltip, style: tooltip.getAttribute("style") };
+      button.setAttribute("aria-expanded", "true");
+      tooltip.classList.add("cbn-tooltip-open");
+      Object.assign(tooltip.style, {
+        position: "fixed",
+        left: "8px",
+        top: "8px",
+        bottom: "auto",
+        right: "auto",
+        transform: "none",
+        width: `${Math.min(340, doc.documentElement.clientWidth - 16)}px`,
+        maxWidth: "none",
+        maxHeight: `${Math.max(80, view.innerHeight - 32)}px`,
+        overflowY: "auto",
+        boxSizing: "border-box",
+        whiteSpace: "normal"
+      });
+      const rect = tooltip.getBoundingClientRect();
+      const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
+      tooltip.style.left = `${position.left}px`;
+      tooltip.style.top = `${position.top}px`;
+    };
+    const outside = (event) => {
+      if (active && !event.composedPath().includes(active.button) && !event.composedPath().includes(active.tooltip)) close();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape" && active) {
+        const button = active.button;
+        close();
+        button.focus();
+        event.stopPropagation();
+      }
+    };
+    const onScroll = (event) => {
+      if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
+    };
+    root.addEventListener("click", onClick);
+    doc.addEventListener("pointerdown", outside, { passive: true });
+    doc.addEventListener("keydown", onKey);
+    doc.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    view.addEventListener("resize", close);
+    return {
+      close,
+      add(parent, tooltip, label = "Vis vilkår og detaljer") {
+        if (parent.querySelector(".cbn-tooltip-trigger")) return;
+        tooltip.id ||= `cbn-tooltip-${++nextTooltipId}`;
+        tooltip.setAttribute("role", "tooltip");
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.className = "cbn-button cbn-button--quiet cbn-tooltip-trigger";
+        button.textContent = "ⓘ";
+        button.setAttribute("aria-label", label);
+        button.setAttribute("aria-expanded", "false");
+        button.setAttribute("aria-controls", tooltip.id);
+        targets.set(button, tooltip);
+        const action = parent.querySelector(":scope > .offer-action");
+        if (action) {
+          const details = doc.createElement("span");
+          details.className = "cbn-offer-details";
+          details.append(button);
+          const reward = action.querySelector(".offer-reward, .offer-label");
+          while (reward?.nextElementSibling) details.append(reward.nextElementSibling);
+          action.after(details);
+        } else parent.insertBefore(button, parent.querySelector(":scope > .code-source-badge, :scope > .provider-filter-link, :scope > .badge"));
+      },
+      addBeside(anchor, tooltip, label) {
+        const row = doc.createElement("div");
+        row.className = "cbn-tooltip-row";
+        anchor.replaceWith(row);
+        row.append(anchor);
+        if (anchor.classList.contains("bonus-chip")) {
+          row.className += ` ${anchor.className}`;
+          anchor.className = "bonus-chip-action";
+          const details = doc.createElement("span");
+          details.className = "cbn-offer-details";
+          this.add(details, tooltip, label);
+          const reward = anchor.querySelector(".bonus-chip-label");
+          const brandLink = doc.createElement("a");
+          brandLink.className = "bonus-chip-brand-link";
+          for (const attribute of ["href", "target", "rel"]) {
+            const value = anchor.getAttribute(attribute);
+            if (value !== null) brandLink.setAttribute(attribute, value);
+          }
+          while (reward?.nextElementSibling) brandLink.append(reward.nextElementSibling);
+          details.append(brandLink);
+          row.append(details);
+        } else {
+          this.add(row, tooltip, label);
+          row.prepend(row.querySelector(".cbn-tooltip-trigger"));
+        }
+        return row;
+      },
+      dispose() {
+        close();
+        root.removeEventListener("click", onClick);
+        doc.removeEventListener("pointerdown", outside);
+        doc.removeEventListener("keydown", onKey);
+        doc.removeEventListener("scroll", onScroll, true);
+        view.removeEventListener("resize", close);
+      }
+    };
+  }
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
@@ -7781,7 +8007,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     near.closest(".code-item-row")?.insertAdjacentElement("afterend", flash);
     setTimeout(() => flash.remove(), 2500);
   }
-  const CBN_LOGO_B64 = "data:image/png;base64,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";
   const HOST_ID = "cashback-varsler-notice";
   let disposeNoticeTheme;
   const COLLAPSED_STORAGE_KEY = "cashback-varsler-collapsed";
@@ -13218,13 +13443,19 @@ query SearchSuggestions($query: String!, $category: Int) {
     return Number.isFinite(amount) && amount > 0 ? amount : void 0;
   }
   function makeAdChip() {
-    return createMutedChip("Ad");
+    const chip = createMutedChip("Ad");
+    chip.classList.add("ad-chip");
+    return chip;
   }
   function makeSupportChip() {
-    return createMutedChip("Støtt oss");
+    const chip = createMutedChip("Støtt oss");
+    chip.classList.add("support-chip");
+    return chip;
   }
   function makeCharityChip() {
-    return createMutedChip("10% til veldedighet");
+    const chip = createMutedChip("10% til veldedighet");
+    chip.classList.add("charity-chip");
+    return chip;
   }
   function getCodeSourceProvider(codeOffer) {
     if (codeOffer.provider !== "rabattkode") {
@@ -13897,13 +14128,14 @@ query SearchSuggestions($query: String!, $category: Int) {
     .offer-link .provider-badge {
       grid-column: 3;
     }
+    .offer-link > .cbn-offer-details { grid-column: 2; }
     .offer-action {
       align-items: center;
       align-self: stretch;
       color: inherit;
       display: flex;
       gap: 8px;
-      grid-column: 1 / 3;
+      grid-column: 1;
       min-width: 0;
       text-decoration: none;
     }
@@ -14488,10 +14720,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       font-size: 10px;
       transition: transform 0.15s;
     }
-    .price-match-section.collapsed .price-match-card {
+    .price-match-section.collapsed .price-match-card,
+    .price-match-section.collapsed .cbn-tooltip-row {
       display: none;
     }
-    .region-prices-section.collapsed .region-price-card {
+    .region-prices-section.collapsed .region-price-card,
+    .region-prices-section.collapsed .cbn-tooltip-row {
       display: none;
     }
     .price-match-section.collapsed .price-match-toggle-arrow,
@@ -14544,7 +14778,9 @@ query SearchSuggestions($query: String!, $category: Int) {
       color: var(--cbn-accent, #3a7d55);
     }
     .price-match-card + .price-match-card,
-    .region-price-card + .region-price-card {
+    .region-price-card + .region-price-card,
+    .price-match-section .cbn-tooltip-row + .cbn-tooltip-row,
+    .region-prices-section .cbn-tooltip-row + .cbn-tooltip-row {
       margin-top: 4px;
     }
     .price-match-title,
@@ -14841,6 +15077,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (primaryOffer === void 0 && priceMatch === void 0 && bestRegionPrice === void 0) {
       return;
     }
+    const tooltipControls = createTooltipController(shadowRoot);
     const notice = document.createElement("section");
     notice.className = "notice";
     const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : "region");
@@ -15044,7 +15281,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
       bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, ...card.ebPer100kr !== void 0 ? { ebPer100kr: card.ebPer100kr } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
       freeItems.append(chip);
-      addChipTooltip(chip, card.tip, shadowRoot);
+      addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
     }
     bonusChips.append(freeGroup);
     const premiumGroup = document.createElement("div");
@@ -15072,7 +15309,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       revolutChip.append(revolutLabel, revolutBadge);
       premiumItems.append(revolutChip);
       addChipTooltip(revolutChip, `${revolutSub}
-Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
+Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot, tooltipControls);
     }
     for (const card of PREMIUM_CARDS) {
       if (card.label === "Crypto" && cryptoSub !== void 0) continue;
@@ -15086,7 +15323,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       }
       bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
       premiumItems.append(chip);
-      addChipTooltip(chip, card.tip, shadowRoot);
+      addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
     }
     bonusChips.append(premiumGroup);
     const selectedGroup = document.createElement("div");
@@ -15115,10 +15352,10 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       cryptoAdWrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
       cryptoBadge.replaceWith(cryptoAdWrapper);
       cryptoAdWrapper.append(makeAdChip(), cryptoBadge);
+      selectedItems.append(cryptoChip);
       addChipTooltip(cryptoChip, `Crypto.com Visa-kort.
 Jade/Obsidian: 6 mnd gratis ${cryptoSub}
-Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
-      selectedItems.append(cryptoChip);
+Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       hasSelectedItems = true;
     }
     if (hasSelectedItems) bonusChips.append(selectedGroup);
@@ -15594,6 +15831,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         termsTooltip.className = "offer-tooltip";
         setTooltipContent(termsTooltip, [codeOffer.terms]);
         shadowRoot.append(termsTooltip);
+        tooltipControls.add(item, termsTooltip, "Vis vilkår for rabattkoden");
         row.addEventListener("mouseenter", () => {
           const panelEl = shadowRoot.querySelector(".panel");
           const panelRect = panelEl?.getBoundingClientRect();
@@ -15652,13 +15890,14 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
         tooltip.className = "offer-tooltip";
         setTooltipContent(tooltip, buildRegionPriceTooltipParts(regionPrice, regionPrices));
         shadowRoot.append(tooltip);
+        const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om regionprisen");
         card.addEventListener("mouseenter", () => {
           positionTooltipRightOfPanel(tooltip, card, shadowRoot);
         });
         card.addEventListener("mouseleave", () => {
           tooltip.classList.remove("visible");
         });
-        return card;
+        return row;
       });
       regionPricesSection.append(
         regionPricesToggle,
@@ -15846,7 +16085,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       logoLink.rel = "noreferrer";
       logoLink.title = "cashbacknorge.no";
       const logoImg = document.createElement("img");
-      logoImg.src = CBN_LOGO_B64;
+      logoImg.src = BRAND_LOGO_DATA_URL;
       logoImg.className = "support-logo";
       logoImg.alt = "CBN";
       logoLink.append(logoImg);
@@ -15855,7 +16094,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       support.append(supportLink, logoLink);
       const disclosure = document.createElement("p");
       disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
-      disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
+      disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
       panel.append(body, support, disclosure);
     } else {
       panel.append(body);
@@ -15885,11 +16124,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     disposeNoticeTheme = () => {
       unmountTheme();
       unbindTheme();
+      tooltipControls.dispose();
     };
     const mountTarget = document.body ?? document.documentElement;
     mountTarget.append(host);
     void detectConflicts(shadowRoot, title);
-    attachPriceMatchTooltips(shadowRoot, priceMatches);
+    attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls);
     const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
     for (let idx = 0; idx < mainOffers.length; idx++) {
       const currentOffer = mainOffers[idx];
@@ -15912,6 +16152,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       setTooltipContent(tooltip, tooltipParts);
       shadowRoot.append(tooltip);
       tooltipElements.push({ element: tooltip, offer: currentOffer });
+      tooltipControls.add(wrapper.querySelector(".offer-link"), tooltip, `Vis vilkår for ${formatProviderName(currentOffer.provider)}`);
       wrapper.addEventListener("mouseenter", () => {
         const panelEl = shadowRoot.querySelector(".panel");
         const panelRect = panelEl?.getBoundingClientRect();
@@ -15960,7 +16201,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     disposeNoticeTheme = void 0;
     document.getElementById(HOST_ID)?.remove();
   }
-  function attachPriceMatchTooltips(shadowRoot, priceMatches) {
+  function attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls) {
     if (priceMatches.length === 0) return;
     const cards = shadowRoot.querySelectorAll(".price-match-card");
     for (let index = 0; index < priceMatches.length; index++) {
@@ -15971,6 +16212,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       tooltip.className = "offer-tooltip";
       setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
       shadowRoot.append(tooltip);
+      tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
       let hideTimer;
       const clearHideTimer = () => {
         if (hideTimer === void 0) return;
@@ -16775,15 +17017,16 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     }
     return "Cashback";
   }
-  function addChipTooltip(chip, text, shadowRoot) {
+  function addChipTooltip(chip, text, shadowRoot, tooltipControls) {
     const tooltip = document.createElement("div");
     tooltip.className = "bonus-chip-tooltip";
     tooltip.textContent = text;
     shadowRoot.append(tooltip);
-    chip.addEventListener("mouseenter", () => {
+    const row = tooltipControls.addBeside(chip, tooltip);
+    row.addEventListener("mouseenter", () => {
       const panelEl = shadowRoot.querySelector(".panel");
       const panelRect = panelEl?.getBoundingClientRect();
-      const rect = chip.getBoundingClientRect();
+      const rect = row.getBoundingClientRect();
       tooltip.style.left = "-9999px";
       tooltip.style.top = "-9999px";
       tooltip.classList.add("visible");
@@ -16793,7 +17036,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
       tooltip.style.top = `${rect.top + rect.height / 2 - tooltipHeight / 2}px`;
       tooltip.style.transform = "none";
     });
-    chip.addEventListener("mouseleave", () => {
+    row.addEventListener("mouseleave", () => {
       tooltip.classList.remove("visible");
     });
   }

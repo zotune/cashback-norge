@@ -49,7 +49,7 @@
       instruction: `Besøk for eksempel ${external('https://www.komplett.no/', 'Komplett.no')} i <strong>Firefox</strong>. <strong>Cashback Norge</strong> skal dukke opp nederst til venstre.`,
       note: `Vil du åpne butikklenker i Firefox automatisk? Du kan ${external('https://support.mozilla.org/en-US/kb/make-firefox-default-browser-android', 'sette Firefox som standardnettleser')}.`,
       phoneClass: 'demo-android',
-      demo: `<div class="demo-content"><h4>Nettbutikk</h4><div class="demo-store-line"></div><div class="demo-store-line"></div><div class="demo-check">✓</div></div><div class="demo-cashback"><img src="../favicon.png" alt=""><span><strong>Cashback Norge</strong>Se fordeler for denne butikken</span></div>${address}`,
+      demo: `<div class="demo-content"><h4>Nettbutikk</h4><div class="demo-store-line"></div><div class="demo-store-line"></div><div class="demo-check">✓</div></div><div class="demo-cashback"><img src="../favicon.png?v=bear-1" alt=""><span><strong>Cashback Norge</strong>Se fordeler for denne butikken</span></div>${address}`,
     },
   ];
   window.mountInstallGuide({ guide, steps, storageKey: 'cashback-android-step' });

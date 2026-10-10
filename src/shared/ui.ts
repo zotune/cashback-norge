@@ -46,6 +46,20 @@ export const UI_CSS = `
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
+.cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
+.cbn-tooltip-row { display: contents; }
+.cbn-offer-details { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.bonus-chip.cbn-tooltip-row { display: flex; }
+.bonus-chip-action { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+.bonus-chip-brand-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+.cbn-tooltip-open.cbn-tooltip-open { display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
+.cbn-tooltip-open::after { display: none; }
+@media (hover: none), (pointer: coarse), (max-width: 520px) {
+  .cbn-tooltip-trigger { display: inline-flex; }
+  .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .cbn-tooltip-row > .cbn-row, .cbn-tooltip-row > a { flex: 1; min-width: 0; }
+  .offer-tooltip:not(.cbn-tooltip-open), .bonus-chip-tooltip:not(.cbn-tooltip-open), .tooltip-wrap > .tooltip:not(.cbn-tooltip-open) { visibility: hidden; pointer-events: none; }
+}
 @media (prefers-reduced-motion: reduce) { .cbn-button, .cbn-field, .cbn-field-group, .cbn-row, .cbn-chip { transition: none; } }
 `;
 

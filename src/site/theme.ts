@@ -1,4 +1,11 @@
 import { bindThemeTarget, createThemeStore, installThemeStyles, mountThemeControl, THEME_STORAGE_KEY } from "../shared/theme";
+import { addSiteTooltipButtons, createTooltipController } from "../shared/tooltips";
+
+const tooltipController = createTooltipController(document);
+declare global {
+  interface Window { CashbackTooltips: { attach: (parent: ParentNode) => void; close: () => void } }
+}
+window.CashbackTooltips = { attach: (parent) => addSiteTooltipButtons(tooltipController, parent), close: tooltipController.close };
 
 let saved: unknown;
 try { saved = localStorage.getItem(THEME_STORAGE_KEY); } catch { /* System default. */ }

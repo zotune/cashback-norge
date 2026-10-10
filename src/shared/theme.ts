@@ -1,4 +1,5 @@
 import { UI_CSS } from "./ui";
+import { PROVIDER_COLORS } from "./provider-data";
 
 export type ThemePreference = "system" | "light" | "dark";
 export const THEME_STORAGE_KEY = "cashback-norge-theme";
@@ -50,8 +51,19 @@ export function createThemeStore(options: ThemeOptions = {}) {
 }
 export type ThemeStore = ReturnType<typeof createThemeStore>;
 
-// Neutral charcoal, with green reserved for actions and rewards. Provider brands
-// and images retain their own colors in both appearances.
+const darkProviderColors = { ...PROVIDER_COLORS,
+  prisradar: { bg: "#ffffff", fg: "#0c4598" }, google: { bg: "#ffffff", fg: "#1a73e8" },
+  panflights: { bg: "#ffffff", fg: "#1375f7" }, enhver: { bg: "#ffffff", fg: "#162333" },
+  sesum: { bg: "#f3f4f6", fg: "#111827" },
+};
+const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {
+  const pale = ["#ffffff", "#fff7f0", "#f3f4f6"].includes(colors.bg.toLowerCase());
+  const declarations = pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);`
+    : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
+  return declarations ? `:root[data-cbn-theme="dark"] .provider-${id}, :root[data-cbn-theme="dark"] .badge-${id}, :host([data-cbn-theme="dark"]) .provider-${id} {${declarations}}` : "";
+}).join("\n");
+
+// Neutral charcoal, with green reserved for actions and rewards.
 export const THEME_CSS = `
 :root, :host {
   color-scheme: light;
@@ -64,13 +76,18 @@ export const THEME_CSS = `
 }
 :root[data-cbn-theme="dark"], :host([data-cbn-theme="dark"]) {
   color-scheme: dark;
-  --cbn-bg: #0f0f0f; --cbn-surface: #181818; --cbn-soft: #222;
-  --cbn-text: #f1f1f1; --cbn-muted: #b3b3b3; --cbn-subtle: #a0a0a0;
-  --cbn-border: #363636; --cbn-hover: #303030; --cbn-accent: #7ddc9f;
+  --cbn-bg: #0a0a0a; --cbn-surface: #171717; --cbn-soft: #282828;
+  --cbn-text: #dedede; --cbn-muted: #b7b7b7; --cbn-subtle: #aaa;
+  --cbn-border: #3d3d3d; --cbn-hover: #363636; --cbn-accent: #7ddc9f;
   --cbn-highlight: #193526; --cbn-highlight-border: #376b4b;
-  --cbn-tooltip: #303030; --cbn-glass: rgba(15,15,15,.94);
-  --cbn-glass-surface: rgba(24,24,24,.98);
+  --cbn-tooltip: #363636; --cbn-glass: rgba(10,10,10,.94);
+  --cbn-glass-surface: rgba(23,23,23,.98);
 }
+${darkProviderCss}
+:root[data-cbn-theme="dark"] .cbn-chip--muted, :host([data-cbn-theme="dark"]) .cbn-chip--muted { background: #3b3b3b; color: #c8c8c8; }
+:root[data-cbn-theme="dark"] .app-chip, :host([data-cbn-theme="dark"]) .app-chip { background: #303d4b; color: #bfd0e5; }
+:root[data-cbn-theme="dark"] .ad-chip, :host([data-cbn-theme="dark"]) .ad-chip { background: #40372b; color: #e3c79d; }
+:root[data-cbn-theme="dark"] .offer-card-only-warn, :host([data-cbn-theme="dark"]) .card-only-warn { color: #c7b98e; }
 .cbn-theme { position: relative; display: inline-flex; flex: 0 0 auto; color: var(--cbn-muted); font: 13px/1.4 ui-sans-serif, system-ui, sans-serif; }
 .cbn-theme button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cbn-theme .cbn-theme-toggle { display: grid; place-items: center; width: 32px; height: 32px; padding: 6px; border-radius: 50%; }

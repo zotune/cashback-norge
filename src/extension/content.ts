@@ -38,6 +38,8 @@ import enWords from "naughty-words/en.json";
 import { bindThemeTarget, installThemeStyles, mountThemeControl } from "../shared/theme";
 import { extensionTheme } from "./theme";
 import { createMutedChip } from "../shared/ui";
+import { BRAND_LOGO_DATA_URL } from "../shared/brand";
+import { createTooltipController, type TooltipController } from "../shared/tooltips";
 
 type UserscriptHttpRequestOptions = {
   method?: string;
@@ -183,7 +185,6 @@ function showRateLimitFlash(near: HTMLElement): void {
   near.closest(".code-item-row")?.insertAdjacentElement("afterend", flash);
   setTimeout(() => flash.remove(), 2500);
 }
-const CBN_LOGO_B64 = "data:image/png;base64,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";
 type CashbackOffer = {
   provider: string;
   merchantName: string;
@@ -8986,15 +8987,21 @@ function readVinmonopoletUnitPricePerLiter(text: string): number | undefined {
   return Number.isFinite(amount) && amount > 0 ? amount : undefined;
 }
 function makeAdChip(): HTMLSpanElement {
-  return createMutedChip("Ad");
+  const chip = createMutedChip("Ad");
+  chip.classList.add("ad-chip");
+  return chip;
 }
 
 function makeSupportChip(): HTMLSpanElement {
-  return createMutedChip("Støtt oss");
+  const chip = createMutedChip("Støtt oss");
+  chip.classList.add("support-chip");
+  return chip;
 }
 
 function makeCharityChip(): HTMLSpanElement {
-  return createMutedChip("10% til veldedighet");
+  const chip = createMutedChip("10% til veldedighet");
+  chip.classList.add("charity-chip");
+  return chip;
 }
 
 function getCodeSourceProvider(codeOffer: CashbackOffer): string | undefined {
@@ -9869,13 +9876,14 @@ function renderNotice(
     .offer-link .provider-badge {
       grid-column: 3;
     }
+    .offer-link > .cbn-offer-details { grid-column: 2; }
     .offer-action {
       align-items: center;
       align-self: stretch;
       color: inherit;
       display: flex;
       gap: 8px;
-      grid-column: 1 / 3;
+      grid-column: 1;
       min-width: 0;
       text-decoration: none;
     }
@@ -10460,10 +10468,12 @@ function renderNotice(
       font-size: 10px;
       transition: transform 0.15s;
     }
-    .price-match-section.collapsed .price-match-card {
+    .price-match-section.collapsed .price-match-card,
+    .price-match-section.collapsed .cbn-tooltip-row {
       display: none;
     }
-    .region-prices-section.collapsed .region-price-card {
+    .region-prices-section.collapsed .region-price-card,
+    .region-prices-section.collapsed .cbn-tooltip-row {
       display: none;
     }
     .price-match-section.collapsed .price-match-toggle-arrow,
@@ -10516,7 +10526,9 @@ function renderNotice(
       color: var(--cbn-accent, #3a7d55);
     }
     .price-match-card + .price-match-card,
-    .region-price-card + .region-price-card {
+    .region-price-card + .region-price-card,
+    .price-match-section .cbn-tooltip-row + .cbn-tooltip-row,
+    .region-prices-section .cbn-tooltip-row + .cbn-tooltip-row {
       margin-top: 4px;
     }
     .price-match-title,
@@ -10813,6 +10825,7 @@ function renderNotice(
   if (primaryOffer === undefined && priceMatch === undefined && bestRegionPrice === undefined) {
     return;
   }
+  const tooltipControls = createTooltipController(shadowRoot);
   const notice = document.createElement("section");
   notice.className = "notice";
   const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "region");
@@ -11031,7 +11044,7 @@ function renderNotice(
     if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
     bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), ...(card.ebPer100kr !== undefined ? { ebPer100kr: card.ebPer100kr } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
-    addChipTooltip(chip, card.tip, shadowRoot);
+    addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
   }
   bonusChips.append(freeGroup);
   // --- Premium chips group (right) ---
@@ -11059,7 +11072,7 @@ function renderNotice(
     revolutBadge.textContent = "Revolut";
     revolutChip.append(revolutLabel, revolutBadge);
     premiumItems.append(revolutChip);
-    addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot);
+    addChipTooltip(revolutChip, `${revolutSub}\nInkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, shadowRoot, tooltipControls);
   }
   for (const card of PREMIUM_CARDS) {
     if (card.label === "Crypto" && cryptoSub !== undefined) continue;
@@ -11073,7 +11086,7 @@ function renderNotice(
     }
     bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
     premiumItems.append(chip);
-    addChipTooltip(chip, card.tip, shadowRoot);
+    addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
   }
   bonusChips.append(premiumGroup);
   // --- Selected retailers group ---
@@ -11103,8 +11116,8 @@ function renderNotice(
     cryptoAdWrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
     cryptoBadge.replaceWith(cryptoAdWrapper);
     cryptoAdWrapper.append(makeAdChip(), cryptoBadge);
-    addChipTooltip(cryptoChip, `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSub}\nPlatin: 3 mnd gratis ${cryptoSub}`, shadowRoot);
     selectedItems.append(cryptoChip);
+    addChipTooltip(cryptoChip, `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSub}\nPlatin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     hasSelectedItems = true;
   }
   if (hasSelectedItems) bonusChips.append(selectedGroup);
@@ -11558,6 +11571,7 @@ function renderNotice(
       termsTooltip.className = "offer-tooltip";
       setTooltipContent(termsTooltip, [codeOffer.terms]);
       shadowRoot.append(termsTooltip);
+      tooltipControls.add(item, termsTooltip, "Vis vilkår for rabattkoden");
       row.addEventListener("mouseenter", () => {
         const panelEl = shadowRoot.querySelector(".panel");
         const panelRect = panelEl?.getBoundingClientRect();
@@ -11619,13 +11633,14 @@ function renderNotice(
       tooltip.className = "offer-tooltip";
       setTooltipContent(tooltip, buildRegionPriceTooltipParts(regionPrice, regionPrices));
       shadowRoot.append(tooltip);
+      const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om regionprisen");
       card.addEventListener("mouseenter", () => {
         positionTooltipRightOfPanel(tooltip, card, shadowRoot);
       });
       card.addEventListener("mouseleave", () => {
         tooltip.classList.remove("visible");
       });
-      return card;
+      return row;
     });
 
     regionPricesSection.append(
@@ -11855,7 +11870,7 @@ function renderNotice(
     logoLink.rel = "noreferrer";
     logoLink.title = "cashbacknorge.no";
     const logoImg = document.createElement("img");
-    logoImg.src = CBN_LOGO_B64;
+    logoImg.src = BRAND_LOGO_DATA_URL;
     logoImg.className = "support-logo";
     logoImg.alt = "CBN";
     logoLink.append(logoImg);
@@ -11864,7 +11879,7 @@ function renderNotice(
     support.append(supportLink, logoLink);
     const disclosure = document.createElement("p");
     disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
-    disclosure.style.cssText = "color:#b0bec5;font-size:10px;margin:0;padding:2px 14px 6px;";
+    disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
     panel.append(body, support, disclosure);
   } else {
     panel.append(body);
@@ -11893,11 +11908,11 @@ function renderNotice(
   if (!existingFooter) panel.append(themeFooter);
   const unbindTheme = bindThemeTarget(extensionTheme, host);
   const unmountTheme = mountThemeControl(extensionTheme, themeSlot, "up");
-  disposeNoticeTheme = () => { unmountTheme(); unbindTheme(); };
+  disposeNoticeTheme = () => { unmountTheme(); unbindTheme(); tooltipControls.dispose(); };
   const mountTarget = document.body ?? document.documentElement;
   mountTarget.append(host);
   void detectConflicts(shadowRoot, title);
-  attachPriceMatchTooltips(shadowRoot, priceMatches);
+  attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls);
   // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
   const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
   for (let idx = 0; idx < mainOffers.length; idx++) {
@@ -11921,6 +11936,7 @@ function renderNotice(
     setTooltipContent(tooltip, tooltipParts);
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });
+    tooltipControls.add(wrapper.querySelector<HTMLElement>(".offer-link")!, tooltip, `Vis vilkår for ${formatProviderName(currentOffer.provider)}`);
     wrapper.addEventListener("mouseenter", () => {
       const panelEl = shadowRoot.querySelector(".panel");
       const panelRect = panelEl?.getBoundingClientRect();
@@ -11976,7 +11992,7 @@ function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
 }
 
-function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMatchOffer[]): void {
+function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMatchOffer[], tooltipControls: TooltipController): void {
   if (priceMatches.length === 0) return;
 
   const cards = shadowRoot.querySelectorAll<HTMLElement>(".price-match-card");
@@ -11989,6 +12005,7 @@ function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMat
     tooltip.className = "offer-tooltip";
     setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
     shadowRoot.append(tooltip);
+    tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
 
     let hideTimer: number | undefined;
     const clearHideTimer = () => {
@@ -13040,15 +13057,16 @@ function formatSideTabText(
   }
   return formatCompactRewardLabel(primaryOffer) ?? "Rabattkode";
 }
-function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot): void {
+function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot, tooltipControls: TooltipController): void {
   const tooltip = document.createElement("div");
   tooltip.className = "bonus-chip-tooltip";
   tooltip.textContent = text;
   shadowRoot.append(tooltip);
-  chip.addEventListener("mouseenter", () => {
+  const row = tooltipControls.addBeside(chip, tooltip);
+  row.addEventListener("mouseenter", () => {
     const panelEl = shadowRoot.querySelector(".panel");
     const panelRect = panelEl?.getBoundingClientRect();
-    const rect = chip.getBoundingClientRect();
+    const rect = row.getBoundingClientRect();
     tooltip.style.left = "-9999px";
     tooltip.style.top = "-9999px";
     tooltip.classList.add("visible");
@@ -13058,7 +13076,7 @@ function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot)
     tooltip.style.top = `${rect.top + rect.height / 2 - tooltipHeight / 2}px`;
     tooltip.style.transform = "none";
   });
-  chip.addEventListener("mouseleave", () => {
+  row.addEventListener("mouseleave", () => {
     tooltip.classList.remove("visible");
   });
 }
