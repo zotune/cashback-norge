@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <title>Cashback Norge – Chrome Web Store</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1280px; height: 800px; overflow: hidden; }
+    body { background: #fff; color: #172520; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    .canvas { position: relative; width: 1280px; height: 800px; background: linear-gradient(110deg, #f0f7f3 0%, #fafcfb 51%, #fff 74%); }
+    .browser { position: absolute; left: 28px; top: 32px; width: 650px; height: 736px; background: #fff; border: 1px solid #e4e9e5; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 30px #1733240c; }
+    .chrome-tab { display: flex; align-items: center; height: 37px; gap: 16px; padding: 0 15px; background: #eff1f0; color: #67716c; font-size: 11px; }
+    .dots { display: flex; gap: 6px; }
+    .dots i { width: 9px; height: 9px; border-radius: 50%; background: #ff6057; }
+    .dots i:nth-child(2) { background: #ffbd2e; }
+    .dots i:nth-child(3) { background: #28c840; }
+    .tab { display: flex; align-items: center; gap: 7px; align-self: end; background: #fff; padding: 9px 14px 8px; border-radius: 9px 9px 0 0; width: 245px; }
+    .tab img { width: 13px; height: 13px; object-fit: contain; }
+    .toolbar { display: flex; align-items: center; gap: 12px; height: 43px; padding: 0 14px; background: #fff; color: #7e8782; border-bottom: 1px solid #eef0ef; }
+    .toolbar svg { height: 15px; width: 15px; flex-shrink: 0; }
+    .address { display: flex; align-items: center; gap: 8px; background: #f4f6f5; border-radius: 18px; font-size: 12px; color: #515d56; padding: 7px 12px; flex: 1; }
+    .toolbar .extension-logo { width: 26px; height: 26px; object-fit: contain; }
+    .shop { position: absolute; top: 80px; left: 0; width: 100%; height: 656px; overflow: hidden; }
+    .shop img { width: 774px; max-width: none; height: auto; filter: blur(2.3px); opacity: .6; transform: translate(-5px, -12px); }
+    .shop::after { content: ""; position: absolute; inset: 0; background: #f9fbfa19; }
+    .panel { position: absolute; left: 66px; top: 147px; width: 438px; height: auto; border-radius: 14px; box-shadow: 0 14px 42px #183d282b, 0 1px 3px #183d2812; }
+    .copy { position: absolute; left: 728px; top: 62px; width: 500px; }
+    .brand { display: flex; align-items: center; gap: 14px; height: 82px; font-size: 27px; font-weight: 710; letter-spacing: -.6px; }
+    .brand img { width: 76px; height: 82px; object-fit: contain; }
+    h1 { margin: 63px 0 23px; font-size: 53px; line-height: 1.12; letter-spacing: -1.9px; font-weight: 740; }
+    h1 em { color: #21844e; font-style: normal; }
+    .description { color: #59665e; font-size: 20px; line-height: 1.5; margin: 0; }
+    .features { display: flex; gap: 15px; margin-top: 39px; }
+    .feature { width: 105px; text-align: center; font-size: 14px; font-weight: 550; }
+    .feature-icon { display: grid; place-items: center; width: 86px; height: 80px; margin: 0 auto 12px; border-radius: 21px; background: #e4f3e9; color: #268454; }
+    .feature-icon svg { height: 35px; width: 35px; }
+    .feature:nth-child(2) .feature-icon { background: #eee8f9; color: #8061b2; }
+    .feature:nth-child(3) .feature-icon { background: #fff0e5; color: #cf8757; }
+    .feature:nth-child(4) .feature-icon { background: #e6effa; color: #4b7eb5; }
+    .facts { position: absolute; left: 728px; top: 644px; display: flex; gap: 24px; align-items: center; color: #4b5b51; font-size: 14px; font-weight: 550; }
+    .fact { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .fact svg { width: 18px; height: 18px; color: #318451; }
+    .domain { position: absolute; left: 728px; bottom: 49px; font-size: 15px; color: #7d8c82; }
+    .sources { display: none; }
+    .prismatch.canvas { background: linear-gradient(110deg, #eaf4ee 0%, #f7fbf8 48%, #fff 78%); }
+    .prismatch .browser { display: none; }
+    .prismatch .panel { left: 85px; top: 110px; width: 480px; }
+    .prismatch h1 { margin-top: 74px; font-size: 51px; }
+    .prismatch .features { display: none; }
+    .prismatch .sources { display: flex; gap: 12px; margin-top: 35px; }
+    .source { padding: 9px 14px; border-radius: 9px; background: #e3f4f7; color: #008ca8; font-size: 17px; font-weight: 650; }
+    .source:nth-child(2) { background: #ffe5f0; color: #732b4c; }
+    .source:nth-child(3) { background: #edf1fa; color: #235092; }
+  </style>
+</head>
+<body>
+  <main class="canvas" id="canvas">
+    <div class="browser" aria-hidden="true">
+      <div class="chrome-tab"><span class="dots"><i></i><i></i><i></i></span><span class="tab"><img src="sources/kicks-favicon.ico">KICKS – Parfyme, sminke, hudpleie<span style="margin-left:auto">×</span></span><span>+</span></div>
+      <div class="toolbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 5-7 7 7 7M7 12h14"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10 5 7 7-7 7M17 12H3"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/></svg>
+        <div class="address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>kicks.no</div>
+        <img class="extension-logo" src="../brand/quokka-transparent.png">
+      </div>
+      <div class="shop"><img src="sources/kicks-background.png"></div>
+    </div>
+    <img class="panel" id="panel" src="sources/cashback-panel.png" alt="Utvidelsen viser cashback hos KICKS">
+    <div class="copy">
+      <div class="brand"><img src="../brand/quokka-transparent.png" alt="">Cashback Norge</div>
+      <h1 id="headline">Finn cashback<br><em>før du handler.</em></h1>
+      <p class="description" id="description">Sammenlign cashback, bonuspoeng<br>og rabattkoder automatisk.</p>
+      <div class="features">
+        <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m6 19 12-14"/><circle cx="6.5" cy="6.5" r="3"/><circle cx="17.5" cy="17.5" r="3"/></svg></div>Cashback</div>
+        <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m12 2 3.1 6.3L22 9.4l-5 4.9 1.2 7-6.2-3.4-6.2 3.4 1.2-7-5-4.9 6.9-1.1Z"/></svg></div>Bonuspoeng</div>
+        <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 14 11-11 3 3a3 3 0 0 0 4 4l2 2-11 11-2-2a3 3 0 0 0-4-4Z" transform="translate(-1 -1)"/><path d="m10 8 6 6" stroke-dasharray="2 3"/></svg></div>Rabattkoder</div>
+        <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg></div>Prismatch</div>
+      </div>
+      <div class="sources"><span class="source">Prisjakt</span><span class="source">Klarna</span><span class="source">Prisradar</span></div>
+    </div>
+    <div class="facts">
+      <span class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-9 12h7l-1 8 10-12h-7Z"/></svg>Automatisk</span>
+      <span class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 8a8 8 0 0 0-14-2L3 9m0-6v6h6M4 16a8 8 0 0 0 14 2l3-3m0 6v-6h-6"/></svg>Oppdatert daglig</span>
+      <span class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6Z"/><path d="m8 12 3 3 5-6"/></svg>Gratis å bruke</span>
+    </div>
+    <div class="domain">cashbacknorge.no</div>
+  </main>
+  <script>
+    if (new URLSearchParams(location.search).get('variant') === 'prismatch') {
+      document.getElementById('canvas').classList.add('prismatch');
+      document.getElementById('panel').src = 'sources/prismatch-panel.png';
+      document.getElementById('panel').alt = 'Utvidelsen sammenligner priser fra Prisjakt, Klarna og Prisradar';
+      document.getElementById('headline').innerHTML = 'Sammenlign priser<br><em>mens du handler.</em>';
+      document.getElementById('description').innerHTML = 'Se priser fra flere tjenester<br>rett i nettbutikken.';
+    }
+  </script>
+</body>
+</html>
