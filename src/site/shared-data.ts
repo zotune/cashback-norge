@@ -16,6 +16,7 @@ import {
   formatRewardLabel,
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
+import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters";
 
 // Expose shared data as globals for the inline site script
 Object.assign(window, {
@@ -27,6 +28,8 @@ Object.assign(window, {
     PREMIUM_CARDS,
     SUPPORT_LINKS,
     MERCHANT_ALIASES,
+    QUICK_FILTERS,
+    matchesOfferQuickFilters,
     calculateCashback,
     calculateCashbackMaxKr,
     formatBreakdownWithAmounts,

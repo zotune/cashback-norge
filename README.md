@@ -47,6 +47,8 @@ pnpm run build:store
 
 Kommandoen bygger extensionen og lager en opplastbar zip i `dist/` med versjonen fra `src/extension/public/manifest.json`.
 
+Butikkikonet i Chrome Web Store oppdateres separat under **Store listing** i Developer Dashboard. Last opp `src/extension/public/icons/store_icon_128.png` der. Ikonene i manifestet styrer ikonet i selve utvidelsen; en ny zip erstatter ikke butikkikonet.
+
 ## License
 
 Source available for transparency. Not open source.

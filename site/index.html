@@ -131,8 +131,8 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .provider-menu-search-wrap:focus-within .provider-search-mascot { animation: provider-quokka-sniff .25s ease-out 1; }
 @keyframes provider-quokka-sniff { 45% { transform: translateY(-1px) rotate(-1deg); } }
 .provider-menu-hint { align-items: center; color: var(--cbn-muted); display: flex; font-size: 12px; justify-content: space-between; padding: 0 2px; }
-.provider-menu-done { align-self: flex-end; min-height: 34px; padding: 0 12px; }
-.provider-option-list { display: grid; gap: 2px; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.provider-menu-done { align-self: flex-end; font: inherit; font-size: 13px; min-height: 36px; padding: 0 14px; }
+.provider-option-list { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; }
 .provider-option {
   align-items: center;
   background: transparent;
@@ -142,19 +142,22 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   cursor: pointer;
   display: grid;
   font: inherit;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) 64px 24px;
-  min-height: 42px;
-  padding: 6px 8px;
+  column-gap: 10px;
+  flex-shrink: 0;
+  grid-template-columns: minmax(0, 1fr) 4ch 18px;
+  min-height: 44px;
+  padding: 8px 10px;
   text-align: left;
   width: 100%;
 }
 .provider-option:hover, .provider-option.is-active { background: var(--cbn-hover); }
 .provider-option[aria-selected="true"] { background: var(--cbn-highlight); }
-.provider-option .badge { font-size: 12px; justify-self: start; max-width: 100%; min-height: 24px; min-width: 0; overflow: hidden; padding: 0 9px; text-overflow: ellipsis; }
-.provider-option-all { background: var(--cbn-highlight); color: var(--cbn-accent); }
-.provider-option-count { color: var(--cbn-muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
-.provider-option-check { color: var(--cbn-accent); font-weight: 800; text-align: center; }
+.provider-option-label { display: flex; min-width: 0; }
+.provider-option .badge { display: block; font-size: 12px; line-height: 24px; max-width: 100%; min-height: 24px; min-width: 0; overflow: hidden; padding: 0 9px; text-overflow: ellipsis; }
+.provider-option-all { color: var(--cbn-text); font-size: 12px; font-weight: 650; overflow: hidden; padding-left: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-option[aria-selected="true"] .provider-option-all { color: var(--cbn-accent); }
+.provider-option-count { color: var(--cbn-subtle); font-size: 12px; font-variant-numeric: tabular-nums; justify-self: stretch; text-align: right; white-space: nowrap; }
+.provider-option-check { color: var(--cbn-accent); font-size: 15px; font-weight: 700; text-align: center; }
 .provider-option-empty { color: var(--cbn-muted); font-size: 13px; padding: 14px 8px; text-align: center; }
 .provider-filter-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .provider-filter-status[hidden] { display: none; }
@@ -173,9 +176,24 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   padding: 4px 10px;
 }
 .active-provider:focus-visible, .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
+.filter-bar { align-items: center; display: flex; gap: 4px; margin-bottom: 8px; }
+.filter-bar .provider-picker { align-self: stretch; min-height: 36px; width: 36px; }
+.invite-card { margin: 4px 0 16px; padding: 14px; }
+.invite-card[hidden] { display: none; }
+.invite-card-header { align-items: center; display: flex; gap: 6px; margin: -4px -4px 6px 0; color: var(--cbn-muted); font-size: 11px; }
+.invite-card-dismiss { align-items: center; display: inline-flex; flex-shrink: 0; justify-content: center; margin-left: auto; min-height: 32px; width: 32px; }
+.invite-card h2 { font-size: 18px; font-weight: 700; line-height: 1.3; }
+.invite-card p { color: var(--cbn-muted); font-size: 13px; line-height: 1.5; margin: 7px 0 12px; }
+.invite-card-action { align-items: center; display: flex; font-size: 13px; font-weight: 650; gap: 8px; justify-content: center; min-height: 44px; padding: 10px 12px; text-align: center; }
+.invite-card .invite-card-terms { font-size: 11px; line-height: 1.5; margin: 0 0 12px; }
+.invite-card-terms a { color: inherit; text-underline-offset: 2px; }
+.quick-filters { display: flex; flex: 1; gap: 6px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding: 3px; scrollbar-width: thin; }
+.quick-filter { flex: 1 0 auto; font: inherit; font-size: 12px; font-weight: 600; min-height: 36px; padding: 0 11px; white-space: nowrap; }
 @media (max-width: 380px) {
   .search-wrap { gap: 6px; }
   .input-wrap .global-sum { width: 80px; padding-left: 10px; }
+  .quick-filters { gap: 4px; }
+  .quick-filter { font-size: 11px; padding: 0 7px; }
 }
 .results { display: grid; gap: 12px; padding-top: 12px; padding-bottom: 60px; }
 .az-section-header {
@@ -904,7 +922,24 @@ a.code-reward { color: inherit; text-decoration: none; }
   </nav>
   <p style="font-size:11px;color:var(--cbn-muted);text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
+  <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
+    <div class="invite-card-header">
+      <span class="cbn-chip cbn-chip--muted">Annonse</span>
+      <span id="support-invite-provider"></span>
+      <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul invitasjonen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <h2 id="support-invite-title"></h2>
+    <p id="support-invite-description"></p>
+    <p class="invite-card-terms" id="support-invite-terms" hidden></p>
+    <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="noopener noreferrer" data-goatcounter-click="support-invite-card" data-goatcounter-title="Invitasjon"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+  </aside>
   <div class="sticky-header">
+  <div class="filter-bar">
+    <nav class="quick-filters" id="quick-filters" aria-label="Finn tilbud etter tema"></nav>
+    <button class="cbn-button cbn-button--quiet provider-picker" id="provider-picker" type="button" title="Filtrer etter fordelsprogram" aria-label="Filtrer etter fordelsprogram" aria-haspopup="dialog" aria-controls="provider-menu" aria-expanded="false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
+    </button>
+  </div>
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
       <button class="cbn-button cbn-button--quiet bonus-toggle" type="button">
@@ -918,9 +953,6 @@ a.code-reward { color: inherit; text-decoration: none; }
       <input class="cbn-field search" type="search" placeholder="Søk etter butikk..." autofocus>
       <button class="cbn-button cbn-button--quiet input-clear" type="button" aria-label="Tøm søk">✕</button>
     </div>
-    <button class="cbn-button cbn-button--quiet provider-picker" id="provider-picker" type="button" title="Filtrer etter fordelsprogram" aria-label="Filtrer etter fordelsprogram" aria-haspopup="dialog" aria-controls="provider-menu" aria-expanded="false">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
-    </button>
     <div class="input-wrap">
       <input class="cbn-field global-sum" type="text" inputmode="decimal" placeholder="Sum">
       <button class="cbn-button cbn-button--quiet input-clear" type="button" aria-label="Tøm kjøpesum">✕</button>
@@ -934,7 +966,7 @@ a.code-reward { color: inherit; text-decoration: none; }
       <span class="provider-search-mascot" aria-hidden="true"><img src="quokka-mascot.png?v=quokka-1" alt=""></span>
     </div>
     <div class="provider-menu-hint">Velg ett eller flere programmer</div>
-    <div class="provider-option-list" id="provider-options" role="listbox" aria-label="Fordelsprogrammer"></div>
+    <div class="provider-option-list" id="provider-options" role="listbox" aria-label="Fordelsprogrammer" aria-multiselectable="true"></div>
     <button class="cbn-button cbn-button--quiet provider-menu-done" id="provider-menu-done" type="button">Ferdig</button>
   </div>
   <div class="bonus-chips-portal" style="display:none">
@@ -948,7 +980,7 @@ a.code-reward { color: inherit; text-decoration: none; }
     </div>
   </div>
   </div>
-  <div class="results"></div>
+  <div class="results" id="results"></div>
   <div class="az-bar" id="az-bar"></div>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
@@ -963,11 +995,28 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
 };
+
+const SUPPORT_INVITES = [
+  {
+    id: "spareborsen", name: "Sparebørsen", url: SITE_PROVIDER_REFERRAL_URLS.spareborsen,
+    title: "Få 50 kr. Støtt Cashback Norge.",
+    description: "Registrer deg hos Sparebørsen med Vipps. Du får 50 kr i startsaldo, og vi får en vervebonus som støtter utviklingen.",
+    action: "Registrer deg med Vipps",
+  },
+  {
+    id: "kron", name: "Kron", url: SUPPORT_LINKS.find(link => link.url.includes("kron.no/app/invitert/"))?.url,
+    title: "Få 100 kr i fond hos Kron.",
+    description: "Start fondssparing med minst 300 kr. Du får 100 kr i fondsbonus, og vi får en vervebonus som støtter Cashback Norge.",
+    terms: "For deg som ikke har spart i Kron før. Innskudd og bonus må stå i 30 dager.",
+    termsUrl: "https://www.kron.no/vilkar-for-verving-i-kron",
+    action: "Start sparing hos Kron",
+  },
+];
 
 const CRYPTO_SUBSCRIPTIONS = {
   "spotify.com": "Spotify",
@@ -979,6 +1028,7 @@ let allMerchants = [];
 let curveDomains = new Set();
 let selectedProviders = new Set();
 let providerCounts = new Map();
+let selectedQuickFilters = new Set();
 
 let currentAmount = 0;
 
@@ -1046,17 +1096,22 @@ function renderProviderOptions(query = "") {
     const selected = item.provider ? selectedProviders.has(item.provider) : !hasProviderFilter();
     option.setAttribute("aria-selected", String(selected));
     option.dataset.provider = item.provider;
+    const label = document.createElement("span");
+    label.className = "provider-option-label";
     const chip = document.createElement("span");
-    chip.className = item.provider ? `badge badge-${item.provider}` : "badge provider-option-all";
+    chip.className = item.provider ? `cbn-chip badge badge-${item.provider}` : "provider-option-all";
     chip.textContent = item.name;
+    chip.title = item.name;
+    label.append(chip);
     const count = document.createElement("span");
     count.className = "provider-option-count";
-    count.textContent = `(${item.count})`;
+    count.textContent = item.count.toLocaleString("nb-NO");
+    count.setAttribute("aria-label", `${item.count} butikker`);
     const check = document.createElement("span");
     check.className = "provider-option-check";
     check.setAttribute("aria-hidden", "true");
     check.textContent = selected ? "✓" : "";
-    option.append(chip, count, check);
+    option.append(label, count, check);
     list.append(option);
   });
   const selectedIndex = visibleProviderOptions.findIndex(option => option.provider && selectedProviders.has(option.provider));
@@ -1191,6 +1246,51 @@ function matchesProvider(offer) {
     (offer.provider === "rabattkode" && selectedProviders.has(getCodeSourceProvider(offer)));
 }
 
+function matchesActiveFilters(offer) {
+  return matchesProvider(offer) && matchesOfferQuickFilters(offer, selectedQuickFilters);
+}
+
+function getVisibleMerchantOffers(merchant) {
+  const seen = new Set();
+  return merchant.offers.filter(offer => {
+    if (!matchesActiveFilters(offer)) return false;
+    const key = offer.provider + ":" + (offer.discountCode || "");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function updateQuickFilters() {
+  document.querySelectorAll(".quick-filter").forEach(button => {
+    button.setAttribute("aria-pressed", String(selectedQuickFilters.has(button.dataset.filter)));
+  });
+}
+
+function setupQuickFilters() {
+  const nav = document.getElementById("quick-filters");
+  for (const { id, label } of QUICK_FILTERS) {
+    const button = document.createElement("button");
+    button.className = "cbn-button cbn-button--filter quick-filter";
+    button.type = "button";
+    button.dataset.filter = id;
+    button.textContent = label;
+    button.setAttribute("aria-controls", "results");
+    nav.append(button);
+  }
+  nav.addEventListener("click", event => {
+    const button = event.target.closest(".quick-filter");
+    if (!button) return;
+    const filter = button.dataset.filter;
+    if (selectedQuickFilters.has(filter)) selectedQuickFilters.delete(filter);
+    else selectedQuickFilters.add(filter);
+    updateQuickFilters();
+    syncFilterUrl(true);
+    render(document.querySelector(".search").value);
+    document.querySelector(".sticky-header").scrollIntoView({ block: "start" });
+  });
+}
+
 function getProviderFilterHref(provider) {
   const url = new URL(window.location.href);
   url.searchParams.set("provider", provider);
@@ -1209,6 +1309,8 @@ function syncFilterUrl(push = false) {
   const query = document.querySelector(".search").value;
   if (query) url.searchParams.set("q", query);
   else url.searchParams.delete("q");
+  if (selectedQuickFilters.size > 0) url.searchParams.set("tema", QUICK_FILTERS.filter(filter => selectedQuickFilters.has(filter.id)).map(filter => filter.id).join(","));
+  else url.searchParams.delete("tema");
   url.searchParams.delete("provider");
   url.searchParams.delete("providers");
   if (selectedProviders.size === 1) url.searchParams.set("provider", [...selectedProviders][0]);
@@ -1280,6 +1382,9 @@ function readFilterUrl() {
     (providerCounts.has(provider) || Object.hasOwn(PROVIDER_NAMES, provider) || provider === "crypto");
   const providers = (params.get("providers") || params.get("provider") || "").split(",").filter(isKnownProvider);
   selectedProviders = new Set(providers);
+  const knownFilters = new Set(QUICK_FILTERS.map(filter => filter.id));
+  selectedQuickFilters = new Set((params.get("tema") || "").split(",").filter(filter => knownFilters.has(filter)));
+  updateQuickFilters();
   const search = document.querySelector(".search");
   search.value = params.get("q") || "";
   search.closest(".input-wrap").classList.toggle("has-value", search.value.length > 0);
@@ -1310,6 +1415,7 @@ function applyProviderMeta(providers) {
 
 async function init() {
   renderTips();
+  setupSupportInvite();
   setupBonusToggle();
   const res = await fetch("cashback-index.json", { cache: "no-cache" });
   const data = await res.json();
@@ -1330,6 +1436,7 @@ async function init() {
     }
   }
   setupProviderPicker();
+  setupQuickFilters();
   document.querySelector(".results").addEventListener("click", (event) => {
     const chip = event.target.closest(".provider-filter-link");
     if (!chip || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -1351,7 +1458,7 @@ async function init() {
 
   // Provider changes create a history entry; typing updates the current entry.
   readFilterUrl();
-  if (searchEl.value.length > 0 || hasProviderFilter()) {
+  if (searchEl.value.length > 0 || hasProviderFilter() || selectedQuickFilters.size > 0) {
     searchEl.scrollIntoView({ block: "center" });
   }
 
@@ -1467,7 +1574,8 @@ function groupByMerchant(offers) {
     }
   }
   const sharedDomains = new Set(Object.keys(domainNames).filter(d =>
-    domainNames[d].size > 8 || d.includes("sjv.io") || d.includes("emjcd.com") || d.includes("jdoqocy.com") || d.includes("dpbolvw.net")
+    domainNames[d].size > 8 || d === "cartrawler.com" || d.endsWith(".cartrawler.com") ||
+    d.includes("sjv.io") || d.includes("emjcd.com") || d.includes("jdoqocy.com") || d.includes("dpbolvw.net")
   ));
 
   // Union-find: group offers that share a domain
@@ -1520,15 +1628,9 @@ function groupByMerchant(offers) {
   }
 
   for (const m of groups) {
-    // Deduplicate: keep only the best offer per provider (highest reward wins)
+    // Keep all products until filtering; one provider may offer both electricity
+    // and mobile at the same merchant. Deduplicate the visible offers in render.
     m.offers.sort(compareOffers);
-    const bestPerProvider = new Map();
-    m.offers = m.offers.filter(o => {
-      const key = o.provider + ":" + (o.discountCode || "");
-      if (bestPerProvider.has(key)) return false;
-      bestPerProvider.set(key, true);
-      return true;
-    });
     // Override group name based on primary domain when merchant names are generic
     const DOMAIN_DISPLAY_NAMES = {
       "strawberry.no": "Strawberry",
@@ -1546,7 +1648,7 @@ function groupByMerchant(offers) {
   return groups.sort((a, b) => a.name.localeCompare(b.name, "nb"));
 }
 
-const TRACKING_DOMAINS = ["sjv.io", "pxf.io", "emjcd.com", "jdoqocy.com", "dpbolvw.net", "anrdoezrs.net", "tkqlhce.com", "kqzyfj.com", "awstrack.me", "madmetrics.com", "synxis.com", "vpweb.no"];
+const TRACKING_DOMAINS = ["sjv.io", "pxf.io", "emjcd.com", "jdoqocy.com", "dpbolvw.net", "anrdoezrs.net", "tkqlhce.com", "kqzyfj.com", "awstrack.me", "madmetrics.com", "synxis.com", "vpweb.no", "cartrawler.com"];
 
 function pickBestDomain(domains) {
   if (!domains || domains.length === 0) return "";
@@ -1590,7 +1692,8 @@ function render(query) {
   const q = foldSearchText(query.trim());
   const terms = q.split(/\s+/).filter(t => t.length > 0);
   const merchants = allMerchants.filter(m => m.providers.size > 0 &&
-    (!hasProviderFilter() || [...selectedProviders].some(provider => m.providers.has(provider))));
+    (!hasProviderFilter() || [...selectedProviders].some(provider => m.providers.has(provider))) &&
+    (selectedQuickFilters.size === 0 || m.offers.some(matchesActiveFilters)));
   let filtered;
   if (terms.length === 0) {
     filtered = merchants;
@@ -1620,8 +1723,9 @@ function render(query) {
   const container = document.querySelector(".results");
   window.CashbackTooltips.close();
   if (filtered.length === 0) {
-    const providerNames = getSelectedProviderNames().join(", ");
-    container.innerHTML = `<div class="empty">${hasProviderFilter() ? `Ingen treff i ${esc(providerNames)}. Prøv et annet søk eller fjern filteret.` : "Ingen treff"}</div>`;
+    const filterNames = [...getSelectedProviderNames(), ...QUICK_FILTERS.filter(filter => selectedQuickFilters.has(filter.id)).map(filter => filter.label)].join(", ");
+    container.innerHTML = `<div class="empty">${filterNames ? `Ingen treff med ${esc(filterNames)}. Prøv et annet søk eller fjern et filter.` : "Ingen treff"}</div>`;
+    if (window._azObserveAll) window._azObserveAll();
     return;
   }
 
@@ -1638,8 +1742,9 @@ function render(query) {
     const iconHtml = hasIcon
       ? `<img class="merchant-icon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
       : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
-    const cashbackOffers = m.offers.filter(o => matchesProvider(o) && o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
-    const codeOffers = m.offers.filter(o => matchesProvider(o) && (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
+    const visibleOffers = getVisibleMerchantOffers(m);
+    const cashbackOffers = visibleOffers.filter(o => o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
+    const codeOffers = visibleOffers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
     const offerHtml = cashbackOffers.map((o, idx) => {
       const url = getSiteOfferUrl(o);
       const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
@@ -1672,16 +1777,17 @@ function render(query) {
     }).join("");
     const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
     const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
-    const cryptoSelectedHtml = cryptoSubName && (!hasProviderFilter() || selectedProviders.has("crypto")) ? (() => {
+    const cryptoSelectedHtml = selectedQuickFilters.size === 0 && cryptoSubName && (!hasProviderFilter() || selectedProviders.has("crypto")) ? (() => {
       const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
       return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
     })() : "";
     const hasCurve = m.domains.some(d => curveDomains.has(d));
-    const curveSelectedHtml = hasCurve && (!hasProviderFilter() || selectedProviders.has("curve")) ? (() => {
+    const curveSelectedHtml = selectedQuickFilters.size === 0 && hasCurve && (!hasProviderFilter() || selectedProviders.has("curve")) ? (() => {
       const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
       return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
     })() : "";
     const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
+    const filterCodes = hasProviderFilter() || selectedQuickFilters.size > 0;
     const codesHtml = codeOffers.map(o => {
       const code = o.discountCode || "";
       const codeTerms = o.terms || "";
@@ -1717,10 +1823,10 @@ function render(query) {
       </div>
       <div class="offers">${offerHtml}</div>
       ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
-      <div class="codes-inline${hasProviderFilter() && codesHtml ? " open" : ""}${(hasProviderFilter() ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
+      <div class="codes-inline${filterCodes && codesHtml ? " open" : ""}${(filterCodes ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
         <div class="codes-toggle-wrap">
-          <button class="cbn-button cbn-button--quiet codes-toggle${hasProviderFilter() && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
-          <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${hasProviderFilter() ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="cbn-button cbn-button--quiet codes-toggle${filterCodes && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
+          <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${filterCodes ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
         <div class="codes-items">
           <div class="codes-add-form">
@@ -1914,7 +2020,7 @@ function render(query) {
     // Load DB codes — deferred until section is first expanded
     let dbLoaded = false;
     const loadDbCodes = () => {
-      if (hasProviderFilter()) return; // Community codes have no provider attribution.
+      if (hasProviderFilter() || selectedQuickFilters.size > 0) return; // Community codes have no provider/topic attribution.
       if (dbLoaded) return;
       dbLoaded = true;
       Promise.all([fetchCodesForHost(hostname), fetchOwnedCodesForHost(hostname), fetchMyVotes(hostname)]).then(([dbCodes, serverOwnedIds, myVotes]) => {
@@ -2226,6 +2332,42 @@ function makeDeleteBtn(codeId, row, hostname) {
     });
   });
   return btn;
+}
+
+function setupSupportInvite() {
+  const card = document.getElementById("support-invite");
+  let dismissed = false;
+  try { dismissed = sessionStorage.getItem("cbn-support-invite-dismissed") === "1"; } catch {}
+  if (dismissed) return;
+  const invites = SUPPORT_INVITES.filter(invite => invite.url);
+  if (invites.length === 0) return;
+  const invite = invites[Math.floor(Math.random() * invites.length)];
+  card.dataset.invite = invite.id;
+  document.getElementById("support-invite-provider").textContent = `Invitasjon til ${invite.name}`;
+  document.getElementById("support-invite-title").textContent = invite.title;
+  document.getElementById("support-invite-description").textContent = invite.description;
+  const terms = document.getElementById("support-invite-terms");
+  if (invite.terms) {
+    terms.textContent = invite.terms + " ";
+    const termsLink = document.createElement("a");
+    termsLink.href = invite.termsUrl;
+    termsLink.target = "_blank";
+    termsLink.rel = "noopener noreferrer";
+    termsLink.textContent = "Se vilkår";
+    terms.append(termsLink);
+    terms.hidden = false;
+  }
+  const action = card.querySelector(".invite-card-action");
+  action.href = invite.url;
+  action.querySelector("span").textContent = invite.action;
+  action.dataset.goatcounterClick = `${invite.id}-invite-card`;
+  action.dataset.goatcounterTitle = `${invite.name}: invitasjon`;
+  card.hidden = false;
+  card.querySelector("button").addEventListener("click", () => {
+    card.hidden = true;
+    try { sessionStorage.setItem("cbn-support-invite-dismissed", "1"); } catch {}
+    document.querySelector(".search").focus({ preventScroll: true });
+  });
 }
 
 function renderTips() {

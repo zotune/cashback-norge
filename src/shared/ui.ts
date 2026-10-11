@@ -26,6 +26,11 @@ export const UI_CSS = `
 .cbn-button--quiet { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
 .cbn-button--primary { --cbn-button-bg: var(--cbn-accent); --cbn-button-fg: var(--cbn-on-accent); }
 .cbn-button[aria-pressed="true"], .cbn-button.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.cbn-button--filter { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
+.cbn-button--filter[aria-pressed="true"] {
+  --cbn-button-bg: var(--cbn-accent); --cbn-button-fg: var(--cbn-on-accent);
+  background: var(--cbn-button-bg); color: var(--cbn-button-fg);
+}
 .cbn-field, .cbn-field-group {
   border: 0; border-radius: var(--cbn-control-radius); box-shadow: none;
   background: var(--cbn-field); color: var(--cbn-text); outline: none;

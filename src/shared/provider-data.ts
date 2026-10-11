@@ -259,7 +259,7 @@ export const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
 };
 
 export const SUPPORT_LINKS = [
-  { text: "Kron: 200 kr gratis i fond", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
+  { text: "Kron: 100 kr i fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
   { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
   { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
   { text: "Wise: Gratis internasjonal overføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
@@ -269,7 +269,7 @@ export const SUPPORT_LINKS = [
   { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
   { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
   { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-  { text: "Sparebørsen: 50 kr settes inn med en gang du registrerer deg", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
+  { text: "Sparebørsen: Få 50 kr i startsaldo når du registrerer deg med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
 ];
 
 export const MERCHANT_ALIASES: Record<string, string> = {

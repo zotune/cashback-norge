@@ -2,6 +2,7 @@ Cashback Norge uses one visual component layer in `ui.ts`, including the website
 installation guides, React popup, shadow DOM panel and generated userscript.
 
 - `cbn-button`, `cbn-button--quiet`, `cbn-button--primary`: actions and navigation.
+- `cbn-button--filter`: neutral filter toggles with a solid accent when pressed.
 - `cbn-field`, `cbn-field-group`: inputs and grouped inputs.
 - `cbn-card`, `cbn-row`: content surfaces and interactive offer rows.
 - `cbn-chip`, `cbn-chip--muted`: provider brands and small status labels.
