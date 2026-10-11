@@ -185,8 +185,6 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .invite-card h2 { font-size: 18px; font-weight: 700; line-height: 1.3; }
 .invite-card p { color: var(--cbn-muted); font-size: 13px; line-height: 1.5; margin: 7px 0 12px; }
 .invite-card-action { align-items: center; display: flex; font-size: 13px; font-weight: 650; gap: 8px; justify-content: center; min-height: 44px; padding: 10px 12px; text-align: center; }
-.invite-card .invite-card-terms { font-size: 11px; line-height: 1.5; margin: 0 0 12px; }
-.invite-card-terms a { color: inherit; text-underline-offset: 2px; }
 .quick-filters { display: flex; flex: 1; gap: 6px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding: 3px; scrollbar-width: thin; }
 .quick-filter { flex: 1 0 auto; font: inherit; font-size: 12px; font-weight: 600; min-height: 36px; padding: 0 11px; white-space: nowrap; }
 @media (max-width: 380px) {
@@ -930,7 +928,6 @@ a.code-reward { color: inherit; text-decoration: none; }
     </div>
     <h2 id="support-invite-title"></h2>
     <p id="support-invite-description"></p>
-    <p class="invite-card-terms" id="support-invite-terms" hidden></p>
     <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="noopener noreferrer" data-goatcounter-click="support-invite-card" data-goatcounter-title="Invitasjon"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
   </aside>
   <div class="sticky-header">
@@ -1004,17 +1001,15 @@ const SITE_PROVIDER_REFERRAL_URLS = {
 const SUPPORT_INVITES = [
   {
     id: "spareborsen", name: "Sparebørsen", url: SITE_PROVIDER_REFERRAL_URLS.spareborsen,
-    title: "Få 50 kr. Støtt Cashback Norge.",
-    description: "Registrer deg hos Sparebørsen med Vipps. Du får 50 kr i startsaldo, og vi får en vervebonus som støtter utviklingen.",
-    action: "Registrer deg med Vipps",
+    title: "Få 50 kr i startsaldo.",
+    description: "Registrer deg med Vipps og støtt Cashback Norge.",
+    action: "Få 50 kr med Vipps",
   },
   {
     id: "kron", name: "Kron", url: SUPPORT_LINKS.find(link => link.url.includes("kron.no/app/invitert/"))?.url,
     title: "Få 100 kr i fond hos Kron.",
-    description: "Start fondssparing med minst 300 kr. Du får 100 kr i fondsbonus, og vi får en vervebonus som støtter Cashback Norge.",
-    terms: "For deg som ikke har spart i Kron før. Innskudd og bonus må stå i 30 dager.",
-    termsUrl: "https://www.kron.no/vilkar-for-verving-i-kron",
-    action: "Start sparing hos Kron",
+    description: "Start sparing fra 300 kr og støtt Cashback Norge.",
+    action: "Få 100 kr i bonus",
   },
 ];
 
@@ -2343,20 +2338,9 @@ function setupSupportInvite() {
   if (invites.length === 0) return;
   const invite = invites[Math.floor(Math.random() * invites.length)];
   card.dataset.invite = invite.id;
-  document.getElementById("support-invite-provider").textContent = `Invitasjon til ${invite.name}`;
+  document.getElementById("support-invite-provider").textContent = invite.name;
   document.getElementById("support-invite-title").textContent = invite.title;
   document.getElementById("support-invite-description").textContent = invite.description;
-  const terms = document.getElementById("support-invite-terms");
-  if (invite.terms) {
-    terms.textContent = invite.terms + " ";
-    const termsLink = document.createElement("a");
-    termsLink.href = invite.termsUrl;
-    termsLink.target = "_blank";
-    termsLink.rel = "noopener noreferrer";
-    termsLink.textContent = "Se vilkår";
-    terms.append(termsLink);
-    terms.hidden = false;
-  }
   const action = card.querySelector(".invite-card-action");
   action.href = invite.url;
   action.querySelector("span").textContent = invite.action;
