@@ -15,12 +15,19 @@ export type ProviderMeta = {
   border?: string;
 };
 
+export type RewardCalculationRules = {
+  minimumPurchaseNok?: number;
+  minimumPurchaseExclusive?: boolean;
+  singleItemOnly?: boolean;
+};
+
 export type CashbackOffer = {
   provider: CashbackProvider;
   merchantName: string;
   domains: string[];
   reward: string;
   rewardSortValueNok?: number;
+  rewardCalculation?: RewardCalculationRules;
   sourceUrl: string;
   activationUrl: string;
   terms: string;
@@ -71,12 +78,21 @@ export function isCashbackOffer(value: unknown): value is CashbackOffer {
     typeof value.reward === "string" &&
     (value.rewardSortValueNok === undefined ||
       (typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok))) &&
+    (value.rewardCalculation === undefined || isRewardCalculationRules(value.rewardCalculation)) &&
     typeof value.sourceUrl === "string" &&
     typeof value.activationUrl === "string" &&
     typeof value.terms === "string" &&
     (value.discountCode === undefined || typeof value.discountCode === "string") &&
     typeof value.updatedAt === "string"
   );
+}
+
+function isRewardCalculationRules(value: unknown): value is RewardCalculationRules {
+  return isRecord(value) &&
+    (value.minimumPurchaseNok === undefined ||
+      (typeof value.minimumPurchaseNok === "number" && Number.isFinite(value.minimumPurchaseNok) && value.minimumPurchaseNok >= 0)) &&
+    (value.minimumPurchaseExclusive === undefined || typeof value.minimumPurchaseExclusive === "boolean") &&
+    (value.singleItemOnly === undefined || typeof value.singleItemOnly === "boolean");
 }
 
 export function isCashbackIndex(value: unknown): value is CashbackIndex {

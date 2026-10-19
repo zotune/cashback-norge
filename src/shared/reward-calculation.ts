@@ -3,6 +3,7 @@ import {
   normalizeCurrencyForExchange,
   type NokBaseRates,
 } from "./exchange-rates.js";
+import type { RewardCalculationRules } from "./cashback.js";
 
 export const EB_PER_TRUMF_KR = 13.5;
 
@@ -10,6 +11,7 @@ type RewardOffer = {
   provider: string;
   reward: string;
   rewardSortValueNok?: number;
+  rewardCalculation?: RewardCalculationRules;
 };
 
 export function formatRewardLabel(reward: string, provider: string): string {
@@ -77,6 +79,7 @@ export function formatCompactRewardLabel(offer: RewardOffer): string | undefined
 }
 
 export function calculateCashback(offer: RewardOffer, amount: number): string {
+  if (!canCalculateForPurchase(offer, amount)) return "";
   if (offer.provider === "cbn") {
     const pctMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
     if (pctMatch !== null) {
@@ -141,6 +144,7 @@ export function calculateCashback(offer: RewardOffer, amount: number): string {
 }
 
 export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): number {
+  if (!canCalculateForPurchase(offer, amount)) return 0;
   if (offer.provider === "cbn") return 0;
 
   const reward = offer.reward.trim();
@@ -167,6 +171,16 @@ export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): numb
   }
 
   return 0;
+}
+
+function canCalculateForPurchase(offer: RewardOffer, amount: number): boolean {
+  const rules = offer.rewardCalculation;
+  // The Sum field is a basket total; it cannot price a single eligible item.
+  if (rules?.singleItemOnly === true) return false;
+  if (rules?.minimumPurchaseNok === undefined) return true;
+  return rules.minimumPurchaseExclusive === true
+    ? amount > rules.minimumPurchaseNok
+    : amount >= rules.minimumPurchaseNok;
 }
 
 export function getMaxRewardPercent(offer: RewardOffer): number {

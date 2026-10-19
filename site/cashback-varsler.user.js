@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1791724225
+// @version      1792395600
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -170,6 +170,7 @@
     dreams: "Dreams",
     utdanningibergen: "Utdanning i Bergen",
     unidays: "UNiDAYS",
+    gratisbursdag: "Gratis gaver",
     cbn: "♥",
     unio: "Unio",
     coop: "Coop",
@@ -229,6 +230,7 @@
     dreams: { bg: "#a389d8", fg: "#1a1a1a" },
     utdanningibergen: { bg: "#ffffff", fg: "#000000" },
     unidays: { bg: "#00b140", fg: "#ffffff" },
+    gratisbursdag: { bg: "#7c3aed", fg: "#ffffff" },
     unio: { bg: "#ffffff", fg: "#6b5330" },
     coop: { bg: "#003366", fg: "#ffffff" },
     elkjop: { bg: "#1d1b58", fg: "#ffffff" },
@@ -434,6 +436,7 @@
     return label.length <= 14 ? label : void 0;
   }
   function calculateCashback(offer, amount) {
+    if (!canCalculateForPurchase(offer, amount)) return "";
     if (offer.provider === "cbn") {
       const pctMatch2 = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
       if (pctMatch2 !== null) {
@@ -486,6 +489,12 @@
       return `${formatKr(kr)} kr`;
     }
     return "";
+  }
+  function canCalculateForPurchase(offer, amount) {
+    const rules = offer.rewardCalculation;
+    if (rules?.singleItemOnly === true) return false;
+    if (rules?.minimumPurchaseNok === void 0) return true;
+    return rules.minimumPurchaseExclusive === true ? amount > rules.minimumPurchaseNok : amount >= rules.minimumPurchaseNok;
   }
   function readFixedRewardMax(reward) {
     const currencyPattern = "(?:kr|NOK|SEK|DKK|EUR|USD|GBP)";

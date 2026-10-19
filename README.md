@@ -59,4 +59,20 @@ See [LICENSE](LICENSE).
 
 ## Disclaimer on crawlers
 
+`gratisbursdag` henter den offentlige katalogen fra gratisbursdag.no. Nettstedet
+har for tiden ikke et separat API i bruk; tilbudene ligger som JSON i en
+JavaScript-modul. Crawleren finner gjeldende modulnavn fra forsiden og leser bare
+dataene, uten å kjøre tredjepartskode. Domenekoblinger vedlikeholdes i
+`data/provider-overrides.json`. Nye butikker uten kjent domene vises på nettsiden
+til domenet er kartlagt. Tilbudene vises som «Gratis gaver» med lilla chip og hvit
+tekst i nettsiden, extensionen og userscriptet.
+
+Tooltipene beholder gave/rabatt, beskrivelse, medlemskrav, gyldighet,
+brukssted, unntak og kildens bekreftelsesstatus. Personlige koder hentes ikke.
+Prosent og kronebeløp bruker de delte rabattfunksjonene. Minstekjøp begrenser
+beregningen, og rabatter på én vare beregnes ikke fra en hel handlekurv.
+Gratisvarer følger standardformatet `0 kr totalsum`; ukjent gaveverdi og «2 for 1»
+gjøres ikke om til cashback. Ved kildefeil gjenbrukes tidligere data i maksimalt
+14 dager. Bruk `--skip-gratisbursdag` for å hoppe over kilden ved lokal crawling.
+
 The crawlers only extract publicly available information. No proprietary or copyrighted content from third parties is included in this repository. Offers requiring authentication/login are not shown. If a discount code is shown, it is because it is available without login.

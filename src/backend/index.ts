@@ -94,6 +94,7 @@ import { fetchDaisycon } from "./providers/daisycon.js";
 import { fetchTradedoubler } from "./providers/tradedoubler.js";
 import { fetchCoupert } from "./providers/coupert.js";
 import { fetchRabatta } from "./providers/rabatta.js";
+import { fetchGratisbursdag } from "./providers/gratisbursdag.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -185,6 +186,7 @@ type CliConfig = {
   skipTradedoubler: boolean;
   skipCoupert: boolean;
   skipRabatta: boolean;
+  skipGratisbursdag: boolean;
   rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -969,6 +971,17 @@ async function main(): Promise<void> {
   ]);
   logger.info(`Full domain lookup: ${fullDomainLookup.size} merchant names with known domains`);
 
+  const gratisbursdagOffers = config.skipGratisbursdag ? [] : await collectOffers({
+    label: "Gratis Bursdag",
+    provider: "gratisbursdag",
+    fallbackWhenEmpty: true,
+    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+    reusePreviousOnFailure: true,
+    run: () => fetchGratisbursdag({
+      domainLookup: fullDomainLookup, generatedAt, logger, overrides: providerOverrides,
+    }),
+  });
+
   const spennOffers = config.skipSpenn ? [] : await collectOffers({
     label: "Spenn",
     provider: "spenn",
@@ -1003,6 +1016,7 @@ async function main(): Promise<void> {
   // domain already selected by the Norwegian sources above, but it must never
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
+    ...gratisbursdagOffers,
     ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers, ...kondisOffers,
   ];
   const knownCoupertDomains = new Set(
@@ -1203,6 +1217,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipTradedoubler: args.includes("--skip-tradedoubler"),
     skipCoupert: args.includes("--skip-coupert"),
     skipRabatta: args.includes("--skip-rabatta"),
+    skipGratisbursdag: args.includes("--skip-gratisbursdag"),
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??

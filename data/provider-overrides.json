@@ -2253,5 +2253,192 @@
   "bbl": {},
   "elbilforeningen": {},
   "ys": {},
-  "lofavor": {}
+  "lofavor": {},
+  "gratisbursdag": {
+    "godt brød": [
+      "godtbrod.no"
+    ],
+    "meny": [
+      "meny.no"
+    ],
+    "tilbords": [
+      "tilbords.no"
+    ],
+    "7-eleven": [
+      "7-eleven.no"
+    ],
+    "narvesen": [
+      "narvesen.no"
+    ],
+    "espresso house": [
+      "espressohouse.com"
+    ],
+    "kitch'n": [
+      "kitchn.no"
+    ],
+    "mester grønn": [
+      "mestergronn.no"
+    ],
+    "rituals": [
+      "rituals.com"
+    ],
+    "rema 1000": [
+      "rema.no"
+    ],
+    "jordbærpikene": [
+      "jordbarpikene.no"
+    ],
+    "oda": [
+      "oda.com"
+    ],
+    "mcdonalds": [
+      "mcdonalds.com",
+      "mcdonalds.no"
+    ],
+    "musti": [
+      "musti.no"
+    ],
+    "vitus apotek": [
+      "vitusapotek.no"
+    ],
+    "change": [
+      "change.com"
+    ],
+    "princess": [
+      "princessbutikken.no"
+    ],
+    "gnist": [
+      "gnist.no"
+    ],
+    "xxl": [
+      "xxl.no"
+    ],
+    "eurosko": [
+      "eurosko.com"
+    ],
+    "hageland": [
+      "hageland.no"
+    ],
+    "heidis": [
+      "heidisbierbar.no"
+    ],
+    "bjørklund": [
+      "bjorklund.no"
+    ],
+    "sats": [
+      "sats.no"
+    ],
+    "dæhlie": [
+      "dahlie.com"
+    ],
+    "sweet protection": [
+      "sweetprotection.com"
+    ],
+    "kid interiør": [
+      "kid.no"
+    ],
+    "egon": [
+      "egon.no"
+    ],
+    "junkyard": [
+      "junkyard.no"
+    ],
+    "dna": [
+      "dna-shoes.com"
+    ],
+    "christiania glassmagasin": [
+      "cg.no",
+      "christianiaglasmagasin.no",
+      "glasmagasinet.no"
+    ],
+    "lindex": [
+      "lindex.com"
+    ],
+    "europris": [
+      "europris.no"
+    ],
+    "døgnvill": [
+      "dognvillburger.no"
+    ],
+    "carlings": [
+      "carlings.com"
+    ],
+    "t.g.i fridays": [
+      "fridays.no"
+    ],
+    "råde bakeri": [
+      "radebakeri.no"
+    ],
+    "kicks": [
+      "kicks.no"
+    ],
+    "funky frozen yoghurt": [
+      "ffy.no"
+    ],
+    "kremmerhuset": [
+      "kremmerhuset.no"
+    ],
+    "h&m": [
+      "hm.com"
+    ],
+    "ellos": [
+      "ellos.no"
+    ],
+    "jotex": [
+      "jotex.no"
+    ],
+    "cubus": [
+      "cubus.com"
+    ],
+    "sabrura": [
+      "sabrurasushi.no"
+    ],
+    "lucky bowl": [
+      "luckybowl.no"
+    ],
+    "peppes pizza": [
+      "peppes.no"
+    ],
+    "ikea": [
+      "ikea.com",
+      "ikea.no"
+    ],
+    "bikbok": [
+      "bikbok.com"
+    ],
+    "vita": [
+      "vita.no"
+    ],
+    "byoung": [
+      "byoung.com"
+    ],
+    "outland": [
+      "outland.no"
+    ],
+    "talkmore": [
+      "talkmore.no"
+    ],
+    "glitter": [
+      "glitter.no"
+    ],
+    "stormberg": [
+      "stormberg.com",
+      "stormberg.no"
+    ],
+    "power": [
+      "power.no"
+    ],
+    "boots apotek": [
+      "boots.no"
+    ],
+    "ringo": [
+      "ringo.no"
+    ],
+    "blivakker": [
+      "blivakker.no"
+    ],
+    "jernia": [
+      "jernia.no"
+    ]
+  }
 }

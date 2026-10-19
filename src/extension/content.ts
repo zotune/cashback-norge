@@ -191,6 +191,7 @@ type CashbackOffer = {
   domains: string[];
   reward: string;
   rewardSortValueNok?: number;
+  rewardCalculation?: import("../shared/cashback").RewardCalculationRules;
   sourceUrl: string;
   activationUrl: string;
   terms: string;
