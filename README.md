@@ -61,7 +61,8 @@ See [LICENSE](LICENSE).
 
 `gratisbursdag` henter den offentlige katalogen fra gratisbursdag.no. Nettstedet
 har for tiden ikke et separat API i bruk; tilbudene ligger som JSON i en
-JavaScript-modul. Crawleren finner gjeldende modulnavn fra forsiden og leser bare
+JavaScript-modul. Crawlee `HttpCrawler` henter forsiden og gjeldende modul med
+nettlesertransport, inntil to nye forsøk og sertifikatkontroll. Den leser bare
 dataene, uten å kjøre tredjepartskode. Domenekoblinger vedlikeholdes i
 `data/provider-overrides.json`. Nye butikker uten kjent domene vises på nettsiden
 til domenet er kartlagt. Tilbudene vises som «Gratis gaver» med lilla chip og hvit

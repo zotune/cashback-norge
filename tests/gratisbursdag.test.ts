@@ -18,13 +18,20 @@ const entry = {
 async function withCatalogue(
   entries: unknown[],
   run: (startUrl: string, requests: string[]) => Promise<void>,
-  options: { status?: number; script?: string; filename?: string } = {},
+  options: { status?: number; script?: string; filename?: string; disconnectOnce?: "page" | "script" } = {},
 ) {
   const requests: string[] = [];
   const filename = options.filename ?? "index-new-hash.js";
+  let disconnected = false;
   const server = createServer((request, response) => {
     requests.push(request.url!);
+    if (!disconnected && options.disconnectOnce === (request.url === "/" ? "page" : "script")) {
+      disconnected = true;
+      request.socket.destroy();
+      return;
+    }
     if (request.url === "/") {
+      response.setHeader("Content-Type", "text/html");
       response.end(`<script src="https://unrelated.invalid/analytics.js"></script><script type="module" src="/assets/${filename}"></script>`);
     } else if (request.url === `/assets/${filename}`) {
       response.writeHead(options.status ?? 200, { "Content-Type": "text/javascript" });
@@ -132,6 +139,18 @@ test("HTTP errors, changed schemas and missing catalogues fail for the bounded p
     await withCatalogue([entry], async (startUrl) => {
       await assert.rejects(fetchGratisbursdag(await input(startUrl)), /Gratis Bursdag:/);
     }, options);
+  }
+});
+
+test("Crawlee retries a dropped page or JavaScript connection instead of losing all birthday offers", async () => {
+  for (const disconnectOnce of ["page", "script"] as const) {
+    await withCatalogue([entry], async (startUrl, requests) => {
+      const offers = await fetchGratisbursdag(await input(startUrl));
+      assert.equal(offers.length, 1);
+      assert.equal(offers[0]!.merchantName, "Example");
+      const retriedUrl = disconnectOnce === "page" ? "/" : "/assets/index-new-hash.js";
+      assert.equal(requests.filter((url) => url === retriedUrl).length, 2);
+    }, { disconnectOnce });
   }
 });
 

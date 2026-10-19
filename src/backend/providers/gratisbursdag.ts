@@ -1,4 +1,5 @@
 // Extracts public birthday offers without executing third-party JavaScript.
+import { Configuration, HttpCrawler, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
   type RewardCalculationRules,
@@ -38,19 +39,46 @@ export type FetchGratisbursdagInput = {
 export async function fetchGratisbursdag(input: FetchGratisbursdagInput): Promise<CashbackOffer[]> {
   const pageUrl = input.startUrl ?? PAGE_URL;
   input.logger.info("Gratis Bursdag: fetching public offer catalogue...");
-  const html = await fetchText(pageUrl);
-  // The current site ships its catalogue as JSON.parse(`[...]`) inside a
-  // hashed Vite module. Discover the filename on every run; it changes on deploy.
-  const scriptUrls = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
-    .map((match) => new URL(match[1]!, pageUrl))
-    .filter((url) => url.origin === new URL(pageUrl).origin && /\.m?js$/.test(url.pathname));
-  let catalogue = parseCatalogue(html);
-  for (const url of scriptUrls.slice(0, 5)) {
-    if (catalogue !== undefined) break;
-    catalogue = parseCatalogue(await fetchText(url.href));
-  }
+  const storage = new MemoryStorage({ persistStorage: false });
+  const config = new Configuration();
+  config.useStorageClient(storage);
+  let catalogue: BirthdayOffer[] | undefined;
+  let requestFailure: Error | undefined;
+  const crawler = new HttpCrawler({
+    maxConcurrency: 1,
+    maxRequestsPerCrawl: 6,
+    maxRequestRetries: 2,
+    useSessionPool: false,
+    ignoreSslErrors: false,
+    navigationTimeoutSecs: 30,
+    requestHandlerTimeoutSecs: 30,
+    additionalMimeTypes: ["application/javascript", "text/javascript", "application/ecmascript"],
+    requestHandler: async ({ body, request, response }) => {
+      if (catalogue !== undefined) return;
+      const statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(`Gratis Bursdag: request returned ${statusCode} for ${request.url}`);
+      }
+      const source = Buffer.isBuffer(body) ? body.toString("utf8") : body;
+      catalogue = parseCatalogue(source);
+      if (catalogue !== undefined || request.userData.kind !== "page") return;
+      // Discover the current Vite module instead of pinning its deploy hash.
+      // Only enqueue scripts from the page's own origin; scripts never execute.
+      const loadedUrl = request.loadedUrl ?? request.url;
+      const page = new URL(loadedUrl);
+      const scripts = [...source.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
+        .map((match) => new URL(match[1]!, page))
+        .filter((url) => url.origin === page.origin && /\.m?js$/.test(url.pathname));
+      await crawler.addRequests(scripts.slice(0, 5).map((url) => ({ url: url.href, userData: { kind: "script" } })));
+    },
+    failedRequestHandler: async ({ request }, error) => {
+      requestFailure = new Error(`Gratis Bursdag: ${request.url} failed after retries (${error.message})`, { cause: error });
+      input.logger.warn(requestFailure.message);
+    },
+  }, config);
+  await crawler.run([{ url: pageUrl, userData: { kind: "page" } }]);
   if (catalogue === undefined || catalogue.length === 0) {
-    throw new Error("Gratis Bursdag: public offer catalogue not found or empty");
+    throw requestFailure ?? new Error("Gratis Bursdag: public offer catalogue not found or empty");
   }
 
   const offers = catalogue.map((entry): CashbackOffer => {
@@ -78,15 +106,6 @@ export async function fetchGratisbursdag(input: FetchGratisbursdagInput): Promis
   });
   input.logger.info(`Gratis Bursdag: ${offers.length} birthday offers`);
   return uniqueOffers(offers);
-}
-
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: { "User-Agent": "CashbackNorge/1.0" },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`Gratis Bursdag: request returned ${response.status}`);
-  return response.text();
 }
 
 function parseCatalogue(source: string): BirthdayOffer[] | undefined {
