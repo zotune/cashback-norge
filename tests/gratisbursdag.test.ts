@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
+import { log, LogLevel } from "crawlee";
 import { fetchGratisbursdag } from "../src/backend/providers/gratisbursdag.js";
 import { readProviderOverrides } from "../src/backend/provider-overrides.js";
 import { buildCashbackIndex, findOffersForHostname, isCashbackIndex, isCashbackOffer } from "../src/shared/cashback.js";
@@ -18,11 +19,12 @@ const entry = {
 async function withCatalogue(
   entries: unknown[],
   run: (startUrl: string, requests: string[]) => Promise<void>,
-  options: { status?: number; script?: string; filename?: string; disconnectOnce?: "page" | "script" } = {},
+  options: { status?: number; script?: string; filename?: string; disconnectOnce?: "page" | "script"; longErrors?: boolean } = {},
 ) {
   const requests: string[] = [];
   const filename = options.filename ?? "index-new-hash.js";
   let disconnected = false;
+  let moduleRequests = 0;
   const server = createServer((request, response) => {
     requests.push(request.url!);
     if (!disconnected && options.disconnectOnce === (request.url === "/" ? "page" : "script")) {
@@ -34,6 +36,12 @@ async function withCatalogue(
       response.setHeader("Content-Type", "text/html");
       response.end(`<script src="https://unrelated.invalid/analytics.js"></script><script type="module" src="/assets/${filename}"></script>`);
     } else if (request.url === `/assets/${filename}`) {
+      moduleRequests++;
+      if (options.longErrors && moduleRequests < 3) {
+        response.writeHead(503, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ message: `Upstream ${"temporarily unavailable ".repeat(1500)} retry ${moduleRequests}` }));
+        return;
+      }
       response.writeHead(options.status ?? 200, { "Content-Type": "text/javascript" });
       // If any third-party code is evaluated, the crawler test must fail.
       response.end(options.script ?? `throw new Error("must not execute");const offers=JSON.parse(\`${JSON.stringify(entries)}\`);`);
@@ -152,6 +160,17 @@ test("Crawlee retries a dropped page or JavaScript connection instead of losing 
       assert.equal(requests.filter((url) => url === retriedUrl).length, 2);
     }, { disconnectOnce });
   }
+});
+
+test("long upstream errors do not break Crawlee's error tracking before a successful retry", async (t) => {
+  const previousLevel = log.getLevel();
+  log.setLevel(LogLevel.OFF);
+  t.after(() => log.setLevel(previousLevel));
+  await withCatalogue([entry], async (startUrl, requests) => {
+    const offers = await fetchGratisbursdag(await input(startUrl));
+    assert.equal(offers.length, 1);
+    assert.equal(requests.filter((url) => url.endsWith("index-new-hash.js")).length, 3);
+  }, { longErrors: true });
 });
 
 test("new calculation rules validate persisted indexes and leave existing reward calculations intact", () => {

@@ -1,5 +1,5 @@
 // Extracts public birthday offers without executing third-party JavaScript.
-import { Configuration, HttpCrawler, MemoryStorage } from "crawlee";
+import { Configuration, ErrorTracker, HttpCrawler, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
   type RewardCalculationRules,
@@ -72,10 +72,15 @@ export async function fetchGratisbursdag(input: FetchGratisbursdagInput): Promis
       await crawler.addRequests(scripts.slice(0, 5).map((url) => ({ url: url.href, userData: { kind: "script" } })));
     },
     failedRequestHandler: async ({ request }, error) => {
-      requestFailure = new Error(`Gratis Bursdag: ${request.url} failed after retries (${error.message})`, { cause: error });
+      requestFailure = new Error(`Gratis Bursdag: ${request.url} failed after retries (${error.message.slice(0, 500)})`, { cause: error });
       input.logger.warn(requestFailure.message);
     },
   }, config);
+  // Crawlee 3.16 recursively merges similar error messages. Long, one-line
+  // upstream responses can overflow that tracker before retries are recorded.
+  // Keep request errors in the normal logs and group statistics by name/code.
+  crawler.stats.errorTracker = new ErrorTracker({ showErrorMessage: false });
+  crawler.stats.errorTrackerRetry = new ErrorTracker({ showErrorMessage: false });
   await crawler.run([{ url: pageUrl, userData: { kind: "page" } }]);
   if (catalogue === undefined || catalogue.length === 0) {
     throw requestFailure ?? new Error("Gratis Bursdag: public offer catalogue not found or empty");
