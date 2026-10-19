@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Femten vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen, hentet 6. okt. 2026.
+Tjue vertikale videoer (1080×1920, 30 fps, 15–26 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -19,6 +19,11 @@ Femten vertikale videoer (1080×1920, 30 fps, 15–23 s) med norsk voiceover, ka
 | `out/14-evo-medlemspris.mp4` | EVO Fitness: NITO/Akademikerne+/OBOS-pris | «Trener du på EVO? Spar 1 080 kr i året» |
 | `out/15-studentrabatt.mp4` | Studentrabatter (Flytoget, Talkmore, Samsung, Lyko) | «Student? 🎓 Du betaler for mye» |
 | `out/12-rabattkoder-community.mp4` | Stem på koder og del egne | «Rabattkoden funket ikke… igjen? 😤» |
+| `out/16-gratis-bursdag.mp4` | Gratis bursdag-filteret: gratis drikke, kaffe, bolle og is | «Bursdag snart? 🎂 Dette får du gratis 🎁» |
+| `out/17-bursdag-boots.mp4` | Bursdagsrabatt i butikken: Boots 30 % over 300 kr, Sum-felt og tooltip | «Bursdag snart? 🎂 30 % hos Boots 💊» |
+| `out/18-bursdagsrabatter.mp4` | Bursdagsrabatter: Glitter, Dæhlie, Ringo, Outland | «Bursdag? 🎂 Sjekk før du handler 🛍️» |
+| `out/19-android.mp4` | Oppsett på Android: Firefox + Tampermonkey | «Har du Android? 🤖 Nå funker det 🎉» |
+| `out/20-tema-filtre.mp4` | Temafiltre: strøm, mobil og student | «Strøm eller mobil? ⚡📱 Sjekk bonusen 👀» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -58,6 +63,10 @@ node render.mjs <navn>                         # full mp4 til out/
   - `overlay-food.mjs`, `overlay-hotels.mjs`, `overlay-flights.mjs` og `games-capture.mjs` er varianter for mat, hotell, fly og spill. `overlay-flights.mjs` har den mest komplette GM-shimmen (cookies, headere, timeout).
   - `ps.mjs <url> <prefix> <Region,...>` fanger PlayStation Store med regionpriser.
   - `lyko-codes.mjs` fanger stemming og innsending av rabattkoder med Supabase-kallene stubbet, så ingenting lagres.
+  - `bday-capture.mjs <url> <prefix> [sum]` setter inn userscriptet og tar bilde av siden, panelet alene, Sum-feltet og tooltipen for «Gratis bursdag». Sett `UA` for en annen nettleser, f.eks. Firefox på Android.
+  - `site-capture.mjs "<query>" <prefix> [scrollY,...]` fanger cashbacknorge.no med URL-parametre (`?provider=gratisbursdag`, `?tema=strom`). `TAP=1` åpner tooltipen på første kort.
+  - `android-guide.mjs <prefix>` fanger hvert steg i Android-guiden.
+  - Bursdagsvideoene bruker bare tilbud som er bekreftet hos gratisbursdag.no, viser kilden og kaller dem ikke cashback. cubus.com, lindex.com og komplett.no blokkerer automatisert nettleser.
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).
 

@@ -1,0 +1,51 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Har du bursdag snart? Da kan du få ting helt *gratis.*",
+   "gap": 0.25
+  },
+  {
+   "id": "intro",
+   "line": "Cashback Norge viser nå bursdagsfordeler fra gratisbursdag.no.",
+   "gap": 0.2
+  },
+  {
+   "id": "esp",
+   "line": "Espresso House: *gratis* *drikke* med appen.",
+   "gap": 0.15
+  },
+  {
+   "id": "narv",
+   "line": "Narvesen: kaffe og bakverk, også med appen.",
+   "gap": 0.15
+  },
+  {
+   "id": "godt",
+   "line": "Godt Brød: kaffe og bolle for Bakekompiser.",
+   "gap": 0.15
+  },
+  {
+   "id": "meny",
+   "line": "Meny: *is* for MENY MER-kunder.",
+   "gap": 0.25
+  },
+  {
+   "id": "terms",
+   "line": "Trykk på info-knappen for krav, gyldighet og om tilbudet er bekreftet.",
+   "gap": 0.25
+  },
+  {
+   "id": "count",
+   "line": "*{60|Seksti}* bursdagsfordeler, også på klær, apotek og leker.",
+   "gap": 0.3
+  },
+  {
+   "id": "cta",
+   "line": "Helt gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ]
+}

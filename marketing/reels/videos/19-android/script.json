@@ -1,0 +1,8 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Har du *Android?* Nå funker Cashback Norge der også.", "gap": 0.25 },
+  { "id": "s0",    "line": "Installer *Firefox* fra Google Play. Chrome på Android støtter ikke utvidelser.", "gap": 0.2 },
+  { "id": "s1",    "line": "Legg til *Tampermonkey* i Firefox.", "gap": 0.2 },
+  { "id": "s2",    "line": "Åpne Cashback Norge-scriptet, og trykk *installer.* Det oppdateres automatisk.", "gap": 0.2 },
+  { "id": "s4",    "line": "Så dukker fordelene opp når du handler.", "gap": 0.15 },
+  { "id": "shop",  "line": "Som *{25 %|tjuefem prosent}* bursdagsrabatt hos Glitter.", "gap": 0.3 },
+  { "id": "cta",   "line": "Trykk Android på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }

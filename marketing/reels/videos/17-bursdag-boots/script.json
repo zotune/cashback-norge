@@ -1,0 +1,7 @@
+{ "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "segments": [
+  { "id": "hook",  "line": "Bursdag snart? Da kan du få *{30 %|tretti prosent}* hos Boots.", "gap": 0.25 },
+  { "id": "store", "line": "Her er jeg på Boots, og Cashback Norge viser bursdagsrabatten automatisk.", "gap": 0.2 },
+  { "id": "sum",   "line": "Skriv inn *{450 kr,|fire hundre og femti kroner,}* så ser du rabatten: *{135 kr.|hundre og trettifem kroner.}*", "gap": 0.25 },
+  { "id": "terms", "line": "Trykk på info-knappen: krever kundeklubb og registrert fødselsdato, og gjelder kjøp over *{300 kr.|tre hundre kroner.}*", "gap": 0.3 },
+  { "id": "more",  "line": "Det samme dukker opp i *{60|seksti}* butikker med bursdagsfordeler.", "gap": 0.3 },
+  { "id": "cta",   "line": "Helt gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" } ] }
