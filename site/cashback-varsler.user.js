@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792395600
+// @version      1792397508
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -170,7 +170,7 @@
     dreams: "Dreams",
     utdanningibergen: "Utdanning i Bergen",
     unidays: "UNiDAYS",
-    gratisbursdag: "Gratis gaver",
+    gratisbursdag: "Gratis bursdag",
     cbn: "♥",
     unio: "Unio",
     coop: "Coop",
@@ -8275,7 +8275,7 @@ ${darkProviderCss}
         chrome.storage.local.get(HIDDEN_HOSTS_KEY, (result) => {
           const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
           const isHidden = hidden.includes(CURRENT_HOST);
-          if (isHidden) {
+          if (isHidden || document.getElementById(HOST_ID) === null) {
             const next = hidden.filter((h) => h !== CURRENT_HOST);
             chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: next });
             requestCurrentOffers();

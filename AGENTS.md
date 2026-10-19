@@ -50,7 +50,7 @@ delte funksjoner og workflow-filer før du endrer crawler eller tilbudsvisning.
 - Legg navn, farger og standardtips i `src/shared/provider-data.ts`, og send
   metadataene med indeksen slik eksisterende klienter kan vise nye providere.
   Følg `src/shared/UI.md` og de delte UI- og temafunksjonene.
-- For `gratisbursdag`: chipen heter **Gratis gaver**, med lilla bakgrunn
+- For `gratisbursdag`: chipen heter **Gratis bursdag**, med lilla bakgrunn
   (`#7c3aed`) og hvit tekst (`#ffffff`).
 - Hent all nyttig offentlig informasjon til tooltipen: konkret gave/rabatt,
   beskrivelse, medlemskap/app, registrert fødselsdato, gyldighet, minstekjøp,
@@ -76,6 +76,10 @@ delte funksjoner og workflow-filer før du endrer crawler eller tilbudsvisning.
 - Når brukeren har bedt om push og Daily crawl: push rettingen, start
   `.github/workflows/crawl.yml` på `main`, bekreft riktig `headSha`, og følg opp
   providerresultatet. Rapporter konkret dersom kilden fortsatt feiler.
+- En butikk som finnes i den publiserte indeksen må også testes med en eldre
+  innebygd indeks og cache i extensionen. Omstart må beholde nyere data, hente
+  oppdateringer og varsle åpne faner. En test bare med en fersk lokal indeks
+  avdekker ikke feil i oppdateringen hos eksisterende brukere.
 
 ## Git og genererte data
 

@@ -38,7 +38,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   dreams: "Dreams",
   utdanningibergen: "Utdanning i Bergen",
   unidays: "UNiDAYS",
-  gratisbursdag: "Gratis gaver",
+  gratisbursdag: "Gratis bursdag",
   cbn: "♥",
   unio: "Unio",
   coop: "Coop",

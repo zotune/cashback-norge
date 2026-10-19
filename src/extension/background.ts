@@ -5,6 +5,7 @@ import {
   parseUrl,
 } from "../shared/cashback.js";
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
+import { createCashbackIndexCache, type CachedIndex } from "./cashback-index-cache.js";
 import { findPriceMatches } from "../shared/price-match.js";
 import {
   findPlayStationRegionPrices,
@@ -34,18 +35,18 @@ import {
   isGetPriceMatchForProductMessage,
 } from "../shared/extension-messages.js";
 
-type CachedIndex = {
-  downloadedAt: string;
-  index: CashbackIndex;
-};
-
 const STORAGE_KEY = "cashback-index";
-const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
 const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v3";
 const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const APPSTOREPRICE_REGION_PRICE_CACHE_KEY = "appstoreprice-region-price-cache-v10";
 const APPSTOREPRICE_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const indexCache = createCashbackIndexCache({
+  readBundled: readBundledIndex,
+  readCached: readCachedIndex,
+  writeCached: (cached) => setStorageValue(STORAGE_KEY, cached),
+  fetchRemote: fetchRemoteIndex,
+});
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshIndex();
@@ -72,6 +73,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id !== undefined) {
     void chrome.tabs.sendMessage(tab.id, { type: "toggle-notice" });
+    void refreshIndex();
   }
 });
 
@@ -213,14 +215,14 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
   }
 }
 
-async function notifyTab(tabId: number, url: string): Promise<void> {
+async function notifyTab(tabId: number, url: string, index?: CashbackIndex): Promise<void> {
   const parsedUrl = parseHttpUrl(url);
 
   if (parsedUrl === undefined) {
     return;
   }
 
-  const cashbackIndex = await ensureIndex();
+  const cashbackIndex = index ?? await ensureIndex();
   const offers = findOffersForHostname(cashbackIndex, parsedUrl.hostname);
   const message: CashbackFoundMessage | CashbackNoneMessage =
     offers.length > 0
@@ -235,54 +237,27 @@ async function notifyTab(tabId: number, url: string): Promise<void> {
 }
 
 async function ensureIndex(): Promise<CashbackIndex> {
-  const bundledIndex = await readBundledIndex();
-  const cachedIndex = await readCachedIndex();
-
-  // Bundled always wins over cached — remote is only a fallback for when bundled is stale
-  if (cachedIndex !== undefined && isFresh(cachedIndex.downloadedAt) && cachedIndex.index.generatedAt > bundledIndex.generatedAt) {
-    return cachedIndex.index;
-  }
-
-  await cacheIndex(bundledIndex);
-  void fetchRemoteIndex();
-  return bundledIndex;
-}
-
-async function cacheIndex(index: CashbackIndex): Promise<void> {
-  const cachedIndex: CachedIndex = {
-    downloadedAt: new Date().toISOString(),
-    index,
-  };
-  await setStorageValue(STORAGE_KEY, cachedIndex);
+  return indexCache.get();
 }
 
 async function refreshIndex(): Promise<CashbackIndex> {
-  // Always use the bundled index first — it's the most up-to-date at build time.
-  // Then try to fetch a newer remote version in the background.
-  const bundledIndex = await readBundledIndex();
-  await cacheIndex(bundledIndex);
-
-  // Fetch remote in background to update for next load
-  void fetchRemoteIndex();
-
-  return bundledIndex;
+  const index = await indexCache.refresh();
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(tabs.map(async (tab) => {
+    if (tab.id !== undefined && tab.url !== undefined) await notifyTab(tab.id, tab.url, index);
+  }));
+  return index;
 }
 
-async function fetchRemoteIndex(): Promise<void> {
-  try {
-    const response = await fetch(REMOTE_INDEX_URL);
-    const value: unknown = await response.json();
-
-    if (isCashbackIndex(value)) {
-      const bundledIndex = await readBundledIndex();
-      // Only use remote if it's newer than bundled
-      if (value.generatedAt > bundledIndex.generatedAt) {
-        await cacheIndex(value);
-      }
-    }
-  } catch {
-    // Remote fetch failed, bundled index is already in use
-  }
+async function fetchRemoteIndex(): Promise<CashbackIndex> {
+  const response = await fetch(REMOTE_INDEX_URL, {
+    cache: "no-cache",
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`Cashback index returned ${response.status}`);
+  const value: unknown = await response.json();
+  if (!isCashbackIndex(value)) throw new Error("Remote cashback index is invalid");
+  return value;
 }
 
 async function readCachedPlayStationRegionPrices(url: string): Promise<PlayStationRegionPriceResult | undefined> {
@@ -371,10 +346,6 @@ function isCachedIndex(value: unknown): value is CachedIndex {
     typeof value.downloadedAt === "string" &&
     isCashbackIndex(value.index)
   );
-}
-
-function isFresh(downloadedAt: string): boolean {
-  return isFreshWithin(downloadedAt, INDEX_MAX_AGE_MS);
 }
 
 function isFreshWithin(downloadedAt: string, maxAgeMs: number): boolean {

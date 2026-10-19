@@ -723,7 +723,7 @@ function startContentScript(): void {
       chrome.storage.local.get(HIDDEN_HOSTS_KEY, (result: Record<string, unknown>) => {
         const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
         const isHidden = hidden.includes(CURRENT_HOST);
-        if (isHidden) {
+        if (isHidden || document.getElementById(HOST_ID) === null) {
           const next = hidden.filter((h) => h !== CURRENT_HOST);
           chrome.storage.local.set({ [HIDDEN_HOSTS_KEY]: next });
           requestCurrentOffers();

@@ -78,7 +78,7 @@ test("discovers the current bundle safely and carries useful birthday terms thro
     assert.equal(isCashbackIndex(index), true);
     assert.deepEqual(findOffersForHostname(index, "www.shop.example"), offers);
     assert.deepEqual(index.providers?.gratisbursdag, {
-      name: "Gratis gaver", tip: buildProviderMeta().gratisbursdag!.tip, bg: "#7c3aed", fg: "#ffffff",
+      name: "Gratis bursdag", tip: buildProviderMeta().gratisbursdag!.tip, bg: "#7c3aed", fg: "#ffffff",
     });
   });
 });
