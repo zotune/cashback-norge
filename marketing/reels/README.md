@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Tjue vertikale videoer (1080×1920, 30 fps, 15–26 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026.
+Tjuefem vertikale videoer (1080×1920, 30 fps, 15–26 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026 og video 21–25 21. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -24,6 +24,11 @@ Tjue vertikale videoer (1080×1920, 30 fps, 15–26 s) med norsk voiceover, kara
 | `out/18-bursdagsrabatter.mp4` | Bursdagsrabatter: Glitter, Dæhlie, Ringo, Outland | «Bursdag? 🎂 Sjekk før du handler 🛍️» |
 | `out/19-android.mp4` | Oppsett på Android: Firefox + Tampermonkey | «Har du Android? 🤖 Nå funker det 🎉» |
 | `out/20-tema-filtre.mp4` | Temafiltre: strøm, mobil og student | «Strøm eller mobil? ⚡📱 Sjekk bonusen 👀» |
+| `out/21-farming-sim.mp4` | Steam mot IsThereAnyDeal: Farming Simulator 25 (389 kr mot 182 kr hos Zapagames) | «Samme Steam-spill 🚜 207 kr billigere? 👀» |
+| `out/22-helldivers.mp4` | Steam mot IsThereAnyDeal: Helldivers 2 (449 kr mot 338 kr hos GamesPlanet US) | «Samme Steam-spill 🪖 111 kr billigere? 👀» |
+| `out/23-arc-raiders.mp4` | Steam mot IsThereAnyDeal: ARC Raiders (449 kr mot 338 kr hos GamesPlanet US) | «Samme Steam-spill 🤖 111 kr billigere? 👀» |
+| `out/24-hearts-of-iron.mp4` | Steam mot IsThereAnyDeal: Hearts of Iron IV (559 kr mot 153 kr hos Fanatical) | «Samme Steam-spill 🎖️ 406 kr billigere? 👀» |
+| `out/25-youtube-premium.mp4` | YouTube Premium: 219 kr i App Store mot 169 kr på nett, pluss SB1 Ung 20 % | «YouTube Premium 📺 600 kr billigere i året? 👀» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -66,6 +71,9 @@ node render.mjs <navn>                         # full mp4 til out/
   - `bday-capture.mjs <url> <prefix> [sum]` setter inn userscriptet og tar bilde av siden, panelet alene, Sum-feltet og tooltipen for «Gratis bursdag». Sett `UA` for en annen nettleser, f.eks. Firefox på Android.
   - `site-capture.mjs "<query>" <prefix> [scrollY,...]` fanger cashbacknorge.no med URL-parametre (`?provider=gratisbursdag`, `?tema=strom`). `TAP=1` åpner tooltipen på første kort.
   - `android-guide.mjs <prefix>` fanger hvert steg i Android-guiden.
+  - Spillvideoene 21–24 bruker `MODE=desktop SCROLL=buy HOVER=IsThereAnyDeal node games-capture.mjs <steam-url> <navn>`. Hver butikk er sjekket fra norsk IP: nøkkelen må aktiveres i Norge og butikken må selge til Norge. Muve selger for eksempel ikke Modern Warfare 4 til Norge, og Cyberpunk 2077 er billigst på Steam.
+  - `yt-capture.mjs <url> <navn>` er games-capture for youtube.com med samtykke-cookie. `PRESET='{"cashback-varsler-region-prices-collapsed":true}'` lukker regionlisten, `TAPINFO=1` åpner første tooltip og `SCROLL=text:<tekst>` scroller til teksten.
+  - `appstore-capture.mjs <url> <out.png> "<tekst>"` åpner «Kjøp i app» på apps.apple.com og scroller til teksten.
   - Bursdagsvideoene bruker bare tilbud som er bekreftet hos gratisbursdag.no, viser kilden og kaller dem ikke cashback. cubus.com, lindex.com og komplett.no blokkerer automatisert nettleser.
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).

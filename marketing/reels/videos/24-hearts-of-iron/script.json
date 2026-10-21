@@ -1,0 +1,36 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Samme Steam-spill. *{406 kr|fire hundre og seks kroner}* billigere.",
+   "gap": 0.25
+  },
+  {
+   "id": "store",
+   "line": "{Hearts of Iron IV|Hearts of Iron fire} koster *{559 kr|fem hundre og femtini}* på Steam.",
+   "gap": 0.2
+  },
+  {
+   "id": "match",
+   "line": "Cashback Norge sjekker andre butikker: {Fanatical|Fanatical} har samme Steam-nøkkel til *{153 kr.|hundre og femtitre.}*",
+   "gap": 0.25
+  },
+  {
+   "id": "tip",
+   "line": "Hold over for å se alle butikkene og rabattkodene.",
+   "gap": 0.2
+  },
+  {
+   "id": "sum",
+   "line": "Nøkkelen aktiveres i Norge, rett i Steam-biblioteket ditt.",
+   "gap": 0.3
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ]
+}
