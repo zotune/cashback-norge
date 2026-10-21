@@ -39,7 +39,7 @@ const STORAGE_KEY = "cashback-index";
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
 const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v3";
 const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-const APPSTOREPRICE_REGION_PRICE_CACHE_KEY = "appstoreprice-region-price-cache-v10";
+const APPSTOREPRICE_REGION_PRICE_CACHE_KEY = "appstoreprice-region-price-cache-v11";
 const APPSTOREPRICE_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const indexCache = createCashbackIndexCache({
   readBundled: readBundledIndex,
