@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792570372
+// @version      1792572255
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -745,6 +745,8 @@
   const EPIC_GAME_STORE_SHOP_ID = 16;
   const MICROSOFT_STORE_SHOP_ID = 48;
   const STEAM_SHOP_ID = 61;
+  const GOG_SHOP_ID = 35;
+  const NOK_PRICED_SHOP_IDS = /* @__PURE__ */ new Set([EPIC_GAME_STORE_SHOP_ID, GOG_SHOP_ID, MICROSOFT_STORE_SHOP_ID, STEAM_SHOP_ID]);
   const FALLBACK_ITAD_SHOP_IDS = [
     19,
     2,
@@ -786,7 +788,11 @@
     if (target === void 0) return void 0;
     const pageContext = target.pageContext;
     const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
-    const deals = readItadDeals(gameInfo, pageContext.shops).filter((deal) => deal.currency === "NOK").filter((deal) => isItadDealInScope(deal, target.dealScope)).sort((first, second) => first.amount - second.amount);
+    const deals = withNorwegianShopPrices(
+      readItadDeals(gameInfo, pageContext.shops).filter((deal) => deal.currency === "NOK").filter((deal) => isItadDealInScope(deal, target.dealScope)),
+      target.currentShopId,
+      message
+    ).sort((first, second) => first.amount - second.amount);
     const bestDeal = deals[0];
     if (bestDeal === void 0) return void 0;
     const matchedCurrentMerchant = deals.some((deal) => deal.shopId === target.currentShopId);
@@ -1200,6 +1206,18 @@
     if (deal.shopId === MICROSOFT_STORE_SHOP_ID) return true;
     const platform = deal.platform?.toLowerCase() ?? "";
     return platform.includes("microsoft") || platform.includes("xbox") || platform.includes("windows");
+  }
+  function withNorwegianShopPrices(deals, currentShopId, message) {
+    const pagePrice = readNokPagePrice(message);
+    return deals.flatMap((deal) => {
+      if (!NOK_PRICED_SHOP_IDS.has(deal.shopId)) return [deal];
+      if (deal.shopId !== currentShopId || pagePrice === void 0) return [];
+      return [{ ...deal, amount: pagePrice, price: formatCurrency$4(pagePrice, "NOK") }];
+    });
+  }
+  function readNokPagePrice(message) {
+    if (message.currency !== void 0 && message.currency.toUpperCase() !== "NOK") return void 0;
+    return typeof message.price === "number" && Number.isFinite(message.price) && message.price > 0 ? message.price : void 0;
   }
   function hasNokDeal(value) {
     if (!isRecord$4(value) || !Array.isArray(value.deals)) return false;

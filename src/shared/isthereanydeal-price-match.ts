@@ -77,6 +77,8 @@ const MAX_STEAM_PURCHASE_TARGETS = 8;
 const EPIC_GAME_STORE_SHOP_ID = 16;
 const MICROSOFT_STORE_SHOP_ID = 48;
 const STEAM_SHOP_ID = 61;
+const GOG_SHOP_ID = 35;
+const NOK_PRICED_SHOP_IDS = new Set([EPIC_GAME_STORE_SHOP_ID, GOG_SHOP_ID, MICROSOFT_STORE_SHOP_ID, STEAM_SHOP_ID]);
 const FALLBACK_ITAD_SHOP_IDS = [
   19, 2, 4, 13, 15, 52, 16, 67, 6, 17, 75, 20, 24, 25, 27, 28, 26, 29, 76,
   35, 36, 37, 42, 65, 47, 48, 49, 50, 73, 70, STEAM_SHOP_ID, 62, 64, 72,
@@ -92,10 +94,13 @@ export async function findIsthereanydealPriceMatch(
 
   const pageContext = target.pageContext;
   const gameInfo = await fetchItadGameInfoWithNok(pageContext, requestJson);
-  const deals = readItadDeals(gameInfo, pageContext.shops)
-    .filter((deal) => deal.currency === "NOK")
-    .filter((deal) => isItadDealInScope(deal, target.dealScope))
-    .sort((first, second) => first.amount - second.amount);
+  const deals = withNorwegianShopPrices(
+    readItadDeals(gameInfo, pageContext.shops)
+      .filter((deal) => deal.currency === "NOK")
+      .filter((deal) => isItadDealInScope(deal, target.dealScope)),
+    target.currentShopId,
+    message,
+  ).sort((first, second) => first.amount - second.amount);
   const bestDeal = deals[0];
   if (bestDeal === undefined) return undefined;
   const matchedCurrentMerchant = deals.some((deal) => deal.shopId === target.currentShopId);
@@ -689,6 +694,30 @@ function isMicrosoftStoreDeal(deal: ItadDeal): boolean {
   return platform.includes("microsoft") ||
     platform.includes("xbox") ||
     platform.includes("windows");
+}
+
+// ITAD prises Norge som en EUR-region og regner om til NOK. Butikker med egne
+// norske kronepriser blir da feil: Call of Duty MW4 vises som 737,50 kr på
+// Steam, mens Steam selv tar 949 kr. Gjeldende butikk får prisen fra siden, og
+// de andre NOK-butikkene utelates fordi vi ikke kjenner den norske prisen.
+function withNorwegianShopPrices(
+  deals: ItadDeal[],
+  currentShopId: number,
+  message: GetPriceMatchForProductMessage,
+): ItadDeal[] {
+  const pagePrice = readNokPagePrice(message);
+  return deals.flatMap((deal) => {
+    if (!NOK_PRICED_SHOP_IDS.has(deal.shopId)) return [deal];
+    if (deal.shopId !== currentShopId || pagePrice === undefined) return [];
+    return [{ ...deal, amount: pagePrice, price: formatCurrency(pagePrice, "NOK") }];
+  });
+}
+
+function readNokPagePrice(message: GetPriceMatchForProductMessage): number | undefined {
+  if (message.currency !== undefined && message.currency.toUpperCase() !== "NOK") return undefined;
+  return typeof message.price === "number" && Number.isFinite(message.price) && message.price > 0
+    ? message.price
+    : undefined;
 }
 
 function hasNokDeal(value: unknown): boolean {
