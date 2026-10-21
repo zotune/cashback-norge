@@ -1,0 +1,36 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Samme spill. *{452 kr|fire hundre og femtito kroner}* billigere.",
+   "gap": 0.25
+  },
+  {
+   "id": "store",
+   "line": "{Modern Warfare 4|Modern Warfare fire} koster *{949 kr|ni hundre og førtini}* på Steam.",
+   "gap": 0.2
+  },
+  {
+   "id": "match",
+   "line": "Cashback Norge finner billigste nøkkel: *{497 kr.|fire hundre og nittisju kroner.}*",
+   "gap": 0.25
+  },
+  {
+   "id": "tip",
+   "line": "Hold over for billigste keyshop og billigste offisielle butikk.",
+   "gap": 0.2
+  },
+  {
+   "id": "sum",
+   "line": "Nøkkelen er for PC og Xbox, via Microsoft Store.",
+   "gap": 0.3
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ]
+}

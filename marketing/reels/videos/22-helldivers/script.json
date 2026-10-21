@@ -5,7 +5,7 @@
  "segments": [
   {
    "id": "hook",
-   "line": "Samme Steam-spill. *{111 kr|hundre og elleve kroner}* billigere.",
+   "line": "Samme spill. *{244 kr|to hundre og førtifire kroner}* billigere.",
    "gap": 0.25
   },
   {
@@ -15,17 +15,17 @@
   },
   {
    "id": "match",
-   "line": "Cashback Norge sjekker andre butikker: {GamesPlanet US|Games Planet} har samme Steam-nøkkel til *{338 kr.|tre hundre og trettiåtte.}*",
+   "line": "Cashback Norge finner billigste nøkkel: *{205 kr.|to hundre og fem kroner.}*",
    "gap": 0.25
   },
   {
    "id": "tip",
-   "line": "Hold over for å se alle butikkene og rabattkodene.",
+   "line": "Hold over for billigste keyshop og billigste offisielle butikk.",
    "gap": 0.2
   },
   {
    "id": "sum",
-   "line": "Nøkkelen aktiveres i Norge, rett i Steam-biblioteket ditt.",
+   "line": "Det er en Steam-nøkkel som virker i Norge.",
    "gap": 0.3
   },
   {

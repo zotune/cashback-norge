@@ -5,7 +5,7 @@
  "segments": [
   {
    "id": "hook",
-   "line": "Samme Steam-spill. *{207 kr|to hundre og sju kroner}* billigere.",
+   "line": "Samme spill. *{256 kr|to hundre og femtiseks kroner}* billigere.",
    "gap": 0.25
   },
   {
@@ -15,17 +15,17 @@
   },
   {
    "id": "match",
-   "line": "Cashback Norge sjekker andre butikker: {Zapagames|Zapagames} har samme Steam-nøkkel til *{182 kr.|hundre og åttito.}*",
+   "line": "Cashback Norge finner billigste nøkkel: *{133 kr.|hundre og trettitre kroner.}*",
    "gap": 0.25
   },
   {
    "id": "tip",
-   "line": "Hold over for å se alle butikkene og rabattkodene.",
+   "line": "Hold over for billigste keyshop og billigste offisielle butikk.",
    "gap": 0.2
   },
   {
    "id": "sum",
-   "line": "Nøkkelen aktiveres i Norge, rett i Steam-biblioteket ditt.",
+   "line": "Billigst er en Giants-nøkkel. Steam-nøkkelen koster *{134 kr.|hundre og trettifire.}*",
    "gap": 0.3
   },
   {
