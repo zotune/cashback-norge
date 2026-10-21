@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792397508
+// @version      1792570372
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -6432,10 +6432,10 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function selectDefaultAppStorePriceSubscription(subscriptions, config) {
     const configuredSubscription = subscriptions.find((entry) => entry.subscriptionId === config.subscriptionId || entry.name === config.planName);
-    if (configuredSubscription !== void 0 && isYearlyAppStorePriceSubscription(configuredSubscription)) {
+    if (configuredSubscription?.duration === "monthly") {
       return configuredSubscription;
     }
-    return subscriptions.find(isYearlyAppStorePriceSubscription) ?? configuredSubscription ?? subscriptions[0];
+    return subscriptions.find((subscription) => subscription.duration === "monthly") ?? configuredSubscription ?? subscriptions[0];
   }
   function filterAppStorePriceSubscriptions(subscriptions, config) {
     if (isYouTubeAppStorePriceConfig(config)) {
@@ -6445,9 +6445,6 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isYouTubeAppStorePriceConfig(config) {
     return config.productName.toLowerCase().includes("youtube") || /\/(?:544007664|1017492454)(?:[/?#]|$)/.test(config.sourceUrl);
-  }
-  function isYearlyAppStorePriceSubscription(subscription) {
-    return subscription.prices.length > 0 && (subscription.duration === "annual" || subscription.duration === "yearly");
   }
   function hasPositiveAppStorePrice(subscription) {
     return subscription.prices.some((price) => price.price > 0);

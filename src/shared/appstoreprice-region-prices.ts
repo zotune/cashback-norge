@@ -335,11 +335,11 @@ function selectDefaultAppStorePriceSubscription(
   config: AppStorePriceConfig,
 ): AppStorePriceSubscription | undefined {
   const configuredSubscription = subscriptions.find((entry) => entry.subscriptionId === config.subscriptionId || entry.name === config.planName);
-  if (configuredSubscription !== undefined && isYearlyAppStorePriceSubscription(configuredSubscription)) {
+  if (configuredSubscription?.duration === "monthly") {
     return configuredSubscription;
   }
 
-  return subscriptions.find(isYearlyAppStorePriceSubscription) ?? configuredSubscription ?? subscriptions[0];
+  return subscriptions.find((subscription) => subscription.duration === "monthly") ?? configuredSubscription ?? subscriptions[0];
 }
 
 function filterAppStorePriceSubscriptions(
@@ -358,10 +358,6 @@ function isYouTubeAppStorePriceConfig(config: AppStorePriceConfig): boolean {
     config.productName.toLowerCase().includes("youtube") ||
     /\/(?:544007664|1017492454)(?:[/?#]|$)/.test(config.sourceUrl)
   );
-}
-
-function isYearlyAppStorePriceSubscription(subscription: AppStorePriceSubscription): boolean {
-  return subscription.prices.length > 0 && (subscription.duration === "annual" || subscription.duration === "yearly");
 }
 
 function hasPositiveAppStorePrice(subscription: AppStorePriceSubscription): boolean {
