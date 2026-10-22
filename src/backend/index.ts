@@ -257,6 +257,7 @@ async function main(): Promise<void> {
     lofavorOffers,
     norwegianOffers,
     dnbOffers,
+    dnbSatsOffers,
     dnbSupertilbudOffers,
     norskfamilieOffers,
     obosOffers,
@@ -559,6 +560,7 @@ async function main(): Promise<void> {
     ...lofavorOffers,
     ...norwegianOffers,
     ...dnbOffers,
+    ...dnbSatsOffers,
     ...dnbSupertilbudOffers,
     ...norskfamilieOffers,
     ...obosOffers,
@@ -953,7 +955,7 @@ async function main(): Promise<void> {
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
   const fullDomainLookup = buildDomainLookup([
-    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers,
+    ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSatsOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
     ...sparebank1Offers, ...spareborsenOffers, ...coopOffers, ...manualOffers,
     ...partnerAdsOffers,
@@ -1017,7 +1019,7 @@ async function main(): Promise<void> {
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
     ...gratisbursdagOffers,
-    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers, ...kondisOffers,
+    ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSatsOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers, ...kondisOffers,
   ];
   const knownCoupertDomains = new Set(
     offersBeforeCoupert
