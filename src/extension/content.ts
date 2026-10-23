@@ -40,6 +40,8 @@ import { extensionTheme } from "./theme";
 import { createMutedChip } from "../shared/ui";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, type TooltipController } from "../shared/tooltips";
+import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
+import { createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate } from "../shared/card-benefits";
 
 type UserscriptHttpRequestOptions = {
   method?: string;
@@ -185,25 +187,6 @@ function showRateLimitFlash(near: HTMLElement): void {
   near.closest(".code-item-row")?.insertAdjacentElement("afterend", flash);
   setTimeout(() => flash.remove(), 2500);
 }
-type CashbackOffer = {
-  provider: string;
-  merchantName: string;
-  domains: string[];
-  reward: string;
-  rewardSortValueNok?: number;
-  rewardCalculation?: import("../shared/cashback").RewardCalculationRules;
-  sourceUrl: string;
-  activationUrl: string;
-  terms: string;
-  discountCode?: string;
-  updatedAt: string;
-};
-type CashbackIndex = {
-  version: number;
-  generatedAt: string;
-  offers: CashbackOffer[];
-  domainIndex: Record<string, CashbackOffer[]>;
-};
 type CashbackFoundMessage = {
   type: "cashback-found";
   offers: CashbackOffer[];
@@ -250,6 +233,7 @@ type OffersForUrlResponse =
       ok: true;
       offers: CashbackOffer[];
       providers?: Record<string, unknown>;
+      cardOffers?: CashbackOffer[];
     }
   | {
       ok: false;
@@ -704,6 +688,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
 ]);
 function startContentScript(): void {
   if (isNoticeBlockedHost(CURRENT_HOST)) return;
+  watchCardBenefitDate(requestCurrentOffers);
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
     if (isNoticeBlockedHost(CURRENT_HOST)) {
@@ -920,6 +905,7 @@ function hasBlockedHostname(blockedHosts: ReadonlySet<string>, hostname: string)
 }
 
 let renderGeneration = 0;
+let runtimeCardOffers: CashbackOffer[] = [];
 
 async function renderCurrentContext(): Promise<void> {
   const generation = ++renderGeneration;
@@ -945,6 +931,8 @@ async function getCurrentOffers(): Promise<CashbackOffer[]> {
   const response = await sendRuntimeMessage<OffersForUrlResponse>(message);
   if (response !== undefined && isOffersForUrlResponse(response) && response.ok) {
     applyRuntimeProviderMeta(response.providers);
+    runtimeCardOffers = response.cardOffers ?? [];
+    if (response.cardOffers !== undefined) return response.offers;
     if (response.offers.length > 0) return response.offers;
   }
   return readBundledOffersForCurrentUrl();
@@ -1000,6 +988,7 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
       return [];
     }
     applyRuntimeProviderMeta((value as { providers?: Record<string, unknown> }).providers);
+    runtimeCardOffers = getCardBenefitOffers(value.offers);
     return findOffersForHostname(value, parsedUrl.hostname);
   } catch {
     return [];
@@ -11185,6 +11174,18 @@ function renderNotice(
     addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
   }
   bonusChips.append(premiumGroup);
+  const cardBenefitTooltips: HTMLElement[] = [];
+  const cardBenefits = createCardBenefitGroup(runtimeCardOffers);
+  if (cardBenefits) {
+    for (const row of cardBenefits.querySelectorAll<HTMLElement>(".cbn-card-benefit")) {
+      const action = row.querySelector<HTMLElement>(".bonus-chip")!;
+      const tooltip = row.querySelector<HTMLElement>(".cbn-card-benefit-tooltip")!;
+      tooltipControls.addBeside(action, tooltip, "Vis Instabank-rabatter og vilkår");
+      // Fixed tooltips must escape the panel's transformed containing block.
+      cardBenefitTooltips.push(tooltip);
+    }
+    bonusChips.append(cardBenefits);
+  }
   // --- Selected retailers group ---
   const selectedGroup = document.createElement("div");
   selectedGroup.className = "chip-group";
@@ -12025,7 +12026,7 @@ function renderNotice(
     sideTabArrow.textContent = "\u203A";
     sideTab.setAttribute("aria-label", "Expand cashback offers");
   }
-  shadowRoot.append(style, notice);
+  shadowRoot.append(style, notice, ...cardBenefitTooltips);
   installThemeStyles(shadowRoot);
   const themeSlot = document.createElement("div");
   themeSlot.className = "theme-slot";
@@ -12307,7 +12308,8 @@ function isOffersForUrlResponse(value: unknown): value is OffersForUrlResponse {
     return false;
   }
   if (value.ok) {
-    return Array.isArray(value.offers) && value.offers.every(isCashbackOffer);
+    return Array.isArray(value.offers) && value.offers.every(isCashbackOffer) &&
+      (value.cardOffers === undefined || (Array.isArray(value.cardOffers) && value.cardOffers.every(isCashbackOffer)));
   }
   return typeof value.reason === "string";
 }
@@ -12410,38 +12412,6 @@ function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative
     (value.durationText === undefined || typeof value.durationText === "string") &&
     (value.shippingPrice === undefined || typeof value.shippingPrice === "string") &&
     (value.totalPrice === undefined || typeof value.totalPrice === "string")
-  );
-}
-function isCashbackIndex(value: unknown): value is CashbackIndex {
-  if (
-    !isRecord(value) ||
-    typeof value.version !== "number" ||
-    typeof value.generatedAt !== "string" ||
-    !Array.isArray(value.offers) ||
-    !isRecord(value.domainIndex)
-  ) {
-    return false;
-  }
-  return (
-    value.offers.every(isCashbackOffer) &&
-    Object.values(value.domainIndex).every((offers) => {
-      return Array.isArray(offers) && offers.every(isCashbackOffer);
-    })
-  );
-}
-function isCashbackOffer(value: unknown): value is CashbackOffer {
-  return (
-    isRecord(value) &&
-    typeof value.provider === "string" &&
-    typeof value.merchantName === "string" &&
-    Array.isArray(value.domains) &&
-    value.domains.every(isString) &&
-    typeof value.reward === "string" &&
-    typeof value.sourceUrl === "string" &&
-    typeof value.activationUrl === "string" &&
-    typeof value.terms === "string" &&
-    (value.discountCode === undefined || typeof value.discountCode === "string") &&
-    typeof value.updatedAt === "string"
   );
 }
 function isRecord(value: unknown): value is Record<string, unknown> {

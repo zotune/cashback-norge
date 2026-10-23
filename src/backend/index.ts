@@ -32,6 +32,7 @@ import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
 import { fetchDealpass } from "./providers/dealpass.js";
 import { fetchNorwegianReward } from "./providers/norwegian.js";
+import { fetchInstabank } from "./providers/instabank.js";
 import { crawlTrumf } from "./providers/trumf.js";
 import { crawlCuponation } from "./providers/cuponation.js";
 import { fetchDnb, fetchDnbSats, fetchDnbSupertilbud } from "./providers/dnb.js";
@@ -116,6 +117,8 @@ type CliConfig = {
   lofavorStartUrl: string;
   norwegianApiUrl: string;
   norwegianGridListId: number;
+  instabankStartUrl: string;
+  instabankCardUrl: string;
   maxRequestsPerCrawl: number;
   skipKlarna: boolean;
   skipRemember: boolean;
@@ -129,6 +132,7 @@ type CliConfig = {
   skipYs: boolean;
   skipLofavor: boolean;
   skipNorwegian: boolean;
+  skipInstabank: boolean;
   skipCuponation: boolean;
   skipDnb: boolean;
   skipCurve: boolean;
@@ -247,6 +251,7 @@ async function main(): Promise<void> {
     ysOffers,
     lofavorOffers,
     norwegianOffers,
+    instabankOffers,
     dnbOffers,
     dnbSatsOffers,
     dnbSupertilbudOffers,
@@ -377,6 +382,14 @@ async function main(): Promise<void> {
         gridListId: config.norwegianGridListId,
         overrides: providerOverrides,
       }),
+    }),
+    config.skipInstabank ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
+      label: "Instabank",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      provider: "instabank",
+      reusePreviousOnFailure: true,
+      run: () => fetchInstabank({ generatedAt, logger, startUrl: config.instabankStartUrl, cardUrl: config.instabankCardUrl }),
     }),
     config.skipDnb ? Promise.resolve([]) : collectOffers({
       fallbackWhenEmpty: true,
@@ -1008,6 +1021,7 @@ async function main(): Promise<void> {
   // domain already selected by the Norwegian sources above, but it must never
   // expand the catalogue with unrelated stores from Coupert's global index.
   const offersBeforeCoupert: CashbackOffer[] = [
+    ...instabankOffers,
     ...gratisbursdagOffers,
     ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSatsOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers, ...kondisOffers,
   ];
@@ -1131,6 +1145,8 @@ function readCliConfig(args: string[]): CliConfig {
     norwegianApiUrl:
       readArgumentValue(args, "--norwegian-api-url") ??
       "https://www.norwegian.com/api/gridlist",
+    instabankStartUrl: readArgumentValue(args, "--instabank-start-url") ?? "https://instabank.no/kredittkort/rabatter",
+    instabankCardUrl: readArgumentValue(args, "--instabank-card-url") ?? "https://instabank.no/kredittkort",
     norwegianGridListId: readPositiveIntegerArgument(
       args,
       "--norwegian-gridlist-id",
@@ -1153,6 +1169,7 @@ function readCliConfig(args: string[]): CliConfig {
     skipYs: args.includes("--skip-ys"),
     skipLofavor: args.includes("--skip-lofavor"),
     skipNorwegian: args.includes("--skip-norwegian"),
+    skipInstabank: args.includes("--skip-instabank"),
     skipCuponation: args.includes("--skip-cuponation"),
     skipDnb: args.includes("--skip-dnb"),
     skipCurve: args.includes("--skip-curve"),

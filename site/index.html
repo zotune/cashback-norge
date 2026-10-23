@@ -984,6 +984,7 @@ a.code-reward { color: inherit; text-decoration: none; }
       <span class="chip-group-label">Premium</span>
       <div class="chip-group-items" id="premium-chips"></div>
     </div>
+    <div id="card-benefits"></div>
   </div>
   </div>
   <div class="results" id="results"></div>
@@ -1002,7 +1003,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -1036,6 +1037,7 @@ let providerCounts = new Map();
 let selectedQuickFilters = new Set();
 
 let currentAmount = 0;
+let cardBenefitOffers = [];
 
 function getProviderFilterName(provider) {
   if (provider === "cbn") return "Cashback Norge";
@@ -1425,7 +1427,10 @@ async function init() {
   const res = await fetch("cashback-index.json", { cache: "no-cache" });
   const data = await res.json();
   applyProviderMeta(data.providers);
-  allMerchants = groupByMerchant(data.offers);
+  cardBenefitOffers = getCardBenefitOffers(data.offers);
+  renderBonusChips();
+  watchCardBenefitDate(() => { window.CashbackTooltips.close(); renderBonusChips(); });
+  allMerchants = groupByMerchant(data.offers.filter(offer => !offer.cardBenefit));
   curveDomains = new Set(data.offers.filter(o => o.provider === "curve").flatMap(o => o.domains));
   for (const [domain, name] of Object.entries(CRYPTO_SUBSCRIPTIONS)) {
     if (!allMerchants.some(m => m.domains.includes(domain))) {
@@ -2527,6 +2532,8 @@ function setupAzBar() {
 function renderBonusChips() {
   renderChipGroup(FREE_CARDS, document.getElementById("free-chips"));
   renderChipGroup(PREMIUM_CARDS, document.getElementById("premium-chips"));
+  const benefits = createCardBenefitGroup(cardBenefitOffers);
+  document.getElementById("card-benefits").replaceChildren(...(benefits ? [benefits] : []));
   window.CashbackTooltips.attach(document.querySelector(".bonus-chips-portal"));
 }
 

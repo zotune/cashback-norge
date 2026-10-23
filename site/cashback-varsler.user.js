@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792765708
+// @version      1792773223
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -193,6 +193,7 @@
     kondis: "Kondis",
     santander: "Santander",
     norwegian: "Norwegian",
+    instabank: "Instabank",
     vestbo: "Vestbo",
     bbl: "BBL",
     elbilforeningen: "Elbilforeningen",
@@ -252,6 +253,7 @@
     kondis: { bg: "#ffffff", fg: "#8b1a1a" },
     santander: { bg: "#ffffff", fg: "#ec0000" },
     norwegian: { bg: "#d81939", fg: "#ffffff" },
+    instabank: { bg: "#00ff85", fg: "#333f48" },
     vestbo: { bg: "#ffffff", fg: "#1dc1dd" },
     bbl: { bg: "#1657e2", fg: "#ffffff" },
     elbilforeningen: { bg: "#003a78", fg: "#ffffff" },
@@ -436,6 +438,7 @@
     return label.length <= 14 ? label : void 0;
   }
   function calculateCashback(offer, amount) {
+    if (offer.cardBenefit !== void 0) return "";
     if (!canCalculateForPurchase(offer, amount)) return "";
     if (offer.provider === "cbn") {
       const pctMatch2 = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
@@ -609,6 +612,41 @@
   }
   function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function isCashbackProvider(value) {
+    return typeof value === "string" && value.length > 0;
+  }
+  function isProviderMeta(value) {
+    if (!isRecord$5(value)) {
+      return false;
+    }
+    return typeof value.name === "string" && (value.tip === void 0 || typeof value.tip === "string") && (value.bg === void 0 || typeof value.bg === "string") && (value.fg === void 0 || typeof value.fg === "string") && (value.border === void 0 || typeof value.border === "string");
+  }
+  function isCashbackOffer(value) {
+    if (!isRecord$5(value)) {
+      return false;
+    }
+    return isCashbackProvider(value.provider) && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every((domain) => typeof domain === "string") && typeof value.reward === "string" && (value.rewardSortValueNok === void 0 || typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok)) && (value.rewardCalculation === void 0 || isRewardCalculationRules(value.rewardCalculation)) && (value.cardBenefit === void 0 || isCardBenefit(value.cardBenefit)) && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
+  }
+  function isCardBenefit(value) {
+    if (!isRecord$5(value) || typeof value.category !== "string" || !value.category.trim()) return false;
+    if (value.kind === "ongoing") return value.validFrom === void 0 && value.validUntil === void 0;
+    const isDate = (date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+    return value.kind === "monthly" && isDate(value.validFrom) && isDate(value.validUntil) && value.validFrom <= value.validUntil;
+  }
+  function isRewardCalculationRules(value) {
+    return isRecord$5(value) && (value.minimumPurchaseNok === void 0 || typeof value.minimumPurchaseNok === "number" && Number.isFinite(value.minimumPurchaseNok) && value.minimumPurchaseNok >= 0) && (value.minimumPurchaseExclusive === void 0 || typeof value.minimumPurchaseExclusive === "boolean") && (value.singleItemOnly === void 0 || typeof value.singleItemOnly === "boolean");
+  }
+  function isCashbackIndex(value) {
+    if (!isRecord$5(value)) {
+      return false;
+    }
+    if (typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord$5(value.domainIndex) || value.providers !== void 0 && !(isRecord$5(value.providers) && Object.values(value.providers).every(isProviderMeta))) {
+      return false;
+    }
+    return value.offers.every(isCashbackOffer) && Object.values(value.domainIndex).every((offers) => {
+      return Array.isArray(offers) && offers.every(isCashbackOffer);
+    });
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
     /\s+\|\s+/,
@@ -7603,6 +7641,24 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-has-quokka { padding-left: 46px !important; }
 .cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
 .cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
+.cbn-card-benefits { display: grid; gap: 6px; grid-column: 1 / -1; flex-basis: 100%; width: 100%; min-width: 0; }
+.cbn-card-benefits-heading { color: var(--cbn-muted); font-size: 10px; font-weight: 700; }
+.cbn-card-benefit { min-width: 0; position: relative; }
+.cbn-card-benefit .bonus-chip, .cbn-card-benefit .bonus-chip-action { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.cbn-card-benefit .bonus-chip { padding: 6px 8px; }
+.cbn-card-benefit .bonus-chip-label { white-space: normal; overflow-wrap: anywhere; flex: 1; min-width: 90px; font-size: 11px; line-height: 1.4; }
+.cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; }
+.cbn-card-benefit .badge, .cbn-card-benefit .provider-badge { display: inline-flex; padding: 3px 5px; font-size: 10px; font-weight: 700; line-height: 1.2; }
+.cbn-card-benefit--current .bonus-chip { background: color-mix(in srgb, #00ff85 14%, var(--cbn-soft)); }
+.cbn-card-benefit-status { font-size: 9px; }
+.cbn-card-benefit-tooltip { background: var(--cbn-tooltip, #172026); border: 0; border-radius: 8px; color: #fff; box-sizing: border-box; display: none; font: 11px/1.45 system-ui, sans-serif; left: 8px; top: 8px; max-height: calc(100vh - 32px); max-width: min(340px, calc(100vw - 16px)); overflow-y: auto; padding: 12px; position: fixed; width: 340px; white-space: normal; z-index: 2147483647; }
+.cbn-card-benefit > .cbn-card-benefit-tooltip:not(.cbn-tooltip-open) { display: none; opacity: 0; visibility: hidden; pointer-events: none; }
+.cbn-card-calendar-month { display: grid; gap: 2px; padding: 7px 5px; border-radius: 4px; }
+.cbn-card-calendar-month--current { background: #00ff85; color: #333f48; }
+.cbn-card-calendar-month strong { font-size: 11px; }
+.cbn-card-benefit-terms { margin: 8px 0 0; padding-top: 8px; white-space: pre-line; }
+.cbn-card-benefits-notice { color: var(--cbn-muted); font-size: 10px; line-height: 1.45; margin: 1px 0; }
+.cbn-card-benefits-calendar { color: var(--cbn-accent); font-size: 10px; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
   .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -7888,7 +7944,7 @@ ${darkProviderCss}
         whiteSpace: "normal",
         margin: "0"
       });
-      if (isBonusChipTooltip) {
+      if (isBonusChipTooltip || tooltip.classList.contains("cbn-card-benefit-tooltip")) {
         const popover = tooltip;
         if (typeof popover.showPopover === "function") {
           try {
@@ -8023,6 +8079,110 @@ ${darkProviderCss}
         view.removeEventListener("resize", close);
       }
     };
+  }
+  const INSTABANK_DISCOUNTS_URL = "https://instabank.no/kredittkort/rabatter";
+  const INSTABANK_INTEREST_NOTICE = "Ingen rentefri periode – renter fra første dag ved bruk av kreditt. Termingebyr kommer i tillegg.";
+  function osloDate(now) {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    return ["year", "month", "day"].map((kind) => parts.find((part) => part.type === kind).value).join("-");
+  }
+  function watchCardBenefitDate(onChange) {
+    let day = osloDate(/* @__PURE__ */ new Date());
+    const timer = setInterval(() => {
+      const nextDay = osloDate(/* @__PURE__ */ new Date());
+      if (nextDay !== day) {
+        day = nextDay;
+        onChange();
+      }
+    }, 6e4);
+    return () => clearInterval(timer);
+  }
+  function getCardBenefitOffers(offers) {
+    return offers.filter((offer) => offer.cardBenefit !== void 0);
+  }
+  function getActiveCardBenefits(offers, now = /* @__PURE__ */ new Date()) {
+    const today = osloDate(now);
+    return getCardBenefitOffers(offers).filter((offer) => {
+      if (!isCashbackOffer(offer)) return false;
+      const age = now.getTime() - Date.parse(offer.updatedAt);
+      if (!Number.isFinite(age) || age > 14 * 864e5) return false;
+      const benefit = offer.cardBenefit;
+      return benefit.kind === "ongoing" || benefit.validFrom <= today && benefit.validUntil >= today;
+    }).sort((a, b) => Number(b.cardBenefit.kind === "monthly") - Number(a.cardBenefit.kind === "monthly"));
+  }
+  function createCardBenefitGroup(offers, now = /* @__PURE__ */ new Date()) {
+    const active = getActiveCardBenefits(offers, now);
+    if (active.length === 0) return void 0;
+    const group = document.createElement("div");
+    group.className = "cbn-card-benefits";
+    const heading = document.createElement("span");
+    heading.className = "cbn-card-benefits-heading";
+    heading.textContent = "Kort med betingede rabatter";
+    group.append(heading);
+    for (const offer of active) {
+      const benefit = offer.cardBenefit;
+      const wrap = document.createElement("div");
+      wrap.className = "tooltip-wrap cbn-card-benefit";
+      if (benefit.kind === "monthly") wrap.classList.add("cbn-card-benefit--current");
+      const tooltip = document.createElement("div");
+      tooltip.className = "tooltip cbn-card-benefit-tooltip";
+      const calendarTitle = document.createElement("strong");
+      calendarTitle.textContent = "Rabattkalender";
+      tooltip.append(calendarTitle);
+      const today = osloDate(now);
+      const calendar2 = getCardBenefitOffers(offers).filter((entry) => entry.provider === offer.provider && Number.isFinite(Date.parse(entry.updatedAt)) && now.getTime() - Date.parse(entry.updatedAt) <= 14 * 864e5).sort((a, b) => (a.cardBenefit.validFrom ?? "9999").localeCompare(b.cardBenefit.validFrom ?? "9999"));
+      for (const entry of calendar2) {
+        const period = entry.cardBenefit;
+        const row = document.createElement("div");
+        row.className = "cbn-card-calendar-month";
+        const current = period.kind === "monthly" && period.validFrom <= today && period.validUntil >= today;
+        if (current) row.classList.add("cbn-card-calendar-month--current");
+        const month = period.kind === "monthly" ? new Intl.DateTimeFormat("nb-NO", { month: "long", year: "numeric", timeZone: "Europe/Oslo" }).format(/* @__PURE__ */ new Date(`${period.validFrom}T12:00:00Z`)) : "Fast grønn rabatt";
+        const name = document.createElement("strong");
+        name.textContent = `${month}${current ? " · denne måneden" : ""}`;
+        const benefitText = document.createElement("span");
+        benefitText.textContent = `${formatCompactRewardLabel(entry) ?? entry.reward} · ${period.category}`;
+        row.append(name, benefitText);
+        tooltip.append(row);
+      }
+      const terms = document.createElement("p");
+      terms.className = "cbn-card-benefit-terms";
+      terms.textContent = offer.terms;
+      tooltip.append(terms);
+      const action = document.createElement("a");
+      action.className = "cbn-row bonus-chip cbn-card-benefit-action";
+      action.href = offer.activationUrl;
+      action.target = "_blank";
+      action.rel = "noreferrer";
+      const label = document.createElement("span");
+      label.className = "bonus-chip-label";
+      label.textContent = `${formatCompactRewardLabel(offer) ?? offer.reward} · ${benefit.category}`;
+      const badge = document.createElement("span");
+      badge.className = `cbn-chip badge provider-badge badge-${offer.provider} provider-${offer.provider}`;
+      badge.textContent = PROVIDER_NAMES[offer.provider] ?? offer.provider;
+      const colors = PROVIDER_COLORS[offer.provider];
+      if (colors) {
+        badge.style.backgroundColor = colors.bg;
+        badge.style.color = colors.fg;
+      }
+      const status = document.createElement("span");
+      status.className = "cbn-chip cbn-chip--muted cbn-card-benefit-status";
+      status.textContent = benefit.kind === "monthly" ? "Gjelder i dag" : "Fast fordel";
+      action.append(label, status, badge);
+      wrap.append(tooltip, action);
+      group.append(wrap);
+    }
+    const notice = document.createElement("p");
+    notice.className = "cbn-card-benefits-notice";
+    notice.textContent = INSTABANK_INTEREST_NOTICE;
+    const calendar = document.createElement("a");
+    calendar.className = "cbn-card-benefits-calendar";
+    calendar.href = INSTABANK_DISCOUNTS_URL;
+    calendar.target = "_blank";
+    calendar.rel = "noreferrer";
+    calendar.textContent = "Se rabattkalender og vilkår";
+    group.append(notice, calendar);
+    return group;
   }
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
@@ -8312,6 +8472,7 @@ ${darkProviderCss}
   ]);
   function startContentScript() {
     if (isNoticeBlockedHost(CURRENT_HOST)) return;
+    watchCardBenefitDate(requestCurrentOffers);
     installOfferActivationClickTracker();
     chrome.runtime.onMessage.addListener((message) => {
       if (isNoticeBlockedHost(CURRENT_HOST)) {
@@ -8486,6 +8647,7 @@ ${darkProviderCss}
     return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
   }
   let renderGeneration = 0;
+  let runtimeCardOffers = [];
   async function renderCurrentContext() {
     const generation = ++renderGeneration;
     const [offers, priceMatches, regionPrices] = await Promise.all([
@@ -8509,6 +8671,8 @@ ${darkProviderCss}
     const response = await sendRuntimeMessage(message);
     if (response !== void 0 && isOffersForUrlResponse(response) && response.ok) {
       applyRuntimeProviderMeta(response.providers);
+      runtimeCardOffers = response.cardOffers ?? [];
+      if (response.cardOffers !== void 0) return response.offers;
       if (response.offers.length > 0) return response.offers;
     }
     return readBundledOffersForCurrentUrl();
@@ -8552,6 +8716,7 @@ ${darkProviderCss}
         return [];
       }
       applyRuntimeProviderMeta(value.providers);
+      runtimeCardOffers = getCardBenefitOffers(value.offers);
       return findOffersForHostname(value, parsedUrl.hostname);
     } catch {
       return [];
@@ -15544,6 +15709,17 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
     }
     bonusChips.append(premiumGroup);
+    const cardBenefitTooltips = [];
+    const cardBenefits = createCardBenefitGroup(runtimeCardOffers);
+    if (cardBenefits) {
+      for (const row of cardBenefits.querySelectorAll(".cbn-card-benefit")) {
+        const action = row.querySelector(".bonus-chip");
+        const tooltip = row.querySelector(".cbn-card-benefit-tooltip");
+        tooltipControls.addBeside(action, tooltip, "Vis Instabank-rabatter og vilkår");
+        cardBenefitTooltips.push(tooltip);
+      }
+      bonusChips.append(cardBenefits);
+    }
     const selectedGroup = document.createElement("div");
     selectedGroup.className = "chip-group";
     const selectedLabel = document.createElement("span");
@@ -16360,7 +16536,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       sideTabArrow.textContent = "›";
       sideTab.setAttribute("aria-label", "Expand cashback offers");
     }
-    shadowRoot.append(style, notice);
+    shadowRoot.append(style, notice, ...cardBenefitTooltips);
     installThemeStyles(shadowRoot);
     const themeSlot = document.createElement("div");
     themeSlot.className = "theme-slot";
@@ -16610,7 +16786,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       return false;
     }
     if (value.ok) {
-      return Array.isArray(value.offers) && value.offers.every(isCashbackOffer);
+      return Array.isArray(value.offers) && value.offers.every(isCashbackOffer) && (value.cardOffers === void 0 || Array.isArray(value.cardOffers) && value.cardOffers.every(isCashbackOffer));
     }
     return typeof value.reason === "string";
   }
@@ -16646,17 +16822,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   }
   function isPriceMatchAlternative(value) {
     return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
-  }
-  function isCashbackIndex(value) {
-    if (!isRecord(value) || typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord(value.domainIndex)) {
-      return false;
-    }
-    return value.offers.every(isCashbackOffer) && Object.values(value.domainIndex).every((offers) => {
-      return Array.isArray(offers) && offers.every(isCashbackOffer);
-    });
-  }
-  function isCashbackOffer(value) {
-    return isRecord(value) && typeof value.provider === "string" && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every(isString) && typeof value.reward === "string" && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);

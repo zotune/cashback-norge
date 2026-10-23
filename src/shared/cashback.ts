@@ -21,6 +21,13 @@ export type RewardCalculationRules = {
   singleItemOnly?: boolean;
 };
 
+export type CardBenefit = {
+  kind: "monthly" | "ongoing";
+  category: string;
+  validFrom?: string;
+  validUntil?: string;
+};
+
 export type CashbackOffer = {
   provider: CashbackProvider;
   merchantName: string;
@@ -28,6 +35,7 @@ export type CashbackOffer = {
   reward: string;
   rewardSortValueNok?: number;
   rewardCalculation?: RewardCalculationRules;
+  cardBenefit?: CardBenefit;
   sourceUrl: string;
   activationUrl: string;
   terms: string;
@@ -79,12 +87,21 @@ export function isCashbackOffer(value: unknown): value is CashbackOffer {
     (value.rewardSortValueNok === undefined ||
       (typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok))) &&
     (value.rewardCalculation === undefined || isRewardCalculationRules(value.rewardCalculation)) &&
+    (value.cardBenefit === undefined || isCardBenefit(value.cardBenefit)) &&
     typeof value.sourceUrl === "string" &&
     typeof value.activationUrl === "string" &&
     typeof value.terms === "string" &&
     (value.discountCode === undefined || typeof value.discountCode === "string") &&
     typeof value.updatedAt === "string"
   );
+}
+
+function isCardBenefit(value: unknown): value is CardBenefit {
+  if (!isRecord(value) || typeof value.category !== "string" || !value.category.trim()) return false;
+  if (value.kind === "ongoing") return value.validFrom === undefined && value.validUntil === undefined;
+  const isDate = (date: unknown): date is string => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+  return value.kind === "monthly" && isDate(value.validFrom) && isDate(value.validUntil) && value.validFrom <= value.validUntil;
 }
 
 function isRewardCalculationRules(value: unknown): value is RewardCalculationRules {

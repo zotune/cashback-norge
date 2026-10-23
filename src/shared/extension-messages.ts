@@ -17,6 +17,7 @@ export type CashbackFoundMessage = {
   type: "cashback-found";
   offers: CashbackOffer[];
   providers?: Record<string, ProviderMeta>;
+  cardOffers?: CashbackOffer[];
 };
 
 export type CashbackNoneMessage = {
@@ -70,6 +71,7 @@ export type OffersForUrlResponse =
       ok: true;
       offers: CashbackOffer[];
       providers?: Record<string, ProviderMeta>;
+      cardOffers?: CashbackOffer[];
     }
   | {
       ok: false;
@@ -152,7 +154,8 @@ export function isCashbackFoundMessage(
     value.type === "cashback-found" &&
     Array.isArray(value.offers) &&
     value.offers.every(isCashbackOffer) &&
-    isOptionalProviderMetaRecord(value.providers)
+    isOptionalProviderMetaRecord(value.providers) &&
+    (value.cardOffers === undefined || (Array.isArray(value.cardOffers) && value.cardOffers.every(isCashbackOffer)))
   );
 }
 
@@ -240,7 +243,8 @@ export function isOffersForUrlResponse(
     return (
       Array.isArray(value.offers) &&
       value.offers.every(isCashbackOffer) &&
-      isOptionalProviderMetaRecord(value.providers)
+      isOptionalProviderMetaRecord(value.providers) &&
+      (value.cardOffers === undefined || (Array.isArray(value.cardOffers) && value.cardOffers.every(isCashbackOffer)))
     );
   }
 

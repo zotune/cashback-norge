@@ -6,6 +6,7 @@ import {
 } from "../shared/cashback.js";
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import { createCashbackIndexCache, type CachedIndex } from "./cashback-index-cache.js";
+import { getCardBenefitOffers } from "../shared/card-benefits.js";
 import { findPriceMatches } from "../shared/price-match.js";
 import {
   findPlayStationRegionPrices,
@@ -126,6 +127,7 @@ async function findOffersForUrl(
   return {
     ok: true,
     offers: findOffersForHostname(cashbackIndex, parsedUrl.hostname),
+    cardOffers: getCardBenefitOffers(cashbackIndex.offers),
     ...(cashbackIndex.providers !== undefined ? { providers: cashbackIndex.providers } : {}),
   };
 }
@@ -229,6 +231,7 @@ async function notifyTab(tabId: number, url: string, index?: CashbackIndex): Pro
       ? {
         type: "cashback-found",
         offers,
+        cardOffers: getCardBenefitOffers(cashbackIndex.offers),
         ...(cashbackIndex.providers !== undefined ? { providers: cashbackIndex.providers } : {}),
       }
       : { type: "cashback-none" };

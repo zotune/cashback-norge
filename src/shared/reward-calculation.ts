@@ -3,7 +3,7 @@ import {
   normalizeCurrencyForExchange,
   type NokBaseRates,
 } from "./exchange-rates.js";
-import type { RewardCalculationRules } from "./cashback.js";
+import type { CardBenefit, RewardCalculationRules } from "./cashback.js";
 
 export const EB_PER_TRUMF_KR = 13.5;
 
@@ -12,6 +12,7 @@ type RewardOffer = {
   reward: string;
   rewardSortValueNok?: number;
   rewardCalculation?: RewardCalculationRules;
+  cardBenefit?: CardBenefit;
 };
 
 export function formatRewardLabel(reward: string, provider: string): string {
@@ -79,6 +80,7 @@ export function formatCompactRewardLabel(offer: RewardOffer): string | undefined
 }
 
 export function calculateCashback(offer: RewardOffer, amount: number): string {
+  if (offer.cardBenefit !== undefined) return "";
   if (!canCalculateForPurchase(offer, amount)) return "";
   if (offer.provider === "cbn") {
     const pctMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
@@ -144,6 +146,7 @@ export function calculateCashback(offer: RewardOffer, amount: number): string {
 }
 
 export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): number {
+  if (offer.cardBenefit !== undefined) return 0;
   if (!canCalculateForPurchase(offer, amount)) return 0;
   if (offer.provider === "cbn") return 0;
 

@@ -68,7 +68,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     // iOS Safari can paint a shadow-DOM tooltip underneath the host page. A
     // manual popover enters the browser's top layer, while the normal z-index
     // path remains available on browsers without the Popover API.
-    if (isBonusChipTooltip) {
+    if (isBonusChipTooltip || tooltip.classList.contains("cbn-card-benefit-tooltip")) {
       const popover = tooltip as HTMLElement & { showPopover?: () => void };
       if (typeof popover.showPopover === "function") {
         try {
