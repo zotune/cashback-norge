@@ -17,6 +17,9 @@ concurrency:
 jobs:
   crawl:
     runs-on: ubuntu-latest
+    # A normal run takes about five minutes. Stop a stalled run instead of
+    # holding the Pages concurrency group for the six-hour default.
+    timeout-minutes: 30
     environment:
       name: github-pages
     steps:
@@ -95,9 +98,7 @@ jobs:
             git push
           fi
 
-      - run: pnpm run build:site
-      - run: pnpm run build:userscript
-
+      # pnpm run crawl already built the site and userscript from this index.
       - name: Prepare pages content
         run: |
           mkdir _site

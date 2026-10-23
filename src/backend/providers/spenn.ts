@@ -1,5 +1,6 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
+import { Configuration, HttpCrawler, MemoryStorage, Request } from "crawlee";
 import { normalizeDomainInput, parseUrl, type CashbackOffer } from "../../shared/cashback.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
@@ -7,9 +8,17 @@ import type { Logger } from "../logger.js";
 const CONTENTFUL_URL =
   "https://graphql.eu.contentful.com/content/v1/spaces/eu01y9qnrf4v/environments/master";
 const CONTENTFUL_TOKEN = "7M6TKX9Vk0uQzCh16pbokiOlJztMRtJ_EvQPOrPVu4I";
+const CONTENTFUL_PAGE_SIZE = 100;
 
 /** Norway site ID in refunder tracking links */
 const NORWAY_SITE_ID = "4aefb3fa-6549-11ef-be75-0aaed722973b";
+
+/**
+ * Refunder pages only refine rates that Contentful also describes. When the
+ * pages keep failing (a slow or blocking server once held the crawl for 24
+ * minutes), stop and use the Contentful descriptions for the rest.
+ */
+const MAX_REFUNDER_FAILURES = 10;
 
 /**
  * Highest percentage rate we trust from the source. Merchants paying a fixed
@@ -50,49 +59,137 @@ type SpennOfferItem = {
   externalTarget: { link: string } | null;
 };
 
-export async function fetchSpenn(options: {
-  generatedAt: string;
+type ContentfulResponse = {
+  data?: { offerCollection?: { items: SpennOfferItem[] } };
+  errors?: { message?: string }[];
+};
+
+type RefunderStore = { merchantName: string; link: string; desc: string };
+
+export type SpennSource = {
+  items: SpennOfferItem[];
+  /** Rates from refunder landing pages, keyed by link. */
+  refunderRates: Map<string, ParsedRate>;
+};
+
+export type FetchSpennSourceInput = {
   logger: Logger;
-  domainLookup: DomainLookup;
-}): Promise<CashbackOffer[]> {
-  const { generatedAt, logger, domainLookup } = options;
+  contentfulUrl?: string;
+  navigationTimeoutSecs?: number;
+  maxRefunderFailures?: number;
+};
+
+/**
+ * Fetches the Contentful offers and the refunder rates. No domain lookup is
+ * needed here, so the crawl runs this alongside the other providers and maps
+ * the result with {@link buildSpennOffers} once the full lookup exists.
+ */
+export async function fetchSpennSource(input: FetchSpennSourceInput): Promise<SpennSource> {
+  const { logger } = input;
+  const contentfulUrl = input.contentfulUrl ?? CONTENTFUL_URL;
+  const maxRefunderFailures = input.maxRefunderFailures ?? MAX_REFUNDER_FAILURES;
   const now = new Date().toISOString();
+  const items: SpennOfferItem[] = [];
+  const refunderRates = new Map<string, ParsedRate>();
+  let refunderLinks: string[] | undefined;
+  let contentfulFailure: string | undefined;
+  let refunderFailures = 0;
 
-  const allItems: SpennOfferItem[] = [];
-  let skip = 0;
-  const limit = 100;
+  const config = new Configuration();
+  config.useStorageClient(new MemoryStorage({ persistStorage: false }));
+  const crawler = new HttpCrawler({
+    maxConcurrency: 5,
+    maxRequestRetries: 2,
+    navigationTimeoutSecs: input.navigationTimeoutSecs ?? 15,
+    requestHandlerTimeoutSecs: 30,
+    useSessionPool: false,
+    ignoreSslErrors: false,
+    preNavigationHooks: [(_context, gotOptions) => {
+      gotOptions.followRedirect = false;
+    }],
+    requestHandler: async ({ body, request, response }) => {
+      const status = response.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        // Redirects and client errors do not change on a retry.
+        if (status !== 429) request.noRetry = true;
+        throw new Error(`HTTP ${status}`);
+      }
+      const text = Buffer.isBuffer(body) ? body.toString("utf8") : body;
+      if (request.label === "refunder") {
+        const parsed = parseRefunderPage(text);
+        if (parsed) refunderRates.set(String(request.userData.link), parsed);
+        return;
+      }
 
-  while (true) {
-    const response = await fetch(CONTENTFUL_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${CONTENTFUL_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: OFFERS_QUERY,
-        variables: { limit, skip, now },
-      }),
-    });
+      const json = JSON.parse(text) as ContentfulResponse;
+      const pageItems = json.data?.offerCollection?.items;
+      if (pageItems === undefined) {
+        const errors = json.errors?.map((error) => error.message).join("; ");
+        throw new Error(`no offerCollection in response${errors ? ` (${errors})` : ""}`);
+      }
+      items.push(...pageItems);
+      if (pageItems.length === CONTENTFUL_PAGE_SIZE) {
+        await crawler.addRequests([contentfulRequest(contentfulUrl, Number(request.userData.skip) + CONTENTFUL_PAGE_SIZE, now)]);
+        return;
+      }
+      // Rates from the refunder landing pages are more reliable than the
+      // Contentful descriptions.
+      refunderLinks = [...groupRefunderStores(items).values()].map((store) => store.link);
+      await crawler.addRequests(refunderLinks.map((link) => new Request({
+        url: link,
+        label: "refunder",
+        userData: { link },
+        headers: { "Accept-Language": "nb-NO,nb" },
+      })));
+    },
+    failedRequestHandler: async ({ request }, error) => {
+      const reason = error.message.slice(0, 300);
+      if (request.label !== "refunder") {
+        contentfulFailure = `Contentful offers request (skip ${String(request.userData.skip)}) to ${request.url} failed after retries (${reason})`;
+        return;
+      }
+      refunderFailures++;
+      logger.warn(`Spenn: refunder page ${request.url} failed after retries (${reason})`);
+      if (refunderFailures === maxRefunderFailures) {
+        logger.warn(`Spenn: stopping refunder pages after ${refunderFailures} failures; using Contentful descriptions for the remaining stores`);
+        crawler.stop();
+      }
+    },
+  }, config);
 
-    const json = (await response.json()) as {
-      data?: {
-        offerCollection?: { total: number; items: SpennOfferItem[] };
-      };
-    };
-    const items = json.data?.offerCollection?.items ?? [];
-    allItems.push(...items);
-
-    if (items.length < limit) break;
-    skip += limit;
+  await crawler.run([contentfulRequest(contentfulUrl, 0, now)]);
+  if (refunderLinks === undefined) {
+    throw new Error(`Spenn: ${contentfulFailure ?? "Contentful offers did not complete"}`);
   }
+  logger.info(`Spenn: fetched ${items.length} active offers from Contentful`);
+  logger.info(`Spenn: fetched rates from ${refunderRates.size}/${refunderLinks.length} refunder pages`);
+  return { items, refunderRates };
+}
 
-  logger.info(`Spenn: fetched ${allItems.length} active offers from Contentful`);
+function contentfulRequest(url: string, skip: number, now: string): Request {
+  return new Request({
+    url,
+    uniqueKey: `POST:${url}:${skip}`,
+    method: "POST",
+    label: "contentful",
+    userData: { skip },
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${CONTENTFUL_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    payload: JSON.stringify({
+      query: OFFERS_QUERY,
+      variables: { limit: CONTENTFUL_PAGE_SIZE, skip, now },
+    }),
+  });
+}
 
-  // Group Norwegian offers by store UUID (one link per store is enough)
-  const storeMap = new Map<string, { merchantName: string; link: string; desc: string }>();
+/** Norwegian refunder offers by store UUID (one link per store is enough). */
+function groupRefunderStores(items: SpennOfferItem[]): Map<string, RefunderStore> {
+  const storeMap = new Map<string, RefunderStore>();
 
-  for (const item of allItems) {
+  for (const item of items) {
     const name = item.merchant?.name;
     if (!name) continue;
 
@@ -109,11 +206,19 @@ export async function fetchSpenn(options: {
     }
   }
 
-  // Fetch rates from refunder landing pages (more reliable than Contentful descriptions)
-  const refunderRates = await fetchRefunderRates(
-    [...storeMap.values()].map((s) => s.link),
-    logger,
-  );
+  return storeMap;
+}
+
+export function buildSpennOffers(options: {
+  source: SpennSource;
+  generatedAt: string;
+  logger: Logger;
+  domainLookup: DomainLookup;
+}): CashbackOffer[] {
+  const { source, generatedAt, logger, domainLookup } = options;
+  const allItems = source.items;
+  const storeMap = groupRefunderStores(allItems);
+  const refunderRates = source.refunderRates;
 
   // Pick best rate per merchant (highest max)
   const best = new Map<string, { rate: string; maxVal: number; link: string; terms: string }>();
@@ -271,41 +376,6 @@ function extractLinkDomain(link: string): string | undefined {
 }
 
 type ParsedRate = { rate: string; maxVal: number; terms: string };
-
-/**
- * Fetch rates from refunder landing pages concurrently.
- * These pages are the source of truth and match the Spenn app.
- */
-async function fetchRefunderRates(
-  links: string[],
-  logger: Logger,
-): Promise<Map<string, ParsedRate>> {
-  const results = new Map<string, ParsedRate>();
-  const CONCURRENCY = 5;
-
-  for (let i = 0; i < links.length; i += CONCURRENCY) {
-    const batch = links.slice(i, i + CONCURRENCY);
-    const settled = await Promise.allSettled(
-      batch.map(async (link) => {
-        const res = await fetch(link, {
-          headers: { "Accept-Language": "nb-NO,nb" },
-          redirect: "manual",
-        });
-        const html = await res.text();
-        const parsed = parseRefunderPage(html);
-        if (parsed) results.set(link, parsed);
-      }),
-    );
-    for (const r of settled) {
-      if (r.status === "rejected") {
-        logger.warn(`Spenn: refunder page fetch failed: ${r.reason}`);
-      }
-    }
-  }
-
-  logger.info(`Spenn: fetched rates from ${results.size}/${links.length} refunder pages`);
-  return results;
-}
 
 /**
  * Parse rate from a refunder landing page HTML.

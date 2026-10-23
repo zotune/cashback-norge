@@ -54,7 +54,7 @@ import { crawlNito } from "./providers/nito.js";
 import { crawlSparebank1 } from "./providers/sparebank1.js";
 import { crawlStudentkortet } from "./providers/studentkortet.js";
 import { crawlNettbonus } from "./providers/nettbonus.js";
-import { fetchSpenn } from "./providers/spenn.js";
+import { buildSpennOffers, fetchSpennSource } from "./providers/spenn.js";
 import { fetchSpareborsen } from "./providers/spareborsen.js";
 import { crawlRabble } from "./providers/rabble.js";
 import { fetchDreams } from "./providers/dreams.js";
@@ -239,6 +239,40 @@ async function main(): Promise<void> {
   const providerOverrides = await readProviderOverrides(
     config.providerOverridesPath,
   );
+  // Sources that no domain lookup waits for start now and are awaited later.
+  // Awin allows 20 API requests per minute, so its programme details take
+  // about four minutes; Phase 3 runs meanwhile and Awin's domains join the
+  // full lookup in Phase 4. Spenn fetches its offers and refunder rates now
+  // and maps merchant names in Phase 4. Rabatta's public Norwegian catalogue
+  // provides exact locale-specific shop ids, so no Swedish, Danish or Finnish
+  // variants are accepted by fuzzy search. --rabatta-shops can restrict local
+  // test crawls.
+  const awinOffersPromise = startEarly(config.skipAwin ? Promise.resolve([]) : collectOffers({
+    label: "Awin",
+    provider: "cbn",
+    run: () => fetchAwin({
+      generatedAt, logger,
+    }),
+  }));
+  const spennSourcePromise = config.skipSpenn ? undefined : startEarly(fetchSpennSource({ logger }));
+  const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
+    label: "Rabatta",
+    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+    // Rabatta shares the rabattkode provider key with the Rabattkode source,
+    // so the fallback must only reuse the offers that came from rabatta.app.
+    previousOfferFilter: (offer) =>
+      parseUrl(offer.sourceUrl)?.hostname === "rabatta.app",
+    provider: "rabattkode",
+    reusePreviousOnFailure: true,
+    run: () => fetchRabatta({
+      generatedAt,
+      logger,
+      ...(config.rabattaShopSlugs.length === 0
+        ? {}
+        : { shopSlugs: config.rabattaShopSlugs }),
+    }),
+  }));
+
   // Phase 1: Crawl providers that have real merchant URLs (parallel)
   const [
     klarnaOffers,
@@ -267,7 +301,6 @@ async function main(): Promise<void> {
     coopOffers,
     partnerAdsOffers,
     tradeTrackerOffers,
-    awinOffers,
     addrevenueOffers,
     orionOffers,
     daisyconOffers,
@@ -512,13 +545,6 @@ async function main(): Promise<void> {
         generatedAt, logger,
       }),
     }),
-    config.skipAwin ? Promise.resolve([]) : collectOffers({
-      label: "Awin",
-      provider: "cbn",
-      run: () => fetchAwin({
-        generatedAt, logger,
-      }),
-    }),
     config.skipAddrevenue ? Promise.resolve([]) : collectOffers({
       label: "Addrevenue",
       provider: "cbn",
@@ -573,7 +599,6 @@ async function main(): Promise<void> {
     ...coopOffers,
     ...partnerAdsOffers,
     ...tradeTrackerOffers,
-    ...awinOffers,
     ...addrevenueOffers,
     ...orionOffers,
     ...daisyconOffers,
@@ -957,6 +982,7 @@ async function main(): Promise<void> {
   ]);
 
   // Phase 4: Spenn needs the widest domain lookup (from Phase 1 + Phase 3)
+  const awinOffers = await awinOffersPromise;
   const fullDomainLookup = buildDomainLookup([
     ...klarnaOffers, ...rememberOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSatsOffers,
     ...dnbSupertilbudOffers, ...norskfamilieOffers, ...obosOffers, ...bobOffers,
@@ -987,35 +1013,20 @@ async function main(): Promise<void> {
     }),
   });
 
-  const spennOffers = config.skipSpenn ? [] : await collectOffers({
+  const spennOffers = spennSourcePromise === undefined ? [] : await collectOffers({
+    fallbackWhenEmpty: true,
     label: "Spenn",
+    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
     provider: "spenn",
-    run: () => fetchSpenn({
-      domainLookup: fullDomainLookup, generatedAt, logger,
+    reusePreviousOnFailure: true,
+    run: async () => buildSpennOffers({
+      source: await spennSourcePromise, domainLookup: fullDomainLookup, generatedAt, logger,
     }),
   });
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
 
-  // Phase 5: Rabatta's public Norwegian catalogue provides exact
-  // locale-specific shop ids, so no Swedish, Danish or Finnish variants are
-  // accepted by fuzzy search. --rabatta-shops can restrict local test crawls.
-  const rabattaOffers = config.skipRabatta ? [] : await collectOffers({
-    label: "Rabatta",
-    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
-    // Rabatta shares the rabattkode provider key with the Rabattkode source,
-    // so the fallback must only reuse the offers that came from rabatta.app.
-    previousOfferFilter: (offer) =>
-      parseUrl(offer.sourceUrl)?.hostname === "rabatta.app",
-    provider: "rabattkode",
-    reusePreviousOnFailure: true,
-    run: () => fetchRabatta({
-      generatedAt,
-      logger,
-      ...(config.rabattaShopSlugs.length === 0
-        ? {}
-        : { shopSlugs: config.rabattaShopSlugs }),
-    }),
-  });
+  // Phase 5: Rabatta (started before Phase 1)
+  const rabattaOffers = await rabattaOffersPromise;
 
   // Phase 6: Coupert is an enrichment source only. It may add cashback to a
   // domain already selected by the Norwegian sources above, but it must never
@@ -1356,6 +1367,16 @@ main().catch((error: unknown) => {
   logger.error(message);
   process.exitCode = 1;
 });
+
+/**
+ * Marks a promise that a later phase awaits. Its failure still reaches that
+ * await; the handler only keeps Node from reporting it as unhandled while the
+ * earlier phases run.
+ */
+function startEarly<T>(promise: Promise<T>): Promise<T> {
+  promise.catch(() => undefined);
+  return promise;
+}
 
 async function readPreviousOffersByProvider(
   filePath: string,
