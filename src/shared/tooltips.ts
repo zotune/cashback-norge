@@ -15,7 +15,22 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const doc = root.ownerDocument ?? root as Document;
   const view = doc.defaultView!;
   const targets = new WeakMap<HTMLButtonElement, HTMLElement>();
+  const hoverHosts = new WeakMap<Element, HTMLElement>();
   let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean } | undefined;
+
+  // The mascot is a large data URL; create it on first hover or tap, not once per tooltip in long lists.
+  const addMascot = (tooltip: HTMLElement) => {
+    if (tooltip.querySelector(".cbn-tooltip-mascot")) return;
+    tooltip.classList.add("cbn-has-quokka");
+    const mascot = doc.createElement("span");
+    mascot.className = "cbn-tooltip-mascot";
+    mascot.setAttribute("aria-hidden", "true");
+    const image = doc.createElement("img");
+    image.src = BRAND_QUOKKA_DATA_URL;
+    image.alt = "";
+    mascot.append(image);
+    tooltip.prepend(mascot);
+  };
 
   const close = () => {
     if (!active) return;
@@ -41,6 +56,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip");
     let topLayer = false;
     button.setAttribute("aria-expanded", "true");
+    addMascot(tooltip);
     tooltip.classList.add("cbn-tooltip-open");
     const availableWidth = Math.max(80, doc.documentElement.clientWidth - 16);
     Object.assign(tooltip.style, {
@@ -81,7 +97,15 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const onScroll = (event: Event) => {
     if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
   };
+  // Desktop tooltips also open on CSS hover, so add the mascot before that first paint.
+  const onHover = (event: Event) => {
+    for (let element = event.target as Element | null; element; element = element.parentElement) {
+      const tooltip = hoverHosts.get(element);
+      if (tooltip) { addMascot(tooltip); return; }
+    }
+  };
   root.addEventListener("click", onClick);
+  root.addEventListener("pointerover", onHover, { passive: true });
   doc.addEventListener("pointerdown", outside, { passive: true });
   doc.addEventListener("keydown", onKey);
   doc.addEventListener("scroll", onScroll, { capture: true, passive: true });
@@ -93,17 +117,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
       if (parent.querySelector(".cbn-tooltip-trigger")) return;
       const mascotAnchor = parent.closest<HTMLElement>(".offer-wrap, .offer-link-wrapper, .code-item-row, .tooltip-wrap");
       mascotAnchor?.classList.add("cbn-quokka-tooltip-anchor");
-      if (!tooltip.querySelector(".cbn-tooltip-mascot")) {
-        tooltip.classList.add("cbn-has-quokka");
-        const mascot = doc.createElement("span");
-        mascot.className = "cbn-tooltip-mascot";
-        mascot.setAttribute("aria-hidden", "true");
-        const image = doc.createElement("img");
-        image.src = BRAND_QUOKKA_DATA_URL;
-        image.alt = "";
-        mascot.append(image);
-        tooltip.prepend(mascot);
-      }
+      hoverHosts.set(mascotAnchor ?? parent, tooltip);
       tooltip.id ||= `cbn-tooltip-${++nextTooltipId}`;
       tooltip.setAttribute("role", "tooltip");
       const button = doc.createElement("button");
@@ -155,6 +169,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     dispose() {
       close();
       root.removeEventListener("click", onClick);
+      root.removeEventListener("pointerover", onHover);
       doc.removeEventListener("pointerdown", outside);
       doc.removeEventListener("keydown", onKey);
       doc.removeEventListener("scroll", onScroll, true);

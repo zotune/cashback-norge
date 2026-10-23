@@ -295,6 +295,8 @@ a.code-reward { color: inherit; text-decoration: none; }
   border-radius: 8px;
   bottom: calc(100% + 6px);
   color: #fff;
+  /* Closed tooltips stay out of layout; thousands of max-content tooltips made long lists slow. */
+  display: none;
   font-size: 12px;
   left: 0;
   line-height: 1.45;
@@ -303,6 +305,8 @@ a.code-reward { color: inherit; text-decoration: none; }
   pointer-events: none;
   position: absolute;
   transition: opacity 0.15s;
+  transition-property: opacity, display;
+  transition-behavior: allow-discrete;
   white-space: normal;
   width: max-content;
   max-width: min(340px, calc(100vw - 32px));
@@ -342,8 +346,13 @@ a.code-reward { color: inherit; text-decoration: none; }
 }
 .offer-wrap:hover > .offer-tooltip,
 .code-item-row:hover > .offer-tooltip {
+  display: block;
   opacity: 1;
   pointer-events: auto;
+}
+@starting-style {
+  .offer-wrap:hover > .offer-tooltip,
+  .code-item-row:hover > .offer-tooltip { opacity: 0; }
 }
 .offer-reward {
   font-size: 14px;
@@ -978,6 +987,7 @@ a.code-reward { color: inherit; text-decoration: none; }
   </div>
   </div>
   <div class="results" id="results"></div>
+  <div id="results-more" aria-hidden="true"></div>
   <div class="az-bar" id="az-bar"></div>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
@@ -1478,25 +1488,7 @@ async function init() {
     updateClear(e.target, sumWrap);
     const raw = cleaned.replace(",", ".");
     currentAmount = raw.length > 0 ? parseFloat(raw) : 0;
-    document.querySelectorAll(".offer-reward[data-reward]").forEach(el => {
-      try {
-        const o = JSON.parse(el.dataset.reward);
-        const calculated = currentAmount > 0 ? calcReward(o, currentAmount) : "";
-        el.textContent = calculated || formatCompactReward(o);
-      } catch(e) { console.error("offer-reward parse error:", e, el.dataset.reward?.slice(0,100)); }
-    });
-    document.querySelectorAll(".offer-reward[data-pct-curve]").forEach(el => {
-      el.textContent = currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %';
-    });
-    document.querySelectorAll(".code-reward[data-pct]").forEach(el => {
-      const pct = parseFloat(el.dataset.pct ?? "0");
-      if (!el.dataset.origReward) el.dataset.origReward = el.textContent;
-      if (pct > 0 && currentAmount > 0) {
-        el.textContent = `${Math.round(currentAmount * pct / 100)} kr`;
-      } else {
-        el.textContent = el.dataset.origReward || el.textContent;
-      }
-    });
+    updateRewardAmounts(document);
     try { renderBonusChips(); } catch(e) { console.error("renderBonusChips error:", e); }
   });
 
@@ -1505,6 +1497,28 @@ async function init() {
     updateClear(sumEl, sumWrap);
     sumEl.dispatchEvent(new Event("input"));
     sumEl.focus();
+  });
+}
+
+function updateRewardAmounts(root) {
+  root.querySelectorAll(".offer-reward[data-reward]").forEach(el => {
+    try {
+      const o = JSON.parse(el.dataset.reward);
+      const calculated = currentAmount > 0 ? calcReward(o, currentAmount) : "";
+      el.textContent = calculated || formatCompactReward(o);
+    } catch(e) { console.error("offer-reward parse error:", e, el.dataset.reward?.slice(0,100)); }
+  });
+  root.querySelectorAll(".offer-reward[data-pct-curve]").forEach(el => {
+    el.textContent = currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %';
+  });
+  root.querySelectorAll(".code-reward[data-pct]").forEach(el => {
+    const pct = parseFloat(el.dataset.pct ?? "0");
+    if (!el.dataset.origReward) el.dataset.origReward = el.textContent;
+    if (pct > 0 && currentAmount > 0) {
+      el.textContent = `${Math.round(currentAmount * pct / 100)} kr`;
+    } else {
+      el.textContent = el.dataset.origReward || el.textContent;
+    }
   });
 }
 
@@ -1696,8 +1710,8 @@ function render(query) {
     // All words must match name or a domain; rank exact > prefix > substring
     const scored = [];
     for (const m of merchants) {
-      const name = foldSearchText(m.name);
-      const domains = m.domains.map(foldSearchText);
+      const name = m.searchName ??= foldSearchText(m.name);
+      const domains = m.searchDomains ??= m.domains.map(foldSearchText);
       const haystack = name + " " + domains.join(" ");
       if (!terms.every(t => haystack.includes(t))) continue;
       let score = 2;
@@ -1717,136 +1731,176 @@ function render(query) {
 
   const container = document.querySelector(".results");
   window.CashbackTooltips.close();
+  if (window._azReset) window._azReset();
+  renderedMerchants = { list: filtered, count: 0, prevLetter: null, showHeaders: q.length === 0 };
   if (filtered.length === 0) {
     const filterNames = [...getSelectedProviderNames(), ...QUICK_FILTERS.filter(filter => selectedQuickFilters.has(filter.id)).map(filter => filter.label)].join(", ");
     container.innerHTML = `<div class="empty">${filterNames ? `Ingen treff med ${esc(filterNames)}. Prøv et annet søk eller fjern et filter.` : "Ingen treff"}</div>`;
-    if (window._azObserveAll) window._azObserveAll();
     return;
   }
+  container.replaceChildren();
+  renderMoreMerchants(MERCHANT_BATCH_SIZE);
+  watchMoreMerchants();
+}
 
-  let prevLetter = null;
-  const showHeaders = q.length === 0;
-  container.innerHTML = filtered.map(m => {
-    const currentLetter = /^[A-ZÆØÅ]/i.test(m.name) ? m.name.charAt(0).toUpperCase() : '#';
-    const headerHtml = showHeaders && currentLetter !== prevLetter ? `<div class="az-section-header" data-letter="${esc(currentLetter)}">${esc(currentLetter)}</div>` : '';
-    prevLetter = currentLetter;
-    const key = m.name.toLowerCase();
-    const domain = pickBestDomain(m.domains);
-    const hasIcon = domain.length > 0;
-    const letter = esc(m.name.charAt(0).toUpperCase());
-    const iconHtml = hasIcon
-      ? `<img class="merchant-icon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
-      : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
-    const visibleOffers = getVisibleMerchantOffers(m);
-    const cashbackOffers = visibleOffers.filter(o => o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
-    const codeOffers = visibleOffers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
-    const offerHtml = cashbackOffers.map((o, idx) => {
-      const url = getSiteOfferUrl(o);
-      const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
-      const label = calculatedLabel || formatCompactReward(o);
-      const fullReward = formatReward(o);
-      const compact = formatCompactReward(o);
-      const terms = o.terms || "";
-      const hasBreakdown = terms.includes("\n") && (/\d+.*%/.test(terms) || /\d+\s*prosent/i.test(terms));
-      const rewardDetail = o.provider === "cbn" ? "" : (compact !== fullReward) ? fullReward : "";
-      const tipBase = o.provider === "cbn"
-        ? terms
-        : hasBreakdown
-        ? (currentAmount > 0 ? formatBreakdownWithAmounts(terms, currentAmount) : terms)
-        : (terms || PROVIDER_TIPS[o.provider] || "");
-      const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
-      const cardOnly = ["sparebank1", "remember"].includes(o.provider);
-      const appOnly = ["klarna", "spenn", "dreams"].includes(o.provider);
-      const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
-      const appText = "Krever " + (PROVIDER_NAMES[o.provider] || o.provider) + "-appen for å aktivere cashback";
-      const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText;
-      const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
-      const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="cbn-chip cbn-chip--muted app-chip">App</span>` : "";
-      const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>` : "";
-      const supportChipHtml = o.provider === "cbn" ? `<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span><span class="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>` : "";
-      const bestClass = idx === 0 ? " offer--best" : "";
-      return `<span class="offer-wrap">${tooltipHtml}<span class="cbn-row offer${bestClass} ${cardOnly ? "offer-card-only" : ""}"><a class="offer-action" href="${esc(url)}" target="_blank" rel="noreferrer">
-        <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
-        ${warnIconHtml}${adChipHtml}${supportChipHtml}</a>${providerFilterChip(o.provider)}
-      </span></span>`;
-    }).join("");
-    const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
-    const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
-    const cryptoSelectedHtml = selectedQuickFilters.size === 0 && cryptoSubName && (!hasProviderFilter() || selectedProviders.has("crypto")) ? (() => {
-      const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
-    })() : "";
-    const hasCurve = m.domains.some(d => curveDomains.has(d));
-    const curveSelectedHtml = selectedQuickFilters.size === 0 && hasCurve && (!hasProviderFilter() || selectedProviders.has("curve")) ? (() => {
-      const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
-      return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
-    })() : "";
-    const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
-    const filterCodes = hasProviderFilter() || selectedQuickFilters.size > 0;
-    const codesHtml = codeOffers.map(o => {
-      const code = o.discountCode || "";
-      const codeTerms = o.terms || "";
-      const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(o.reward.trim());
-      const tooltipText = isNumericReward ? codeTerms : (codeTerms || o.reward);
-      const codeLabel = isNumericReward ? o.reward : "?";
-      const codeTooltipHtml = tooltipText ? `<span class="offer-tooltip">${formatTooltipHtml(tooltipText)}</span>` : "";
-      const sourceProvider = getCodeSourceProvider(o);
-      const sourceChipHtml = sourceProvider
-        ? providerFilterChip(sourceProvider)
-        : "";
-      return `<div class="code-item-row" data-net="0">
-        ${codeTooltipHtml}<div class="cbn-row code-item">
-          <a class="code-reward" href="${esc(o.sourceUrl || o.activationUrl)}" target="_blank" rel="noreferrer" title="Åpne tilbudet" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</a>
-          <span class="code-copy-group"><span class="code-value">${esc(code)}</span><button class="cbn-button cbn-button--quiet code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button></span>
-          <button class="cbn-button cbn-button--quiet vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
-          <button class="cbn-button cbn-button--quiet vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
-          ${sourceChipHtml}
-        </div>
-      </div>`;
-    }).join("");
-    const hostname = domain ? domain.replace(/^www\./, "") : null;
-    const storeUrl = domain ? `https://${domain}` : "";
-    const nameHtml = storeUrl
-      ? `<a class="merchant-name" href="${esc(storeUrl)}" target="_blank" rel="noreferrer">${esc(m.name)}</a>`
-      : `<span class="merchant-name">${esc(m.name)}</span>`;
-    return `${headerHtml}<div class="cbn-card merchant" data-letter="${
-      /^[A-ZÆØÅ]/i.test(m.name) ? esc(m.name.charAt(0).toUpperCase()) : '#'
-    }">
-      <div class="merchant-header">
-        ${iconHtml}
-        ${nameHtml}
-      </div>
-      <div class="offers">${offerHtml}</div>
-      ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
-      <div class="codes-inline${filterCodes && codesHtml ? " open" : ""}${(filterCodes ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
-        <div class="codes-toggle-wrap">
-          <button class="cbn-button cbn-button--quiet codes-toggle${filterCodes && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
-          <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${filterCodes ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        </div>
-        <div class="codes-items">
-          <div class="codes-add-form">
-            <div class="codes-add-form-row">
-              <div class="cbn-field-group codes-add-form-inner">
-                <input class="cbn-field codes-add-input codes-reward-input" type="number" placeholder="%" min="0" max="100">
-                <input class="cbn-field codes-add-input codes-code-input" type="text" placeholder="Kode" maxlength="50">
-                <button class="cbn-button cbn-button--quiet codes-add-submit" type="button" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
-                <button class="cbn-button cbn-button--quiet codes-add-cancel" type="button">✕</button>
-              </div>
-            </div>
-          </div>
-          ${codesHtml}
-          <div class="codes-expired-section" style="display:none">
-            <button class="cbn-button cbn-button--quiet codes-expired-toggle" type="button">▶ Utgåtte koder</button>
-            <div class="codes-expired-list"></div>
-          </div>
-        </div>
+// Building all ~1700 cards at once takes seconds on phones, so the list grows in batches while scrolling.
+const MERCHANT_BATCH_SIZE = 40;
+let renderedMerchants = { list: [], count: 0, prevLetter: null, showHeaders: true };
+let moreMerchantsObserver;
+
+function merchantLetter(m) {
+  return /^[A-ZÆØÅ]/i.test(m.name) ? m.name.charAt(0).toUpperCase() : '#';
+}
+
+function renderMoreMerchants(size) {
+  const end = Math.min(renderedMerchants.list.length, renderedMerchants.count + size);
+  if (end <= renderedMerchants.count) return;
+  const template = document.createElement("template");
+  template.innerHTML = renderedMerchants.list.slice(renderedMerchants.count, end).map(merchantCardHtml).join("");
+  renderedMerchants.count = end;
+  const cards = template.content;
+  window.CashbackTooltips.attach(cards);
+  bindMerchantCards(cards);
+  if (currentAmount > 0) updateRewardAmounts(cards);
+  const merchants = [...cards.querySelectorAll(".merchant[data-letter]")];
+  document.querySelector(".results").append(cards);
+  if (window._azObserve) window._azObserve(merchants);
+}
+
+function renderMerchantsThroughLetter(letter) {
+  const index = renderedMerchants.list.findIndex(m => merchantLetter(m) === letter);
+  if (index >= renderedMerchants.count) renderMoreMerchants(index - renderedMerchants.count + MERCHANT_BATCH_SIZE);
+}
+
+function watchMoreMerchants() {
+  const sentinel = document.getElementById("results-more");
+  moreMerchantsObserver ||= new IntersectionObserver(entries => {
+    if (!entries.some(entry => entry.isIntersecting) || renderedMerchants.count >= renderedMerchants.list.length) return;
+    renderMoreMerchants(MERCHANT_BATCH_SIZE);
+    watchMoreMerchants();
+  }, { rootMargin: "0px 0px 1500px 0px" });
+  // Observing again reports the current position, so a sentinel still near the viewport loads another batch.
+  moreMerchantsObserver.unobserve(sentinel);
+  moreMerchantsObserver.observe(sentinel);
+}
+
+function merchantCardHtml(m) {
+  const currentLetter = merchantLetter(m);
+  const headerHtml = renderedMerchants.showHeaders && currentLetter !== renderedMerchants.prevLetter ? `<div class="az-section-header" data-letter="${esc(currentLetter)}">${esc(currentLetter)}</div>` : '';
+  renderedMerchants.prevLetter = currentLetter;
+  const key = m.name.toLowerCase();
+  const domain = pickBestDomain(m.domains);
+  const hasIcon = domain.length > 0;
+  const letter = esc(m.name.charAt(0).toUpperCase());
+  const iconHtml = hasIcon
+    ? `<img class="merchant-icon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
+    : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
+  const visibleOffers = getVisibleMerchantOffers(m);
+  const cashbackOffers = visibleOffers.filter(o => o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
+  const codeOffers = visibleOffers.filter(o => (o.provider === "rabattkode" || o.provider === "dnb" || o.provider === "tfbank") && o.discountCode);
+  const offerHtml = cashbackOffers.map((o, idx) => {
+    const url = getSiteOfferUrl(o);
+    const calculatedLabel = currentAmount > 0 ? calcReward(o, currentAmount) : "";
+    const label = calculatedLabel || formatCompactReward(o);
+    const fullReward = formatReward(o);
+    const compact = formatCompactReward(o);
+    const terms = o.terms || "";
+    const hasBreakdown = terms.includes("\n") && (/\d+.*%/.test(terms) || /\d+\s*prosent/i.test(terms));
+    const rewardDetail = o.provider === "cbn" ? "" : (compact !== fullReward) ? fullReward : "";
+    const tipBase = o.provider === "cbn"
+      ? terms
+      : hasBreakdown
+      ? (currentAmount > 0 ? formatBreakdownWithAmounts(terms, currentAmount) : terms)
+      : (terms || PROVIDER_TIPS[o.provider] || "");
+    const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
+    const cardOnly = ["sparebank1", "remember"].includes(o.provider);
+    const appOnly = ["klarna", "spenn", "dreams"].includes(o.provider);
+    const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
+    const appText = "Krever " + (PROVIDER_NAMES[o.provider] || o.provider) + "-appen for å aktivere cashback";
+    const fullTip = cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText;
+    const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
+    const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="cbn-chip cbn-chip--muted app-chip">App</span>` : "";
+    const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>` : "";
+    const supportChipHtml = o.provider === "cbn" ? `<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span><span class="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>` : "";
+    const bestClass = idx === 0 ? " offer--best" : "";
+    return `<span class="offer-wrap">${tooltipHtml}<span class="cbn-row offer${bestClass} ${cardOnly ? "offer-card-only" : ""}"><a class="offer-action" href="${esc(url)}" target="_blank" rel="noreferrer">
+      <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
+      ${warnIconHtml}${adChipHtml}${supportChipHtml}</a>${providerFilterChip(o.provider)}
+    </span></span>`;
+  }).join("");
+  const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
+  const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
+  const cryptoSelectedHtml = selectedQuickFilters.size === 0 && cryptoSubName && (!hasProviderFilter() || selectedProviders.has("crypto")) ? (() => {
+    const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
+    return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
+  })() : "";
+  const hasCurve = m.domains.some(d => curveDomains.has(d));
+  const curveSelectedHtml = selectedQuickFilters.size === 0 && hasCurve && (!hasProviderFilter() || selectedProviders.has("curve")) ? (() => {
+    const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
+    return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
+  })() : "";
+  const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
+  const filterCodes = hasProviderFilter() || selectedQuickFilters.size > 0;
+  const codesHtml = codeOffers.map(o => {
+    const code = o.discountCode || "";
+    const codeTerms = o.terms || "";
+    const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(o.reward.trim());
+    const tooltipText = isNumericReward ? codeTerms : (codeTerms || o.reward);
+    const codeLabel = isNumericReward ? o.reward : "?";
+    const codeTooltipHtml = tooltipText ? `<span class="offer-tooltip">${formatTooltipHtml(tooltipText)}</span>` : "";
+    const sourceProvider = getCodeSourceProvider(o);
+    const sourceChipHtml = sourceProvider
+      ? providerFilterChip(sourceProvider)
+      : "";
+    return `<div class="code-item-row" data-net="0">
+      ${codeTooltipHtml}<div class="cbn-row code-item">
+        <a class="code-reward" href="${esc(o.sourceUrl || o.activationUrl)}" target="_blank" rel="noreferrer" title="Åpne tilbudet" ${/\%/.test(o.reward) ? `data-pct="${parseFloat(o.reward) || 0}" data-orig-reward="${esc(o.reward)}"` : ''}>${esc(codeLabel)}</a>
+        <span class="code-copy-group"><span class="code-value">${esc(code)}</span><button class="cbn-button cbn-button--quiet code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button></span>
+        <button class="cbn-button cbn-button--quiet vote-btn" type="button" data-vote="-1">${THUMBS_DOWN_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden er utgått</span></button>
+        <button class="cbn-button cbn-button--quiet vote-btn" type="button" data-vote="1">${THUMBS_UP_SVG}<span class="vote-count"></span><span class="vote-tooltip">Koden fungerer!</span></button>
+        ${sourceChipHtml}
       </div>
     </div>`;
   }).join("");
+  const hostname = domain ? domain.replace(/^www\./, "") : null;
+  const storeUrl = domain ? `https://${domain}` : "";
+  const nameHtml = storeUrl
+    ? `<a class="merchant-name" href="${esc(storeUrl)}" target="_blank" rel="noreferrer">${esc(m.name)}</a>`
+    : `<span class="merchant-name">${esc(m.name)}</span>`;
+  return `${headerHtml}<div class="cbn-card merchant" data-letter="${esc(currentLetter)}">
+    <div class="merchant-header">
+      ${iconHtml}
+      ${nameHtml}
+    </div>
+    <div class="offers">${offerHtml}</div>
+    ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
+    <div class="codes-inline${filterCodes && codesHtml ? " open" : ""}${(filterCodes ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
+      <div class="codes-toggle-wrap">
+        <button class="cbn-button cbn-button--quiet codes-toggle${filterCodes && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
+        <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${filterCodes ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      </div>
+      <div class="codes-items">
+        <div class="codes-add-form">
+          <div class="codes-add-form-row">
+            <div class="cbn-field-group codes-add-form-inner">
+              <input class="cbn-field codes-add-input codes-reward-input" type="number" placeholder="%" min="0" max="100">
+              <input class="cbn-field codes-add-input codes-code-input" type="text" placeholder="Kode" maxlength="50">
+              <button class="cbn-button cbn-button--quiet codes-add-submit" type="button" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button class="cbn-button cbn-button--quiet codes-add-cancel" type="button">✕</button>
+            </div>
+          </div>
+        </div>
+        ${codesHtml}
+        <div class="codes-expired-section" style="display:none">
+          <button class="cbn-button cbn-button--quiet codes-expired-toggle" type="button">▶ Utgåtte koder</button>
+          <div class="codes-expired-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
 
-  window.CashbackTooltips.attach(container);
-  if (window._azObserveAll) window._azObserveAll();
-
+function bindMerchantCards(container) {
   // Attach codes toggle handlers
   container.querySelectorAll(".codes-toggle-wrap").forEach(wrap => {
     const btn = wrap.querySelector(".codes-toggle");
@@ -2133,10 +2187,9 @@ function calcReward(o, amount) {
   return window.SHARED.calculateCashback(o, amount);
 }
 
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function esc(s) {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
+  return String(s ?? "").replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
 function formatTooltipHtml(text) {
@@ -2425,6 +2478,7 @@ function setupAzBar() {
   };
 
   const jumpTo = (letter) => {
+    renderMerchantsThroughLetter(letter);
     const header = document.querySelector(`.az-section-header[data-letter="${letter}"]`);
     const el = header || document.querySelector(`.merchant[data-letter="${letter}"]`);
     if (el) {
@@ -2445,11 +2499,8 @@ function setupAzBar() {
     }
   }, { threshold: 0, rootMargin: "-40% 0px -55% 0px" });
 
-  window._azObserveAll = () => {
-    observer.disconnect();
-    document.querySelectorAll(".merchant[data-letter]").forEach(el => observer.observe(el));
-  };
-  window._azObserveAll();
+  window._azReset = () => observer.disconnect();
+  window._azObserve = (merchants) => merchants.forEach(el => observer.observe(el));
 
   bar.addEventListener("click", (e) => {
     const span = e.target.closest("span[data-l]");
