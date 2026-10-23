@@ -41,7 +41,7 @@ import { createMutedChip } from "../shared/ui";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, type TooltipController } from "../shared/tooltips";
 import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
-import { createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate, sortBonusChips } from "../shared/card-benefits";
+import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 
 type UserscriptHttpRequestOptions = {
   method?: string;
@@ -932,7 +932,6 @@ async function getCurrentOffers(): Promise<CashbackOffer[]> {
   if (response !== undefined && isOffersForUrlResponse(response) && response.ok) {
     applyRuntimeProviderMeta(response.providers);
     runtimeCardOffers = response.cardOffers ?? [];
-    if (response.cardOffers !== undefined) return response.offers;
     if (response.offers.length > 0) return response.offers;
   }
   return readBundledOffersForCurrentUrl();
@@ -988,7 +987,8 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
       return [];
     }
     applyRuntimeProviderMeta((value as { providers?: Record<string, unknown> }).providers);
-    runtimeCardOffers = getCardBenefitOffers(value.offers);
+    // Keep the background's newer card benefits when it sent any.
+    if (runtimeCardOffers.length === 0) runtimeCardOffers = getCardBenefitOffers(value.offers);
     return findOffersForHostname(value, parsedUrl.hostname);
   } catch {
     return [];
@@ -11124,13 +11124,12 @@ function renderNotice(
     return { chip, label };
   }
   const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0]!.provider);
-  for (const [cardIdx, card] of FREE_CARDS.entries()) {
+  for (const card of getFreeCards(runtimeCardOffers)) {
     const { chip, label } = createBonusChip(card);
-    if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
-    bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), ...(card.ebPer100kr !== undefined ? { ebPer100kr: card.ebPer100kr } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
+    if (card === FREE_CARDS[0] && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
+    if (!card.conditional) bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), ...(card.ebPer100kr !== undefined ? { ebPer100kr: card.ebPer100kr } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
-    (freeItems.lastElementChild as HTMLElement).dataset.bonusRate = String(card.pct * 100);
   }
   bonusChips.append(freeGroup);
   // --- Premium chips group (right) ---
@@ -11175,19 +11174,6 @@ function renderNotice(
     addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
   }
   bonusChips.append(premiumGroup);
-  const cardBenefitTooltips: HTMLElement[] = [];
-  const cardBenefits = createCardBenefitGroup(runtimeCardOffers);
-  if (cardBenefits) {
-    for (const row of cardBenefits.querySelectorAll<HTMLElement>(".cbn-card-benefit")) {
-      const action = row.querySelector<HTMLElement>(".bonus-chip")!;
-      const tooltip = row.querySelector<HTMLElement>(".cbn-card-benefit-tooltip")!;
-      tooltipControls.addBeside(action, tooltip, "Vis Instabank-rabatter og vilkår");
-      // Fixed tooltips must escape the panel's transformed containing block.
-      cardBenefitTooltips.push(tooltip);
-    }
-    freeItems.append(cardBenefits);
-  }
-  sortBonusChips(freeItems);
   // --- Selected retailers group ---
   const selectedGroup = document.createElement("div");
   selectedGroup.className = "chip-group";
@@ -12028,7 +12014,7 @@ function renderNotice(
     sideTabArrow.textContent = "\u203A";
     sideTab.setAttribute("aria-label", "Expand cashback offers");
   }
-  shadowRoot.append(style, notice, ...cardBenefitTooltips);
+  shadowRoot.append(style, notice);
   installThemeStyles(shadowRoot);
   const themeSlot = document.createElement("div");
   themeSlot.className = "theme-slot";

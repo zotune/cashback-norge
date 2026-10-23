@@ -1,11 +1,16 @@
 import { type CashbackOffer, isCashbackOffer } from "./cashback.js";
 import { formatCompactRewardLabel, getMaxRewardPercent } from "./reward-calculation.js";
-import { PROVIDER_COLORS, PROVIDER_NAMES } from "./provider-data.js";
+import { type BonusCard, FREE_CARDS, PROVIDER_NAMES, PROVIDER_TIPS } from "./provider-data.js";
 
 export const INSTABANK_CARD_URL = "https://instabank.no/kredittkort";
 export const INSTABANK_DISCOUNTS_URL = "https://instabank.no/kredittkort/rabatter";
 export const INSTABANK_INTEREST_NOTICE = "Ingen rentefri periode – renter fra første dag ved bruk av kreditt. Termingebyr kommer i tillegg.";
 export const INSTABANK_PREPAYMENT_NOTICE = "Forskuddsbetaling: Avklar med banken om positiv saldo er tillatt, hvordan renter og gebyrer beregnes, og om rabatten fortsatt gjelder. Vi har ikke bekreftet at dette gir rentefri bruk.";
+
+/** Same limit as the crawl's provider fallback. */
+const MAX_BENEFIT_AGE_MS = 14 * 86400000;
+/** The tooltip lists this month and the next ones, not the whole year. */
+const LISTED_MONTHS = 3;
 
 export function osloDate(now: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
@@ -25,77 +30,63 @@ export function getCardBenefitOffers(offers: CashbackOffer[]): CashbackOffer[] {
   return offers.filter((offer) => offer.cardBenefit !== undefined);
 }
 
+function isRecentCardBenefit(offer: CashbackOffer, now: Date): boolean {
+  const age = now.getTime() - Date.parse(offer.updatedAt);
+  return isCashbackOffer(offer) && Number.isFinite(age) && age <= MAX_BENEFIT_AGE_MS;
+}
+
 export function getActiveCardBenefits(offers: CashbackOffer[], now = new Date()): CashbackOffer[] {
   const today = osloDate(now);
   return getCardBenefitOffers(offers).filter((offer) => {
-    if (!isCashbackOffer(offer)) return false;
-    const age = now.getTime() - Date.parse(offer.updatedAt);
-    if (!Number.isFinite(age) || age > 14 * 86400000) return false;
+    if (!isRecentCardBenefit(offer, now)) return false;
     const benefit = offer.cardBenefit!;
     return benefit.kind === "ongoing" || (benefit.validFrom! <= today && benefit.validUntil! >= today);
   }).sort((a, b) => Number(b.cardBenefit!.kind === "monthly") - Number(a.cardBenefit!.kind === "monthly"));
 }
 
-/** Both clients render the same conditional benefits; no cart amount is used. */
-export function createCardBenefitGroup(offers: CashbackOffer[], now = new Date()): HTMLElement | undefined {
-  const active = getActiveCardBenefits(offers, now);
-  if (active.length === 0) return undefined;
-  const group = document.createElement("div");
-  group.className = "cbn-card-benefits";
-  group.dataset.bonusRate = String(getMaxRewardPercent(active[0]!));
-  for (const offer of active.slice(0, 1)) {
-    const wrap = document.createElement("div");
-    wrap.className = "tooltip-wrap cbn-card-benefit";
-    const tooltip = document.createElement("div");
-    tooltip.className = "tooltip cbn-card-benefit-tooltip";
-    const calendarTitle = document.createElement("strong");
-    calendarTitle.textContent = "Rabattkalender";
-    tooltip.append(calendarTitle);
-    const today = osloDate(now);
-    const calendar = getCardBenefitOffers(offers).filter((entry) => entry.provider === offer.provider &&
-      Number.isFinite(Date.parse(entry.updatedAt)) && now.getTime() - Date.parse(entry.updatedAt) <= 14 * 86400000)
-      .sort((a, b) => (a.cardBenefit!.validFrom ?? "9999").localeCompare(b.cardBenefit!.validFrom ?? "9999"));
-    for (const entry of calendar) {
-      const period = entry.cardBenefit!;
-      const row = document.createElement("div");
-      row.className = "cbn-card-calendar-month";
-      const current = period.kind === "monthly" && period.validFrom! <= today && period.validUntil! >= today;
-      if (current) row.classList.add("cbn-card-calendar-month--current");
-      const month = period.kind === "monthly" ? new Intl.DateTimeFormat("nb-NO", { month: "long", year: "numeric", timeZone: "Europe/Oslo" })
-        .format(new Date(`${period.validFrom}T12:00:00Z`)) : "Fast grønn rabatt";
-      const name = document.createElement("strong");
-      name.textContent = `${month}${current ? " · denne måneden" : ""}`;
-      const benefitText = document.createElement("span");
-      benefitText.textContent = `${formatCompactRewardLabel(entry) ?? entry.reward} · ${period.category}`;
-      row.append(name, benefitText);
-      tooltip.append(row);
-    }
-    const terms = document.createElement("p");
-    terms.className = "cbn-card-benefit-terms";
-    terms.textContent = offer.terms;
-    tooltip.append(terms);
-    const action = document.createElement("a");
-    action.className = "cbn-row bonus-chip cbn-card-benefit-action";
-    action.href = offer.activationUrl;
-    action.target = "_blank";
-    action.rel = "noreferrer";
-    const label = document.createElement("span");
-    label.className = "bonus-chip-label";
-    label.textContent = `+${formatCompactRewardLabel(offer) ?? offer.reward}`;
-    const badge = document.createElement("span");
-    badge.className = `cbn-chip badge provider-badge badge-${offer.provider} provider-${offer.provider}`;
-    badge.textContent = PROVIDER_NAMES[offer.provider] ?? offer.provider;
-    const colors = PROVIDER_COLORS[offer.provider];
-    if (colors) { badge.style.backgroundColor = colors.bg; badge.style.color = colors.fg; }
-    action.append(label, badge);
-    wrap.append(tooltip, action);
-    group.append(wrap);
-  }
-  return group;
+/**
+ * The free cards plus today's card benefit as one more card, highest rate
+ * first. Clients render it like the other free cards, with the shared bonus
+ * chip and tooltip.
+ */
+export function getFreeCards(offers: CashbackOffer[], now = new Date()): BonusCard[] {
+  const [benefit] = getActiveCardBenefits(offers, now);
+  if (benefit === undefined) return FREE_CARDS;
+  const card: BonusCard = {
+    pct: getMaxRewardPercent(benefit) / 100,
+    label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
+    badge: benefit.provider,
+    url: benefit.activationUrl,
+    approx: false,
+    conditional: true,
+    tip: describeCardBenefits(benefit, offers, now),
+  };
+  return [...FREE_CARDS, card].sort((a, b) => b.pct - a.pct);
 }
 
-export function sortBonusChips(container: HTMLElement): void {
-  const rows = [...container.children] as HTMLElement[];
-  rows.sort((a, b) => Number(b.dataset.bonusRate ?? 0) - Number(a.dataset.bonusRate ?? 0));
-  container.append(...rows);
+function describeCardBenefits(current: CashbackOffer, offers: CashbackOffer[], now: Date): string {
+  const today = osloDate(now);
+  const benefits = getCardBenefitOffers(offers)
+    .filter((offer) => offer.provider === current.provider && isRecentCardBenefit(offer, now));
+  const months = benefits
+    .filter((offer) => offer.cardBenefit!.kind === "monthly" && offer.cardBenefit!.validUntil! >= today)
+    .sort((a, b) => a.cardBenefit!.validFrom!.localeCompare(b.cardBenefit!.validFrom!))
+    .slice(0, LISTED_MONTHS);
+  const ongoing = benefits.filter((offer) => offer.cardBenefit!.kind === "ongoing");
+  const describe = (name: string, offer: CashbackOffer) =>
+    `${name}: ${formatCompactRewardLabel(offer) ?? offer.reward} på ${offer.cardBenefit!.category}`;
+  const caps = current.terms.split("\n")
+    .filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line))
+    .map((line) => line.replace(/\s*\(.*\)$/, ""));
+  return [
+    ...months.map((offer) => describe(monthName(offer.cardBenefit!.validFrom!), offer)),
+    ...ongoing.map((offer) => describe("Alltid", offer)),
+    caps.length > 0 ? `${caps.join(". ")}.` : "",
+    PROVIDER_TIPS[current.provider] ?? "",
+  ].filter((line) => line !== "").join("\n");
+}
+
+function monthName(date: string): string {
+  const name = new Intl.DateTimeFormat("nb-NO", { month: "long", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }

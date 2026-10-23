@@ -17,7 +17,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters";
-import { createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate, sortBonusChips } from "../shared/card-benefits";
+import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 
 // Expose shared data as globals for the inline site script
 Object.assign(window, {
@@ -26,9 +26,8 @@ Object.assign(window, {
     PROVIDER_NAMES,
     PROVIDER_TIPS,
     FREE_CARDS,
-    sortBonusChips,
-    createCardBenefitGroup,
     getCardBenefitOffers,
+    getFreeCards,
     watchCardBenefitDate,
     PREMIUM_CARDS,
     SUPPORT_LINKS,

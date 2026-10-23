@@ -4,8 +4,8 @@ import { test } from "node:test";
 import { fetchInstabank } from "../src/backend/providers/instabank.js";
 import { collectProviderOffers } from "../src/backend/provider-offers.js";
 import { buildCashbackIndex, findOffersForHostname, isCashbackIndex, isCashbackOffer, type CashbackOffer } from "../src/shared/cashback.js";
-import { getActiveCardBenefits, getCardBenefitOffers, osloDate, watchCardBenefitDate } from "../src/shared/card-benefits.js";
-import { buildProviderMeta } from "../src/shared/provider-data.js";
+import { getActiveCardBenefits, getCardBenefitOffers, getFreeCards, osloDate, watchCardBenefitDate } from "../src/shared/card-benefits.js";
+import { buildProviderMeta, FREE_CARDS, PROVIDER_TIPS } from "../src/shared/provider-data.js";
 import { calculateCashback, calculateCashbackMaxKr } from "../src/shared/reward-calculation.js";
 import { isCashbackFoundMessage, isOffersForUrlResponse } from "../src/shared/extension-messages.js";
 import { createCashbackIndexCache, type CachedIndex } from "../src/extension/cashback-index-cache.js";
@@ -112,6 +112,29 @@ test("invalid benefit metadata is rejected all the way through persisted indexes
     assert.equal(isOffersForUrlResponse({ ok: true, offers: [], cardOffers: [invalid] }), false);
     assert.equal(isCashbackFoundMessage({ type: "cashback-found", offers: [], cardOffers: [invalid] }), false);
   }
+});
+
+test("the current benefit joins the free cards as a conditional card with this month, the next ones and the caps in its tooltip", async () => {
+  const offers = await offersFromSource();
+  const cards = getFreeCards(offers, new Date(generatedAt));
+  assert.deepEqual(cards.slice(1), FREE_CARDS);
+  const card = cards[0]!;
+  assert.deepEqual({ ...card, tip: undefined }, {
+    pct: 0.05, label: "Instabank", badge: "instabank", url: "https://instabank.no/kredittkort",
+    approx: false, conditional: true, tip: undefined,
+  });
+  assert.deepEqual(card.tip.split("\n"), [
+    "Oktober: 5 % på sportsutstyr",
+    "November: 5 % på all netthandel",
+    "Desember: 3 % på alle kjøp",
+    "Alltid: 5 % på kollektivtransport og elbillading",
+    "Maks rabatt pr måned er kr 500. Maks rabatt pr år er kr 3 000.",
+    ...PROVIDER_TIPS.instabank!.split("\n"),
+  ]);
+  const december = offers.map((offer) => ({ ...offer, updatedAt: "2026-12-14T12:00:00.000Z" }));
+  assert.equal(getFreeCards(december, new Date("2026-12-15T12:00:00Z"))[0]?.pct, 0.03);
+  assert.equal(getFreeCards([], new Date(generatedAt)), FREE_CARDS);
+  assert.equal(getFreeCards(offers, new Date("2026-11-08T12:00:01Z")), FREE_CARDS);
 });
 
 test("an already open page updates once when the Oslo date changes and the watcher can be disposed", (t) => {

@@ -211,6 +211,8 @@ export type BonusCard = {
   badge: string;
   url: string;
   approx: boolean;
+  /** Applies to some purchases only (such as a merchant category), so no kroner amount is calculated from the sum. */
+  conditional?: boolean;
   tip: string;
 };
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792775475
+// @version      1792777781
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -199,6 +199,60 @@
     elbilforeningen: "Elbilforeningen",
     ys: "YS",
     lofavor: "LOfavør"
+  };
+  const PROVIDER_TIPS = {
+    trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
+    klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
+    coupert: "Coupert.\nGratis cashback. Logg inn hos Coupert og aktiver cashback før kjøpet.\nFullfør kjøpet på butikkens nettsted.",
+    remember: "re:member kredittkort.\nAktiver tilbud i re:member-appen før kjøp.",
+    sas: "SAS EuroBonus-poeng.\nAktiver tilbud på SAS sine sider.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
+    tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
+    dnb: "DNB Spare. Aktiver i DNB-appen.",
+    rabattkode: "Rabattkode fra rabattkode.no.\nLim inn koden i handlekurven.",
+    norskfamilie: "Norsk Familieøkonomi.\nKrever medlemskap. Aktiver kjøp via norskfamilie.no.",
+    usbl: "USBL-tilbud.\nKrever USBL-medlemskap og eventuell Bonabo-aktivering.",
+    bate: "Bate medlemsfordeler.\nKrever Bate-medlemskap. Aktiver eller vis fordelen via bate.no.",
+    tobb: "TOBB medlemsfordeler.\nKrever TOBB-medlemskap. Aktiver eller vis fordelen via tobb.no.",
+    bob: "BOB-medlemsfordel.\nKrever BOB-medlemskap og gyldig medlemsbevis i BOB-appen.",
+    tekna: "Tekna medlemsfordeler.\nKrever Tekna-medlemskap. Aktiver tilbud via tekna.no.",
+    nito: "NITO medlemsfordeler.\nKrever NITO-medlemskap. Aktiver tilbud via nito.no.",
+    sparebank1: "SpareBank 1 Mastercard Ung.\n20 % rabatt på utvalgte strømmetjenester.\nSamlet inntil 500 kr per kalenderår.",
+    studentkortet: "Studentkortet.no\nGratis medlemskap for studenter i Norge.\nAktiver rabatt via studentkortet.no.",
+    nettbonus: "NettBonus.no\nGratis cashback-program.\nKlikk deg via nettbonus.no til butikken for å tjene bonus.",
+    spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
+    spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
+    rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
+    dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
+    utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
+    unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
+    gratisbursdag: "Bursdagsgaver og bursdagsrabatter fra gratisbursdag.no.\nKan kreve kundeklubb, app eller registrert fødselsdato.\nSe vilkår, gyldighet og bekreftelsesstatus for hvert tilbud.",
+    unio: "Unio medlemsfordeler.\nKrever medlemskap i et Unio-forbund.\nOppgi rabattkode eller vis medlemsbevis.",
+    coop: "Coop medlemsfordeler.\nKrever Coop-medlemskap.\nBruk rabattkode eller aktiver via Coop-siden der det kreves.",
+    elkjop: "Elkjøps Kundeklubb.\nKrever gratis kundeklubbmedlemskap.\nAktiver eller hent kode via Elkjøp.",
+    akademikerne: "Akademikerne Pluss medlemsfordeler.\nKrever medlemskap i en tilknyttet fagforening.\nAktiver via akademikernepluss.no eller A+-appen.",
+    huseierne: "Huseiernes medlemsfordeler.\nKrever Huseierne-medlemskap.\nVis medlemskort eller hent rabattkode via huseierne.no.",
+    huseierforbundet: "Norges Huseierforbund og Bergen Huseierforening.\nKrever medlemskap i den aktuelle foreningen.\nBruk den offisielle medlemssiden for vilkår og aktivering.",
+    amcar: "AMCARs rabattavtaler.\nKrever gyldig AMCAR-medlemskap.\nSe vilkår og aktivering på amcar.no.",
+    horselsforbundet: "Hørselsforbundets medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på horselsforbundet.no.",
+    knbf: "Kongelig Norsk Båtforbunds medlemsfordeler.\nKrever KNBF-medlemskap.\nSe vilkår og aktivering på knbf.no.",
+    njff: "NJFF medlemsfordeler.\nKrever NJFF-medlemskap.\nSe vilkår og aktivering på njff.no.",
+    pensjonistforbundet: "Pensjonistforbundets medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på pensjonistforbundet.no.",
+    kna: "KNAs medlemsfordeler.\nKrever KNA-medlemskap.\nSe vilkår og aktivering på kna.no.",
+    syklistforeningen: "Syklistforeningens medlemsfordeler.\nKrever medlemskap i Syklistforeningen.\nSe vilkår og aktivering på syklistforeningen.no.",
+    revmatikerforbundet: "Norsk Revmatikerforbunds medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på revmatiker.no.",
+    redningsselskapet: "Redningsselskapets medlemsfordeler.\nKrever medlemskap i Redningsselskapet.\nSe vilkår og aktivering på rs.no.",
+    lhl: "LHLs medlemsfordeler (Landsforeningen for hjerte- og lungesyke).\nKrever LHL-medlemskap.\nSe vilkår og aktivering på lhl.no.",
+    skiforeningen: "Skiforeningens medlemsfordeler.\nKrever medlemskap i Skiforeningen.\nSe vilkår og aktivering på skiforeningen.no.",
+    agrol: "Agrol – fordelsprogram for medlemmer av Norges Bondelag m.fl.\nKrever medlemskap i en tilknyttet landbruksorganisasjon.\nSe vilkår og aktivering på agrol.no.",
+    kondis: "Kondis' medlemsfordeler (organisasjon for kondisjonsidrett).\nKrever Kondis-medlemskap.\nSe vilkår og aktivering på kondis.no.",
+    santander: "Santander-kredittkort.\nKrever kredittkort fra Santander.\nAktiver tilbudet via santander.dealpass.no.",
+    norwegian: "Norwegian Reward.\nGratis fordelsprogram.\nTjen CashPoints via partnersiden på norwegian.com.\n1 CashPoint = 1 kr på Norwegian-kjøp.",
+    instabank: "Instabank kredittkort.\nMånedsrabatt og faste grønne rabatter avhenger av vilkår og butikkens MCC-kode.\nIngen rentefri periode: renter fra første dag ved bruk av kreditt. Termingebyr kan påløpe.\nAvklar eventuell forskuddsbetaling med banken; dette er ingen garanti for rentefri bruk.",
+    vestbo: "Vestbo medlemsfordeler.\nKrever Vestbo-medlemskap.\nVis digitalt medlemskort via vestbo.no.",
+    bbl: "Boligbyggelagenes fordelsprogram.\nKrever medlemskap i et tilknyttet boligbyggelag.\nRegistrer betalingskort på fordelerformedlemmer.no for automatisk bonus.",
+    elbilforeningen: "Norsk elbilforening.\nKrever medlemskap i Elbilforeningen.\nAktiver via elbil.no/medlemsfordeler.",
+    ys: "YS medlemsfordeler.\nKrever medlemskap i et YS-forbund.\nSe vilkår på ys.no/medlemsfordeler.",
+    lofavor: "LOfavør.\nKrever medlemskap i et LO-forbund.\nSe vilkår på lofavor.no."
   };
   const PROVIDER_COLORS = {
     crypto: { bg: "#002d74", fg: "#ffffff" },
@@ -7671,15 +7725,6 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-has-quokka { padding-left: 46px !important; }
 .cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
 .cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
-.cbn-card-benefits { display: contents; }
-.cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; width: 16px; height: 16px; flex-basis: 16px; font-size: 14px; }
-@media (hover: none), (pointer: coarse), (max-width: 520px) { .cbn-card-benefit .cbn-tooltip-trigger { width: 32px; height: 32px; flex-basis: 32px; font-size: 18px; } }
-.cbn-card-benefit-tooltip { background: var(--cbn-tooltip, #172026); border: 0; border-radius: 8px; color: #fff; box-sizing: border-box; display: none; font: 11px/1.45 system-ui, sans-serif; left: 8px; top: 8px; max-height: calc(100vh - 32px); max-width: min(340px, calc(100vw - 16px)); overflow-y: auto; padding: 12px; position: fixed; width: 340px; white-space: normal; z-index: 2147483647; }
-.cbn-card-benefit > .cbn-card-benefit-tooltip:not(.cbn-tooltip-open) { display: none; opacity: 0; visibility: hidden; pointer-events: none; }
-.cbn-card-calendar-month { display: grid; gap: 2px; padding: 7px 5px; border-radius: 4px; }
-.cbn-card-calendar-month--current { background: #00ff85; color: #333f48; }
-.cbn-card-calendar-month strong { font-size: 11px; }
-.cbn-card-benefit-terms { margin: 8px 0 0; padding-top: 8px; white-space: pre-line; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
   .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -7965,7 +8010,7 @@ ${darkProviderCss}
         whiteSpace: "normal",
         margin: "0"
       });
-      if (isBonusChipTooltip || tooltip.classList.contains("cbn-card-benefit-tooltip")) {
+      if (isBonusChipTooltip) {
         const popover = tooltip;
         if (typeof popover.showPopover === "function") {
           try {
@@ -7977,8 +8022,7 @@ ${darkProviderCss}
           }
         }
       }
-      const anchor = button.getBoundingClientRect();
-      active = { button, tooltip, style, topLayer, anchorTop: anchor.top, anchorLeft: anchor.left };
+      active = { button, tooltip, style, topLayer };
       const rect = tooltip.getBoundingClientRect();
       const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
       tooltip.style.left = `${position.left}px`;
@@ -7996,10 +8040,7 @@ ${darkProviderCss}
       }
     };
     const onScroll = (event) => {
-      if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) {
-        const anchor = active.button.getBoundingClientRect();
-        if (anchor.top !== active.anchorTop || anchor.left !== active.anchorLeft) close();
-      }
+      if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
     };
     const onHover = (event) => {
       for (let element = event.target; element; element = element.parentElement) {
@@ -8105,6 +8146,8 @@ ${darkProviderCss}
       }
     };
   }
+  const MAX_BENEFIT_AGE_MS = 14 * 864e5;
+  const LISTED_MONTHS = 3;
   function osloDate(now) {
     const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
     return ["year", "month", "day"].map((kind) => parts.find((part) => part.type === kind).value).join("-");
@@ -8123,76 +8166,49 @@ ${darkProviderCss}
   function getCardBenefitOffers(offers) {
     return offers.filter((offer) => offer.cardBenefit !== void 0);
   }
+  function isRecentCardBenefit(offer, now) {
+    const age = now.getTime() - Date.parse(offer.updatedAt);
+    return isCashbackOffer(offer) && Number.isFinite(age) && age <= MAX_BENEFIT_AGE_MS;
+  }
   function getActiveCardBenefits(offers, now = /* @__PURE__ */ new Date()) {
     const today = osloDate(now);
     return getCardBenefitOffers(offers).filter((offer) => {
-      if (!isCashbackOffer(offer)) return false;
-      const age = now.getTime() - Date.parse(offer.updatedAt);
-      if (!Number.isFinite(age) || age > 14 * 864e5) return false;
+      if (!isRecentCardBenefit(offer, now)) return false;
       const benefit = offer.cardBenefit;
       return benefit.kind === "ongoing" || benefit.validFrom <= today && benefit.validUntil >= today;
     }).sort((a, b) => Number(b.cardBenefit.kind === "monthly") - Number(a.cardBenefit.kind === "monthly"));
   }
-  function createCardBenefitGroup(offers, now = /* @__PURE__ */ new Date()) {
-    const active = getActiveCardBenefits(offers, now);
-    if (active.length === 0) return void 0;
-    const group = document.createElement("div");
-    group.className = "cbn-card-benefits";
-    group.dataset.bonusRate = String(getMaxRewardPercent(active[0]));
-    for (const offer of active.slice(0, 1)) {
-      const wrap = document.createElement("div");
-      wrap.className = "tooltip-wrap cbn-card-benefit";
-      const tooltip = document.createElement("div");
-      tooltip.className = "tooltip cbn-card-benefit-tooltip";
-      const calendarTitle = document.createElement("strong");
-      calendarTitle.textContent = "Rabattkalender";
-      tooltip.append(calendarTitle);
-      const today = osloDate(now);
-      const calendar = getCardBenefitOffers(offers).filter((entry) => entry.provider === offer.provider && Number.isFinite(Date.parse(entry.updatedAt)) && now.getTime() - Date.parse(entry.updatedAt) <= 14 * 864e5).sort((a, b) => (a.cardBenefit.validFrom ?? "9999").localeCompare(b.cardBenefit.validFrom ?? "9999"));
-      for (const entry of calendar) {
-        const period = entry.cardBenefit;
-        const row = document.createElement("div");
-        row.className = "cbn-card-calendar-month";
-        const current = period.kind === "monthly" && period.validFrom <= today && period.validUntil >= today;
-        if (current) row.classList.add("cbn-card-calendar-month--current");
-        const month = period.kind === "monthly" ? new Intl.DateTimeFormat("nb-NO", { month: "long", year: "numeric", timeZone: "Europe/Oslo" }).format(/* @__PURE__ */ new Date(`${period.validFrom}T12:00:00Z`)) : "Fast grønn rabatt";
-        const name = document.createElement("strong");
-        name.textContent = `${month}${current ? " · denne måneden" : ""}`;
-        const benefitText = document.createElement("span");
-        benefitText.textContent = `${formatCompactRewardLabel(entry) ?? entry.reward} · ${period.category}`;
-        row.append(name, benefitText);
-        tooltip.append(row);
-      }
-      const terms = document.createElement("p");
-      terms.className = "cbn-card-benefit-terms";
-      terms.textContent = offer.terms;
-      tooltip.append(terms);
-      const action = document.createElement("a");
-      action.className = "cbn-row bonus-chip cbn-card-benefit-action";
-      action.href = offer.activationUrl;
-      action.target = "_blank";
-      action.rel = "noreferrer";
-      const label = document.createElement("span");
-      label.className = "bonus-chip-label";
-      label.textContent = `+${formatCompactRewardLabel(offer) ?? offer.reward}`;
-      const badge = document.createElement("span");
-      badge.className = `cbn-chip badge provider-badge badge-${offer.provider} provider-${offer.provider}`;
-      badge.textContent = PROVIDER_NAMES[offer.provider] ?? offer.provider;
-      const colors = PROVIDER_COLORS[offer.provider];
-      if (colors) {
-        badge.style.backgroundColor = colors.bg;
-        badge.style.color = colors.fg;
-      }
-      action.append(label, badge);
-      wrap.append(tooltip, action);
-      group.append(wrap);
-    }
-    return group;
+  function getFreeCards(offers, now = /* @__PURE__ */ new Date()) {
+    const [benefit] = getActiveCardBenefits(offers, now);
+    if (benefit === void 0) return FREE_CARDS;
+    const card = {
+      pct: getMaxRewardPercent(benefit) / 100,
+      label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
+      badge: benefit.provider,
+      url: benefit.activationUrl,
+      approx: false,
+      conditional: true,
+      tip: describeCardBenefits(benefit, offers, now)
+    };
+    return [...FREE_CARDS, card].sort((a, b) => b.pct - a.pct);
   }
-  function sortBonusChips(container) {
-    const rows = [...container.children];
-    rows.sort((a, b) => Number(b.dataset.bonusRate ?? 0) - Number(a.dataset.bonusRate ?? 0));
-    container.append(...rows);
+  function describeCardBenefits(current, offers, now) {
+    const today = osloDate(now);
+    const benefits = getCardBenefitOffers(offers).filter((offer) => offer.provider === current.provider && isRecentCardBenefit(offer, now));
+    const months = benefits.filter((offer) => offer.cardBenefit.kind === "monthly" && offer.cardBenefit.validUntil >= today).sort((a, b) => a.cardBenefit.validFrom.localeCompare(b.cardBenefit.validFrom)).slice(0, LISTED_MONTHS);
+    const ongoing = benefits.filter((offer) => offer.cardBenefit.kind === "ongoing");
+    const describe = (name, offer) => `${name}: ${formatCompactRewardLabel(offer) ?? offer.reward} på ${offer.cardBenefit.category}`;
+    const caps = current.terms.split("\n").filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line)).map((line) => line.replace(/\s*\(.*\)$/, ""));
+    return [
+      ...months.map((offer) => describe(monthName(offer.cardBenefit.validFrom), offer)),
+      ...ongoing.map((offer) => describe("Alltid", offer)),
+      caps.length > 0 ? `${caps.join(". ")}.` : "",
+      PROVIDER_TIPS[current.provider] ?? ""
+    ].filter((line) => line !== "").join("\n");
+  }
+  function monthName(date) {
+    const name = new Intl.DateTimeFormat("nb-NO", { month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${date}T12:00:00Z`));
+    return name.charAt(0).toUpperCase() + name.slice(1);
   }
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
@@ -8682,7 +8698,6 @@ ${darkProviderCss}
     if (response !== void 0 && isOffersForUrlResponse(response) && response.ok) {
       applyRuntimeProviderMeta(response.providers);
       runtimeCardOffers = response.cardOffers ?? [];
-      if (response.cardOffers !== void 0) return response.offers;
       if (response.offers.length > 0) return response.offers;
     }
     return readBundledOffersForCurrentUrl();
@@ -8726,7 +8741,7 @@ ${darkProviderCss}
         return [];
       }
       applyRuntimeProviderMeta(value.providers);
-      runtimeCardOffers = getCardBenefitOffers(value.offers);
+      if (runtimeCardOffers.length === 0) runtimeCardOffers = getCardBenefitOffers(value.offers);
       return findOffersForHostname(value, parsedUrl.hostname);
     } catch {
       return [];
@@ -15669,13 +15684,12 @@ ${darkProviderCss}
       return { chip, label };
     }
     const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0].provider);
-    for (const [cardIdx, card] of FREE_CARDS.entries()) {
+    for (const card of getFreeCards(runtimeCardOffers)) {
       const { chip, label } = createBonusChip(card);
-      if (cardIdx === 0 && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
-      bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, ...card.ebPer100kr !== void 0 ? { ebPer100kr: card.ebPer100kr } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
+      if (card === FREE_CARDS[0] && !firstOfferIsCardOnly) chip.classList.add("bonus-chip--best");
+      if (!card.conditional) bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, ...card.ebPer100kr !== void 0 ? { ebPer100kr: card.ebPer100kr } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
-      freeItems.lastElementChild.dataset.bonusRate = String(card.pct * 100);
     }
     bonusChips.append(freeGroup);
     const premiumGroup = document.createElement("div");
@@ -15720,18 +15734,6 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
     }
     bonusChips.append(premiumGroup);
-    const cardBenefitTooltips = [];
-    const cardBenefits = createCardBenefitGroup(runtimeCardOffers);
-    if (cardBenefits) {
-      for (const row of cardBenefits.querySelectorAll(".cbn-card-benefit")) {
-        const action = row.querySelector(".bonus-chip");
-        const tooltip = row.querySelector(".cbn-card-benefit-tooltip");
-        tooltipControls.addBeside(action, tooltip, "Vis Instabank-rabatter og vilkår");
-        cardBenefitTooltips.push(tooltip);
-      }
-      freeItems.append(cardBenefits);
-    }
-    sortBonusChips(freeItems);
     const selectedGroup = document.createElement("div");
     selectedGroup.className = "chip-group";
     const selectedLabel = document.createElement("span");
@@ -16548,7 +16550,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       sideTabArrow.textContent = "›";
       sideTab.setAttribute("aria-label", "Expand cashback offers");
     }
-    shadowRoot.append(style, notice, ...cardBenefitTooltips);
+    shadowRoot.append(style, notice);
     installThemeStyles(shadowRoot);
     const themeSlot = document.createElement("div");
     themeSlot.className = "theme-slot";

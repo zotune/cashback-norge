@@ -16,7 +16,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const view = doc.defaultView!;
   const targets = new WeakMap<HTMLButtonElement, HTMLElement>();
   const hoverHosts = new WeakMap<Element, HTMLElement>();
-  let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean; anchorTop: number; anchorLeft: number } | undefined;
+  let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean } | undefined;
 
   // The mascot is a large data URL; create it on first hover or tap, not once per tooltip in long lists.
   const addMascot = (tooltip: HTMLElement) => {
@@ -68,7 +68,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     // iOS Safari can paint a shadow-DOM tooltip underneath the host page. A
     // manual popover enters the browser's top layer, while the normal z-index
     // path remains available on browsers without the Popover API.
-    if (isBonusChipTooltip || tooltip.classList.contains("cbn-card-benefit-tooltip")) {
+    if (isBonusChipTooltip) {
       const popover = tooltip as HTMLElement & { showPopover?: () => void };
       if (typeof popover.showPopover === "function") {
         try {
@@ -80,8 +80,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
         }
       }
     }
-    const anchor = button.getBoundingClientRect();
-    active = { button, tooltip, style, topLayer, anchorTop: anchor.top, anchorLeft: anchor.left };
+    active = { button, tooltip, style, topLayer };
     const rect = tooltip.getBoundingClientRect();
     const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
     tooltip.style.left = `${position.left}px`;
@@ -96,11 +95,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     }
   };
   const onScroll = (event: Event) => {
-    if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) {
-      const anchor = active.button.getBoundingClientRect();
-      // A queued scroll event from focusing the button must not close a newly opened tooltip.
-      if (anchor.top !== active.anchorTop || anchor.left !== active.anchorLeft) close();
-    }
+    if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
   };
   // Desktop tooltips also open on CSS hover, so add the mascot before that first paint.
   const onHover = (event: Event) => {
