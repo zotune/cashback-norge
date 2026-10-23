@@ -984,7 +984,6 @@ a.code-reward { color: inherit; text-decoration: none; }
       <span class="chip-group-label">Premium</span>
       <div class="chip-group-items" id="premium-chips"></div>
     </div>
-    <div id="card-benefits"></div>
   </div>
   </div>
   <div class="results" id="results"></div>
@@ -2533,7 +2532,7 @@ function renderBonusChips() {
   renderChipGroup(FREE_CARDS, document.getElementById("free-chips"));
   renderChipGroup(PREMIUM_CARDS, document.getElementById("premium-chips"));
   const benefits = createCardBenefitGroup(cardBenefitOffers);
-  document.getElementById("card-benefits").replaceChildren(...(benefits ? [benefits] : []));
+  if (benefits) document.getElementById("free-chips").append(benefits);
   window.CashbackTooltips.attach(document.querySelector(".bonus-chips-portal"));
 }
 

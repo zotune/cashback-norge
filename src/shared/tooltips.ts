@@ -16,7 +16,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const view = doc.defaultView!;
   const targets = new WeakMap<HTMLButtonElement, HTMLElement>();
   const hoverHosts = new WeakMap<Element, HTMLElement>();
-  let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean } | undefined;
+  let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean; anchorTop: number; anchorLeft: number } | undefined;
 
   // The mascot is a large data URL; create it on first hover or tap, not once per tooltip in long lists.
   const addMascot = (tooltip: HTMLElement) => {
@@ -80,7 +80,8 @@ export function createTooltipController(root: Document | ShadowRoot) {
         }
       }
     }
-    active = { button, tooltip, style, topLayer };
+    const anchor = button.getBoundingClientRect();
+    active = { button, tooltip, style, topLayer, anchorTop: anchor.top, anchorLeft: anchor.left };
     const rect = tooltip.getBoundingClientRect();
     const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
     tooltip.style.left = `${position.left}px`;
@@ -95,7 +96,11 @@ export function createTooltipController(root: Document | ShadowRoot) {
     }
   };
   const onScroll = (event: Event) => {
-    if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
+    if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) {
+      const anchor = active.button.getBoundingClientRect();
+      // A queued scroll event from focusing the button must not close a newly opened tooltip.
+      if (anchor.top !== active.anchorTop || anchor.left !== active.anchorLeft) close();
+    }
   };
   // Desktop tooltips also open on CSS hover, so add the mascot before that first paint.
   const onHover = (event: Event) => {

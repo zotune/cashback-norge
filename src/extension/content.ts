@@ -11184,7 +11184,7 @@ function renderNotice(
       // Fixed tooltips must escape the panel's transformed containing block.
       cardBenefitTooltips.push(tooltip);
     }
-    bonusChips.append(cardBenefits);
+    freeItems.append(cardBenefits);
   }
   // --- Selected retailers group ---
   const selectedGroup = document.createElement("div");

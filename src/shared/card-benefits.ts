@@ -42,15 +42,9 @@ export function createCardBenefitGroup(offers: CashbackOffer[], now = new Date()
   if (active.length === 0) return undefined;
   const group = document.createElement("div");
   group.className = "cbn-card-benefits";
-  const heading = document.createElement("span");
-  heading.className = "cbn-card-benefits-heading";
-  heading.textContent = "Kort med betingede rabatter";
-  group.append(heading);
-  for (const offer of active) {
-    const benefit = offer.cardBenefit!;
+  for (const offer of active.slice(0, 1)) {
     const wrap = document.createElement("div");
     wrap.className = "tooltip-wrap cbn-card-benefit";
-    if (benefit.kind === "monthly") wrap.classList.add("cbn-card-benefit--current");
     const tooltip = document.createElement("div");
     tooltip.className = "tooltip cbn-card-benefit-tooltip";
     const calendarTitle = document.createElement("strong");
@@ -86,28 +80,15 @@ export function createCardBenefitGroup(offers: CashbackOffer[], now = new Date()
     action.rel = "noreferrer";
     const label = document.createElement("span");
     label.className = "bonus-chip-label";
-    label.textContent = `${formatCompactRewardLabel(offer) ?? offer.reward} · ${benefit.category}`;
+    label.textContent = `+${formatCompactRewardLabel(offer) ?? offer.reward}`;
     const badge = document.createElement("span");
     badge.className = `cbn-chip badge provider-badge badge-${offer.provider} provider-${offer.provider}`;
     badge.textContent = PROVIDER_NAMES[offer.provider] ?? offer.provider;
     const colors = PROVIDER_COLORS[offer.provider];
     if (colors) { badge.style.backgroundColor = colors.bg; badge.style.color = colors.fg; }
-    const status = document.createElement("span");
-    status.className = "cbn-chip cbn-chip--muted cbn-card-benefit-status";
-    status.textContent = benefit.kind === "monthly" ? "Gjelder i dag" : "Fast fordel";
-    action.append(label, status, badge);
+    action.append(label, badge);
     wrap.append(tooltip, action);
     group.append(wrap);
   }
-  const notice = document.createElement("p");
-  notice.className = "cbn-card-benefits-notice";
-  notice.textContent = INSTABANK_INTEREST_NOTICE;
-  const calendar = document.createElement("a");
-  calendar.className = "cbn-card-benefits-calendar";
-  calendar.href = INSTABANK_DISCOUNTS_URL;
-  calendar.target = "_blank";
-  calendar.rel = "noreferrer";
-  calendar.textContent = "Se rabattkalender og vilkår";
-  group.append(notice, calendar);
   return group;
 }

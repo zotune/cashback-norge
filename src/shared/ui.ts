@@ -63,24 +63,14 @@ export const UI_CSS = `
 .cbn-has-quokka { padding-left: 46px !important; }
 .cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
 .cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
-.cbn-card-benefits { display: grid; gap: 6px; grid-column: 1 / -1; flex-basis: 100%; width: 100%; min-width: 0; }
-.cbn-card-benefits-heading { color: var(--cbn-muted); font-size: 10px; font-weight: 700; }
-.cbn-card-benefit { min-width: 0; position: relative; }
-.cbn-card-benefit .bonus-chip, .cbn-card-benefit .bonus-chip-action { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.cbn-card-benefit .bonus-chip { padding: 6px 8px; }
-.cbn-card-benefit .bonus-chip-label { white-space: normal; overflow-wrap: anywhere; flex: 1; min-width: 90px; font-size: 11px; line-height: 1.4; }
+.cbn-card-benefits { display: contents; }
 .cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; }
-.cbn-card-benefit .badge, .cbn-card-benefit .provider-badge { display: inline-flex; padding: 3px 5px; font-size: 10px; font-weight: 700; line-height: 1.2; }
-.cbn-card-benefit--current .bonus-chip { background: color-mix(in srgb, #00ff85 14%, var(--cbn-soft)); }
-.cbn-card-benefit-status { font-size: 9px; }
 .cbn-card-benefit-tooltip { background: var(--cbn-tooltip, #172026); border: 0; border-radius: 8px; color: #fff; box-sizing: border-box; display: none; font: 11px/1.45 system-ui, sans-serif; left: 8px; top: 8px; max-height: calc(100vh - 32px); max-width: min(340px, calc(100vw - 16px)); overflow-y: auto; padding: 12px; position: fixed; width: 340px; white-space: normal; z-index: 2147483647; }
 .cbn-card-benefit > .cbn-card-benefit-tooltip:not(.cbn-tooltip-open) { display: none; opacity: 0; visibility: hidden; pointer-events: none; }
 .cbn-card-calendar-month { display: grid; gap: 2px; padding: 7px 5px; border-radius: 4px; }
 .cbn-card-calendar-month--current { background: #00ff85; color: #333f48; }
 .cbn-card-calendar-month strong { font-size: 11px; }
 .cbn-card-benefit-terms { margin: 8px 0 0; padding-top: 8px; white-space: pre-line; }
-.cbn-card-benefits-notice { color: var(--cbn-muted); font-size: 10px; line-height: 1.45; margin: 1px 0; }
-.cbn-card-benefits-calendar { color: var(--cbn-accent); font-size: 10px; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
   .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
