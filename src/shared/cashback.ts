@@ -388,17 +388,22 @@ const HTML_ENTITIES: Record<string, string> = {
   amp: "&",
   apos: "'",
   aring: "\u00e5",
+  bull: "\u2022",
   aelig: "\u00e6",
   copy: "\u00a9",
   eacute: "\u00e9",
   gt: ">",
   laquo: "\u00ab",
+  ldquo: "\u201c",
+  lsquo: "\u2018",
   lt: "<",
   nbsp: " ",
   ndash: "\u2013",
   oslash: "\u00f8",
   quot: "\"",
   raquo: "\u00bb",
+  rdquo: "\u201d",
+  rsquo: "\u2019",
 };
 
 export function stripHtml(html: string): string {

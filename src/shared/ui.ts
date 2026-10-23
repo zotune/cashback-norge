@@ -52,6 +52,7 @@ export const UI_CSS = `
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 .cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
+.cbn-tooltip-scrollable .cbn-tooltip-trigger { display: inline-flex; }
 .cbn-tooltip-row { display: contents; }
 .cbn-offer-details { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .bonus-chip.cbn-tooltip-row { display: flex; }

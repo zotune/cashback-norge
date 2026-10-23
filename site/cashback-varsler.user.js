@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792763242
+// @version      1792765708
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -7592,6 +7592,7 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 .cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
+.cbn-tooltip-scrollable .cbn-tooltip-trigger { display: inline-flex; }
 .cbn-tooltip-row { display: contents; }
 .cbn-offer-details { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .bonus-chip.cbn-tooltip-row { display: flex; }
@@ -7924,6 +7925,30 @@ ${darkProviderCss}
         const tooltip = hoverHosts.get(element);
         if (tooltip) {
           addMascot(tooltip);
+          const maxHeight = Math.max(80, view.innerHeight - 32);
+          if (tooltip.getBoundingClientRect().height > maxHeight || element.classList.contains("cbn-tooltip-scrollable")) {
+            element.classList.add("cbn-tooltip-scrollable");
+            Object.assign(tooltip.style, {
+              position: "fixed",
+              left: "8px",
+              top: "8px",
+              bottom: "auto",
+              right: "auto",
+              transform: "none",
+              maxHeight: `${maxHeight}px`,
+              maxWidth: `${Math.min(340, Math.max(80, doc.documentElement.clientWidth - 16))}px`,
+              overflowY: "auto",
+              boxSizing: "border-box",
+              pointerEvents: "auto"
+            });
+            const rect = tooltip.getBoundingClientRect();
+            const position = tooltipPosition(element.getBoundingClientRect(), rect.width, rect.height, {
+              width: doc.documentElement.clientWidth,
+              height: view.innerHeight
+            });
+            tooltip.style.left = `${position.left}px`;
+            tooltip.style.top = `${position.top}px`;
+          }
           return;
         }
       }
@@ -14269,6 +14294,7 @@ ${darkProviderCss}
       grid-column: 3;
     }
     .offer-link > .cbn-offer-details { grid-column: 2; }
+    .offer-link .cbn-tooltip-trigger { display: inline-flex; }
     .offer-action {
       align-items: center;
       align-self: stretch;
@@ -15132,15 +15158,18 @@ ${darkProviderCss}
     }
     .offer-tooltip {
       background: var(--cbn-tooltip, #1a1a2e);
+      box-sizing: border-box;
       border-radius: 8px;
       color: #e0e0e0;
       display: none;
       font-size: 11px;
       font-weight: 400;
       line-height: 1.5;
+      max-height: calc(100vh - 32px);
       max-width: 320px;
+      overflow-y: auto;
       padding: 8px 10px;
-      pointer-events: none;
+      pointer-events: auto;
       position: fixed;
       white-space: normal;
       width: max-content;

@@ -101,7 +101,27 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const onHover = (event: Event) => {
     for (let element = event.target as Element | null; element; element = element.parentElement) {
       const tooltip = hoverHosts.get(element);
-      if (tooltip) { addMascot(tooltip); return; }
+      if (tooltip) {
+        addMascot(tooltip);
+        const maxHeight = Math.max(80, view.innerHeight - 32);
+        // Full partner terms can be taller than the screen even when their
+        // logical line count is small. Fit hover tooltips as well as tap ones.
+        if (tooltip.getBoundingClientRect().height > maxHeight || element.classList.contains("cbn-tooltip-scrollable")) {
+          element.classList.add("cbn-tooltip-scrollable");
+          Object.assign(tooltip.style, {
+            position: "fixed", left: "8px", top: "8px", bottom: "auto", right: "auto", transform: "none",
+            maxHeight: `${maxHeight}px`, maxWidth: `${Math.min(340, Math.max(80, doc.documentElement.clientWidth - 16))}px`,
+            overflowY: "auto", boxSizing: "border-box", pointerEvents: "auto",
+          });
+          const rect = tooltip.getBoundingClientRect();
+          const position = tooltipPosition(element.getBoundingClientRect(), rect.width, rect.height, {
+            width: doc.documentElement.clientWidth, height: view.innerHeight,
+          });
+          tooltip.style.left = `${position.left}px`;
+          tooltip.style.top = `${position.top}px`;
+        }
+        return;
+      }
     }
   };
   root.addEventListener("click", onClick);

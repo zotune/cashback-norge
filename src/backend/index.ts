@@ -23,7 +23,6 @@ import { readJsonFile, writeJsonFile } from "./json-file.js";
 import { createConsoleLogger, type Logger } from "./logger.js";
 import {
   collectProviderOffers,
-  readNewestUpdatedAt,
   type CollectProviderOffersOptions,
 } from "./provider-offers.js";
 import { readManualOffers } from "./manual-offers.js";
@@ -233,14 +232,6 @@ async function main(): Promise<void> {
     });
   };
   const manualOffers = await readManualOffers(config.manualOffersPath);
-  // norwegian.com blocks datacenter IPs. ScraperAPI credits are limited, so
-  // the proxy fallback is only armed when there are no previous offers to
-  // reuse, or they are old enough to approach the 14-day fallback limit.
-  const previousNorwegianOffers = previousOffersByProvider.get("norwegian") ?? [];
-  const newestNorwegianUpdate = readNewestUpdatedAt(previousNorwegianOffers);
-  const norwegianDataIsFresh = newestNorwegianUpdate !== undefined &&
-    Date.now() - newestNorwegianUpdate.getTime() < 7 * 24 * 60 * 60 * 1000;
-  const norwegianProxyUrls = norwegianDataIsFresh ? [] : buildScraperApiProxyUrls();
   const providerOverrides = await readProviderOverrides(
     config.providerOverridesPath,
   );
@@ -385,7 +376,6 @@ async function main(): Promise<void> {
         generatedAt, logger, apiUrl: config.norwegianApiUrl,
         gridListId: config.norwegianGridListId,
         overrides: providerOverrides,
-        proxyUrls: norwegianProxyUrls,
       }),
     }),
     config.skipDnb ? Promise.resolve([]) : collectOffers({

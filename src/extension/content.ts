@@ -9917,6 +9917,7 @@ function renderNotice(
       grid-column: 3;
     }
     .offer-link > .cbn-offer-details { grid-column: 2; }
+    .offer-link .cbn-tooltip-trigger { display: inline-flex; }
     .offer-action {
       align-items: center;
       align-self: stretch;
@@ -10780,15 +10781,18 @@ function renderNotice(
     }
     .offer-tooltip {
       background: var(--cbn-tooltip, #1a1a2e);
+      box-sizing: border-box;
       border-radius: 8px;
       color: #e0e0e0;
       display: none;
       font-size: 11px;
       font-weight: 400;
       line-height: 1.5;
+      max-height: calc(100vh - 32px);
       max-width: 320px;
+      overflow-y: auto;
       padding: 8px 10px;
-      pointer-events: none;
+      pointer-events: auto;
       position: fixed;
       white-space: normal;
       width: max-content;
