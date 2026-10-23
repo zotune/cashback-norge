@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792777781
+// @version      1792778605
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -7990,6 +7990,7 @@ ${darkProviderCss}
       const tooltip = targets.get(button);
       const style = tooltip.getAttribute("style");
       const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip");
+      const whiteSpace = view.getComputedStyle(tooltip).whiteSpace === "pre-line" ? "pre-line" : "normal";
       let topLayer = false;
       button.setAttribute("aria-expanded", "true");
       addMascot(tooltip);
@@ -8007,7 +8008,7 @@ ${darkProviderCss}
         maxHeight: `${Math.max(80, view.innerHeight - 32)}px`,
         overflowY: "auto",
         boxSizing: "border-box",
-        whiteSpace: "normal",
+        whiteSpace,
         margin: "0"
       });
       if (isBonusChipTooltip) {
@@ -8198,13 +8199,16 @@ ${darkProviderCss}
     const months = benefits.filter((offer) => offer.cardBenefit.kind === "monthly" && offer.cardBenefit.validUntil >= today).sort((a, b) => a.cardBenefit.validFrom.localeCompare(b.cardBenefit.validFrom)).slice(0, LISTED_MONTHS);
     const ongoing = benefits.filter((offer) => offer.cardBenefit.kind === "ongoing");
     const describe = (name, offer) => `${name}: ${formatCompactRewardLabel(offer) ?? offer.reward} på ${offer.cardBenefit.category}`;
-    const caps = current.terms.split("\n").filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line)).map((line) => line.replace(/\s*\(.*\)$/, ""));
-    return [
+    const caps = current.terms.split("\n").filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line)).map((line) => line.replace(/\s*\(.*\)$/, "").replace(/\bkr (?=\d)/g, "kr ").replace(/(\d) (?=\d{3}\b)/g, "$1 "));
+    const rebates = [
       ...months.map((offer) => describe(monthName(offer.cardBenefit.validFrom), offer)),
-      ...ongoing.map((offer) => describe("Alltid", offer)),
+      ...ongoing.map((offer) => describe("Alltid", offer))
+    ];
+    return [
+      rebates.join("\n"),
       caps.length > 0 ? `${caps.join(". ")}.` : "",
       PROVIDER_TIPS[current.provider] ?? ""
-    ].filter((line) => line !== "").join("\n");
+    ].filter((section) => section !== "").join("\n\n");
   }
   function monthName(date) {
     const name = new Intl.DateTimeFormat("nb-NO", { month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${date}T12:00:00Z`));
@@ -14484,7 +14488,6 @@ ${darkProviderCss}
       grid-column: 3;
     }
     .offer-link > .cbn-offer-details { grid-column: 2; }
-    .offer-link .cbn-tooltip-trigger { display: inline-flex; }
     .offer-action {
       align-items: center;
       align-self: stretch;
@@ -16612,6 +16615,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         );
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
+        const capped = tooltip.offsetHeight >= Number.parseFloat(getComputedStyle(tooltip).maxHeight) - 1;
+        if (capped && tooltip.scrollHeight > tooltip.clientHeight) wrapper.classList.add("cbn-tooltip-scrollable");
       });
       wrapper.addEventListener("mouseleave", () => {
         tooltip.classList.remove("visible");

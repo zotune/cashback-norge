@@ -34,6 +34,8 @@ body {
   margin: 0 -29px;
   padding: 8px 29px 4px;
 }
+/* The fixed footer shares z-index 100; an open tooltip must not end under it. */
+.sticky-header:has(.cbn-tooltip-open, .tooltip-wrap:hover) { z-index: 101; }
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .subtitle { color: var(--cbn-muted, #5d6b71); font-size: 13px; text-align: center; margin-bottom: 3px; }
 .subtitle a { color: var(--cbn-accent, #3a7d55); }

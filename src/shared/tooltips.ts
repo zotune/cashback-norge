@@ -54,6 +54,8 @@ export function createTooltipController(root: Document | ShadowRoot) {
     const tooltip = targets.get(button)!;
     const style = tooltip.getAttribute("style");
     const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip");
+    // Plain-text tips keep their line breaks when tapped, as on hover.
+    const whiteSpace = view.getComputedStyle(tooltip).whiteSpace === "pre-line" ? "pre-line" : "normal";
     let topLayer = false;
     button.setAttribute("aria-expanded", "true");
     addMascot(tooltip);
@@ -63,7 +65,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
       position: "fixed", left: "8px", top: "8px", bottom: "auto", right: "auto", transform: "none",
       width: isBonusChipTooltip ? "max-content" : `${Math.min(340, availableWidth)}px`,
       maxWidth: isBonusChipTooltip ? `${Math.min(320, availableWidth)}px` : "none",
-      maxHeight: `${Math.max(80, view.innerHeight - 32)}px`, overflowY: "auto", boxSizing: "border-box", whiteSpace: "normal", margin: "0",
+      maxHeight: `${Math.max(80, view.innerHeight - 32)}px`, overflowY: "auto", boxSizing: "border-box", whiteSpace, margin: "0",
     });
     // iOS Safari can paint a shadow-DOM tooltip underneath the host page. A
     // manual popover enters the browser's top layer, while the normal z-index

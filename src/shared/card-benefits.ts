@@ -75,15 +75,20 @@ function describeCardBenefits(current: CashbackOffer, offers: CashbackOffer[], n
   const ongoing = benefits.filter((offer) => offer.cardBenefit!.kind === "ongoing");
   const describe = (name: string, offer: CashbackOffer) =>
     `${name}: ${formatCompactRewardLabel(offer) ?? offer.reward} på ${offer.cardBenefit!.category}`;
+  // Amounts such as "kr 3 000" must not wrap inside the number.
   const caps = current.terms.split("\n")
     .filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line))
-    .map((line) => line.replace(/\s*\(.*\)$/, ""));
-  return [
+    .map((line) => line.replace(/\s*\(.*\)$/, "").replace(/\bkr (?=\d)/g, "kr\u00a0").replace(/(\d) (?=\d{3}\b)/g, "$1\u00a0"));
+  const rebates = [
     ...months.map((offer) => describe(monthName(offer.cardBenefit!.validFrom!), offer)),
     ...ongoing.map((offer) => describe("Alltid", offer)),
+  ];
+  // Blank lines separate the rebates, the caps and the provider tip.
+  return [
+    rebates.join("\n"),
     caps.length > 0 ? `${caps.join(". ")}.` : "",
     PROVIDER_TIPS[current.provider] ?? "",
-  ].filter((line) => line !== "").join("\n");
+  ].filter((section) => section !== "").join("\n\n");
 }
 
 function monthName(date: string): string {

@@ -128,7 +128,9 @@ test("the current benefit joins the free cards as a conditional card with this m
     "November: 5 % på all netthandel",
     "Desember: 3 % på alle kjøp",
     "Alltid: 5 % på kollektivtransport og elbillading",
-    "Maks rabatt pr måned er kr 500. Maks rabatt pr år er kr 3 000.",
+    "",
+    "Maks rabatt pr måned er kr\u00a0500. Maks rabatt pr år er kr\u00a03\u00a0000.",
+    "",
     ...PROVIDER_TIPS.instabank!.split("\n"),
   ]);
   const december = offers.map((offer) => ({ ...offer, updatedAt: "2026-12-14T12:00:00.000Z" }));

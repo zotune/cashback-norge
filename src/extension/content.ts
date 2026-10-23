@@ -9906,7 +9906,6 @@ function renderNotice(
       grid-column: 3;
     }
     .offer-link > .cbn-offer-details { grid-column: 2; }
-    .offer-link .cbn-tooltip-trigger { display: inline-flex; }
     .offer-action {
       align-items: center;
       align-self: stretch;
@@ -12076,6 +12075,10 @@ function renderNotice(
       );
       tooltip.style.left = `${left}px`;
       tooltip.style.top = `${top}px`;
+      // The hover tooltip cannot be scrolled, so terms taller than the window
+      // get the details button that opens them as a scrollable tooltip.
+      const capped = tooltip.offsetHeight >= Number.parseFloat(getComputedStyle(tooltip).maxHeight) - 1;
+      if (capped && tooltip.scrollHeight > tooltip.clientHeight) wrapper.classList.add("cbn-tooltip-scrollable");
     });
     wrapper.addEventListener("mouseleave", () => {
       tooltip.classList.remove("visible");
