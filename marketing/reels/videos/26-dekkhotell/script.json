@@ -1,0 +1,38 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "gap": 0.15,
+  "tail": 1.6,
+  "capture": {
+    "merchant": "Vianor",
+    "provider": "naf",
+    "source": "https://www.naf.no/medlemskap/medlemsfordeler/vianor",
+    "focusText": "25 % rabatt på dekkhotell",
+    "termsText": "OBS: fordelene gjelder ikke hos Vianor Partnere."
+  },
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Dekkhotell i høst? NAF-medlemmer får *{25 %|tjuefem prosent}* hos Vianor."
+    },
+    {
+      "id": "find",
+      "line": "Søk *Vianor* på Cashback Norge, og velg *NAF.*"
+    },
+    {
+      "id": "proof",
+      "line": "I tillegg: *{15 %|femten prosent}* rabatt på dekk. Og *{10 %|ti prosent}* på dekktjenester.",
+      "rate": "+4%",
+      "maxPause": 0.35
+    },
+    {
+      "id": "terms",
+      "line": "Gjelder ordinære butikkpriser, ikke Vianor Partnere. Kan ikke kombineres med andre kampanjer."
+    },
+    {
+      "id": "cta",
+      "line": "Finn fordelene på *{cashbacknorge.no.|Cashback Norge punktum no.}* Gratis å bruke."
+    }
+  ]
+}

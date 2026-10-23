@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Tjuefem vertikale videoer (1080×1920, 30 fps, 15–26 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no og userscriptet/utvidelsen. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026 og video 21–25 21. okt. 2026.
+Tretti vertikale videoer (1080×1920, 30 fps, ca. 15–26 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026 og video 26–30 23. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -29,6 +29,11 @@ Tjuefem vertikale videoer (1080×1920, 30 fps, 15–26 s) med norsk voiceover, k
 | `out/23-modern-warfare-4.mp4` | Billigste nøkkel via GG Deals: Modern Warfare 4 (Steam 949 kr, PC/Xbox-nøkkel 497 kr) | «Modern Warfare 4 🎖️ 452 kr billigere? 👀» |
 | `out/24-hearts-of-iron.mp4` | Billigste nøkkel via GG Deals: Hearts of Iron IV (Steam 559 kr, Steam-nøkkel 84 kr) | «Hearts of Iron IV 🎖️ 475 kr billigere? 👀» |
 | `out/25-youtube-premium.mp4` | YouTube Premium: 219 kr i App Store mot 169 kr på nett, pluss SB1 Ung 20 % | «YouTube Premium 📺 600 kr billigere i året? 👀» |
+| `out/26-dekkhotell.mp4` | NAF hos Vianor: 25 % på dekkhotell, 15 % på dekk og 10 % på dekktjenester | «Dekkhotell i høst? 🚗 25 % med NAF» |
+| `out/27-odeon-kino.mp4` | OBOS hos ODEON: 15 % på ordinære voksenbilletter, inntil fem, med salunntak | «Kino i helga? 🍿 15 % med OBOS» |
+| `out/28-bohus-obos.mp4` | OBOS hos Bohus: 15 % på ordinære priser. 10 000 → 1 500 kr er uttrykkelig et regneeksempel | «Ny sofa? 🛋️ 15 % med OBOS» |
+| `out/29-viaplay-student.mp4` | Studentkortet: 30 % på Viaplay Medium for nye Viaplay-kunder | «Student + Viaplay? 📺 30 % på Medium» |
+| `out/30-briller-naf.mp4` | NAF hos Brilleland: 20 % på komplett brille ved innfatning og oppgraderte glass. Synsundersøkelse/tilpasning kommer i tillegg | «NAF-medlem? 👓 20 % på briller» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -70,6 +75,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - `lyko-codes.mjs` fanger stemming og innsending av rabattkoder med Supabase-kallene stubbet, så ingenting lagres.
   - `bday-capture.mjs <url> <prefix> [sum]` setter inn userscriptet og tar bilde av siden, panelet alene, Sum-feltet og tooltipen for «Gratis bursdag». Sett `UA` for en annen nettleser, f.eks. Firefox på Android.
   - `site-capture.mjs "<query>" <prefix> [scrollY,...]` fanger cashbacknorge.no med URL-parametre (`?provider=gratisbursdag`, `?tema=strom`). `TAP=1` åpner tooltipen på første kort.
+  - `member-capture.mjs <video-name> [...]` fanger tilbud, tooltip, eventuelt Sum-eksempel og offentlig kilde for video 26–30. Leser `capture` fra videoens `script.json`, avslår valgfrie samtykker og bruker maksimalt to nettleserfaner samtidig. `assets/capture.json` dokumenterer kilde, tidspunkt, vilkår og skjermkoordinater. Scenene deler `shared/member-reel.js`.
   - `android-guide.mjs <prefix>` fanger hvert steg i Android-guiden.
   - Spillvideoene 21–24 viser billigste kort i panelet (GG Deals Keyshops) og bruker `MODE=desktop SCROLL=buy HOVER="GG Deals" node games-capture.mjs <steam-url> <navn>`. Sjekk tilbudet på gg.deals/no fra norsk IP: GG Deals-kortet kan være en annen plattform enn siden (ARC Raiders: Xbox-nøkkel, Farming Simulator 25: Giants-nøkkel), og det må stå i videoen. Keyshop-priser er før gebyr. Muve selger ikke Modern Warfare 4 til Norge, og Cyberpunk 2077 er billigst på Steam blant offisielle butikker.
   - `yt-capture.mjs <url> <navn>` er games-capture for youtube.com med samtykke-cookie. `PRESET='{"cashback-varsler-region-prices-collapsed":true}'` lukker regionlisten, `TAPINFO=1` åpner første tooltip og `SCROLL=text:<tekst>` scroller til teksten.
@@ -78,11 +84,13 @@ node render.mjs <navn>                         # full mp4 til out/
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).
 
-**Priser og bonuser er øyeblikksbilder fra 6. okt. 2026.** Publiser snart, eller ta nye skjermbilder og render på nytt. Ta vare på skjermbildene i `shots/` som dokumentasjon. Markedsføringsloven § 3 krever at påstander kan dokumenteres.
+**Priser og bonuser er øyeblikksbilder fra datoen oppgitt i hver video.** Publiser snart, eller ta nye skjermbilder og render på nytt. Ta vare på skjermbildene i `shots/` og `videos/*/assets/` som dokumentasjon. Markedsføringsloven § 3 krever at påstander kan dokumenteres.
 
 ## Tekster til Instagram
 
 Ligger som `.txt` ved siden av hver video i `out/`. Hver fil har bildetekst, en første kommentar å pinne og en alternativ første linje til A/B-test.
+
+Video 26–30 har også en versjonert `caption.txt` i videomappen. Disse har felles bildetekst, egne avslutninger for Instagram/TikTok og Facebook, kilde og kontrollert dato. Kopier dem til `out/<video-name>.txt` ved ny rendering. Sluttkortene er felles for plattformene og viser nettsiden direkte.
 
 ## Hva som får folk til å trykke – og hvordan det er brukt her
 

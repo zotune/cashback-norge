@@ -148,9 +148,17 @@ async def main(video_dir):
     for i, seg in enumerate(spec["segments"]):
         spoken, tokens = parse(seg["line"])
         mp3 = out / "seg" / f"{i:02d}.mp3"
-        words = await synth(spoken, seg.get("voice", voice), seg.get("rate", rate), pitch, mp3)
         wav = out / "seg" / f"{i:02d}.wav"
-        pcm, tmap = tighten(load_pcm(mp3), seg.get("maxPause", spec.get("maxPause", 0.22)))
+        expected_words = sum(token["n"] for token in tokens)
+        for attempt in range(3):
+            words = await synth(spoken, seg.get("voice", voice), seg.get("rate", rate), pitch, mp3)
+            pcm, tmap = tighten(load_pcm(mp3), seg.get("maxPause", spec.get("maxPause", 0.22)))
+            # The speech service can return a valid but truncated audio stream.
+            if len(pcm) / SR >= max(0.35, expected_words * 0.12) and len(words) >= expected_words * 0.45:
+                break
+            if attempt == 2:
+                raise RuntimeError(f"Incomplete speech for {name} segment {i}: {len(pcm) / SR:.2f}s, {len(words)}/{expected_words} words")
+            print(f"  ! seg {i}: incomplete speech; retry {attempt + 1}/2", file=sys.stderr)
         for w in words:
             w["t0"], w["t1"] = tmap(w["t0"]), tmap(w["t1"])
         save_wav(pcm, wav)

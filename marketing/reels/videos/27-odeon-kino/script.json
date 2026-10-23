@@ -1,0 +1,36 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "gap": 0.15,
+  "tail": 1.6,
+  "capture": {
+    "merchant": "ODEON Kino",
+    "provider": "obos",
+    "source": "https://www.obos.no/medlem/medlemsfordeler/odeon-kino",
+    "focusText": "15 % rabatt på kinoforestillinger hele uka.",
+    "termsText": "Gjelder ikke LUXE, ScreenX eller IMAX salen."
+  },
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Skal du på ODEON? Med *OBOS* kan du få *{15 %|femten prosent}* rabatt."
+    },
+    {
+      "id": "find",
+      "line": "Søk *ODEON* på Cashback Norge. Her finner du medlemsfordelen."
+    },
+    {
+      "id": "proof",
+      "line": "Rabatten gjelder ordinære voksenbilletter, inntil *fem* per medlem."
+    },
+    {
+      "id": "terms",
+      "line": "Hent koden hos OBOS. LUXE, Screen X og IMAX er unntatt."
+    },
+    {
+      "id": "cta",
+      "line": "Sjekk før kinokvelden på *{cashbacknorge.no.|Cashback Norge punktum no.}* Gratis å bruke."
+    }
+  ]
+}

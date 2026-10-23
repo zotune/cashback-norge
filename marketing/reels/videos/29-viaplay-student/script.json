@@ -1,0 +1,34 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "gap": 0.15,
+  "tail": 1.6,
+  "capture": {
+    "merchant": "Viaplay",
+    "provider": "studentkortet",
+    "source": "https://studentkortet.no/rabatter/tjenester/annet/viaplay/"
+  },
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Student og *ny* hos Viaplay? Sjekk denne rabatten."
+    },
+    {
+      "id": "find",
+      "line": "Studentkortet gir *{30 %|tretti prosent}* på Viaplay Medium."
+    },
+    {
+      "id": "proof",
+      "line": "Søk *Viaplay* på Cashback Norge, og velg *Studentkortet.*"
+    },
+    {
+      "id": "terms",
+      "line": "Gjelder bare nye Viaplay-kunder. Aktiver hos Studentkortet, og sjekk abonnementsvilkårene."
+    },
+    {
+      "id": "cta",
+      "line": "Finn studentfordelene på *{cashbacknorge.no.|Cashback Norge punktum no.}* Gratis å bruke."
+    }
+  ]
+}

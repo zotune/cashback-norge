@@ -1,0 +1,36 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "gap": 0.15,
+  "tail": 1.6,
+  "capture": {
+    "merchant": "Brilleland",
+    "provider": "naf",
+    "source": "https://www.naf.no/medlemskap/medlemsfordeler/brilleland",
+    "focusText": "20 % rabatt på komplett brille",
+    "termsText": "Tilbudet gjelder ved kjøp av innfatning og oppgradering av alle typer glass. Velg blant merker som Ray-Ban, Oakley, Michael Kors, Ralph, DbyD og mange flere."
+  },
+  "segments": [
+    {
+      "id": "hook",
+      "line": "NAF-medlem? Fordelene gjelder også *briller.*"
+    },
+    {
+      "id": "find",
+      "line": "Hos Brilleland får du *{20 %|tjue prosent}* på komplett brille."
+    },
+    {
+      "id": "proof",
+      "line": "Søk *Brilleland* på Cashback Norge, og velg *NAF.*"
+    },
+    {
+      "id": "terms",
+      "line": "Gjelder innfatning med oppgraderte glass. Synsundersøkelse og tilpasning kommer i tillegg. Oppgi medlemskapet når du bestiller."
+    },
+    {
+      "id": "cta",
+      "line": "Finn fordelene på *{cashbacknorge.no.|Cashback Norge punktum no.}* Gratis å bruke."
+    }
+  ]
+}
