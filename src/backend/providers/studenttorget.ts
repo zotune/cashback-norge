@@ -537,6 +537,9 @@ async function fetchHtml(url: string): Promise<string> {
     responseType: "text",
     throwHttpErrors: false,
     timeout: { request: 30_000 },
+    // got-scraping does not retry by default; one slow listing page used to
+    // fail the whole Daily crawl.
+    retry: { limit: 2 },
     followRedirect: true,
     headers: {
       "Accept-Language": "nb-NO,nb;q=0.9",

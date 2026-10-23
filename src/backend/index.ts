@@ -786,8 +786,11 @@ async function main(): Promise<void> {
       }),
     }),
     config.skipStudentTorget ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
       label: "StudentTorget",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       provider: "studenttorget",
+      reusePreviousOnFailure: true,
       run: () => crawlStudentTorget({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides,
