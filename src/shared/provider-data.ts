@@ -280,6 +280,17 @@ export const SUPPORT_LINKS = [
   { text: "Sparebørsen: Få 50 kr i startsaldo når du registrerer deg med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
 ];
 
+/**
+ * What our invitation gives a new member, shown in that provider's offer rows
+ * and tooltips. The rows already lead new members through the invitation.
+ */
+export const PROVIDER_WELCOME_BONUSES: Record<string, { label: string; tip: string }> = {
+  spareborsen: {
+    label: "Ny: +50 kr",
+    tip: "Ny hos Sparebørsen? Du får 50 kr i startsaldo når du registrerer deg med Vipps via vår invitasjon.",
+  },
+};
+
 export const MERCHANT_ALIASES: Record<string, string> = {
   "auto europe no": "auto europe",
   "christiania glassmagasin": "christiania glasmagasin",

@@ -7,3 +7,5 @@ data/cashback-index.json
 site/cashback-index.json
 *tmp*
 *.log*
+# Plan and roadmap: kept out of the public repository
+/plan/

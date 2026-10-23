@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792778605
+// @version      1792795925
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -395,6 +395,12 @@
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
     { text: "Sparebørsen: Få 50 kr i startsaldo når du registrerer deg med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
   ];
+  const PROVIDER_WELCOME_BONUSES = {
+    spareborsen: {
+      label: "Ny: +50 kr",
+      tip: "Ny hos Sparebørsen? Du får 50 kr i startsaldo når du registrerer deg med Vipps via vår invitasjon."
+    }
+  };
   const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
   const STATIC_NOK_BASE_RATES = {
     rates: {
@@ -7711,6 +7717,7 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-chip[href], button.cbn-chip { transition: filter .12s; }
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
+.cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 .cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
@@ -15607,6 +15614,13 @@ ${darkProviderCss}
       } else {
         offerLink.append(offerLabel);
       }
+      const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
+      if (welcome !== void 0) {
+        const welcomeChip = document.createElement("span");
+        welcomeChip.className = "cbn-chip cbn-chip--highlight";
+        welcomeChip.textContent = welcome.label;
+        offerLink.append(welcomeChip);
+      }
       offerRow.append(offerLink, providerWrap);
       wrapper.append(offerRow);
       offerList.append(wrapper);
@@ -16583,7 +16597,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
       const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider);
       const hasTerms = currentOffer.terms.trim().length > 0;
-      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer) continue;
+      const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
+      if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer && welcome === void 0) continue;
       const wrapper = wrappers[idx];
       if (wrapper === void 0) continue;
       const tooltip = document.createElement("div");
@@ -16592,6 +16607,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
       if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
       if (isAppOnlyOffer) tooltipParts.push("Krever " + formatProviderName(currentOffer.provider) + "-appen for å aktivere cashback");
+      if (welcome !== void 0) tooltipParts.push(welcome.tip);
       setTooltipContent(tooltip, tooltipParts);
       shadowRoot.append(tooltip);
       tooltipElements.push({ element: tooltip, offer: currentOffer });

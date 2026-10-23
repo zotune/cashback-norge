@@ -49,6 +49,7 @@ export const UI_CSS = `
 .cbn-chip[href], button.cbn-chip { transition: filter .12s; }
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
+.cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 .cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }

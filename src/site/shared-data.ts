@@ -4,6 +4,7 @@ import {
   PREMIUM_CARDS,
   PROVIDER_NAMES,
   PROVIDER_TIPS,
+  PROVIDER_WELCOME_BONUSES,
   SUPPORT_LINKS,
 } from "../shared/provider-data";
 import {
@@ -26,6 +27,7 @@ Object.assign(window, {
     PROVIDER_NAMES,
     PROVIDER_TIPS,
     FREE_CARDS,
+    PROVIDER_WELCOME_BONUSES,
     getCardBenefitOffers,
     getFreeCards,
     watchCardBenefitDate,

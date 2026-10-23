@@ -1,4 +1,4 @@
-import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_NAMES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
 import {
   calculateCashback,
   calculateCashbackMaxKr,
@@ -11037,6 +11037,13 @@ function renderNotice(
     } else {
       offerLink.append(offerLabel);
     }
+    const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
+    if (welcome !== undefined) {
+      const welcomeChip = document.createElement("span");
+      welcomeChip.className = "cbn-chip cbn-chip--highlight";
+      welcomeChip.textContent = welcome.label;
+      offerLink.append(welcomeChip);
+    }
     offerRow.append(offerLink, providerWrap);
     wrapper.append(offerRow);
     offerList.append(wrapper);
@@ -12040,7 +12047,8 @@ function renderNotice(
     const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
     const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider);
     const hasTerms = currentOffer.terms.trim().length > 0;
-    if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer) continue;
+    const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
+    if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer && welcome === undefined) continue;
     const wrapper = wrappers[idx];
     if (wrapper === undefined) continue;
     const tooltip = document.createElement("div");
@@ -12049,6 +12057,7 @@ function renderNotice(
     if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
     if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
     if (isAppOnlyOffer) tooltipParts.push("Krever " + formatProviderName(currentOffer.provider) + "-appen for å aktivere cashback");
+    if (welcome !== undefined) tooltipParts.push(welcome.tip);
     setTooltipContent(tooltip, tooltipParts);
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });
