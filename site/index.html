@@ -1002,7 +1002,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, EB_PER_TRUMF_KR, FREE_CARDS, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate, sortBonusChips } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -2463,7 +2463,7 @@ function renderChipGroup(cards, container) {
       const ebInfo = c.ebPer100kr ? ` (~${c.ebPer100kr} EB/100kr)` : "";
       rewardText = (c.approx ? `+~${pctStr} %` : `+${pctStr} %`) + ebInfo;
     }
-    return `<span class="tooltip-wrap">
+    return `<span class="tooltip-wrap" data-bonus-rate="${c.pct * 100}">
       <span class="tooltip">${esc(c.tip)}</span>
       <a class="cbn-row bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
         <span class="bonus-chip-label">${rewardText}</span> <span style="display:inline-flex;align-items:center;gap:6px;">${(c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
@@ -2534,6 +2534,7 @@ function renderBonusChips() {
   const benefits = createCardBenefitGroup(cardBenefitOffers);
   if (benefits) document.getElementById("free-chips").append(benefits);
   window.CashbackTooltips.attach(document.querySelector(".bonus-chips-portal"));
+  sortBonusChips(document.getElementById("free-chips"));
 }
 
 function setupBonusToggle() {

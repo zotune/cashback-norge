@@ -41,7 +41,7 @@ import { createMutedChip } from "../shared/ui";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, type TooltipController } from "../shared/tooltips";
 import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
-import { createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate } from "../shared/card-benefits";
+import { createCardBenefitGroup, getCardBenefitOffers, watchCardBenefitDate, sortBonusChips } from "../shared/card-benefits";
 
 type UserscriptHttpRequestOptions = {
   method?: string;
@@ -11130,6 +11130,7 @@ function renderNotice(
     bonusChipLabels.push({ element: label, pct: card.pct * 100, ...(card.minPct != null ? { minPct: card.minPct * 100 } : {}), ...(card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}), ...(card.ebPer100kr !== undefined ? { ebPer100kr: card.ebPer100kr } : {}), approx: card.approx, defaultText: label.textContent ?? "" });
     freeItems.append(chip);
     addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
+    (freeItems.lastElementChild as HTMLElement).dataset.bonusRate = String(card.pct * 100);
   }
   bonusChips.append(freeGroup);
   // --- Premium chips group (right) ---
@@ -11186,6 +11187,7 @@ function renderNotice(
     }
     freeItems.append(cardBenefits);
   }
+  sortBonusChips(freeItems);
   // --- Selected retailers group ---
   const selectedGroup = document.createElement("div");
   selectedGroup.className = "chip-group";

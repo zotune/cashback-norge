@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1792775273
+// @version      1792775475
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -498,6 +498,36 @@
     if (rules?.singleItemOnly === true) return false;
     if (rules?.minimumPurchaseNok === void 0) return true;
     return rules.minimumPurchaseExclusive === true ? amount > rules.minimumPurchaseNok : amount >= rules.minimumPurchaseNok;
+  }
+  function getMaxRewardPercent(offer) {
+    const reward = offer.reward.trim().replace(/^(?:opptil|inntil|up to)\s+/i, "");
+    const rewardSortValueNok = readRewardSortValueNok$1(offer);
+    const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
+    if (rangeMatch !== null) {
+      return Number.parseFloat((rangeMatch[2] ?? "0").replace(",", "."));
+    }
+    const pctMatch = reward.match(/^([\d,.]+)\s*%$/);
+    if (pctMatch !== null) {
+      return Number.parseFloat((pctMatch[1] ?? "0").replace(",", "."));
+    }
+    const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
+    if (sasRateMatch !== null) {
+      const points = Number.parseInt((sasRateMatch[1] ?? "0").replace(/\s/g, ""), 10);
+      return points / EB_PER_TRUMF_KR;
+    }
+    const krRangeMatch = reward.match(/^([\d.,]+)-([\d.,]+)\s*kr/i);
+    if (krRangeMatch !== null) {
+      return Number.parseFloat((krRangeMatch[2] ?? "0").replace(",", ".")) / 1e3;
+    }
+    const krSingleMatch = reward.match(/([\d.,]+)\s*kr/i);
+    if (krSingleMatch !== null) {
+      return Number.parseFloat((krSingleMatch[1] ?? "0").replace(",", ".")) / 1e3;
+    }
+    const fixedReward = readFixedRewardMax(reward);
+    if (fixedReward !== void 0) {
+      return (rewardSortValueNok ?? fixedReward.amount) / 1e3;
+    }
+    return 0;
   }
   function readFixedRewardMax(reward) {
     const currencyPattern = "(?:kr|NOK|SEK|DKK|EUR|USD|GBP)";
@@ -7642,7 +7672,8 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
 .cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
 .cbn-card-benefits { display: contents; }
-.cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; }
+.cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; width: 16px; height: 16px; flex-basis: 16px; font-size: 14px; }
+@media (hover: none), (pointer: coarse), (max-width: 520px) { .cbn-card-benefit .cbn-tooltip-trigger { width: 32px; height: 32px; flex-basis: 32px; font-size: 18px; } }
 .cbn-card-benefit-tooltip { background: var(--cbn-tooltip, #172026); border: 0; border-radius: 8px; color: #fff; box-sizing: border-box; display: none; font: 11px/1.45 system-ui, sans-serif; left: 8px; top: 8px; max-height: calc(100vh - 32px); max-width: min(340px, calc(100vw - 16px)); overflow-y: auto; padding: 12px; position: fixed; width: 340px; white-space: normal; z-index: 2147483647; }
 .cbn-card-benefit > .cbn-card-benefit-tooltip:not(.cbn-tooltip-open) { display: none; opacity: 0; visibility: hidden; pointer-events: none; }
 .cbn-card-calendar-month { display: grid; gap: 2px; padding: 7px 5px; border-radius: 4px; }
@@ -8107,6 +8138,7 @@ ${darkProviderCss}
     if (active.length === 0) return void 0;
     const group = document.createElement("div");
     group.className = "cbn-card-benefits";
+    group.dataset.bonusRate = String(getMaxRewardPercent(active[0]));
     for (const offer of active.slice(0, 1)) {
       const wrap = document.createElement("div");
       wrap.className = "tooltip-wrap cbn-card-benefit";
@@ -8156,6 +8188,11 @@ ${darkProviderCss}
       group.append(wrap);
     }
     return group;
+  }
+  function sortBonusChips(container) {
+    const rows = [...container.children];
+    rows.sort((a, b) => Number(b.dataset.bonusRate ?? 0) - Number(a.dataset.bonusRate ?? 0));
+    container.append(...rows);
   }
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
@@ -15638,6 +15675,7 @@ ${darkProviderCss}
       bonusChipLabels.push({ element: label, pct: card.pct * 100, ...card.minPct != null ? { minPct: card.minPct * 100 } : {}, ...card.maxPct != null ? { maxPct: card.maxPct * 100 } : {}, ...card.ebPer100kr !== void 0 ? { ebPer100kr: card.ebPer100kr } : {}, approx: card.approx, defaultText: label.textContent ?? "" });
       freeItems.append(chip);
       addChipTooltip(chip, card.tip, shadowRoot, tooltipControls);
+      freeItems.lastElementChild.dataset.bonusRate = String(card.pct * 100);
     }
     bonusChips.append(freeGroup);
     const premiumGroup = document.createElement("div");
@@ -15693,6 +15731,7 @@ Inkludert i Premium (95 kr/mnd), Metal (170 kr/mnd) eller Ultra (700 kr/mnd)`, s
       }
       freeItems.append(cardBenefits);
     }
+    sortBonusChips(freeItems);
     const selectedGroup = document.createElement("div");
     selectedGroup.className = "chip-group";
     const selectedLabel = document.createElement("span");

@@ -64,7 +64,8 @@ export const UI_CSS = `
 .cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
 .cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
 .cbn-card-benefits { display: contents; }
-.cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; }
+.cbn-card-benefit .cbn-tooltip-trigger { display: inline-flex; width: 16px; height: 16px; flex-basis: 16px; font-size: 14px; }
+@media (hover: none), (pointer: coarse), (max-width: 520px) { .cbn-card-benefit .cbn-tooltip-trigger { width: 32px; height: 32px; flex-basis: 32px; font-size: 18px; } }
 .cbn-card-benefit-tooltip { background: var(--cbn-tooltip, #172026); border: 0; border-radius: 8px; color: #fff; box-sizing: border-box; display: none; font: 11px/1.45 system-ui, sans-serif; left: 8px; top: 8px; max-height: calc(100vh - 32px); max-width: min(340px, calc(100vw - 16px)); overflow-y: auto; padding: 12px; position: fixed; width: 340px; white-space: normal; z-index: 2147483647; }
 .cbn-card-benefit > .cbn-card-benefit-tooltip:not(.cbn-tooltip-open) { display: none; opacity: 0; visibility: hidden; pointer-events: none; }
 .cbn-card-calendar-month { display: grid; gap: 2px; padding: 7px 5px; border-radius: 4px; }

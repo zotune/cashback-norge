@@ -1,5 +1,5 @@
 import { type CashbackOffer, isCashbackOffer } from "./cashback.js";
-import { formatCompactRewardLabel } from "./reward-calculation.js";
+import { formatCompactRewardLabel, getMaxRewardPercent } from "./reward-calculation.js";
 import { PROVIDER_COLORS, PROVIDER_NAMES } from "./provider-data.js";
 
 export const INSTABANK_CARD_URL = "https://instabank.no/kredittkort";
@@ -42,6 +42,7 @@ export function createCardBenefitGroup(offers: CashbackOffer[], now = new Date()
   if (active.length === 0) return undefined;
   const group = document.createElement("div");
   group.className = "cbn-card-benefits";
+  group.dataset.bonusRate = String(getMaxRewardPercent(active[0]!));
   for (const offer of active.slice(0, 1)) {
     const wrap = document.createElement("div");
     wrap.className = "tooltip-wrap cbn-card-benefit";
@@ -91,4 +92,10 @@ export function createCardBenefitGroup(offers: CashbackOffer[], now = new Date()
     group.append(wrap);
   }
   return group;
+}
+
+export function sortBonusChips(container: HTMLElement): void {
+  const rows = [...container.children] as HTMLElement[];
+  rows.sort((a, b) => Number(b.dataset.bonusRate ?? 0) - Number(a.dataset.bonusRate ?? 0));
+  container.append(...rows);
 }
