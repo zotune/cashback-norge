@@ -1,0 +1,25 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "gap": 0.15,
+  "tail": 1.6,
+  "sources": {
+    "checked": "2026-10-24",
+    "returns": "https://live.euronext.com/nb/product/funds/NO0010337678.DINOTEC-WOMF (avkastning per år: 3 år 29,13 %, 5 år 23,13 %, 20 år 20,30 %)",
+    "fund": "https://www.kron.no/fond/NO0010337678 (årlig pris 1,10 %, største eierandeler, aksjesparekonto)",
+    "popular": "https://www.dnb.no/dnbnyheter/no/bors-og-marked/dnb-teknologi-ser-etter-selskaper-som-gaar-fra-daarlig-til-bra (Ett av DNBs mest populære fond)",
+    "bonus": "https://kron.no/app/invitert/nvu4d (startbonus 100 kr)",
+    "chart": "1 000 kr/mnd i 20 år, månedlig rentes rente: 20 % → 2 438 856 kr, 10 % → 718 259 kr, innskutt 240 000 kr"
+  },
+  "segments": [
+    { "id": "hook", "line": "Har du lyst å bli *millionær*?", "gap": 0.3 },
+    { "id": "fund", "line": "*DNB Teknologi* er et av DNBs mest populære fond. Du eier blant annet *Microsoft*, *Google*, *Nvidia* og *Amazon*." },
+    { "id": "returns", "line": "På tre år har fondet mer enn *doblet* seg. På fem år nesten *tredoblet*." },
+    { "id": "chart", "line": "De siste tjue årene har det gitt rundt *{20 %|tjue prosent}* i året. Sparer du *{1 000 kr|tusen kroner}* i måneden like lenge, blir det rundt *{2,4 millioner.|to komma fire millioner.}*" },
+    { "id": "half", "line": "Ingen garanti. Men blir det bare *halvparten*, har du likevel over *{700 000.|syv hundre tusen.}*", "gap": 0.25 },
+    { "id": "ask", "line": "På aksjesparekonto kan du ta ut det du har satt inn *uten skatt*, og la gevinsten vokse." },
+    { "id": "kron", "line": "Kjøp fondet i Kron med koden vår, så får du *{100 kr|hundre kroner}*. Og du støtter Cashback Norge." },
+    { "id": "cta", "line": "Lenken ligger i *bio.*" }
+  ]
+}

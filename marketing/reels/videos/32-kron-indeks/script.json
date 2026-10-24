@@ -1,0 +1,26 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "gap": 0.15,
+  "tail": 1.6,
+  "sources": {
+    "checked": "2026-10-24",
+    "fund": "https://www.kron.no/fond/NO0011101545 (årlig pris 0,15 %, største eierandeler) og https://www.kron.no/vare-fond/kron-indeks-global (lavest pris i kategorien indeksfond på Finansportalen, ca. 1500 selskaper, MSCI World)",
+    "returns": "https://live.euronext.com/nb/product/funds/NO0010582984.DKGLBIX-WOMF (DNB Global Indeks, samme referanseindeks MSCI World: 10 år 14,21 % per år)",
+    "bonus": "https://kron.no/app/invitert/nvu4d (startbonus 100 kr)",
+    "chart": "1 000 kr/mnd i 20 år, månedlig rentes rente: 14 % → 1 160 731 kr, 7 % → 507 536 kr, innskutt 240 000 kr",
+    "fees": "14 % før kostnader: 0,15 % i årlig kostnad → 1 139 711 kr, 1,5 % → 967 711 kr, forskjell 172 000 kr"
+  },
+  "segments": [
+    { "id": "hook", "line": "Fondet med *lavest pris* på Finansportalen.", "gap": 0.3 },
+    { "id": "fund", "line": "*Kron Indeks Global* koster bare *{0,15 %|null komma femten prosent}* i året. Alt inkludert." },
+    { "id": "holdings", "line": "Du eier rundt *{1 500|femten hundre}* selskaper, som *Nvidia*, *Apple* og *Microsoft*." },
+    { "id": "fees", "line": "Det betyr mye. Med *{1,5 %|halvannen prosent}* i avgift i stedet, kan du tape over *{170 000 kr|hundre og sytti tusen kroner}* på tjue år." },
+    { "id": "returns", "line": "Fond som følger samme verdensindeks, har gitt *{14 %|fjorten prosent}* i året de siste ti årene." },
+    { "id": "chart", "line": "Sparer du *{1 000 kr|tusen kroner}* i måneden i tjue år, blir det over *{1,1 million.|en komma en million.}*" },
+    { "id": "half", "line": "Ingen garanti. Men selv med *halvparten* blir det rundt *{500 000.|fem hundre tusen.}*", "gap": 0.25 },
+    { "id": "kron", "line": "Start i Kron med koden vår, så får du *{100 kr|hundre kroner}*. Og du støtter Cashback Norge." },
+    { "id": "cta", "line": "Lenken ligger i *bio.*" }
+  ]
+}

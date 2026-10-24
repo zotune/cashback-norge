@@ -1,0 +1,13 @@
+/* Savings chart card for the fund reels (videos 31 and 32), see growth-chart.js. */
+.chartcard { position: absolute; left: 50px; right: 50px; top: 270px; z-index: 64; background: #fff; color: var(--ink); border-radius: 44px; padding: 34px 30px 24px; box-shadow: 0 40px 90px rgba(0, 0, 0, 0.5); opacity: 0; }
+.chartcard h3 { font-weight: 900; font-size: 50px; letter-spacing: -1px; margin: 0 14px 4px; }
+.chartcard .sub { font-weight: 700; font-size: 30px; color: #4a5752; margin: 0 14px 10px; }
+.chartcard svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gc-tick { stroke: #d6e1dc; stroke-width: 3; stroke-dasharray: 10 10; }
+.gc-base { stroke: #9aa8a2; stroke-width: 4; }
+.gc-axis { font: 700 28px Mont, system-ui, sans-serif; fill: #6b7a74; }
+.gc-line { fill: none; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+.gc-line.gc-dashed { stroke-width: 7; stroke-dasharray: 16 14; }
+.gc-value { font: 900 38px Mont, system-ui, sans-serif; letter-spacing: -0.5px; }
+.gc-label { font: 700 26px Mont, system-ui, sans-serif; fill: #4a5752; }
+.chartcard .note { font-weight: 600; font-size: 24px; color: #7c8a84; margin: 6px 14px 0; }
