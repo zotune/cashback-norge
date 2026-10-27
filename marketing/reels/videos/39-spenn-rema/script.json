@@ -1,0 +1,36 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-10-25",
+  "earn": "https://www.norwegian.com/no/reward/om-spenn/ (tjen Spenn hos REMA 1000, Narvesen, 7-Eleven og UNO-X; bruk på Norwegian-fly, Strawberry og dagligvarer hos REMA)",
+  "rema": "https://www.kredittkortlisten.no/artikler/rema-1000-spenn-poeng/ (REMA i Spenn fra 8. juni 2026)",
+  "site": "https://cashbacknorge.no/?provider=spenn (154 butikker, Adidas 3,8 %)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Handler du på *REMA?* Da kan du samle *Spenn.*",
+   "gap": 0.3
+  },
+  {
+   "id": "earn",
+   "line": "Spenn er poengene i Norwegian Reward. Du tjener dem hos *REMA,* Narvesen, Seven-Eleven og UNO-X."
+  },
+  {
+   "id": "use",
+   "line": "Og du kan bruke dem på *flyreiser,* hotell hos Strawberry og *dagligvarer* hos REMA."
+  },
+  {
+   "id": "site",
+   "line": "På Cashback Norge finner du over *{150|hundre og femti}* nettbutikker som gir Spenn, som Adidas med *{3,8 %.|tre komma åtte prosent.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ]
+}

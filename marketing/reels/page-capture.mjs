@@ -1,5 +1,5 @@
-// Fondssider (Kron, Euronext) på iPhone, scrollet til en tekst og eventuelt etter et trykk:
-// node fund-capture.mjs <url> <out.png> ["<tekst å scrolle til>"] ["<knappetekst å trykke>"]
+// Offentlige sider (Kron, Euronext, Sparebørsen, NettBonus) på iPhone, scrollet til en tekst og eventuelt etter et trykk:
+// node page-capture.mjs <url> <out.png> ["<tekst å scrolle til>"] ["<knappetekst å trykke>"]
 // Avslår valgfrie samtykker. BOX=<regex> logger bokser (skjermbilde-px) for løvelementer som matcher.
 import { chromium } from 'playwright';
 const [,, url, out, scrollText, clickText] = process.argv;
@@ -9,7 +9,7 @@ const ctx = await browser.newContext({ viewport: { width: 393, height: 852 }, de
 const page = await ctx.newPage();
 await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
 await page.waitForTimeout(3000);
-for (const label of [/^(avvis|avslå|kun nødvendige|bare nødvendige|reject all|decline|necessary only)/i]) {
+for (const label of [/^(avvis|avslå|kun nødvendige|bare nødvendige|reject all|decline|necessary only|lagre valg)/i]) {
   const button = page.getByRole('button', { name: label }).first();
   if (await button.isVisible().catch(() => false)) { await button.click(); await page.waitForTimeout(800); }
 }

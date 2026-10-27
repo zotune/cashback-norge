@@ -1,0 +1,40 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-10-25",
+  "fee": "https://instabank.no/kredittkort (Valutapåslag 2 % per transaksjon)",
+  "wise": "https://wise.com/invite/dic/mikaele41 (free card or fee-free transfer up to 5,000 NOK; spend at the real exchange rate)",
+  "example": "10 000 kr x 2 % = 200 kr"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Skal du til utlandet i jula? Ikke betal *valutapåslag.*",
+   "gap": 0.3
+  },
+  {
+   "id": "fee",
+   "line": "Mange kort tar et påslag når du betaler i utenlandsk valuta. Instabank tar for eksempel *{2 %.|to prosent.}*"
+  },
+  {
+   "id": "card",
+   "line": "Bruker du *{10 000 kr|ti tusen kroner}* på turen, er det *{200 kr|to hundre kroner}* bare i påslag."
+  },
+  {
+   "id": "wise",
+   "line": "*Wise* bruker den ekte vekslingskursen, med en lav avgift du ser på forhånd."
+  },
+  {
+   "id": "bonus",
+   "line": "Med invitasjonen vår får du *gratis* kort, eller gebyrfri overføring opptil *{5 000 kr.|fem tusen kroner.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

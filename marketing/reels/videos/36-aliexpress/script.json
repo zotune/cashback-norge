@@ -1,0 +1,12 @@
+{
+  "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "gap": 0.15, "tail": 1.6,
+  "sources": { "checked": "2026-10-24", "site": "https://cashbacknorge.no/?q=AliExpress", "offer": "https://spareborsen.no/partnere/ali-express (5 %, logg inn med Vipps først)", "invite": "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5 (50 kr ved registrering med Vipps)" },
+  "segments": [
+    { "id": "hook", "line": "Handler du på *AliExpress?* Få *{5 %|fem prosent}* tilbake.", "gap": 0.3 },
+    { "id": "site", "line": "Søk AliExpress på Cashback Norge. *Sparebørsen* gir *{5 %|fem prosent}* tilbake, rett til bankkontoen." },
+    { "id": "source", "line": "Logg inn med *Vipps* først, så spores kjøpet automatisk." },
+    { "id": "bonus", "line": "Ny på Sparebørsen? Da får du *{50 kr|femti kroner}* i startbonus." },
+    { "id": "card", "line": "Handler du for *{1 000 kr|tusen kroner}*, får du *{100 kr|hundre kroner}* tilbake med startbonusen." },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ]
+}

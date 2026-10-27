@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-10-25",
+  "site": "https://cashbacknorge.no/?tema=strom (Fjordkraft: Trumf 500 kr; Fortum: Spenn 400 kr, NettBonus 300 kr)",
+  "tibber": "https://invite.tibber.com/nwm7kene (dere får begge 1000 kr i Tibber Store eller 12 måneder fri månedsavgift)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Strømregningen øker i vinter. Få *betalt* for å bytte.",
+   "gap": 0.3
+  },
+  {
+   "id": "site",
+   "line": "Trykk *Strøm* på Cashback Norge. Fjordkraft gir *{500 kr|fem hundre kroner}* i Trumf-bonus."
+  },
+  {
+   "id": "fortum",
+   "line": "Hos Fortum får du *{400 kr|fire hundre kroner}* i Spenn, eller *{300 kr|tre hundre kroner}* via NettBonus."
+  },
+  {
+   "id": "tibber",
+   "line": "Mest får du hos *Tibber.* Med invitasjonen vår får du *{1 000 kr|tusen kroner}* i Tibber Store, eller tolv måneder uten månedsavgift."
+  },
+  {
+   "id": "card",
+   "line": "Men sammenlign også strømprisen og *påslaget,* ikke bare bonusen."
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ]
+}

@@ -1,0 +1,12 @@
+{
+  "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "gap": 0.15, "tail": 1.6,
+  "sources": { "checked": "2026-10-24", "site": "https://cashbacknorge.no/?q=Wolt", "offer": "https://spareborsen.no/partnere/wolt (82,8 kr, gjelder kun nye kunder hos Wolt)", "invite": "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5 (50 kr ved registrering med Vipps)" },
+  "segments": [
+    { "id": "hook", "line": "Ny på *Wolt?* Få over *{130 kr|hundre og tretti kroner}* tilbake.", "gap": 0.3 },
+    { "id": "site", "line": "Søk Wolt på Cashback Norge. *Sparebørsen* gir *{82,8 kr|åttito komma åtte kroner}* tilbake." },
+    { "id": "source", "line": "Det gjelder deg som er *ny* Wolt-kunde, på første bestilling." },
+    { "id": "bonus", "line": "Er du ny på Sparebørsen også, får du *{50 kr|femti kroner}* ekstra når du registrerer deg med Vipps." },
+    { "id": "card", "line": "Til sammen over *{130 kr|hundre og tretti kroner}* tilbake på første bestilling." },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ]
+}

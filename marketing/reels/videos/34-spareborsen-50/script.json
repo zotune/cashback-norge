@@ -1,0 +1,12 @@
+{
+  "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "gap": 0.15, "tail": 1.6,
+  "sources": { "checked": "2026-10-24", "invite": "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5 (50 kr ved registrering med Vipps)", "site": "https://cashbacknorge.no/?q=Adidas (Sparebørsen 4,8 %, Ny: +50 kr)", "count": "414 Sparebørsen-tilbud i cashback-index.json 24. okt. 2026" },
+  "segments": [
+    { "id": "hook", "line": "*{50 kr|Femti kroner}* gratis, bare for å *registrere* deg.", "gap": 0.3 },
+    { "id": "invite", "line": "Registrer deg på *Sparebørsen* med *Vipps*, så får du *{50 kr|femti kroner}* med en gang." },
+    { "id": "site", "line": "Så får du cashback i over *{400|fire hundre}* nettbutikker. På Cashback Norge ser du dem som *{Ny: +50 kr.|ny, pluss femti kroner.}*" },
+    { "id": "proof", "line": "Hos Adidas gir Sparebørsen *{4,8 %|fire komma åtte prosent}* tilbake, rett til *bankkontoen.*" },
+    { "id": "card", "line": "Handler du for *{1 000 kr|tusen kroner}* der, får du *{98 kr|nittiåtte kroner}* tilbake med startbonusen." },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ]
+}

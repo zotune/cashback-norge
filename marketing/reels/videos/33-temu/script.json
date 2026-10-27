@@ -1,0 +1,12 @@
+{
+  "voice": "nb-NO-PernilleNeural", "rate": "+12%", "maxPause": 0.22, "gap": 0.15, "tail": 1.6,
+  "sources": { "checked": "2026-10-24", "site": "https://cashbacknorge.no/?q=Temu", "offer": "https://nettbonus.no/details/1212/temu (Nye kunder: 15 %, Eksisterende kunder: 5 %)" },
+  "segments": [
+    { "id": "hook", "line": "Handler du på *Temu?* Få opptil *{15 %|femten prosent}* tilbake.", "gap": 0.3 },
+    { "id": "site", "line": "Søk Temu på Cashback Norge. *NettBonus* gir *{5–15 %|fem til femten prosent}* tilbake." },
+    { "id": "source", "line": "Er du ny Temu-kunde, får du *{15 %.|femten prosent.}* Har du handlet der før, får du *{5 %.|fem prosent.}*" },
+    { "id": "student", "line": "Student? Da gir *UNiDAYS* og *Studentkortet* *{30 %|tretti prosent}* rabatt." },
+    { "id": "card", "line": "Handler du for *{1 000 kr|tusen kroner}* som ny kunde, får du *{150 kr|hundre og femti kroner}* tilbake." },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ]
+}

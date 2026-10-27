@@ -1,0 +1,76 @@
+<div id="kilden-investering">
+  <style>
+    #kilden-investering { color: var(--foreground); }
+    #kilden-investering .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    #kilden-investering .control { flex: 1 1 150px; }
+    #kilden-investering .control label { display: block; margin-bottom: 5px; }
+    #kilden-investering .facts { display: flex; flex-wrap: wrap; gap: 12px 36px; margin: 12px 0 22px; }
+    #kilden-investering .fact span { display: block; color: var(--muted-foreground); }
+    #kilden-investering .fact strong { display: block; font-weight: 500; font-variant-numeric: tabular-nums; }
+    #kilden-investering h3 { margin: 0 0 6px; font-weight: 500; }
+    #kilden-investering .sub { color: var(--muted-foreground); margin: 0 0 12px; }
+    #kilden-investering .rows { display: grid; gap: 12px; }
+    #kilden-investering .row { display: grid; grid-template-columns: 62px minmax(80px,1fr) 95px; gap: 10px; align-items: center; }
+    #kilden-investering .label, #kilden-investering .value { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #kilden-investering .value { text-align: right; }
+    #kilden-investering .track { position: relative; height: 20px; background: var(--muted); }
+    #kilden-investering .zero { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--foreground); opacity: .55; }
+    #kilden-investering .bar { position: absolute; top: 2px; height: 16px; background: var(--viz-series-1); transition: width .2s ease, left .2s ease; }
+    #kilden-investering .bar.negative { background: var(--viz-series-2); }
+    #kilden-investering .axis { display: flex; justify-content: space-between; margin: 8px 95px 0 72px; color: var(--muted-foreground); }
+    @media (max-width: 400px) { #kilden-investering .row { grid-template-columns: 48px minmax(70px,1fr) 77px; gap: 6px; } #kilden-investering .axis { margin-left: 54px; margin-right: 77px; } }
+    @media (prefers-reduced-motion: reduce) { #kilden-investering .bar { transition: none; } }
+  </style>
+  <div class="controls viz-controls">
+    <div class="control"><label for="kilden-count">Antall kunder</label><input class="form-control" id="kilden-count" type="number" min="0" max="1000000" value="20" step="1"></div>
+    <div class="control"><label for="kilden-payout">Cashback per kunde (kr)</label><input class="form-control" id="kilden-payout" type="number" min="0" max="100000" value="325" step="5"></div>
+  </div>
+  <div class="facts" aria-live="polite">
+    <div class="fact"><span>Samlet saldo</span><strong id="kilden-principal"></strong></div>
+    <div class="fact"><span>Rente til kundene (5 %)</span><strong id="kilden-interest"></strong></div>
+    <div class="fact"><span>Skyldig etter ett år</span><strong id="kilden-owed"></strong></div>
+  </div>
+  <h3>Hva sitter selskapet igjen med?</h3>
+  <p class="sub">Fondets avkastning etter ett år → resultat etter kunderenten</p>
+  <div class="rows" id="kilden-rows" aria-label="Resultat ved ulike fondsavkastninger" aria-live="polite"></div>
+  <div class="axis" aria-hidden="true"><span>Tap</span><span>0 kr</span><span>Overskudd</span></div>
+  <script>
+    (() => {
+      const root = document.getElementById('kilden-investering');
+      const count = root.querySelector('#kilden-count');
+      const payout = root.querySelector('#kilden-payout');
+      const scenarios = [-20, 0, 5, 10, 20];
+      const format = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 });
+      const money = n => `${format.format(Math.round(n))} kr`;
+      const saved = window.openai?.widgetState?.modelContent;
+      if (saved && Number.isFinite(saved.kunder) && Number.isFinite(saved.cashback)) { count.value = saved.kunder; payout.value = saved.cashback; }
+      const render = () => {
+        const n = Math.min(1000000, Math.max(0, Math.floor(Number(count.value) || 0)));
+        const p = Math.min(100000, Math.max(0, Number(payout.value) || 0));
+        const principal = n * p;
+        root.querySelector('#kilden-principal').textContent = money(principal);
+        root.querySelector('#kilden-interest').textContent = money(principal * .05);
+        root.querySelector('#kilden-owed').textContent = money(principal * 1.05);
+        const rows = root.querySelector('#kilden-rows');
+        rows.replaceChildren();
+        for (const scenario of scenarios) {
+          const result = principal * (scenario / 100 - .05);
+          const row = document.createElement('div'); row.className = 'row';
+          const label = document.createElement('span'); label.className = 'label'; label.textContent = `${scenario > 0 ? '+' : ''}${scenario} %`;
+          const track = document.createElement('div'); track.className = 'track'; track.setAttribute('aria-hidden', 'true');
+          const zero = document.createElement('span'); zero.className = 'zero';
+          const bar = document.createElement('span'); bar.className = `bar${result < 0 ? ' negative' : ''}`;
+          const width = principal === 0 ? 0 : Math.abs(scenario - 5) / 25 * 50;
+          bar.style.width = `${width}%`; bar.style.left = `${result < 0 ? 50 - width : 50}%`;
+          track.append(zero, bar);
+          const value = document.createElement('span'); value.className = 'value'; value.textContent = `${result > 0 ? '+' : result < 0 ? '−' : ''}${money(Math.abs(result))}`;
+          row.append(label, track, value); rows.append(row);
+        }
+      };
+      const change = () => { render(); if (window.openai?.setWidgetState) window.openai.setWidgetState({ modelContent: { kunder: Math.min(1000000, Math.max(0, Math.floor(Number(count.value) || 0))), cashback: Math.min(100000, Math.max(0, Number(payout.value) || 0)) } }).catch(() => {}); };
+      count.addEventListener('input', change); payout.addEventListener('input', change);
+      window.addEventListener('openai:set_globals', (event) => { const next = event.detail?.globals?.widgetState?.modelContent; if (next && Number.isFinite(next.kunder) && Number.isFinite(next.cashback)) { count.value = next.kunder; payout.value = next.cashback; render(); } });
+      render();
+    })();
+  </script>
+</div>

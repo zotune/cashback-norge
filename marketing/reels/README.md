@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Trettito vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026 og video 31–32 24. okt. 2026.
+Trettini vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026 og video 37–39 25. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -36,6 +36,13 @@ Trettito vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceov
 | `out/30-briller-naf.mp4` | NAF hos Brilleland: 20 % på komplett brille ved innfatning og oppgraderte glass. Synsundersøkelse/tilpasning kommer i tillegg | «NAF-medlem? 👓 20 % på briller» |
 | `out/31-dnb-teknologi.mp4` | DNB Teknologi i Kron: 2,15× på 3 år og 2,83× på 5 år (Euronext), rentes rente-graf med 20 % og halvparten, aksjesparekonto, Kron-bonus 100 kr | «Har du lyst å bli millionær? 🤑» |
 | `out/32-kron-indeks.mp4` | Kron Indeks Global: lavest pris på Finansportalen, 0,15 % i året, avgiftsforskjell over 20 år, rentes rente-graf med 14 % og halvparten, Kron-bonus 100 kr | «Lavest pris på Finansportalen 👀» |
+| `out/33-temu.mp4` | Temu: NettBonus 15 % for nye kunder og 5 % for andre, UNiDAYS og Studentkortet 30 % | «Handler du på Temu? Opptil 15 % tilbake» |
+| `out/34-spareborsen-50.mp4` | Sparebørsen: 50 kr med Vipps, «Ny: +50 kr» på cashbacknorge.no, Adidas 4,8 % | «50 kr gratis bare for å registrere deg» |
+| `out/35-wolt.mp4` | Wolt: Sparebørsen 82,8 kr for nye Wolt-kunder + 50 kr startbonus | «Ny på Wolt? Over 130 kr tilbake» |
+| `out/36-aliexpress.mp4` | AliExpress: Sparebørsen 5 % + 50 kr startbonus | «Handler du på AliExpress? 5 % tilbake» |
+| `out/37-strom-vinter.mp4` | Strøm i vinter: Fjordkraft med Trumf 500 kr, Fortum med Spenn 400 kr eller NettBonus 300 kr, Tibber 1 000 kr via invitasjon | «Strømregningen øker ⚡ Få betalt for å bytte» |
+| `out/38-juletur-wise.mp4` | Juletur: Instabank tar 2 % i valutapåslag, Wise bruker ekte kurs og gir gratis kort via invitasjon | «Utlandet i jula? Ikke betal valutapåslag» |
+| `out/39-spenn-rema.mp4` | Spenn: tjen hos REMA, Narvesen, 7-Eleven og UNO-X, bruk på fly, Strawberry og REMA, 154 nettbutikker | «Handler du på REMA? Da kan du samle Spenn» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -79,7 +86,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - `site-capture.mjs "<query>" <prefix> [scrollY,...]` fanger cashbacknorge.no med URL-parametre (`?provider=gratisbursdag`, `?tema=strom`). `TAP=1` åpner tooltipen på første kort.
   - `member-capture.mjs <video-name> [...]` fanger tilbud, tooltip, eventuelt Sum-eksempel og offentlig kilde for video 26–30. Leser `capture` fra videoens `script.json`, avslår valgfrie samtykker og bruker maksimalt to nettleserfaner samtidig. `assets/capture.json` dokumenterer kilde, tidspunkt, vilkår og skjermkoordinater. Scenene deler `shared/member-reel.js`.
   - `android-guide.mjs <prefix>` fanger hvert steg i Android-guiden.
-  - `fund-capture.mjs <url> <out.png> ["<tekst å scrolle til>"] ["<knapp>"]` fanger fondssider hos Kron og Euronext på iPhone, skjuler Krons chat-knapp og logger bokser med `BOX=<regex>`. Fondsvideoene 31–32 bruker den animerte sparegrafen i `shared/growth-chart.js`. Kildene og regnestykkene står i `sources` i `script.json`, og grafen viser alltid også et scenario med halvparten av den historiske avkastningen.
+  - `page-capture.mjs <url> <out.png> ["<tekst å scrolle til>"] ["<knapp>"]` fanger offentlige sider (Kron, Euronext, Sparebørsen, NettBonus) på iPhone, skjuler Krons chat-knapp og logger bokser med `BOX=<regex>`. Fondsvideoene 31–32 bruker den animerte sparegrafen i `shared/growth-chart.js`, og tilbudsvideoene 33–39 den felles scenen i `shared/offer-reel.js`. Kildene og regnestykkene står i `sources` i `script.json`. ♥-tilbudene er vår provisjon, ikke cashback til brukeren, så tilbudsvideoene viser det brukeren faktisk får. Grafen viser alltid også et scenario med halvparten av den historiske avkastningen.
   - Spillvideoene 21–24 viser billigste kort i panelet (GG Deals Keyshops) og bruker `MODE=desktop SCROLL=buy HOVER="GG Deals" node games-capture.mjs <steam-url> <navn>`. Sjekk tilbudet på gg.deals/no fra norsk IP: GG Deals-kortet kan være en annen plattform enn siden (ARC Raiders: Xbox-nøkkel, Farming Simulator 25: Giants-nøkkel), og det må stå i videoen. Keyshop-priser er før gebyr. Muve selger ikke Modern Warfare 4 til Norge, og Cyberpunk 2077 er billigst på Steam blant offisielle butikker.
   - `yt-capture.mjs <url> <navn>` er games-capture for youtube.com med samtykke-cookie. `PRESET='{"cashback-varsler-region-prices-collapsed":true}'` lukker regionlisten, `TAPINFO=1` åpner første tooltip og `SCROLL=text:<tekst>` scroller til teksten.
   - `appstore-capture.mjs <url> <out.png> "<tekst>"` åpner «Kjøp i app» på apps.apple.com og scroller til teksten.
