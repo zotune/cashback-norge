@@ -34,8 +34,13 @@
     .section-heading h2 { margin: 0; font-size: 18px; letter-spacing: -.03em; }
     .section-heading span { color: var(--cbn-muted, #5d6b71); font-size: 12px; }
     .offers { display: grid; gap: 10px; }
-    details { background: var(--cbn-surface, #fff); border-radius: 16px; }
-    summary { display: flex; align-items: center; gap: 13px; padding: 17px; list-style: none; cursor: pointer; }
+    .offer-entry { display: flex; align-items: flex-start; background: var(--cbn-surface, #fff); border-radius: 16px; }
+    .offer-entry:has(input:checked) { background: var(--cbn-highlight, #eaf7ef); }
+    .select-offer { width: 46px; min-height: 70px; display: grid; place-items: center; flex: none; cursor: pointer; }
+    .select-offer input { width: 19px; height: 19px; margin: 0; accent-color: var(--cbn-accent, #22794f); cursor: pointer; }
+    .select-offer input:focus-visible { outline: 2px solid var(--cbn-accent, #22794f); outline-offset: 3px; }
+    details { flex: 1; min-width: 0; border-radius: 16px; }
+    summary { display: flex; align-items: center; gap: 13px; padding: 17px 17px 17px 0; list-style: none; cursor: pointer; }
     summary::-webkit-details-marker { display: none; }
     summary:focus-visible { outline: 2px solid var(--cbn-accent, #22794f); outline-offset: 3px; border-radius: 16px; }
     .merchant-icon { flex: 0 0 40px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--cbn-soft, #f2f7f3); color: var(--cbn-accent, #22794f); font-weight: 800; font-size: 16px; }
@@ -69,23 +74,32 @@
     .explain { padding: 20px 22px; margin-top: 18px; }
     .explain h2 { margin: 0 0 8px; font-size: 15px; }
     .explain p { margin: 0; color: var(--cbn-muted, #5d6b71); font-size: 12px; line-height: 1.65; }
+    .selection { margin-top: 16px; }
+    .selection-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .selection-head h2 { margin: 0; font-size: 15px; }
+    .selection-head strong { font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .selection-status { margin: 8px 0 14px; color: var(--cbn-muted, #5d6b71); font-size: 12px; line-height: 1.5; }
+    .selection button { width: 100%; min-height: 44px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .selection button:disabled { opacity: .5; cursor: not-allowed; }
+    .preview-message { margin: 12px 0 0; font-size: 12px; color: var(--cbn-muted, #5d6b71); line-height: 1.5; }
     .footnote { margin: 20px 2px 0; color: var(--cbn-muted, #5d6b71); font-size: 11px; line-height: 1.65; }
     .footnote strong { color: var(--cbn-text, #172026); }
-    @media (max-width: 480px) { .shell { padding: 0 16px 48px; } header { min-height: 68px; } .brand { font-size: 14px; } .brand img { width: 32px; height: 32px; } .intro { padding: 25px 0 20px; } .card { padding: 20px; } .balance { font-size: 30px; white-space: nowrap; } summary { gap: 10px; padding: 15px; } .offer-details { padding-left: 65px; } .merchant-icon { flex-basis: 36px; height: 36px; width: 36px; } }
+    @media (max-width: 480px) { .shell { padding: 0 16px 48px; } header { min-height: 68px; } .brand { font-size: 14px; } .brand img { width: 32px; height: 32px; } .intro { padding: 25px 0 20px; } .card { padding: 20px; } .balance { font-size: 30px; white-space: nowrap; } summary { gap: 10px; padding: 15px 15px 15px 0; } .offer-details { padding-left: 12px; } .merchant-icon { flex-basis: 36px; height: 36px; width: 36px; } }
   </style>
 </head>
 <body>
   <div class="shell">
     <header><a class="brand" href="/"><img src="/logo.png" alt="">Cashback Norge</a><div class="header-right"><span class="demo">Kun eksempel</span><span data-theme-control></span></div></header>
     <main>
-      <section class="intro"><p class="eyebrow">Din cashback ✨</p><h1>Pengene dine, samlet.</h1><p>Se cashbacken din og bonusene du har fått. Åpne et kjøp for å se veien videre.</p></section>
+      <section class="intro"><p class="eyebrow">Din cashback ✨</p><h1>Pengene dine, samlet.</h1><p>Velg cashbacken du vil ta ut. Åpne et kjøp for å se mulig bonus.</p></section>
       <section class="card" aria-label="Eksempelsaldo">
         <div class="balance-top"><div><p class="label">Din saldo</p><p class="balance" id="balance"></p></div><span class="available">Uttak tilgjengelig</span></div>
         <div class="summary"><strong id="earned-total"></strong><p>Bonusen er allerede med i saldoen over.</p></div>
       </section>
-      <div class="section-heading"><h2>Din cashback</h2><span>6 godkjente kjøp</span></div>
+      <div class="section-heading"><h2>Velg til uttak</h2><span>Minst 500 kr</span></div>
       <div class="offers" id="offers"></div>
-      <section class="card explain"><h2>Slik fungerer eksemplet</h2><p>Hver cashback kan gi 5 % bonus etter ett år, 10 % totalt etter tre år og 25 % totalt etter fem år. Prosentene regnes av den opprinnelige cashbacken. Ved hvert uttak starter ventetiden på nytt for alle cashbackene. Du beholder bonus du allerede har fått, og får ikke samme bonus på nytt. Etter femårstrinnet gis ingen ytterligere bonus på den cashbacken. Minsteuttak er 500 kr.</p></section>
+      <section class="card selection" aria-label="Valgt til uttak"><div class="selection-head"><h2>Valgt til uttak</h2><strong id="selection-total">0 kr</strong></div><p class="selection-status" id="selection-status" aria-live="polite">Velg minst 500 kr for å fortsette.</p><button type="button" id="preview-withdrawal" class="cbn-button cbn-button--primary" disabled>Se eksempel på uttak</button><p class="preview-message" id="preview-message" role="status" hidden></p></section>
+      <section class="card explain"><h2>Slik fungerer eksemplet</h2><p>Velg hvilke hele cashback-beløp du vil ta ut. Bonus du allerede har fått er med i beløpet. Cashback du lar stå beholder fremdriften. Hver cashback kan gi 5 % bonus etter ett år, 10 % totalt etter tre år og 25 % totalt etter fem år, regnet av opprinnelig cashback. Etter femårstrinnet gis ingen ytterligere bonus på den cashbacken.</p></section>
       <p class="footnote"><strong>Dette er bare et eksempel.</strong> Beløpene, datoene og kjøpene er oppdiktet. Eksemplet viser status per 27. oktober 2026. Det finnes ikke en ekte saldo eller et aktivt bonustilbud her.</p>
     </main>
   </div>
@@ -118,7 +132,24 @@
       document.getElementById('balance').textContent = money(sum);
       document.getElementById('earned-total').textContent = `+${money(earnedSum)} i bonus så langt`;
       const offers = document.getElementById('offers');
-      for (const item of items) {
+      const selected = new Set();
+      const selectionTotal = document.getElementById('selection-total');
+      const selectionStatus = document.getElementById('selection-status');
+      const previewButton = document.getElementById('preview-withdrawal');
+      const previewMessage = document.getElementById('preview-message');
+      function updateSelection() {
+        const cents = [...selected].reduce((total, index) => total + Math.round(items[index].total * 100), 0);
+        const amount = cents / 100;
+        selectionTotal.textContent = money(amount);
+        previewButton.disabled = cents < 50000;
+        selectionStatus.textContent = cents >= 50000 ? 'Minsteuttaket er nådd. Cashback du lar stå beholder fremdriften.' : `Velg ${money((50000 - cents) / 100)} til for å nå minsteuttaket.`;
+        previewMessage.hidden = true;
+      }
+      previewButton.addEventListener('click', () => {
+        previewMessage.textContent = `Eksempel: Du har valgt ${selectionTotal.textContent}. Dette er bare en forhåndsvisning – ingen penger tas ut.`;
+        previewMessage.hidden = false;
+      });
+      for (const [index, item] of items.entries()) {
         const milestones = [1, 3, 5].map(year => {
           const done = item.years >= year;
           const projected = valueAt(item.amount, year);
@@ -130,8 +161,19 @@
         const detail = document.createElement('details');
         detail.open = Boolean(item.open);
         detail.innerHTML = `<summary><span class="merchant-icon" aria-hidden="true"><img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(item.domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.hidden=true;this.nextElementSibling.hidden=false}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${item.name[0]}</span></span><span class="offer-main"><span class="merchant">${item.name}</span><span class="offer-caption">${status}</span></span><span class="amount-wrap"><span class="amount">${money(item.total)}</span>${earned}</span><span class="chevron" aria-hidden="true">⌄</span></summary><div class="offer-details"><dl><dt>Godkjent</dt><dd>${dateFormat.format(new Date(`${item.date}T00:00:00Z`))}</dd><dt>Opprinnelig cashback</dt><dd>${money(item.amount)}</dd></dl><div class="projection-heading">Samlet bonus hvis pengene blir stående</div><div class="projection" aria-label="Samlet bonus etter 1, 3 og 5 år">${milestones}</div><p>Grønne trinn er fullført. Fremtidig bonus er ikke opptjent ennå.</p></div>`;
-        offers.append(detail);
+        const entry = document.createElement('div');
+        entry.className = 'offer-entry';
+        const label = document.createElement('label');
+        label.className = 'select-offer';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.setAttribute('aria-label', `Velg ${item.name}, ${money(item.total)}, til uttak`);
+        checkbox.addEventListener('change', () => { if (checkbox.checked) selected.add(index); else selected.delete(index); updateSelection(); });
+        label.append(checkbox);
+        entry.append(label, detail);
+        offers.append(entry);
       }
+      updateSelection();
     })();
   </script>
 </body>
