@@ -41,6 +41,7 @@ export type GetPriceMatchForProductMessage = {
   productPageClue?: boolean;
   organizationName?: string;
   productBrand?: string;
+  productLanguage?: string;
   packageAmount?: number;
   packageUnit?: ProductPackageUnit;
   volumeMl?: number;
@@ -79,7 +80,7 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "googleflights" | "googleshopping";
+  source?: "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -200,6 +201,7 @@ export function isGetPriceMatchForProductMessage(
     (value.productPageClue === undefined || typeof value.productPageClue === "boolean") &&
     (value.organizationName === undefined || typeof value.organizationName === "string") &&
     (value.productBrand === undefined || typeof value.productBrand === "string") &&
+    (value.productLanguage === undefined || typeof value.productLanguage === "string") &&
     (value.packageAmount === undefined || typeof value.packageAmount === "number") &&
     (value.packageUnit === undefined || isProductPackageUnit(value.packageUnit)) &&
     (value.volumeMl === undefined || typeof value.volumeMl === "number") &&

@@ -5,10 +5,13 @@ import type {
 import {
   buildProductMatchAnchor,
   isLikelyGtin,
+  isValidGtin,
+  readProductCodesFromUrl,
   pickBestProductCandidate,
   type ProductMatchAnchor,
 } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
+import { isExplicitPreorder } from "./price-match-availability.js";
 
 const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
 const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
@@ -17,6 +20,21 @@ const KLARNA_PRODUCT_PATH_PATTERN = /\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
 const BAD_AVAILABILITY_STATUSES = new Set(["UNAVAILABLE", "UNAVAILABLE_ON_REQUEST", "TEMPORARILY_UNAVAILABLE"]);
 const BAD_STOCK_STATUSES = new Set(["OUT_OF_STOCK", "NOT_IN_STOCK"]);
 const CODE_QUERY_MIN_MATCH_SCORE = 0.3;
+
+export async function isKlarnaProductForOfferUrls(
+  message: GetPriceMatchForProductMessage,
+  offerUrls: string[],
+  requestJson: JsonRequest = fetchJson,
+): Promise<boolean> {
+  const currentId = readKlarnaProductIdFromUrl(message.url);
+  if (currentId === undefined) return false;
+  const codes = [...new Set(offerUrls.flatMap(readProductCodesFromUrl).filter(isValidGtin))].slice(0, 3);
+  for (const code of codes) {
+    const product = await fetchKlarnaProduct(code, requestJson, buildProductMatchAnchor(message), true);
+    if (product?.id === currentId) return true;
+  }
+  return false;
+}
 
 export async function findKlarnaPriceMatch(
   message: GetPriceMatchForProductMessage,
@@ -203,6 +221,7 @@ function readKlarnaOffer(value: unknown, merchants: Record<string, unknown>): Kl
   if (amount === undefined || amount <= 0 || currency !== "NOK" || shopName === undefined) return undefined;
   if (availability !== undefined && BAD_AVAILABILITY_STATUSES.has(availability)) return undefined;
   if (stockStatus !== undefined && BAD_STOCK_STATUSES.has(stockStatus)) return undefined;
+  if (isExplicitPreorder(value.isPreorder, value.is_preorder, availability, stockStatus)) return undefined;
 
   const offerUrl = toAbsoluteKlarnaUrl(readStringLike(value.url));
   return {
@@ -236,7 +255,7 @@ function readTimeValue(value: unknown): number | undefined {
 
 async function fetchJson(url: string, init?: Parameters<JsonRequest>[1]): Promise<unknown | undefined> {
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
     if (!response.ok) return undefined;
     return response.json();
   } catch {
@@ -248,7 +267,7 @@ function readKlarnaProductIdFromUrl(rawUrl: string | undefined): string | undefi
   if (rawUrl === undefined) return undefined;
   try {
     const url = new URL(rawUrl);
-    return url.hostname.endsWith("klarna.com") ? url.pathname.match(KLARNA_PRODUCT_PATH_PATTERN)?.[1] : undefined;
+    return (url.hostname === "klarna.com" || url.hostname.endsWith(".klarna.com")) ? url.pathname.match(KLARNA_PRODUCT_PATH_PATTERN)?.[1] : undefined;
   } catch {
     return undefined;
   }

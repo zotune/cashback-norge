@@ -29,6 +29,8 @@ import {
   type JsonRequest,
 } from "./prisjakt-price-match.js";
 import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
+import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-match.js";
+import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
 import {
   findTaxfreePriceMatch,
@@ -79,7 +81,8 @@ export async function findPriceMatches(
       .filter((offer): offer is PriceMatchOffer => offer !== undefined));
   }
 
-  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer] = await Promise.all([
+  const verifiedAvailability: VerifiedPriceMatchAvailability[] = [];
+  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer, pokeprisOffer] = await Promise.all([
     ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
     ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText)),
     ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson)),
@@ -89,9 +92,12 @@ export async function findPriceMatches(
     ignorePriceMatchFailure(findSesumPriceMatch(message, requestText)),
     ignorePriceMatchFailure(findEnhverPriceMatch(message, requestJson, requestText)),
     ignorePriceMatchFailure(findKassalPriceMatch(message, requestText)),
+    ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) })),
   ]);
 
   const anchorOffers = [prisjaktOffer, klarnaOffer]
+    .filter((offer): offer is PriceMatchOffer => offer !== undefined)
+    .map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability))
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
   const canUsePrisradarOffer =
@@ -123,7 +129,10 @@ export async function findPriceMatches(
     sesumOffer,
     enhverOffer,
     kassalOffer,
+    pokeprisOffer,
   ]
+    .filter((offer): offer is PriceMatchOffer => offer !== undefined)
+    .map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability))
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
   const productAnchorTerms = uniqueStrings([
     message.searchTerm,
@@ -243,6 +252,7 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "sesum") return 4;
   if (offer.source === "enhver") return 5;
   if (offer.source === "kassal") return 6;
+  if (offer.source === "pokepris") return 6;
   if (offer.source === "isthereanydeal") return 7;
   if (offer.source === "ggdeals") return 8;
   if (offer.source === "allkeyshop") return 9;
@@ -306,6 +316,7 @@ function hasCurrentMerchantOffer(
 }
 
 function isKnownPriceMatchSourceProductUrl(rawUrl: string | undefined): boolean {
+  if (isPokeprisProductUrl(rawUrl)) return true;
   if (rawUrl === undefined) return false;
   try {
     const url = new URL(rawUrl);

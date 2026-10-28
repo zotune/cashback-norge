@@ -4,6 +4,7 @@ import type {
 } from "./extension-messages.js";
 import { hasModelNumberConflict, hasNumericModelConflict } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
+import { readNextFlightPayloads } from "./product-data.js";
 
 type TextRequest = (
   url: string,
@@ -848,14 +849,8 @@ function transliterateNorwegianCharacters(value: string): string {
 const GENERIC_MERCHANT_KEYS = new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
 
 function readPrisradarProductFromNextFlight(html: string): Record<string, unknown> | undefined {
-  const scripts = html.matchAll(/<script[^>]*>self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)<\/script>/g);
-
-  for (const match of scripts) {
-    const encodedPayload = match[1];
-    if (encodedPayload === undefined || !encodedPayload.includes("\\\"product\\\":")) continue;
-
-    const payload = decodeNextFlightString(encodedPayload);
-    if (payload === undefined) continue;
+  for (const payload of readNextFlightPayloads(html)) {
+    if (!payload.includes('"product":')) continue;
 
     const productJson = extractJsonObjectAfter(payload, "\"product\":");
     if (productJson === undefined) continue;
@@ -927,14 +922,6 @@ function readPrisradarProductUrl(rawUrl: string | undefined): string | undefined
     const url = new URL(rawUrl);
     if (!url.hostname.replace(/^www\./, "").toLowerCase().endsWith("prisradar.no")) return undefined;
     return PRISRADAR_PRODUCT_PATH_PATTERN.test(url.pathname) ? `${url.origin}${url.pathname}` : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function decodeNextFlightString(value: string): string | undefined {
-  try {
-    return JSON.parse(`"${value}"`) as string;
   } catch {
     return undefined;
   }

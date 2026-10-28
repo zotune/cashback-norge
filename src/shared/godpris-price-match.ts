@@ -12,6 +12,7 @@ import {
   type ProductMatchAnchor,
 } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
+import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
 
 type TextRequest = (
   url: string,
@@ -210,10 +211,7 @@ async function fetchText(url: string, init?: Parameters<TextRequest>[1]): Promis
 }
 
 function formatNokPrice(amount: number): string {
-  const formatted = new Intl.NumberFormat("nb-NO", {
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-  return `${formatted} kr`;
+  return formatPrice(amount, "NOK");
 }
 
 function decodeHtmlAttribute(value: string): string {
@@ -229,13 +227,6 @@ function readStringLike(value: unknown): string | undefined {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
   const trimmed = String(value).trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function readNumberLike(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return undefined;
-  const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function uniqueStrings(values: Array<string | undefined>): string[] {

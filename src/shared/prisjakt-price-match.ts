@@ -5,7 +5,9 @@ import type {
 import {
   buildProductMatchAnchor,
   pickBestProductCandidate,
+  normalizePriceMatchShopName,
 } from "./product-match.js";
+import { isExplicitPreorder } from "./price-match-availability.js";
 
 export type JsonRequest = (
   url: string,
@@ -16,6 +18,40 @@ export type JsonRequest = (
     credentials?: RequestCredentials;
   },
 ) => Promise<unknown | undefined>;
+
+// Verify identity through an actual retailer URL, not a tracking domain or shop name.
+export async function isPrisjaktProductForOfferUrl(
+  currentUrl: string,
+  offerUrl: string,
+  requestJson: JsonRequest = fetchJson,
+): Promise<boolean> {
+  let current: URL;
+  try { current = new URL(currentUrl); } catch { return false; }
+  if (current.hostname.replace(/^www\./, "") !== "prisjakt.no" || current.pathname !== "/product.php") return false;
+  const id = current.searchParams.get("p");
+  if (id === null || !/^[1-9]\d*$/.test(id)) return false;
+  const product = await fetchNativePrisjaktProductBySingleOfferUrl(offerUrl, requestJson);
+  return product?.id === Number(id);
+}
+
+export async function isPrisjaktProductForAnyOffer(
+  currentUrl: string,
+  candidates: Array<{ shopName: string; offerUrl: string }>,
+  requestJson: JsonRequest = fetchJson,
+): Promise<boolean> {
+  let current: URL;
+  try { current = new URL(currentUrl); } catch { return false; }
+  if (current.hostname.replace(/^www\./, "") !== "prisjakt.no" || current.pathname !== "/product.php") return false;
+  const id = current.searchParams.get("p");
+  if (id === null || !/^[1-9]\d*$/.test(id)) return false;
+  const currentOffers = await fetchNativePrisjaktOffers(Number(id), requestJson);
+  const knownShops = new Set(currentOffers.map((offer) => normalizePriceMatchShopName(offer.shopName)));
+  const ordered = [...candidates].sort((a, b) => Number(knownShops.has(normalizePriceMatchShopName(b.shopName))) - Number(knownShops.has(normalizePriceMatchShopName(a.shopName))));
+  for (const offer of ordered.slice(0, 3)) {
+    if (await isPrisjaktProductForOfferUrl(currentUrl, offer.offerUrl, requestJson)) return true;
+  }
+  return false;
+}
 
 const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
 const PRISJAKT_NATIVE_AUTHORIZATION = "Bearer JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmY";
@@ -263,6 +299,7 @@ function readNativePrisjaktOffer(value: unknown): NativePrisjaktOffer | undefine
   if (condition !== undefined && condition.toUpperCase() !== "NEW") return undefined;
   if (availabilityStatus !== undefined && BAD_AVAILABILITY_STATUSES.has(availabilityStatus.toUpperCase())) return undefined;
   if (stockStatus !== undefined && BAD_STOCK_STATUSES.has(stockStatus.toLowerCase())) return undefined;
+  if (isExplicitPreorder(value.isPreorder, value.is_preorder, stockStatus, availabilityStatus)) return undefined;
 
   const offerUrl = typeof value.externalUri === "string" && value.externalUri.length > 0
     ? value.externalUri
@@ -423,7 +460,7 @@ function readPrisjaktOffer(value: unknown): Omit<PriceMatchOffer, "productName" 
 
 async function fetchJson(url: string, init?: Parameters<JsonRequest>[1]): Promise<unknown | undefined> {
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
     if (!response.ok) return undefined;
     return response.json();
   } catch {

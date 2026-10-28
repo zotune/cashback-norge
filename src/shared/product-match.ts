@@ -1,3 +1,5 @@
+import { hasTcgProductVariantConflict } from "./tcg-product-match.js";
+import { parseUrl } from "./cashback.js";
 import type { GetPriceMatchForProductMessage } from "./extension-messages.js";
 import {
   isSamePackageQuantity,
@@ -10,6 +12,37 @@ import {
 } from "./product-title-match.js";
 
 export const MIN_PRODUCT_MATCH_SCORE = 0.45;
+
+export function isSameProductUrl(first: string | undefined, second: string | undefined): boolean {
+  const a = first === undefined ? undefined : parseUrl(first);
+  const b = second === undefined ? undefined : parseUrl(second);
+  if (a === undefined || b === undefined) return false;
+  for (const url of [a, b]) {
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
+    }
+    url.searchParams.sort();
+  }
+  return a.hostname.replace(/^www\./, "") === b.hostname.replace(/^www\./, "") && a.pathname.replace(/\/$/, "") === b.pathname.replace(/\/$/, "") && a.search === b.search;
+}
+
+export function readProductCodesFromUrl(rawUrl: string): string[] {
+  const url = parseUrl(rawUrl);
+  return url === undefined ? [] : [...new Set(`${url.pathname} ${url.search}`.match(/\b\d{12,14}\b/g) ?? [])];
+}
+
+export function isValidGtin(value: string): boolean {
+  if (!/^(?:\d{8}|\d{12,14})$/.test(value)) return false;
+  const digits = [...value].map(Number);
+  const check = digits.pop();
+  const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+  return (10 - sum % 10) % 10 === check;
+}
+
+export function normalizePriceMatchShopName(value: string): string {
+  return value.toLowerCase().replace(/\.(?:no|com)$/g, "").normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]/g, "");
+}
 
 const STORAGE_SIZE_PATTERN = /\b(\d+(?:[.,]\d+)?)\s*(tb|gb)\b/gi;
 const BRAND_MATCH_GROUPS = [
@@ -49,6 +82,7 @@ const NAMED_HTML_ENTITIES = new Map<string, string>([
 
 export type ProductMatchAnchor = {
   searchTerm: string;
+  productLanguage?: string;
   packageQuantity?: ProductPackageQuantity;
 };
 
@@ -63,6 +97,7 @@ export function buildProductMatchAnchor(message: GetPriceMatchForProductMessage)
     : undefined;
   return {
     searchTerm: message.searchTerm,
+    ...(message.productLanguage !== undefined ? { productLanguage: message.productLanguage } : {}),
     ...(packageQuantity !== undefined ? { packageQuantity } : {}),
   };
 }
@@ -110,7 +145,8 @@ export function pickBestProductCandidate<T>(
 }
 
 export function hasProductVariantConflict(anchor: ProductMatchAnchor, candidateTitle: string): boolean {
-  return hasPackageQuantityConflict(anchor, candidateTitle) ||
+  return hasTcgProductVariantConflict(`${anchor.searchTerm} ${anchor.productLanguage ?? ""}`, candidateTitle) ||
+    hasPackageQuantityConflict(anchor, candidateTitle) ||
     hasStorageSizeConflict(anchor.searchTerm, candidateTitle) ||
     hasModelNumberConflict(anchor.searchTerm, candidateTitle) ||
     hasNumericModelConflict(anchor.searchTerm, candidateTitle) ||

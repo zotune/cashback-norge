@@ -1,4 +1,4 @@
-import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
 import {
   calculateCashback,
   calculateCashbackMaxKr,
@@ -9,7 +9,9 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
-import { decodeHtmlEntities } from "../shared/product-match";
+import { decodeHtmlEntities, readProductCodesFromUrl } from "../shared/product-match";
+import { findTypedLdJson, parseLdJson, readProductLanguage, readProductOfferLanguage, selectProductLdJson } from "../shared/product-data";
+import { isPokeprisProductUrl } from "../shared/pokepris-price-match";
 import {
   readPackageQuantityFromText,
   readPackageQuantityFromValue,
@@ -210,6 +212,7 @@ type GetPriceMatchForProductMessage = {
   productPageClue?: boolean;
   organizationName?: string;
   productBrand?: string;
+  productLanguage?: string;
   packageAmount?: number;
   packageUnit?: ProductPackageUnit;
   volumeMl?: number;
@@ -240,7 +243,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "googleflights" | "googleshopping";
+  source?: "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -678,6 +681,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "hintaopas.fi",
   "ledenicheur.fr",
   "godpris.no",
+  "pokepris.no",
   "tax-free.no",
   "klarna.com",
   "kelkoo.no",
@@ -798,7 +802,7 @@ function installDynamicProductPageRefresh(): void {
           ? buildHotelSearchMetaKey(hotelMeta)
           : productMeta === undefined
             ? ""
-            : [productMeta.searchTerm, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
+            : [productMeta.searchTerm, productMeta.productLanguage, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
         requestCurrentOffers();
@@ -8490,6 +8494,11 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     document.title,
   ]);
   const packageQuantity = readProductPackageQuantity(productLdJson, productTitleCandidates);
+  const productLanguage = readProductLanguage(productLdJson, productTitleCandidates) ??
+    (normalizedHostname === "prisjakt.no" && parsedUrl.pathname === "/product.php" && parsedUrl.searchParams.has("p")
+      ? readProductOfferLanguage([...document.querySelectorAll("script")].filter((script) => script.textContent?.includes("self.__next_f.push"))
+        .map((script) => script.outerHTML).join(""), parsedUrl.searchParams.get("p")!)
+      : undefined);
 
   if (!productPageClue || normalizedSearchTerm.length < 8) {
     return undefined;
@@ -8514,6 +8523,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     ...(productTitleCandidates.length > 0 ? { productTitleCandidates } : {}),
     ...(organizationName !== undefined ? { organizationName } : {}),
     ...(brandName !== undefined ? { productBrand: brandName } : {}),
+    ...(productLanguage !== undefined ? { productLanguage } : {}),
     ...(packageQuantity !== undefined ? { packageAmount: packageQuantity.amount, packageUnit: packageQuantity.unit } : {}),
     ...(volumeMl !== undefined ? { volumeMl } : {}),
     ...(alcoholPercent !== undefined ? { alcoholPercent } : {}),
@@ -8558,6 +8568,7 @@ function isLikelyProductListingPage(parsedUrl: URL): boolean {
 }
 
 function isKnownPriceMatchSourceProductPage(parsedUrl: URL): boolean {
+  if (isPokeprisProductUrl(parsedUrl.href)) return true;
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   const pathname = parsedUrl.pathname.toLowerCase();
 
@@ -8739,11 +8750,7 @@ function hasCommerceActionSignal(): boolean {
 }
 
 function findProductLdJson(): Record<string, unknown> | undefined {
-  for (const entry of readLdJsonEntries()) {
-    const product = findTypedLdJson(entry, "Product");
-    if (product !== undefined) return product;
-  }
-  return undefined;
+  return selectProductLdJson(readLdJsonEntries());
 }
 
 function findOrganizationName(): string | undefined {
@@ -8762,43 +8769,12 @@ function readLdJsonEntries(): unknown[] {
   const entries: unknown[] = [];
   for (const script of document.querySelectorAll<HTMLScriptElement>('script[type="application/ld+json"]')) {
     try {
-      entries.push(decodeLdJsonStrings(JSON.parse(script.textContent ?? "")));
+      entries.push(parseLdJson(script.textContent ?? ""));
     } catch {
       // Ignore malformed site metadata.
     }
   }
   return entries;
-}
-
-// Enkelte butikker (f.eks. Komplett) HTML-koder tekst inne i JSON-LD ("Robotst&#xF8;vsuger").
-function decodeLdJsonStrings(value: unknown): unknown {
-  if (typeof value === "string") return decodeHtmlEntities(value);
-  if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
-  if (isRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
-  }
-  return value;
-}
-
-function findTypedLdJson(value: unknown, type: string): Record<string, unknown> | undefined {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findTypedLdJson(item, type);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  }
-  if (!isRecord(value)) return undefined;
-  const graph = value["@graph"];
-  if (Array.isArray(graph)) {
-    for (const item of graph) {
-      const found = findTypedLdJson(item, type);
-      if (found !== undefined) return found;
-    }
-  }
-  const rawType = value["@type"];
-  const types = Array.isArray(rawType) ? rawType : [rawType];
-  return types.some((item) => item === type) ? value : undefined;
 }
 
 function readFirstOffer(value: unknown): Record<string, unknown> | undefined {
@@ -8852,7 +8828,7 @@ function collectProductCodes(product: Record<string, unknown> | undefined): stri
 // Kun 12-14 sifre (EAN-13/UPC/GTIN-14): 8-sifrede tall i URL-er er som regel
 // interne produkt-ID-er (prisjakt p=, csmegastore /i/…) og forgifter kodesøkene.
 function collectProductCodesFromUrl(parsedUrl: URL): string[] {
-  return uniqueStrings(`${parsedUrl.pathname} ${parsedUrl.search}`.match(/\b\d{12,14}\b/g) ?? []);
+  return readProductCodesFromUrl(parsedUrl.href);
 }
 
 // Mange butikker viser EAN/GTIN kun i spesifikasjonstabellen (<th>EAN</th><td>…</td>
@@ -10076,6 +10052,10 @@ function renderNotice(
     .provider-prisjakt {
       background: #00a9ce;
       color: #ffffff;
+    }
+    .provider-pokepris {
+      background: ${PROVIDER_COLORS.pokepris!.bg};
+      color: ${PROVIDER_COLORS.pokepris!.fg};
     }
     .provider-godpris {
       background: #21003f;
@@ -12383,7 +12363,7 @@ function isRegionPricePlanAlternative(value: unknown): boolean {
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
+    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.details === undefined || typeof value.details === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
@@ -12847,6 +12827,7 @@ function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): s
   ].join("\n");
 }
 function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "pokepris") return "pokepris";
   if (priceMatch.source === "godpris") return "godpris";
   if (priceMatch.source === "klarna") return "klarna";
   if (priceMatch.source === "prisradar") return "prisradar";
@@ -12869,6 +12850,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.sourceName !== undefined) return priceMatch.sourceName;
+  if (priceMatch.source === "pokepris") return PROVIDER_NAMES.pokepris!;
   if (priceMatch.source === "godpris") return "Godpris";
   if (priceMatch.source === "klarna") return "Klarna";
   if (priceMatch.source === "prisradar") return "Prisradar";
@@ -12964,6 +12946,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
   return [
     `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
     alternatives.map(formatPriceMatchTooltipOffer).join("\n"),
+    ...(priceMatch.details !== undefined ? [priceMatch.details] : []),
   ].join("\n\n");
 }
 function isFlightSearchPriceMatch(priceMatch: PriceMatchOffer): boolean {

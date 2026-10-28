@@ -5,6 +5,8 @@
   "version": "0.2.21",
   "permissions": ["storage", "tabs"],
   "host_permissions": [
+    "https://www.pokepris.no/*",
+    "https://pokepris.no/*",
     "https://browser-extension-backend.cloud.pji.nu/*",
     "https://native-backend.cloud.pji.nu/*",
     "https://godpris.no/*",

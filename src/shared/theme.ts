@@ -59,7 +59,8 @@ const darkProviderColors = { ...PROVIDER_COLORS,
 };
 const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {
   const pale = ["#ffffff", "#fff7f0", "#f3f4f6"].includes(colors.bg.toLowerCase());
-  const declarations = pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);`
+  const declarations = "preserveInDark" in colors && colors.preserveInDark === true ? ""
+    : pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);`
     : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
   return declarations ? `:root[data-cbn-theme="dark"] .provider-${id}, :root[data-cbn-theme="dark"] .badge-${id}, :host([data-cbn-theme="dark"]) .provider-${id} {${declarations}}` : "";
 }).join("\n");
