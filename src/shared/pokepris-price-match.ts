@@ -1,12 +1,14 @@
 import { isRecord, parseUrl } from "./cashback.js";
 import type { GetPriceMatchForProductMessage, PriceMatchOffer } from "./extension-messages.js";
 import { readPriceAmount, formatPrice } from "./price.js";
-import { findTypedLdJson, readLdJsonScripts, readNextFlightValues, findStructuredProperty, selectProductLdJson } from "./product-data.js";
-import { buildProductMatchAnchor, scoreProductCandidateMatch, MIN_PRODUCT_MATCH_SCORE, isSameProductUrl } from "./product-match.js";
-import { readTcgProductKind, readTcgLanguage, normalizeTcgText, normalizeTcgProductTitle } from "./tcg-product-match.js";
+import { findTypedLdJson, readLdJsonScripts, readNextFlightValues, findStructuredProperty, selectProductLdJson, readStructuredProductCodes } from "./product-data.js";
+import { buildProductMatchAnchor, scoreProductCandidateMatch, MIN_PRODUCT_MATCH_SCORE, isSameProductUrl, isValidGtin, readProductCodesFromUrl } from "./product-match.js";
+import { readTcgProductKind, readTcgLanguage, normalizeTcgText, normalizeTcgProductTitle, hasTcgSetNameConflict } from "./tcg-product-match.js";
 import { PROVIDER_NAMES, PROVIDER_TIPS } from "./provider-data.js";
 import { isPrisjaktProductForAnyOffer, type JsonRequest } from "./prisjakt-price-match.js";
 import { isKlarnaProductForOfferUrls } from "./klarna-price-match.js";
+import { isPrisradarProductForOfferUrls } from "./prisradar-price-match.js";
+import { isGodprisProductForOfferUrls } from "./godpris-price-match.js";
 import { type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 
 type TextRequest = (url: string, init?: {
@@ -223,6 +225,7 @@ async function readProductPage(html: string, productUrl: string, message: GetPri
   const expectedLanguage = readTcgLanguage(message.productLanguage ?? message.searchTerm);
   if (language === undefined || (expectedLanguage !== undefined && expectedLanguage.code !== language.code)) return reject("language-mismatch");
   if (!direct) {
+    if (hasTcgSetNameConflict(buildSearchTerm(message.searchTerm), buildSearchTerm(name))) return reject("set-name-mismatch");
     if (typeof setName === "string" && normalizeTcgProductTitle(product.name).includes(normalizeTcgProductTitle(setName)) && !normalizeTcgProductTitle(message.searchTerm).includes(normalizeTcgProductTitle(setName))) return reject("set-name-mismatch");
     const anchorWords = new Set(normalizeTcgProductTitle(buildSearchTerm(message.searchTerm)).split(" "));
     if (!normalizeTcgProductTitle(buildSearchTerm(product.name)).split(" ").every((word) => anchorWords.has(word))) return reject("product-name-mismatch");
@@ -256,14 +259,19 @@ async function readProductPage(html: string, productUrl: string, message: GetPri
       ? [{ shopName: seller.name, offerUrl: url.href }] : [];
   });
   const matchedCurrentMerchant = identityOffers.some((offer) => [message.url, message.productUrl].some((url) => isSameProductUrl(url, offer.offerUrl)));
+  const currentCodes = new Set((message.codes ?? []).filter(isValidGtin).map((code) => code.padStart(14, "0")));
+  const matchedProductCode = [...readStructuredProductCodes(product), ...identityOffers.flatMap((offer) => readProductCodesFromUrl(offer.offerUrl))]
+    .some((code) => isValidGtin(code) && currentCodes.has(code.padStart(14, "0")));
   let matchedComparisonProduct = false;
   const currentName = normalizeTcgProductTitle(buildSearchTerm(message.searchTerm));
   const candidateName = normalizeTcgProductTitle(buildSearchTerm(product.name));
   const exactTitle = currentName === candidateName ||
     (!/^(?:booster|elite trainer|bundle|tin)\b/.test(candidateName) && currentName === `mega evolution ${candidateName}`);
-  if (!direct && (expectedLanguage === undefined || !exactTitle) && !matchedCurrentMerchant) {
+  if (!direct && (expectedLanguage === undefined || !exactTitle) && !matchedCurrentMerchant && !matchedProductCode) {
     matchedComparisonProduct = await isPrisjaktProductForAnyOffer(message.url, identityOffers, options.requestJson) ||
-      await isKlarnaProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
+      await isKlarnaProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) ||
+      await isPrisradarProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) ||
+      await isGodprisProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
     if (!matchedComparisonProduct) return reject("unverified-product-identity");
   }
   const preorders = rawOffers.filter(isRecord).flatMap((offer) => {
@@ -280,7 +288,7 @@ async function readProductPage(html: string, productUrl: string, message: GetPri
     productName: name, productUrl, shopName: best.shopName,
     amount: best.amount, price: best.price, currency: best.currency, offerUrl: best.offerUrl,
     matchedCurrentMerchant,
-    matchedExactProduct: direct || matchedCurrentMerchant || matchedComparisonProduct,
+    matchedExactProduct: direct || matchedCurrentMerchant || matchedComparisonProduct || matchedProductCode,
     details: `${language.label}. ${offers.length} tilbud på lager. ${PROVIDER_TIPS.pokepris}`,
     alternatives: offers.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer),
   };

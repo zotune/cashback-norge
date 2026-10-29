@@ -7,12 +7,17 @@ import {
   hasProductVariantConflict,
   isLikelyGtin,
   isLikelyMpn,
+  isValidGtin,
+  readProductCodesFromUrl,
   scoreProductCandidateMatch,
   MIN_PRODUCT_MATCH_SCORE,
   type ProductMatchAnchor,
 } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
+import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
+import { isExplicitPreorder } from "./price-match-availability.js";
+import { parseUrl, isRecord } from "./cashback.js";
 
 type TextRequest = (
   url: string,
@@ -54,6 +59,14 @@ export async function findGodprisPriceMatch(
   ]);
   const anchor = buildProductMatchAnchor(message);
 
+  const directUrl = parseUrl(message.url);
+  if (directUrl?.hostname.replace(/^www\./, "") === "godpris.no" && /^\/produkt\/\d+\/?$/.test(directUrl.pathname)) {
+    const id = directUrl.pathname.split("/")[2]!;
+    const html = await requestText(`${GODPRIS_PRODUCT_URL}${id}`);
+    const offer = html === undefined ? undefined : readGodprisProductPage(html, id, anchor);
+    return offer === undefined ? undefined : { ...offer, matchedExactProduct: true };
+  }
+
   const visitedProductIds = new Set<string>();
   for (const query of searchQueries) {
     // Prøv alle godkjente kandidater i scorerekkefølge, ikke bare den beste:
@@ -72,6 +85,18 @@ export async function findGodprisPriceMatch(
   }
 
   return undefined;
+}
+
+export async function isGodprisProductForOfferUrls(message: GetPriceMatchForProductMessage, offerUrls: string[], requestJson: JsonRequest = fetchJson): Promise<boolean> {
+  const current = parseUrl(message.url);
+  if (current?.hostname.replace(/^www\./, "") !== "godpris.no" || !/^\/produkt\/\d+\/?$/.test(current.pathname)) return false;
+  const currentId = current.pathname.split("/")[2];
+  const codes = [...new Set(offerUrls.flatMap(readProductCodesFromUrl).filter(isValidGtin))].slice(0, 3);
+  for (const code of codes) {
+    const ids = await fetchGodprisProductIds(code, requestJson, buildProductMatchAnchor(message));
+    if (ids.includes(currentId!)) return true;
+  }
+  return false;
 }
 
 async function fetchGodprisProductIds(
@@ -120,6 +145,33 @@ function readGodprisProductPage(
   fallbackProductId: string,
   anchor: ProductMatchAnchor,
 ): PriceMatchOffer | undefined {
+  // The current site publishes concrete seller offers as JSON-LD; the older
+  // Inertia payload remains a fallback for saved pages and older deployments.
+  const structured = selectProductLdJson(readLdJsonScripts(html));
+  if (structured !== undefined) {
+    const productName = withLeadingBrand(readStringLike(structured.name),
+      readStringLike(isRecord(structured.brand) ? structured.brand.name : structured.brand));
+    if (productName === undefined || hasProductVariantConflict(anchor, productName) ||
+      scoreProductCandidateMatch(anchor, { title: productName }) < MIN_PRODUCT_MATCH_SCORE) return undefined;
+    const aggregate = isRecord(structured.offers) ? structured.offers : undefined;
+    const rawOffers = Array.isArray(structured.offers) ? structured.offers : Array.isArray(aggregate?.offers) ? aggregate.offers : [];
+    const offers = rawOffers.filter(isRecord).flatMap((item) => {
+      const stock = readStringLike(item.availability)?.replace(/^https?:\/\/schema\.org\//, "");
+      const amount = readNumberLike(item.price);
+      const shopName = readStringLike(isRecord(item.seller) ? item.seller.name : undefined);
+      const currency = readStringLike(item.priceCurrency);
+      if (stock !== "InStock" || isExplicitPreorder(item.isPreorder, item.is_preorder) ||
+        item.itemCondition === "https://schema.org/UsedCondition" || amount === undefined || amount <= 0 || shopName === undefined || currency !== "NOK") return [];
+      const url = parseUrl(readStringLike(item.url) ?? "");
+      return [{ shopName, amount, currency, price: formatPrice(amount, currency), shippingPrice: "Frakt ukjent",
+        ...(url !== undefined && ["https:", "http:"].includes(url.protocol) ? { offerUrl: url.href } : {}) }];
+    }).sort((a, b) => a.amount - b.amount);
+    const best = offers[0];
+    if (best === undefined) return undefined;
+    return { ...best, source: "godpris", sourceName: "Godpris", productName,
+      productUrl: `${GODPRIS_PRODUCT_URL}${fallbackProductId}`,
+      alternatives: offers.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer) };
+  }
   const page = readGodprisDataPage(html);
   const props = isPlainRecord(page?.props) ? page.props : undefined;
   const product = isPlainRecord(props?.product) ? props.product : undefined;
@@ -192,7 +244,7 @@ function readGodprisOffer(value: unknown): Omit<PriceMatchOffer, "productName" |
 
 async function fetchJson(url: string, init?: Parameters<JsonRequest>[1]): Promise<unknown | undefined> {
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
     if (!response.ok) return undefined;
     return response.json();
   } catch {
@@ -202,7 +254,7 @@ async function fetchJson(url: string, init?: Parameters<JsonRequest>[1]): Promis
 
 async function fetchText(url: string, init?: Parameters<TextRequest>[1]): Promise<string | undefined> {
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
     if (!response.ok) return undefined;
     return response.text();
   } catch {

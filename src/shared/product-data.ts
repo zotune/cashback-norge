@@ -1,5 +1,5 @@
-import { isRecord } from "./cashback.js";
-import { decodeHtmlEntities } from "./product-match.js";
+import { isRecord, parseUrl } from "./cashback.js";
+import { decodeHtmlEntities, isSameProductUrl } from "./product-match.js";
 import { readTcgLanguage } from "./tcg-product-match.js";
 
 export function parseLdJson(text: string): unknown {
@@ -34,6 +34,48 @@ export function readNextFlightValues(html: string): unknown[] {
     try { values.push(JSON.parse(row.slice(separator + 1))); } catch { /* Skip references and streamed text. */ }
   }
   return values;
+}
+
+// Choose the actual product record, not a recommendation or a later Flight reference.
+export function readNextProductData(html: string, productUrl: string): Record<string, unknown> | undefined {
+  const pending = [...readNextFlightValues(html)];
+  for (let visited = 0; visited < pending.length && visited < 50_000; visited += 1) {
+    const item = pending[visited];
+    if (Array.isArray(item)) pending.push(...item);
+    else if (isRecord(item)) {
+      if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) &&
+        typeof item.title === "string" && Array.isArray(item.offers)) return item;
+      pending.push(...Object.values(item));
+    }
+  }
+  return undefined;
+}
+
+export function readStructuredProductCodes(product: Record<string, unknown> | undefined): string[] {
+  if (product === undefined) return [];
+  return [...new Set(Object.entries(product).flatMap(([key, raw]) => {
+    if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) return [];
+    return (Array.isArray(raw) ? raw : [raw]).flatMap((value) =>
+      typeof value === "string" || typeof value === "number" ? [String(value).trim()] : []).filter(Boolean);
+  }))];
+}
+
+export function readComparisonProductLdJson(html: string, rawUrl: string): Record<string, unknown> | undefined {
+  const schema = selectProductLdJson(readLdJsonScripts(html));
+  if (schema !== undefined) return schema;
+  const url = parseUrl(rawUrl);
+  if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return undefined;
+  const product = readNextProductData(html, rawUrl);
+  if (product === undefined) return undefined;
+  const brand = isRecord(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : undefined;
+  const attributes = isRecord(product.attributes) && Array.isArray(product.attributes.grouped)
+    ? product.attributes.grouped.filter(isRecord).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord) : []) : [];
+  return { "@type": "Product", name: product.title, url: product.url,
+    ...(brand !== undefined ? { brand } : {}),
+    ...(typeof product.ean === "string" && product.ean !== "$undefined" ? { gtin: product.ean } : {}),
+    additionalProperty: attributes.filter((attribute) => /^(?:språk|language)$/i.test(String(attribute.title)))
+      .map((attribute) => ({ name: attribute.title, value: attribute.value })),
+  };
 }
 
 export function findStructuredProperty(value: unknown, name: string): unknown {

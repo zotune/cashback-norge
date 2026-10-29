@@ -175,7 +175,12 @@ tilbudsvisning.
   ukjent språk. Uten oppgitt språk skal en butikk-URL fra Pokepris bekreftes
   mot samme produkt-ID via Prisjakts eksisterende API før treffet godtas.
   På Klarna kan en gyldig EAN/GTIN fra de konkrete butikklenkene bekreftes
-  mot sidens produkt-ID i Klarnas API. En utsolgt butikklenke kan bekrefte
+  mot sidens produkt-ID i Klarnas API. Det samme gjelder Godpris og Prisradar
+  når deres faktiske kodeoppslag returnerer den konkrete produkt-ID-en/URL-en.
+  Bruk også gyldige GTIN-er fra sidens strukturerte produktmetadata; UPC og
+  EAN kan sammenlignes som GTIN-14 med ledende nuller. Et kodetreff må fortsatt
+  avvises ved motstridende sett, språk eller pakning i titlene.
+  En utsolgt butikklenke kan bekrefte
   identitet selv om prisen ikke skal vises. Ikke hardkod produkt-ID-er fra
   topplisten eller regresjonstestene i matcheren.
   Oppføringer merket `is_preorder` i sidedata skal utelates selv om JSON-LD
@@ -241,6 +246,18 @@ tilbudsvisning.
   en reell side blokkerer testnettleseren; en API-test beviser ikke at den
   blokkerte siden viser panelet. Topplisten er testutvalg, ikke en whitelist
   i produksjonskoden eller bevis på at alle kategorisider er kontrollert.
+  `scripts/dev/audit-tcg-categories.mts` kontrollerer også Klarna (opptil 48
+  produkter via offentlig paginering), Prisradar og Godpris (første listeside).
+  Rapporter dekning separat for hver kilde. Gjenbruk snapshots ved iterasjon
+  med `--reuse-snapshots`, og skill produktmetadata fra kategorien fra en
+  verifisert produktside. `e2e-pokepris.mjs --categories` velger aktuelle
+  Prisradar-/Godpris-regresjoner fra rapporten, uten ID-whitelist i matcheren.
+- Godpris publiserer nå navngitt Product og konkrete butikktilbud som JSON-LD.
+  Les disse før eldre Inertia-`data-page`, og bruk aldri bare AggregateOffer-
+  minimum som kjøpbart tilbud. Prisradar-metadata og priser skal bruke samme
+  komplette Next-produktoppføring for riktig URL; referanser og anbefalte
+  produkter skal ikke overta. Gjenbruk `src/shared/product-data.ts` i klienten
+  og adapteren for koder og metadata.
 - **En grønn Daily crawl betyr ikke at alle kilder lyktes.**
   `collectProviderOffers` kan utelate en kilde og fortsatt la jobben lykkes.
   Les loggen for den aktuelle provideren, sjekk antall tilbud og kontroller den

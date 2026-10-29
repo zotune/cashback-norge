@@ -10,7 +10,7 @@ import {
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
 import { decodeHtmlEntities, readProductCodesFromUrl } from "../shared/product-match";
-import { findTypedLdJson, parseLdJson, readProductLanguage, readProductOfferLanguage, selectProductLdJson } from "../shared/product-data";
+import { findTypedLdJson, parseLdJson, readProductLanguage, readProductOfferLanguage, selectProductLdJson, readComparisonProductLdJson, readStructuredProductCodes } from "../shared/product-data";
 import { isPokeprisProductUrl } from "../shared/pokepris-price-match";
 import {
   readPackageQuantityFromText,
@@ -8750,7 +8750,10 @@ function hasCommerceActionSignal(): boolean {
 }
 
 function findProductLdJson(): Record<string, unknown> | undefined {
-  return selectProductLdJson(readLdJsonEntries());
+  const product = selectProductLdJson(readLdJsonEntries());
+  if (product !== undefined || window.location.hostname.replace(/^www\./, "") !== "prisradar.no") return product;
+  return readComparisonProductLdJson([...document.scripts].filter((script) => script.textContent?.includes("self.__next_f.push"))
+    .map((script) => script.outerHTML).join(""), window.location.href);
 }
 
 function findOrganizationName(): string | undefined {
@@ -8810,19 +8813,7 @@ function readUrlValue(value: unknown): string | undefined {
 }
 
 function collectProductCodes(product: Record<string, unknown> | undefined): string[] {
-  if (product === undefined) return [];
-  const codes = new Set<string>();
-  for (const [key, value] of Object.entries(product)) {
-    if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) continue;
-    const values = Array.isArray(value) ? value : [value];
-    for (const item of values) {
-      if (typeof item === "string" || typeof item === "number") {
-        const code = String(item).trim();
-        if (code.length > 0) codes.add(code);
-      }
-    }
-  }
-  return [...codes];
+  return readStructuredProductCodes(product);
 }
 
 // Kun 12-14 sifre (EAN-13/UPC/GTIN-14): 8-sifrede tall i URL-er er som regel

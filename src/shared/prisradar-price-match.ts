@@ -2,9 +2,10 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
-import { hasModelNumberConflict, hasNumericModelConflict } from "./product-match.js";
+import { hasModelNumberConflict, hasNumericModelConflict, isSameProductUrl, isValidGtin, readProductCodesFromUrl } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
-import { readNextFlightPayloads } from "./product-data.js";
+import { readNextProductData } from "./product-data.js";
+import { isExplicitPreorder } from "./price-match-availability.js";
 
 type TextRequest = (
   url: string,
@@ -91,6 +92,17 @@ export async function findPrisradarPriceMatch(
     uniqueStrings([message.searchTerm, ...(options.anchorSearchTerms ?? [])]),
     message,
   );
+}
+
+export async function isPrisradarProductForOfferUrls(message: GetPriceMatchForProductMessage, offerUrls: string[], requestJson: JsonRequest = fetchJson): Promise<boolean> {
+  const current = readPrisradarProductUrl(message.url);
+  if (current === undefined) return false;
+  const codes = [...new Set(offerUrls.flatMap(readProductCodesFromUrl).filter(isValidGtin))].slice(0, 3);
+  for (const code of codes) {
+    const products = await fetchPrisradarProducts(code, requestJson);
+    if (products.some((product) => isSameProductUrl(current, product.productUrl))) return true;
+  }
+  return false;
 }
 
 async function fetchPrisradarOfferForQueries(
@@ -691,7 +703,7 @@ async function fetchPrisradarOfferForUrl(
 }
 
 function readPrisradarProductPage(html: string, fallbackProductUrl: string): PriceMatchOffer | undefined {
-  const product = readPrisradarProductFromNextFlight(html);
+  const product = readNextProductData(html, fallbackProductUrl);
   if (!isPlainRecord(product)) return undefined;
 
   const productName = readStringLike(product.title) ?? readStringLike(product.name) ?? "Prisradar-produkt";
@@ -848,24 +860,6 @@ function transliterateNorwegianCharacters(value: string): string {
 
 const GENERIC_MERCHANT_KEYS = new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
 
-function readPrisradarProductFromNextFlight(html: string): Record<string, unknown> | undefined {
-  for (const payload of readNextFlightPayloads(html)) {
-    if (!payload.includes('"product":')) continue;
-
-    const productJson = extractJsonObjectAfter(payload, "\"product\":");
-    if (productJson === undefined) continue;
-
-    try {
-      const product = JSON.parse(productJson.replace(/"\$undefined"/g, "null")) as unknown;
-      if (isPlainRecord(product)) return product;
-    } catch {
-      continue;
-    }
-  }
-
-  return undefined;
-}
-
 function readPrisradarOffer(value: unknown): PrisradarOffer | undefined {
   if (!isPlainRecord(value)) return undefined;
   const shop = isPlainRecord(value.shop) ? value.shop : undefined;
@@ -874,6 +868,7 @@ function readPrisradarOffer(value: unknown): PrisradarOffer | undefined {
   const availability = readStringLike(value.availability)?.toLowerCase();
   const isUsed = value.isUsed === true;
   if (amount === undefined || amount <= 0 || shopName === undefined || isUsed) return undefined;
+  if (isExplicitPreorder(value.isPreorder, value.is_preorder, availability)) return undefined;
   if (availability !== undefined && BAD_AVAILABILITY_STATUSES.has(availability)) return undefined;
 
   const shippingAmount = readShippingAmount(value);
@@ -920,49 +915,11 @@ function readPrisradarProductUrl(rawUrl: string | undefined): string | undefined
   if (rawUrl === undefined) return undefined;
   try {
     const url = new URL(rawUrl);
-    if (!url.hostname.replace(/^www\./, "").toLowerCase().endsWith("prisradar.no")) return undefined;
+    if (url.hostname.replace(/^www\./, "").toLowerCase() !== "prisradar.no") return undefined;
     return PRISRADAR_PRODUCT_PATH_PATTERN.test(url.pathname) ? `${url.origin}${url.pathname}` : undefined;
   } catch {
     return undefined;
   }
-}
-
-function extractJsonObjectAfter(value: string, marker: string): string | undefined {
-  const markerIndex = value.indexOf(marker);
-  if (markerIndex < 0) return undefined;
-
-  const objectStart = value.indexOf("{", markerIndex + marker.length);
-  if (objectStart < 0) return undefined;
-
-  let depth = 0;
-  let escaped = false;
-  let inString = false;
-  for (let index = objectStart; index < value.length; index += 1) {
-    const character = value[index];
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (character === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (character === "\"") {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (character === "{") {
-      depth += 1;
-      continue;
-    }
-    if (character === "}") {
-      depth -= 1;
-      if (depth === 0) return value.slice(objectStart, index + 1);
-    }
-  }
-
-  return undefined;
 }
 
 function formatNokPrice(amount: number): string {

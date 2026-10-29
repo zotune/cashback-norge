@@ -161,6 +161,25 @@ function flight(value: unknown): string {
   return `<script>self.__next_f.push(${JSON.stringify([1, `1:${JSON.stringify(value)}\n`])})</script>`;
 }
 
+test("a verified GTIN from structured comparison metadata confirms identity without guessing language", async () => {
+  const code = "0196214142138";
+  const fixture = transport(page({ offers: [offer(1048, "InStock", `https://shop.example/item-${code}`)] }));
+  const comparison = { ...message, url: "https://prisradar.no/produkter/prismatic-evolutions", codes: [code.slice(1)] };
+  const result = await findPokeprisPriceMatch(comparison, fixture.request, { requestJson: async () => { throw new Error("Code proof must not require a search API"); } });
+  assert.equal(result?.matchedExactProduct, true);
+  assert.equal(result?.amount, 1048);
+  assert.equal(await findPokeprisPriceMatch({ ...comparison, codes: ["0196214142139"] }, fixture.request), undefined);
+  assert.equal(await findPokeprisPriceMatch({ ...comparison, productLanguage: "jp" }, fixture.request), undefined);
+});
+
+test("a retailer GTIN cannot override an explicit conflicting set name in a comparison title", async () => {
+  const code = "0196214142138";
+  const fixture = transport(page({ name: "Mega Evolution Booster Box", offers: [offer(1048, "InStock", `https://shop.example/item-${code}`)] }), [{ id: 3594, name: "Mega Evolution Booster Box" }]);
+  const result = await findPokeprisPriceMatch({ ...message, url: "https://godpris.no/produkt/12345",
+    searchTerm: "Pokémon Perfect Order Booster Box - Mega Evolution", codes: [code] }, fixture.request);
+  assert.equal(result, undefined);
+});
+
 test("public taxonomy lookup supports an unseen set and product ID without a curated product list", async () => {
   const name = "Future Aurora Elite Trainer Box";
   const target = "https://www.pokepris.no/produkt/987654321";

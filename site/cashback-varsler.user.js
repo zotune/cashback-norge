@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793220616
+// @version      1793231891
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -2177,19 +2177,21 @@
     if (/\b(?:case|kartong)\b/.test(normalized)) return "case";
     if (/\b(?:elite trainer box|etb)\b/.test(normalized)) return "etb";
     if (/\bbooster (?:box|display)\b/.test(normalized)) return "booster-box";
-    if (/\bbooster (?:pack|pakke)\b/.test(normalized)) return "booster-pack";
     if (/\bblister\b/.test(normalized)) return "blister";
     if (/\bpremium deck (?:set|sett)\b/.test(normalized)) return "premium-deck-set";
+    if (/\bbuild (?:and )?battle stadium\b/.test(normalized)) return "build-battle-stadium";
     if (/\bbuild (?:and )?battle\b/.test(normalized)) return "build-battle";
     if (/\bsurprise box\b/.test(normalized)) return "surprise-box";
     if (/\bbinder\b/.test(normalized)) return "binder";
     if (/\b(?:collection box|box samling)\b/.test(normalized)) return "collection-box";
     if (/\bultra premium collection\b/.test(normalized)) return "ultra-premium-collection";
     if (/\bpremium collection\b/.test(normalized)) return "premium-collection";
-    if (/\bcollection\b/.test(normalized)) return "collection";
     if (/\b(?:booster )?bundle\b/.test(normalized)) return "bundle";
+    if (/\bmini tin\b/.test(normalized) && /\bdisplay\b/.test(normalized)) return "mini-tin-display";
     if (/\bmini tin\b/.test(normalized)) return "mini-tin";
     if (/\btin\b/.test(normalized)) return "tin";
+    if (/\bbooster (?:pack|pakke)\b/.test(normalized)) return "booster-pack";
+    if (/\bcollection\b/.test(normalized)) return "collection";
     return void 0;
   }
   function readTcgLanguage(text) {
@@ -2198,7 +2200,11 @@
       ["en", "Engelsk", /\b(?:engelsk|english|en)\b/],
       ["jp", "Japansk", /\b(?:japansk|japanese|jpn|jp|ja)\b/],
       ["ko", "Koreansk", /\b(?:koreansk|korean|kor|ko)\b/],
-      ["zh", "Kinesisk", /\b(?:kinesisk|chinese|zh|cn)\b/]
+      ["zh", "Kinesisk", /\b(?:kinesisk|chinese|zh|cn)\b/],
+      ["es", "Spansk", /\b(?:spansk|spanish|espanol|es)\b/],
+      ["de", "Tysk", /\b(?:tysk|german|deutsch|de)\b/],
+      ["fr", "Fransk", /\b(?:fransk|french|francais|fr)\b/],
+      ["it", "Italiensk", /\b(?:italiensk|italian|italiano|it)\b/]
     ]) if (pattern.test(normalized)) return { code, label };
     return void 0;
   }
@@ -2206,12 +2212,16 @@
     return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
   function normalizeTcgProductTitle(text) {
-    return normalizeTcgText(text).replace(/\bpokemon(?:\s+tcg)?\b|\btrading card game\b/g, " ").replace(/\b(?:engelsk|english|en|japansk|japanese|jpn|jp|ja|koreansk|korean|kor|ko|kinesisk|chinese|zh|cn)\b/g, " ").replace(/\bbooster\s*(?:box|boks)\s+display\b|\bbooster\s+display\s+(?:box|boks)\b|\bbooster\s*(?:box|boks|display)\b/g, "booster box").replace(/\bbooster\s*(?:pack|pakke)\b/g, "booster pack").replace(/\bbooster bundle\b/g, "bundle").replace(/\betb\b/g, "elite trainer box").replace(/\bcelebration collection 30th(?: anniversary)?\b/g, "30th celebration").replace(/\b30th anniversary first partner illustration\b/g, "first partner illustration").replace(/\bserie\b/g, "series").replace(/\bbinder collection\b/g, "binder").replace(/\bcollection box surprise box\b/g, "surprise box").replace(/\s+/g, " ").trim();
+    return normalizeTcgText(text).replace(/\bpokemon(?:\s+tcg)?\b|\btrading card game\b/g, " ").replace(/\b(?:engelsk|english|en|japansk|japanese|jpn|jp|ja|koreansk|korean|kor|ko|kinesisk|chinese|zh|cn|spansk|spanish|espanol|es|tysk|german|deutsch|de|fransk|french|francais|fr|italiensk|italian|italiano|it)\b/g, " ").replace(/\bbooster\s*(?:box|boks)\s+display\b|\bbooster\s+display\s+(?:box|boks)\b|\bbooster\s*(?:box|boks|display)\b/g, "booster box").replace(/\bbooster\s*(?:pack|pakke)\b/g, "booster pack").replace(/\bbooster bundle\b/g, "bundle").replace(/\betb\b/g, "elite trainer box").replace(/\belite trainer boks\b/g, "elite trainer box").replace(/\bpremium samleboks\b/g, "premium collection").replace(/\bex (?:box|boks|samleboks)\b/g, "ex collection box").replace(/\bsamlekortspill\b|\bkortspill fra outland\b/g, " ").replace(/\bcelebration collection 30th(?: anniversary)?\b/g, "30th celebration").replace(/\b30th anniversary first partner illustration\b/g, "first partner illustration").replace(/\bserie\b/g, "series").replace(/\bbinder collection\b/g, "binder").replace(/\bcollection box surprise box\b/g, "surprise box").replace(/\s+/g, " ").trim();
   }
   function isSameTcgProductTitle(first, second) {
     if (hasTcgProductVariantConflict(first, second)) return false;
     const canonical = (text) => normalizeTcgProductTitle(text).replace(/\b(?:scarlet violet|sword shield)\s+/g, "").replace(/^mega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/, "");
     return canonical(first) === canonical(second);
+  }
+  function hasTcgSetNameConflict(first, second) {
+    const signature = (text) => [...new Set(normalizeTcgProductTitle(text).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean))].sort().join(" ");
+    return signature(first) !== signature(second);
   }
   function hasTcgProductVariantConflict(first, second) {
     if (!/pok[eé]mon|\btcg\b/i.test(`${first} ${second}`)) return false;
@@ -2723,6 +2733,162 @@
       maximumFractionDigits: 2
     }).format(amount);
   }
+  function parseLdJson(text) {
+    return decodeLdJsonStrings(JSON.parse(text));
+  }
+  function readLdJsonScripts(html) {
+    const entries = [];
+    for (const match of html.matchAll(/<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+      try {
+        entries.push(parseLdJson(match[1] ?? ""));
+      } catch {
+      }
+    }
+    return entries;
+  }
+  function readNextFlightPayloads(html) {
+    const payloads = [];
+    for (const match of html.matchAll(/<script\b[^>]*>\s*self\.__next_f\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
+      try {
+        const row = JSON.parse(match[1] ?? "");
+        if (Array.isArray(row) && row[0] === 1 && typeof row[1] === "string") payloads.push(row[1]);
+      } catch {
+      }
+    }
+    return payloads;
+  }
+  function readNextFlightValues(html) {
+    const values = [];
+    for (const row of readNextFlightPayloads(html).join("").split("\n")) {
+      const separator = row.indexOf(":");
+      if (separator < 0) continue;
+      try {
+        values.push(JSON.parse(row.slice(separator + 1)));
+      } catch {
+      }
+    }
+    return values;
+  }
+  function readNextProductData(html, productUrl) {
+    const pending = [...readNextFlightValues(html)];
+    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
+      const item = pending[visited];
+      if (Array.isArray(item)) pending.push(...item);
+      else if (isRecord$5(item)) {
+        if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
+        pending.push(...Object.values(item));
+      }
+    }
+    return void 0;
+  }
+  function readStructuredProductCodes(product) {
+    if (product === void 0) return [];
+    return [...new Set(Object.entries(product).flatMap(([key, raw]) => {
+      if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) return [];
+      return (Array.isArray(raw) ? raw : [raw]).flatMap((value) => typeof value === "string" || typeof value === "number" ? [String(value).trim()] : []).filter(Boolean);
+    }))];
+  }
+  function readComparisonProductLdJson(html, rawUrl) {
+    const schema = selectProductLdJson(readLdJsonScripts(html));
+    if (schema !== void 0) return schema;
+    const url = parseUrl$1(rawUrl);
+    if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return void 0;
+    const product = readNextProductData(html, rawUrl);
+    if (product === void 0) return void 0;
+    const brand = isRecord$5(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
+    const attributes = isRecord$5(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$5).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$5) : []) : [];
+    return {
+      "@type": "Product",
+      name: product.title,
+      url: product.url,
+      ...brand !== void 0 ? { brand } : {},
+      ...typeof product.ean === "string" && product.ean !== "$undefined" ? { gtin: product.ean } : {},
+      additionalProperty: attributes.filter((attribute) => /^(?:språk|language)$/i.test(String(attribute.title))).map((attribute) => ({ name: attribute.title, value: attribute.value }))
+    };
+  }
+  function findStructuredProperty(value, name) {
+    const pending = [value];
+    for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
+      const item = pending.pop();
+      if (Array.isArray(item)) pending.push(...item);
+      else if (isRecord$5(item)) {
+        if (Object.hasOwn(item, name)) return item[name];
+        pending.push(...Object.values(item));
+      }
+    }
+    return void 0;
+  }
+  function readProductLanguage(product, titles) {
+    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$5) : [];
+    const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
+    const languages = new Set(values.filter((value) => typeof value === "string").map((value) => readTcgLanguage(value)?.code).filter((code) => code !== void 0));
+    return languages.size === 1 ? [...languages][0] : void 0;
+  }
+  function readProductOfferLanguage(html, productId) {
+    const rows = findStructuredProperty(readNextFlightValues(html), "offerRows");
+    if (!Array.isArray(rows)) return void 0;
+    const names = rows.filter(isRecord$5).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
+    return readProductLanguage(void 0, names);
+  }
+  function findTypedLdJson(value, type) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found2 = findTypedLdJson(item, type);
+        if (found2 !== void 0) return found2;
+      }
+      return void 0;
+    }
+    if (!isRecord$5(value)) return void 0;
+    const found = Array.isArray(value["@graph"]) ? findTypedLdJson(value["@graph"], type) : void 0;
+    if (found !== void 0) return found;
+    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+    return types.includes(type) ? value : void 0;
+  }
+  function selectProductLdJson(value) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const product = selectProductLdJson(item);
+        if (product !== void 0) return product;
+      }
+      return void 0;
+    }
+    if (!isRecord$5(value)) return void 0;
+    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+    if (types.includes("Product") && typeof value.name === "string" && value.name.trim().length > 0) return value;
+    return Array.isArray(value["@graph"]) ? selectProductLdJson(value["@graph"]) : void 0;
+  }
+  function decodeLdJsonStrings(value) {
+    if (typeof value === "string") return decodeHtmlEntities(value);
+    if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
+    if (isRecord$5(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
+    return value;
+  }
+  function isExplicitPreorder(...values) {
+    return values.some((value) => value === true || typeof value === "string" && /^(?:pre[\s_-]?order(?:ed|able)?|forh[aå]ndsbestilling)$/i.test(value.trim()));
+  }
+  function excludeVerifiedPreorders(offer, facts) {
+    const preorders = facts.filter((fact) => isSameTcgProductTitle(offer.productName, fact.productName)).flatMap((fact) => fact.preorders);
+    if (preorders.length === 0) return offer;
+    const blocked = (item) => preorders.some((preorder) => normalizePriceMatchShopName(preorder.shopName) === normalizePriceMatchShopName(item.shopName) && preorder.amount === item.amount && preorder.currency === item.currency);
+    const alternatives = offer.alternatives?.length ? offer.alternatives : [{ shopName: offer.shopName, price: offer.price, amount: offer.amount, currency: offer.currency }];
+    const remaining = alternatives.filter((alternative) => !blocked(alternative));
+    if (remaining.length === alternatives.length) return offer;
+    const best = remaining[0];
+    if (best === void 0) return void 0;
+    const details = [offer.details, "Bekreftet forhåndsbestilling er utelatt."].filter(Boolean).join(" ");
+    if (!blocked(offer)) return { ...offer, alternatives: remaining, details };
+    const { offerUrl: _offerUrl, sortAmount: _sortAmount, ...base } = offer;
+    return {
+      ...base,
+      shopName: best.shopName,
+      amount: best.amount,
+      price: best.price,
+      currency: best.currency,
+      ...best.sortAmount !== void 0 ? { sortAmount: best.sortAmount } : {},
+      alternatives: remaining,
+      details
+    };
+  }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
   const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
     "discontinued",
@@ -2742,6 +2908,13 @@
       ...options.anchorSearchTerms ?? []
     ]);
     const anchor = buildProductMatchAnchor(message);
+    const directUrl = parseUrl$1(message.url);
+    if (directUrl?.hostname.replace(/^www\./, "") === "godpris.no" && /^\/produkt\/\d+\/?$/.test(directUrl.pathname)) {
+      const id = directUrl.pathname.split("/")[2];
+      const html = await requestText(`${GODPRIS_PRODUCT_URL}${id}`);
+      const offer = html === void 0 ? void 0 : readGodprisProductPage(html, id, anchor);
+      return offer === void 0 ? void 0 : { ...offer, matchedExactProduct: true };
+    }
     const visitedProductIds = /* @__PURE__ */ new Set();
     for (const query of searchQueries) {
       const productIds = await fetchGodprisProductIds(query, requestJson, anchor);
@@ -2756,6 +2929,17 @@
       }
     }
     return void 0;
+  }
+  async function isGodprisProductForOfferUrls(message, offerUrls, requestJson = fetchJson$5) {
+    const current = parseUrl$1(message.url);
+    if (current?.hostname.replace(/^www\./, "") !== "godpris.no" || !/^\/produkt\/\d+\/?$/.test(current.pathname)) return false;
+    const currentId = current.pathname.split("/")[2];
+    const codes = [...new Set(offerUrls.flatMap(readProductCodesFromUrl).filter(isValidGtin))].slice(0, 3);
+    for (const code of codes) {
+      const ids = await fetchGodprisProductIds(code, requestJson, buildProductMatchAnchor(message));
+      if (ids.includes(currentId)) return true;
+    }
+    return false;
   }
   async function fetchGodprisProductIds(query, requestJson, anchor) {
     const normalizedQuery = query.trim();
@@ -2786,6 +2970,42 @@
     return matches.sort((first, second) => second.score - first.score).slice(0, 3).map((match) => match.id);
   }
   function readGodprisProductPage(html, fallbackProductId, anchor) {
+    const structured = selectProductLdJson(readLdJsonScripts(html));
+    if (structured !== void 0) {
+      const productName2 = withLeadingBrand$1(
+        readStringLike$5(structured.name),
+        readStringLike$5(isRecord$5(structured.brand) ? structured.brand.name : structured.brand)
+      );
+      if (productName2 === void 0 || hasProductVariantConflict(anchor, productName2) || scoreProductCandidateMatch(anchor, { title: productName2 }) < MIN_PRODUCT_MATCH_SCORE) return void 0;
+      const aggregate = isRecord$5(structured.offers) ? structured.offers : void 0;
+      const rawOffers = Array.isArray(structured.offers) ? structured.offers : Array.isArray(aggregate?.offers) ? aggregate.offers : [];
+      const offers2 = rawOffers.filter(isRecord$5).flatMap((item) => {
+        const stock = readStringLike$5(item.availability)?.replace(/^https?:\/\/schema\.org\//, "");
+        const amount = readPriceAmount(item.price);
+        const shopName = readStringLike$5(isRecord$5(item.seller) ? item.seller.name : void 0);
+        const currency = readStringLike$5(item.priceCurrency);
+        if (stock !== "InStock" || isExplicitPreorder(item.isPreorder, item.is_preorder) || item.itemCondition === "https://schema.org/UsedCondition" || amount === void 0 || amount <= 0 || shopName === void 0 || currency !== "NOK") return [];
+        const url = parseUrl$1(readStringLike$5(item.url) ?? "");
+        return [{
+          shopName,
+          amount,
+          currency,
+          price: formatPrice(amount, currency),
+          shippingPrice: "Frakt ukjent",
+          ...url !== void 0 && ["https:", "http:"].includes(url.protocol) ? { offerUrl: url.href } : {}
+        }];
+      }).sort((a, b) => a.amount - b.amount);
+      const best2 = offers2[0];
+      if (best2 === void 0) return void 0;
+      return {
+        ...best2,
+        source: "godpris",
+        sourceName: "Godpris",
+        productName: productName2,
+        productUrl: `${GODPRIS_PRODUCT_URL}${fallbackProductId}`,
+        alternatives: offers2.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer)
+      };
+    }
     const page = readGodprisDataPage(html);
     const props = isPlainRecord$6(page?.props) ? page.props : void 0;
     const product = isPlainRecord$6(props?.product) ? props.product : void 0;
@@ -2846,7 +3066,7 @@
   }
   async function fetchJson$5(url, init) {
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8e3) });
       if (!response.ok) return void 0;
       return response.json();
     } catch {
@@ -2855,7 +3075,7 @@
   }
   async function fetchText$5(url, init) {
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8e3) });
       if (!response.ok) return void 0;
       return response.text();
     } catch {
@@ -3438,32 +3658,6 @@
   }
   function isPlainRecord$4(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function isExplicitPreorder(...values) {
-    return values.some((value) => value === true || typeof value === "string" && /^(?:pre[\s_-]?order(?:ed|able)?|forh[aå]ndsbestilling)$/i.test(value.trim()));
-  }
-  function excludeVerifiedPreorders(offer, facts) {
-    const preorders = facts.filter((fact) => isSameTcgProductTitle(offer.productName, fact.productName)).flatMap((fact) => fact.preorders);
-    if (preorders.length === 0) return offer;
-    const blocked = (item) => preorders.some((preorder) => normalizePriceMatchShopName(preorder.shopName) === normalizePriceMatchShopName(item.shopName) && preorder.amount === item.amount && preorder.currency === item.currency);
-    const alternatives = offer.alternatives?.length ? offer.alternatives : [{ shopName: offer.shopName, price: offer.price, amount: offer.amount, currency: offer.currency }];
-    const remaining = alternatives.filter((alternative) => !blocked(alternative));
-    if (remaining.length === alternatives.length) return offer;
-    const best = remaining[0];
-    if (best === void 0) return void 0;
-    const details = [offer.details, "Bekreftet forhåndsbestilling er utelatt."].filter(Boolean).join(" ");
-    if (!blocked(offer)) return { ...offer, alternatives: remaining, details };
-    const { offerUrl: _offerUrl, sortAmount: _sortAmount, ...base } = offer;
-    return {
-      ...base,
-      shopName: best.shopName,
-      amount: best.amount,
-      price: best.price,
-      currency: best.currency,
-      ...best.sortAmount !== void 0 ? { sortAmount: best.sortAmount } : {},
-      alternatives: remaining,
-      details
-    };
   }
   const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
   const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
@@ -4075,99 +4269,6 @@ query OfferList($productId: Int!) {
   function isPlainRecord$2(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  function parseLdJson(text) {
-    return decodeLdJsonStrings(JSON.parse(text));
-  }
-  function readLdJsonScripts(html) {
-    const entries = [];
-    for (const match of html.matchAll(/<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
-      try {
-        entries.push(parseLdJson(match[1] ?? ""));
-      } catch {
-      }
-    }
-    return entries;
-  }
-  function readNextFlightPayloads(html) {
-    const payloads = [];
-    for (const match of html.matchAll(/<script\b[^>]*>\s*self\.__next_f\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
-      try {
-        const row = JSON.parse(match[1] ?? "");
-        if (Array.isArray(row) && row[0] === 1 && typeof row[1] === "string") payloads.push(row[1]);
-      } catch {
-      }
-    }
-    return payloads;
-  }
-  function readNextFlightValues(html) {
-    const values = [];
-    for (const row of readNextFlightPayloads(html).join("").split("\n")) {
-      const separator = row.indexOf(":");
-      if (separator < 0) continue;
-      try {
-        values.push(JSON.parse(row.slice(separator + 1)));
-      } catch {
-      }
-    }
-    return values;
-  }
-  function findStructuredProperty(value, name) {
-    const pending = [value];
-    for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
-      const item = pending.pop();
-      if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$5(item)) {
-        if (Object.hasOwn(item, name)) return item[name];
-        pending.push(...Object.values(item));
-      }
-    }
-    return void 0;
-  }
-  function readProductLanguage(product, titles) {
-    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$5) : [];
-    const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
-    const languages = new Set(values.filter((value) => typeof value === "string").map((value) => readTcgLanguage(value)?.code).filter((code) => code !== void 0));
-    return languages.size === 1 ? [...languages][0] : void 0;
-  }
-  function readProductOfferLanguage(html, productId) {
-    const rows = findStructuredProperty(readNextFlightValues(html), "offerRows");
-    if (!Array.isArray(rows)) return void 0;
-    const names = rows.filter(isRecord$5).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
-    return readProductLanguage(void 0, names);
-  }
-  function findTypedLdJson(value, type) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const found2 = findTypedLdJson(item, type);
-        if (found2 !== void 0) return found2;
-      }
-      return void 0;
-    }
-    if (!isRecord$5(value)) return void 0;
-    const found = Array.isArray(value["@graph"]) ? findTypedLdJson(value["@graph"], type) : void 0;
-    if (found !== void 0) return found;
-    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
-    return types.includes(type) ? value : void 0;
-  }
-  function selectProductLdJson(value) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const product = selectProductLdJson(item);
-        if (product !== void 0) return product;
-      }
-      return void 0;
-    }
-    if (!isRecord$5(value)) return void 0;
-    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
-    if (types.includes("Product") && typeof value.name === "string" && value.name.trim().length > 0) return value;
-    return Array.isArray(value["@graph"]) ? selectProductLdJson(value["@graph"]) : void 0;
-  }
-  function decodeLdJsonStrings(value) {
-    if (typeof value === "string") return decodeHtmlEntities(value);
-    if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
-    if (isRecord$5(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
-    return value;
-  }
   const PRISRADAR_GRAPHQL_URL = "https://gql.prisradar.no";
   const PRISRADAR_PRODUCT_URL = "https://prisradar.no/produkter/";
   const PRISRADAR_PRODUCT_PATH_PATTERN = /^\/produkter\/[^/?#]+\/?$/;
@@ -4227,6 +4328,16 @@ query SearchSuggestions($query: String!, $category: Int) {
       uniqueStrings$3([message.searchTerm, ...options.anchorSearchTerms ?? []]),
       message
     );
+  }
+  async function isPrisradarProductForOfferUrls(message, offerUrls, requestJson = fetchJson$1) {
+    const current = readPrisradarProductUrl(message.url);
+    if (current === void 0) return false;
+    const codes = [...new Set(offerUrls.flatMap(readProductCodesFromUrl).filter(isValidGtin))].slice(0, 3);
+    for (const code of codes) {
+      const products = await fetchPrisradarProducts(code, requestJson);
+      if (products.some((product) => isSameProductUrl(current, product.productUrl))) return true;
+    }
+    return false;
   }
   async function fetchPrisradarOfferForQueries(queries, requestJson, requestText, message) {
     const candidates = /* @__PURE__ */ new Map();
@@ -4626,7 +4737,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return html !== void 0 ? readPrisradarProductPage(html, productUrl) : void 0;
   }
   function readPrisradarProductPage(html, fallbackProductUrl) {
-    const product = readPrisradarProductFromNextFlight(html);
+    const product = readNextProductData(html, fallbackProductUrl);
     if (!isPlainRecord$1(product)) return void 0;
     const productName = readStringLike$1(product.title) ?? readStringLike$1(product.name) ?? "Prisradar-produkt";
     const productUrl = readStringLike$1(product.url) ?? fallbackProductUrl;
@@ -4734,20 +4845,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     return value.replace(/[Ææ]/g, "ae").replace(/[Øø]/g, "o").replace(/[Åå]/g, "a");
   }
   const GENERIC_MERCHANT_KEYS$1 = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
-  function readPrisradarProductFromNextFlight(html) {
-    for (const payload of readNextFlightPayloads(html)) {
-      if (!payload.includes('"product":')) continue;
-      const productJson = extractJsonObjectAfter(payload, '"product":');
-      if (productJson === void 0) continue;
-      try {
-        const product = JSON.parse(productJson.replace(/"\$undefined"/g, "null"));
-        if (isPlainRecord$1(product)) return product;
-      } catch {
-        continue;
-      }
-    }
-    return void 0;
-  }
   function readPrisradarOffer(value) {
     if (!isPlainRecord$1(value)) return void 0;
     const shop = isPlainRecord$1(value.shop) ? value.shop : void 0;
@@ -4756,6 +4853,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const availability = readStringLike$1(value.availability)?.toLowerCase();
     const isUsed = value.isUsed === true;
     if (amount === void 0 || amount <= 0 || shopName === void 0 || isUsed) return void 0;
+    if (isExplicitPreorder(value.isPreorder, value.is_preorder, availability)) return void 0;
     if (availability !== void 0 && BAD_AVAILABILITY_STATUSES.has(availability)) return void 0;
     const shippingAmount = readShippingAmount(value);
     const sortAmount = shippingAmount !== void 0 ? amount + shippingAmount : void 0;
@@ -4796,45 +4894,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (rawUrl === void 0) return void 0;
     try {
       const url = new URL(rawUrl);
-      if (!url.hostname.replace(/^www\./, "").toLowerCase().endsWith("prisradar.no")) return void 0;
+      if (url.hostname.replace(/^www\./, "").toLowerCase() !== "prisradar.no") return void 0;
       return PRISRADAR_PRODUCT_PATH_PATTERN.test(url.pathname) ? `${url.origin}${url.pathname}` : void 0;
     } catch {
       return void 0;
     }
-  }
-  function extractJsonObjectAfter(value, marker) {
-    const markerIndex = value.indexOf(marker);
-    if (markerIndex < 0) return void 0;
-    const objectStart = value.indexOf("{", markerIndex + marker.length);
-    if (objectStart < 0) return void 0;
-    let depth = 0;
-    let escaped = false;
-    let inString = false;
-    for (let index = objectStart; index < value.length; index += 1) {
-      const character = value[index];
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (character === "\\") {
-        escaped = true;
-        continue;
-      }
-      if (character === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) continue;
-      if (character === "{") {
-        depth += 1;
-        continue;
-      }
-      if (character === "}") {
-        depth -= 1;
-        if (depth === 0) return value.slice(objectStart, index + 1);
-      }
-    }
-    return void 0;
   }
   function formatNokPrice$2(amount) {
     const formatted = new Intl.NumberFormat("nb-NO", {
@@ -5049,6 +5113,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const expectedLanguage = readTcgLanguage(message.productLanguage ?? message.searchTerm);
     if (language === void 0 || expectedLanguage !== void 0 && expectedLanguage.code !== language.code) return reject("language-mismatch");
     if (!direct) {
+      if (hasTcgSetNameConflict(buildSearchTerm(message.searchTerm), buildSearchTerm(name))) return reject("set-name-mismatch");
       if (typeof setName === "string" && normalizeTcgProductTitle(product.name).includes(normalizeTcgProductTitle(setName)) && !normalizeTcgProductTitle(message.searchTerm).includes(normalizeTcgProductTitle(setName))) return reject("set-name-mismatch");
       const anchorWords = new Set(normalizeTcgProductTitle(buildSearchTerm(message.searchTerm)).split(" "));
       if (!normalizeTcgProductTitle(buildSearchTerm(product.name)).split(" ").every((word) => anchorWords.has(word))) return reject("product-name-mismatch");
@@ -5079,12 +5144,14 @@ query SearchSuggestions($query: String!, $category: Int) {
       return offer.itemCondition === "https://schema.org/NewCondition" && typeof seller?.name === "string" && url !== void 0 && ["https:", "http:"].includes(url.protocol) ? [{ shopName: seller.name, offerUrl: url.href }] : [];
     });
     const matchedCurrentMerchant = identityOffers.some((offer) => [message.url, message.productUrl].some((url) => isSameProductUrl(url, offer.offerUrl)));
+    const currentCodes = new Set((message.codes ?? []).filter(isValidGtin).map((code) => code.padStart(14, "0")));
+    const matchedProductCode = [...readStructuredProductCodes(product), ...identityOffers.flatMap((offer) => readProductCodesFromUrl(offer.offerUrl))].some((code) => isValidGtin(code) && currentCodes.has(code.padStart(14, "0")));
     let matchedComparisonProduct = false;
     const currentName = normalizeTcgProductTitle(buildSearchTerm(message.searchTerm));
     const candidateName = normalizeTcgProductTitle(buildSearchTerm(product.name));
     const exactTitle = currentName === candidateName || !/^(?:booster|elite trainer|bundle|tin)\b/.test(candidateName) && currentName === `mega evolution ${candidateName}`;
-    if (!direct && (expectedLanguage === void 0 || !exactTitle) && !matchedCurrentMerchant) {
-      matchedComparisonProduct = await isPrisjaktProductForAnyOffer(message.url, identityOffers, options.requestJson) || await isKlarnaProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
+    if (!direct && (expectedLanguage === void 0 || !exactTitle) && !matchedCurrentMerchant && !matchedProductCode) {
+      matchedComparisonProduct = await isPrisjaktProductForAnyOffer(message.url, identityOffers, options.requestJson) || await isKlarnaProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) || await isPrisradarProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) || await isGodprisProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
       if (!matchedComparisonProduct) return reject("unverified-product-identity");
     }
     const preorders = rawOffers.filter(isRecord$5).flatMap((offer) => {
@@ -5105,7 +5172,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       currency: best.currency,
       offerUrl: best.offerUrl,
       matchedCurrentMerchant,
-      matchedExactProduct: direct || matchedCurrentMerchant || matchedComparisonProduct,
+      matchedExactProduct: direct || matchedCurrentMerchant || matchedComparisonProduct || matchedProductCode,
       details: `${language.label}. ${offers.length} tilbud på lager. ${PROVIDER_TIPS.pokepris}`,
       alternatives: offers.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer)
     };
@@ -14092,7 +14159,9 @@ ${darkProviderCss}
     return false;
   }
   function findProductLdJson() {
-    return selectProductLdJson(readLdJsonEntries());
+    const product = selectProductLdJson(readLdJsonEntries());
+    if (product !== void 0 || window.location.hostname.replace(/^www\./, "") !== "prisradar.no") return product;
+    return readComparisonProductLdJson([...document.scripts].filter((script) => script.textContent?.includes("self.__next_f.push")).map((script) => script.outerHTML).join(""), window.location.href);
   }
   function findOrganizationName() {
     for (const entry of readLdJsonEntries()) {
@@ -14141,19 +14210,7 @@ ${darkProviderCss}
     return url !== void 0 && parseUrlWithBase(url, window.location.href) !== void 0 ? parseUrlWithBase(url, window.location.href)?.toString() : void 0;
   }
   function collectProductCodes(product) {
-    if (product === void 0) return [];
-    const codes = /* @__PURE__ */ new Set();
-    for (const [key, value] of Object.entries(product)) {
-      if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) continue;
-      const values = Array.isArray(value) ? value : [value];
-      for (const item of values) {
-        if (typeof item === "string" || typeof item === "number") {
-          const code = String(item).trim();
-          if (code.length > 0) codes.add(code);
-        }
-      }
-    }
-    return [...codes];
+    return readStructuredProductCodes(product);
   }
   function collectProductCodesFromUrl(parsedUrl) {
     return readProductCodesFromUrl(parsedUrl.href);
