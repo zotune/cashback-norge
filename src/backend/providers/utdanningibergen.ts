@@ -19,7 +19,7 @@ const BLOCKED_DOMAINS = new Set([
 type Discount = {
   id: number;
   name: string;
-  business_name: string;
+  business_name: string | null;
   discount_type: "%" | "fastpris" | "NOK" | null;
   discount: number;
   description: string | null;
@@ -75,6 +75,13 @@ export async function fetchUtdanningiBergen(
   for (const d of discounts) {
     if (d.validTo && new Date(d.validTo) < now) continue;
 
+    if (typeof d.business_name !== "string" || d.business_name.trim().length === 0) {
+      input.logger.warn(
+        `Utdanning i Bergen: skipping discount ${d.id} from ${PAGE_URL} (missing business_name)`,
+      );
+      continue;
+    }
+
     const domain = extractDomain(d.link);
     if (!domain) {
       input.logger.warn(
@@ -89,7 +96,7 @@ export async function fetchUtdanningiBergen(
 
     offers.push({
       provider: "utdanningibergen",
-      merchantName: d.business_name.replace(/^studentrabatt\s+/i, ""),
+      merchantName: d.business_name.trim().replace(/^studentrabatt\s+/i, ""),
       domains: [domain],
       reward,
       sourceUrl,

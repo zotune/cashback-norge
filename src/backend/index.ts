@@ -503,6 +503,9 @@ async function main(): Promise<void> {
     config.skipUtdanningibergen ? Promise.resolve([]) : collectOffers({
       label: "Utdanning i Bergen",
       provider: "utdanningibergen",
+      fallbackWhenEmpty: true,
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      reusePreviousOnFailure: true,
       run: () => fetchUtdanningiBergen({
         generatedAt, logger,
       }),
