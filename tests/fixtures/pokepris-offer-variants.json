@@ -1,0 +1,23 @@
+{
+  "capturedAt": "2026-10-29",
+  "sourceUrl": "https://www.pokepris.no/produkt/6373",
+  "product": { "id": 6373, "name": "Chaos Rising Elite Trainer Box", "language": "Engelsk" },
+  "offers": [
+    {
+      "shop": "Wasteland",
+      "url": "https://wstl.no/products/pokemon-center-elite-trainer-box-mega-evolution-chaos-rising-forseglet",
+      "title": "Pokémon Center Elite Trainer Box – Mega Evolution: Chaos Rising ()",
+      "capturedPrice": 2499,
+      "expectedIssue": "product-form-mismatch",
+      "evidence": "Merchant page confirms the Pokémon Center edition, exclusive promo and 11 boosters."
+    },
+    {
+      "shop": "Pokio",
+      "url": "https://pokio.no/products/pokemon-chaos-rising-etb",
+      "title": "Pokémon - Chaos Rising ETB",
+      "capturedPrice": 1048,
+      "expectedIssue": null,
+      "evidence": "Public product price row: standard ETB title, in_stock true, is_preorder false."
+    }
+  ]
+}

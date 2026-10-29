@@ -1,6 +1,6 @@
 import { isRecord, parseUrl } from "./cashback.js";
 import { decodeHtmlEntities, isSameProductUrl } from "./product-match.js";
-import { readTcgLanguage } from "./tcg-product-match.js";
+import { readTcgLanguages } from "./tcg-product-match.js";
 
 export function parseLdJson(text: string): unknown {
   return decodeLdJsonStrings(JSON.parse(text));
@@ -95,7 +95,7 @@ export function readProductLanguage(product: Record<string, unknown> | undefined
   const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord) : [];
   const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
   const languages = new Set(values.filter((value): value is string => typeof value === "string")
-    .map((value) => readTcgLanguage(value)?.code).filter((code): code is string => code !== undefined));
+    .flatMap((value) => readTcgLanguages(value).map((language) => language.code)));
   return languages.size === 1 ? [...languages][0] : undefined;
 }
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793231891
+// @version      1793306538
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -2172,9 +2172,9 @@
     }
   }
   function readTcgProductKind(text) {
-    const normalized = normalizeTcgProductTitle(text);
-    if (/\bpokemon center\b/.test(normalizeTcgText(text)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
+    const normalized = normalizeTcgProductTitle(text.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
     if (/\b(?:case|kartong)\b/.test(normalized)) return "case";
+    if (/\bpokemon center\b/.test(normalizeTcgText(text)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
     if (/\b(?:elite trainer box|etb)\b/.test(normalized)) return "etb";
     if (/\bbooster (?:box|display)\b/.test(normalized)) return "booster-box";
     if (/\bblister\b/.test(normalized)) return "blister";
@@ -2190,12 +2190,17 @@
     if (/\bmini tin\b/.test(normalized) && /\bdisplay\b/.test(normalized)) return "mini-tin-display";
     if (/\bmini tin\b/.test(normalized)) return "mini-tin";
     if (/\btin\b/.test(normalized)) return "tin";
-    if (/\bbooster (?:pack|pakke)\b/.test(normalized)) return "booster-pack";
+    if (/\bbooster (?:packs?|pakker?)\b/.test(normalized)) return "booster-pack";
     if (/\bcollection\b/.test(normalized)) return "collection";
     return void 0;
   }
   function readTcgLanguage(text) {
+    const languages = readTcgLanguages(text);
+    return languages.length === 1 ? languages[0] : void 0;
+  }
+  function readTcgLanguages(text) {
     const normalized = normalizeTcgText(text);
+    const languages = [];
     for (const [code, label, pattern] of [
       ["en", "Engelsk", /\b(?:engelsk|english|en)\b/],
       ["jp", "Japansk", /\b(?:japansk|japanese|jpn|jp|ja)\b/],
@@ -2205,7 +2210,29 @@
       ["de", "Tysk", /\b(?:tysk|german|deutsch|de)\b/],
       ["fr", "Fransk", /\b(?:fransk|french|francais|fr)\b/],
       ["it", "Italiensk", /\b(?:italiensk|italian|italiano|it)\b/]
-    ]) if (pattern.test(normalized)) return { code, label };
+    ]) if (pattern.test(normalized)) languages.push({ code, label });
+    return languages;
+  }
+  function readTcgSealedOfferIssue(productName, offerName, language) {
+    const normalized = normalizeTcgText(offerName);
+    if (/\b(?:used|brukt|opened|apnet|graded|gradert|psa|bgs|cgc)\b/.test(normalized)) return "condition-mismatch";
+    const expectedKind = readTcgProductKind(productName);
+    const offerKind = readTcgProductKind(offerName);
+    if (offerKind === void 0) return "unknown-product-form";
+    if (expectedKind !== offerKind) return "product-form-mismatch";
+    const languages = readTcgLanguages(offerName);
+    if (languages.length > 1) return "ambiguous-language";
+    if (languages[0] !== void 0 && languages[0].code !== language) return "language-mismatch";
+    if (offerName.split("+").filter((part) => readTcgProductKind(part) !== void 0).length > 1) return "combined-products";
+    const unitCount = (text) => {
+      const title = normalizeTcgProductTitle(text);
+      return Number(title.match(/\b(\d+)\s*x\b/)?.[1] ?? title.match(/^(\d+)\s+(?:elite trainer box|booster box|mini tins?|tins?)\b/)?.[1] ?? "1");
+    };
+    if (["etb", "pokemon-center-etb", "booster-box", "mini-tin", "tin"].includes(offerKind) && unitCount(productName) !== unitCount(offerName)) return "quantity-mismatch";
+    const packCount = (text) => normalizeTcgText(text).match(/\b(\d+)\s*(?:booster packs?|boosters?|packs?|pakker)\b/)?.[1];
+    const expectedPacks = packCount(productName) ?? (expectedKind === "booster-pack" ? "1" : void 0);
+    const offeredPacks = packCount(offerName);
+    if (expectedPacks !== void 0 && offeredPacks !== void 0 && Number(expectedPacks) !== Number(offeredPacks)) return "quantity-mismatch";
     return void 0;
   }
   function normalizeTcgText(text) {
@@ -2821,7 +2848,7 @@
   function readProductLanguage(product, titles) {
     const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$5) : [];
     const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
-    const languages = new Set(values.filter((value) => typeof value === "string").map((value) => readTcgLanguage(value)?.code).filter((code) => code !== void 0));
+    const languages = new Set(values.filter((value) => typeof value === "string").flatMap((value) => readTcgLanguages(value).map((language) => language.code)));
     return languages.size === 1 ? [...languages][0] : void 0;
   }
   function readProductOfferLanguage(html, productId) {
@@ -4932,6 +4959,74 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isPlainRecord$1(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
+  function readPriceRows(html, productUrl) {
+    const id = new URL(productUrl).pathname.split("/")[2];
+    const pending = readNextFlightValues(html);
+    const components = [];
+    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
+      const item = pending[visited];
+      if (Array.isArray(item)) pending.push(...item);
+      else if (isRecord$5(item)) {
+        if (isRecord$5(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
+        pending.push(...Object.values(item));
+      }
+    }
+    const rowLists = components.map((item) => [item.lowestPrice, ...item.otherInStockPrices, ...item.outOfStockPrices]);
+    if (rowLists.length === 0) return { issue: "missing-product-price-data" };
+    if (new Set(rowLists.map((rows) => JSON.stringify(rows))).size !== 1) return { issue: "ambiguous-product-price-data" };
+    return { rows: rowLists[0].filter(isRecord$5) };
+  }
+  function readPokeprisOffers(html, rawOffers, productUrl, productName, language, onDiagnostic) {
+    const scoped = readPriceRows(html, productUrl);
+    if (scoped.issue !== void 0) {
+      onDiagnostic({ reason: scoped.issue });
+      return void 0;
+    }
+    const verified = rawOffers.filter(isRecord$5).flatMap((offer) => {
+      const shopName = isRecord$5(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
+      const url = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
+      const diagnostic = { reason: "", ...url !== void 0 ? { offerUrl: url.href } : {}, ...shopName ? { shopName } : {} };
+      const reject = (reason) => {
+        onDiagnostic({ ...diagnostic, reason: `offer-${reason}` });
+        return [];
+      };
+      if (!shopName || shopName === "Butikk" || url === void 0 || !["http:", "https:"].includes(url.protocol)) return reject("missing-merchant-url");
+      const rows = scoped.rows.filter((row2) => typeof row2.product_url === "string" && isSameProductUrl(row2.product_url, url.href));
+      if (rows.length === 0) return reject("missing-price-row");
+      if (rows.length !== 1) return reject("ambiguous-price-row");
+      const row = rows[0];
+      if (row.redacted === true || typeof row.product_name !== "string" || !row.product_name.trim()) return reject("missing-original-title");
+      const originalTitle = decodeHtmlEntities(row.product_name);
+      diagnostic.offerProductName = originalTitle;
+      if (typeof row.store_name !== "string" || normalizePriceMatchShopName(row.store_name) !== normalizePriceMatchShopName(shopName)) return reject("merchant-mismatch");
+      const variantIssue = readTcgSealedOfferIssue(productName, originalTitle, language);
+      if (variantIssue !== void 0) return reject(variantIssue);
+      if (offer.itemCondition !== "https://schema.org/NewCondition") return reject("condition-mismatch");
+      if (offer.priceCurrency !== "NOK") return reject("currency-mismatch");
+      const amount = readPriceAmount(offer.price);
+      if (amount === void 0 || amount <= 0) return reject("invalid-price");
+      if (readPriceAmount(row.current_price) !== amount) return reject("price-mismatch");
+      const preorder = row.is_preorder === true;
+      const inStock = offer.availability === "https://schema.org/InStock" && row.in_stock === true && row.is_preorder === false;
+      if (preorder) onDiagnostic({ ...diagnostic, reason: "offer-preorder" });
+      else if (!inStock) onDiagnostic({ ...diagnostic, reason: "offer-not-confirmed-in-stock" });
+      return [{
+        shopName,
+        amount,
+        currency: "NOK",
+        price: formatPrice(amount, "NOK"),
+        offerUrl: url.href,
+        shippingPrice: "Frakt ukjent",
+        inStock,
+        preorder
+      }];
+    });
+    return {
+      identityOffers: verified.map(({ shopName, offerUrl }) => ({ shopName, offerUrl })),
+      offers: verified.filter((offer) => offer.inStock).map(({ inStock: _stock, preorder: _preorder, ...offer }) => offer).sort((a, b) => a.amount - b.amount),
+      preorders: verified.filter((offer) => offer.preorder).map(({ shopName, amount, currency }) => ({ shopName, amount, currency }))
+    };
+  }
   const ORIGIN = "https://www.pokepris.no";
   const MAX_SCRIPT_REQUESTS = 16;
   const MAX_PRODUCT_REQUESTS = 3;
@@ -5121,28 +5216,17 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     const aggregate = product.offers;
     const rawOffers = isRecord$5(aggregate) && Array.isArray(aggregate.offers) ? aggregate.offers : Array.isArray(aggregate) ? aggregate : [];
-    const flight = readNextFlightValues(html);
-    const lowest = findStructuredProperty(flight, "lowestPrice");
-    const stockLists = ["otherInStockPrices", "outOfStockPrices"].flatMap((key) => {
-      const values = findStructuredProperty(flight, key);
-      return Array.isArray(values) ? values : [];
-    });
-    const preorderUrls = [lowest, ...stockLists].filter(isRecord$5).filter((row) => row.is_preorder === true && typeof row.product_url === "string").map((row) => row.product_url);
-    const offers = rawOffers.filter(isRecord$5).flatMap((offer) => {
-      if (offer.availability !== "https://schema.org/InStock" || offer.itemCondition !== "https://schema.org/NewCondition" || offer.priceCurrency !== "NOK") return [];
-      const amount = readPriceAmount(offer.price);
-      const shopName = isRecord$5(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
-      const url = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
-      if (amount === void 0 || amount <= 0 || !shopName || shopName === "Butikk" || url === void 0 || !["https:", "http:"].includes(url.protocol)) return [];
-      if (preorderUrls.some((preorderUrl) => isSameProductUrl(preorderUrl, url.href))) return [];
-      return [{ shopName, amount, currency: "NOK", price: formatPrice(amount, "NOK"), offerUrl: url.href, shippingPrice: "Frakt ukjent" }];
-    }).sort((a, b) => a.amount - b.amount);
+    const validated = readPokeprisOffers(
+      html,
+      rawOffers,
+      productUrl,
+      name,
+      language.code,
+      (event) => options.onDiagnostic?.({ ...event, productUrl, productName: name })
+    );
+    if (validated === void 0) return void 0;
+    const { offers, identityOffers, preorders } = validated;
     const best = offers[0];
-    const identityOffers = rawOffers.filter(isRecord$5).flatMap((offer) => {
-      const seller = isRecord$5(offer.seller) ? offer.seller : void 0;
-      const url = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
-      return offer.itemCondition === "https://schema.org/NewCondition" && typeof seller?.name === "string" && url !== void 0 && ["https:", "http:"].includes(url.protocol) ? [{ shopName: seller.name, offerUrl: url.href }] : [];
-    });
     const matchedCurrentMerchant = identityOffers.some((offer) => [message.url, message.productUrl].some((url) => isSameProductUrl(url, offer.offerUrl)));
     const currentCodes = new Set((message.codes ?? []).filter(isValidGtin).map((code) => code.padStart(14, "0")));
     const matchedProductCode = [...readStructuredProductCodes(product), ...identityOffers.flatMap((offer) => readProductCodesFromUrl(offer.offerUrl))].some((code) => isValidGtin(code) && currentCodes.has(code.padStart(14, "0")));
@@ -5154,11 +5238,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       matchedComparisonProduct = await isPrisjaktProductForAnyOffer(message.url, identityOffers, options.requestJson) || await isKlarnaProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) || await isPrisradarProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) || await isGodprisProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
       if (!matchedComparisonProduct) return reject("unverified-product-identity");
     }
-    const preorders = rawOffers.filter(isRecord$5).flatMap((offer) => {
-      const seller = isRecord$5(offer.seller) ? offer.seller : void 0;
-      const amount = readPriceAmount(offer.price);
-      return offer.itemCondition === "https://schema.org/NewCondition" && typeof seller?.name === "string" && amount !== void 0 && amount > 0 && offer.priceCurrency === "NOK" && typeof offer.url === "string" && preorderUrls.some((url) => isSameProductUrl(url, offer.url)) ? [{ shopName: seller.name, amount, currency: "NOK" }] : [];
-    });
     options.onVerifiedAvailability?.({ productName: name, productUrl, preorders });
     if (best === void 0) return reject("no-in-stock-offers");
     return {

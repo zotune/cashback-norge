@@ -1,7 +1,9 @@
 export function readTcgProductKind(text: string): string | undefined {
-  const normalized = normalizeTcgProductTitle(text);
-  if (/\bpokemon center\b/.test(normalizeTcgText(text)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
+  // An advertised alternative is not the selected package. An actual case
+  // (including a case of Pokémon Center ETBs) still takes precedence.
+  const normalized = normalizeTcgProductTitle(text.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
   if (/\b(?:case|kartong)\b/.test(normalized)) return "case";
+  if (/\bpokemon center\b/.test(normalizeTcgText(text)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
   if (/\b(?:elite trainer box|etb)\b/.test(normalized)) return "etb";
   if (/\bbooster (?:box|display)\b/.test(normalized)) return "booster-box";
   if (/\bblister\b/.test(normalized)) return "blister";
@@ -17,13 +19,19 @@ export function readTcgProductKind(text: string): string | undefined {
   if (/\bmini tin\b/.test(normalized) && /\bdisplay\b/.test(normalized)) return "mini-tin-display";
   if (/\bmini tin\b/.test(normalized)) return "mini-tin";
   if (/\btin\b/.test(normalized)) return "tin";
-  if (/\bbooster (?:pack|pakke)\b/.test(normalized)) return "booster-pack";
+  if (/\bbooster (?:packs?|pakker?)\b/.test(normalized)) return "booster-pack";
   if (/\bcollection\b/.test(normalized)) return "collection";
   return undefined;
 }
 
 export function readTcgLanguage(text: string): { code: string; label: string } | undefined {
+  const languages = readTcgLanguages(text);
+  return languages.length === 1 ? languages[0] : undefined;
+}
+
+export function readTcgLanguages(text: string): Array<{ code: string; label: string }> {
   const normalized = normalizeTcgText(text);
+  const languages = [];
   for (const [code, label, pattern] of [
     ["en", "Engelsk", /\b(?:engelsk|english|en)\b/],
     ["jp", "Japansk", /\b(?:japansk|japanese|jpn|jp|ja)\b/],
@@ -33,7 +41,34 @@ export function readTcgLanguage(text: string): { code: string; label: string } |
     ["de", "Tysk", /\b(?:tysk|german|deutsch|de)\b/],
     ["fr", "Fransk", /\b(?:fransk|french|francais|fr)\b/],
     ["it", "Italiensk", /\b(?:italiensk|italian|italiano|it)\b/],
-  ] as const) if (pattern.test(normalized)) return { code, label };
+  ] as const) if (pattern.test(normalized)) languages.push({ code, label });
+  return languages;
+}
+
+// A catalog association does not prove the merchant's selected edition or
+// packaging. Use the original offer title, before prices enter the comparison.
+// Missing form evidence remains unknown; the caller decides whether to omit it.
+export function readTcgSealedOfferIssue(productName: string, offerName: string, language: string): string | undefined {
+  const normalized = normalizeTcgText(offerName);
+  if (/\b(?:used|brukt|opened|apnet|graded|gradert|psa|bgs|cgc)\b/.test(normalized)) return "condition-mismatch";
+  const expectedKind = readTcgProductKind(productName);
+  const offerKind = readTcgProductKind(offerName);
+  if (offerKind === undefined) return "unknown-product-form";
+  if (expectedKind !== offerKind) return "product-form-mismatch";
+  const languages = readTcgLanguages(offerName);
+  if (languages.length > 1) return "ambiguous-language";
+  if (languages[0] !== undefined && languages[0].code !== language) return "language-mismatch";
+  if (offerName.split("+").filter((part) => readTcgProductKind(part) !== undefined).length > 1) return "combined-products";
+  // Count purchased boxes/tins separately from the booster packs inside them.
+  const unitCount = (text: string) => {
+    const title = normalizeTcgProductTitle(text);
+    return Number(title.match(/\b(\d+)\s*x\b/)?.[1] ?? title.match(/^(\d+)\s+(?:elite trainer box|booster box|mini tins?|tins?)\b/)?.[1] ?? "1");
+  };
+  if (["etb", "pokemon-center-etb", "booster-box", "mini-tin", "tin"].includes(offerKind) && unitCount(productName) !== unitCount(offerName)) return "quantity-mismatch";
+  const packCount = (text: string) => normalizeTcgText(text).match(/\b(\d+)\s*(?:booster packs?|boosters?|packs?|pakker)\b/)?.[1];
+  const expectedPacks = packCount(productName) ?? (expectedKind === "booster-pack" ? "1" : undefined);
+  const offeredPacks = packCount(offerName);
+  if (expectedPacks !== undefined && offeredPacks !== undefined && Number(expectedPacks) !== Number(offeredPacks)) return "quantity-mismatch";
   return undefined;
 }
 

@@ -191,6 +191,17 @@ tilbudsvisning.
   ikke fjern andre produkter eller priser på grunnlag av butikkens navn alene.
   Bruk konkrete tilbud på lager, ikke sidens historiske/utsolgte minimum eller
   generelle prisstatistikk.
+  Knytt prisradene til den konkrete produkt-ID-ens komponent i Next-data;
+  ikke bruk et globalt feltsøk som kan velge anbefalte produkter. Kontroller
+  hvert butikktilbud mot original `product_name` før pris, sortering og tooltip.
+  `src/shared/pokepris-offers.ts` kobler konkrete URL-er og kontrollerer data;
+  de delte variantreglene ligger i `src/shared/tcg-product-match.ts`.
+  Pokémon Center ETB og standard ETB må aldri blandes. Et utelatt varianttilbud
+  skal heller ikke bekrefte identitet eller gi forhåndsbestillingsdata til andre
+  kilder. Manglende/tvetydige prisrader eller originaltitler skal utelates med
+  en konkret feilsøkingsgrunn. «Case Tilgjengelig» i parentes er et annonsert
+  kjøpsvalg, ikke i seg selv bevis på at tilbudet gjelder en hel kartong.
+  Flere språk i samme tittel skal forbli tvetydig.
 - For Pokepris skal prismatch-raden åpne produktets konkrete prisliste på
   `https://www.pokepris.no/produkt/<id>`, ikke forsiden eller et generelt søk.
   Tooltipen skal vise produkt, språk/variant, butikker og priser på lager,
@@ -242,7 +253,10 @@ tilbudsvisning.
   til å kontrollere første Prisjakt-side for samlekortspill, og behold skillet
   mellom faktiske treff, avviste varianter, manglende data og transportfeil.
   `scripts/dev/e2e-pokepris.mjs` har assertions for Klarna, MaxGaming, Prisjakt,
-  regresjonssiden, farger og tooltip på desktop/mobil. Rapporter konkret om
+  regresjonssiden, farger og tooltip på desktop/mobil.
+  `--offer-variants` tester i tillegg bygde klienter med et fanget variantavvik
+  der feil Pokémon Center-utgave er gjort billigst. Hold denne fixturetesten
+  adskilt fra resultatene for reelle sider. Rapporter konkret om
   en reell side blokkerer testnettleseren; en API-test beviser ikke at den
   blokkerte siden viser panelet. Topplisten er testutvalg, ikke en whitelist
   i produksjonskoden eller bevis på at alle kategorisider er kontrollert.

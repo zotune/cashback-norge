@@ -1,6 +1,5 @@
 import { isRecord, parseUrl } from "./cashback.js";
 import type { GetPriceMatchForProductMessage, PriceMatchOffer } from "./extension-messages.js";
-import { readPriceAmount, formatPrice } from "./price.js";
 import { findTypedLdJson, readLdJsonScripts, readNextFlightValues, findStructuredProperty, selectProductLdJson, readStructuredProductCodes } from "./product-data.js";
 import { buildProductMatchAnchor, scoreProductCandidateMatch, MIN_PRODUCT_MATCH_SCORE, isSameProductUrl, isValidGtin, readProductCodesFromUrl } from "./product-match.js";
 import { readTcgProductKind, readTcgLanguage, normalizeTcgText, normalizeTcgProductTitle, hasTcgSetNameConflict } from "./tcg-product-match.js";
@@ -10,6 +9,7 @@ import { isKlarnaProductForOfferUrls } from "./klarna-price-match.js";
 import { isPrisradarProductForOfferUrls } from "./prisradar-price-match.js";
 import { isGodprisProductForOfferUrls } from "./godpris-price-match.js";
 import { type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
+import { readPokeprisOffers, type PokeprisOfferDiagnostic } from "./pokepris-offers.js";
 
 type TextRequest = (url: string, init?: {
   method?: string;
@@ -22,7 +22,7 @@ const MAX_SCRIPT_REQUESTS = 16;
 const MAX_PRODUCT_REQUESTS = 3;
 const actionCache = new WeakMap<TextRequest, { expires: number; promise: Promise<string | undefined> }>();
 
-export type PokeprisDiagnostic = { reason: string; productUrl?: string; productName?: string };
+export type PokeprisDiagnostic = PokeprisOfferDiagnostic & { productUrl?: string; productName?: string };
 type PokeprisOptions = { useSearchApi?: boolean; requestJson?: JsonRequest | undefined; onDiagnostic?: (event: PokeprisDiagnostic) => void; onVerifiedAvailability?: (data: VerifiedPriceMatchAvailability) => void };
 
 export function isPokeprisProductUrl(rawUrl: string | undefined): boolean {
@@ -233,31 +233,13 @@ async function readProductPage(html: string, productUrl: string, message: GetPri
   }
   const aggregate = product.offers;
   const rawOffers = isRecord(aggregate) && Array.isArray(aggregate.offers) ? aggregate.offers : Array.isArray(aggregate) ? aggregate : [];
-  const flight = readNextFlightValues(html);
-  const lowest = findStructuredProperty(flight, "lowestPrice");
-  const stockLists = ["otherInStockPrices", "outOfStockPrices"].flatMap((key) => {
-    const values = findStructuredProperty(flight, key);
-    return Array.isArray(values) ? values : [];
-  });
-  const preorderUrls = [lowest, ...stockLists].filter(isRecord)
-    .filter((row) => row.is_preorder === true && typeof row.product_url === "string").map((row) => row.product_url as string);
-  const offers = rawOffers.filter(isRecord).flatMap((offer) => {
-    if (offer.availability !== "https://schema.org/InStock" || offer.itemCondition !== "https://schema.org/NewCondition" || offer.priceCurrency !== "NOK") return [];
-    const amount = readPriceAmount(offer.price);
-    const shopName = isRecord(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
-    const url = typeof offer.url === "string" ? parseUrl(offer.url) : undefined;
-    if (amount === undefined || amount <= 0 || !shopName || shopName === "Butikk" || url === undefined || !["https:", "http:"].includes(url.protocol)) return [];
-    if (preorderUrls.some((preorderUrl) => isSameProductUrl(preorderUrl, url.href))) return [];
-    return [{ shopName, amount, currency: "NOK", price: formatPrice(amount, "NOK"), offerUrl: url.href, shippingPrice: "Frakt ukjent" }];
-  }).sort((a, b) => a.amount - b.amount);
+  const validated = readPokeprisOffers(html, rawOffers, productUrl, name, language.code,
+    (event) => options.onDiagnostic?.({ ...event, productUrl, productName: name }));
+  if (validated === undefined) return undefined;
+  const { offers, identityOffers, preorders } = validated;
   const best = offers[0];
-  // A sold-out or preorder URL can verify identity; its price is still excluded.
-  const identityOffers = rawOffers.filter(isRecord).flatMap((offer) => {
-    const seller = isRecord(offer.seller) ? offer.seller : undefined;
-    const url = typeof offer.url === "string" ? parseUrl(offer.url) : undefined;
-    return offer.itemCondition === "https://schema.org/NewCondition" && typeof seller?.name === "string" && url !== undefined && ["https:", "http:"].includes(url.protocol)
-      ? [{ shopName: seller.name, offerUrl: url.href }] : [];
-  });
+  // Compatible sold-out/preorder rows can prove identity, but conflicting
+  // merchant editions cannot prove it or invalidate another source's price.
   const matchedCurrentMerchant = identityOffers.some((offer) => [message.url, message.productUrl].some((url) => isSameProductUrl(url, offer.offerUrl)));
   const currentCodes = new Set((message.codes ?? []).filter(isValidGtin).map((code) => code.padStart(14, "0")));
   const matchedProductCode = [...readStructuredProductCodes(product), ...identityOffers.flatMap((offer) => readProductCodesFromUrl(offer.offerUrl))]
@@ -274,13 +256,6 @@ async function readProductPage(html: string, productUrl: string, message: GetPri
       await isGodprisProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
     if (!matchedComparisonProduct) return reject("unverified-product-identity");
   }
-  const preorders = rawOffers.filter(isRecord).flatMap((offer) => {
-    const seller = isRecord(offer.seller) ? offer.seller : undefined;
-    const amount = readPriceAmount(offer.price);
-    return offer.itemCondition === "https://schema.org/NewCondition" && typeof seller?.name === "string" && amount !== undefined && amount > 0 && offer.priceCurrency === "NOK" &&
-      typeof offer.url === "string" && preorderUrls.some((url) => isSameProductUrl(url, offer.url as string))
-      ? [{ shopName: seller.name, amount, currency: "NOK" }] : [];
-  });
   options.onVerifiedAvailability?.({ productName: name, productUrl, preorders });
   if (best === undefined) return reject("no-in-stock-offers");
   return {

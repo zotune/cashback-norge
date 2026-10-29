@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { findPokeprisPriceMatch, isPokeprisProductUrl } from "../src/shared/pokepris-price-match.js";
 import { findPriceMatches } from "../src/shared/price-match.js";
@@ -11,6 +12,8 @@ import { findTypedLdJson, parseLdJson, readLdJsonScripts, readNextFlightValues, 
 import { formatPrice, readPriceAmount } from "../src/shared/price.js";
 import { type GetPriceMatchForProductMessage, isGetPriceMatchForProductMessage } from "../src/shared/extension-messages.js";
 import { PROVIDER_COLORS } from "../src/shared/provider-data.js";
+import { isRecord } from "../src/shared/cashback.js";
+import { readTcgSealedOfferIssue, readTcgLanguage, readTcgProductKind } from "../src/shared/tcg-product-match.js";
 
 const productUrl = "https://www.pokepris.no/produkt/3594";
 const merchantUrl = "https://cards.example/products/prismatic-evolutions-etb";
@@ -26,14 +29,20 @@ function offer(price: unknown, availability = "InStock", url = merchantUrl) {
     itemCondition: "https://schema.org/NewCondition", seller: { name: "Kortbutikk" }, url };
 }
 
-function page(options: { language?: string; name?: string; offers?: unknown[] } = {}) {
+function page(options: { language?: string; name?: string; offers?: unknown[]; rows?: unknown[]; id?: number; priceData?: boolean; preorderUrls?: string[] } = {}) {
+  const name = options.name ?? "Prismatic Evolutions Elite Trainer Box";
+  const offers = options.offers ?? [offer(899, "OutOfStock", "https://sold.example/item"), offer(2199), offer(2499, "InStock", "https://other.example/item")];
+  const rows = options.rows ?? offers.filter(isRecord).map((item) => ({ product_url: item.url, product_name: name,
+    store_name: isRecord(item.seller) ? item.seller.name : null, current_price: item.price,
+    in_stock: item.availability === "https://schema.org/InStock", is_preorder: options.preorderUrls?.includes(String(item.url)) || item.availability === "https://schema.org/PreOrder", redacted: false }));
   return `<script type="application/ld+json">${JSON.stringify({ "@type": "Product",
     brand: { "@type": "Brand", name: "Pokémon" },
-    name: options.name ?? "Prismatic Evolutions Elite Trainer Box",
+    name,
     additionalProperty: [{ name: "Kortsett", value: "Prismatic Evolutions" }, { name: "Språk", value: options.language ?? "Engelsk" }],
     offers: { "@type": "AggregateOffer", lowPrice: 99, priceCurrency: "NOK",
-      offers: options.offers ?? [offer(899, "OutOfStock"), offer(2199), offer(2499, "InStock", "https://other.example/item")] },
-  })}</script>`;
+      offers },
+  })}</script>` + (options.priceData === false ? "" : flight({ product: { id: options.id ?? 3594, name }, lowestPrice: rows[0] ?? null,
+    otherInStockPrices: rows.slice(1), outOfStockPrices: [] }));
 }
 
 function transport(productPage = page(), products: unknown[] = [{ id: 3594, name: "Prismatic Evolutions Elite Trainer Box" }]) {
@@ -186,7 +195,7 @@ test("public taxonomy lookup supports an unseen set and product ID without a cur
   const calls: string[] = [];
   const request = async (url: string) => {
     calls.push(url);
-    if (url === target) return page({ name });
+    if (url === target) return page({ name, id: 987654321 });
     if (url.endsWith("/sett/future-aurora")) return `<script type="application/ld+json">${JSON.stringify({ "@type": "ItemList", itemListElement: [{ item: { name, url: target } }] })}</script>`;
     return flight({ seriesWithSets: [{ sets: [{ name: "Future Aurora" }] }] });
   };
@@ -197,7 +206,7 @@ test("public taxonomy lookup supports an unseen set and product ID without a cur
 
 test("a verified product can share preorder facts even when it has no in-stock offer", async () => {
   const facts: VerifiedPriceMatchAvailability[] = [];
-  const html = page({ offers: [offer(990)] }) + flight({ lowestPrice: { product_url: merchantUrl, is_preorder: true } });
+  const html = page({ offers: [offer(990)], preorderUrls: [merchantUrl] });
   const result = await findPokeprisPriceMatch(message, transport(html).request, { onVerifiedAvailability: (fact) => facts.push(fact) });
   assert.equal(result, undefined);
   assert.deepEqual(facts[0]?.preorders, [{ shopName: "Kortbutikk", amount: 990, currency: "NOK" }]);
@@ -210,7 +219,7 @@ test("Japanese products use the public taxonomy, accept missing set metadata, an
   const calls: string[] = [];
   const request = async (url: string) => {
     calls.push(url);
-    if (url === target) return page({ name: "Mega Dream Ex Booster Box [JP]", language: "Japansk", offers: [offer(949, "OutOfStock"), offer(1249, "InStock", merchant)] })
+    if (url === target) return page({ id: 3326, name: "Mega Dream Ex Booster Box [JP]", language: "Japansk", offers: [offer(949, "OutOfStock"), offer(1249, "InStock", merchant)] })
       .replace('{"name":"Kortsett","value":"Prismatic Evolutions"},', "");
     if (url.endsWith("/sett/mega-dream-ex")) return `<script type="application/ld+json">${JSON.stringify({ "@type": "ItemList", itemListElement: [{ item: { name: "Mega Dream Ex Booster Box [JP]", url: target } }] })}</script>`;
     return flight(["$", "Component", null, { seriesWithSets: [{ series: "Other", sets: [{ name: "Mega Dream ex", count: 4 }] }] }]);
@@ -242,7 +251,7 @@ test("a comparison page only derives language from offers for its exact product,
 });
 
 test("unknown language on a comparison page requires the retailer URL to resolve to the exact Prisjakt product ID", async () => {
-  const fixture = transport();
+  const fixture = transport(page({ offers: [offer(2199)] }));
   const comparisonMessage = { ...message, url: "https://www.prisjakt.no/product.php?p=15845117" };
   let calls = 0;
   const requestJson = async (_url: string, init?: { body?: string }) => {
@@ -271,8 +280,7 @@ test("a review widget's nameless Product cannot replace the real product during 
 });
 
 test("explicit preorder data takes precedence over generic InStock JSON-LD", async () => {
-  const html = page({ offers: [offer(1249), offer(1499, "InStock", "https://other.example/item")] }) +
-    flight(["$", "Prices", null, { otherInStockPrices: [{ product_url: merchantUrl, in_stock: true, is_preorder: true }] }]);
+  const html = page({ offers: [offer(1249), offer(1499, "InStock", "https://other.example/item")], preorderUrls: [merchantUrl] });
   const result = await findPokeprisPriceMatch({ ...message, searchTerm: `${message.searchTerm} Engelsk` }, transport(html).request);
   assert.equal(result?.amount, 1499);
   assert.equal(result?.alternatives?.length, 1);
@@ -344,4 +352,103 @@ test("Klarna and Prisjakt reject explicit preorder statuses using the shared rul
     return undefined;
   });
   assert.equal(prisjakt?.shopName, "Stock shop");
+});
+
+test("the captured Chaos Rising association rejects Pokémon Center even when it becomes cheapest", async () => {
+  const captured = JSON.parse(readFileSync(new URL("fixtures/pokepris-offer-variants.json", import.meta.url), "utf8")) as {
+    product: { id: number; name: string; language: string };
+    sourceUrl: string;
+    offers: Array<{ shop: string; title: string; url: string; capturedPrice: number; expectedIssue: string | null }>;
+  };
+  for (const entry of captured.offers) assert.equal(readTcgSealedOfferIssue(captured.product.name, entry.title, "en") ?? null, entry.expectedIssue);
+  // Deliberately change only prices: the erroneous edition must never become
+  // the best offer if standard stock/prices change after this capture.
+  const offers = captured.offers.map((entry, index) => ({ ...offer(index === 0 ? 499 : 1048, "InStock", entry.url), seller: { name: entry.shop } }));
+  const rows = captured.offers.map((entry, index) => ({ product_url: entry.url, product_name: entry.title, store_name: entry.shop,
+    current_price: offers[index]!.price, in_stock: true, is_preorder: false, redacted: false }));
+  const diagnostics: Array<{ reason: string; offerUrl?: string }> = [];
+  const result = await findPokeprisPriceMatch({ ...message, url: captured.sourceUrl }, async () => page({ ...captured.product, rows, offers }), {
+    onDiagnostic: (event) => diagnostics.push(event),
+  });
+  assert.equal(result?.amount, 1048);
+  assert.equal(result?.shopName, "Pokio");
+  assert.equal(result?.offerUrl, captured.offers[1]!.url);
+  assert.deepEqual(result?.alternatives?.map((item) => item.amount), [1048]);
+  assert.match(result?.details ?? "", /1 tilbud på lager/);
+  assert.ok(diagnostics.some((event) => event.reason === "offer-product-form-mismatch" && event.offerUrl === captured.offers[0]!.url));
+});
+
+test("sealed offer checks keep editions, languages, quantities and condition separate", () => {
+  const standard = "Pokémon Ascended Heroes Elite Trainer Box";
+  const pc = "Pokémon Ascended Heroes Pokémon Center Elite Trainer Box";
+  assert.equal(readTcgSealedOfferIssue(standard, pc, "en"), "product-form-mismatch");
+  assert.equal(readTcgSealedOfferIssue(pc, standard, "en"), "product-form-mismatch");
+  assert.equal(readTcgSealedOfferIssue(standard, `${standard} Japanese`, "en"), "language-mismatch");
+  assert.equal(readTcgSealedOfferIssue(standard, `${standard} English / Japanese`, "en"), "ambiguous-language");
+  assert.equal(readTcgLanguage("English / Japanese"), undefined);
+  assert.equal(readTcgSealedOfferIssue(standard, `2x ${standard}`, "en"), "quantity-mismatch");
+  assert.equal(readTcgSealedOfferIssue("Pokémon Pitch Black Booster Pack", "Pokémon Pitch Black 3 Booster Packs", "en"), "quantity-mismatch");
+  assert.equal(readTcgSealedOfferIssue("Pokémon Pitch Black Booster Box 36 packs", "Pokémon Pitch Black Booster Box 10 packs", "en"), "quantity-mismatch");
+  assert.equal(readTcgSealedOfferIssue(standard, `${standard} opened`, "en"), "condition-mismatch");
+  assert.equal(readTcgSealedOfferIssue("Pokémon Prismatic Evolutions Surprise Box", "Pokémon Prismatic Evolutions Surprise Box + Booster Bundle", "en"), "combined-products");
+  assert.equal(readTcgSealedOfferIssue(standard, "Pokemon TCG: Ascended Heroes Elite Trainer Boks (Case Tilgjengelig)", "en"), undefined);
+  assert.equal(readTcgProductKind(`${pc} Case`), "case");
+  assert.equal(readTcgSealedOfferIssue(standard, `${standard} Case`, "en"), "product-form-mismatch");
+  assert.equal(readTcgSealedOfferIssue(standard, "Ascended Heroes", "en"), "unknown-product-form");
+  assert.equal(readTcgSealedOfferIssue("Pokémon Ascended Heroes Mini Tin", "Pokémon Mega Evolution 2 Mini Tin - Ascended Heroes", "en"), undefined);
+  assert.equal(readProductOfferLanguage(flight({ offerRows: [{ productId: 1, name: "Pokémon ETB English / Japanese" },
+    { productId: 1, name: "Pokémon ETB English" }] }), "1"), undefined);
+});
+
+test("price data must belong to the current product, with no global recommendation fallback", async () => {
+  const unrelated = { product: { id: 99 }, lowestPrice: { product_url: merchantUrl, product_name: message.searchTerm,
+    store_name: "Kortbutikk", current_price: 199, in_stock: true, is_preorder: false }, otherInStockPrices: [], outOfStockPrices: [] };
+  const diagnostics: string[] = [];
+  const request = async () => page({ priceData: false, offers: [offer(199)] }) + flight(unrelated);
+  assert.equal(await findPokeprisPriceMatch({ ...message, url: productUrl }, request, { onDiagnostic: ({ reason }) => diagnostics.push(reason) }), undefined);
+  assert.ok(diagnostics.includes("missing-product-price-data"));
+  // A different product's preorder flag must not remove the current offer.
+  const html = page({ offers: [offer(199)] }) + flight({ ...unrelated, lowestPrice: { ...unrelated.lowestPrice, is_preorder: true } });
+  assert.equal((await findPokeprisPriceMatch({ ...message, url: productUrl }, async () => html))?.amount, 199);
+  assert.equal(await findPokeprisPriceMatch({ ...message, url: productUrl }, async () => html + flight({ ...unrelated, product: { id: 3594 } })), undefined);
+});
+
+test("unjoined, duplicate and inconsistent merchant rows cannot supply price or identity", async () => {
+  const original = { product_url: merchantUrl, product_name: message.searchTerm, store_name: "Kortbutikk", current_price: 499, in_stock: true, is_preorder: false };
+  const goodUrl = "https://other.example/good";
+  const good = { ...original, product_url: goodUrl, current_price: 1048 };
+  for (const badRows of [[], [original, original], [{ ...original, product_url: `${merchantUrl}?variant=jp` }],
+    [{ ...original, product_name: null }], [{ ...original, redacted: true }], [{ ...original, store_name: "Other" }], [{ ...original, current_price: 490 }]]) {
+    const html = page({ offers: [offer(499), offer(1048, "InStock", goodUrl)], rows: [...badRows, good] });
+    const result = await findPokeprisPriceMatch({ ...message, url: productUrl }, async () => html);
+    assert.equal(result?.amount, 1048);
+    assert.equal(result?.offerUrl, goodUrl);
+    assert.equal(await findPokeprisPriceMatch(message, transport(html).request), undefined, "unverified current merchant must not prove the product's unknown language");
+  }
+});
+
+test("a conflicting merchant edition cannot verify identity or share preorder facts", async () => {
+  const pc = { product_url: merchantUrl, product_name: "Pokémon Prismatic Evolutions Pokémon Center Elite Trainer Box", store_name: "Kortbutikk",
+    current_price: 990, in_stock: true, is_preorder: true };
+  const otherUrl = "https://other.example/good";
+  const html = page({ offers: [offer(990), offer(1048, "InStock", otherUrl)], rows: [pc, { ...pc, product_url: otherUrl,
+    product_name: message.searchTerm, current_price: 1048, is_preorder: false }] });
+  const facts: VerifiedPriceMatchAvailability[] = [];
+  const result = await findPokeprisPriceMatch({ ...message, url: productUrl }, async () => html, { onVerifiedAvailability: (fact) => facts.push(fact) });
+  assert.equal(result?.amount, 1048);
+  assert.deepEqual(facts[0]?.preorders, []);
+  assert.equal(await findPokeprisPriceMatch(message, transport(html).request), undefined);
+});
+
+test("stock must be explicitly confirmed by both price representations", async () => {
+  for (const [in_stock, is_preorder] of [[false, false], [undefined, false], [true, undefined], [true, "false"]]) {
+    const rows = [{ product_url: merchantUrl, product_name: message.searchTerm, store_name: "Kortbutikk", current_price: 499, in_stock, is_preorder }];
+    assert.equal(await findPokeprisPriceMatch({ ...message, url: productUrl }, async () => page({ offers: [offer(499)], rows })), undefined);
+  }
+});
+
+test("HTML entities in original merchant titles are decoded before quantity checks", async () => {
+  const rows = [{ product_url: merchantUrl, product_name: "Prismatic Evolutions &#8211; Elite Trainer Box", store_name: "Kortbutikk",
+    current_price: 1048, in_stock: true, is_preorder: false }];
+  assert.equal((await findPokeprisPriceMatch(message, transport(page({ offers: [offer(1048)], rows })).request))?.amount, 1048);
 });
