@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793443836
+// @version      1793444791
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -15980,6 +15980,30 @@ ${darkProviderCss}
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
     }
+    .price-match-section .price-match-tooltip-row {
+      align-items: center;
+      column-gap: 8px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+    }
+    .price-match-section .price-match-tooltip-row--with-duration {
+      grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+    }
+    .price-match-tooltip-row > .price-match-card {
+      grid-area: 1 / 1 / 2 / -1;
+      grid-template-columns: subgrid;
+    }
+    .price-match-tooltip-row > .cbn-tooltip-trigger {
+      grid-column: 3;
+      grid-row: 1;
+      z-index: 1;
+    }
+    .price-match-tooltip-row--with-duration > .cbn-tooltip-trigger {
+      grid-column: 4;
+    }
+    .price-match-tooltip-row .provider-badge {
+      grid-column: -2;
+    }
     .region-price-card {
       grid-template-columns: minmax(0, 1fr) auto;
     }
@@ -17515,7 +17539,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       tooltip.className = "offer-tooltip";
       setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
       shadowRoot.append(tooltip);
-      tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
+      const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
+      row.classList.add("price-match-tooltip-row");
+      row.classList.toggle("price-match-tooltip-row--with-duration", card.classList.contains("price-match-card--with-duration"));
       let hideTimer;
       const clearHideTimer = () => {
         if (hideTimer === void 0) return;

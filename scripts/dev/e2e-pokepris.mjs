@@ -202,7 +202,20 @@ try {
       await page.waitForFunction(() => document.querySelector("#cashback-varsler-notice")?.getAttribute("data-cbn-theme") === "dark");
       assert.deepEqual(await colors(), ["rgb(0, 0, 0)", "rgb(255, 255, 255)"]);
       await page.setViewportSize({ width: 390, height: 844 });
-      await row.locator("..").getByRole("button", { name: "Vis detaljer om prissammenligningen" }).click();
+      const detailsButton = row.locator("..").getByRole("button", { name: "Vis detaljer om prissammenligningen" });
+      const detailsBounds = await detailsButton.boundingBox();
+      const badgeBounds = await badge.boundingBox();
+      const priceBounds = await row.locator(".price-match-price").boundingBox();
+      assert.ok(detailsBounds && badgeBounds && detailsBounds.x + detailsBounds.width <= badgeBounds.x,
+        "Details button must be immediately left of the source chip");
+      assert.ok(badgeBounds.x - detailsBounds.x - detailsBounds.width <= 12,
+        "Details button must sit next to the source chip");
+      assert.ok(priceBounds && priceBounds.x + priceBounds.width <= detailsBounds.x,
+        "Details button must follow the price");
+      assert.ok(Math.abs(detailsBounds.y + detailsBounds.height / 2 - badgeBounds.y - badgeBounds.height / 2) < 1,
+        "Details button and source chip must share a line");
+      assert.equal(await detailsButton.evaluate((button) => button.closest("a") === null), true);
+      await detailsButton.click();
       await tooltip.waitFor({ state: "visible", timeout: 5000 });
       const bounds = await tooltip.boundingBox();
       assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 391, JSON.stringify(bounds));

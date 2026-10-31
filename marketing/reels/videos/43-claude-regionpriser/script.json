@@ -1,0 +1,64 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "{Claude|Klåd} Pro. *{249 kr|to hundre og førtini kroner}* eller *{163 kr|hundre og sekstitre}*?",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "I norsk App Store: *{249 kr|to hundre og førtini kroner}* i måneden.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge viser App Store-priser rett på {claude.ai.|Klåd punktum ai.}",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "I Pakistan: rundt *{163 kr.|hundre og sekstitre kroner.}*",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Trykk på info for å se planene.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "Rundt *{86 kr|åttiseks kroner}* i prisforskjell hver måned.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Regionbytte krever konto og betaling i landet. Sjekk vilkårene.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-10-31",
+  "comparison": {
+    "plan": "Claude Pro - Monthly",
+    "norwayNok": 249,
+    "pakistanPkr": 4900,
+    "pakistanApproxNok": 163.29,
+    "differenceNok": 85.71,
+    "displayedDifferenceApproxNok": 86,
+    "basis": "App Store IAP, 1 month. These are not the direct website prices."
+  },
+  "sources": [
+    "https://claude.ai/",
+    "https://apps.apple.com/no/app/claude-by-anthropic/id6473753684",
+    "https://apps.apple.com/pk/app/claude-by-anthropic/id6473753684",
+    "https://appstoreprice.org/en/apps/6473753684",
+    "https://open.er-api.com/v6/latest/NOK",
+    "https://support.apple.com/118283"
+  ]
+}

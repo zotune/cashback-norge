@@ -1,0 +1,61 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Samme Pokémon-boks. *{450 kr|fire hundre og femti kroner}* i prisforskjell?",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "{Mega Dream ex|Mega drim eks} på japansk: *{1 699 kr|tusen seks hundre og nittini kroner}* her.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge henter priser fra {Pokepris|Poképris}, rett i nettbutikken.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Samme boks: *{1 249 kr|tusen to hundre og førtini kroner}* hos {MaxGaming.|Maks geiming.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Trykk på info for butikker og lagerstatus.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{450 kr|Fire hundre og femti kroner}* lavere varepris.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Sjekk frakt og totalsum før du handler.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-10-31",
+  "comparison": {
+    "product": "Pokémon Mega Dream ex M2a Booster Box",
+    "language": "Japanese",
+    "packaging": "Sealed booster box, 10 packs, 10 cards per pack",
+    "wastelandNok": 1699,
+    "maxgamingNok": 1249,
+    "differenceNok": 450,
+    "basis": "Item prices only, shipping unknown in Pokepris. No claim of the lowest total price across all sources."
+  },
+  "sources": [
+    "https://wstl.no/products/pokemon-tcg-mega-dream-ex-m2a-booster-box-japansk-forseglet-high-class-pack",
+    "https://www.pokepris.no/produkt/3326",
+    "https://www.maxgaming.no/no/pokemon/pokemon-mega-dream-ex-booster-boks-japansk"
+  ]
+}

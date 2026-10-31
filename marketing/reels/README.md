@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Trettini vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026 video 37–39 25. okt. 2026 og video 40–42 31. okt. 2026.
+44 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 og video 40–44 31. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -46,6 +46,8 @@ Trettini vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceov
 | `out/40-chatgpt-regionpriser.mp4` | App Store-regionpriser for ChatGPT Plus: Norge 249 kr, Filippinene ≈ 145 kr, USA ≈ 184 kr før lokal skatt. Ingen fremgangsmåte for regionbytte, bare vilkårsforbehold | «Samme ChatGPT Plus 🤖 249 kr eller 145 kr?» |
 | `out/41-soundcloud-regionpriser.mp4` | App Store-regionpriser for SoundCloud Go: Norge 99 kr, Tyrkia ≈ 3 kr, India ≈ 39 kr | «SoundCloud Go 🎧 99 kr eller 3 kr?» |
 | `out/42-duolingo-regionpriser.mp4` | Super Duolingo 1 år: Norge 1 039 kr, Tyrkia ≈ 179 kr, via info-tooltipen i panelet. AppStorePrice oppgir også TRY 34,99/mnd, men den finnes ikke i Apples offentlige liste og er ikke brukt | «Super Duolingo 🦉 1 039 kr eller 179 kr?» |
+| `out/43-claude-regionpriser.mp4` | Claude Pro i App Store: Norge 249 kr/mnd mot Pakistan ≈ 163 kr/mnd, vist på ekte claude.ai med den oppdaterte info-knappen. Begge lokale priser bekreftet hos Apple | «Claude Pro 🤖 249 kr eller 163 kr?» |
+| `out/44-pokepris.mp4` | Samme forseglede japanske Mega Dream ex-boks: Wasteland 1 699 kr mot MaxGaming 1 249 kr via Pokepris. Tooltip viser butikkene på lager; 450 kr gjelder varepris, frakt er ukjent | «Samme Pokémon-boks 📦 450 kr forskjell?» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -93,6 +95,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - Spillvideoene 21–24 viser billigste kort i panelet (GG Deals Keyshops) og bruker `MODE=desktop SCROLL=buy HOVER="GG Deals" node games-capture.mjs <steam-url> <navn>`. Sjekk tilbudet på gg.deals/no fra norsk IP: GG Deals-kortet kan være en annen plattform enn siden (ARC Raiders: Xbox-nøkkel, Farming Simulator 25: Giants-nøkkel), og det må stå i videoen. Keyshop-priser er før gebyr. Muve selger ikke Modern Warfare 4 til Norge, og Cyberpunk 2077 er billigst på Steam blant offisielle butikker.
   - `yt-capture.mjs <url> <navn>` er games-capture for youtube.com med samtykke-cookie. `PRESET='{"cashback-varsler-region-prices-collapsed":true}'` lukker regionlisten, `TAPINFO=1` åpner første tooltip og `SCROLL=text:<tekst>` scroller til teksten.
   - `appstore-capture.mjs <url> <out.png> "<tekst>"` åpner «Kjøp i app» på apps.apple.com og scroller til teksten.
+  - `feature-capture.mjs <url> <video-name> <region|pokepris>` fanger dagens bygde userscript på en ekte side, avslår valgfrie samtykker og nyhetsbrev, åpner riktig info-tooltip og lagrer skjermbilder, kilde, tidspunkt, forespørselsstatus og DOM-koordinater i `videos/<video-name>/assets/`. `capture.js` driver zoom og markeringer i `shared/feature-reel.js` for video 43–44. Claude-videoen bruker i tillegg `appstore-capture.mjs` for `assets/apple-no.png` og dokumentasjonen `assets/apple-pk.png`.
   - Bursdagsvideoene bruker bare tilbud som er bekreftet hos gratisbursdag.no, viser kilden og kaller dem ikke cashback. cubus.com, lindex.com og komplett.no blokkerer automatisert nettleser.
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).
