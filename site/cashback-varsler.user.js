@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793441628
+// @version      1793441908
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -750,6 +750,112 @@
     } catch {
       return void 0;
     }
+  }
+  const HTML_ENTITIES = new Map(Object.entries({
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    nbsp: " ",
+    shy: "",
+    aring: "å",
+    Aring: "Å",
+    aelig: "æ",
+    AElig: "Æ",
+    oslash: "ø",
+    Oslash: "Ø",
+    auml: "ä",
+    Auml: "Ä",
+    ouml: "ö",
+    Ouml: "Ö",
+    uuml: "ü",
+    Uuml: "Ü",
+    aacute: "á",
+    Aacute: "Á",
+    eacute: "é",
+    Eacute: "É",
+    egrave: "è",
+    Egrave: "È",
+    agrave: "à",
+    acirc: "â",
+    atilde: "ã",
+    ecirc: "ê",
+    euml: "ë",
+    igrave: "ì",
+    iuml: "ï",
+    ograve: "ò",
+    ocirc: "ô",
+    otilde: "õ",
+    ugrave: "ù",
+    ucirc: "û",
+    Ccedil: "Ç",
+    iacute: "í",
+    oacute: "ó",
+    Oacute: "Ó",
+    uacute: "ú",
+    ntilde: "ñ",
+    ccedil: "ç",
+    szlig: "ß",
+    zwj: "‍",
+    zwnj: "‌",
+    lrm: "",
+    rlm: "",
+    ensp: " ",
+    emsp: " ",
+    thinsp: " ",
+    bull: "•",
+    middot: "·",
+    hellip: "…",
+    ndash: "–",
+    mdash: "—",
+    minus: "−",
+    lsquo: "‘",
+    rsquo: "’",
+    sbquo: "‚",
+    ldquo: "“",
+    rdquo: "”",
+    bdquo: "„",
+    laquo: "«",
+    raquo: "»",
+    rarr: "→",
+    larr: "←",
+    uarr: "↑",
+    darr: "↓",
+    harr: "↔",
+    check: "✓",
+    euro: "€",
+    pound: "£",
+    dollar: "$",
+    cent: "¢",
+    percnt: "%",
+    times: "×",
+    divide: "÷",
+    plusmn: "±",
+    deg: "°",
+    frac12: "½",
+    frac14: "¼",
+    frac34: "¾",
+    sup2: "²",
+    sup3: "³",
+    copy: "©",
+    reg: "®",
+    trade: "™",
+    sect: "§",
+    para: "¶",
+    star: "☆",
+    hearts: "♥"
+  }));
+  function decodeHtmlEntities(value) {
+    if (!value.includes("&")) return value;
+    return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
+      if (entity.startsWith("#")) {
+        const isHex = entity[1] === "x" || entity[1] === "X";
+        const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+        return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : match;
+      }
+      return HTML_ENTITIES.get(entity) ?? HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
+    });
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
     /\s+\|\s+/,
@@ -2440,32 +2546,6 @@
     ["samsung"],
     ["sony", "playstation"]
   ];
-  const NAMED_HTML_ENTITIES = /* @__PURE__ */ new Map([
-    ["amp", "&"],
-    ["quot", '"'],
-    ["apos", "'"],
-    ["nbsp", " "],
-    ["shy", ""],
-    ["aring", "å"],
-    ["Aring", "Å"],
-    ["aelig", "æ"],
-    ["AElig", "Æ"],
-    ["oslash", "ø"],
-    ["Oslash", "Ø"],
-    ["auml", "ä"],
-    ["Auml", "Ä"],
-    ["ouml", "ö"],
-    ["Ouml", "Ö"],
-    ["uuml", "ü"],
-    ["Uuml", "Ü"],
-    ["eacute", "é"],
-    ["Eacute", "É"],
-    ["egrave", "è"],
-    ["deg", "°"],
-    ["trade", "™"],
-    ["reg", "®"],
-    ["copy", "©"]
-  ]);
   function buildProductMatchAnchor(message) {
     const packageQuantity = message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
     return {
@@ -2724,17 +2804,6 @@
     const normalized = value.trim();
     if (normalized.length < 5 || normalized.length > 40 || isLikelyGtin$5(normalized)) return false;
     return /^[A-Za-z0-9][A-Za-z0-9._/ -]*$/.test(normalized) && /[A-Za-z]/.test(normalized) && /\d/.test(normalized);
-  }
-  function decodeHtmlEntities(value) {
-    if (!value.includes("&")) return value;
-    return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity) => {
-      if (entity.startsWith("#")) {
-        const isHex = entity[1] === "x" || entity[1] === "X";
-        const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
-        return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : match;
-      }
-      return NAMED_HTML_ENTITIES.get(entity) ?? NAMED_HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
-    });
   }
   function tokenizeBrandText(value) {
     return uniqueStrings$9(value.split(/[^A-Za-z0-9ÆØÅæøå]+/).map(normalizeBrandToken).filter((token) => token !== void 0 && token.length >= 2));
