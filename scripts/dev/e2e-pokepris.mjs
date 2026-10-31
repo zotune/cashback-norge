@@ -1,5 +1,6 @@
 // Live assertions against the built extension on merchant and comparison pages.
-// node scripts/dev/e2e-pokepris.mjs [--categories] [--userscript] [--offer-variants] [case names]
+// node scripts/dev/e2e-pokepris.mjs [--categories] [--userscript] [--offer-variants] [--catalog <file>] [case names]
+// --catalog serves a local merchant-URL catalog in place of the published one.
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, readFile } from "node:fs/promises";
@@ -18,6 +19,12 @@ const cases = [
   { name: "pokepris", url: "https://www.pokepris.no/produkt/6373", productId: "6373" },
 ];
 const requestedCases = process.argv.slice(2);
+const catalogUrl = "https://cashbacknorge.no/pokepris-catalog.json";
+let localCatalog;
+if (requestedCases.includes("--catalog")) {
+  localCatalog = await readFile(requestedCases[requestedCases.indexOf("--catalog") + 1], "utf8");
+  requestedCases.splice(requestedCases.indexOf("--catalog"), 2);
+}
 const offerVariants = requestedCases.includes("--offer-variants");
 if (offerVariants) requestedCases.splice(requestedCases.indexOf("--offer-variants"), 1);
 const userscript = requestedCases.includes("--userscript");
@@ -57,6 +64,7 @@ if (userscript) {
   // isolated transport harness, not an installed Tampermonkey test.
   await context.exposeFunction("tcgGmHttp", async (request) => {
     if (offerFixture && request.url === offerFixture.url) return { status: 200, responseText: offerFixture.html };
+    if (localCatalog !== undefined && request.url === catalogUrl) return { status: 200, responseText: localCatalog };
     const response = await context.request.fetch(request.url, { method: request.method ?? "GET", headers: request.headers,
       ...(request.data !== undefined ? { data: request.data } : {}), timeout: 15_000 });
     return { status: response.status(), responseText: await response.text() };
@@ -72,6 +80,13 @@ if (userscript) {
       }).catch((error) => request.onerror?.({ error: String(error) }));
     };
   });
+}
+if (localCatalog !== undefined && !userscript) {
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker", { timeout: 10_000 });
+  await worker.evaluate(({ url, text }) => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (input, init) => String(input) === url ? Promise.resolve(new Response(text, { headers: { "Content-Type": "application/json" } })) : original(input, init);
+  }, { url: catalogUrl, text: localCatalog });
 }
 try {
   if (offerVariants) {

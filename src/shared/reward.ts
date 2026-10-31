@@ -22,6 +22,21 @@ export function extractPercentageReward(text: string, suffix = ""): string {
   return formatPercentageReward(extractPercentageValues(text), suffix);
 }
 
+// "opptil 70 %" / "inntil -30%" states a maximum, not a guaranteed rate.
+const UP_TO_PERCENTAGE_PATTERN =
+  /(?:^|[^\p{L}\d])(?:opptil|opp\s+til|inntil)\s+-?\s*\d{1,3}(?:[,.]\d+)?\s*(?:[-–—]\s*\d{1,3}(?:[,.]\d+)?\s*)?(?:%|prosent)/iu;
+
+/**
+ * Like extractPercentageReward, but keeps an «opptil»/«inntil» qualifier that
+ * is attached to the percentage itself. Clients rank "opptil 70 %" by its
+ * maximum without calculating it as a guaranteed reward.
+ */
+export function extractUpToPercentageReward(text: string): string {
+  const reward = extractPercentageReward(text);
+  if (!reward) return "";
+  return UP_TO_PERCENTAGE_PATTERN.test(text) ? `opptil ${reward}` : reward;
+}
+
 export function formatPercentageReward(values: number[], suffix = ""): string {
   if (values.length === 0) return "";
 
@@ -58,8 +73,10 @@ export function extractExplicitTotalPriceReward(text: string): string {
   const cleanedText = stripOrdinaryPriceParentheticals(text);
   const values: number[] = [];
   const patterns = [
-    /\b(?:fast\s+lav\s+)?(?:månedspris|medlemspris|studentpris|kampanjepris|tilbudspris)\s*(?:på|er|:)?\s*(?:kun\s+)?(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
-    /\b(?:basis)?abonnement(?:et)?\s+til\s+kun\s+(?:kr\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
+    /\b(?:fast\s+lav\s+)?(?:månedspris|medlemspris|studentpris|kampanjepris|tilbudspris)\s*(?:på|er|:)?\s*(?:kun\s+)?(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
+    /\b(?:basis)?abonnement(?:et)?\s+til\s+kun\s+(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
+    // "Kun 65 kr/mnd" is a monthly price, like "månedspris 65 kr".
+    /\b(?:kun|bare)\s+(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])(?=\s*(?:\/\s*mnd|\/\s*måned|per\s+(?:mnd|måned)|i\s+måneden)\b)/gi,
   ];
 
   for (const pattern of patterns) {
@@ -69,6 +86,10 @@ export function extractExplicitTotalPriceReward(text: string): string {
         match.index ?? 0,
       );
       if (/\b(?:førpris|normal|ordinær|vanlig)\s*$/i.test(beforeMatch)) continue;
+      // An hourly rate ("studentpris kr. 295,-/timen") is a unit price, not
+      // the total the customer pays.
+      const afterMatch = cleanedText.slice((match.index ?? 0) + match[0].length);
+      if (/^\s*(?:\/|per\s+)\s*(?:time|timen|t)\b/i.test(afterMatch)) continue;
 
       const value = parseKrNumber(match[1] ?? "");
       if (value > 0) addUniqueNumber(values, value);
@@ -300,6 +321,12 @@ export function extractBenefitReward(text: string): string {
   }
 
   if (/\bmedlemspris(?:er)?\b/i.test(text)) return "Medlemspris";
+  // A benefit stated as a discount without an amount ("Rabatt på
+  // advokattjenester", "Vestbo-rabatt") is not free: incidental extras
+  // elsewhere in the text ("første samtale er gratis", "gratis befaring") must
+  // not turn it into "0 kr totalsum". Generic plural marketing in page chrome
+  // ("Gode rabatter på forsikring") does not describe this benefit.
+  if (/\b(?:rabatt|avslag)\b/i.test(rewardText)) return "Rabatt";
   const gratis = extractGratisReward(text);
   if (gratis) return gratis;
   if (/\brabatt/i.test(text)) return "Rabatt";

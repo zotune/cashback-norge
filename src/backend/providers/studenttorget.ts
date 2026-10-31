@@ -7,13 +7,16 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractPercentageReward, extractKrReward } from "../../shared/reward.js";
+import {
+  extractExplicitTotalPriceReward,
+  extractKrReward,
+  extractUpToPercentageReward,
+} from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
 const BASE_URL = "https://studenttorget.no";
-const LIST_URL = `${BASE_URL}/studentrabatter`;
 const DEFAULT_TERMS = "Krever registrering på studenttorget.no (gratis).";
 const DETAIL_CONCURRENCY = 30;
 
@@ -33,6 +36,8 @@ const SKIP_HOSTNAMES = new Set([
 ]);
 
 export type CrawlStudentTorgetInput = {
+  /** Site origin; injectable for tests. Defaults to https://studenttorget.no. */
+  baseUrl?: string;
   domainLookup: DomainLookup;
   generatedAt: string;
   logger: Logger;
@@ -55,6 +60,8 @@ type RawOffer = {
   location: string;
   /** Category */
   category: string;
+  /** Rich listing card (pages 1-11); only these detail pages link to a website. */
+  profiled: boolean;
 };
 
 export async function crawlStudentTorget(
@@ -62,10 +69,26 @@ export async function crawlStudentTorget(
 ): Promise<CashbackOffer[]> {
   input.logger.info("StudentTorget: fetching listing pages...");
 
-  const rawOffers = await fetchAllListingOffers(input.logger);
+  const baseUrl = input.baseUrl ?? BASE_URL;
+  const rawOffers = await fetchAllListingOffers(baseUrl, input.logger);
   input.logger.info(`StudentTorget: found ${rawOffers.length} offers on listing pages`);
 
-  await enrichDetails(rawOffers, input.logger);
+  // Only profiled listing cards (the first ~11 pages) link to the merchant's
+  // website from their detail page; unprofiled entries never do and can only
+  // be published through an override or a name lookup. Read the detail page
+  // (benefit text, terms, website) for exactly those two groups. The listing
+  // is shuffled on every request, so the earlier order-dependent cut-off
+  // ("stop after 15 pages without a website") published a random share of
+  // offers without their benefit text, as "?".
+  const detailTargets = rawOffers.filter((raw) => {
+    return raw.profiled ||
+      (input.overrides.studenttorget?.[raw.slug] ?? []).length > 0 ||
+      lookupDomains(input.domainLookup, raw.name).length > 0;
+  });
+  input.logger.info(
+    `StudentTorget: fetching ${detailTargets.length} detail pages (profiled or matched by override/name lookup)`,
+  );
+  await enrichDetails(detailTargets, input.logger);
 
   const offers: CashbackOffer[] = [];
   let lookupCount = 0;
@@ -73,7 +96,7 @@ export async function crawlStudentTorget(
   let directCount = 0;
 
   for (const raw of rawOffers) {
-    let reward = parseReward(raw.badgeText, raw.description, raw.richDescription);
+    let reward = parseStudentTorgetReward(raw.badgeText, raw.description, raw.richDescription);
     // If no specific reward could be parsed, show "?"
     if (!reward) {
       reward = "?";
@@ -141,24 +164,25 @@ export async function crawlStudentTorget(
   return uniqueOffers(offers);
 }
 
-async function fetchAllListingOffers(logger: Logger): Promise<RawOffer[]> {
+async function fetchAllListingOffers(baseUrl: string, logger: Logger): Promise<RawOffer[]> {
+  const listUrl = `${baseUrl}/studentrabatter`;
   // Fetch first page to determine total pages
-  const firstHtml = await fetchHtml(LIST_URL);
+  const firstHtml = await fetchHtml(listUrl);
   const totalPages = extractTotalPages(firstHtml);
   logger.info(`StudentTorget: ${totalPages} listing pages`);
 
-  const allOffers = extractListingOffers(firstHtml);
+  const allOffers = extractListingOffers(firstHtml, baseUrl);
 
   // Fetch remaining pages in parallel batches
   const PAGE_CONCURRENCY = 10;
   for (let page = 2; page <= totalPages; page += PAGE_CONCURRENCY) {
     const batch = [];
     for (let p = page; p < page + PAGE_CONCURRENCY && p <= totalPages; p++) {
-      batch.push(fetchHtml(`${LIST_URL}?page=${p}`));
+      batch.push(fetchHtml(`${listUrl}?page=${p}`));
     }
     const htmlPages = await Promise.all(batch);
     for (const html of htmlPages) {
-      allOffers.push(...extractListingOffers(html));
+      allOffers.push(...extractListingOffers(html, baseUrl));
     }
   }
 
@@ -189,7 +213,7 @@ function extractTotalPages(html: string): number {
   return Math.max(...matches.map((m) => Number(m[1])));
 }
 
-function extractListingOffers(html: string): RawOffer[] {
+function extractListingOffers(html: string, baseUrl: string): RawOffer[] {
   const offers: RawOffer[] = [];
   const seen = new Set<string>();
 
@@ -226,10 +250,11 @@ function extractListingOffers(html: string): RawOffer[] {
       slug, id,
       name: decodeHtmlEntities(rawName),
       badgeText: decodeHtmlEntities(badgeText),
-      sourceUrl: `${BASE_URL}/studentrabatt/${slug}/${id}`,
+      sourceUrl: `${baseUrl}/studentrabatt/${slug}/${id}`,
       websiteUrl: "",
       description: decodeHtmlEntities(description),
       richDescription: "", subtitle: "", location: "", category: "",
+      profiled: true,
     });
   }
 
@@ -253,10 +278,11 @@ function extractListingOffers(html: string): RawOffer[] {
       slug, id,
       name: decodeHtmlEntities(rawName),
       badgeText: "",
-      sourceUrl: `${BASE_URL}/studentrabatt/${slug}/${id}`,
+      sourceUrl: `${baseUrl}/studentrabatt/${slug}/${id}`,
       websiteUrl: "",
       description: "",
       richDescription: "", subtitle: "", location: "", category: "",
+      profiled: false,
     });
   }
 
@@ -298,26 +324,9 @@ async function enrichDetails(offers: RawOffer[], logger: Logger): Promise<void> 
     }
   }
 
-  let consecutiveMisses = 0;
-  const STOP_AFTER_MISSES = 15;
-
   for (let i = 0; i < offers.length; i += DETAIL_CONCURRENCY) {
     const batch = offers.slice(i, i + DETAIL_CONCURRENCY);
     await Promise.all(batch.map(enrich));
-
-    // Check how many in this batch got a URL
-    for (const o of batch) {
-      if (o.websiteUrl) {
-        consecutiveMisses = 0;
-      } else {
-        consecutiveMisses++;
-      }
-    }
-
-    if (consecutiveMisses >= STOP_AFTER_MISSES) {
-      logger.info(`StudentTorget: stopping detail enrichment after ${STOP_AFTER_MISSES} consecutive misses (at ${completed}/${offers.length})`);
-      break;
-    }
   }
 
   if (offers.length > 0) process.stdout.write("\n");
@@ -452,20 +461,26 @@ function extractDetailPageInfo(html: string): DetailPageInfo {
  *   "Studentpris 170 kr" → "170 kr totalsum"
  *   "STUDENTRABATT!" → fall through to description
  *
+ * Description examples (detail page subtitle, then body):
+ *   "Vi gir studenter 20% rabatt på medium pizza" → "20 %"
+ *   "Studentpris: 580,-" → "580 kr totalsum"
+ *   "For kun 1250,- får du både bil og medhjelper" → "1250 kr totalsum"
+ *   "enkel rens til kr 740,-" → "740 kr totalsum"
+ *
  * Uses shared reward functions from src/shared/reward.ts so calculation
  * logic is not duplicated.
  */
-function parseReward(badgeText: string, description: string, richDescription: string = ""): string {
+export function parseStudentTorgetReward(
+  badgeText: string,
+  description: string,
+  richDescription: string = "",
+): string {
   if (badgeText && !/^studentrabatt!?$/i.test(badgeText)) {
     const badge = badgeText.trim();
 
     // Check for percentage discount first
-    const lower = badge.toLowerCase();
-    const isOpptil = lower.includes("opptil") || lower.includes("opp til");
-    const pct = extractPercentageReward(badge);
-    if (pct) {
-      return isOpptil ? `opptil ${pct}` : pct;
-    }
+    const pct = extractUpToPercentageReward(badge);
+    if (pct) return pct;
 
     // kr-discount from badge (e.g. "Spar 200 kr" style)
     const krDiscount = extractKrReward(`${badge} rabatt`);
@@ -489,26 +504,37 @@ function parseReward(badgeText: string, description: string, richDescription: st
   for (const text of [description, richDescription]) {
     if (!text) continue;
 
-    const textLower = text.toLowerCase();
-    const isOpptil = textLower.includes("opptil") || textLower.includes("opp til");
-
-    const pct = extractPercentageReward(text);
-    if (pct) {
-      return isOpptil ? `opptil ${pct}` : pct;
-    }
+    const pct = extractUpToPercentageReward(text);
+    if (pct) return pct;
 
     // kr discount (e.g. "200 kr i rabatt")
     const krDiscount = extractKrReward(text);
     if (krDiscount) return krDiscount;
 
-    // Fixed price in text: "Kun 110 kr", "2690,-", "studentpris: 499,-"
-    const fixedPriceMatch = text.match(/(?:kun|studentpris|pris)[:\s]+(?:kr\.?\s*)?(\d[\d\s]*)(?:,[-–]|,-|\s*kr)\b/i);
-    if (fixedPriceMatch) {
-      const value = fixedPriceMatch[1]!.replace(/\s/g, "");
-      return `${value} kr totalsum`;
-    }
+    // Fixed student price: "Studentpris: 499,-", "Kun 110 kr", "for kr 149,-"
+    const fixedPrice = extractExplicitTotalPriceReward(text) || extractStatedPrice(text);
+    if (fixedPrice) return fixedPrice;
   }
 
+  return "";
+}
+
+// "For kun 1250,- får du …", "enkel rens til kr 740,-", "se film for 99,-",
+// "Studenter betaler kr 100,- i inngangsbillett".
+// The keyword must be a word of its own ("inntil"/"opptil" are maximum
+// discounts, not prices) and the amount must carry an explicit kr or ",-".
+const STATED_PRICE_PATTERN =
+  /(?<![\p{L}\d])(?<!\bopp\s)(?:kun|bare|til|for|betaler)\s+(?:kun\s+|bare\s+)?(?:kr\.?\s*)?(\d{1,3}(?:[ .]\d{3})+|\d+)\s*(?:,[-–]|kr\b|kroner\b)/giu;
+
+function extractStatedPrice(text: string): string {
+  for (const match of text.matchAll(STATED_PRICE_PATTERN)) {
+    const afterMatch = text.slice((match.index ?? 0) + match[0].length);
+    // Unit prices ("250,- per time", "300,- per måned") are not a total.
+    if (/^\s*(?:\/|per\s+|pr\.?\s+)\s*(?:time|timen|t|mnd|måned|semester|år)\b/iu.test(afterMatch)) continue;
+
+    const value = Number.parseInt((match[1] ?? "").replace(/[ .]/g, ""), 10);
+    if (Number.isFinite(value) && value > 0) return `${value} kr totalsum`;
+  }
   return "";
 }
 

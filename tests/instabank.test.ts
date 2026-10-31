@@ -120,7 +120,7 @@ test("the current benefit joins the free cards as a conditional card with this m
   assert.deepEqual(cards.slice(1), FREE_CARDS);
   const card = cards[0]!;
   assert.deepEqual({ ...card, tip: undefined }, {
-    pct: 0.05, label: "Instabank", badge: "instabank", url: "https://instabank.no/kredittkort",
+    pct: 0.05, minPct: 0, maxPct: 0.05, label: "Instabank", badge: "instabank", url: "https://instabank.no/kredittkort",
     approx: false, conditional: true, tip: undefined,
   });
   assert.deepEqual(card.tip.split("\n"), [
@@ -134,7 +134,10 @@ test("the current benefit joins the free cards as a conditional card with this m
     ...PROVIDER_TIPS.instabank!.split("\n"),
   ]);
   const december = offers.map((offer) => ({ ...offer, updatedAt: "2026-12-14T12:00:00.000Z" }));
-  assert.equal(getFreeCards(december, new Date("2026-12-15T12:00:00Z"))[0]?.pct, 0.03);
+  const decemberCard = getFreeCards(december, new Date("2026-12-15T12:00:00Z"))[0]!;
+  assert.deepEqual([decemberCard.pct, decemberCard.minPct, decemberCard.maxPct], [0.03, undefined, undefined]);
+  const novemberCard = getFreeCards(offers, new Date("2026-11-02T12:00:00Z"))[0]!;
+  assert.deepEqual([novemberCard.pct, novemberCard.minPct], [0.05, undefined]);
   assert.equal(getFreeCards([], new Date(generatedAt)), FREE_CARDS);
   assert.equal(getFreeCards(offers, new Date("2026-11-08T12:00:01Z")), FREE_CARDS);
 });

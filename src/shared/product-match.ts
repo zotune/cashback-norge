@@ -14,16 +14,19 @@ import {
 export const MIN_PRODUCT_MATCH_SCORE = 0.45;
 
 export function isSameProductUrl(first: string | undefined, second: string | undefined): boolean {
-  const a = first === undefined ? undefined : parseUrl(first);
-  const b = second === undefined ? undefined : parseUrl(second);
-  if (a === undefined || b === undefined) return false;
-  for (const url of [a, b]) {
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
-    }
-    url.searchParams.sort();
+  const a = first === undefined ? undefined : normalizeProductUrlKey(first);
+  return a !== undefined && a === (second === undefined ? undefined : normalizeProductUrlKey(second));
+}
+
+// Tracking parameters are dropped; variant parameters remain part of the product.
+export function normalizeProductUrlKey(rawUrl: string): string | undefined {
+  const url = parseUrl(rawUrl);
+  if (url === undefined) return undefined;
+  for (const key of [...url.searchParams.keys()]) {
+    if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
   }
-  return a.hostname.replace(/^www\./, "") === b.hostname.replace(/^www\./, "") && a.pathname.replace(/\/$/, "") === b.pathname.replace(/\/$/, "") && a.search === b.search;
+  url.searchParams.sort();
+  return `${url.hostname.replace(/^www\./, "")}${url.pathname.replace(/\/$/, "")}${url.search}`;
 }
 
 export function readProductCodesFromUrl(rawUrl: string): string[] {

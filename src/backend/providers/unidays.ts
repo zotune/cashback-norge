@@ -5,7 +5,11 @@ import {
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
-import { extractPercentageReward, extractKrReward } from "../../shared/reward.js";
+import {
+  extractExplicitTotalPriceReward,
+  extractKrReward,
+  extractPercentageReward,
+} from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 const PARTNERS_API = "https://api.myunidays.com/partners";
@@ -140,7 +144,10 @@ export async function fetchUnidays(
 
 
       const rewardRaw = benefit.name.trim();
-      let reward = extractPercentageReward(rewardRaw) || extractKrReward(rewardRaw, { totalsum: false });
+      // "Kun 65 kr/mnd og gratis Apple TV" is a student price, not a discount.
+      let reward = extractPercentageReward(rewardRaw) ||
+        extractKrReward(rewardRaw, { totalsum: false }) ||
+        extractExplicitTotalPriceReward(rewardRaw);
       if (!reward) reward = "?";
 
       offers.push({
@@ -150,7 +157,7 @@ export async function fetchUnidays(
         reward,
         sourceUrl: benefit.url,
         activationUrl: benefit.url,
-        terms: "UNiDAYS studentrabatt. Krever gyldig UNiDAYS-konto.",
+        terms: buildTerms(rewardRaw),
         updatedAt: input.generatedAt,
       });
     }
@@ -159,4 +166,12 @@ export async function fetchUnidays(
   input.logger.info(`UNiDAYS: ${offers.length} offers`);
 
   return uniqueOffers(offers);
+}
+
+const DEFAULT_TERMS = "UNiDAYS studentrabatt. Krever gyldig UNiDAYS-konto.";
+
+// The benefit name is the public offer text ("Kun 65 kr/mnd og gratis Apple
+// TV"); keep it in the tooltip so units and extras are not lost.
+function buildTerms(benefitName: string): string {
+  return benefitName ? `${benefitName}\n${DEFAULT_TERMS}` : DEFAULT_TERMS;
 }

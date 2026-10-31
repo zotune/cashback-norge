@@ -423,12 +423,22 @@ function extractReward(store: RememberStore): string {
     return `${formatRewardNumber(store.maxPercentageValue)} %`;
   }
 
+  // Fixed commissions carry their currency as the type ("NOK", "SEK"); the
+  // page renders e.g. "251 SEK i reward-rabatt". `maxFixedValue` drops both
+  // the currency and the other amounts, so it is only a fallback.
   const fixedCommissions = store.commission.filter(
-    (c) => c.type === "FIXED" && c.value > 0,
+    (c) => c.value > 0 && fixedCommissionUnit(c.type) !== undefined,
   );
+  const fixedUnits = uniqueStrings(fixedCommissions.map((c) => fixedCommissionUnit(c.type) ?? ""));
 
-  if (fixedCommissions.length === 1 && fixedCommissions[0] !== undefined) {
-    return `${formatRewardNumber(fixedCommissions[0].value)} kr`;
+  if (fixedCommissions.length > 0 && fixedUnits.length === 1) {
+    const values = fixedCommissions.map((c) => c.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const amount = min !== max
+      ? `${formatRewardNumber(min)}-${formatRewardNumber(max)}`
+      : formatRewardNumber(max);
+    return `${amount} ${fixedUnits[0]}`;
   }
 
   if (store.maxFixedValue > 0) {
@@ -453,21 +463,78 @@ function extractReward(store: RememberStore): string {
   return "";
 }
 
+// The structured `commission` list is what re:member renders as the store's
+// current rate ("6% i reward-rabatt på alt du kjøper") and what the reward is
+// built from. The editorial `terms` prose is updated separately and can still
+// quote an older rate ("Få 4 % reward-rabatt"), so the tooltip leads with the
+// structured rate and leaves out prose sentences that quote a different one.
 function extractTerms(store: RememberStore): string {
   const percentageCommissions = store.commission.filter(
     (c) => c.type === "PERCENTAGE" && c.value > 0 && c.description.length > 0,
   );
 
   if (percentageCommissions.length > 1) {
-    return percentageCommissions
-      .map((c) => `${formatRewardNumber(c.value)} % – ${c.description}`)
-      .join("\n");
+    return percentageCommissions.map(formatCommissionLine).join("\n");
   }
 
+  const commissionLines = store.commission
+    .filter((c) => {
+      return (c.type === "PERCENTAGE" || fixedCommissionUnit(c.type) !== undefined) &&
+        c.value > 0 && c.description.length > 0;
+    })
+    .map(formatCommissionLine);
+  const currentPercentages = store.commission
+    .filter((c) => c.type === "PERCENTAGE" && c.value > 0)
+    .map((c) => c.value);
+  const prose = store.terms
+    ? withoutStaleRewardRates(stripHtml(store.terms), currentPercentages)
+    : "";
+
   return (
-    (store.terms ? stripHtml(store.terms) : "") ||
+    [...commissionLines, prose].filter((part) => part.length > 0).join("\n") ||
     "Requires re:member reward login and payment with a re:member card."
   );
+}
+
+function formatCommissionLine(commission: RememberCommission): string {
+  const unit = commission.type === "PERCENTAGE" ? "%" : fixedCommissionUnit(commission.type) ?? commission.type;
+  return `${formatRewardNumber(commission.value)} ${unit} – ${commission.description}`;
+}
+
+const FOREIGN_COMMISSION_CURRENCIES = new Set(["SEK", "DKK", "EUR", "USD", "GBP"]);
+
+function fixedCommissionUnit(type: string): string | undefined {
+  if (type === "FIXED" || type === "NOK") return "kr";
+  return FOREIGN_COMMISSION_CURRENCIES.has(type) ? type : undefined;
+}
+
+const REWARD_RATE_CLAIM = /(\d+(?:[,.]\d+)?)\s*%\s*(?:i\s+)?(?:reward[\s-]?rabatt|belønningsrabatt)/gi;
+
+function withoutStaleRewardRates(prose: string, currentPercentages: number[]): string {
+  if (currentPercentages.length === 0) return prose.replace(/\r\n?/g, "\n").trim();
+
+  const isStale = (sentence: string): boolean => {
+    return [...sentence.matchAll(REWARD_RATE_CLAIM)].some((match) => {
+      const value = Number.parseFloat((match[1] ?? "").replace(",", "."));
+      return !currentPercentages.includes(value);
+    });
+  };
+
+  return prose
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => {
+      return line
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => !isStale(sentence))
+        .join(" ")
+        .trimEnd();
+    })
+    // Drop list bullets whose only sentence was a stale rate claim.
+    .filter((line, index, lines) => !/^\s*-\s*$/.test(line) && !(line === "" && lines[index - 1] === ""))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function inferStoreDomains(store: RememberStore): string[] {

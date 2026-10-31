@@ -28,10 +28,27 @@ export function readNextFlightPayloads(html: string): string[] {
 
 export function readNextFlightValues(html: string): unknown[] {
   const values: unknown[] = [];
-  for (const row of readNextFlightPayloads(html).join("").split("\n")) {
-    const separator = row.indexOf(":");
-    if (separator < 0) continue;
-    try { values.push(JSON.parse(row.slice(separator + 1))); } catch { /* Skip references and streamed text. */ }
+  const data = readNextFlightPayloads(html).join("");
+  for (let index = 0; index < data.length;) {
+    const separator = data.indexOf(":", index);
+    if (separator < 0) break;
+    // A text row ("id:T<hex byte length>,text") has no newline, so the next
+    // row follows directly. Skip it by its UTF-8 length.
+    const text = /^T([0-9a-f]+),/.exec(data.slice(separator + 1, separator + 12));
+    if (text !== null) {
+      let end = separator + 1 + text[0].length;
+      for (let bytes = 0, length = parseInt(text[1]!, 16); end < data.length && bytes < length;) {
+        const code = data.codePointAt(end)!;
+        bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+        end += code > 0xffff ? 2 : 1;
+      }
+      index = end;
+      continue;
+    }
+    const newline = data.indexOf("\n", separator);
+    const end = newline < 0 ? data.length : newline;
+    try { values.push(JSON.parse(data.slice(separator + 1, end))); } catch { /* Skip references and module rows. */ }
+    index = end + 1;
   }
   return values;
 }

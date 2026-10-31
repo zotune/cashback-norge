@@ -56,3 +56,44 @@ test("an entirely incomplete catalogue activates bounded fallback without refres
     previousOffersByProvider: new Map([["utdanningibergen", [expired]]]) }), []);
   assert.ok(warnings.some((warning) => /above the 14 day fallback limit.*skipping provider/.test(warning)));
 });
+
+test("rewards stated only in the description or conditions are read with the shared parsers", async (t) => {
+  // Live records (utdanningibergen.no, 2026-10-31), trimmed.
+  const rows = [
+    { ...valid, id: 18644, business_name: "Specsavers", url: "specsavers", link: "https://www.specsavers.no/",
+      discount_type: "fastpris", discount: 395, description: "<p>Adresse: Vågsallmenningen 4</p>",
+      conditions: "<p>Kun synsundersøkelse + 25 % på komplett brille. Vis gyldig studentbevis. Se nettside for flere betingelser</p>" },
+    { ...valid, id: 15900, business_name: "SAS", url: "sas", link: "https://www.sas.no/",
+      discount_type: "%", discount: 0,
+      description: "<p>Hver SAS-flyvning har en Young-rabatt på opptil 70 % av ordinær pris.For unge mellom 12 og 25 år.</p>",
+      conditions: "<p>Reisende på ungdomsbilletter må kunne bevise alderen sin med gyldig legitimasjon.</p>" },
+    { ...valid, id: 16027, business_name: "Widerøe", url: "wideroee", link: "https://www.wideroe.no/",
+      discount_type: "NOK", discount: 0,
+      description: "<p>For fulltidsstudenter mellom 26 og 31 år. Du må sjekke nettsider for pris, da denne varierer.</p>",
+      conditions: "<p>Husk gyldig studentbevis, ellers blir du nektet ombordsstigning.</p>" },
+    { ...valid, id: 18667, business_name: "Kunsthall 3.14", url: "kunsthall", link: "https://www.kunsthall314.art/",
+      discount_type: "fastpris", discount: 0, description: "<p>Internasjonal samtidskunstgalleri i hjertet av Bergen.</p>",
+      conditions: "<p>Gratis inngang</p>" },
+    // A zero fixed price without a documented free offer is a missing amount.
+    { ...valid, id: 4, business_name: "Ukjent pris", url: "ukjent", link: "https://ukjent.example/",
+      discount_type: "fastpris", discount: 0, description: "<p>Studentrabatt på kurs.</p>", conditions: null },
+    { ...valid, id: 5, business_name: "Zupperia", url: "zupperia", link: "https://zupperia.example/",
+      discount_type: "%", discount: 15,
+      description: "<p>Rabatt på alle retter. Tilbyr også 25% rabatt på utvalgte lunsjretter.</p>", conditions: null },
+  ];
+  t.mock.method(globalThis, "fetch", async () => new Response(fixture(rows)));
+  const offers = await fetchUtdanningiBergen({ generatedAt, logger: { info() {}, warn() {}, error() {} } });
+  const rewards = Object.fromEntries(offers.map((offer) => [offer.merchantName, offer.reward]));
+  assert.deepEqual(rewards, {
+    // The structured eye-test price stays first; the glasses discount is kept.
+    Specsavers: "395 kr totalsum + 25 %",
+    SAS: "opptil 70 %",
+    Widerøe: "?",
+    "Kunsthall 3.14": "0 kr totalsum",
+    "Ukjent pris": "?",
+    // The structured rate is not overridden by a narrower campaign in the text.
+    Zupperia: "15 %",
+  });
+  const specsavers = offers.find((offer) => offer.merchantName === "Specsavers");
+  assert.match(specsavers?.terms ?? "", /25 % på komplett brille/);
+});

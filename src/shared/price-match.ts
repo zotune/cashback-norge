@@ -92,7 +92,7 @@ export async function findPriceMatches(
     ignorePriceMatchFailure(findSesumPriceMatch(message, requestText)),
     ignorePriceMatchFailure(findEnhverPriceMatch(message, requestJson, requestText)),
     ignorePriceMatchFailure(findKassalPriceMatch(message, requestText)),
-    ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) })),
+    ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, useCatalog: true, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) })),
   ]);
 
   const anchorOffers = [prisjaktOffer, klarnaOffer]

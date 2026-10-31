@@ -91,6 +91,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add --force data/cashback-index.json
+          # Kept for the 14-day fallback when Pokepris is unavailable.
+          if [ -f data/pokepris-catalog.json ]; then git add --force data/pokepris-catalog.json; fi
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
@@ -104,6 +106,7 @@ jobs:
           mkdir _site
           cp -R site/* _site/
           cp data/cashback-index.json _site/cashback-index.json
+          if [ -f data/pokepris-catalog.json ]; then cp data/pokepris-catalog.json _site/pokepris-catalog.json; fi
 
       - uses: actions/upload-pages-artifact@v3
         with:

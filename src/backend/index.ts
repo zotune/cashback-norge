@@ -28,6 +28,7 @@ import {
 import { readManualOffers } from "./manual-offers.js";
 import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
+import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
 import { fetchDealpass } from "./providers/dealpass.js";
@@ -190,6 +191,9 @@ type CliConfig = {
   skipCoupert: boolean;
   skipRabatta: boolean;
   skipGratisbursdag: boolean;
+  skipPokeprisCatalog: boolean;
+  pokeprisOrigin: string;
+  pokeprisCatalogPath: string;
   rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -255,6 +259,10 @@ async function main(): Promise<void> {
     }),
   }));
   const spennSourcePromise = config.skipSpenn ? undefined : startEarly(fetchSpennSource({ logger }));
+  // Not a cashback source: a merchant-URL catalog for Pokepris price matches.
+  const pokeprisCatalogPromise = config.skipPokeprisCatalog ? undefined : startEarly(collectPokeprisCatalog({
+    generatedAt, logger, origin: config.pokeprisOrigin, previousPath: config.pokeprisCatalogPath,
+  }));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
     maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
@@ -1108,6 +1116,14 @@ async function main(): Promise<void> {
   const siteIndexPath = resolve("site/cashback-index.json");
   await copyFile(config.outputPath, siteIndexPath);
   logger.info(`Copied index to ${siteIndexPath}`);
+
+  const pokeprisCatalog = await pokeprisCatalogPromise;
+  if (pokeprisCatalog !== undefined) {
+    await writePokeprisCatalog(config.pokeprisCatalogPath, pokeprisCatalog);
+    const siteCatalogPath = resolve("site/pokepris-catalog.json");
+    await copyFile(config.pokeprisCatalogPath, siteCatalogPath);
+    logger.info(`Wrote Pokepris catalog (${pokeprisCatalog.generatedAt}) to ${config.pokeprisCatalogPath} and ${siteCatalogPath}`);
+  }
 }
 
 function readCliConfig(args: string[]): CliConfig {
@@ -1244,6 +1260,9 @@ function readCliConfig(args: string[]): CliConfig {
     skipCoupert: args.includes("--skip-coupert"),
     skipRabatta: args.includes("--skip-rabatta"),
     skipGratisbursdag: args.includes("--skip-gratisbursdag"),
+    skipPokeprisCatalog: args.includes("--skip-pokepris-catalog"),
+    pokeprisOrigin: readArgumentValue(args, "--pokepris-origin") ?? "https://www.pokepris.no",
+    pokeprisCatalogPath: resolve(readArgumentValue(args, "--pokepris-catalog-output") ?? "data/pokepris-catalog.json"),
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??

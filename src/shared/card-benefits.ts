@@ -52,8 +52,13 @@ export function getActiveCardBenefits(offers: CashbackOffer[], now = new Date())
 export function getFreeCards(offers: CashbackOffer[], now = new Date()): BonusCard[] {
   const [benefit] = getActiveCardBenefits(offers, now);
   if (benefit === undefined) return FREE_CARDS;
+  const pct = getMaxRewardPercent(benefit) / 100;
+  // A category month gives nothing outside its MCC codes, so the chip shows
+  // 0 % as the lower bound. All purchases and all online shopping apply here.
+  const allPurchases = /^(?:alle kjøp|all netthandel)\b/i.test(benefit.cardBenefit!.category);
   const card: BonusCard = {
-    pct: getMaxRewardPercent(benefit) / 100,
+    pct,
+    ...(allPurchases ? {} : { minPct: 0, maxPct: pct }),
     label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
     badge: benefit.provider,
     url: benefit.activationUrl,

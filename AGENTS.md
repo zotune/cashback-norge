@@ -155,7 +155,17 @@ tilbudsvisning.
   produktsider skal støttes, oppdater også gjenkjenning og kilde-/host-lister
   i `content.ts` og `price-match.ts` uten å aktivere oppslag på alle listesider.
 - Pokepris (`https://www.pokepris.no/`) er en prismatch-kilde for forseglede
-  Pokémon TCG-produkter. Adapteren bruker JSON-LD og sidens offentlige
+  Pokémon TCG-produkter. Identitet avgjøres først av butikkens konkrete
+  produkt-URL: Daily crawl bygger `data/pokepris-catalog.json`
+  (`src/backend/pokepris-catalog.ts`) fra de butikkfiltrerte `getProducts`-
+  radene og publiserer den på `https://cashbacknorge.no/pokepris-catalog.json`.
+  Katalogen har ingen priser, bare URL → produkt-ID, kanonisk ID, språk og
+  type; pris og lager leses alltid live fra produktsiden. Et URL-treff må
+  fortsatt bekreftes av butikkens egen rad (originaltittel og variant) på
+  produktsiden, ellers fortsetter vanlig søk. Utelat Pokepris' umatchede
+  `*_unique_*`-oppføringer og skjulte (`redacted`) Pro-rader. Komparatorsider
+  søker i katalogen i stedet for Pokepris' action. Uten gyldig katalog under
+  14 dager brukes oppslagene under. Adapteren bruker JSON-LD og sidens offentlige
   `getProducts`-oppslag der transporten støtter det. Next-oppslaget returnerer
   HTTP 500 med extensionens transport; bruk de offentlige produkt-/settsidene
   med strukturerte data i extensionen. Oppdag gjeldende action-ID, settlenker

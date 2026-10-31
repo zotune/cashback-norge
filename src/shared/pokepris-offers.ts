@@ -62,8 +62,22 @@ export function readPokeprisOffers(html: string, rawOffers: unknown[], productUr
     return [{ shopName, amount, currency: "NOK", price: formatPrice(amount, "NOK"), offerUrl: url.href,
       shippingPrice: "Frakt ukjent", inStock, preorder }];
   });
+  // Sold-out rows are often missing from JSON-LD. Their own original title
+  // can still prove identity, never price; rows already judged above are skipped.
+  const judgedUrls = rawOffers.filter(isRecord).map((offer) => typeof offer.url === "string" ? offer.url : "");
+  const rowIdentity = new Map<string, { shopName: string; offerUrl: string } | undefined>();
+  for (const row of scoped.rows) {
+    const url = typeof row.product_url === "string" ? parseUrl(row.product_url) : undefined;
+    if (url === undefined || !["http:", "https:"].includes(url.protocol) || judgedUrls.some((judged) => isSameProductUrl(judged, url.href))) continue;
+    const valid = row.redacted !== true && typeof row.store_name === "string" && row.store_name.trim() !== "" &&
+      typeof row.product_name === "string" && readTcgSealedOfferIssue(productName, decodeHtmlEntities(row.product_name), language) === undefined;
+    // Every row for the URL must agree.
+    const key = url.href;
+    rowIdentity.set(key, valid && (!rowIdentity.has(key) || rowIdentity.get(key) !== undefined) ? { shopName: String(row.store_name).trim(), offerUrl: key } : undefined);
+  }
   return {
-    identityOffers: verified.map(({ shopName, offerUrl }) => ({ shopName, offerUrl })),
+    identityOffers: [...verified.map(({ shopName, offerUrl }) => ({ shopName, offerUrl })),
+      ...[...rowIdentity.values()].filter((offer) => offer !== undefined)],
     offers: verified.filter((offer) => offer.inStock).map(({ inStock: _stock, preorder: _preorder, ...offer }) => offer).sort((a, b) => a.amount - b.amount),
     preorders: verified.filter((offer) => offer.preorder).map(({ shopName, amount, currency }) => ({ shopName, amount, currency })),
   };

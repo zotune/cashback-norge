@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793306538
+// @version      1793441628
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -15,6 +15,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
+// @connect      cashbacknorge.no
 // @connect      www.pokepris.no
 // @connect      pokepris.no
 // @connect      browser-extension-backend.cloud.pji.nu
@@ -2404,16 +2405,17 @@
   }
   const MIN_PRODUCT_MATCH_SCORE = 0.45;
   function isSameProductUrl(first, second) {
-    const a = first === void 0 ? void 0 : parseUrl$1(first);
-    const b = second === void 0 ? void 0 : parseUrl$1(second);
-    if (a === void 0 || b === void 0) return false;
-    for (const url of [a, b]) {
-      for (const key of [...url.searchParams.keys()]) {
-        if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
-      }
-      url.searchParams.sort();
+    const a = first === void 0 ? void 0 : normalizeProductUrlKey(first);
+    return a !== void 0 && a === (second === void 0 ? void 0 : normalizeProductUrlKey(second));
+  }
+  function normalizeProductUrlKey(rawUrl) {
+    const url = parseUrl$1(rawUrl);
+    if (url === void 0) return void 0;
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
     }
-    return a.hostname.replace(/^www\./, "") === b.hostname.replace(/^www\./, "") && a.pathname.replace(/\/$/, "") === b.pathname.replace(/\/$/, "") && a.search === b.search;
+    url.searchParams.sort();
+    return `${url.hostname.replace(/^www\./, "")}${url.pathname.replace(/\/$/, "")}${url.search}`;
   }
   function readProductCodesFromUrl(rawUrl) {
     const url = parseUrl$1(rawUrl);
@@ -2786,13 +2788,28 @@
   }
   function readNextFlightValues(html) {
     const values = [];
-    for (const row of readNextFlightPayloads(html).join("").split("\n")) {
-      const separator = row.indexOf(":");
-      if (separator < 0) continue;
+    const data = readNextFlightPayloads(html).join("");
+    for (let index = 0; index < data.length; ) {
+      const separator = data.indexOf(":", index);
+      if (separator < 0) break;
+      const text = /^T([0-9a-f]+),/.exec(data.slice(separator + 1, separator + 12));
+      if (text !== null) {
+        let end2 = separator + 1 + text[0].length;
+        for (let bytes = 0, length = parseInt(text[1], 16); end2 < data.length && bytes < length; ) {
+          const code = data.codePointAt(end2);
+          bytes += code < 128 ? 1 : code < 2048 ? 2 : code < 65536 ? 3 : 4;
+          end2 += code > 65535 ? 2 : 1;
+        }
+        index = end2;
+        continue;
+      }
+      const newline = data.indexOf("\n", separator);
+      const end = newline < 0 ? data.length : newline;
       try {
-        values.push(JSON.parse(row.slice(separator + 1)));
+        values.push(JSON.parse(data.slice(separator + 1, end)));
       } catch {
       }
+      index = end + 1;
     }
     return values;
   }
@@ -5021,16 +5038,64 @@ query SearchSuggestions($query: String!, $category: Int) {
         preorder
       }];
     });
+    const judgedUrls = rawOffers.filter(isRecord$5).map((offer) => typeof offer.url === "string" ? offer.url : "");
+    const rowIdentity = /* @__PURE__ */ new Map();
+    for (const row of scoped.rows) {
+      const url = typeof row.product_url === "string" ? parseUrl$1(row.product_url) : void 0;
+      if (url === void 0 || !["http:", "https:"].includes(url.protocol) || judgedUrls.some((judged) => isSameProductUrl(judged, url.href))) continue;
+      const valid = row.redacted !== true && typeof row.store_name === "string" && row.store_name.trim() !== "" && typeof row.product_name === "string" && readTcgSealedOfferIssue(productName, decodeHtmlEntities(row.product_name), language) === void 0;
+      const key = url.href;
+      rowIdentity.set(key, valid && (!rowIdentity.has(key) || rowIdentity.get(key) !== void 0) ? { shopName: String(row.store_name).trim(), offerUrl: key } : void 0);
+    }
     return {
-      identityOffers: verified.map(({ shopName, offerUrl }) => ({ shopName, offerUrl })),
+      identityOffers: [
+        ...verified.map(({ shopName, offerUrl }) => ({ shopName, offerUrl })),
+        ...[...rowIdentity.values()].filter((offer) => offer !== void 0)
+      ],
       offers: verified.filter((offer) => offer.inStock).map(({ inStock: _stock, preorder: _preorder, ...offer }) => offer).sort((a, b) => a.amount - b.amount),
       preorders: verified.filter((offer) => offer.preorder).map(({ shopName, amount, currency }) => ({ shopName, amount, currency }))
     };
+  }
+  const POKEPRIS_CATALOG_URL = "https://cashbacknorge.no/pokepris-catalog.json";
+  const POKEPRIS_CATALOG_MAX_AGE_MS = 14 * 864e5;
+  function isPokeprisCatalog(value) {
+    if (!isRecord$5(value) || value.version !== 1 || typeof value.source !== "string") return false;
+    if (typeof value.generatedAt !== "string" || !Number.isFinite(Date.parse(value.generatedAt))) return false;
+    if (!Array.isArray(value.products) || !isRecord$5(value.urls)) return false;
+    const ids = /* @__PURE__ */ new Set();
+    for (const product of value.products) {
+      if (!isRecord$5(product) || !Number.isSafeInteger(product.id) || product.id <= 0) return false;
+      if (typeof product.canonicalId !== "string" || typeof product.name !== "string" || typeof product.category !== "string") return false;
+      if (product.setName !== void 0 && typeof product.setName !== "string") return false;
+      if (product.language !== void 0 && typeof product.language !== "string") return false;
+      ids.add(product.id);
+    }
+    return Object.values(value.urls).every((id) => typeof id === "number" && ids.has(id));
+  }
+  function isFreshPokeprisCatalog(catalog, now = Date.now()) {
+    const age = now - Date.parse(catalog.generatedAt);
+    return age >= -864e5 && age <= POKEPRIS_CATALOG_MAX_AGE_MS;
+  }
+  const productsById = /* @__PURE__ */ new WeakMap();
+  function findPokeprisCatalogProduct(catalog, urls) {
+    let byId = productsById.get(catalog);
+    if (byId === void 0) {
+      byId = new Map(catalog.products.map((product) => [product.id, product]));
+      productsById.set(catalog, byId);
+    }
+    for (const url of urls) {
+      const key = url === void 0 ? void 0 : normalizeProductUrlKey(url);
+      const id = key === void 0 || !Object.hasOwn(catalog.urls, key) ? void 0 : catalog.urls[key];
+      const product = id === void 0 ? void 0 : byId.get(id);
+      if (product !== void 0) return product;
+    }
+    return void 0;
   }
   const ORIGIN = "https://www.pokepris.no";
   const MAX_SCRIPT_REQUESTS = 16;
   const MAX_PRODUCT_REQUESTS = 3;
   const actionCache = /* @__PURE__ */ new WeakMap();
+  const catalogCache = /* @__PURE__ */ new WeakMap();
   function isPokeprisProductUrl(rawUrl) {
     const url = rawUrl === void 0 ? void 0 : parseUrl$1(rawUrl);
     return url !== void 0 && (url.hostname === "www.pokepris.no" || url.hostname === "pokepris.no") && /^\/produkt\/\d+\/?$/.test(url.pathname);
@@ -5041,36 +5106,87 @@ query SearchSuggestions($query: String!, $category: Int) {
       const url = new URL(directUrl);
       const productUrl = `${ORIGIN}${url.pathname}`;
       const html = await requestText(productUrl);
-      return html === void 0 ? void 0 : readProductPage(html, productUrl, message, true, options);
+      return html === void 0 ? void 0 : readProductPage(html, productUrl, message, "direct", options);
     }
     if (!/pok[eé]mon/i.test(`${message.searchTerm} ${message.productBrand ?? ""} ${message.url}`)) return void 0;
+    const catalog = options.useCatalog ? await loadCatalog(requestText, options) : void 0;
+    const listed = catalog === void 0 ? void 0 : findPokeprisCatalogProduct(catalog, [message.url, message.productUrl]);
+    if (listed !== void 0) {
+      const productUrl = `${ORIGIN}/produkt/${listed.id}`;
+      const html = await requestText(productUrl);
+      let identified = false;
+      const offer = html === void 0 ? void 0 : await readProductPage(html, productUrl, message, "merchant-url", {
+        ...options,
+        onVerifiedAvailability: (data) => {
+          identified = true;
+          options.onVerifiedAvailability?.(data);
+        }
+      });
+      if (offer !== void 0 || identified) return offer;
+    }
     const kind = readTcgProductKind(message.searchTerm);
     if (kind === void 0 || !message.productPageClue) {
       options.onDiagnostic?.({ reason: "unsupported-product-form" });
       return void 0;
     }
-    const useSearchApi = options.useSearchApi ?? !(typeof location !== "undefined" && location.protocol === "chrome-extension:");
     let products = [];
-    let apiFailure;
-    if (useSearchApi) {
-      try {
-        products = await searchApi(message, requestText);
-      } catch (error) {
-        apiFailure = error;
+    if (catalog !== void 0) {
+      products = searchCatalog(catalog, message, kind).filter((product) => product.id !== listed?.id);
+    } else {
+      const useSearchApi = options.useSearchApi ?? !(typeof location !== "undefined" && location.protocol === "chrome-extension:");
+      let apiFailure;
+      if (useSearchApi) {
+        try {
+          products = await searchApi(message, requestText);
+        } catch (error) {
+          apiFailure = error;
+        }
       }
+      if (products.length === 0) products = await searchStructuredCatalog(message, requestText);
+      if (products.length === 0 && apiFailure !== void 0) throw apiFailure;
     }
-    if (products.length === 0) products = await searchStructuredCatalog(message, requestText);
-    if (products.length === 0 && apiFailure !== void 0) throw apiFailure;
     const anchor = buildProductMatchAnchor(message);
     const candidates = products.filter(isRecord$5).filter((product) => /^[1-9]\d*$/.test(String(product.id ?? "")) && typeof product.name === "string").filter((product) => readTcgProductKind(String(product.name)) === kind).map((product) => ({ product, score: scoreProductCandidateMatch(anchor, { title: `Pokémon ${product.name}` }) })).filter(({ score }) => score >= MIN_PRODUCT_MATCH_SCORE).sort((a, b) => b.score - a.score).slice(0, MAX_PRODUCT_REQUESTS);
     if (candidates.length === 0) options.onDiagnostic?.({ reason: "no-matching-catalog-product" });
     for (const { product } of candidates) {
       const productUrl = `${ORIGIN}/produkt/${encodeURIComponent(String(product.id))}`;
       const html = await requestText(productUrl);
-      const offer = html === void 0 ? void 0 : await readProductPage(html, productUrl, message, false, options);
+      const offer = html === void 0 ? void 0 : await readProductPage(html, productUrl, message, "search", options);
       if (offer !== void 0) return offer;
     }
     return void 0;
+  }
+  async function loadCatalog(requestText, options) {
+    const cached = catalogCache.get(requestText);
+    const promise = cached !== void 0 && cached.expires > Date.now() ? cached.promise : (async () => {
+      const text = await requestText(POKEPRIS_CATALOG_URL);
+      if (text === void 0) throw new Error(`Pokepris catalog: empty response from ${POKEPRIS_CATALOG_URL}`);
+      let value;
+      try {
+        value = JSON.parse(text);
+      } catch {
+        throw new Error(`Pokepris catalog: invalid JSON from ${POKEPRIS_CATALOG_URL}`);
+      }
+      if (!isPokeprisCatalog(value)) throw new Error(`Pokepris catalog: unexpected format from ${POKEPRIS_CATALOG_URL}`);
+      if (!isFreshPokeprisCatalog(value)) throw new Error(`Pokepris catalog: generated ${value.generatedAt} is too old`);
+      return value;
+    })();
+    if (promise !== cached?.promise) catalogCache.set(requestText, { expires: Date.now() + 60 * 60 * 1e3, promise });
+    try {
+      return await promise;
+    } catch (error) {
+      catalogCache.delete(requestText);
+      options.onDiagnostic?.({ reason: `catalog-unavailable: ${error instanceof Error ? error.message : String(error)}` });
+      return void 0;
+    }
+  }
+  function searchCatalog(catalog, message, kind) {
+    const language = readTcgLanguage(message.productLanguage ?? message.searchTerm)?.code;
+    return catalog.products.filter((product) => language === void 0 || product.language === void 0 || product.language === language).filter((product) => readTcgProductKind(product.name) === kind && isNameWithinSearchTerm(product.name, message.searchTerm)).map(({ id, name }) => ({ id, name }));
+  }
+  function isNameWithinSearchTerm(name, searchTerm) {
+    const words = new Set(normalizeTcgProductTitle(buildSearchTerm(searchTerm)).split(" "));
+    return normalizeTcgProductTitle(buildSearchTerm(name)).split(" ").every((word) => words.has(word));
   }
   async function searchApi(message, requestText) {
     const action = await discoverSearchAction(requestText);
@@ -5098,7 +5214,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       actionCache.delete(requestText);
       throw new Error("Pokepris: empty getProducts response");
     }
-    const data = readSearchResult(result);
+    const data = readPokeprisSearchResult(result);
     if (!isRecord$5(data) || !Array.isArray(data.products)) {
       actionCache.delete(requestText);
       throw new Error("Pokepris: invalid getProducts response");
@@ -5145,9 +5261,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }).filter(isRecord$5).flatMap((entry) => {
       const item = isRecord$5(entry.item) ? entry.item : void 0;
       if (typeof item?.name !== "string" || typeof item.url !== "string" || !isPokeprisProductUrl(item.url)) return [];
-      if (readTcgProductKind(item.name) !== kind) return [];
-      const words = new Set(normalizeTcgProductTitle(buildSearchTerm(message.searchTerm)).split(" "));
-      if (!normalizeTcgProductTitle(buildSearchTerm(item.name)).split(" ").every((word) => words.has(word))) return [];
+      if (readTcgProductKind(item.name) !== kind || !isNameWithinSearchTerm(item.name, message.searchTerm)) return [];
       return [{ id: new URL(item.url).pathname.split("/")[2], name: item.name }];
     });
   }
@@ -5157,12 +5271,12 @@ query SearchSuggestions($query: String!, $category: Int) {
     const promise = (async () => {
       const html = await requestText(`${ORIGIN}/`);
       if (html === void 0) return void 0;
-      const scripts = [...new Set([...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((match) => new URL(match[1], ORIGIN)).filter((url) => url.origin === ORIGIN && url.pathname.startsWith("/_next/static/chunks/")).map((url) => url.href))].reverse().slice(0, MAX_SCRIPT_REQUESTS);
+      const scripts = readPokeprisScriptUrls(html, ORIGIN);
       for (let offset = 0; offset < scripts.length; offset += 4) {
         const sources = await Promise.all(scripts.slice(offset, offset + 4).map((url) => requestText(url)));
         for (const source of sources) {
-          const match = source?.match(/createServerReference\)\(\s*["']([a-f0-9]{40,})["'][^;]{0,250}?["']getProducts["']/);
-          if (match?.[1] !== void 0) return match[1];
+          const action = source === void 0 ? void 0 : readPokeprisSearchAction(source);
+          if (action !== void 0) return action;
         }
       }
       return void 0;
@@ -5177,7 +5291,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       throw error;
     }
   }
-  function readSearchResult(text) {
+  function readPokeprisScriptUrls(html, origin) {
+    return [...new Set([...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((match) => new URL(match[1], origin)).filter((url) => url.origin === origin && url.pathname.startsWith("/_next/static/chunks/")).map((url) => url.href))].reverse().slice(0, MAX_SCRIPT_REQUESTS);
+  }
+  function readPokeprisSearchAction(source) {
+    return source.match(/createServerReference\)\(\s*["']([a-f0-9]{40,})["'][^;]{0,250}?["']getProducts["']/)?.[1];
+  }
+  function readPokeprisSearchResult(text) {
     for (const line of text.split("\n")) {
       const separator = line.indexOf(":");
       if (separator < 0) continue;
@@ -5189,7 +5309,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return void 0;
   }
-  async function readProductPage(html, productUrl, message, direct, options) {
+  async function readProductPage(html, productUrl, message, mode, options) {
     const product = selectProductLdJson(readLdJsonScripts(html));
     if (product === void 0 || typeof product.name !== "string") return void 0;
     const brand = isRecord$5(product.brand) ? product.brand.name : product.brand;
@@ -5200,14 +5320,15 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     };
     const kind = readTcgProductKind(name);
-    if (kind === void 0 || !direct && readTcgProductKind(message.searchTerm) !== kind) return void 0;
+    if (kind === void 0 || mode === "search" && readTcgProductKind(message.searchTerm) !== kind) return void 0;
+    if (mode === "merchant-url" && hasTcgProductVariantConflict(message.searchTerm, name)) return reject("product-variant-mismatch");
     const properties = Array.isArray(product.additionalProperty) ? product.additionalProperty.filter(isRecord$5) : [];
     const setName = properties.find((item) => item.name === "Kortsett")?.value;
     const languageName = properties.find((item) => item.name === "Språk")?.value;
     const language = typeof languageName === "string" ? readTcgLanguage(languageName) : void 0;
     const expectedLanguage = readTcgLanguage(message.productLanguage ?? message.searchTerm);
     if (language === void 0 || expectedLanguage !== void 0 && expectedLanguage.code !== language.code) return reject("language-mismatch");
-    if (!direct) {
+    if (mode === "search") {
       if (hasTcgSetNameConflict(buildSearchTerm(message.searchTerm), buildSearchTerm(name))) return reject("set-name-mismatch");
       if (typeof setName === "string" && normalizeTcgProductTitle(product.name).includes(normalizeTcgProductTitle(setName)) && !normalizeTcgProductTitle(message.searchTerm).includes(normalizeTcgProductTitle(setName))) return reject("set-name-mismatch");
       const anchorWords = new Set(normalizeTcgProductTitle(buildSearchTerm(message.searchTerm)).split(" "));
@@ -5234,7 +5355,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     const currentName = normalizeTcgProductTitle(buildSearchTerm(message.searchTerm));
     const candidateName = normalizeTcgProductTitle(buildSearchTerm(product.name));
     const exactTitle = currentName === candidateName || !/^(?:booster|elite trainer|bundle|tin)\b/.test(candidateName) && currentName === `mega evolution ${candidateName}`;
-    if (!direct && (expectedLanguage === void 0 || !exactTitle) && !matchedCurrentMerchant && !matchedProductCode) {
+    if (mode === "merchant-url" && !matchedCurrentMerchant) return reject("current-merchant-offer-not-verified");
+    if (mode === "search" && (expectedLanguage === void 0 || !exactTitle) && !matchedCurrentMerchant && !matchedProductCode) {
       matchedComparisonProduct = await isPrisjaktProductForAnyOffer(message.url, identityOffers, options.requestJson) || await isKlarnaProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) || await isPrisradarProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson) || await isGodprisProductForOfferUrls(message, identityOffers.map((offer) => offer.offerUrl), options.requestJson);
       if (!matchedComparisonProduct) return reject("unverified-product-identity");
     }
@@ -5251,7 +5373,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       currency: best.currency,
       offerUrl: best.offerUrl,
       matchedCurrentMerchant,
-      matchedExactProduct: direct || matchedCurrentMerchant || matchedComparisonProduct || matchedProductCode,
+      matchedExactProduct: mode === "direct" || matchedCurrentMerchant || matchedComparisonProduct || matchedProductCode,
       details: `${language.label}. ${offers.length} tilbud på lager. ${PROVIDER_TIPS.pokepris}`,
       alternatives: offers.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer)
     };
@@ -6354,7 +6476,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       ignorePriceMatchFailure(findSesumPriceMatch(message, requestText)),
       ignorePriceMatchFailure(findEnhverPriceMatch(message, requestJson, requestText)),
       ignorePriceMatchFailure(findKassalPriceMatch(message, requestText)),
-      ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) }))
+      ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, useCatalog: true, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) }))
     ]);
     const anchorOffers = [prisjaktOffer, klarnaOffer].filter((offer) => offer !== void 0).map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability)).filter((offer) => offer !== void 0);
     const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
@@ -8842,8 +8964,11 @@ ${darkProviderCss}
   function getFreeCards(offers, now = /* @__PURE__ */ new Date()) {
     const [benefit] = getActiveCardBenefits(offers, now);
     if (benefit === void 0) return FREE_CARDS;
+    const pct = getMaxRewardPercent(benefit) / 100;
+    const allPurchases = /^(?:alle kjøp|all netthandel)\b/i.test(benefit.cardBenefit.category);
     const card = {
-      pct: getMaxRewardPercent(benefit) / 100,
+      pct,
+      ...allPurchases ? {} : { minPct: 0, maxPct: pct },
       label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
       badge: benefit.provider,
       url: benefit.activationUrl,

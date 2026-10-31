@@ -5,6 +5,12 @@ import {
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
+import {
+  extractGratisReward,
+  extractKrReward,
+  extractPercentageReward,
+  extractUpToPercentageReward,
+} from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 const PAGE_URL = "https://www.utdanningibergen.no/studentrabatter/";
@@ -125,13 +131,46 @@ function extractDomain(link: string): string | null {
   }
 }
 
+// The structured `discount_type`/`discount` pair is the primary source. Some
+// entries leave the amount at 0 and state the benefit only in their public
+// description/conditions ("Young-rabatt på opptil 70 %", "Gratis inngang"),
+// or add a second benefit there ("Kun synsundersøkelse + 25 % på komplett
+// brille"). Those texts are read with the shared reward functions.
 function buildReward(d: Discount): string {
+  const text = [d.description, d.conditions]
+    .filter((part): part is string => typeof part === "string")
+    .map(stripHtml)
+    .join("\n");
+
   if (d.discount_type === "%" && d.discount > 0) return `${d.discount} %`;
   if (d.discount_type === "NOK" && d.discount > 0) return `${d.discount} kr`;
-  if (d.discount_type === "fastpris" && d.discount === 0) return "0 kr totalsum";
-  if (d.discount_type === "fastpris" && d.discount > 0) return `${d.discount} kr totalsum`;
+  if (d.discount_type === "fastpris" && d.discount > 0) {
+    const fixedPrice = `${d.discount} kr totalsum`;
+    const additionalPercentage = extractPercentageReward(percentageDiscountText(text));
+    return additionalPercentage ? `${fixedPrice} + ${additionalPercentage}` : fixedPrice;
+  }
+
+  // A zero amount is a missing value unless the text documents a free offer.
+  const textReward =
+    extractUpToPercentageReward(percentageDiscountText(text)) ||
+    extractKrReward(text, { totalsum: false });
+  if (textReward) return textReward;
+  if (d.discount_type === "fastpris" && d.discount === 0) {
+    const gratis = extractGratisReward(text);
+    if (gratis) return gratis;
+  }
+
   // Hvis vi ikke vet hva rabatten er, vis bare '?'
   return "?";
+}
+
+// Only percentages stated as a discount ("25 % på komplett brille",
+// "opptil 70 % av ordinær pris", "20 % rabatt") — not e.g. VAT rates.
+function percentageDiscountText(text: string): string {
+  return text
+    .split(/[\n.;]+|\s\+\s/)
+    .filter((part) => /\d\s*(?:%|prosent)\s*(?:rabatt|avslag|på|av)(?![\p{L}\d])/iu.test(part))
+    .join("\n");
 }
 
 function stripHtml(html: string): string {
