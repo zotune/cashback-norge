@@ -11735,6 +11735,9 @@ function renderNotice(
       setTooltipContent(tooltip, buildRegionPriceTooltipParts(regionPrice, regionPrices));
       shadowRoot.append(tooltip);
       const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om regionprisen");
+      const actions = card.querySelector(".region-price-actions");
+      const detailsButton = row.querySelector(".cbn-tooltip-trigger");
+      if (actions !== null && detailsButton !== null) actions.prepend(detailsButton);
       card.addEventListener("mouseenter", () => {
         positionTooltipRightOfPanel(tooltip, card, shadowRoot);
       });
