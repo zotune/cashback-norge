@@ -10545,6 +10545,23 @@ function renderNotice(
     .region-price-card-with-action {
       grid-template-columns: minmax(0, 1fr) auto auto;
     }
+    .region-prices-section {
+      container: region-prices / inline-size;
+    }
+    /* On a phone the source chip left the country name a few pixels;
+       it moves under the price, beside the two-line country title. */
+    @container region-prices (max-width: 360px) {
+      .region-price-card-with-action {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 3px;
+      }
+      .region-price-card-with-action .region-price-title {
+        grid-row: span 2;
+      }
+      .region-price-card-with-action .region-price-actions {
+        grid-column: 2;
+      }
+    }
     .region-price-main {
       color: inherit;
       display: contents;

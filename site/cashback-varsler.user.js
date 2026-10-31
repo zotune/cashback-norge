@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793442418
+// @version      1793442868
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -15976,6 +15976,23 @@ ${darkProviderCss}
     }
     .region-price-card-with-action {
       grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+    .region-prices-section {
+      container: region-prices / inline-size;
+    }
+    /* On a phone the source chip left the country name a few pixels;
+       it moves under the price, beside the two-line country title. */
+    @container region-prices (max-width: 360px) {
+      .region-price-card-with-action {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 3px;
+      }
+      .region-price-card-with-action .region-price-title {
+        grid-row: span 2;
+      }
+      .region-price-card-with-action .region-price-actions {
+        grid-column: 2;
+      }
     }
     .region-price-main {
       color: inherit;

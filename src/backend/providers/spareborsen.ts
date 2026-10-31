@@ -33,11 +33,16 @@ type SpareborsenPartner = {
   cashbackCurrency: string | null;
   active: boolean;
   segments: SpareborsenSegment[];
+  /** The ordinary rate while a campaign raises cashbackPercent. */
+  baseCashbackPercent?: number | null;
+  campaignApplies?: boolean;
 };
 
 export type FetchSpareborsenInput = {
   generatedAt: string;
   logger: Logger;
+  /** Local verification only. */
+  apiUrls?: string[];
 };
 
 export async function fetchSpareborsen(
@@ -45,7 +50,7 @@ export async function fetchSpareborsen(
 ): Promise<CashbackOffer[]> {
   input.logger.info("Sparebørsen: fetching partners...");
 
-  const partners = (await fetchPartners(input.logger)).filter((p) => p.active);
+  const partners = (await fetchPartners(input.logger, input.apiUrls ?? API_URLS)).filter((p) => p.active);
   input.logger.info(`Sparebørsen: ${partners.length} active partners`);
 
   const offers: CashbackOffer[] = [];
@@ -82,10 +87,10 @@ export async function fetchSpareborsen(
   return uniqueOffers(offers);
 }
 
-async function fetchPartners(logger: Logger): Promise<SpareborsenPartner[]> {
+async function fetchPartners(logger: Logger, urls: string[]): Promise<SpareborsenPartner[]> {
   const errors: string[] = [];
 
-  for (const url of API_URLS) {
+  for (const url of urls) {
     for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
       try {
         const response = await gotScraping(url, {
@@ -169,16 +174,24 @@ function buildReward(partner: SpareborsenPartner): string {
 }
 
 function buildTerms(partner: SpareborsenPartner): string {
-  if (partner.segments.length <= 1) return "";
-
-  const lines = partner.segments.map((s) => {
+  const lines = partner.segments.length <= 1 ? [] : partner.segments.map((s) => {
     if (s.cashbackType === "fixed") {
       return `${s.cashbackValue} kr – ${s.name}`;
     }
-    return `${s.cashbackValue} % – ${s.name}`;
+    return `${formatPercentageReward([s.cashbackValue])} – ${s.name}`;
   });
 
-  return lines.join("\n");
+  // Sparebørsen marks campaign rates as "+x prosentpoeng"; the reward is the
+  // raised rate, so the tooltip names the ordinary one beside it.
+  const base = partner.baseCashbackPercent;
+  const campaign = partner.cashbackType === "percentage" && partner.campaignApplies === true &&
+    typeof base === "number" && Number.isFinite(base) && base >= 0 && base < partner.cashbackPercent;
+  // With several segments the API gives one base rate, not one per segment.
+  const campaignLine = !campaign ? "" : partner.segments.length > 1
+    ? "Forhøyede kampanjesatser hos Sparebørsen. Kampanjen er tidsbegrenset."
+    : `Forhøyet kampanjesats hos Sparebørsen: +${formatPercentageReward([Math.round((partner.cashbackPercent - base) * 100) / 100]).replace(" %", "")} prosentpoeng. Vanlig sats: ${formatPercentageReward([base])}. Kampanjen er tidsbegrenset.`;
+
+  return [lines.join("\n"), campaignLine].filter(Boolean).join("\n\n");
 }
 
 function sleep(ms: number): Promise<void> {
