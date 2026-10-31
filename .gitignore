@@ -11,3 +11,5 @@ site/pokepris-catalog.json
 *.log*
 # Plan and roadmap: kept out of the public repository
 /plan/
+# Local agent worktrees
+/.claude/worktrees/
