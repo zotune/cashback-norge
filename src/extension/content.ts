@@ -11107,8 +11107,8 @@ function renderNotice(
     label.className = "bonus-chip-label";
     const ebInfo = card.ebPer100kr ? ` (~${card.ebPer100kr} EB/100kr)` : "";
     const pctStr = (card.minPct != null && card.maxPct != null)
-      ? `${(card.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}-${(card.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}`
-      : (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+      ? `${(card.minPct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",")}-${(card.maxPct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",")}`
+      : (card.pct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
     label.textContent = `+${card.approx ? "~" : ""}${pctStr} %${ebInfo}`;
     const badge = document.createElement("span");
     badge.className = `cbn-chip provider-badge provider-${card.badge}`;

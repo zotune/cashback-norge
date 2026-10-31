@@ -452,3 +452,14 @@ test("HTML entities in original merchant titles are decoded before quantity chec
     current_price: 1048, in_stock: true, is_preorder: false }];
   assert.equal((await findPokeprisPriceMatch(message, transport(page({ offers: [offer(1048)], rows })).request))?.amount, 1048);
 });
+
+test("other sources cannot price another set's sealed product of the same form", () => {
+  const anchor = "Pokémon Ascended Heroes Elite Trainer Box";
+  for (const title of ["Pokémon 30th Celebration Elite Trainer Box", "Pokemon Mega Evolution - Phantasmal Flames - Elite Trainer Box"]) {
+    assert.equal(hasProductVariantConflict({ searchTerm: anchor } as never, title), true, title);
+  }
+  // Series prefixes and retailer extras on one side still match.
+  for (const title of ["Pokémon TCG: Mega Evolution Ascended Heroes Elite Trainer Box", "Pokemon Ascended Heroes ETB (Engelsk) ny"]) {
+    assert.equal(hasProductVariantConflict({ searchTerm: anchor } as never, title), false, title);
+  }
+});

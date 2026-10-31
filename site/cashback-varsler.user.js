@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793443144
+// @version      1793443589
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -2355,14 +2355,23 @@
     return canonical(first) === canonical(second);
   }
   function hasTcgSetNameConflict(first, second) {
-    const signature = (text) => [...new Set(normalizeTcgProductTitle(text).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean))].sort().join(" ");
+    const signature = (text) => [...readTcgSetWords(text)].sort().join(" ");
     return signature(first) !== signature(second);
+  }
+  function readTcgSetWords(text) {
+    return new Set(normalizeTcgProductTitle(text).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean));
   }
   function hasTcgProductVariantConflict(first, second) {
     if (!/pok[eé]mon|\btcg\b/i.test(`${first} ${second}`)) return false;
     const a = readTcgProductKind(first);
     const b = readTcgProductKind(second);
     if (a !== void 0 && b !== void 0 && a !== b) return true;
+    if (a !== void 0 && b !== void 0) {
+      const firstSet = readTcgSetWords(first);
+      const secondSet = readTcgSetWords(second);
+      const within = (inner, outer) => [...inner].every((word) => outer.has(word));
+      if (firstSet.size > 0 && secondSet.size > 0 && !within(firstSet, secondSet) && !within(secondSet, firstSet)) return true;
+    }
     const firstLanguage = readTcgLanguage(first);
     const secondLanguage = readTcgLanguage(second);
     return firstLanguage !== void 0 && secondLanguage !== void 0 && firstLanguage.code !== secondLanguage.code;
@@ -16522,7 +16531,7 @@ ${darkProviderCss}
       const label = document.createElement("span");
       label.className = "bonus-chip-label";
       const ebInfo = card.ebPer100kr ? ` (~${card.ebPer100kr} EB/100kr)` : "";
-      const pctStr = card.minPct != null && card.maxPct != null ? `${(card.minPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}-${(card.maxPct * 100).toFixed(2).replace(".", ",").replace(/0$/, "")}` : (card.pct * 100).toFixed(2).replace(".", ",").replace(/0$/, "");
+      const pctStr = card.minPct != null && card.maxPct != null ? `${(card.minPct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",")}-${(card.maxPct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",")}` : (card.pct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
       label.textContent = `+${card.approx ? "~" : ""}${pctStr} %${ebInfo}`;
       const badge = document.createElement("span");
       badge.className = `cbn-chip provider-badge provider-${card.badge}`;

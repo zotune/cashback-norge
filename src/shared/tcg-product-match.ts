@@ -108,13 +108,19 @@ export function isSameTcgProductTitle(first: string, second: string): boolean {
 // Retailer titles can add packaging counts, series prefixes and SEO phrases.
 // A code lookup must still retain the distinguishing set/character name.
 export function hasTcgSetNameConflict(first: string, second: string): boolean {
-  const signature = (text: string) => [...new Set(normalizeTcgProductTitle(text)
+  const signature = (text: string) => [...readTcgSetWords(text)].sort().join(" ");
+  return signature(first) !== signature(second);
+}
+
+// The words left after form, packaging, series and filler: mostly the set or
+// character name ("ascended heroes", "30th celebration").
+function readTcgSetWords(text: string): Set<string> {
+  return new Set(normalizeTcgProductTitle(text)
     .replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ")
     .replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ")
     .replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ")
     .replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ")
-    .replace(/\s+/g, " ").trim().split(" ").filter(Boolean))].sort().join(" ");
-  return signature(first) !== signature(second);
+    .replace(/\s+/g, " ").trim().split(" ").filter(Boolean));
 }
 
 export function hasTcgProductVariantConflict(first: string, second: string): boolean {
@@ -122,6 +128,15 @@ export function hasTcgProductVariantConflict(first: string, second: string): boo
   const a = readTcgProductKind(first);
   const b = readTcgProductKind(second);
   if (a !== undefined && b !== undefined && a !== b) return true;
+  // Two sealed products of one form are different sets unless one title's
+  // set words contain the other's: an Ascended Heroes ETB is not a 30th
+  // Celebration ETB. Retailer extras on one side ("Mega Evolution", "ny") pass.
+  if (a !== undefined && b !== undefined) {
+    const firstSet = readTcgSetWords(first);
+    const secondSet = readTcgSetWords(second);
+    const within = (inner: Set<string>, outer: Set<string>) => [...inner].every((word) => outer.has(word));
+    if (firstSet.size > 0 && secondSet.size > 0 && !within(firstSet, secondSet) && !within(secondSet, firstSet)) return true;
+  }
   const firstLanguage = readTcgLanguage(first);
   const secondLanguage = readTcgLanguage(second);
   return firstLanguage !== undefined && secondLanguage !== undefined && firstLanguage.code !== secondLanguage.code;
