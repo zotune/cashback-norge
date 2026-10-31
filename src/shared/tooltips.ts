@@ -67,10 +67,11 @@ export function createTooltipController(root: Document | ShadowRoot) {
       maxWidth: isBonusChipTooltip ? `${Math.min(320, availableWidth)}px` : "none",
       maxHeight: `${Math.max(80, view.innerHeight - 32)}px`, overflowY: "auto", boxSizing: "border-box", whiteSpace, margin: "0",
     });
-    // iOS Safari can paint a shadow-DOM tooltip underneath the host page. A
-    // manual popover enters the browser's top layer, while the normal z-index
-    // path remains available on browsers without the Popover API.
-    if (isBonusChipTooltip) {
+    // iOS Safari can paint a shadow-DOM tooltip underneath the host page, and
+    // later rows of a list can paint over it. A manual popover enters the
+    // browser's top layer, while the normal z-index path remains available on
+    // browsers without the Popover API.
+    {
       const popover = tooltip as HTMLElement & { showPopover?: () => void };
       if (typeof popover.showPopover === "function") {
         try {

@@ -10545,12 +10545,11 @@ function renderNotice(
     .region-price-card-with-action {
       grid-template-columns: minmax(0, 1fr) auto auto;
     }
-    .region-prices-section {
-      container: region-prices / inline-size;
-    }
     /* On a phone the source chip left the country name a few pixels;
-       it moves under the price, beside the two-line country title. */
-    @container region-prices (max-width: 360px) {
+       it moves under the price, beside the two-line country title. A
+       container query would make the section the containing block of the
+       fixed-position tooltips, so this follows the viewport instead. */
+    @media (max-width: 520px) {
       .region-price-card-with-action {
         grid-template-columns: minmax(0, 1fr) auto;
         row-gap: 3px;
