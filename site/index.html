@@ -1833,7 +1833,7 @@ function merchantCardHtml(m) {
     const supportChipHtml = o.provider === "cbn" ? `<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span><span class="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>` : "";
     const bestClass = idx === 0 ? " offer--best" : "";
     return `<span class="offer-wrap">${tooltipHtml}<span class="cbn-row offer${bestClass} ${cardOnly ? "offer-card-only" : ""}"><a class="offer-action" href="${esc(url)}" target="_blank" rel="noreferrer">
-      <span class="offer-reward" data-reward="${JSON.stringify(o).replace(/"/g, '&quot;')}">${esc(label)}</span>
+      <span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span>
       ${warnIconHtml}${welcomeChipHtml}${adChipHtml}${supportChipHtml}</a>${providerFilterChip(o.provider)}
     </span></span>`;
   }).join("");

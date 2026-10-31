@@ -1,5 +1,7 @@
 import { hasTcgProductVariantConflict } from "./tcg-product-match.js";
-import { parseUrl } from "./cashback.js";
+import { decodeHtmlEntities, parseUrl } from "./cashback.js";
+
+export { decodeHtmlEntities };
 import type { GetPriceMatchForProductMessage } from "./extension-messages.js";
 import {
   isSamePackageQuantity,
@@ -56,33 +58,6 @@ const BRAND_MATCH_GROUPS = [
   ["samsung"],
   ["sony", "playstation"],
 ];
-const NAMED_HTML_ENTITIES = new Map<string, string>([
-  ["amp", "&"],
-  ["quot", "\""],
-  ["apos", "'"],
-  ["nbsp", " "],
-  ["shy", ""],
-  ["aring", "å"],
-  ["Aring", "Å"],
-  ["aelig", "æ"],
-  ["AElig", "Æ"],
-  ["oslash", "ø"],
-  ["Oslash", "Ø"],
-  ["auml", "ä"],
-  ["Auml", "Ä"],
-  ["ouml", "ö"],
-  ["Ouml", "Ö"],
-  ["uuml", "ü"],
-  ["Uuml", "Ü"],
-  ["eacute", "é"],
-  ["Eacute", "É"],
-  ["egrave", "è"],
-  ["deg", "°"],
-  ["trade", "™"],
-  ["reg", "®"],
-  ["copy", "©"],
-]);
-
 export type ProductMatchAnchor = {
   searchTerm: string;
   productLanguage?: string;
@@ -423,18 +398,6 @@ export function isLikelyMpn(value: string): boolean {
   const normalized = value.trim();
   if (normalized.length < 5 || normalized.length > 40 || isLikelyGtin(normalized)) return false;
   return /^[A-Za-z0-9][A-Za-z0-9._/ -]*$/.test(normalized) && /[A-Za-z]/.test(normalized) && /\d/.test(normalized);
-}
-
-export function decodeHtmlEntities(value: string): string {
-  if (!value.includes("&")) return value;
-  return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
-    if (entity.startsWith("#")) {
-      const isHex = entity[1] === "x" || entity[1] === "X";
-      const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
-      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
-    }
-    return NAMED_HTML_ENTITIES.get(entity) ?? NAMED_HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
-  });
 }
 
 function tokenizeBrandText(value: string): string[] {

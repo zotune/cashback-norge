@@ -291,8 +291,10 @@ export function buildCashbackIndex(
   const normalizedOffers = offers.map((offer) => {
     return {
       ...offer,
+      merchantName: normalizeOfferText(offer.merchantName).trim(),
       domains: uniqueStrings(offer.domains.map(normalizeDomainInput)),
-      reward: normalizeRewardLabel(offer.reward),
+      reward: normalizeRewardLabel(normalizeOfferText(offer.reward)),
+      terms: normalizeOfferText(offer.terms),
     };
   });
   const domainIndex: Record<string, CashbackOffer[]> = {};
@@ -401,49 +403,54 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
   return sortOffers([...byKey.values()]);
 }
 
-const HTML_ENTITIES: Record<string, string> = {
-  amp: "&",
-  apos: "'",
-  aring: "\u00e5",
-  bull: "\u2022",
-  aelig: "\u00e6",
-  copy: "\u00a9",
-  eacute: "\u00e9",
-  gt: ">",
-  laquo: "\u00ab",
-  ldquo: "\u201c",
-  lsquo: "\u2018",
-  lt: "<",
-  nbsp: " ",
-  ndash: "\u2013",
-  oslash: "\u00f8",
-  quot: "\"",
-  raquo: "\u00bb",
-  rdquo: "\u201d",
-  rsquo: "\u2019",
-};
+// Named references seen in Norwegian offer sources. Case matters (Ø/ø);
+// an unknown reference is left as written rather than guessed.
+const HTML_ENTITIES = new Map<string, string>(Object.entries({
+  amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", shy: "",
+  aring: "å", Aring: "Å", aelig: "æ", AElig: "Æ", oslash: "ø", Oslash: "Ø",
+  auml: "ä", Auml: "Ä", ouml: "ö", Ouml: "Ö", uuml: "ü", Uuml: "Ü",
+  aacute: "á", Aacute: "Á", eacute: "é", Eacute: "É", egrave: "è", Egrave: "È",
+  agrave: "à", acirc: "â", atilde: "ã", ecirc: "ê", euml: "ë", igrave: "ì", iuml: "ï",
+  ograve: "ò", ocirc: "ô", otilde: "õ", ugrave: "ù", ucirc: "û", Ccedil: "Ç",
+  iacute: "í", oacute: "ó", Oacute: "Ó", uacute: "ú", ntilde: "ñ", ccedil: "ç", szlig: "ß",
+  zwj: "\u200d", zwnj: "\u200c", lrm: "", rlm: "", ensp: " ", emsp: " ", thinsp: " ",
+  bull: "•", middot: "·", hellip: "…", ndash: "–", mdash: "—", minus: "−",
+  lsquo: "‘", rsquo: "’", sbquo: "‚", ldquo: "“", rdquo: "”", bdquo: "„", laquo: "«", raquo: "»",
+  rarr: "→", larr: "←", uarr: "↑", darr: "↓", harr: "↔", check: "✓",
+  euro: "€", pound: "£", dollar: "$", cent: "¢", percnt: "%", times: "×", divide: "÷", plusmn: "±",
+  deg: "°", frac12: "½", frac14: "¼", frac34: "¾", sup2: "²", sup3: "³",
+  copy: "©", reg: "®", trade: "™", sect: "§", para: "¶", star: "☆", hearts: "♥",
+}));
+
+export function decodeHtmlEntities(value: string): string {
+  if (!value.includes("&")) return value;
+  return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity: string) => {
+    if (entity.startsWith("#")) {
+      const isHex = entity[1] === "x" || entity[1] === "X";
+      const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    return HTML_ENTITIES.get(entity) ?? HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
+  });
+}
 
 export function stripHtml(html: string): string {
-  return html
+  return decodeHtmlEntities(html
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/li>/gi, "\n")
     .replace(/<li>/gi, "- ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&#(\d+);/g, (_match, value: string) => decodeNumericHtmlEntity(value, 10))
-    .replace(/&#x([0-9a-f]+);/gi, (_match, value: string) => decodeNumericHtmlEntity(value, 16))
-    .replace(/&([a-z]+);/gi, (_match, entity: string) => HTML_ENTITIES[entity.toLowerCase()] ?? `&${entity};`)
+    .replace(/<[^>]+>/g, ""))
     .replace(/\n{2,}/g, "\n\n")
     .trim();
 }
 
-function decodeNumericHtmlEntity(value: string, radix: number): string {
-  const codePoint = Number.parseInt(value, radix);
-  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
-    return "";
-  }
-  return String.fromCodePoint(codePoint);
+// Clients show offer text as plain text, so references and Windows line
+// breaks from the sources must not reach the published index. A second pass
+// handles sources that escape their references twice ("&amp;#x27;").
+function normalizeOfferText(text: string): string {
+  return decodeHtmlEntities(decodeHtmlEntities(text)).replace(/\r\n?/g, "\n");
 }
 
 export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
