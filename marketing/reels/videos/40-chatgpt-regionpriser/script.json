@@ -1,0 +1,51 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Samme ChatGPT Plus. Over *{100 kr|hundre kroner}* billigere?",
+   "gap": 0.25
+  },
+  {
+   "id": "store",
+   "line": "I norsk App Store koster det *{249 kr|to hundre og førtini kroner}* i måneden.",
+   "gap": 0.2
+  },
+  {
+   "id": "popup",
+   "line": "Cashback Norge viser hva samme abonnement koster i andre land.",
+   "gap": 0.2
+  },
+  {
+   "id": "best",
+   "line": "På Filippinene: rundt *{145 kr.|hundre og førtifem.}*",
+   "gap": 0.25
+  },
+  {
+   "id": "second",
+   "line": "I USA: *{184 kr|hundre og åttifire}*, før lokal skatt.",
+   "gap": 0.25
+  },
+  {
+   "id": "sum",
+   "line": "Forskjellen er over *{100 kr|hundre kroner}* i måneden.",
+   "gap": 0.25
+  },
+  {
+   "id": "terms",
+   "line": "Regionbytte krever konto og betaling i landet, så sjekk vilkårene.",
+   "gap": 0.3
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ],
+ "sources": [
+  "https://apps.apple.com/no/app/id6448311069",
+  "https://apps.apple.com/ph/app/id6448311069",
+  "https://apps.apple.com/us/app/id6448311069"
+ ]
+}

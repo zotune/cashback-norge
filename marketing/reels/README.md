@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-Trettini vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026 og video 37–39 25. okt. 2026.
+Trettini vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026 video 37–39 25. okt. 2026 og video 40–42 31. okt. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -43,6 +43,9 @@ Trettini vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceov
 | `out/37-strom-vinter.mp4` | Strøm i vinter: Fjordkraft med Trumf 500 kr, Fortum med Spenn 400 kr eller NettBonus 300 kr, Tibber 1 000 kr via invitasjon | «Strømregningen øker ⚡ Få betalt for å bytte» |
 | `out/38-juletur-wise.mp4` | Juletur: Instabank tar 2 % i valutapåslag, Wise bruker ekte kurs og gir gratis kort via invitasjon | «Utlandet i jula? Ikke betal valutapåslag» |
 | `out/39-spenn-rema.mp4` | Spenn: tjen hos REMA, Narvesen, 7-Eleven og UNO-X, bruk på fly, Strawberry og REMA, 154 nettbutikker | «Handler du på REMA? Da kan du samle Spenn» |
+| `out/40-chatgpt-regionpriser.mp4` | App Store-regionpriser for ChatGPT Plus: Norge 249 kr, Filippinene ≈ 145 kr, USA ≈ 184 kr før lokal skatt. Ingen fremgangsmåte for regionbytte, bare vilkårsforbehold | «Samme ChatGPT Plus 🤖 249 kr eller 145 kr?» |
+| `out/41-soundcloud-regionpriser.mp4` | App Store-regionpriser for SoundCloud Go: Norge 99 kr, Tyrkia ≈ 3 kr, India ≈ 39 kr | «SoundCloud Go 🎧 99 kr eller 3 kr?» |
+| `out/42-duolingo-regionpriser.mp4` | Super Duolingo 1 år: Norge 1 039 kr, Tyrkia ≈ 179 kr, via info-tooltipen i panelet. AppStorePrice oppgir også TRY 34,99/mnd, men den finnes ikke i Apples offentlige liste og er ikke brukt | «Super Duolingo 🦉 1 039 kr eller 179 kr?» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 

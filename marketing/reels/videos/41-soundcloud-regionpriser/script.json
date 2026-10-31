@@ -1,0 +1,51 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "segments": [
+  {
+   "id": "hook",
+   "line": "SoundCloud Go. *{99 kr|nittini kroner}* eller *{3 kr?|tre kroner?}*",
+   "gap": 0.25
+  },
+  {
+   "id": "store",
+   "line": "I norsk App Store koster det *{99 kr|nittini kroner}* i måneden.",
+   "gap": 0.2
+  },
+  {
+   "id": "popup",
+   "line": "Cashback Norge viser hva samme abonnement koster i andre land.",
+   "gap": 0.2
+  },
+  {
+   "id": "best",
+   "line": "I tyrkisk App Store: rundt *{3 kr.|tre kroner.}*",
+   "gap": 0.25
+  },
+  {
+   "id": "second",
+   "line": "I India: rundt *{39 kr.|trettini.}*",
+   "gap": 0.25
+  },
+  {
+   "id": "sum",
+   "line": "Samme app. Helt ulik pris.",
+   "gap": 0.25
+  },
+  {
+   "id": "terms",
+   "line": "Regionbytte krever konto og betaling i landet, så sjekk vilkårene.",
+   "gap": 0.3
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ],
+ "sources": [
+  "https://apps.apple.com/no/app/id336353151",
+  "https://apps.apple.com/tr/app/id336353151",
+  "https://apps.apple.com/in/app/id336353151"
+ ]
+}

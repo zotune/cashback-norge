@@ -1,0 +1,50 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Super Duolingo. Over *{800 kr|åtte hundre kroner}* billigere i året?",
+   "gap": 0.25
+  },
+  {
+   "id": "store",
+   "line": "I norsk App Store koster et år *{1 039 kr.|tusen og trettini kroner.}*",
+   "gap": 0.2
+  },
+  {
+   "id": "popup",
+   "line": "Cashback Norge viser hva samme abonnement koster i andre land.",
+   "gap": 0.2
+  },
+  {
+   "id": "best",
+   "line": "Trykk på info for alle planene i landet.",
+   "gap": 0.2
+  },
+  {
+   "id": "second",
+   "line": "Et år i Tyrkia: rundt *{179 kr.|hundre og syttini.}*",
+   "gap": 0.25
+  },
+  {
+   "id": "sum",
+   "line": "Samme app. Helt ulik pris.",
+   "gap": 0.25
+  },
+  {
+   "id": "terms",
+   "line": "Regionbytte krever konto og betaling i landet, så sjekk vilkårene.",
+   "gap": 0.3
+  },
+  {
+   "id": "cta",
+   "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+  }
+ ],
+ "sources": [
+  "https://apps.apple.com/no/app/id570060128",
+  "https://apps.apple.com/tr/app/id570060128"
+ ]
+}
