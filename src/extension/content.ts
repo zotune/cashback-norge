@@ -264,6 +264,8 @@ type PriceMatchOffer = {
   travelKind?: "hotel";
   // Flysøk med fleksible datoer: prisen gjelder datoene her, som kan avvike fra valgt søk.
   dateFlex?: FlightDateFlexResult;
+  // Bagasje er valgt, men kilden oppgir ikke bagasjeavgift: prisen er uten bagasje.
+  baggageExcluded?: boolean;
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -495,6 +497,7 @@ const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
 const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
 const FLIGHT_TOOLTIP_MAX_ROWS = 6;
+const FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET = 1_000_000_000;
 // FINN har ikke fleksible datoer i API-et: hver kombinasjon er et eget søk.
 // ±3/±3 tur/retur = 49 søk; større vinduer begrenses til kombinasjonene nærmest valgt dato.
 const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
@@ -535,6 +538,9 @@ const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
 const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
 const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
 const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
+// Kilder som ikke leser stopp/bagasje fra URL-en (PanFlights, Trip.com) får filtrene
+// som eget parameter; innholdsskriptet krysser dem av når siden åpnes.
+const FLIGHT_LINK_FILTERS_PARAM = "cbvFilters";
 const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
 const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
 // Sted-ID-er (f.eks. 2642 = Bergen) uten flyplasstabell i siden slås opp i PanFlights' sted-API.
@@ -777,6 +783,7 @@ function startContentScript(): void {
   requestCurrentOffers();
   installDynamicProductPageRefresh();
   installPanFlightsAutoSearch();
+  installTripComLinkFilters();
 }
 function renderNoticeWithStoredState(
   offers: CashbackOffer[],
@@ -914,12 +921,15 @@ function installPanFlightsAutoSearch(): void {
     return;
   }
 
+  const linkFilters = readFlightLinkFilters(parsedUrl);
   let attempts = 0;
   let timerId: number | undefined;
   const tryStartSearch = (): boolean => {
     attempts += 1;
     const searchButton = document.querySelector<HTMLElement>("#dosearch");
     if (searchButton !== null && isVisibleElement(searchButton)) {
+      // Stoppvalget styrer også PanFlights' API-søk, så filtrene settes før søket.
+      if (linkFilters !== undefined) applyPanFlightsLinkFilters(linkFilters);
       removePanFlightsAutoSearchParam();
       searchButton.click();
       return true;
@@ -935,6 +945,102 @@ function installPanFlightsAutoSearch(): void {
   }, 250);
 }
 
+type FlightLinkFilters = Pick<FlightSearchMeta, "maxStops" | "includeCabinBag" | "includeCheckedBag">;
+
+// "stops:1,cabin,checked" ↔ maks stopp og bagasje.
+function buildFlightLinkFiltersValue(flightMeta: FlightSearchMeta): string | undefined {
+  const parts = [
+    flightMeta.maxStops !== undefined ? `stops:${flightMeta.maxStops}` : undefined,
+    flightMeta.includeCabinBag === true ? "cabin" : undefined,
+    flightMeta.includeCheckedBag === true ? "checked" : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.length > 0 ? parts.join(",") : undefined;
+}
+
+function readFlightLinkFilters(parsedUrl: URL): FlightLinkFilters | undefined {
+  const value = parsedUrl.searchParams.get(FLIGHT_LINK_FILTERS_PARAM);
+  if (value === null) return undefined;
+  const parts = value.split(",");
+  const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
+  return {
+    ...(maxStops !== undefined ? { maxStops } : {}),
+    ...(parts.includes("cabin") ? { includeCabinBag: true } : {}),
+    ...(parts.includes("checked") ? { includeCheckedBag: true } : {}),
+  };
+}
+
+// PanFlights: stopp er radioknapper (#radiostops0–3), bagasje er tellere med +/-.
+function applyPanFlightsLinkFilters(filters: FlightLinkFilters): void {
+  if (filters.maxStops !== undefined) {
+    document.querySelector<HTMLInputElement>(`#radiostops${Math.min(filters.maxStops, 3)}`)?.click();
+  }
+  const setBagCount = (countSelector: string, plusSelector: string): void => {
+    if ((readNonNegativeIntegerValue(document.querySelector(countSelector)?.textContent?.trim()) ?? 0) >= 1) return;
+    document.querySelector<HTMLElement>(plusSelector)?.click();
+  };
+  if (filters.includeCabinBag === true) setBagCount("#carryons", ".carrybags .plus");
+  if (filters.includeCheckedBag === true) setBagCount("#checkedluggages", ".checkedbags .plus");
+}
+
+// Trip.com speiler ikke filtrene i URL-en. Lenken bruker en-US, så etikettene er engelske;
+// stopp velges via data-code (maks antall stopp) i filter_stops. Bagasje ligger i
+// filter_others (us.trip.com) eller filter_baggage (www.trip.com). Trip reagerer bare på
+// klikk på etiketten, og et filter regnes som satt først når aria-checked er "true".
+function installTripComLinkFilters(): void {
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined || !parsedUrl.hostname.endsWith("trip.com")) return;
+  const filters = readFlightLinkFilters(parsedUrl);
+  if (filters === undefined) return;
+
+  const pending = new Set<"stops" | "cabin" | "checked">([
+    ...(filters.maxStops !== undefined && filters.maxStops > 0 ? ["stops" as const] : []),
+    ...(filters.includeCabinBag === true ? ["cabin" as const] : []),
+    ...(filters.includeCheckedBag === true ? ["checked" as const] : []),
+  ]);
+  const clickedKeys = new Set<string>();
+  const checkOnce = (key: "stops" | "cabin" | "checked", element: HTMLElement | null | undefined): void => {
+    if (element === null || element === undefined) return;
+    if (element.getAttribute("aria-checked") === "true") {
+      pending.delete(key);
+      return;
+    }
+    // Ett klikk per filter; et nytt klikk før Trip har oppdatert ville slått det av igjen.
+    if (clickedKeys.has(key)) return;
+    clickedKeys.add(key);
+    (element.querySelector<HTMLElement>("label") ?? element).click();
+  };
+
+  let attempts = 0;
+  const timerId = window.setInterval(() => {
+    attempts += 1;
+    if (pending.has("stops")) {
+      checkOnce("stops", document.querySelector<HTMLElement>(
+        `[data-testid="filter_stops"] .filter-item[data-code="${filters.maxStops}"] [role="checkbox"]`,
+      ));
+    }
+    const baggageOptions = [...document.querySelectorAll<HTMLElement>(
+      '[data-testid="filter_baggage"] [role="checkbox"], [data-testid="filter_others"] [role="checkbox"]',
+    )];
+    if (pending.has("cabin")) {
+      checkOnce("cabin", baggageOptions.find((option) => /carry-on/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
+    }
+    if (pending.has("checked")) {
+      checkOnce("checked", baggageOptions.find((option) => /checked/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
+    }
+    if (pending.size === 0 || attempts >= 120) {
+      window.clearInterval(timerId);
+      if (pending.size > 0) {
+        console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending].join(", ")} på ${window.location.href}.`);
+      }
+      const currentUrl = parseUrl(window.location.href);
+      if (currentUrl !== undefined && currentUrl.searchParams.has(FLIGHT_LINK_FILTERS_PARAM)) {
+        currentUrl.searchParams.delete(FLIGHT_LINK_FILTERS_PARAM);
+        window.history.replaceState(window.history.state, "", currentUrl.toString());
+      }
+    }
+  }, 500);
+}
+
 function isPanFlightsSearchPage(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return (hostname === "panflights.no" || hostname === "panflights.com") &&
@@ -945,6 +1051,7 @@ function removePanFlightsAutoSearchParam(): void {
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined) return;
   parsedUrl.searchParams.delete(PANFLIGHTS_AUTO_SEARCH_PARAM);
+  parsedUrl.searchParams.delete(FLIGHT_LINK_FILTERS_PARAM);
   window.history.replaceState(window.history.state, "", parsedUrl.toString());
 }
 
@@ -1617,6 +1724,8 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
 
   const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
+  // FINN speiler filtrene i URL-en (handLuggage/checkedLuggage=true, maximumNumberOfStops=N).
+  const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("maximumNumberOfStops"));
   return normalizeFlightSearchMeta({
     origin,
     destination,
@@ -1627,6 +1736,9 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
     ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...(maxStops !== undefined ? { maxStops } : {}),
+    ...(parsedUrl.searchParams.get("handLuggage")?.toLowerCase() === "true" ? { includeCabinBag: true } : {}),
+    ...(parsedUrl.searchParams.get("checkedLuggage")?.toLowerCase() === "true" ? { includeCheckedBag: true } : {}),
   });
 }
 
@@ -1784,7 +1896,37 @@ function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
     ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...readMomondoFlightFilters(parsedUrl),
   });
+}
+
+// momondos fs-filter (verifisert 2026-11-01): stops=0,1 = maks ett stopp, bfc/cfc = antall
+// hånd-/innsjekkede bagasjer i prisassistenten.
+function buildMomondoFlightFilterValue(flightMeta: FlightSearchMeta): string | undefined {
+  const parts = [
+    flightMeta.maxStops !== undefined && flightMeta.maxStops < 2
+      ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}`
+      : undefined,
+    flightMeta.includeCabinBag === true ? "bfc=1" : undefined,
+    flightMeta.includeCheckedBag === true ? "cfc=1" : undefined,
+  ].filter((part): part is string => part !== undefined);
+  return parts.length > 0 ? parts.join(";") : undefined;
+}
+
+function readMomondoFlightFilters(parsedUrl: URL): FlightLinkFilters {
+  const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
+    const [key = "", value = ""] = part.split("=");
+    return [key, value] as const;
+  }));
+  const stopValues = (filters.get("stops") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value));
+  const maxStops = filters.has("stops") && stopValues.every((value): value is number => value !== undefined && value < 2)
+    ? Math.max(...stopValues.filter((value): value is number => value !== undefined))
+    : undefined;
+  return {
+    ...(maxStops !== undefined ? { maxStops } : {}),
+    ...((readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {}),
+    ...((readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {}),
+  };
 }
 
 // "2026-11-10-flexible-3days" → ["2026-11-10", 3].
@@ -2627,6 +2769,11 @@ function buildFinnFlightResultApiUrl(
   const params = searchData.resultParams !== undefined
     ? new URLSearchParams(searchData.resultParams)
     : buildFinnFlightExactAirportParams(flightMeta);
+  // Uten filtrene svarer API-et med priser uten bagasje og alle stopp (verifisert 2026-11-01);
+  // med dem er bagasjen inkludert i prisen, slik FINN-siden selv viser den.
+  if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
+  if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
+  if (flightMeta.maxStops !== undefined) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
   params.set("cacheBuster", String(Date.now()));
   params.set("progress", String(progress));
   return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -2846,6 +2993,10 @@ function buildFinnFlightSearchUrl(
   if (flightMeta.inboundDate !== undefined) {
     params.set("requestedReturnDate", flightMeta.inboundDate);
   }
+  // Filtrene leses fra URL-en av FINNs resultatside, så lenken åpner samme filtrerte søk.
+  if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
+  if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
+  if (flightMeta.maxStops !== undefined) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
   return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
 }
 
@@ -3935,6 +4086,8 @@ function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}`
     : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
   const params = new URLSearchParams({ v2, order: "quality", [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1" });
+  const linkFilters = buildFlightLinkFiltersValue(flightMeta);
+  if (linkFilters !== undefined) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
   return `https://panflights.no/nb/${path}/?${params.toString()}`;
 }
 
@@ -4161,6 +4314,9 @@ function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
     rtn: flightMeta.inboundDate !== undefined ? "1" : "0",
   });
+  // Skyscanners stoppfilter ekskluderer kategorier: "!oneStop,!twoPlusStops" = kun direkte.
+  if (flightMeta.maxStops === 0) params.set("stops", "!oneStop,!twoPlusStops");
+  else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
   return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
 }
 
@@ -4665,6 +4821,8 @@ function buildTripComFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     curr: TRIP_COM_DEFAULT_CURRENCY,
   });
   if (flightMeta.inboundDate !== undefined) params.set("rdate", flightMeta.inboundDate);
+  const linkFilters = buildFlightLinkFiltersValue(flightMeta);
+  if (linkFilters !== undefined) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
   return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
 }
 
@@ -4987,6 +5145,16 @@ function parseTripComSseResponse(text: string): Record<string, unknown> | undefi
   return records.find((record) => Array.isArray(record.itineraryList)) ?? records[records.length - 1];
 }
 
+// Trip.com merker hver pris med FREE_CARRY_ON_BAGGAGE/FREE_CHECKED_BAGGAGE (verifisert i
+// FlightListSearchSSE 2026-11-01). Uten merket er bagasjen ikke bekreftet inkludert.
+function isTripComPolicyMatchingBaggage(policy: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+  if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+  const flags = new Set((Array.isArray(policy.policyFlags) ? policy.policyFlags : []).filter(isString));
+  if (flightMeta.includeCabinBag === true && !flags.has("FREE_CARRY_ON_BAGGAGE")) return false;
+  if (flightMeta.includeCheckedBag === true && !flags.has("FREE_CHECKED_BAGGAGE")) return false;
+  return true;
+}
+
 function extractTripComListOfferCandidates(
   resultData: Record<string, unknown>,
   resultUrl: string,
@@ -5000,6 +5168,7 @@ function extractTripComListOfferCandidates(
   const candidates = readRecordArray(resultData.itineraryList)
     .map((itinerary): TripComFlightOfferCandidate | undefined => {
       const amount = readRecordArray(itinerary.policies)
+        .filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta))
         .map(readTripComPolicyAmount)
         .find((policyAmount): policyAmount is number => policyAmount !== undefined);
       if (amount === undefined) return undefined;
@@ -5283,8 +5452,11 @@ async function findSkyscannerFlightPriceMatchOffer(
   const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
+  // web-unified-search har tomme fareAttributes (verifisert 2026-11-01): bagasjeavgift er ukjent.
+  const baggageExcluded = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
 
   return {
+    ...(baggageExcluded ? { baggageExcluded: true } : {}),
     source: "skyscanner",
     sourceName: "Skyscanner",
     details: searchDetails,
@@ -5292,7 +5464,8 @@ async function findSkyscannerFlightPriceMatchOffer(
     shopName: candidate.shopName,
     price: candidate.price,
     amount: candidate.amount,
-    sortAmount: candidate.sortAmount ?? candidate.amount,
+    // Uten bagasje er prisen ikke sammenlignbar: sorteres etter kilder med bekreftet bagasje.
+    sortAmount: (candidate.sortAmount ?? candidate.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
     currency: candidate.currency,
     productName: routeTitle,
     productUrl: resultUrl,
@@ -5966,6 +6139,8 @@ function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string {
   ].filter((part): part is string => part !== undefined);
   // Med datovindu sorteres på pris, så de billigste kombinasjonene kommer med i svaret.
   const params = new URLSearchParams({ sort: dateFlex !== undefined ? "price_a" : MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
+  const momondoFilters = buildMomondoFlightFilterValue(flightMeta);
+  if (momondoFilters !== undefined) params.set("fs", momondoFilters);
   if (flightMeta.adults !== 1) {
     params.set("adults", String(flightMeta.adults));
   }
@@ -6072,10 +6247,17 @@ async function findMomondoFlightPriceMatchOffer(
   const resultData = await pollMomondoFlightResults(searchData, flightMeta, airportLookup);
   if (resultData === undefined) return undefined;
 
-  const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
+  let candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
+  // Ingen pris med bekreftet bagasje: vis prisen uten bagasje, tydelig merket og sortert sist.
+  let baggageExcluded = false;
+  if (candidates.length === 0 && (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true)) {
+    const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
+    candidates = extractMomondoFlightOfferCandidates(resultData, flightMetaWithoutBaggage, airportLookup, searchData.resultUrl);
+    baggageExcluded = candidates.length > 0;
+  }
   const best = candidates[0];
   if (best === undefined) return undefined;
-  const visibleBestPrice = readCurrentMomondoVisibleBestPrice(flightMeta);
+  const visibleBestPrice = baggageExcluded ? undefined : readCurrentMomondoVisibleBestPrice(flightMeta);
   const displayedBest: MomondoFlightOfferCandidate = visibleBestPrice === undefined
     ? best
     : {
@@ -6095,10 +6277,11 @@ async function findMomondoFlightPriceMatchOffer(
     sourceName: "momondo",
     details: searchDetails,
     matchedExactProduct: true,
+    ...(baggageExcluded ? { baggageExcluded: true } : {}),
     shopName: displayedBest.shopName,
     price: displayedBest.price,
     amount: displayedBest.amount,
-    sortAmount: displayedBest.sortAmount ?? displayedBest.amount,
+    sortAmount: (displayedBest.sortAmount ?? displayedBest.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
     currency: displayedBest.currency,
     productName: routeTitle,
     productUrl: searchData.resultUrl,
@@ -6798,12 +6981,11 @@ function formatMomondoFlightClock(value: string | undefined): string | undefined
 function isMomondoBookingOptionMatchingBaggage(bookingOption: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
   if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
 
+  // Bare "Inkludert" bekrefter bagasjen; "Ukjent" eller et gebyr betyr at prisen er uten den.
   const fees = isRecord(bookingOption.fees) ? bookingOption.fees : undefined;
-  const isExcluded = (value: string | undefined): boolean => {
-    return value !== undefined && /ikke\s+inkl|not\s+included/i.test(value.replace(/<[^>]*>/g, " "));
-  };
-  if (flightMeta.includeCabinBag === true && isExcluded(readStringValue(fees?.carryOnDisplay))) return false;
-  if (flightMeta.includeCheckedBag === true && isExcluded(readStringValue(fees?.checkedBagDisplay))) return false;
+  const isIncluded = (value: string | undefined): boolean => formatMomondoLuggageValue(value) === "inkl.";
+  if (flightMeta.includeCabinBag === true && !isIncluded(readStringValue(fees?.carryOnDisplay))) return false;
+  if (flightMeta.includeCheckedBag === true && !isIncluded(readStringValue(fees?.checkedBagDisplay))) return false;
   return true;
 }
 
@@ -13356,9 +13538,12 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchProduct.textContent = priceMatch.productName;
   const priceMatchShop = document.createElement("span");
   priceMatchShop.className = "price-match-shop";
-  priceMatchShop.textContent = priceMatch.dateFlex === undefined
-    ? priceMatch.shopName
-    : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`;
+  priceMatchShop.textContent = [
+    priceMatch.dateFlex === undefined
+      ? priceMatch.shopName
+      : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
+    priceMatch.baggageExcluded === true ? "ekskl. bagasje" : undefined,
+  ].filter((part): part is string => part !== undefined).join(" · ");
   priceMatchTitle.append(priceMatchProduct, priceMatchShop);
 
   const priceMatchPrice = document.createElement("span");
@@ -13691,6 +13876,9 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
           isCalendarPrice
             ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.`
             : `Dato og ${airportScopeText} er filtrert til samme søk.`,
+          priceMatch.baggageExcluded === true
+            ? `Pris uten bagasje: ${getPriceMatchSourceName(priceMatch)} bekrefter ikke at valgt bagasje er inkludert, så den kan komme i tillegg.`
+            : undefined,
         ].filter((line): line is string => line !== undefined).join("\n"),
         [
           isCalendarPrice ? "Prisgrunnlag" : "Treffliste",

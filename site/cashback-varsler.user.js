@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793568749
+// @version      1793571431
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9199,6 +9199,7 @@ ${darkProviderCss}
   const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
   const FLIGHT_TOOLTIP_MAX_ROWS = 6;
+  const FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET = 1e9;
   const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
   const FINN_FLIGHT_DATE_FLEX_CONCURRENCY = 6;
   const FINN_FLIGHT_DATE_FLEX_RETRY_DELAY_MS = 3e3;
@@ -9228,6 +9229,7 @@ ${darkProviderCss}
   const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
   const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
+  const FLIGHT_LINK_FILTERS_PARAM = "cbvFilters";
   const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
   const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
   const PANFLIGHTS_PLACE_LOOKUP_ENDPOINT = "https://typeb.panflights.com/placesidlistpost";
@@ -9425,6 +9427,7 @@ ${darkProviderCss}
     requestCurrentOffers();
     installDynamicProductPageRefresh();
     installPanFlightsAutoSearch();
+    installTripComLinkFilters();
   }
   function renderNoticeWithStoredState(offers, priceMatches = [], regionPrices) {
     if (isNoticeBlockedHost(CURRENT_HOST)) {
@@ -9531,12 +9534,14 @@ ${darkProviderCss}
     if (parsedUrl === void 0 || !isPanFlightsSearchPage(parsedUrl) || parsedUrl.searchParams.get(PANFLIGHTS_AUTO_SEARCH_PARAM) !== "1" || parsedUrl.searchParams.get("v2") === null) {
       return;
     }
+    const linkFilters = readFlightLinkFilters(parsedUrl);
     let attempts = 0;
     let timerId;
     const tryStartSearch = () => {
       attempts += 1;
       const searchButton = document.querySelector("#dosearch");
       if (searchButton !== null && isVisibleElement(searchButton)) {
+        if (linkFilters !== void 0) applyPanFlightsLinkFilters(linkFilters);
         removePanFlightsAutoSearchParam();
         searchButton.click();
         return true;
@@ -9550,6 +9555,87 @@ ${darkProviderCss}
       }
     }, 250);
   }
+  function buildFlightLinkFiltersValue(flightMeta) {
+    const parts = [
+      flightMeta.maxStops !== void 0 ? `stops:${flightMeta.maxStops}` : void 0,
+      flightMeta.includeCabinBag === true ? "cabin" : void 0,
+      flightMeta.includeCheckedBag === true ? "checked" : void 0
+    ].filter((part) => part !== void 0);
+    return parts.length > 0 ? parts.join(",") : void 0;
+  }
+  function readFlightLinkFilters(parsedUrl) {
+    const value = parsedUrl.searchParams.get(FLIGHT_LINK_FILTERS_PARAM);
+    if (value === null) return void 0;
+    const parts = value.split(",");
+    const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
+    return {
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...parts.includes("cabin") ? { includeCabinBag: true } : {},
+      ...parts.includes("checked") ? { includeCheckedBag: true } : {}
+    };
+  }
+  function applyPanFlightsLinkFilters(filters) {
+    if (filters.maxStops !== void 0) {
+      document.querySelector(`#radiostops${Math.min(filters.maxStops, 3)}`)?.click();
+    }
+    const setBagCount = (countSelector, plusSelector) => {
+      if ((readNonNegativeIntegerValue(document.querySelector(countSelector)?.textContent?.trim()) ?? 0) >= 1) return;
+      document.querySelector(plusSelector)?.click();
+    };
+    if (filters.includeCabinBag === true) setBagCount("#carryons", ".carrybags .plus");
+    if (filters.includeCheckedBag === true) setBagCount("#checkedluggages", ".checkedbags .plus");
+  }
+  function installTripComLinkFilters() {
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl === void 0 || !parsedUrl.hostname.endsWith("trip.com")) return;
+    const filters = readFlightLinkFilters(parsedUrl);
+    if (filters === void 0) return;
+    const pending = /* @__PURE__ */ new Set([
+      ...filters.maxStops !== void 0 && filters.maxStops > 0 ? ["stops"] : [],
+      ...filters.includeCabinBag === true ? ["cabin"] : [],
+      ...filters.includeCheckedBag === true ? ["checked"] : []
+    ]);
+    const clickedKeys = /* @__PURE__ */ new Set();
+    const checkOnce = (key, element) => {
+      if (element === null || element === void 0) return;
+      if (element.getAttribute("aria-checked") === "true") {
+        pending.delete(key);
+        return;
+      }
+      if (clickedKeys.has(key)) return;
+      clickedKeys.add(key);
+      (element.querySelector("label") ?? element).click();
+    };
+    let attempts = 0;
+    const timerId = window.setInterval(() => {
+      attempts += 1;
+      if (pending.has("stops")) {
+        checkOnce("stops", document.querySelector(
+          `[data-testid="filter_stops"] .filter-item[data-code="${filters.maxStops}"] [role="checkbox"]`
+        ));
+      }
+      const baggageOptions = [...document.querySelectorAll(
+        '[data-testid="filter_baggage"] [role="checkbox"], [data-testid="filter_others"] [role="checkbox"]'
+      )];
+      if (pending.has("cabin")) {
+        checkOnce("cabin", baggageOptions.find((option) => /carry-on/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
+      }
+      if (pending.has("checked")) {
+        checkOnce("checked", baggageOptions.find((option) => /checked/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
+      }
+      if (pending.size === 0 || attempts >= 120) {
+        window.clearInterval(timerId);
+        if (pending.size > 0) {
+          console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending].join(", ")} på ${window.location.href}.`);
+        }
+        const currentUrl = parseUrl(window.location.href);
+        if (currentUrl !== void 0 && currentUrl.searchParams.has(FLIGHT_LINK_FILTERS_PARAM)) {
+          currentUrl.searchParams.delete(FLIGHT_LINK_FILTERS_PARAM);
+          window.history.replaceState(window.history.state, "", currentUrl.toString());
+        }
+      }
+    }, 500);
+  }
   function isPanFlightsSearchPage(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return (hostname === "panflights.no" || hostname === "panflights.com") && /(?:^|\/)(?:nb\/)?(?:roundtrip|oneway)\/?$/i.test(parsedUrl.pathname);
@@ -9558,6 +9644,7 @@ ${darkProviderCss}
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0) return;
     parsedUrl.searchParams.delete(PANFLIGHTS_AUTO_SEARCH_PARAM);
+    parsedUrl.searchParams.delete(FLIGHT_LINK_FILTERS_PARAM);
     window.history.replaceState(window.history.state, "", parsedUrl.toString());
   }
   function isVisibleElement(element) {
@@ -10060,6 +10147,7 @@ ${darkProviderCss}
     ]);
     if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
     const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
+    const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("maximumNumberOfStops"));
     return normalizeFlightSearchMeta({
       origin,
       destination,
@@ -10069,7 +10157,10 @@ ${darkProviderCss}
       youths: 0,
       children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
       infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
-      ...cabinClass !== void 0 ? { cabinClass } : {}
+      ...cabinClass !== void 0 ? { cabinClass } : {},
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...parsedUrl.searchParams.get("handLuggage")?.toLowerCase() === "true" ? { includeCabinBag: true } : {},
+      ...parsedUrl.searchParams.get("checkedLuggage")?.toLowerCase() === "true" ? { includeCheckedBag: true } : {}
     });
   }
   function extractPanFlightsFlightSearchMeta(parsedUrl) {
@@ -10195,8 +10286,30 @@ ${darkProviderCss}
       youths: 0,
       children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
       infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
-      ...cabinClass !== void 0 ? { cabinClass } : {}
+      ...cabinClass !== void 0 ? { cabinClass } : {},
+      ...readMomondoFlightFilters(parsedUrl)
     });
+  }
+  function buildMomondoFlightFilterValue(flightMeta) {
+    const parts = [
+      flightMeta.maxStops !== void 0 && flightMeta.maxStops < 2 ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}` : void 0,
+      flightMeta.includeCabinBag === true ? "bfc=1" : void 0,
+      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0
+    ].filter((part) => part !== void 0);
+    return parts.length > 0 ? parts.join(";") : void 0;
+  }
+  function readMomondoFlightFilters(parsedUrl) {
+    const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
+      const [key = "", value = ""] = part.split("=");
+      return [key, value];
+    }));
+    const stopValues = (filters.get("stops") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value));
+    const maxStops = filters.has("stops") && stopValues.every((value) => value !== void 0 && value < 2) ? Math.max(...stopValues.filter((value) => value !== void 0)) : void 0;
+    return {
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...(readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {},
+      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {}
+    };
   }
   function readMomondoFlexibleDatePart(value) {
     const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
@@ -10888,6 +11001,9 @@ ${darkProviderCss}
   }
   function buildFinnFlightResultApiUrl(searchData, flightMeta, progress) {
     const params = searchData.resultParams !== void 0 ? new URLSearchParams(searchData.resultParams) : buildFinnFlightExactAirportParams(flightMeta);
+    if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
+    if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
+    if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
     params.set("cacheBuster", String(Date.now()));
     params.set("progress", String(progress));
     return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -11033,6 +11149,9 @@ ${darkProviderCss}
     if (flightMeta.inboundDate !== void 0) {
       params.set("requestedReturnDate", flightMeta.inboundDate);
     }
+    if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
+    if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
+    if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
     return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
   }
   function buildFinnFlightExactAirportParams(flightMeta) {
@@ -11889,6 +12008,8 @@ ${darkProviderCss}
     const path = inboundDate !== void 0 ? "roundtrip" : "oneway";
     const v2 = inboundDate !== void 0 ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}` : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
     const params = new URLSearchParams({ v2, order: "quality", [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1" });
+    const linkFilters = buildFlightLinkFiltersValue(flightMeta);
+    if (linkFilters !== void 0) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
     return `https://panflights.no/nb/${path}/?${params.toString()}`;
   }
   function buildGoogleFlightsSearchUrl(flightMeta) {
@@ -12081,6 +12202,8 @@ ${darkProviderCss}
       preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
       rtn: flightMeta.inboundDate !== void 0 ? "1" : "0"
     });
+    if (flightMeta.maxStops === 0) params.set("stops", "!oneStop,!twoPlusStops");
+    else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
     return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
   }
   function buildTripComFlightSearchUrl(flightMeta) {
@@ -12098,6 +12221,8 @@ ${darkProviderCss}
       curr: TRIP_COM_DEFAULT_CURRENCY
     });
     if (flightMeta.inboundDate !== void 0) params.set("rdate", flightMeta.inboundDate);
+    const linkFilters = buildFlightLinkFiltersValue(flightMeta);
+    if (linkFilters !== void 0) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
     return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
   }
   function buildTripComCabinClassParam(flightMeta) {
@@ -12345,12 +12470,19 @@ ${darkProviderCss}
     });
     return records.find((record) => Array.isArray(record.itineraryList)) ?? records[records.length - 1];
   }
+  function isTripComPolicyMatchingBaggage(policy, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+    const flags = new Set((Array.isArray(policy.policyFlags) ? policy.policyFlags : []).filter(isString));
+    if (flightMeta.includeCabinBag === true && !flags.has("FREE_CARRY_ON_BAGGAGE")) return false;
+    if (flightMeta.includeCheckedBag === true && !flags.has("FREE_CHECKED_BAGGAGE")) return false;
+    return true;
+  }
   function extractTripComListOfferCandidates(resultData, resultUrl, rates, flightMeta) {
     const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
     const currency = readStringValue(basicInfo.currency) ?? TRIP_COM_DEFAULT_CURRENCY;
     const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
     const candidates = readRecordArray(resultData.itineraryList).map((itinerary) => {
-      const amount = readRecordArray(itinerary.policies).map(readTripComPolicyAmount).find((policyAmount) => policyAmount !== void 0);
+      const amount = readRecordArray(itinerary.policies).filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta)).map(readTripComPolicyAmount).find((policyAmount) => policyAmount !== void 0);
       if (amount === void 0) return void 0;
       const journeys = readRecordArray(itinerary.journeyList);
       if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return void 0;
@@ -12557,7 +12689,9 @@ ${darkProviderCss}
     const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;
+    const baggageExcluded = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
     return {
+      ...baggageExcluded ? { baggageExcluded: true } : {},
       source: "skyscanner",
       sourceName: "Skyscanner",
       details: searchDetails,
@@ -12565,7 +12699,8 @@ ${darkProviderCss}
       shopName: candidate.shopName,
       price: candidate.price,
       amount: candidate.amount,
-      sortAmount: candidate.sortAmount ?? candidate.amount,
+      // Uten bagasje er prisen ikke sammenlignbar: sorteres etter kilder med bekreftet bagasje.
+      sortAmount: (candidate.sortAmount ?? candidate.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
       currency: candidate.currency,
       productName: routeTitle,
       productUrl: resultUrl,
@@ -13044,6 +13179,8 @@ ${darkProviderCss}
       flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : void 0
     ].filter((part) => part !== void 0);
     const params = new URLSearchParams({ sort: dateFlex !== void 0 ? "price_a" : MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
+    const momondoFilters = buildMomondoFlightFilterValue(flightMeta);
+    if (momondoFilters !== void 0) params.set("fs", momondoFilters);
     if (flightMeta.adults !== 1) {
       params.set("adults", String(flightMeta.adults));
     }
@@ -13112,10 +13249,16 @@ ${darkProviderCss}
     if (searchData === void 0) return void 0;
     const resultData = await pollMomondoFlightResults(searchData, flightMeta, airportLookup);
     if (resultData === void 0) return void 0;
-    const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
+    let candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
+    let baggageExcluded = false;
+    if (candidates.length === 0 && (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true)) {
+      const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
+      candidates = extractMomondoFlightOfferCandidates(resultData, flightMetaWithoutBaggage, airportLookup, searchData.resultUrl);
+      baggageExcluded = candidates.length > 0;
+    }
     const best = candidates[0];
     if (best === void 0) return void 0;
-    const visibleBestPrice = readCurrentMomondoVisibleBestPrice(flightMeta);
+    const visibleBestPrice = baggageExcluded ? void 0 : readCurrentMomondoVisibleBestPrice(flightMeta);
     const displayedBest = visibleBestPrice === void 0 ? best : {
       ...best,
       price: formatNokFlightPrice(visibleBestPrice),
@@ -13129,10 +13272,11 @@ ${darkProviderCss}
       sourceName: "momondo",
       details: searchDetails,
       matchedExactProduct: true,
+      ...baggageExcluded ? { baggageExcluded: true } : {},
       shopName: displayedBest.shopName,
       price: displayedBest.price,
       amount: displayedBest.amount,
-      sortAmount: displayedBest.sortAmount ?? displayedBest.amount,
+      sortAmount: (displayedBest.sortAmount ?? displayedBest.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
       currency: displayedBest.currency,
       productName: routeTitle,
       productUrl: searchData.resultUrl,
@@ -13618,11 +13762,9 @@ ${darkProviderCss}
   function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
     const fees = isRecord(bookingOption.fees) ? bookingOption.fees : void 0;
-    const isExcluded = (value) => {
-      return value !== void 0 && /ikke\s+inkl|not\s+included/i.test(value.replace(/<[^>]*>/g, " "));
-    };
-    if (flightMeta.includeCabinBag === true && isExcluded(readStringValue(fees?.carryOnDisplay))) return false;
-    if (flightMeta.includeCheckedBag === true && isExcluded(readStringValue(fees?.checkedBagDisplay))) return false;
+    const isIncluded = (value) => formatMomondoLuggageValue(value) === "inkl.";
+    if (flightMeta.includeCabinBag === true && !isIncluded(readStringValue(fees?.carryOnDisplay))) return false;
+    if (flightMeta.includeCheckedBag === true && !isIncluded(readStringValue(fees?.checkedBagDisplay))) return false;
     return true;
   }
   function formatMomondoFlightLuggageSummary(bookingOption) {
@@ -19088,7 +19230,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     priceMatchProduct.textContent = priceMatch.productName;
     const priceMatchShop = document.createElement("span");
     priceMatchShop.className = "price-match-shop";
-    priceMatchShop.textContent = priceMatch.dateFlex === void 0 ? priceMatch.shopName : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`;
+    priceMatchShop.textContent = [
+      priceMatch.dateFlex === void 0 ? priceMatch.shopName : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
+      priceMatch.baggageExcluded === true ? "ekskl. bagasje" : void 0
+    ].filter((part) => part !== void 0).join(" · ");
     priceMatchTitle.append(priceMatchProduct, priceMatchShop);
     const priceMatchPrice = document.createElement("span");
     priceMatchPrice.className = "price-match-price";
@@ -19363,7 +19508,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
             priceMatch.shopName,
             details !== priceMatch.shopName ? details : void 0,
             `${isCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
-            isCalendarPrice ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.` : `Dato og ${airportScopeText} er filtrert til samme søk.`
+            isCalendarPrice ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.` : `Dato og ${airportScopeText} er filtrert til samme søk.`,
+            priceMatch.baggageExcluded === true ? `Pris uten bagasje: ${getPriceMatchSourceName(priceMatch)} bekrefter ikke at valgt bagasje er inkludert, så den kan komme i tillegg.` : void 0
           ].filter((line) => line !== void 0).join("\n"),
           [
             isCalendarPrice ? "Prisgrunnlag" : "Treffliste",
