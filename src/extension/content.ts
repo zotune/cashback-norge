@@ -9022,9 +9022,43 @@ function formatFlightSearchFilterDetails(flightMeta: FlightSearchMeta): string[]
   ].filter((part): part is string => part !== undefined);
 }
 
+// Stopp og bagasje vises som filterchips ved «Prismatch»; kortet viser resten av søket.
 function formatFlightCardSearchDetails(flightMeta: FlightSearchMeta): string {
   const tripType = flightMeta.inboundDate === undefined ? "En vei" : "Tur/retur";
-  return [tripType, formatFlightPassengerText(flightMeta), ...formatFlightSearchFilterDetails(flightMeta)].join(", ");
+  return [tripType, formatFlightPassengerText(flightMeta), formatFlightCabinClassText(flightMeta)]
+    .filter((part): part is string => part !== undefined)
+    .join(", ");
+}
+
+const FLIGHT_CABIN_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="3.5" y="4.5" width="9" height="8.5" rx="1.5" fill="currentColor"/><circle cx="5.5" cy="14.5" r="1" fill="currentColor"/><circle cx="10.5" cy="14.5" r="1" fill="currentColor"/></svg>';
+const FLIGHT_CHECKED_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4V2.5h4V4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="4" width="11" height="10.5" rx="1.5" fill="currentColor"/><path d="M5.5 4v10.5M10.5 4v10.5" stroke="var(--cbn-surface, #fff)" stroke-width="1"/></svg>';
+
+// Aktive søkefiltre (bagasje og stopp) som små chips ved siden av «Prismatch».
+function buildFlightFilterChips(flightMeta: FlightSearchMeta): HTMLSpanElement | undefined {
+  const chips: Array<{ iconSvg?: string; text: string; title: string }> = [
+    ...(flightMeta.includeCabinBag === true
+      ? [{ iconSvg: FLIGHT_CABIN_BAG_ICON_SVG, text: "1", title: "1 håndbagasje per reisende er med i prisene" }]
+      : []),
+    ...(flightMeta.includeCheckedBag === true
+      ? [{ iconSvg: FLIGHT_CHECKED_BAG_ICON_SVG, text: "1", title: "1 innsjekket bagasje per reisende er med i prisene" }]
+      : []),
+    ...(flightMeta.maxStops !== undefined
+      ? [{ text: flightMeta.maxStops === 0 ? "Direkte" : `≤${flightMeta.maxStops} stopp`, title: formatFlightStopsFilterText(flightMeta) ?? "" }]
+      : []),
+  ];
+  if (chips.length === 0) return undefined;
+
+  const container = document.createElement("span");
+  container.className = "flight-filter-chips";
+  for (const chip of chips) {
+    const element = document.createElement("span");
+    element.className = "cbn-chip cbn-chip--muted flight-filter-chip";
+    element.title = chip.title;
+    if (chip.iconSvg !== undefined) element.insertAdjacentHTML("beforeend", chip.iconSvg);
+    element.append(chip.text);
+    container.append(element);
+  }
+  return container;
 }
 
 function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
@@ -11394,6 +11428,35 @@ function renderNotice(
       text-align: left;
       width: 100%;
     }
+    .price-match-header {
+      align-items: center;
+      display: flex;
+      gap: 6px;
+      margin-bottom: 1px;
+    }
+    .price-match-header .price-match-toggle {
+      flex: 1;
+      margin-bottom: 0;
+      min-width: 0;
+    }
+    .flight-filter-chips {
+      display: inline-flex;
+      flex-shrink: 0;
+      gap: 4px;
+    }
+    .flight-filter-chips .flight-filter-chip {
+      align-items: center;
+      display: inline-flex;
+      font-size: 11px;
+      font-weight: 700;
+      gap: 4px;
+      line-height: 20px;
+      padding: 0 6px;
+    }
+    .flight-filter-chips .flight-filter-chip svg {
+      height: 13px;
+      width: 13px;
+    }
     .price-match-toggle-arrow,
     .region-prices-toggle-arrow {
       display: inline-block;
@@ -12685,8 +12748,18 @@ function renderNotice(
       chrome.storage.local.set({ [PRICE_MATCH_COLLAPSED_KEY]: isCollapsed });
     });
 
+    const priceMatchHeader = document.createElement("div");
+    priceMatchHeader.className = "price-match-header";
+    priceMatchHeader.append(priceMatchToggle);
+    const currentUrl = parseUrl(window.location.href);
+    const flightMeta = currentUrl !== undefined && priceMatches.some((priceMatch) => priceMatch.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch))
+      ? extractFlightSearchMeta(currentUrl)
+      : undefined;
+    const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta) : undefined;
+    if (flightFilterChips !== undefined) priceMatchHeader.append(flightFilterChips);
+
     priceMatchSection.append(
-      priceMatchToggle,
+      priceMatchHeader,
       ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0)),
     );
   }
