@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793571431
+// @version      1793571722
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10298,6 +10298,10 @@ ${darkProviderCss}
     ].filter((part) => part !== void 0);
     return parts.length > 0 ? parts.join(";") : void 0;
   }
+  function buildMomondoRequestFilterParams(flightMeta, filterState) {
+    const fs = [filterState, buildMomondoFlightFilterValue(flightMeta)].filter((part) => part !== void 0 && part.length > 0).join(";");
+    return fs.length > 0 ? { fs } : {};
+  }
   function readMomondoFlightFilters(parsedUrl) {
     const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
       const [key = "", value = ""] = part.split("=");
@@ -13408,7 +13412,7 @@ ${darkProviderCss}
   }
   function buildMomondoFlightDynamicPollPayload(flightMeta, searchId, filterState, sortMode) {
     return {
-      filterParams: filterState !== void 0 ? { fs: filterState } : {},
+      filterParams: buildMomondoRequestFilterParams(flightMeta, filterState),
       userSearchParams: {
         legs: buildMomondoFlightDynamicRequestLegs(flightMeta),
         ...searchId !== void 0 ? { searchId } : {},
@@ -13428,7 +13432,7 @@ ${darkProviderCss}
   }
   function buildMomondoFlightPollPayload(flightMeta, airportLookup, searchId, filterState, sortMode) {
     return {
-      ...filterState !== void 0 ? { filterParams: { fs: filterState } } : {},
+      filterParams: buildMomondoRequestFilterParams(flightMeta, filterState),
       userSearchParams: {
         ...searchId !== void 0 ? { searchId } : {},
         legs: buildMomondoFlightRequestLegs(flightMeta, airportLookup),
@@ -13762,9 +13766,12 @@ ${darkProviderCss}
   function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
     const fees = isRecord(bookingOption.fees) ? bookingOption.fees : void 0;
-    const isIncluded = (value) => formatMomondoLuggageValue(value) === "inkl.";
-    if (flightMeta.includeCabinBag === true && !isIncluded(readStringValue(fees?.carryOnDisplay))) return false;
-    if (flightMeta.includeCheckedBag === true && !isIncluded(readStringValue(fees?.checkedBagDisplay))) return false;
+    const isIncluded = (bagData, display) => {
+      const status = isRecord(bagData) ? readStringValue(bagData.status) : void 0;
+      return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
+    };
+    if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
+    if (flightMeta.includeCheckedBag === true && !isIncluded(fees?.checkedBagData, fees?.checkedBagDisplay)) return false;
     return true;
   }
   function formatMomondoFlightLuggageSummary(bookingOption) {

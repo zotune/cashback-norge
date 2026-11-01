@@ -1913,6 +1913,15 @@ function buildMomondoFlightFilterValue(flightMeta: FlightSearchMeta): string | u
   return parts.length > 0 ? parts.join(";") : undefined;
 }
 
+// Med bfc/cfc i fs legger momondo bagasjeavgiften inn i displayPrice og setter
+// carryOnBagData/checkedBagData.status = "INCLUDED" (verifisert 2026-11-01).
+function buildMomondoRequestFilterParams(flightMeta: FlightSearchMeta, filterState: string | undefined): Record<string, string> {
+  const fs = [filterState, buildMomondoFlightFilterValue(flightMeta)]
+    .filter((part): part is string => part !== undefined && part.length > 0)
+    .join(";");
+  return fs.length > 0 ? { fs } : {};
+}
+
 function readMomondoFlightFilters(parsedUrl: URL): FlightLinkFilters {
   const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
     const [key = "", value = ""] = part.split("=");
@@ -6455,7 +6464,7 @@ function buildMomondoFlightDynamicPollPayload(
   sortMode: MomondoFlightSortMode,
 ): Record<string, unknown> {
   return {
-    filterParams: filterState !== undefined ? { fs: filterState } : {},
+    filterParams: buildMomondoRequestFilterParams(flightMeta, filterState),
     userSearchParams: {
       legs: buildMomondoFlightDynamicRequestLegs(flightMeta),
       ...(searchId !== undefined ? { searchId } : {}),
@@ -6482,7 +6491,7 @@ function buildMomondoFlightPollPayload(
   sortMode: MomondoFlightSortMode,
 ): Record<string, unknown> {
   return {
-    ...(filterState !== undefined ? { filterParams: { fs: filterState } } : {}),
+    filterParams: buildMomondoRequestFilterParams(flightMeta, filterState),
     userSearchParams: {
       ...(searchId !== undefined ? { searchId } : {}),
       legs: buildMomondoFlightRequestLegs(flightMeta, airportLookup),
@@ -6981,11 +6990,15 @@ function formatMomondoFlightClock(value: string | undefined): string | undefined
 function isMomondoBookingOptionMatchingBaggage(bookingOption: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
   if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
 
-  // Bare "Inkludert" bekrefter bagasjen; "Ukjent" eller et gebyr betyr at prisen er uten den.
+  // status "INCLUDED" = bagasjen (gratis eller med gebyr) er med i prisen. Uten status
+  // godtas bare visningsteksten "Inkludert"; "Ukjent" betyr ukjent totalpris.
   const fees = isRecord(bookingOption.fees) ? bookingOption.fees : undefined;
-  const isIncluded = (value: string | undefined): boolean => formatMomondoLuggageValue(value) === "inkl.";
-  if (flightMeta.includeCabinBag === true && !isIncluded(readStringValue(fees?.carryOnDisplay))) return false;
-  if (flightMeta.includeCheckedBag === true && !isIncluded(readStringValue(fees?.checkedBagDisplay))) return false;
+  const isIncluded = (bagData: unknown, display: unknown): boolean => {
+    const status = isRecord(bagData) ? readStringValue(bagData.status) : undefined;
+    return status !== undefined ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
+  };
+  if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
+  if (flightMeta.includeCheckedBag === true && !isIncluded(fees?.checkedBagData, fees?.checkedBagDisplay)) return false;
   return true;
 }
 
