@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793575261
+// @version      1793576066
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9079,6 +9079,461 @@ ${darkProviderCss}
     const name = new Intl.DateTimeFormat("nb-NO", { month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${date}T12:00:00Z`));
     return name.charAt(0).toUpperCase() + name.slice(1);
   }
+  function readStringValue(value) {
+    if (typeof value !== "string") return void 0;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberValue(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function readPositiveNumberValue(value) {
+    const numberValue = readNumberValue(value);
+    return numberValue !== void 0 && numberValue > 0 ? numberValue : void 0;
+  }
+  function readNonNegativeIntegerValue(value) {
+    const parsedValue = typeof value === "number" ? value : typeof value === "string" ? Number.parseInt(value, 10) : Number.NaN;
+    return Number.isInteger(parsedValue) && parsedValue >= 0 ? parsedValue : void 0;
+  }
+  function readPositiveIntegerValue(value) {
+    const parsedValue = readNonNegativeIntegerValue(value);
+    return parsedValue !== void 0 && parsedValue > 0 ? parsedValue : void 0;
+  }
+  function readIataCodeValue(value) {
+    if (typeof value !== "string") return void 0;
+    const trimmed = value.trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(trimmed)) return trimmed;
+    return trimmed.match(/\b[A-Z]{3}\b/)?.[0];
+  }
+  function readIsoDateValue(value) {
+    if (typeof value !== "string") return void 0;
+    const dateMatch = value.trim().match(/\b(\d{4}-\d{2}-\d{2})\b/);
+    const parsedValue = dateMatch?.[1];
+    if (parsedValue === void 0) return void 0;
+    const parsedDate = /* @__PURE__ */ new Date(`${parsedValue}T00:00:00Z`);
+    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== parsedValue) {
+      return void 0;
+    }
+    return parsedValue;
+  }
+  function addDaysToIsoDate(isoDate, days) {
+    const time = (/* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`)).getTime();
+    if (Number.isNaN(time)) return void 0;
+    return new Date(time + days * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+  }
+  function parseJsonValue(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return void 0;
+    }
+  }
+  function readRecordArray(value) {
+    return Array.isArray(value) ? value.filter(isRecord$5) : [];
+  }
+  function isString(value) {
+    return typeof value === "string";
+  }
+  const FLIGHT_DEFAULT_CHILD_AGE = 7;
+  const FLIGHT_INFANT_AGE = 1;
+  const FLIGHT_LINK_FILTERS_PARAM = "cbvFilters";
+  const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"];
+  function normalizeFlightSearchMeta(meta) {
+    const origin = readIataCodeValue(meta.origin);
+    const destination = readIataCodeValue(meta.destination);
+    const outboundDate = readIsoDateValue(meta.outboundDate);
+    const inboundDate = meta.inboundDate !== void 0 ? readIsoDateValue(meta.inboundDate) : void 0;
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || origin === destination) {
+      return void 0;
+    }
+    const normalizedMeta = {
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
+      adults: Math.max(1, Math.trunc(meta.adults) + Math.max(0, Math.trunc(meta.youths))),
+      youths: 0,
+      children: Math.max(0, Math.trunc(meta.children)),
+      infants: Math.max(0, Math.trunc(meta.infants)),
+      ...meta.childAges !== void 0 && meta.childAges.length === Math.trunc(meta.children) && meta.childAges.every((age) => Number.isInteger(age) && age >= 2 && age <= 11) ? { childAges: meta.childAges } : {},
+      ...meta.cabinClass !== void 0 ? { cabinClass: meta.cabinClass } : {},
+      ...meta.maxStops !== void 0 ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {},
+      ...meta.includeCabinBag === true ? { includeCabinBag: true } : {},
+      ...meta.includeCheckedBag === true ? { includeCheckedBag: true } : {},
+      ...meta.maxDurationMinutes !== void 0 && meta.maxDurationMinutes > 0 ? { maxDurationMinutes: Math.round(meta.maxDurationMinutes) } : {},
+      ...meta.dateFlex !== void 0 ? { dateFlex: meta.dateFlex } : {}
+    };
+    return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : void 0;
+  }
+  function isFlightSearchPassengerMatchSupported(flightMeta) {
+    return flightMeta.adults > 0 && flightMeta.infants <= flightMeta.adults;
+  }
+  function readFlightChildAges(flightMeta) {
+    return flightMeta.childAges ?? Array.from({ length: flightMeta.children }, () => FLIGHT_DEFAULT_CHILD_AGE);
+  }
+  function countFlightSeatedPassengers(flightMeta) {
+    return flightMeta.adults + flightMeta.children;
+  }
+  function readFlightPassengerAges(ages) {
+    const childAges = ages.filter((age) => age >= 2 && age <= 11);
+    return { children: childAges.length, infants: ages.filter((age) => age < 2).length, childAges };
+  }
+  function readFlightCabinClassValue(value) {
+    if (typeof value !== "string") return void 0;
+    const normalized = value.trim().toLowerCase().replace(/[^a-zæøå]/g, "");
+    if (normalized.length === 0) return void 0;
+    if (/^(?:economy|okonomi|økonomi|ekonomi)$/.test(normalized)) return "economy";
+    if (normalized.includes("premium")) return "premium";
+    if (normalized.includes("business")) return "business";
+    if (/^first(?:class)?$|f[oø]rsteklasse/.test(normalized)) return "first";
+    return void 0;
+  }
+  function exceedsFlightMaxStops(flightMeta, stopCounts) {
+    if (flightMeta.maxStops === void 0) return false;
+    const maxStops = flightMeta.maxStops;
+    return stopCounts.some((stopCount) => stopCount !== void 0 && stopCount > maxStops);
+  }
+  function exceedsFlightMaxDuration(flightMeta, legDurationsMinutes) {
+    const { maxDurationMinutes } = flightMeta;
+    if (maxDurationMinutes === void 0) return false;
+    return legDurationsMinutes.some((durationMinutes) => durationMinutes !== void 0 && durationMinutes > maxDurationMinutes);
+  }
+  function isIsoDateWithinDays(date, centerDate, daysBefore, daysAfter) {
+    if (date === void 0) return false;
+    const time = (/* @__PURE__ */ new Date(`${date}T00:00:00Z`)).getTime();
+    const centerTime = (/* @__PURE__ */ new Date(`${centerDate}T00:00:00Z`)).getTime();
+    if (Number.isNaN(time) || Number.isNaN(centerTime)) return false;
+    const dayOffset = Math.round((time - centerTime) / (24 * 60 * 60 * 1e3));
+    return dayOffset >= -daysBefore && dayOffset <= daysAfter;
+  }
+  function formatFlightDateFlexWindow(before, after) {
+    return before === after ? `±${before}` : `-${before}/+${after}`;
+  }
+  function formatFlightDateFlexDays(dateFlex, roundTrip) {
+    const outbound = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
+    const inbound = formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter);
+    return !roundTrip || outbound === inbound ? `${outbound} d` : `${outbound}/${inbound} d`;
+  }
+  function shiftFlightDateNotBeforeToday(isoDate, days, now = /* @__PURE__ */ new Date()) {
+    if (days === 0) return isoDate;
+    const shiftedDate = addDaysToIsoDate(isoDate, days) ?? isoDate;
+    if (days > 0) return shiftedDate;
+    const today = [
+      String(now.getFullYear()),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0")
+    ].join("-");
+    const earliestDate = today < isoDate ? today : isoDate;
+    return shiftedDate < earliestDate ? earliestDate : shiftedDate;
+  }
+  function listFlightDateFlexCombinations(flightMeta, dateFlex, now = /* @__PURE__ */ new Date()) {
+    const listDates = (centerDate, before, after) => {
+      const firstDate = shiftFlightDateNotBeforeToday(centerDate, -before, now);
+      const dates = [];
+      for (let offset = -before; offset <= after; offset++) {
+        const date = addDaysToIsoDate(centerDate, offset);
+        if (date !== void 0 && date >= firstDate) dates.push({ date, offset });
+      }
+      return dates;
+    };
+    const outboundDates = listDates(flightMeta.outboundDate, dateFlex.outboundBefore, dateFlex.outboundAfter);
+    const { inboundDate } = flightMeta;
+    const combinations = inboundDate === void 0 ? outboundDates.map(({ date, offset }) => ({ outboundDate: date, distance: Math.abs(offset) })) : outboundDates.flatMap((outbound) => {
+      return listDates(inboundDate, dateFlex.inboundBefore, dateFlex.inboundAfter).filter((inbound) => inbound.date >= outbound.date).map((inbound) => ({
+        outboundDate: outbound.date,
+        inboundDate: inbound.date,
+        distance: Math.abs(outbound.offset) + Math.abs(inbound.offset)
+      }));
+    });
+    return combinations.sort((left, right) => left.distance - right.distance).map(({ distance: _distance, ...combination }) => combination);
+  }
+  function buildFlightDateCombinationKey(combination) {
+    return `${combination.outboundDate}|${combination.inboundDate ?? ""}`;
+  }
+  function readPanFlightsDateFlex(extraParts, roundTrip) {
+    const readWindow = (key) => {
+      const value = extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+      const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
+      return before !== void 0 ? [before, after ?? before] : [0, 0];
+    };
+    const [outboundBefore, outboundAfter] = readWindow("ff");
+    const [inboundBefore, inboundAfter] = roundTrip ? readWindow("tf") : [0, 0];
+    return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0 ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter } : void 0;
+  }
+  function buildFlightLinkFiltersValue(flightMeta) {
+    const parts = [
+      flightMeta.maxStops !== void 0 ? `stops:${flightMeta.maxStops}` : void 0,
+      flightMeta.includeCabinBag === true ? "cabin" : void 0,
+      flightMeta.includeCheckedBag === true ? "checked" : void 0
+    ].filter((part) => part !== void 0);
+    return parts.length > 0 ? parts.join(",") : void 0;
+  }
+  function readFlightLinkFilters(parsedUrl) {
+    const value = parsedUrl.searchParams.get(FLIGHT_LINK_FILTERS_PARAM);
+    if (value === null) return void 0;
+    const parts = value.split(",");
+    const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
+    return {
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...parts.includes("cabin") ? { includeCabinBag: true } : {},
+      ...parts.includes("checked") ? { includeCheckedBag: true } : {}
+    };
+  }
+  function buildMomondoFlightFilterValue(flightMeta) {
+    const parts = [
+      flightMeta.maxStops !== void 0 && flightMeta.maxStops < 2 ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}` : void 0,
+      flightMeta.includeCabinBag === true ? "bfc=1" : void 0,
+      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0,
+      // legdur=-N = maks N minutter per etappe (verifisert 2026-11-01).
+      flightMeta.maxDurationMinutes !== void 0 ? `legdur=-${flightMeta.maxDurationMinutes}` : void 0
+    ].filter((part) => part !== void 0);
+    return parts.length > 0 ? parts.join(";") : void 0;
+  }
+  function readMomondoFlightFilters(parsedUrl) {
+    const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
+      const [key = "", value = ""] = part.split("=");
+      return [key, value];
+    }));
+    const stopValues = (filters.get("stops") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value));
+    const maxStops = filters.has("stops") && stopValues.every((value) => value !== void 0 && value < 2) ? Math.max(...stopValues.filter((value) => value !== void 0)) : void 0;
+    return {
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...(readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {},
+      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {},
+      ...readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) !== void 0 ? { maxDurationMinutes: readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) } : {}
+    };
+  }
+  function buildMomondoPassengerDetails(flightMeta) {
+    return [
+      ...Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
+      ...readFlightChildAges(flightMeta).map((age) => ({ ptc: "CHD", age })),
+      ...Array.from({ length: flightMeta.infants }, () => ({ ptc: "INL" }))
+    ];
+  }
+  function buildMomondoPassengerPathParts(flightMeta) {
+    const hasChildren = flightMeta.children > 0 || flightMeta.infants > 0;
+    return [
+      ...flightMeta.adults > 1 || hasChildren ? [`${flightMeta.adults}adults`] : [],
+      ...hasChildren ? [["children", ...readFlightChildAges(flightMeta).map(String), ...Array.from({ length: flightMeta.infants }, () => "1L")].join("-")] : []
+    ];
+  }
+  function readMomondoPassengerPathParts(parts) {
+    const adults = readPositiveIntegerValue(parts.map((part) => part.match(/^(\d+)adults?$/i)?.[1]).find((value) => value !== void 0));
+    const childPart = parts.find((part) => /^children(-\d+[LS]?)+$/i.test(part));
+    if (adults === void 0 && childPart === void 0) return void 0;
+    const childTokens = childPart?.split("-").slice(1) ?? [];
+    const childAges = childTokens.filter((token) => /^\d+$/.test(token)).map(Number).filter((age) => age >= 2 && age <= 11);
+    return {
+      adults: adults ?? 1,
+      children: childAges.length,
+      infants: childTokens.filter((token) => /^\d+[LS]$/i.test(token) || Number(token) < 2).length,
+      childAges
+    };
+  }
+  function readMomondoFlexibleDatePart(value) {
+    const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
+    if (match === null || match === void 0) return [value, 0];
+    return [match[1], match[2] !== void 0 ? Number(match[2]) : 0];
+  }
+  function readMomondoFlightFlexDays(before, after) {
+    return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
+  }
+  function formatMomondoLuggageValue(value) {
+    if (value === void 0) return void 0;
+    const cleaned = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (/^inkludert$/i.test(cleaned)) return "inkl.";
+    if (/^ukjent$/i.test(cleaned)) return "ukjent";
+    if (/ikke\s+inkludert|ikke\s+inkl/i.test(cleaned)) return "ikke inkl.";
+    return cleaned;
+  }
+  function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+    const fees = isRecord$5(bookingOption.fees) ? bookingOption.fees : void 0;
+    const isIncluded = (bagData, display) => {
+      const status = isRecord$5(bagData) ? readStringValue(bagData.status) : void 0;
+      return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
+    };
+    if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
+    if (flightMeta.includeCheckedBag === true && !isIncluded(fees?.checkedBagData, fees?.checkedBagDisplay)) return false;
+    return true;
+  }
+  function isTripComPolicyMatchingBaggage(policy, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+    const flags = new Set((Array.isArray(policy.policyFlags) ? policy.policyFlags : []).filter(isString));
+    if (flightMeta.includeCabinBag === true && !flags.has("FREE_CARRY_ON_BAGGAGE")) return false;
+    if (flightMeta.includeCheckedBag === true && !flags.has("FREE_CHECKED_BAGGAGE")) return false;
+    return true;
+  }
+  function readPanFlightsPackageRecord(item) {
+    return isRecord$5(item.package) ? item.package : void 0;
+  }
+  function readPanFlightsRouteLegStopCount(route, dataKey) {
+    const legData = isRecord$5(route[dataKey]) ? route[dataKey] : void 0;
+    const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
+    return specs.length > 0 ? Math.max(0, specs.length - 1) : void 0;
+  }
+  function readPanFlightsLegStopCounts(item) {
+    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+    const outboundRoute = routeList[0];
+    if (outboundRoute === void 0) return [];
+    return [
+      readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
+      readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ?? (routeList[1] !== void 0 ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : void 0)
+    ];
+  }
+  function readPanFlightsLegDurationsMinutes(item, roundTrip) {
+    const packageRecord = readPanFlightsPackageRecord(item);
+    return [roundTrip ? readPositiveNumberValue(packageRecord?.legduration) : readPositiveNumberValue(packageRecord?.duration) ?? readPositiveNumberValue(item.duration)];
+  }
+  function readPanFlightsBaggageFee(baggage, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
+    if (!isRecord$5(baggage)) return void 0;
+    let feePerPassenger = 0;
+    if (flightMeta.includeCabinBag === true) {
+      const cabinFee = readNumberValue(baggage.bin);
+      if (cabinFee === void 0 || cabinFee < 0) return void 0;
+      feePerPassenger += cabinFee;
+    }
+    if (flightMeta.includeCheckedBag === true) {
+      if (baggage.unit !== void 0) {
+        const includedPieces = baggage.unit === "pcs" ? readNumberValue(baggage.amount) ?? 0 : 1;
+        if (includedPieces < 1) return void 0;
+      } else {
+        const checkedFee = readNumberValue(baggage["1"]);
+        if (checkedFee === void 0 || checkedFee < 0) return void 0;
+        feePerPassenger += checkedFee;
+      }
+    }
+    return Math.round(feePerPassenger * countFlightSeatedPassengers(flightMeta));
+  }
+  function formatPanFlightsEpochDate(epochSeconds) {
+    if (epochSeconds === void 0) return void 0;
+    const date = new Date(epochSeconds * 1e3);
+    return Number.isNaN(date.getTime()) ? void 0 : date.toISOString().slice(0, 10);
+  }
+  function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
+    const legData = isRecord$5(route[dataKey]) ? route[dataKey] : void 0;
+    return readStringValue(legData?.flyFrom)?.toUpperCase() === origin && readStringValue(legData?.flyTo)?.toUpperCase() === destination ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
+  }
+  function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex) {
+    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+    const outboundRoute = routeList[0];
+    if (outboundRoute === void 0) return void 0;
+    const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination);
+    if (outboundDate === void 0 || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
+      return void 0;
+    }
+    const requestedInboundDate = flightMeta.inboundDate;
+    if (requestedInboundDate === void 0) return { outboundDate };
+    const inboundDate = [
+      readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin),
+      ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin))
+    ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
+    return inboundDate !== void 0 && inboundDate >= outboundDate ? { outboundDate, inboundDate } : void 0;
+  }
+  function extractWideroeFlightSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "wideroe.no" || !/^\/(?:[a-z]{2}\/)?(?:book-flight\/flight|bestill-flybillett\/flygning)\/?$/i.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    const tripType = parsedUrl.searchParams.get("triptype");
+    if (tripType !== "1" && tripType !== "2") return void 0;
+    const readDate = (dayKey, monthKey) => {
+      const month = parsedUrl.searchParams.get(monthKey)?.match(/^(\d{4})(\d{2})$/);
+      const day = readPositiveIntegerValue(parsedUrl.searchParams.get(dayKey));
+      return month !== null && month !== void 0 && day !== void 0 ? readIsoDateValue(`${month[1]}-${month[2]}-${String(day).padStart(2, "0")}`) : void 0;
+    };
+    const origin = readIataCodeValue(parsedUrl.searchParams.get("d_city")?.toUpperCase());
+    const destination = readIataCodeValue(parsedUrl.searchParams.get("a_city")?.toUpperCase());
+    const outboundDate = readDate("d_day", "d_month");
+    const inboundDate = tripType === "2" ? readDate("r_day", "r_month") : void 0;
+    const paxTokens = (parsedUrl.searchParams.get("pax") ?? "").toLowerCase().split(/[,;]/).filter(Boolean);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    if (tripType === "2" && (inboundDate === void 0 || inboundDate < outboundDate)) return void 0;
+    if (paxTokens.length === 0 || paxTokens.some((token) => token !== "adt")) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults: paxTokens.length,
+      youths: 0,
+      children: 0,
+      infants: 0
+    });
+  }
+  function readAirFranceKlmFlightSearchMeta(connectionsText, taggingText) {
+    const connections = readRecordArray(parseJsonValue(connectionsText ?? ""));
+    const outbound = connections[0];
+    const inbound = connections[1];
+    const readCode = (place) => readIataCodeValue(isRecord$5(place) ? place.code : void 0);
+    const origin = readCode(outbound?.origin);
+    const destination = readCode(outbound?.destination);
+    const outboundDate = readIsoDateValue(outbound?.departureDate);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || connections.length > 2) return void 0;
+    const inboundDate = inbound === void 0 ? void 0 : readIsoDateValue(inbound.departureDate);
+    if (inbound !== void 0 && (inboundDate === void 0 || readCode(inbound.origin) !== destination || readCode(inbound.destination) !== origin)) {
+      return void 0;
+    }
+    const tagging = parseJsonValue(taggingText ?? "");
+    const flow = isRecord$5(tagging) && isRecord$5(tagging.flow) ? tagging.flow : void 0;
+    if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
+    const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      // Seniorer og ungdom er voksne hos sammenligningskildene.
+      adults: (readNonNegativeIntegerValue(flow.z_nb_adults) ?? 0) + (readNonNegativeIntegerValue(flow.z_nb_seniors) ?? 0),
+      youths: readNonNegativeIntegerValue(flow.z_nb_youth) ?? 0,
+      children: readNonNegativeIntegerValue(flow.z_nb_children) ?? 0,
+      infants: readNonNegativeIntegerValue(flow.z_nb_infants) ?? 0,
+      ...cabinClass !== void 0 ? { cabinClass } : {}
+    });
+  }
+  function readAmadeusAirBoundsFlightSearchMeta(stateText) {
+    const state = parseJsonValue(stateText ?? "");
+    if (!isRecord$5(state) || !isRecord$5(state.entities)) return void 0;
+    const selectedId = readStringValue(state.selectedAirBoundsSearchId);
+    const search = selectedId !== void 0 && isRecord$5(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
+    if (search === void 0) return void 0;
+    const itineraries = readRecordArray(search.itineraries);
+    const outbound = itineraries[0];
+    const inbound = itineraries[1];
+    const origin = readIataCodeValue(outbound?.originLocationCode);
+    const destination = readIataCodeValue(outbound?.destinationLocationCode);
+    const readDate = (value) => readIsoDateValue(readStringValue(value)?.slice(0, 10));
+    const outboundDate = readDate(outbound?.departureDateTime);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || itineraries.length > 2) return void 0;
+    const inboundDate = inbound === void 0 ? void 0 : readDate(inbound.departureDateTime);
+    if (inbound !== void 0 && (inboundDate === void 0 || readIataCodeValue(inbound.originLocationCode) !== destination || readIataCodeValue(inbound.destinationLocationCode) !== origin)) {
+      return void 0;
+    }
+    const passengerCodes = readRecordArray(search.travelers).map((traveler) => readStringValue(traveler.passengerTypeCode)?.toUpperCase());
+    const countCodes = (codes) => passengerCodes.filter((code) => code !== void 0 && codes.includes(code)).length;
+    const adults = countCodes(["ADT", "YTH", "YCD", "SRC"]);
+    const children = countCodes(["CHD"]);
+    const infants = countCodes(["INF"]);
+    if (passengerCodes.length === 0 || adults + children + infants !== passengerCodes.length) return void 0;
+    const cabinClass = readFlightCabinClassValue(search.cabin);
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults,
+      youths: 0,
+      children,
+      infants,
+      ...cabinClass !== void 0 ? { cabinClass } : {},
+      ...outbound?.directFlights === true ? { maxStops: 0 } : {}
+    });
+  }
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
@@ -9200,8 +9655,6 @@ ${darkProviderCss}
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
   const FLIGHT_TOOLTIP_MAX_ROWS = 6;
   const FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET = 1e9;
-  const FLIGHT_DEFAULT_CHILD_AGE = 7;
-  const FLIGHT_INFANT_AGE = 1;
   const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
   const FINN_FLIGHT_DATE_FLEX_CONCURRENCY = 6;
   const FINN_FLIGHT_DATE_FLEX_RETRY_DELAY_MS = 3e3;
@@ -9231,7 +9684,6 @@ ${darkProviderCss}
   const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
   const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
-  const FLIGHT_LINK_FILTERS_PARAM = "cbvFilters";
   const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
   const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
   const PANFLIGHTS_PLACE_LOOKUP_ENDPOINT = "https://typeb.panflights.com/placesidlistpost";
@@ -9556,25 +10008,6 @@ ${darkProviderCss}
         window.clearInterval(timerId);
       }
     }, 250);
-  }
-  function buildFlightLinkFiltersValue(flightMeta) {
-    const parts = [
-      flightMeta.maxStops !== void 0 ? `stops:${flightMeta.maxStops}` : void 0,
-      flightMeta.includeCabinBag === true ? "cabin" : void 0,
-      flightMeta.includeCheckedBag === true ? "checked" : void 0
-    ].filter((part) => part !== void 0);
-    return parts.length > 0 ? parts.join(",") : void 0;
-  }
-  function readFlightLinkFilters(parsedUrl) {
-    const value = parsedUrl.searchParams.get(FLIGHT_LINK_FILTERS_PARAM);
-    if (value === null) return void 0;
-    const parts = value.split(",");
-    const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
-    return {
-      ...maxStops !== void 0 ? { maxStops } : {},
-      ...parts.includes("cabin") ? { includeCabinBag: true } : {},
-      ...parts.includes("checked") ? { includeCheckedBag: true } : {}
-    };
   }
   function applyPanFlightsLinkFilters(filters) {
     if (filters.maxStops !== void 0) {
@@ -9930,46 +10363,6 @@ ${darkProviderCss}
       return void 0;
     }
   }
-  function isIsoDateWithinDays(date, centerDate, daysBefore, daysAfter) {
-    if (date === void 0) return false;
-    const time = (/* @__PURE__ */ new Date(`${date}T00:00:00Z`)).getTime();
-    const centerTime = (/* @__PURE__ */ new Date(`${centerDate}T00:00:00Z`)).getTime();
-    if (Number.isNaN(time) || Number.isNaN(centerTime)) return false;
-    const dayOffset = Math.round((time - centerTime) / (24 * 60 * 60 * 1e3));
-    return dayOffset >= -daysBefore && dayOffset <= daysAfter;
-  }
-  function formatFlightDateFlexWindow(before, after) {
-    return before === after ? `±${before}` : `-${before}/+${after}`;
-  }
-  function formatFlightDateFlexDays(dateFlex, roundTrip) {
-    const outbound = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
-    const inbound = formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter);
-    return !roundTrip || outbound === inbound ? `${outbound} d` : `${outbound}/${inbound} d`;
-  }
-  function listFlightDateFlexCombinations(flightMeta, dateFlex) {
-    const listDates = (centerDate, before, after) => {
-      const firstDate = shiftFlightDateNotBeforeToday(centerDate, -before);
-      const dates = [];
-      for (let offset = -before; offset <= after; offset++) {
-        const date = addDaysToIsoDate(centerDate, offset);
-        if (date !== void 0 && date >= firstDate) dates.push({ date, offset });
-      }
-      return dates;
-    };
-    const outboundDates = listDates(flightMeta.outboundDate, dateFlex.outboundBefore, dateFlex.outboundAfter);
-    const { inboundDate } = flightMeta;
-    const combinations = inboundDate === void 0 ? outboundDates.map(({ date, offset }) => ({ outboundDate: date, distance: Math.abs(offset) })) : outboundDates.flatMap((outbound) => {
-      return listDates(inboundDate, dateFlex.inboundBefore, dateFlex.inboundAfter).filter((inbound) => inbound.date >= outbound.date).map((inbound) => ({
-        outboundDate: outbound.date,
-        inboundDate: inbound.date,
-        distance: Math.abs(outbound.offset) + Math.abs(inbound.offset)
-      }));
-    });
-    return combinations.sort((left, right) => left.distance - right.distance).map(({ distance: _distance, ...combination }) => combination);
-  }
-  function buildFlightDateCombinationKey(combination) {
-    return `${combination.outboundDate}|${combination.inboundDate ?? ""}`;
-  }
   function buildFlightDateFlexOffer(input) {
     const { flightMeta } = input;
     const options = [...input.options].sort(comparePriceMatchesBySortAmount);
@@ -10096,16 +10489,6 @@ ${darkProviderCss}
     const label = input.labels?.[0]?.innerText ?? input.getAttribute("aria-label") ?? input.closest("label")?.innerText;
     return label?.replace(/\s+/g, " ").trim();
   }
-  function readFlightCabinClassValue(value) {
-    if (typeof value !== "string") return void 0;
-    const normalized = value.trim().toLowerCase().replace(/[^a-zæøå]/g, "");
-    if (normalized.length === 0) return void 0;
-    if (/^(?:economy|okonomi|økonomi|ekonomi)$/.test(normalized)) return "economy";
-    if (normalized.includes("premium")) return "premium";
-    if (normalized.includes("business")) return "business";
-    if (/^first(?:class)?$|f[oø]rsteklasse/.test(normalized)) return "first";
-    return void 0;
-  }
   function extractSasFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     if (hostname !== "sas.no" || !/^\/book-new\/revenue\/flights\/?$/i.test(parsedUrl.pathname)) {
@@ -10141,75 +10524,15 @@ ${darkProviderCss}
     if (!isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase()) || !/^\/search\/flights\/\d+\/?$/i.test(parsedUrl.pathname)) {
       return void 0;
     }
-    const connections = readRecordArray(parseJsonValue(readSessionStorageValue("bwsfe-state-connections") ?? ""));
-    const outbound = connections[0];
-    const inbound = connections[1];
-    const readCode = (place) => readIataCodeValue(isRecord(place) ? place.code : void 0);
-    const origin = readCode(outbound?.origin);
-    const destination = readCode(outbound?.destination);
-    const outboundDate = readIsoDateValue(outbound?.departureDate);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || connections.length > 2) return void 0;
-    const inboundDate = inbound === void 0 ? void 0 : readIsoDateValue(inbound.departureDate);
-    if (inbound !== void 0 && (inboundDate === void 0 || readCode(inbound.origin) !== destination || readCode(inbound.destination) !== origin)) {
-      return void 0;
-    }
-    const tagging = parseJsonValue(readSessionStorageValue("bwc-bw-tagging-state") ?? "");
-    const flow = isRecord(tagging) && isRecord(tagging.flow) ? tagging.flow : void 0;
-    if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
-    const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
-    return normalizeFlightSearchMeta({
-      origin,
-      destination,
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      // Seniorer og ungdom er voksne hos sammenligningskildene.
-      adults: (readNonNegativeIntegerValue(flow.z_nb_adults) ?? 0) + (readNonNegativeIntegerValue(flow.z_nb_seniors) ?? 0),
-      youths: readNonNegativeIntegerValue(flow.z_nb_youth) ?? 0,
-      children: readNonNegativeIntegerValue(flow.z_nb_children) ?? 0,
-      infants: readNonNegativeIntegerValue(flow.z_nb_infants) ?? 0,
-      ...cabinClass !== void 0 ? { cabinClass } : {}
-    });
+    return readAirFranceKlmFlightSearchMeta(
+      readSessionStorageValue("bwsfe-state-connections"),
+      readSessionStorageValue("bwc-bw-tagging-state")
+    );
   }
   function extractAmadeusAirBoundsFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     const isAmadeusBookingPage = hostname === "booking.norwegian.com" && /^\/booking\/flight\/\d+\/?$/i.test(parsedUrl.pathname) || hostname === "shop.lufthansa.com" && /^\/booking\/availability\/\d+\/?$/i.test(parsedUrl.pathname);
-    if (!isAmadeusBookingPage) return void 0;
-    const state = parseJsonValue(readSessionStorageValue("airBoundsSearch") ?? "");
-    if (!isRecord(state) || !isRecord(state.entities)) return void 0;
-    const selectedId = readStringValue(state.selectedAirBoundsSearchId);
-    const search = selectedId !== void 0 && isRecord(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
-    if (search === void 0) return void 0;
-    const itineraries = readRecordArray(search.itineraries);
-    const outbound = itineraries[0];
-    const inbound = itineraries[1];
-    const origin = readIataCodeValue(outbound?.originLocationCode);
-    const destination = readIataCodeValue(outbound?.destinationLocationCode);
-    const readDate = (value) => readIsoDateValue(readStringValue(value)?.slice(0, 10));
-    const outboundDate = readDate(outbound?.departureDateTime);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || itineraries.length > 2) return void 0;
-    const inboundDate = inbound === void 0 ? void 0 : readDate(inbound.departureDateTime);
-    if (inbound !== void 0 && (inboundDate === void 0 || readIataCodeValue(inbound.originLocationCode) !== destination || readIataCodeValue(inbound.destinationLocationCode) !== origin)) {
-      return void 0;
-    }
-    const passengerCodes = readRecordArray(search.travelers).map((traveler) => readStringValue(traveler.passengerTypeCode)?.toUpperCase());
-    const countCodes = (codes) => passengerCodes.filter((code) => code !== void 0 && codes.includes(code)).length;
-    const adults = countCodes(["ADT", "YTH", "YCD", "SRC"]);
-    const children = countCodes(["CHD"]);
-    const infants = countCodes(["INF"]);
-    if (passengerCodes.length === 0 || adults + children + infants !== passengerCodes.length) return void 0;
-    const cabinClass = readFlightCabinClassValue(search.cabin);
-    return normalizeFlightSearchMeta({
-      origin,
-      destination,
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      adults,
-      youths: 0,
-      children,
-      infants,
-      ...cabinClass !== void 0 ? { cabinClass } : {},
-      ...outbound?.directFlights === true ? { maxStops: 0 } : {}
-    });
+    return isAmadeusBookingPage ? readAmadeusAirBoundsFlightSearchMeta(readSessionStorageValue("airBoundsSearch")) : void 0;
   }
   function readSessionStorageValue(key) {
     try {
@@ -10217,30 +10540,6 @@ ${darkProviderCss}
     } catch {
       return void 0;
     }
-  }
-  function extractWideroeFlightSearchMeta(parsedUrl) {
-    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    if (hostname !== "wideroe.no" || !/^\/(?:[a-z]{2}\/)?book-flight\/flight\/?$/i.test(parsedUrl.pathname)) {
-      return void 0;
-    }
-    if (parsedUrl.searchParams.get("triptype") !== "1") return void 0;
-    const origin = readIataCodeValue(parsedUrl.searchParams.get("d_city")?.toUpperCase());
-    const destination = readIataCodeValue(parsedUrl.searchParams.get("a_city")?.toUpperCase());
-    const month = parsedUrl.searchParams.get("d_month")?.match(/^(\d{4})(\d{2})$/);
-    const day = readPositiveIntegerValue(parsedUrl.searchParams.get("d_day"));
-    const outboundDate = month !== null && month !== void 0 && day !== void 0 ? readIsoDateValue(`${month[1]}-${month[2]}-${String(day).padStart(2, "0")}`) : void 0;
-    const paxTokens = (parsedUrl.searchParams.get("pax") ?? "").toLowerCase().split(/[,;]/).filter(Boolean);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
-    if (paxTokens.length === 0 || paxTokens.some((token) => token !== "adt")) return void 0;
-    return normalizeFlightSearchMeta({
-      origin,
-      destination,
-      outboundDate,
-      adults: paxTokens.length,
-      youths: 0,
-      children: 0,
-      infants: 0
-    });
   }
   function extractFinnFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -10306,16 +10605,6 @@ ${darkProviderCss}
       infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0
     });
   }
-  function readPanFlightsDateFlex(extraParts, roundTrip) {
-    const readWindow = (key) => {
-      const value = extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
-      const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
-      return before !== void 0 ? [before, after ?? before] : [0, 0];
-    };
-    const [outboundBefore, outboundAfter] = readWindow("ff");
-    const [inboundBefore, inboundAfter] = roundTrip ? readWindow("tf") : [0, 0];
-    return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0 ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter } : void 0;
-  }
   function readPanFlightsPlaceIataCode(value) {
     const directCode = readIataCodeValue(value);
     if (directCode !== void 0) return directCode;
@@ -10371,7 +10660,6 @@ ${darkProviderCss}
     return code;
   }
   const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?(?:\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?)?(?:\/\d+adults?)?(?:\/children(?:-\d+[LS]?)+)?(?:\/(?:economy|premium|business|first))?\/?$/i;
-  const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"];
   function extractMomondoFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     if (hostname !== "momondo.no" || !MOMONDO_FLIGHT_SEARCH_PATH_PATTERN.test(parsedUrl.pathname)) {
@@ -10411,68 +10699,9 @@ ${darkProviderCss}
       ...readMomondoFlightFilters(parsedUrl)
     });
   }
-  function buildMomondoFlightFilterValue(flightMeta) {
-    const parts = [
-      flightMeta.maxStops !== void 0 && flightMeta.maxStops < 2 ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}` : void 0,
-      flightMeta.includeCabinBag === true ? "bfc=1" : void 0,
-      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0,
-      // legdur=-N = maks N minutter per etappe (verifisert 2026-11-01).
-      flightMeta.maxDurationMinutes !== void 0 ? `legdur=-${flightMeta.maxDurationMinutes}` : void 0
-    ].filter((part) => part !== void 0);
-    return parts.length > 0 ? parts.join(";") : void 0;
-  }
   function buildMomondoRequestFilterParams(flightMeta, filterState) {
     const fs = [filterState, buildMomondoFlightFilterValue(flightMeta)].filter((part) => part !== void 0 && part.length > 0).join(";");
     return fs.length > 0 ? { fs } : {};
-  }
-  function readMomondoFlightFilters(parsedUrl) {
-    const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
-      const [key = "", value = ""] = part.split("=");
-      return [key, value];
-    }));
-    const stopValues = (filters.get("stops") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value));
-    const maxStops = filters.has("stops") && stopValues.every((value) => value !== void 0 && value < 2) ? Math.max(...stopValues.filter((value) => value !== void 0)) : void 0;
-    return {
-      ...maxStops !== void 0 ? { maxStops } : {},
-      ...(readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {},
-      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {},
-      ...readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) !== void 0 ? { maxDurationMinutes: readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) } : {}
-    };
-  }
-  function buildMomondoPassengerDetails(flightMeta) {
-    return [
-      ...Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
-      ...readFlightChildAges(flightMeta).map((age) => ({ ptc: "CHD", age })),
-      ...Array.from({ length: flightMeta.infants }, () => ({ ptc: "INL" }))
-    ];
-  }
-  function buildMomondoPassengerPathParts(flightMeta) {
-    const hasChildren = flightMeta.children > 0 || flightMeta.infants > 0;
-    return [
-      ...flightMeta.adults > 1 || hasChildren ? [`${flightMeta.adults}adults`] : [],
-      ...hasChildren ? [["children", ...readFlightChildAges(flightMeta).map(String), ...Array.from({ length: flightMeta.infants }, () => "1L")].join("-")] : []
-    ];
-  }
-  function readMomondoPassengerPathParts(parts) {
-    const adults = readPositiveIntegerValue(parts.map((part) => part.match(/^(\d+)adults?$/i)?.[1]).find((value) => value !== void 0));
-    const childPart = parts.find((part) => /^children(-\d+[LS]?)+$/i.test(part));
-    if (adults === void 0 && childPart === void 0) return void 0;
-    const childTokens = childPart?.split("-").slice(1) ?? [];
-    const childAges = childTokens.filter((token) => /^\d+$/.test(token)).map(Number).filter((age) => age >= 2 && age <= 11);
-    return {
-      adults: adults ?? 1,
-      children: childAges.length,
-      infants: childTokens.filter((token) => /^\d+[LS]$/i.test(token) || Number(token) < 2).length,
-      childAges
-    };
-  }
-  function readMomondoFlexibleDatePart(value) {
-    const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
-    if (match === null || match === void 0) return [value, 0];
-    return [match[1], match[2] !== void 0 ? Number(match[2]) : 0];
-  }
-  function readMomondoFlightFlexDays(before, after) {
-    return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
   }
   function extractSkyscannerFlightSearchMeta(parsedUrl) {
     if (!isSkyscannerFlightSearchPage(parsedUrl)) return void 0;
@@ -10821,51 +11050,10 @@ ${darkProviderCss}
     const match = value.match(/\b(\d+)\s*(?:voksen|voksne|adult|adults)\b/i);
     return readPositiveIntegerValue(match?.[1]);
   }
-  function normalizeFlightSearchMeta(meta) {
-    const origin = readIataCodeValue(meta.origin);
-    const destination = readIataCodeValue(meta.destination);
-    const outboundDate = readIsoDateValue(meta.outboundDate);
-    const inboundDate = meta.inboundDate !== void 0 ? readIsoDateValue(meta.inboundDate) : void 0;
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || origin === destination) {
-      return void 0;
-    }
-    const normalizedMeta = {
-      origin,
-      destination,
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
-      adults: Math.max(1, Math.trunc(meta.adults) + Math.max(0, Math.trunc(meta.youths))),
-      youths: 0,
-      children: Math.max(0, Math.trunc(meta.children)),
-      infants: Math.max(0, Math.trunc(meta.infants)),
-      ...meta.childAges !== void 0 && meta.childAges.length === Math.trunc(meta.children) && meta.childAges.every((age) => Number.isInteger(age) && age >= 2 && age <= 11) ? { childAges: meta.childAges } : {},
-      ...meta.cabinClass !== void 0 ? { cabinClass: meta.cabinClass } : {},
-      ...meta.maxStops !== void 0 ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {},
-      ...meta.includeCabinBag === true ? { includeCabinBag: true } : {},
-      ...meta.includeCheckedBag === true ? { includeCheckedBag: true } : {},
-      ...meta.maxDurationMinutes !== void 0 && meta.maxDurationMinutes > 0 ? { maxDurationMinutes: Math.round(meta.maxDurationMinutes) } : {},
-      ...meta.dateFlex !== void 0 ? { dateFlex: meta.dateFlex } : {}
-    };
-    return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : void 0;
-  }
   function isOpaqueFlightSearchPage(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return hostname === "shop.lufthansa.com" && /^\/booking\/availability\/\d+\/?$/i.test(parsedUrl.pathname) || hostname === "booking.norwegian.com" && /^\/booking\/flight\/\d+\/?$/i.test(parsedUrl.pathname) || // Byvalg i Google Flights gir tfs uten IATA-koder — synlig tekst tar over.
     isGoogleFlightsSearchPage(parsedUrl);
-  }
-  function isFlightSearchPassengerMatchSupported(flightMeta) {
-    return flightMeta.adults > 0 && flightMeta.infants <= flightMeta.adults;
-  }
-  function readFlightChildAges(flightMeta) {
-    return flightMeta.childAges ?? Array.from({ length: flightMeta.children }, () => FLIGHT_DEFAULT_CHILD_AGE);
-  }
-  function countFlightSeatedPassengers(flightMeta) {
-    return flightMeta.adults + flightMeta.children;
-  }
-  function readFlightPassengerAges(ages) {
-    const childAges = ages.filter((age) => age >= 2 && age <= 11);
-    return { children: childAges.length, infants: ages.filter((age) => age < 2).length, childAges };
   }
   async function buildFlightAirportLookup(flightMeta) {
     const lookup = /* @__PURE__ */ new Map();
@@ -11859,19 +12047,6 @@ ${darkProviderCss}
       version: variant.version
     };
   }
-  function shiftFlightDateNotBeforeToday(isoDate, days) {
-    if (days === 0) return isoDate;
-    const shiftedDate = addDaysToIsoDate(isoDate, days) ?? isoDate;
-    if (days > 0) return shiftedDate;
-    const now = /* @__PURE__ */ new Date();
-    const today = [
-      String(now.getFullYear()),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0")
-    ].join("-");
-    const earliestDate = today < isoDate ? today : isoDate;
-    return shiftedDate < earliestDate ? earliestDate : shiftedDate;
-  }
   function buildPanFlightsCabinClass(flightMeta) {
     switch (flightMeta.cabinClass) {
       case "premium":
@@ -12048,26 +12223,6 @@ ${darkProviderCss}
     if (maxReasonableDuration === void 0 || candidate.durationMinutes === void 0) return true;
     return candidate.durationMinutes <= maxReasonableDuration;
   }
-  function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex) {
-    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
-    const outboundRoute = routeList[0];
-    if (outboundRoute === void 0) return void 0;
-    const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination);
-    if (outboundDate === void 0 || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
-      return void 0;
-    }
-    const requestedInboundDate = flightMeta.inboundDate;
-    if (requestedInboundDate === void 0) return { outboundDate };
-    const inboundDate = [
-      readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin),
-      ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin))
-    ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
-    return inboundDate !== void 0 && inboundDate >= outboundDate ? { outboundDate, inboundDate } : void 0;
-  }
-  function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
-    const legData = isRecord(route[dataKey]) ? route[dataKey] : void 0;
-    return readStringValue(legData?.flyFrom)?.toUpperCase() === origin && readStringValue(legData?.flyTo)?.toUpperCase() === destination ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
-  }
   function readPanFlightsBestProvider(resultData, item) {
     const packageRecord = readPanFlightsPackageRecord(item);
     const providerCandidates = readRecordArray(packageRecord?.providerlist);
@@ -12080,9 +12235,6 @@ ${darkProviderCss}
     return providerCandidates.filter((provider) => readPositiveNumberValue(provider.price) !== void 0).sort((left, right) => {
       return (readPositiveNumberValue(left.price) ?? Number.MAX_SAFE_INTEGER) - (readPositiveNumberValue(right.price) ?? Number.MAX_SAFE_INTEGER);
     })[0];
-  }
-  function readPanFlightsPackageRecord(item) {
-    return isRecord(item.package) ? item.package : void 0;
   }
   function readPanFlightsProviderNameFromUrl(value) {
     const url = readStringValue(value);
@@ -12130,45 +12282,6 @@ ${darkProviderCss}
     if (stops.every((stopCount) => stopCount === 0)) return "direkte";
     return stops.map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`).join(" / ");
   }
-  function readPanFlightsLegStopCounts(item) {
-    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
-    const outboundRoute = routeList[0];
-    if (outboundRoute === void 0) return [];
-    return [
-      readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
-      readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ?? (routeList[1] !== void 0 ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : void 0)
-    ];
-  }
-  function readPanFlightsLegDurationsMinutes(item, roundTrip) {
-    const packageRecord = readPanFlightsPackageRecord(item);
-    return [roundTrip ? readPositiveNumberValue(packageRecord?.legduration) : readPositiveNumberValue(packageRecord?.duration) ?? readPositiveNumberValue(item.duration)];
-  }
-  function readPanFlightsBaggageFee(baggage, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
-    if (!isRecord(baggage)) return void 0;
-    let feePerPassenger = 0;
-    if (flightMeta.includeCabinBag === true) {
-      const cabinFee = readNumberValue(baggage.bin);
-      if (cabinFee === void 0 || cabinFee < 0) return void 0;
-      feePerPassenger += cabinFee;
-    }
-    if (flightMeta.includeCheckedBag === true) {
-      if (baggage.unit !== void 0) {
-        const includedPieces = baggage.unit === "pcs" ? readNumberValue(baggage.amount) ?? 0 : 1;
-        if (includedPieces < 1) return void 0;
-      } else {
-        const checkedFee = readNumberValue(baggage["1"]);
-        if (checkedFee === void 0 || checkedFee < 0) return void 0;
-        feePerPassenger += checkedFee;
-      }
-    }
-    return Math.round(feePerPassenger * countFlightSeatedPassengers(flightMeta));
-  }
-  function readPanFlightsRouteLegStopCount(route, dataKey) {
-    const legData = isRecord(route[dataKey]) ? route[dataKey] : void 0;
-    const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
-    return specs.length > 0 ? Math.max(0, specs.length - 1) : void 0;
-  }
   function formatPanFlightsDuration(minutes) {
     if (minutes === void 0) return void 0;
     const totalMinutes = Math.round(minutes);
@@ -12176,11 +12289,6 @@ ${darkProviderCss}
     const remainingMinutes = totalMinutes % 60;
     if (hours <= 0) return `${remainingMinutes} min`;
     return remainingMinutes === 0 ? `${hours} t` : `${hours} t ${remainingMinutes} min`;
-  }
-  function formatPanFlightsEpochDate(epochSeconds) {
-    if (epochSeconds === void 0) return void 0;
-    const date = new Date(epochSeconds * 1e3);
-    return Number.isNaN(date.getTime()) ? void 0 : date.toISOString().slice(0, 10);
   }
   function buildPanFlightsFlightSearchUrl(flightMeta) {
     const outboundDate = compactIsoDate(flightMeta.outboundDate);
@@ -12658,13 +12766,6 @@ ${darkProviderCss}
       return isRecord(parsed) ? [parsed] : [];
     });
     return records.find((record) => Array.isArray(record.itineraryList)) ?? records[records.length - 1];
-  }
-  function isTripComPolicyMatchingBaggage(policy, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const flags = new Set((Array.isArray(policy.policyFlags) ? policy.policyFlags : []).filter(isString));
-    if (flightMeta.includeCabinBag === true && !flags.has("FREE_CARRY_ON_BAGGAGE")) return false;
-    if (flightMeta.includeCheckedBag === true && !flags.has("FREE_CHECKED_BAGGAGE")) return false;
-    return true;
   }
   function extractTripComListOfferCandidates(resultData, resultUrl, rates, flightMeta) {
     const basicInfo = isRecord(resultData.basicInfo) ? resultData.basicInfo : {};
@@ -13952,17 +14053,6 @@ ${darkProviderCss}
   function formatMomondoFlightClock(value) {
     return value?.match(/T(\d{2}):(\d{2})/)?.slice(1, 3).join(":");
   }
-  function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fees = isRecord(bookingOption.fees) ? bookingOption.fees : void 0;
-    const isIncluded = (bagData, display) => {
-      const status = isRecord(bagData) ? readStringValue(bagData.status) : void 0;
-      return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
-    };
-    if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
-    if (flightMeta.includeCheckedBag === true && !isIncluded(fees?.checkedBagData, fees?.checkedBagDisplay)) return false;
-    return true;
-  }
   function formatMomondoFlightLuggageSummary(bookingOption) {
     const fees = isRecord(bookingOption.fees) ? bookingOption.fees : void 0;
     const carryOn = formatMomondoLuggageValue(readStringValue(fees?.carryOnDisplay));
@@ -13973,14 +14063,6 @@ ${darkProviderCss}
     ].filter((part) => part !== void 0);
     return parts.length > 0 ? parts.join(", ") : void 0;
   }
-  function formatMomondoLuggageValue(value) {
-    if (value === void 0) return void 0;
-    const cleaned = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    if (/^inkludert$/i.test(cleaned)) return "inkl.";
-    if (/^ukjent$/i.test(cleaned)) return "ukjent";
-    if (/ikke\s+inkludert|ikke\s+inkl/i.test(cleaned)) return "ikke inkl.";
-    return cleaned;
-  }
   function formatFlightPrice(amount, currency) {
     const formattedAmount = new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(amount);
     return currency.toUpperCase() === "NOK" ? `${formattedAmount} kr` : `${formattedAmount} ${currency.toUpperCase()}`;
@@ -13990,23 +14072,6 @@ ${darkProviderCss}
   }
   function readIsoDateParam(parsedUrl, key) {
     return readIsoDateValue(parsedUrl.searchParams.get(key));
-  }
-  function readIataCodeValue(value) {
-    if (typeof value !== "string") return void 0;
-    const trimmed = value.trim().toUpperCase();
-    if (/^[A-Z]{3}$/.test(trimmed)) return trimmed;
-    return trimmed.match(/\b[A-Z]{3}\b/)?.[0];
-  }
-  function readIsoDateValue(value) {
-    if (typeof value !== "string") return void 0;
-    const dateMatch = value.trim().match(/\b(\d{4}-\d{2}-\d{2})\b/);
-    const parsedValue = dateMatch?.[1];
-    if (parsedValue === void 0) return void 0;
-    const parsedDate = /* @__PURE__ */ new Date(`${parsedValue}T00:00:00Z`);
-    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== parsedValue) {
-      return void 0;
-    }
-    return parsedValue;
   }
   function readDottedIsoDateValue(value) {
     if (typeof value !== "string") return void 0;
@@ -14083,25 +14148,10 @@ ${darkProviderCss}
     }
     return void 0;
   }
-  function readPositiveIntegerValue(value) {
-    const parsedValue = readNonNegativeIntegerValue(value);
-    return parsedValue !== void 0 && parsedValue > 0 ? parsedValue : void 0;
-  }
-  function readNonNegativeIntegerValue(value) {
-    const parsedValue = typeof value === "number" ? value : typeof value === "string" ? Number.parseInt(value, 10) : Number.NaN;
-    return Number.isInteger(parsedValue) && parsedValue >= 0 ? parsedValue : void 0;
-  }
   function readRecordValueCaseInsensitive(record, key) {
     if (key in record) return record[key];
     const lowerKey = key.toLowerCase();
     return Object.entries(record).find(([entryKey]) => entryKey.toLowerCase() === lowerKey)?.[1];
-  }
-  function parseJsonValue(value) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return void 0;
-    }
   }
   function readNonNegativeIntegerParam(parsedUrl, key, fallback) {
     const value = parsedUrl.searchParams.get(key);
@@ -14115,10 +14165,6 @@ ${darkProviderCss}
       month: value.slice(5, 7),
       day: value.slice(8, 10)
     };
-  }
-  function readPositiveNumberValue(value) {
-    const numberValue = readNumberValue(value);
-    return numberValue !== void 0 && numberValue > 0 ? numberValue : void 0;
   }
   function compactIsoDate(value) {
     return value.replace(/-/g, "");
@@ -14612,11 +14658,6 @@ ${darkProviderCss}
     const match = value?.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (match === null || match === void 0) return void 0;
     return readIsoDateValue(`${match[1]}-${match[2]?.padStart(2, "0")}-${match[3]?.padStart(2, "0")}`);
-  }
-  function addDaysToIsoDate(isoDate, days) {
-    const time = (/* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`)).getTime();
-    if (Number.isNaN(time)) return void 0;
-    return new Date(time + days * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
   }
   function extractTripcomHotelSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -15351,9 +15392,6 @@ ${darkProviderCss}
   function comparePriceMatchesBySortAmount(left, right) {
     return (left.sortAmount ?? left.amount) - (right.sortAmount ?? right.amount);
   }
-  function readRecordArray(value) {
-    return Array.isArray(value) ? value.filter(isRecord) : [];
-  }
   function readRecordValues(value) {
     if (Array.isArray(value)) return value.filter(isRecord);
     return isRecord(value) ? Object.values(value).filter(isRecord) : [];
@@ -15385,16 +15423,6 @@ ${darkProviderCss}
     if (stopCounts.some((stopCount) => stopCount === void 0)) return durationsText;
     const stopsText = stopCounts.every((stopCount) => stopCount === 0) ? "direkte" : `${stopCounts.join("/")} stopp`;
     return `${durationsText} · ${stopsText}`;
-  }
-  function exceedsFlightMaxDuration(flightMeta, legDurationsMinutes) {
-    const { maxDurationMinutes } = flightMeta;
-    if (maxDurationMinutes === void 0) return false;
-    return legDurationsMinutes.some((durationMinutes) => durationMinutes !== void 0 && durationMinutes > maxDurationMinutes);
-  }
-  function exceedsFlightMaxStops(flightMeta, stopCounts) {
-    if (flightMeta.maxStops === void 0) return false;
-    const maxStops = flightMeta.maxStops;
-    return stopCounts.some((stopCount) => stopCount !== void 0 && stopCount > maxStops);
   }
   function hasFlightSearchResultFilters(flightMeta) {
     return flightMeta.children > 0 || flightMeta.infants > 0 || flightMeta.maxStops !== void 0 || flightMeta.maxDurationMinutes !== void 0 || flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true || flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy";
@@ -16046,17 +16074,6 @@ ${darkProviderCss}
   function readBrandName(value) {
     if (typeof value === "string") return value.trim() || void 0;
     return isRecord(value) ? readStringValue(value.name) : void 0;
-  }
-  function readStringValue(value) {
-    if (typeof value !== "string") return void 0;
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function readNumberValue(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value !== "string") return void 0;
-    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
-    return Number.isFinite(parsed) ? parsed : void 0;
   }
   function readUrlValue(value) {
     const url = readStringValue(value);
@@ -19343,9 +19360,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function isString(value) {
-    return typeof value === "string";
   }
   function findOffersForHostname(cashbackIndex, hostname) {
     const normalizedHostname = normalizeHostname(hostname);
