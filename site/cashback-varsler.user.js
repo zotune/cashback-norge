@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793572169
+// @version      1793573603
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10026,7 +10026,8 @@ ${darkProviderCss}
       ...meta,
       ...meta.maxStops === void 0 && filters.maxStops !== void 0 ? { maxStops: filters.maxStops } : {},
       ...meta.includeCabinBag === void 0 && filters.includeCabinBag === true ? { includeCabinBag: true } : {},
-      ...meta.includeCheckedBag === void 0 && filters.includeCheckedBag === true ? { includeCheckedBag: true } : {}
+      ...meta.includeCheckedBag === void 0 && filters.includeCheckedBag === true ? { includeCheckedBag: true } : {},
+      ...meta.maxDurationMinutes === void 0 && filters.maxDurationMinutes !== void 0 ? { maxDurationMinutes: filters.maxDurationMinutes } : {}
     };
   }
   function readVisibleFlightSearchFilterState() {
@@ -10075,6 +10076,13 @@ ${darkProviderCss}
     if (parsedUrl !== void 0 && isPanFlightsSearchPage(parsedUrl)) {
       if ((readNonNegativeIntegerValue(document.getElementById("carryons")?.textContent?.trim()) ?? 0) > 0) state.includeCabinBag = true;
       if ((readNonNegativeIntegerValue(document.getElementById("checkedluggages")?.textContent?.trim()) ?? 0) > 0) state.includeCheckedBag = true;
+      const durationHandle = document.querySelector("#routedur-slider-range .ui-slider-handle");
+      const durationHours = readPositiveIntegerValue(
+        document.querySelector("#routedur-amount")?.value.match(/(\d+)\s*timer/i)?.[1]
+      );
+      if (durationHandle !== null && durationHandle.style.left !== "100%" && durationHours !== void 0) {
+        state.maxDurationMinutes = durationHours * 60;
+      }
     }
     return state;
   }
@@ -10148,6 +10156,7 @@ ${darkProviderCss}
     if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
     const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
     const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("maximumNumberOfStops"));
+    const maxDurationMinutes = readPositiveIntegerValue(parsedUrl.searchParams.get("durationTo"));
     return normalizeFlightSearchMeta({
       origin,
       destination,
@@ -10160,7 +10169,8 @@ ${darkProviderCss}
       ...cabinClass !== void 0 ? { cabinClass } : {},
       ...maxStops !== void 0 ? { maxStops } : {},
       ...parsedUrl.searchParams.get("handLuggage")?.toLowerCase() === "true" ? { includeCabinBag: true } : {},
-      ...parsedUrl.searchParams.get("checkedLuggage")?.toLowerCase() === "true" ? { includeCheckedBag: true } : {}
+      ...parsedUrl.searchParams.get("checkedLuggage")?.toLowerCase() === "true" ? { includeCheckedBag: true } : {},
+      ...maxDurationMinutes !== void 0 ? { maxDurationMinutes } : {}
     });
   }
   function extractPanFlightsFlightSearchMeta(parsedUrl) {
@@ -10294,7 +10304,9 @@ ${darkProviderCss}
     const parts = [
       flightMeta.maxStops !== void 0 && flightMeta.maxStops < 2 ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}` : void 0,
       flightMeta.includeCabinBag === true ? "bfc=1" : void 0,
-      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0
+      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0,
+      // legdur=-N = maks N minutter per etappe (verifisert 2026-11-01).
+      flightMeta.maxDurationMinutes !== void 0 ? `legdur=-${flightMeta.maxDurationMinutes}` : void 0
     ].filter((part) => part !== void 0);
     return parts.length > 0 ? parts.join(";") : void 0;
   }
@@ -10312,7 +10324,8 @@ ${darkProviderCss}
     return {
       ...maxStops !== void 0 ? { maxStops } : {},
       ...(readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {},
-      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {}
+      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {},
+      ...readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) !== void 0 ? { maxDurationMinutes: readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) } : {}
     };
   }
   function readMomondoFlexibleDatePart(value) {
@@ -10691,6 +10704,7 @@ ${darkProviderCss}
       ...meta.maxStops !== void 0 ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {},
       ...meta.includeCabinBag === true ? { includeCabinBag: true } : {},
       ...meta.includeCheckedBag === true ? { includeCheckedBag: true } : {},
+      ...meta.maxDurationMinutes !== void 0 && meta.maxDurationMinutes > 0 ? { maxDurationMinutes: Math.round(meta.maxDurationMinutes) } : {},
       ...meta.dateFlex !== void 0 ? { dateFlex: meta.dateFlex } : {}
     };
     return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : void 0;
@@ -11008,6 +11022,7 @@ ${darkProviderCss}
     if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
     if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
     if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
+    if (flightMeta.maxDurationMinutes !== void 0) params.set("durationTo", String(flightMeta.maxDurationMinutes));
     params.set("cacheBuster", String(Date.now()));
     params.set("progress", String(progress));
     return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -11018,6 +11033,7 @@ ${darkProviderCss}
       if (!isFinnFlightTripMatchingSearch(trip, flightMeta, searchData, airportLookup)) continue;
       const legs = readRecordArray(trip.legs);
       if (exceedsFlightMaxStops(flightMeta, legs.map(readFinnFlightLegStopCount))) continue;
+      if (exceedsFlightMaxDuration(flightMeta, legs.map((leg) => readNumberValue(leg.duration)))) continue;
       const tripSummary = formatFinnFlightTripSummary(trip);
       const durationText = formatFlightLegDurationsWithStopsText(
         legs.map((leg) => ({
@@ -11156,6 +11172,7 @@ ${darkProviderCss}
     if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
     if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
     if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
+    if (flightMeta.maxDurationMinutes !== void 0) params.set("durationTo", String(flightMeta.maxDurationMinutes));
     return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
   }
   function buildFinnFlightExactAirportParams(flightMeta) {
@@ -11720,6 +11737,7 @@ ${darkProviderCss}
       const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex);
       if (matchedDates === void 0) continue;
       if (exceedsFlightMaxStops(flightMeta, readPanFlightsLegStopCounts(item))) continue;
+      if (exceedsFlightMaxDuration(flightMeta, readPanFlightsLegDurationsMinutes(item, flightMeta.inboundDate !== void 0))) continue;
       const packageRecord = readPanFlightsPackageRecord(item);
       const provider = readPanFlightsBestProvider(resultData, item);
       const baseAmount = readPositiveNumberValue(item.price_pp) ?? readPositiveNumberValue(item.price) ?? readPositiveNumberValue(packageRecord?.price) ?? readPositiveNumberValue(provider?.price);
@@ -11966,6 +11984,10 @@ ${darkProviderCss}
       readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
       readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ?? (routeList[1] !== void 0 ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : void 0)
     ];
+  }
+  function readPanFlightsLegDurationsMinutes(item, roundTrip) {
+    const packageRecord = readPanFlightsPackageRecord(item);
+    return [roundTrip ? readPositiveNumberValue(packageRecord?.legduration) : readPositiveNumberValue(packageRecord?.duration) ?? readPositiveNumberValue(item.duration)];
   }
   function readPanFlightsBaggageFee(baggage, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
@@ -12490,6 +12512,7 @@ ${darkProviderCss}
       if (amount === void 0) return void 0;
       const journeys = readRecordArray(itinerary.journeyList);
       if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return void 0;
+      if (exceedsFlightMaxDuration(flightMeta, journeys.map((journey) => readNumberValue(journey.duration)))) return void 0;
       const candidate = toTripComOfferCandidate({
         amount,
         currency,
@@ -12858,6 +12881,7 @@ ${darkProviderCss}
       if (result.isSelfTransfer === true && result.isProtectedSelfTransfer !== true) continue;
       const legSummaries = readSkyscannerFlightLegSummaries(result);
       if (exceedsFlightMaxStops(flightMeta, legSummaries.map((leg) => leg.stopCount))) continue;
+      if (exceedsFlightMaxDuration(flightMeta, legSummaries.map((leg) => leg.durationMinutes))) continue;
       const score = readNumberValue(result.score);
       const tripSummary = formatSkyscannerFlightTripSummary(result);
       const tags = readSkyscannerResultTags(result);
@@ -13573,6 +13597,7 @@ ${darkProviderCss}
       if (isMomondoFlightPoorItinerary(result)) continue;
       const legSummaries = readMomondoFlightLegSummaries(result, resultData);
       if (exceedsFlightMaxStops(flightMeta, legSummaries.map((leg) => leg.stopCount))) continue;
+      if (exceedsFlightMaxDuration(flightMeta, legSummaries.map((leg) => leg.durationMinutes))) continue;
       const tripSummary = formatMomondoFlightTripSummary(result, resultData);
       const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
       const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
@@ -13708,6 +13733,7 @@ ${darkProviderCss}
   }
   function readMomondoFlightLegSummaries(result, resultData) {
     const segmentsById = isRecord(resultData.segments) ? resultData.segments : {};
+    const legsById = isRecord(resultData.legs) ? resultData.legs : {};
     return readRecordArray(result.legs).map((leg) => {
       const segments = readRecordArray(leg.segments).map((segmentRef) => readStringValue(segmentRef.id)).map((segmentId) => segmentId !== void 0 && isRecord(segmentsById[segmentId]) ? segmentsById[segmentId] : void 0).filter((segment) => segment !== void 0);
       const firstSegment = segments[0];
@@ -13715,7 +13741,9 @@ ${darkProviderCss}
       const origin = readStringValue(firstSegment?.origin)?.toUpperCase();
       const destination = readStringValue(lastSegment?.destination)?.toUpperCase();
       if (origin === void 0 || destination === void 0) return void 0;
-      const durationMinutes = segments.reduce((total, segment) => total + (readNumberValue(segment.duration) ?? 0), 0);
+      const legId = readStringValue(leg.id);
+      const legRecord = legId !== void 0 && isRecord(legsById[legId]) ? legsById[legId] : void 0;
+      const durationMinutes = readPositiveNumberValue(legRecord?.duration) ?? segments.reduce((total, segment) => total + (readNumberValue(segment.duration) ?? 0), 0);
       const departureDate = readStringValue(firstSegment?.departure)?.slice(0, 10);
       const departureTime = readStringValue(firstSegment?.departure);
       const arrivalTime = readStringValue(lastSegment?.arrival);
@@ -15197,13 +15225,18 @@ ${darkProviderCss}
     const stopsText = stopCounts.every((stopCount) => stopCount === 0) ? "direkte" : `${stopCounts.join("/")} stopp`;
     return `${durationsText} · ${stopsText}`;
   }
+  function exceedsFlightMaxDuration(flightMeta, legDurationsMinutes) {
+    const { maxDurationMinutes } = flightMeta;
+    if (maxDurationMinutes === void 0) return false;
+    return legDurationsMinutes.some((durationMinutes) => durationMinutes !== void 0 && durationMinutes > maxDurationMinutes);
+  }
   function exceedsFlightMaxStops(flightMeta, stopCounts) {
     if (flightMeta.maxStops === void 0) return false;
     const maxStops = flightMeta.maxStops;
     return stopCounts.some((stopCount) => stopCount !== void 0 && stopCount > maxStops);
   }
   function hasFlightSearchResultFilters(flightMeta) {
-    return flightMeta.maxStops !== void 0 || flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true || flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy";
+    return flightMeta.maxStops !== void 0 || flightMeta.maxDurationMinutes !== void 0 || flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true || flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy";
   }
   function formatFlightCarriersByLeg(carriersPerLeg) {
     const legTexts = carriersPerLeg.map((carriers) => uniqueStrings(carriers).join("+")).filter((text) => text.length > 0);
@@ -15328,10 +15361,20 @@ ${darkProviderCss}
     ].filter((part) => part !== void 0);
     return parts.length > 0 ? `m/${parts.join(" + ")}` : void 0;
   }
+  function formatFlightDurationFilterText(flightMeta) {
+    if (flightMeta.maxDurationMinutes === void 0) return void 0;
+    return `maks ${formatFlightDurationHours(flightMeta.maxDurationMinutes)} reisetid per vei`;
+  }
+  function formatFlightDurationHours(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes === 0 ? `${hours} t` : `${hours} t ${remainingMinutes} min`;
+  }
   function formatFlightSearchFilterDetails(flightMeta) {
     return [
       formatFlightCabinClassText(flightMeta),
       formatFlightStopsFilterText(flightMeta),
+      formatFlightDurationFilterText(flightMeta),
       formatFlightBaggageFilterText(flightMeta)
     ].filter((part) => part !== void 0);
   }
@@ -15340,24 +15383,41 @@ ${darkProviderCss}
     return [tripType, formatFlightPassengerText(flightMeta), formatFlightCabinClassText(flightMeta)].filter((part) => part !== void 0).join(", ");
   }
   const FLIGHT_CABIN_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="3.5" y="4.5" width="9" height="8.5" rx="1.5" fill="currentColor"/><circle cx="5.5" cy="14.5" r="1" fill="currentColor"/><circle cx="10.5" cy="14.5" r="1" fill="currentColor"/></svg>';
+  const FLIGHT_PASSENGER_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="4.5" r="3" fill="currentColor"/><path d="M2.5 15a5.5 5.5 0 0 1 11 0z" fill="currentColor"/></svg>';
+  const FLIGHT_CABIN_CLASS_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h3.5l1 7h4.5a1 1 0 0 1 1 1V11H5.5a1 1 0 0 1-1-.9z" fill="currentColor"/><path d="M6 11v3.5M12 11v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  const FLIGHT_DURATION_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  const FLIGHT_STOPS_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.5"/><circle cx="2.5" cy="8" r="2" fill="currentColor"/><circle cx="13.5" cy="8" r="2" fill="currentColor"/><circle cx="8" cy="8" r="2" fill="var(--cbn-plate, #eaf0ec)" stroke="currentColor" stroke-width="1.5"/></svg>';
   const FLIGHT_CHECKED_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4V2.5h4V4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="4" width="11" height="10.5" rx="1.5" fill="currentColor"/><path d="M5.5 4v10.5M10.5 4v10.5" stroke="var(--cbn-surface, #fff)" stroke-width="1"/></svg>';
-  function buildFlightFilterChips(flightMeta) {
+  function buildFlightFilterChips(flightMeta, shadowRoot) {
+    const passengerCount = flightMeta.adults + flightMeta.youths + flightMeta.children + flightMeta.infants;
+    const cabinClassText = formatFlightCabinClassText(flightMeta) ?? "Økonomi";
     const chips = [
-      ...flightMeta.includeCabinBag === true ? [{ iconSvg: FLIGHT_CABIN_BAG_ICON_SVG, text: "1", title: "1 håndbagasje per reisende er med i prisene" }] : [],
-      ...flightMeta.includeCheckedBag === true ? [{ iconSvg: FLIGHT_CHECKED_BAG_ICON_SVG, text: "1", title: "1 innsjekket bagasje per reisende er med i prisene" }] : [],
-      ...flightMeta.maxStops !== void 0 ? [{ text: flightMeta.maxStops === 0 ? "Direkte" : `≤${flightMeta.maxStops} stopp`, title: formatFlightStopsFilterText(flightMeta) ?? "" }] : []
+      { iconSvg: FLIGHT_PASSENGER_ICON_SVG, text: String(passengerCount), tip: formatFlightPassengerText(flightMeta) },
+      { iconSvg: FLIGHT_CABIN_CLASS_ICON_SVG, text: cabinClassText.replace(" Economy", "").replace(" Class", ""), tip: cabinClassText },
+      ...flightMeta.includeCabinBag === true ? [{ iconSvg: FLIGHT_CABIN_BAG_ICON_SVG, text: "1", tip: "1 håndbagasje per reisende" }] : [],
+      ...flightMeta.includeCheckedBag === true ? [{ iconSvg: FLIGHT_CHECKED_BAG_ICON_SVG, text: "1", tip: "1 innsjekket bagasje per reisende" }] : [],
+      ...flightMeta.maxStops !== void 0 ? [{ iconSvg: FLIGHT_STOPS_ICON_SVG, text: flightMeta.maxStops === 0 ? "Direkte" : `≤${flightMeta.maxStops}`, tip: formatFlightStopsFilterText(flightMeta) ?? "" }] : [],
+      ...flightMeta.maxDurationMinutes !== void 0 ? [{
+        iconSvg: FLIGHT_DURATION_ICON_SVG,
+        text: `≤${formatFlightDurationHours(flightMeta.maxDurationMinutes).replace(" t", "t").replace(" min", "m")}`,
+        tip: formatFlightDurationFilterText(flightMeta) ?? ""
+      }] : []
     ];
-    if (chips.length === 0) return void 0;
     const container = document.createElement("span");
     container.className = "flight-filter-chips";
     for (const chip of chips) {
       const element = document.createElement("span");
       element.className = "cbn-chip cbn-chip--muted flight-filter-chip";
-      element.title = chip.title;
       if (chip.iconSvg !== void 0) element.insertAdjacentHTML("beforeend", chip.iconSvg);
       element.append(chip.text);
       container.append(element);
     }
+    const hasBaggage = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
+    addHoverChipTooltip(container, [
+      "Prisene gjelder søket ditt:",
+      ...chips.map((chip) => `- ${chip.tip}`),
+      ...hasBaggage ? ["Kilder som ikke bekrefter bagasjen er merket «ekskl. bagasje»."] : []
+    ].join("\n"), shadowRoot);
     return container;
   }
   function buildFlightSearchMetaKey(flightMeta) {
@@ -15374,6 +15434,7 @@ ${darkProviderCss}
       flightMeta.maxStops ?? "",
       flightMeta.includeCabinBag === true ? "hb" : "",
       flightMeta.includeCheckedBag === true ? "cb" : "",
+      flightMeta.maxDurationMinutes ?? "",
       flightMeta.dateFlex !== void 0 ? formatFlightDateFlexDays(flightMeta.dateFlex, true) : ""
     ].join("|");
   }
@@ -17291,18 +17352,22 @@ ${darkProviderCss}
     .price-match-header {
       align-items: center;
       display: flex;
-      gap: 6px;
+      flex-wrap: wrap;
+      gap: 4px 6px;
       margin-bottom: 1px;
     }
+    /* Etiketten krymper ikke; chipene brytes til egen linje på smale skjermer. */
     .price-match-header .price-match-toggle {
-      flex: 1;
+      flex: 1 0 auto;
       margin-bottom: 0;
-      min-width: 0;
+      width: auto;
     }
     .flight-filter-chips {
       display: inline-flex;
       flex-shrink: 0;
+      flex-wrap: wrap;
       gap: 4px;
+      justify-content: flex-end;
     }
     .flight-filter-chips .flight-filter-chip {
       align-items: center;
@@ -18611,7 +18676,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       priceMatchHeader.append(priceMatchToggle);
       const currentUrl = parseUrl(window.location.href);
       const flightMeta = currentUrl !== void 0 && priceMatches.some((priceMatch2) => priceMatch2.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch2)) ? extractFlightSearchMeta(currentUrl) : void 0;
-      const flightFilterChips = flightMeta !== void 0 ? buildFlightFilterChips(flightMeta) : void 0;
+      const flightFilterChips = flightMeta !== void 0 ? buildFlightFilterChips(flightMeta, shadowRoot) : void 0;
       if (flightFilterChips !== void 0) priceMatchHeader.append(flightFilterChips);
       priceMatchSection.append(
         priceMatchHeader,
@@ -19753,21 +19818,38 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     shadowRoot.append(tooltip);
     const row = tooltipControls.addBeside(chip, tooltip);
     row.addEventListener("mouseenter", () => {
-      const panelEl = shadowRoot.querySelector(".panel");
-      const panelRect = panelEl?.getBoundingClientRect();
-      const rect = row.getBoundingClientRect();
-      tooltip.style.left = "-9999px";
-      tooltip.style.top = "-9999px";
-      tooltip.classList.add("visible");
-      const tooltipHeight = tooltip.offsetHeight;
-      const rightEdge = panelRect ? panelRect.right + 6 : rect.right + 6;
-      tooltip.style.left = `${rightEdge}px`;
-      tooltip.style.top = `${rect.top + rect.height / 2 - tooltipHeight / 2}px`;
-      tooltip.style.transform = "none";
+      showChipTooltipRightOfPanel(tooltip, row, shadowRoot);
     });
     row.addEventListener("mouseleave", () => {
       tooltip.classList.remove("visible");
     });
+  }
+  function addHoverChipTooltip(anchor, text, shadowRoot) {
+    const tooltip = document.createElement("div");
+    tooltip.className = "bonus-chip-tooltip";
+    tooltip.textContent = text;
+    shadowRoot.append(tooltip);
+    anchor.addEventListener("mouseenter", () => {
+      showChipTooltipRightOfPanel(tooltip, anchor, shadowRoot);
+    });
+    anchor.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("visible");
+    });
+  }
+  function showChipTooltipRightOfPanel(tooltip, anchor, shadowRoot) {
+    const panelEl = shadowRoot.querySelector(".panel");
+    const panelRect = panelEl?.getBoundingClientRect();
+    const measured = anchor.getClientRects().length > 0 ? anchor : anchor.firstElementChild ?? anchor;
+    const rect = measured.getBoundingClientRect();
+    tooltip.style.left = "-9999px";
+    tooltip.style.top = "-9999px";
+    tooltip.classList.add("visible");
+    const tooltipHeight = tooltip.offsetHeight;
+    const rightEdge = panelRect ? panelRect.right + 6 : rect.right + 6;
+    const centeredTop = rect.top + rect.height / 2 - tooltipHeight / 2;
+    tooltip.style.left = `${Math.max(8, Math.min(rightEdge, window.innerWidth - tooltip.offsetWidth - 8))}px`;
+    tooltip.style.top = `${Math.max(8, Math.min(centeredTop, window.innerHeight - tooltipHeight - 8))}px`;
+    tooltip.style.transform = "none";
   }
   startContentScript();
 })();

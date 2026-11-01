@@ -293,6 +293,8 @@ type FlightSearchMeta = {
   maxStops?: number;
   includeCabinBag?: boolean;
   includeCheckedBag?: boolean;
+  // Maks reisetid per etappe (hver vei) i minutter, inkl. bytter.
+  maxDurationMinutes?: number;
   dateFlex?: FlightDateFlex;
 };
 // Dager før/etter valgt utreise- og hjemreisedato (PanFlights' ff:/tf: i v2-URL-en).
@@ -332,6 +334,7 @@ type FlightSearchFilterState = {
   maxStops?: number;
   includeCabinBag?: boolean;
   includeCheckedBag?: boolean;
+  maxDurationMinutes?: number;
 };
 type FlightAirportData = {
   code: string;
@@ -1578,6 +1581,7 @@ function withVisibleFlightSearchFilters(meta: FlightSearchMeta): FlightSearchMet
     ...(meta.maxStops === undefined && filters.maxStops !== undefined ? { maxStops: filters.maxStops } : {}),
     ...(meta.includeCabinBag === undefined && filters.includeCabinBag === true ? { includeCabinBag: true } : {}),
     ...(meta.includeCheckedBag === undefined && filters.includeCheckedBag === true ? { includeCheckedBag: true } : {}),
+    ...(meta.maxDurationMinutes === undefined && filters.maxDurationMinutes !== undefined ? { maxDurationMinutes: filters.maxDurationMinutes } : {}),
   };
 }
 
@@ -1640,6 +1644,14 @@ function readVisibleFlightSearchFilterState(): FlightSearchFilterState {
   if (parsedUrl !== undefined && isPanFlightsSearchPage(parsedUrl)) {
     if ((readNonNegativeIntegerValue(document.getElementById("carryons")?.textContent?.trim()) ?? 0) > 0) state.includeCabinBag = true;
     if ((readNonNegativeIntegerValue(document.getElementById("checkedluggages")?.textContent?.trim()) ?? 0) > 0) state.includeCheckedBag = true;
+    // Varighet per etappe: feltet viser "Alle" eller "Mindre enn 22 timer"; håndtaket står på 100 % uten grense.
+    const durationHandle = document.querySelector<HTMLElement>("#routedur-slider-range .ui-slider-handle");
+    const durationHours = readPositiveIntegerValue(
+      document.querySelector<HTMLInputElement>("#routedur-amount")?.value.match(/(\d+)\s*timer/i)?.[1],
+    );
+    if (durationHandle !== null && durationHandle.style.left !== "100%" && durationHours !== undefined) {
+      state.maxDurationMinutes = durationHours * 60;
+    }
   }
   return state;
 }
@@ -1726,6 +1738,8 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
   const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
   // FINN speiler filtrene i URL-en (handLuggage/checkedLuggage=true, maximumNumberOfStops=N).
   const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("maximumNumberOfStops"));
+  // durationTo er maks reisetid per etappe i minutter (FINNs glidebryter går i hele timer).
+  const maxDurationMinutes = readPositiveIntegerValue(parsedUrl.searchParams.get("durationTo"));
   return normalizeFlightSearchMeta({
     origin,
     destination,
@@ -1739,6 +1753,7 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
     ...(maxStops !== undefined ? { maxStops } : {}),
     ...(parsedUrl.searchParams.get("handLuggage")?.toLowerCase() === "true" ? { includeCabinBag: true } : {}),
     ...(parsedUrl.searchParams.get("checkedLuggage")?.toLowerCase() === "true" ? { includeCheckedBag: true } : {}),
+    ...(maxDurationMinutes !== undefined ? { maxDurationMinutes } : {}),
   });
 }
 
@@ -1909,6 +1924,8 @@ function buildMomondoFlightFilterValue(flightMeta: FlightSearchMeta): string | u
       : undefined,
     flightMeta.includeCabinBag === true ? "bfc=1" : undefined,
     flightMeta.includeCheckedBag === true ? "cfc=1" : undefined,
+    // legdur=-N = maks N minutter per etappe (verifisert 2026-11-01).
+    flightMeta.maxDurationMinutes !== undefined ? `legdur=-${flightMeta.maxDurationMinutes}` : undefined,
   ].filter((part): part is string => part !== undefined);
   return parts.length > 0 ? parts.join(";") : undefined;
 }
@@ -1935,6 +1952,9 @@ function readMomondoFlightFilters(parsedUrl: URL): FlightLinkFilters {
     ...(maxStops !== undefined ? { maxStops } : {}),
     ...((readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {}),
     ...((readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {}),
+    ...(readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) !== undefined
+      ? { maxDurationMinutes: readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) }
+      : {}),
   };
 }
 
@@ -2363,6 +2383,7 @@ function normalizeFlightSearchMeta(meta: FlightSearchMeta): FlightSearchMeta | u
     ...(meta.maxStops !== undefined ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {}),
     ...(meta.includeCabinBag === true ? { includeCabinBag: true } : {}),
     ...(meta.includeCheckedBag === true ? { includeCheckedBag: true } : {}),
+    ...(meta.maxDurationMinutes !== undefined && meta.maxDurationMinutes > 0 ? { maxDurationMinutes: Math.round(meta.maxDurationMinutes) } : {}),
     ...(meta.dateFlex !== undefined ? { dateFlex: meta.dateFlex } : {}),
   };
   return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : undefined;
@@ -2783,6 +2804,7 @@ function buildFinnFlightResultApiUrl(
   if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
   if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
   if (flightMeta.maxStops !== undefined) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
+  if (flightMeta.maxDurationMinutes !== undefined) params.set("durationTo", String(flightMeta.maxDurationMinutes));
   params.set("cacheBuster", String(Date.now()));
   params.set("progress", String(progress));
   return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -2801,6 +2823,7 @@ function extractFinnFlightOfferCandidates(
 
     const legs = readRecordArray(trip.legs);
     if (exceedsFlightMaxStops(flightMeta, legs.map(readFinnFlightLegStopCount))) continue;
+    if (exceedsFlightMaxDuration(flightMeta, legs.map((leg) => readNumberValue(leg.duration)))) continue;
 
     const tripSummary = formatFinnFlightTripSummary(trip);
     const durationText = formatFlightLegDurationsWithStopsText(
@@ -3006,6 +3029,7 @@ function buildFinnFlightSearchUrl(
   if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
   if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
   if (flightMeta.maxStops !== undefined) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
+  if (flightMeta.maxDurationMinutes !== undefined) params.set("durationTo", String(flightMeta.maxDurationMinutes));
   return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
 }
 
@@ -3689,6 +3713,7 @@ function extractPanFlightsOfferCandidates(
     if (matchedDates === undefined) continue;
     // API-ets maxstops-felt holder ikke alltid; kontroller stopp per etappe som for de andre kildene.
     if (exceedsFlightMaxStops(flightMeta, readPanFlightsLegStopCounts(item))) continue;
+    if (exceedsFlightMaxDuration(flightMeta, readPanFlightsLegDurationsMinutes(item, flightMeta.inboundDate !== undefined))) continue;
 
     const packageRecord = readPanFlightsPackageRecord(item);
     const provider = readPanFlightsBestProvider(resultData, item);
@@ -4037,6 +4062,15 @@ function readPanFlightsLegStopCounts(item: Record<string, unknown>): Array<numbe
     readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ??
       (routeList[1] !== undefined ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : undefined),
   ];
+}
+
+// Reisetid per etappe i minutter, inkl. bytter: package.duration er hele reisen én vei
+// (også med separate billetter), package.legduration den lengste etappen tur/retur.
+function readPanFlightsLegDurationsMinutes(item: Record<string, unknown>, roundTrip: boolean): Array<number | undefined> {
+  const packageRecord = readPanFlightsPackageRecord(item);
+  return [roundTrip
+    ? readPositiveNumberValue(packageRecord?.legduration)
+    : readPositiveNumberValue(packageRecord?.duration) ?? readPositiveNumberValue(item.duration)];
 }
 
 // PanFlights legger bagasjeavgiften til prisen i nettleseren (updateOfferFee):
@@ -4570,6 +4604,7 @@ function extractTravellinkOfferCandidates(
     const legs = readTravellinkFlightLegSummaries(itinerary, searchData);
     if (!isTravellinkFlightMatchingSearch(legs, flightMeta)) continue;
     if (exceedsFlightMaxStops(flightMeta, legs.map((leg) => leg.stopCount))) continue;
+    if (exceedsFlightMaxDuration(flightMeta, legs.map((leg) => leg.durationMinutes))) continue;
 
     const fee = readTravellinkStandardFee(itinerary);
     if (fee === undefined) continue;
@@ -5184,6 +5219,7 @@ function extractTripComListOfferCandidates(
 
       const journeys = readRecordArray(itinerary.journeyList);
       if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return undefined;
+      if (exceedsFlightMaxDuration(flightMeta, journeys.map((journey) => readNumberValue(journey.duration)))) return undefined;
 
       const candidate = toTripComOfferCandidate({
         amount,
@@ -5683,6 +5719,7 @@ function extractSkyscannerFlightSearchCandidates(
 
     const legSummaries = readSkyscannerFlightLegSummaries(result);
     if (exceedsFlightMaxStops(flightMeta, legSummaries.map((leg) => leg.stopCount))) continue;
+    if (exceedsFlightMaxDuration(flightMeta, legSummaries.map((leg) => leg.durationMinutes))) continue;
 
     const score = readNumberValue(result.score);
     const tripSummary = formatSkyscannerFlightTripSummary(result);
@@ -6677,6 +6714,7 @@ function collectMomondoFlightOfferCandidates(
 
     const legSummaries = readMomondoFlightLegSummaries(result, resultData);
     if (exceedsFlightMaxStops(flightMeta, legSummaries.map((leg) => leg.stopCount))) continue;
+    if (exceedsFlightMaxDuration(flightMeta, legSummaries.map((leg) => leg.durationMinutes))) continue;
 
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
     const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
@@ -6905,6 +6943,7 @@ function readMomondoFlightLegSummaries(
   resultData: Record<string, unknown>,
 ): MomondoFlightLegSummary[] {
   const segmentsById = isRecord(resultData.segments) ? resultData.segments : {};
+  const legsById = isRecord(resultData.legs) ? resultData.legs : {};
 
   return readRecordArray(result.legs)
     .map((leg): MomondoFlightLegSummary | undefined => {
@@ -6918,7 +6957,11 @@ function readMomondoFlightLegSummaries(
       const destination = readStringValue(lastSegment?.destination)?.toUpperCase();
       if (origin === undefined || destination === undefined) return undefined;
 
-      const durationMinutes = segments.reduce((total, segment) => total + (readNumberValue(segment.duration) ?? 0), 0);
+      // Etappens totale reisetid (inkl. bytter) fra legs-oppslaget; ellers summen av flyvningene.
+      const legId = readStringValue(leg.id);
+      const legRecord = legId !== undefined && isRecord(legsById[legId]) ? legsById[legId] : undefined;
+      const durationMinutes = readPositiveNumberValue(legRecord?.duration) ??
+        segments.reduce((total, segment) => total + (readNumberValue(segment.duration) ?? 0), 0);
       const departureDate = readStringValue(firstSegment?.departure)?.slice(0, 10);
       const departureTime = readStringValue(firstSegment?.departure);
       const arrivalTime = readStringValue(lastSegment?.arrival);
@@ -8848,6 +8891,12 @@ function formatFlightLegDurationsWithStopsText(
   return `${durationsText} · ${stopsText}`;
 }
 
+function exceedsFlightMaxDuration(flightMeta: FlightSearchMeta, legDurationsMinutes: Array<number | undefined>): boolean {
+  const { maxDurationMinutes } = flightMeta;
+  if (maxDurationMinutes === undefined) return false;
+  return legDurationsMinutes.some((durationMinutes) => durationMinutes !== undefined && durationMinutes > maxDurationMinutes);
+}
+
 function exceedsFlightMaxStops(flightMeta: FlightSearchMeta, stopCounts: Array<number | undefined>): boolean {
   if (flightMeta.maxStops === undefined) return false;
   const maxStops = flightMeta.maxStops;
@@ -8858,6 +8907,7 @@ function exceedsFlightMaxStops(flightMeta: FlightSearchMeta, stopCounts: Array<n
 // stopp-/bagasjeinfo; med aktive filtre ville de undergrave sammenligningen.
 function hasFlightSearchResultFilters(flightMeta: FlightSearchMeta): boolean {
   return flightMeta.maxStops !== undefined ||
+    flightMeta.maxDurationMinutes !== undefined ||
     flightMeta.includeCabinBag === true ||
     flightMeta.includeCheckedBag === true ||
     (flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy");
@@ -9014,10 +9064,22 @@ function formatFlightBaggageFilterText(flightMeta: FlightSearchMeta): string | u
   return parts.length > 0 ? `m/${parts.join(" + ")}` : undefined;
 }
 
+function formatFlightDurationFilterText(flightMeta: FlightSearchMeta): string | undefined {
+  if (flightMeta.maxDurationMinutes === undefined) return undefined;
+  return `maks ${formatFlightDurationHours(flightMeta.maxDurationMinutes)} reisetid per vei`;
+}
+
+function formatFlightDurationHours(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0 ? `${hours} t` : `${hours} t ${remainingMinutes} min`;
+}
+
 function formatFlightSearchFilterDetails(flightMeta: FlightSearchMeta): string[] {
   return [
     formatFlightCabinClassText(flightMeta),
     formatFlightStopsFilterText(flightMeta),
+    formatFlightDurationFilterText(flightMeta),
     formatFlightBaggageFilterText(flightMeta),
   ].filter((part): part is string => part !== undefined);
 }
@@ -9031,33 +9093,52 @@ function formatFlightCardSearchDetails(flightMeta: FlightSearchMeta): string {
 }
 
 const FLIGHT_CABIN_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="3.5" y="4.5" width="9" height="8.5" rx="1.5" fill="currentColor"/><circle cx="5.5" cy="14.5" r="1" fill="currentColor"/><circle cx="10.5" cy="14.5" r="1" fill="currentColor"/></svg>';
+const FLIGHT_PASSENGER_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="4.5" r="3" fill="currentColor"/><path d="M2.5 15a5.5 5.5 0 0 1 11 0z" fill="currentColor"/></svg>';
+const FLIGHT_CABIN_CLASS_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h3.5l1 7h4.5a1 1 0 0 1 1 1V11H5.5a1 1 0 0 1-1-.9z" fill="currentColor"/><path d="M6 11v3.5M12 11v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const FLIGHT_DURATION_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const FLIGHT_STOPS_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.5"/><circle cx="2.5" cy="8" r="2" fill="currentColor"/><circle cx="13.5" cy="8" r="2" fill="currentColor"/><circle cx="8" cy="8" r="2" fill="var(--cbn-plate, #eaf0ec)" stroke="currentColor" stroke-width="1.5"/></svg>';
 const FLIGHT_CHECKED_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4V2.5h4V4" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="4" width="11" height="10.5" rx="1.5" fill="currentColor"/><path d="M5.5 4v10.5M10.5 4v10.5" stroke="var(--cbn-surface, #fff)" stroke-width="1"/></svg>';
 
-// Aktive søkefiltre (bagasje og stopp) som små chips ved siden av «Prismatch».
-function buildFlightFilterChips(flightMeta: FlightSearchMeta): HTMLSpanElement | undefined {
-  const chips: Array<{ iconSvg?: string; text: string; title: string }> = [
+// Søket som prisene gjelder (reisende, klasse, bagasje, stopp) som små chips ved
+// «Prismatch», med én felles hover-tooltip.
+function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: ShadowRoot): HTMLSpanElement {
+  const passengerCount = flightMeta.adults + flightMeta.youths + flightMeta.children + flightMeta.infants;
+  const cabinClassText = formatFlightCabinClassText(flightMeta) ?? "Økonomi";
+  const chips: Array<{ iconSvg?: string; text: string; tip: string }> = [
+    { iconSvg: FLIGHT_PASSENGER_ICON_SVG, text: String(passengerCount), tip: formatFlightPassengerText(flightMeta) },
+    { iconSvg: FLIGHT_CABIN_CLASS_ICON_SVG, text: cabinClassText.replace(" Economy", "").replace(" Class", ""), tip: cabinClassText },
     ...(flightMeta.includeCabinBag === true
-      ? [{ iconSvg: FLIGHT_CABIN_BAG_ICON_SVG, text: "1", title: "1 håndbagasje per reisende er med i prisene" }]
+      ? [{ iconSvg: FLIGHT_CABIN_BAG_ICON_SVG, text: "1", tip: "1 håndbagasje per reisende" }]
       : []),
     ...(flightMeta.includeCheckedBag === true
-      ? [{ iconSvg: FLIGHT_CHECKED_BAG_ICON_SVG, text: "1", title: "1 innsjekket bagasje per reisende er med i prisene" }]
+      ? [{ iconSvg: FLIGHT_CHECKED_BAG_ICON_SVG, text: "1", tip: "1 innsjekket bagasje per reisende" }]
       : []),
     ...(flightMeta.maxStops !== undefined
-      ? [{ text: flightMeta.maxStops === 0 ? "Direkte" : `≤${flightMeta.maxStops} stopp`, title: formatFlightStopsFilterText(flightMeta) ?? "" }]
+      ? [{ iconSvg: FLIGHT_STOPS_ICON_SVG, text: flightMeta.maxStops === 0 ? "Direkte" : `≤${flightMeta.maxStops}`, tip: formatFlightStopsFilterText(flightMeta) ?? "" }]
+      : []),
+    ...(flightMeta.maxDurationMinutes !== undefined
+      ? [{
+        iconSvg: FLIGHT_DURATION_ICON_SVG,
+        text: `≤${formatFlightDurationHours(flightMeta.maxDurationMinutes).replace(" t", "t").replace(" min", "m")}`,
+        tip: formatFlightDurationFilterText(flightMeta) ?? "",
+      }]
       : []),
   ];
-  if (chips.length === 0) return undefined;
-
   const container = document.createElement("span");
   container.className = "flight-filter-chips";
   for (const chip of chips) {
     const element = document.createElement("span");
     element.className = "cbn-chip cbn-chip--muted flight-filter-chip";
-    element.title = chip.title;
     if (chip.iconSvg !== undefined) element.insertAdjacentHTML("beforeend", chip.iconSvg);
     element.append(chip.text);
     container.append(element);
   }
+  const hasBaggage = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
+  addHoverChipTooltip(container, [
+    "Prisene gjelder søket ditt:",
+    ...chips.map((chip) => `- ${chip.tip}`),
+    ...(hasBaggage ? ["Kilder som ikke bekrefter bagasjen er merket «ekskl. bagasje»."] : []),
+  ].join("\n"), shadowRoot);
   return container;
 }
 
@@ -9075,6 +9156,7 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
     flightMeta.maxStops ?? "",
     flightMeta.includeCabinBag === true ? "hb" : "",
     flightMeta.includeCheckedBag === true ? "cb" : "",
+    flightMeta.maxDurationMinutes ?? "",
     flightMeta.dateFlex !== undefined ? formatFlightDateFlexDays(flightMeta.dateFlex, true) : "",
   ].join("|");
 }
@@ -11431,18 +11513,22 @@ function renderNotice(
     .price-match-header {
       align-items: center;
       display: flex;
-      gap: 6px;
+      flex-wrap: wrap;
+      gap: 4px 6px;
       margin-bottom: 1px;
     }
+    /* Etiketten krymper ikke; chipene brytes til egen linje på smale skjermer. */
     .price-match-header .price-match-toggle {
-      flex: 1;
+      flex: 1 0 auto;
       margin-bottom: 0;
-      min-width: 0;
+      width: auto;
     }
     .flight-filter-chips {
       display: inline-flex;
       flex-shrink: 0;
+      flex-wrap: wrap;
       gap: 4px;
+      justify-content: flex-end;
     }
     .flight-filter-chips .flight-filter-chip {
       align-items: center;
@@ -12755,7 +12841,7 @@ function renderNotice(
     const flightMeta = currentUrl !== undefined && priceMatches.some((priceMatch) => priceMatch.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch))
       ? extractFlightSearchMeta(currentUrl)
       : undefined;
-    const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta) : undefined;
+    const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta, shadowRoot) : undefined;
     if (flightFilterChips !== undefined) priceMatchHeader.append(flightFilterChips);
 
     priceMatchSection.append(
@@ -14189,21 +14275,43 @@ function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot,
   shadowRoot.append(tooltip);
   const row = tooltipControls.addBeside(chip, tooltip);
   row.addEventListener("mouseenter", () => {
-    const panelEl = shadowRoot.querySelector(".panel");
-    const panelRect = panelEl?.getBoundingClientRect();
-    const rect = row.getBoundingClientRect();
-    tooltip.style.left = "-9999px";
-    tooltip.style.top = "-9999px";
-    tooltip.classList.add("visible");
-    const tooltipHeight = tooltip.offsetHeight;
-    const rightEdge = panelRect ? panelRect.right + 6 : rect.right + 6;
-    tooltip.style.left = `${rightEdge}px`;
-    tooltip.style.top = `${rect.top + rect.height / 2 - tooltipHeight / 2}px`;
-    tooltip.style.transform = "none";
+    showChipTooltipRightOfPanel(tooltip, row, shadowRoot);
   });
   row.addEventListener("mouseleave", () => {
     tooltip.classList.remove("visible");
   });
+}
+
+// Samme tooltip som chipene, men bare ved hover (uten trykkknapp ved siden av).
+function addHoverChipTooltip(anchor: HTMLElement, text: string, shadowRoot: ShadowRoot): void {
+  const tooltip = document.createElement("div");
+  tooltip.className = "bonus-chip-tooltip";
+  tooltip.textContent = text;
+  shadowRoot.append(tooltip);
+  anchor.addEventListener("mouseenter", () => {
+    showChipTooltipRightOfPanel(tooltip, anchor, shadowRoot);
+  });
+  anchor.addEventListener("mouseleave", () => {
+    tooltip.classList.remove("visible");
+  });
+}
+
+function showChipTooltipRightOfPanel(tooltip: HTMLElement, anchor: HTMLElement, shadowRoot: ShadowRoot): void {
+  const panelEl = shadowRoot.querySelector(".panel");
+  const panelRect = panelEl?.getBoundingClientRect();
+  // En rad med display: contents har ingen egen boks; mål da første barn.
+  const measured = anchor.getClientRects().length > 0 ? anchor : anchor.firstElementChild ?? anchor;
+  const rect = measured.getBoundingClientRect();
+  tooltip.style.left = "-9999px";
+  tooltip.style.top = "-9999px";
+  tooltip.classList.add("visible");
+  const tooltipHeight = tooltip.offsetHeight;
+  const rightEdge = panelRect ? panelRect.right + 6 : rect.right + 6;
+  const centeredTop = rect.top + rect.height / 2 - tooltipHeight / 2;
+  // Smale skjermer: ingen plass til høyre for panelet, så tooltipen holdes innenfor.
+  tooltip.style.left = `${Math.max(8, Math.min(rightEdge, window.innerWidth - tooltip.offsetWidth - 8))}px`;
+  tooltip.style.top = `${Math.max(8, Math.min(centeredTop, window.innerHeight - tooltipHeight - 8))}px`;
+  tooltip.style.transform = "none";
 }
 
 startContentScript();
