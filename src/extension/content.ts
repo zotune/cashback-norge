@@ -846,7 +846,8 @@ function installDynamicProductPageRefresh(): void {
         ? [
           buildFlightSearchMetaKey(flightMeta),
           isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : "",
-          isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
+          // Med datovindu kommer PanFlights-raden fra API-et; sidens priser endres ved hvert filterklikk.
+          isPanFlightsSearchPage(currentUrl) && flightMeta.dateFlex === undefined ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
           isMomondoFlightSearchPage(currentUrl) ? readCurrentMomondoVisiblePriceKey() : "",
         ].join("|")
         : hotelMeta !== undefined
@@ -964,11 +965,21 @@ let runtimeCardOffers: CashbackOffer[] = [];
 
 async function renderCurrentContext(): Promise<void> {
   const generation = ++renderGeneration;
+  const offersPromise = getCurrentOffers().catch(() => []);
+  const regionPricesPromise = getRegionPricesForCurrentPage().catch(() => undefined);
+  let priceMatchesSettled = false;
+  const renderPartialPriceMatches = (partialMatches: PriceMatchOffer[]): void => {
+    void Promise.all([offersPromise, regionPricesPromise]).then(([offers, regionPrices]) => {
+      if (generation !== renderGeneration || priceMatchesSettled || partialMatches.length === 0) return;
+      renderNoticeWithStoredState(offers, partialMatches, regionPrices);
+    });
+  };
   const [offers, priceMatches, regionPrices] = await Promise.all([
-    getCurrentOffers().catch(() => []),
-    getPriceMatchesForCurrentPage().catch(() => []),
-    getRegionPricesForCurrentPage().catch(() => undefined),
+    offersPromise,
+    getPriceMatchesForCurrentPage(renderPartialPriceMatches).catch(() => []),
+    regionPricesPromise,
   ]);
+  priceMatchesSettled = true;
   if (generation !== renderGeneration) return;
   if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
@@ -1050,8 +1061,8 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
   }
 }
 
-async function getPriceMatchesForCurrentPage(): Promise<PriceMatchOffer[]> {
-  const flightOffers = await findFlightPriceMatchOffers();
+async function getPriceMatchesForCurrentPage(onFlightProgress?: (offers: PriceMatchOffer[]) => void): Promise<PriceMatchOffer[]> {
+  const flightOffers = await findFlightPriceMatchOffers(onFlightProgress);
   if (flightOffers.length > 0) return flightOffers;
 
   const hotelOffers = await findHotelPriceMatchOffers();
@@ -1120,11 +1131,29 @@ type FlightPriceMatchSession = {
   liveOfferFinders: FlightLiveOfferFinder[];
 };
 
-async function findFlightPriceMatchOffers(): Promise<PriceMatchOffer[]> {
+// onProgress får faste rader med én gang og en ny liste hver gang en kilde svarer,
+// slik at panelet ikke venter på den tregeste kilden.
+async function findFlightPriceMatchOffers(onProgress?: (offers: PriceMatchOffer[]) => void): Promise<PriceMatchOffer[]> {
   const session = await buildFlightPriceMatchSession();
   if (session === undefined) return [];
+  if (onProgress === undefined) {
+    return mergeFlightPriceMatchOffers(session.staticOffers, await runFlightLiveOfferFinders(session.liveOfferFinders));
+  }
 
-  const liveOffers = await runFlightLiveOfferFinders(session.liveOfferFinders);
+  const liveOffers: PriceMatchOffer[] = [];
+  const pendingSources = new Set(session.liveOfferFinders.map((finder) => finder.source));
+  const reportProgress = (): void => {
+    onProgress(mergeFlightPriceMatchOffers(session.staticOffers, liveOffers).map((offer) => {
+      return offer.source !== undefined && pendingSources.has(offer.source) ? { ...offer, searchIncomplete: true } : offer;
+    }));
+  };
+  reportProgress();
+  await Promise.all(session.liveOfferFinders.map(async ({ source, sourceName, findOffer }) => {
+    const offer = await safelyFindFlightPriceMatchOffer(sourceName, () => findOffer());
+    if (offer !== undefined) liveOffers.push(offer);
+    pendingSources.delete(source);
+    if (pendingSources.size > 0) reportProgress();
+  }));
   return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
 }
 
@@ -3498,14 +3527,18 @@ function extractPanFlightsOfferCandidates(
   for (const [sourceRank, item] of readRecordArray(resultData.flighttab).entries()) {
     const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex);
     if (matchedDates === undefined) continue;
+    // API-ets maxstops-felt holder ikke alltid; kontroller stopp per etappe som for de andre kildene.
+    if (exceedsFlightMaxStops(flightMeta, readPanFlightsLegStopCounts(item))) continue;
 
     const packageRecord = readPanFlightsPackageRecord(item);
     const provider = readPanFlightsBestProvider(resultData, item);
-    const amount = readPositiveNumberValue(item.price_pp) ??
+    const baseAmount = readPositiveNumberValue(item.price_pp) ??
       readPositiveNumberValue(item.price) ??
       readPositiveNumberValue(packageRecord?.price) ??
       readPositiveNumberValue(provider?.price);
-    if (amount === undefined) continue;
+    const baggageFee = readPanFlightsBaggageFee(provider?.baggage ?? packageRecord?.baggage, flightMeta);
+    if (baseAmount === undefined || baggageFee === undefined) continue;
+    const amount = baseAmount + baggageFee;
 
     const deepLink = provider?.deep_link ?? packageRecord?.deep_link;
     const productUrl = readPanFlightsProductUrl(deepLink, resultUrl);
@@ -3833,6 +3866,44 @@ function formatPanFlightsStops(route: Record<string, unknown>): string | undefin
   if (stops.length === 0) return undefined;
   if (stops.every((stopCount) => stopCount === 0)) return "direkte";
   return stops.map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`).join(" / ");
+}
+
+function readPanFlightsLegStopCounts(item: Record<string, unknown>): Array<number | undefined> {
+  const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+  const outboundRoute = routeList[0];
+  if (outboundRoute === undefined) return [];
+  return [
+    readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
+    readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ??
+      (routeList[1] !== undefined ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : undefined),
+  ];
+}
+
+// PanFlights legger bagasjeavgiften til prisen i nettleseren (updateOfferFee):
+// baggage.bin = håndbagasje, baggage["1"] = én innsjekket, per passasjer. Ukjent
+// avgift (mangler/negativ) betyr ukjent totalpris, og tilbudet utelates.
+function readPanFlightsBaggageFee(baggage: unknown, flightMeta: FlightSearchMeta): number | undefined {
+  if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
+  if (!isRecord(baggage)) return undefined;
+
+  let feePerPassenger = 0;
+  if (flightMeta.includeCabinBag === true) {
+    const cabinFee = readNumberValue(baggage.bin);
+    if (cabinFee === undefined || cabinFee < 0) return undefined;
+    feePerPassenger += cabinFee;
+  }
+  if (flightMeta.includeCheckedBag === true) {
+    if (baggage.unit !== undefined) {
+      // Inkluderte kolli: minst ett innsjekket kolli gir ingen ekstra avgift.
+      const includedPieces = baggage.unit === "pcs" ? readNumberValue(baggage.amount) ?? 0 : 1;
+      if (includedPieces < 1) return undefined;
+    } else {
+      const checkedFee = readNumberValue(baggage["1"]);
+      if (checkedFee === undefined || checkedFee < 0) return undefined;
+      feePerPassenger += checkedFee;
+    }
+  }
+  return Math.round(feePerPassenger * flightMeta.adults);
 }
 
 function readPanFlightsRouteLegStopCount(route: Record<string, unknown>, dataKey: "tripdata" | "backdata"): number | undefined {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793568444
+// @version      1793568749
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9480,7 +9480,8 @@ ${darkProviderCss}
         const metaKey = flightMeta !== void 0 ? [
           buildFlightSearchMetaKey(flightMeta),
           isSkyscannerFlightSearchPage(currentUrl) ? readCurrentSkyscannerVisiblePriceKey() : "",
-          isPanFlightsSearchPage(currentUrl) ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
+          // Med datovindu kommer PanFlights-raden fra API-et; sidens priser endres ved hvert filterklikk.
+          isPanFlightsSearchPage(currentUrl) && flightMeta.dateFlex === void 0 ? readCurrentPanFlightsVisiblePriceKey(flightMeta) : "",
           isMomondoFlightSearchPage(currentUrl) ? readCurrentMomondoVisiblePriceKey() : ""
         ].join("|") : hotelMeta !== void 0 ? buildHotelSearchMetaKey(hotelMeta) : productMeta === void 0 ? "" : [productMeta.searchTerm, productMeta.productLanguage, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
         if (metaKey.length > 0 && metaKey !== latestMetaKey) {
@@ -9570,11 +9571,21 @@ ${darkProviderCss}
   let runtimeCardOffers = [];
   async function renderCurrentContext() {
     const generation = ++renderGeneration;
+    const offersPromise = getCurrentOffers().catch(() => []);
+    const regionPricesPromise = getRegionPricesForCurrentPage().catch(() => void 0);
+    let priceMatchesSettled = false;
+    const renderPartialPriceMatches = (partialMatches) => {
+      void Promise.all([offersPromise, regionPricesPromise]).then(([offers2, regionPrices2]) => {
+        if (generation !== renderGeneration || priceMatchesSettled || partialMatches.length === 0) return;
+        renderNoticeWithStoredState(offers2, partialMatches, regionPrices2);
+      });
+    };
     const [offers, priceMatches, regionPrices] = await Promise.all([
-      getCurrentOffers().catch(() => []),
-      getPriceMatchesForCurrentPage().catch(() => []),
-      getRegionPricesForCurrentPage().catch(() => void 0)
+      offersPromise,
+      getPriceMatchesForCurrentPage(renderPartialPriceMatches).catch(() => []),
+      regionPricesPromise
     ]);
+    priceMatchesSettled = true;
     if (generation !== renderGeneration) return;
     if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
       renderNoticeWithStoredState(offers, priceMatches, regionPrices);
@@ -9641,8 +9652,8 @@ ${darkProviderCss}
       return [];
     }
   }
-  async function getPriceMatchesForCurrentPage() {
-    const flightOffers = await findFlightPriceMatchOffers();
+  async function getPriceMatchesForCurrentPage(onFlightProgress) {
+    const flightOffers = await findFlightPriceMatchOffers(onFlightProgress);
     if (flightOffers.length > 0) return flightOffers;
     const hotelOffers = await findHotelPriceMatchOffers();
     if (hotelOffers.length > 0) return hotelOffers;
@@ -9685,10 +9696,26 @@ ${darkProviderCss}
       }
     ];
   }
-  async function findFlightPriceMatchOffers() {
+  async function findFlightPriceMatchOffers(onProgress) {
     const session = await buildFlightPriceMatchSession();
     if (session === void 0) return [];
-    const liveOffers = await runFlightLiveOfferFinders(session.liveOfferFinders);
+    if (onProgress === void 0) {
+      return mergeFlightPriceMatchOffers(session.staticOffers, await runFlightLiveOfferFinders(session.liveOfferFinders));
+    }
+    const liveOffers = [];
+    const pendingSources = new Set(session.liveOfferFinders.map((finder) => finder.source));
+    const reportProgress = () => {
+      onProgress(mergeFlightPriceMatchOffers(session.staticOffers, liveOffers).map((offer) => {
+        return offer.source !== void 0 && pendingSources.has(offer.source) ? { ...offer, searchIncomplete: true } : offer;
+      }));
+    };
+    reportProgress();
+    await Promise.all(session.liveOfferFinders.map(async ({ source, sourceName, findOffer }) => {
+      const offer = await safelyFindFlightPriceMatchOffer(sourceName, () => findOffer());
+      if (offer !== void 0) liveOffers.push(offer);
+      pendingSources.delete(source);
+      if (pendingSources.size > 0) reportProgress();
+    }));
     return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
   }
   async function buildFlightPriceMatchSession() {
@@ -11569,10 +11596,13 @@ ${darkProviderCss}
     for (const [sourceRank2, item] of readRecordArray(resultData.flighttab).entries()) {
       const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex);
       if (matchedDates === void 0) continue;
+      if (exceedsFlightMaxStops(flightMeta, readPanFlightsLegStopCounts(item))) continue;
       const packageRecord = readPanFlightsPackageRecord(item);
       const provider = readPanFlightsBestProvider(resultData, item);
-      const amount = readPositiveNumberValue(item.price_pp) ?? readPositiveNumberValue(item.price) ?? readPositiveNumberValue(packageRecord?.price) ?? readPositiveNumberValue(provider?.price);
-      if (amount === void 0) continue;
+      const baseAmount = readPositiveNumberValue(item.price_pp) ?? readPositiveNumberValue(item.price) ?? readPositiveNumberValue(packageRecord?.price) ?? readPositiveNumberValue(provider?.price);
+      const baggageFee = readPanFlightsBaggageFee(provider?.baggage ?? packageRecord?.baggage, flightMeta);
+      if (baseAmount === void 0 || baggageFee === void 0) continue;
+      const amount = baseAmount + baggageFee;
       const deepLink = provider?.deep_link ?? packageRecord?.deep_link;
       const productUrl = readPanFlightsProductUrl(deepLink, resultUrl);
       const shopName = readStringValue(item.provider) ?? readStringValue(provider?.provider) ?? readStringValue(packageRecord?.provider) ?? readPanFlightsProviderNameFromUrl(deepLink) ?? readStringValue(resultData.provider) ?? "PanFlights";
@@ -11804,6 +11834,36 @@ ${darkProviderCss}
     if (stops.length === 0) return void 0;
     if (stops.every((stopCount) => stopCount === 0)) return "direkte";
     return stops.map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`).join(" / ");
+  }
+  function readPanFlightsLegStopCounts(item) {
+    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+    const outboundRoute = routeList[0];
+    if (outboundRoute === void 0) return [];
+    return [
+      readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
+      readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ?? (routeList[1] !== void 0 ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : void 0)
+    ];
+  }
+  function readPanFlightsBaggageFee(baggage, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
+    if (!isRecord(baggage)) return void 0;
+    let feePerPassenger = 0;
+    if (flightMeta.includeCabinBag === true) {
+      const cabinFee = readNumberValue(baggage.bin);
+      if (cabinFee === void 0 || cabinFee < 0) return void 0;
+      feePerPassenger += cabinFee;
+    }
+    if (flightMeta.includeCheckedBag === true) {
+      if (baggage.unit !== void 0) {
+        const includedPieces = baggage.unit === "pcs" ? readNumberValue(baggage.amount) ?? 0 : 1;
+        if (includedPieces < 1) return void 0;
+      } else {
+        const checkedFee = readNumberValue(baggage["1"]);
+        if (checkedFee === void 0 || checkedFee < 0) return void 0;
+        feePerPassenger += checkedFee;
+      }
+    }
+    return Math.round(feePerPassenger * flightMeta.adults);
   }
   function readPanFlightsRouteLegStopCount(route, dataKey) {
     const legData = isRecord(route[dataKey]) ? route[dataKey] : void 0;
