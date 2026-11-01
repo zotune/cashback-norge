@@ -286,8 +286,11 @@ type FlightSearchMeta = {
   inboundDate?: string;
   adults: number;
   youths: number;
+  // Barn 2–11 år og spedbarn 0–1 år (på fanget), som FINN og flyselskapene skiller.
   children: number;
   infants: number;
+  // Barnas alder når siden oppgir den; ellers brukes FLIGHT_DEFAULT_CHILD_AGE.
+  childAges?: number[];
   cabinClass?: FlightCabinClass;
   // 0 = kun direkte; undefined = alle.
   maxStops?: number;
@@ -501,6 +504,10 @@ const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
 const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
 const FLIGHT_TOOLTIP_MAX_ROWS = 6;
 const FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET = 1_000_000_000;
+// Kilder som krever alder (Skyscanner, momondo) får en alder i barnebåndet 2–11 år
+// når siden bare oppgir antall; barnepris gjelder hele båndet hos flyselskapene.
+const FLIGHT_DEFAULT_CHILD_AGE = 7;
+const FLIGHT_INFANT_AGE = 1;
 // FINN har ikke fleksible datoer i API-et: hver kombinasjon er et eget søk.
 // ±3/±3 tur/retur = 49 søk; større vinduer begrenses til kombinasjonene nærmest valgt dato.
 const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
@@ -1867,7 +1874,7 @@ async function fetchPanFlightsPlaceIataCode(sid: string): Promise<string | undef
   return code;
 }
 
-const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?(?:\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?)?(?:\/(?:economy|premium|business|first))?\/?$/i;
+const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?(?:\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?)?(?:\/\d+adults?)?(?:\/children(?:-\d+[LS]?)+)?(?:\/(?:economy|premium|business|first))?\/?$/i;
 // momondo støtter ±1–3 dager per etappe, både i URL-en og i poll-API-ets flex-felt.
 const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"] as const;
 
@@ -1910,6 +1917,7 @@ function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     youths: 0,
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+    ...readMomondoPassengerPathParts(parts.slice(3)),
     ...(cabinClass !== undefined ? { cabinClass } : {}),
     ...readMomondoFlightFilters(parsedUrl),
   });
@@ -1958,6 +1966,44 @@ function readMomondoFlightFilters(parsedUrl: URL): FlightLinkFilters {
   };
 }
 
+// momondos passasjerkoder (verifisert 2026-11-02): ADT, CHD med alder, INL = spedbarn på fanget.
+function buildMomondoPassengerDetails(flightMeta: FlightSearchMeta): Array<{ ptc: string; age?: number }> {
+  return [
+    ...Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
+    ...readFlightChildAges(flightMeta).map((age) => ({ ptc: "CHD", age })),
+    ...Array.from({ length: flightMeta.infants }, () => ({ ptc: "INL" })),
+  ];
+}
+
+// Sti-segmenter for reisende: "2adults" og "children-7-1L" (L = spedbarn på fanget).
+// Med barn må voksne alltid oppgis ("1adults"); "1adult" ignorerer barna.
+function buildMomondoPassengerPathParts(flightMeta: FlightSearchMeta): string[] {
+  const hasChildren = flightMeta.children > 0 || flightMeta.infants > 0;
+  return [
+    ...(flightMeta.adults > 1 || hasChildren ? [`${flightMeta.adults}adults`] : []),
+    ...(hasChildren
+      ? [["children", ...readFlightChildAges(flightMeta).map(String), ...Array.from({ length: flightMeta.infants }, () => "1L")].join("-")]
+      : []),
+  ];
+}
+
+function readMomondoPassengerPathParts(parts: string[]): Pick<FlightSearchMeta, "adults" | "children" | "infants" | "childAges"> | undefined {
+  const adults = readPositiveIntegerValue(parts.map((part) => part.match(/^(\d+)adults?$/i)?.[1]).find((value) => value !== undefined));
+  const childPart = parts.find((part) => /^children(-\d+[LS]?)+$/i.test(part));
+  if (adults === undefined && childPart === undefined) return undefined;
+  const childTokens = childPart?.split("-").slice(1) ?? [];
+  const childAges = childTokens
+    .filter((token) => /^\d+$/.test(token))
+    .map(Number)
+    .filter((age) => age >= 2 && age <= 11);
+  return {
+    adults: adults ?? 1,
+    children: childAges.length,
+    infants: childTokens.filter((token) => /^\d+[LS]$/i.test(token) || Number(token) < 2).length,
+    childAges,
+  };
+}
+
 // "2026-11-10-flexible-3days" → ["2026-11-10", 3].
 function readMomondoFlexibleDatePart(value: string | undefined): [string | undefined, number] {
   const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
@@ -1991,10 +2037,11 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
       readPositiveIntegerValue(parsedUrl.searchParams.get("adultsv2")) ??
       1,
     youths: 0,
-    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ??
-      readNonNegativeIntegerValue(parsedUrl.searchParams.get("childrenv2")) ??
-      0,
-    infants: 0,
+    // childrenv2 er aldere skilt med "|" (f.eks. "7|1"); 0–1 år er spedbarn.
+    ...readFlightPassengerAges((parsedUrl.searchParams.get("childrenv2") ?? "")
+      .split("|")
+      .map((age) => readNonNegativeIntegerValue(age))
+      .filter((age): age is number => age !== undefined)),
     ...(cabinClass !== undefined ? { cabinClass } : {}),
     ...(prefersDirect ? { maxStops: 0 } : {}),
   });
@@ -2064,8 +2111,8 @@ function extractTripComFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     ...(inboundDate !== undefined ? { inboundDate } : {}),
     adults: readPositiveIntegerValue(parsedUrl.searchParams.get("quantity")) ?? 1,
     youths: 0,
-    children: 0,
-    infants: 0,
+    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("childqty")) ?? 0,
+    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("babyqty")) ?? 0,
     ...(cabinClass !== undefined ? { cabinClass } : {}),
     ...(nonstopOnly ? { maxStops: 0 } : {}),
   });
@@ -2375,10 +2422,15 @@ function normalizeFlightSearchMeta(meta: FlightSearchMeta): FlightSearchMeta | u
     destination,
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
-    adults: Math.max(1, Math.trunc(meta.adults)),
-    youths: Math.max(0, Math.trunc(meta.youths)),
+    // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
+    adults: Math.max(1, Math.trunc(meta.adults) + Math.max(0, Math.trunc(meta.youths))),
+    youths: 0,
     children: Math.max(0, Math.trunc(meta.children)),
     infants: Math.max(0, Math.trunc(meta.infants)),
+    ...(meta.childAges !== undefined && meta.childAges.length === Math.trunc(meta.children) &&
+      meta.childAges.every((age) => Number.isInteger(age) && age >= 2 && age <= 11)
+      ? { childAges: meta.childAges }
+      : {}),
     ...(meta.cabinClass !== undefined ? { cabinClass: meta.cabinClass } : {}),
     ...(meta.maxStops !== undefined ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {}),
     ...(meta.includeCabinBag === true ? { includeCabinBag: true } : {}),
@@ -2397,8 +2449,24 @@ function isOpaqueFlightSearchPage(parsedUrl: URL): boolean {
     isGoogleFlightsSearchPage(parsedUrl);
 }
 
+// Spedbarn sitter på fanget til en voksen, så det kan ikke være flere spedbarn enn voksne.
 function isFlightSearchPassengerMatchSupported(flightMeta: FlightSearchMeta): boolean {
-  return flightMeta.adults > 0 && flightMeta.youths === 0 && flightMeta.children === 0 && flightMeta.infants === 0;
+  return flightMeta.adults > 0 && flightMeta.infants <= flightMeta.adults;
+}
+
+function readFlightChildAges(flightMeta: FlightSearchMeta): number[] {
+  return flightMeta.childAges ?? Array.from({ length: flightMeta.children }, () => FLIGHT_DEFAULT_CHILD_AGE);
+}
+
+// Ett sete per voksen og barn; spedbarn sitter på fanget (bagasje følger setene).
+function countFlightSeatedPassengers(flightMeta: FlightSearchMeta): number {
+  return flightMeta.adults + flightMeta.children;
+}
+
+// Aldersliste (2–11 = barn, 0–1 = spedbarn) slik Skyscanner og momondo tar den.
+function readFlightPassengerAges(ages: number[]): Pick<FlightSearchMeta, "children" | "infants" | "childAges"> {
+  const childAges = ages.filter((age) => age >= 2 && age <= 11);
+  return { children: childAges.length, infants: ages.filter((age) => age < 2).length, childAges };
 }
 
 async function buildFlightAirportLookup(flightMeta: FlightSearchMeta): Promise<FlightAirportCodeLookup> {
@@ -3009,6 +3077,9 @@ function buildFinnFlightSearchUrl(
 ): string {
   const params = new URLSearchParams({
     adults: String(flightMeta.adults),
+    // FINN: barn 2–11 år og spedbarn 0–1 år som antall.
+    ...(flightMeta.children > 0 ? { children: String(flightMeta.children) } : {}),
+    ...(flightMeta.infants > 0 ? { infants: String(flightMeta.infants) } : {}),
     // finn aksepterer economy|premium|business|first (verifisert mot søkeskjemaet).
     cabinType: flightMeta.cabinClass ?? "economy",
     requestedDepartureDate: flightMeta.outboundDate,
@@ -3652,8 +3723,8 @@ function buildPanFlightsFlightSearchPayload(
     oneperdate: "0",
     currency: "NOK",
     adults: String(flightMeta.adults),
-    children: "0",
-    infants: "0",
+    children: String(flightMeta.children),
+    infants: String(flightMeta.infants),
     class: buildPanFlightsCabinClass(flightMeta),
     carryons: flightMeta.includeCabinBag === true ? 1 : 0,
     checkedluggages: flightMeta.includeCheckedBag === true ? 1 : 0,
@@ -4097,7 +4168,7 @@ function readPanFlightsBaggageFee(baggage: unknown, flightMeta: FlightSearchMeta
       feePerPassenger += checkedFee;
     }
   }
-  return Math.round(feePerPassenger * flightMeta.adults);
+  return Math.round(feePerPassenger * countFlightSeatedPassengers(flightMeta));
 }
 
 function readPanFlightsRouteLegStopCount(route: Record<string, unknown>, dataKey: "tripdata" | "backdata"): number | undefined {
@@ -4155,8 +4226,15 @@ function buildGoogleFlightsTfsParam(flightMeta: FlightSearchMeta): string {
       ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops))
       : []),
   ];
+  // Felt 8 per reisende: 1 = voksen, 2 = barn, 4 = spedbarn på fanget.
   for (let index = 0; index < flightMeta.adults; index++) {
     bytes.push(...encodeProtoVarintField(8, 1));
+  }
+  for (let index = 0; index < flightMeta.children; index++) {
+    bytes.push(...encodeProtoVarintField(8, 2));
+  }
+  for (let index = 0; index < flightMeta.infants; index++) {
+    bytes.push(...encodeProtoVarintField(8, 4));
   }
   bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
   bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== undefined ? 1 : 2));
@@ -4351,7 +4429,7 @@ function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     adults: String(flightMeta.adults),
     adultsv2: String(flightMeta.adults),
     cabinclass: buildSkyscannerCabinClass(flightMeta).toLowerCase().replace(/_/g, ""),
-    childrenv2: "",
+    childrenv2: [...readFlightChildAges(flightMeta), ...Array.from({ length: flightMeta.infants }, () => FLIGHT_INFANT_AGE)].join("|"),
     inboundaltsenabled: "false",
     outboundaltsenabled: "false",
     preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
@@ -4493,8 +4571,8 @@ function buildTravellinkRecoverSearchPayload(
     itinerarySearchRequest: {
       type: flightMeta.inboundDate !== undefined ? "ROUND_TRIP" : "ONE_WAY",
       numAdults: flightMeta.adults,
-      numChildren: 0,
-      numInfants: 0,
+      numChildren: flightMeta.children,
+      numInfants: flightMeta.infants,
       cabinClass: buildTravellinkCabinClass(flightMeta),
       mainAirportsOnly: false,
       directFlightsOnly: flightMeta.maxStops === 0,
@@ -4555,8 +4633,8 @@ function buildTravellinkSearchGraphqlPayload(
         unbundledMappingGrouping: "DEFAULT",
         itinerary: {
           numAdults: flightMeta.adults,
-          numChildren: 0,
-          numInfants: 0,
+          numChildren: flightMeta.children,
+          numInfants: flightMeta.infants,
           cabinClass: buildTravellinkCabinClass(flightMeta),
           externalSelection: null,
           segments,
@@ -4859,6 +4937,9 @@ function buildTripComFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     class: buildTripComCabinClassParam(flightMeta),
     lowpricesource: "searchform",
     quantity: String(flightMeta.adults),
+    // childqty/babyqty verifisert 2026-11-02; totalPrice gjelder da alle reisende.
+    ...(flightMeta.children > 0 ? { childqty: String(flightMeta.children) } : {}),
+    ...(flightMeta.infants > 0 ? { babyqty: String(flightMeta.infants) } : {}),
     searchboxarg: "t",
     nonstoponly: flightMeta.maxStops === 0 ? "on" : "off",
     locale: "en-US",
@@ -5074,8 +5155,8 @@ function buildTripComFlightListSearchPayload(
       journeyNo: 1,
       passengerInfoType: {
         adultCount: flightMeta.adults,
-        childCount: 0,
-        infantCount: 0,
+        childCount: flightMeta.children,
+        infantCount: flightMeta.infants,
       },
       journeyInfoTypes: buildTripComJourneyInfoTypes(flightMeta),
       policyId: null,
@@ -5395,8 +5476,8 @@ function buildTripComLowPricePayload(flightMeta: FlightSearchMeta): Record<strin
     searchInfo: {
       travelerNum: {
         adult: flightMeta.adults,
-        child: 0,
-        infant: 0,
+        child: flightMeta.children,
+        infant: flightMeta.infants,
       },
     },
     abtList: [],
@@ -5668,7 +5749,7 @@ function buildSkyscannerFlightSearchPayload(
 
   return {
     cabinClass: buildSkyscannerCabinClass(flightMeta),
-    childAges: [],
+    childAges: [...readFlightChildAges(flightMeta), ...Array.from({ length: flightMeta.infants }, () => FLIGHT_INFANT_AGE)],
     adults: flightMeta.adults,
     legs,
   };
@@ -6181,15 +6262,13 @@ function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     flightMeta.inboundDate !== undefined
       ? formatDate(flightMeta.inboundDate, dateFlex !== undefined ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0)
       : undefined,
+    ...buildMomondoPassengerPathParts(flightMeta),
     flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : undefined,
   ].filter((part): part is string => part !== undefined);
   // Med datovindu sorteres på pris, så de billigste kombinasjonene kommer med i svaret.
   const params = new URLSearchParams({ sort: dateFlex !== undefined ? "price_a" : MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
   const momondoFilters = buildMomondoFlightFilterValue(flightMeta);
   if (momondoFilters !== undefined) params.set("fs", momondoFilters);
-  if (flightMeta.adults !== 1) {
-    params.set("adults", String(flightMeta.adults));
-  }
   return `https://www.momondo.no/flight-search/${pathParts.map(encodeURIComponent).join("/")}?${params.toString()}`;
 }
 
@@ -6505,8 +6584,8 @@ function buildMomondoFlightDynamicPollPayload(
     userSearchParams: {
       legs: buildMomondoFlightDynamicRequestLegs(flightMeta),
       ...(searchId !== undefined ? { searchId } : {}),
-      passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
-      passengerDetails: Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
+      passengers: buildMomondoPassengerDetails(flightMeta).map((passenger) => passenger.ptc),
+      passengerDetails: buildMomondoPassengerDetails(flightMeta),
       sortMode,
     },
     searchMetaData: {
@@ -6532,7 +6611,7 @@ function buildMomondoFlightPollPayload(
     userSearchParams: {
       ...(searchId !== undefined ? { searchId } : {}),
       legs: buildMomondoFlightRequestLegs(flightMeta, airportLookup),
-      passengers: Array.from({ length: flightMeta.adults }, () => "ADT"),
+      passengers: buildMomondoPassengerDetails(flightMeta).map((passenger) => passenger.ptc),
       pageType: "frontDoor",
       sortMode,
     },
@@ -8906,7 +8985,10 @@ function exceedsFlightMaxStops(flightMeta: FlightSearchMeta, stopCounts: Array<n
 // Kalender-/laveste-pris-fallbackene er rute-laveste economy-priser uten
 // stopp-/bagasjeinfo; med aktive filtre ville de undergrave sammenligningen.
 function hasFlightSearchResultFilters(flightMeta: FlightSearchMeta): boolean {
-  return flightMeta.maxStops !== undefined ||
+  // Kalenderprisene er laveste pris per voksen; med barn er de ikke totalpris for søket.
+  return flightMeta.children > 0 ||
+    flightMeta.infants > 0 ||
+    flightMeta.maxStops !== undefined ||
     flightMeta.maxDurationMinutes !== undefined ||
     flightMeta.includeCabinBag === true ||
     flightMeta.includeCheckedBag === true ||
@@ -9039,7 +9121,11 @@ function formatFlightDate(value: string): string {
 }
 
 function formatFlightPassengerText(flightMeta: FlightSearchMeta): string {
-  return flightMeta.adults === 1 ? "1 voksen" : `${flightMeta.adults} voksne`;
+  return [
+    flightMeta.adults === 1 ? "1 voksen" : `${flightMeta.adults} voksne`,
+    flightMeta.children > 0 ? `${flightMeta.children} barn` : undefined,
+    flightMeta.infants > 0 ? `${flightMeta.infants} spedbarn` : undefined,
+  ].filter((part): part is string => part !== undefined).join(", ");
 }
 
 function formatFlightCabinClassText(flightMeta: FlightSearchMeta): string | undefined {
@@ -9105,7 +9191,15 @@ function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: Shadow
   const passengerCount = flightMeta.adults + flightMeta.youths + flightMeta.children + flightMeta.infants;
   const cabinClassText = formatFlightCabinClassText(flightMeta) ?? "Økonomi";
   const chips: Array<{ iconSvg?: string; text: string; tip: string }> = [
-    { iconSvg: FLIGHT_PASSENGER_ICON_SVG, text: String(passengerCount), tip: formatFlightPassengerText(flightMeta) },
+    {
+      iconSvg: FLIGHT_PASSENGER_ICON_SVG,
+      text: String(passengerCount),
+      tip: [
+        formatFlightPassengerText(flightMeta),
+        flightMeta.children > 0 && flightMeta.childAges === undefined ? "(barn regnet som 2–11 år)" : undefined,
+        flightMeta.infants > 0 ? "(spedbarn på fanget)" : undefined,
+      ].filter((part): part is string => part !== undefined).join(" "),
+    },
     { iconSvg: FLIGHT_CABIN_CLASS_ICON_SVG, text: cabinClassText.replace(" Economy", "").replace(" Class", ""), tip: cabinClassText },
     ...(flightMeta.includeCabinBag === true
       ? [{ iconSvg: FLIGHT_CABIN_BAG_ICON_SVG, text: "1", tip: "1 håndbagasje per reisende" }]
@@ -9152,6 +9246,7 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
     flightMeta.youths,
     flightMeta.children,
     flightMeta.infants,
+    flightMeta.childAges?.join(",") ?? "",
     flightMeta.cabinClass ?? "",
     flightMeta.maxStops ?? "",
     flightMeta.includeCabinBag === true ? "hb" : "",
