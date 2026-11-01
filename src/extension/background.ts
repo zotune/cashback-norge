@@ -42,6 +42,8 @@ const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v3";
 const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const APPSTOREPRICE_REGION_PRICE_CACHE_KEY = "appstoreprice-region-price-cache-v11";
 const APPSTOREPRICE_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+// Eldre cacheversjoner ble aldri slettet og fylte lagringskvoten sammen med indeksen.
+const REGION_PRICE_CACHE_KEY_PATTERN = /^(?:playstation|appstoreprice)-region-price-cache(?:-v\d+)?$/;
 const indexCache = createCashbackIndexCache({
   readBundled: readBundledIndex,
   readCached: readCachedIndex,
@@ -50,14 +52,37 @@ const indexCache = createCashbackIndexCache({
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  void refreshIndex();
+  void removeObsoleteRegionPriceCaches().finally(() => refreshIndex());
   void clearIncognitoActivationsIfNoIncognitoWindows();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void refreshIndex();
+  void removeObsoleteRegionPriceCaches().finally(() => refreshIndex());
   void clearIncognitoActivationsIfNoIncognitoWindows();
 });
+
+async function removeObsoleteRegionPriceCaches(): Promise<void> {
+  const items = await new Promise<Record<string, unknown>>((resolveValue) => {
+    chrome.storage.local.get(null, (values) => resolveValue(values ?? {}));
+  });
+  const currentKeys = new Set([PLAYSTATION_REGION_PRICE_CACHE_KEY, APPSTOREPRICE_REGION_PRICE_CACHE_KEY]);
+  const obsoleteKeys = Object.keys(items).filter((key) => REGION_PRICE_CACHE_KEY_PATTERN.test(key) && !currentKeys.has(key));
+  if (obsoleteKeys.length === 0) return;
+  await new Promise<void>((resolveValue) => {
+    chrome.storage.local.remove(obsoleteKeys, () => {
+      void chrome.runtime.lastError;
+      resolveValue();
+    });
+  });
+}
+
+// Utløpte regionpriser leses aldri igjen; behold bare ferske oppføringer.
+function pruneRegionPriceCache(cache: unknown, maxAgeMs: number): Record<string, unknown> {
+  if (!isPlainRecord(cache)) return {};
+  return Object.fromEntries(Object.entries(cache).filter(([, value]) => {
+    return isPlayStationRegionPriceResult(value) && isFreshWithin(value.fetchedAt, maxAgeMs);
+  }));
+}
 
 chrome.windows.onRemoved.addListener(() => {
   void clearIncognitoActivationsIfNoIncognitoWindows();
@@ -191,6 +216,7 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     "www.trip.com",
     "worka.panflights.com",
     "workb.panflights.com",
+    "typeb.panflights.com",
     "panflights.com",
   ]);
   if (parsedUrl === undefined || !supportedHosts.has(parsedUrl.hostname)) {
@@ -283,8 +309,7 @@ async function readCachedPlayStationRegionPrices(url: string): Promise<PlayStati
 }
 
 async function cachePlayStationRegionPrices(result: PlayStationRegionPriceResult): Promise<void> {
-  const cache = await getStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY);
-  const next = isPlainRecord(cache) ? { ...cache } : {};
+  const next = pruneRegionPriceCache(await getStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY), PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS);
   next[result.productId] = result;
   await setStorageValue(PLAYSTATION_REGION_PRICE_CACHE_KEY, next);
 }
@@ -309,8 +334,7 @@ async function readCachedAppStorePriceRegionPrices(url: string): Promise<PlaySta
 }
 
 async function cacheAppStorePriceRegionPrices(url: string, result: PlayStationRegionPriceResult): Promise<void> {
-  const cache = await getStorageValue(APPSTOREPRICE_REGION_PRICE_CACHE_KEY);
-  const next = isPlainRecord(cache) ? { ...cache } : {};
+  const next = pruneRegionPriceCache(await getStorageValue(APPSTOREPRICE_REGION_PRICE_CACHE_KEY), APPSTOREPRICE_REGION_PRICE_CACHE_MAX_AGE_MS);
   const urlCacheKey = getAppStorePriceRegionPriceCacheKey(url);
   if (urlCacheKey !== undefined) {
     next[urlCacheKey] = result;
@@ -385,6 +409,10 @@ function getStorageValue(key: string): Promise<unknown> {
 function setStorageValue(key: string, value: unknown): Promise<void> {
   return new Promise((resolveValue) => {
     chrome.storage.local.set({ [key]: value }, () => {
+      const error = chrome.runtime.lastError;
+      if (error !== undefined) {
+        console.warn(`[Cashback Norge] Kunne ikke lagre ${key} i chrome.storage.local: ${error.message ?? "ukjent feil"}`);
+      }
       resolveValue();
     });
   });

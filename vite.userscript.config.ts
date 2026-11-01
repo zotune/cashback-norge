@@ -73,6 +73,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      www.trip.com
 // @connect      worka.panflights.com
 // @connect      workb.panflights.com
+// @connect      typeb.panflights.com
 // @connect      panflights.com
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js

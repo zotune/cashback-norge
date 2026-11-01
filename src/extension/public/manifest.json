@@ -3,7 +3,7 @@
   "name": "Cashback Norge",
   "description": "Shows cashback offers for supported stores.",
   "version": "0.2.24",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "unlimitedStorage", "tabs"],
   "host_permissions": [
     "https://www.pokepris.no/*",
     "https://pokepris.no/*",
@@ -43,6 +43,7 @@
     "https://www.trip.com/*",
     "https://worka.panflights.com/*",
     "https://workb.panflights.com/*",
+    "https://typeb.panflights.com/*",
     "https://panflights.com/*"
   ],
   "background": {

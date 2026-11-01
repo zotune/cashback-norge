@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793567740
+// @version      1793568444
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -53,6 +53,7 @@
 // @connect      www.trip.com
 // @connect      worka.panflights.com
 // @connect      workb.panflights.com
+// @connect      typeb.panflights.com
 // @connect      panflights.com
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
@@ -9229,6 +9230,8 @@ ${darkProviderCss}
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
   const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
   const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
+  const PANFLIGHTS_PLACE_LOOKUP_ENDPOINT = "https://typeb.panflights.com/placesidlistpost";
+  const PANFLIGHTS_PLACE_SEARCH_ENDPOINT = "https://typeb.panflights.com/placepost";
   const MOMONDO_FLIGHT_DYNAMIC_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/dynamic/flights/poll";
   const MOMONDO_FLIGHT_V2_POLL_ENDPOINT = "https://www.momondo.no/i/api/search/v2/flights/poll";
   const MOMONDO_FLIGHT_POLL_ATTEMPTS = 7;
@@ -9922,8 +9925,8 @@ ${darkProviderCss}
       if (label === void 0 || label.length === 0 || label.length > 60) continue;
       if (input.type === "radio") {
         if (!input.checked) continue;
-        const maxStopsMatch = label.match(/^maks\.?\s*(\d)\s*stopp\b/i) ?? label.match(/^(?:max|opp?\s*til|up\s*to)\.?\s*(\d)\s*stops?\b/i);
-        const maxStops = readNonNegativeIntegerValue(maxStopsMatch?.[1]);
+        const maxStopsMatch = label.match(/^maks\.?\s*(\d|ett|en|to|tre)\s*stopp\b/i) ?? label.match(/^(?:max|opp?\s*til|up\s*to)\.?\s*(\d|ett|en|to|tre|one|two|three)\s*stop(?:p|s)?\b/i);
+        const maxStops = readFlightStopCountWord(maxStopsMatch?.[1]);
         if (maxStops !== void 0) {
           state.maxStops = maxStops;
         } else if (/^(?:kun\s+)?direkte(?:fly)?$|^nonstop(?:\s+only)?$|^direct(?:\s+only)?$/i.test(label)) {
@@ -9954,7 +9957,16 @@ ${darkProviderCss}
     if (state.maxStops === void 0 && !hasUncappedStopChoice && stopChoiceCounts.length > 0) {
       state.maxStops = Math.max(...stopChoiceCounts);
     }
+    const parsedUrl = parseUrl(window.location.href);
+    if (parsedUrl !== void 0 && isPanFlightsSearchPage(parsedUrl)) {
+      if ((readNonNegativeIntegerValue(document.getElementById("carryons")?.textContent?.trim()) ?? 0) > 0) state.includeCabinBag = true;
+      if ((readNonNegativeIntegerValue(document.getElementById("checkedluggages")?.textContent?.trim()) ?? 0) > 0) state.includeCheckedBag = true;
+    }
     return state;
+  }
+  function readFlightStopCountWord(value) {
+    const words = { en: 1, ett: 1, one: 1, to: 2, two: 2, tre: 3, three: 3 };
+    return value === void 0 ? void 0 : words[value.toLowerCase()] ?? readNonNegativeIntegerValue(value);
   }
   function readFlightFilterInputLabel(input) {
     const label = input.labels?.[0]?.innerText ?? input.getAttribute("aria-label") ?? input.closest("label")?.innerText;
@@ -10073,7 +10085,52 @@ ${darkProviderCss}
     const sid2CodesMatch = document.documentElement.innerHTML.match(
       new RegExp(`[,{]\\s*["']?${value}["']?\\s*:\\s*["']([A-Z]{3}(?:,[A-Z]{3})*)["']`)
     );
-    return readIataCodeValue(sid2CodesMatch?.[1]?.split(",")[0]);
+    const pageCode = readIataCodeValue(sid2CodesMatch?.[1]?.split(",")[0]);
+    if (pageCode !== void 0) return pageCode;
+    if (!panFlightsPlaceCodeLookups.has(value)) {
+      const lookup = fetchPanFlightsPlaceIataCode(value).catch(() => void 0);
+      panFlightsPlaceCodeLookups.set(value, lookup);
+      void lookup.then((code) => {
+        if (code !== void 0) requestCurrentOffers();
+      });
+    }
+    return resolvedPanFlightsPlaceCodes.get(value);
+  }
+  const panFlightsPlaceCodeLookups = /* @__PURE__ */ new Map();
+  const resolvedPanFlightsPlaceCodes = /* @__PURE__ */ new Map();
+  async function fetchPanFlightsPlaceIataCode(sid) {
+    const places = await userscriptJsonRequest(PANFLIGHTS_PLACE_LOOKUP_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+      },
+      body: new URLSearchParams({ data: JSON.stringify({ sidlist: [sid], locale: "nb" }) }).toString(),
+      credentials: "omit"
+    });
+    const place = readRecordArray(places).find((candidate) => readStringValue(candidate.sid) === sid);
+    const name = readStringValue(place?.shortname) ?? readStringValue(place?.name);
+    const lat = readNumberValue(place?.lat);
+    const lng = readNumberValue(place?.lng);
+    if (name === void 0 || lat === void 0 || lng === void 0) {
+      console.warn(`[Cashback Norge] PanFlights-sted ${sid} mangler navn/koordinater i ${PANFLIGHTS_PLACE_LOOKUP_ENDPOINT}.`);
+      return void 0;
+    }
+    const params = new URLSearchParams({ locale: "nb", query: name, ver: "9" });
+    const matches = await userscriptJsonRequest(`${PANFLIGHTS_PLACE_SEARCH_ENDPOINT}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      credentials: "omit"
+    });
+    const code = readRecordArray(matches).filter((candidate) => readNumberValue(candidate.type) === 0 && readStringValue(candidate.stationtype) === "air").map((candidate) => ({
+      code: readIataCodeValue(candidate.sid),
+      distance: Math.hypot((readNumberValue(candidate.lat) ?? Number.POSITIVE_INFINITY) - lat, (readNumberValue(candidate.lng) ?? Number.POSITIVE_INFINITY) - lng)
+    })).filter((candidate) => candidate.code !== void 0 && candidate.distance < 1).sort((left, right) => left.distance - right.distance)[0]?.code;
+    if (code === void 0) {
+      console.warn(`[Cashback Norge] Fant ingen flyplass for PanFlights-sted ${sid} (${name}) i ${PANFLIGHTS_PLACE_SEARCH_ENDPOINT}.`);
+      return void 0;
+    }
+    resolvedPanFlightsPlaceCodes.set(sid, code);
+    return code;
   }
   const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?(?:\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?)?(?:\/(?:economy|premium|business|first))?\/?$/i;
   const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"];
