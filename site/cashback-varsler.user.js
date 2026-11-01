@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793574208
+// @version      1793575261
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10019,7 +10019,7 @@ ${darkProviderCss}
     };
   }
   function extractFlightSearchMeta(parsedUrl) {
-    const meta = extractSasFlightSearchMeta(parsedUrl) ?? extractFinnFlightSearchMeta(parsedUrl) ?? extractPanFlightsFlightSearchMeta(parsedUrl) ?? extractMomondoFlightSearchMeta(parsedUrl) ?? extractSkyscannerFlightSearchMeta(parsedUrl) ?? extractTravellinkFlightSearchMeta(parsedUrl) ?? extractTripComFlightSearchMeta(parsedUrl) ?? extractGoogleFlightsSearchMeta(parsedUrl) ?? extractStoredFlightSearchMeta(parsedUrl) ?? extractVisibleFlightSearchMeta(parsedUrl);
+    const meta = extractSasFlightSearchMeta(parsedUrl) ?? extractWideroeFlightSearchMeta(parsedUrl) ?? extractAirFranceKlmFlightSearchMeta(parsedUrl) ?? extractAmadeusAirBoundsFlightSearchMeta(parsedUrl) ?? extractFinnFlightSearchMeta(parsedUrl) ?? extractPanFlightsFlightSearchMeta(parsedUrl) ?? extractMomondoFlightSearchMeta(parsedUrl) ?? extractSkyscannerFlightSearchMeta(parsedUrl) ?? extractTravellinkFlightSearchMeta(parsedUrl) ?? extractTripComFlightSearchMeta(parsedUrl) ?? extractGoogleFlightsSearchMeta(parsedUrl) ?? extractStoredFlightSearchMeta(parsedUrl) ?? extractVisibleFlightSearchMeta(parsedUrl);
     return meta !== void 0 ? withVisibleFlightSearchFilters(meta) : void 0;
   }
   function withVisibleFlightSearchFilters(meta) {
@@ -10133,6 +10133,114 @@ ${darkProviderCss}
       children,
       infants
     };
+  }
+  function isAirFranceKlmHostname(hostname) {
+    return /^(?:www\.|wwws\.)?(?:klm|airfrance)\.[a-z.]+$/.test(hostname);
+  }
+  function extractAirFranceKlmFlightSearchMeta(parsedUrl) {
+    if (!isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase()) || !/^\/search\/flights\/\d+\/?$/i.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    const connections = readRecordArray(parseJsonValue(readSessionStorageValue("bwsfe-state-connections") ?? ""));
+    const outbound = connections[0];
+    const inbound = connections[1];
+    const readCode = (place) => readIataCodeValue(isRecord(place) ? place.code : void 0);
+    const origin = readCode(outbound?.origin);
+    const destination = readCode(outbound?.destination);
+    const outboundDate = readIsoDateValue(outbound?.departureDate);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || connections.length > 2) return void 0;
+    const inboundDate = inbound === void 0 ? void 0 : readIsoDateValue(inbound.departureDate);
+    if (inbound !== void 0 && (inboundDate === void 0 || readCode(inbound.origin) !== destination || readCode(inbound.destination) !== origin)) {
+      return void 0;
+    }
+    const tagging = parseJsonValue(readSessionStorageValue("bwc-bw-tagging-state") ?? "");
+    const flow = isRecord(tagging) && isRecord(tagging.flow) ? tagging.flow : void 0;
+    if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
+    const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      // Seniorer og ungdom er voksne hos sammenligningskildene.
+      adults: (readNonNegativeIntegerValue(flow.z_nb_adults) ?? 0) + (readNonNegativeIntegerValue(flow.z_nb_seniors) ?? 0),
+      youths: readNonNegativeIntegerValue(flow.z_nb_youth) ?? 0,
+      children: readNonNegativeIntegerValue(flow.z_nb_children) ?? 0,
+      infants: readNonNegativeIntegerValue(flow.z_nb_infants) ?? 0,
+      ...cabinClass !== void 0 ? { cabinClass } : {}
+    });
+  }
+  function extractAmadeusAirBoundsFlightSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    const isAmadeusBookingPage = hostname === "booking.norwegian.com" && /^\/booking\/flight\/\d+\/?$/i.test(parsedUrl.pathname) || hostname === "shop.lufthansa.com" && /^\/booking\/availability\/\d+\/?$/i.test(parsedUrl.pathname);
+    if (!isAmadeusBookingPage) return void 0;
+    const state = parseJsonValue(readSessionStorageValue("airBoundsSearch") ?? "");
+    if (!isRecord(state) || !isRecord(state.entities)) return void 0;
+    const selectedId = readStringValue(state.selectedAirBoundsSearchId);
+    const search = selectedId !== void 0 && isRecord(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
+    if (search === void 0) return void 0;
+    const itineraries = readRecordArray(search.itineraries);
+    const outbound = itineraries[0];
+    const inbound = itineraries[1];
+    const origin = readIataCodeValue(outbound?.originLocationCode);
+    const destination = readIataCodeValue(outbound?.destinationLocationCode);
+    const readDate = (value) => readIsoDateValue(readStringValue(value)?.slice(0, 10));
+    const outboundDate = readDate(outbound?.departureDateTime);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || itineraries.length > 2) return void 0;
+    const inboundDate = inbound === void 0 ? void 0 : readDate(inbound.departureDateTime);
+    if (inbound !== void 0 && (inboundDate === void 0 || readIataCodeValue(inbound.originLocationCode) !== destination || readIataCodeValue(inbound.destinationLocationCode) !== origin)) {
+      return void 0;
+    }
+    const passengerCodes = readRecordArray(search.travelers).map((traveler) => readStringValue(traveler.passengerTypeCode)?.toUpperCase());
+    const countCodes = (codes) => passengerCodes.filter((code) => code !== void 0 && codes.includes(code)).length;
+    const adults = countCodes(["ADT", "YTH", "YCD", "SRC"]);
+    const children = countCodes(["CHD"]);
+    const infants = countCodes(["INF"]);
+    if (passengerCodes.length === 0 || adults + children + infants !== passengerCodes.length) return void 0;
+    const cabinClass = readFlightCabinClassValue(search.cabin);
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults,
+      youths: 0,
+      children,
+      infants,
+      ...cabinClass !== void 0 ? { cabinClass } : {},
+      ...outbound?.directFlights === true ? { maxStops: 0 } : {}
+    });
+  }
+  function readSessionStorageValue(key) {
+    try {
+      return window.sessionStorage.getItem(key) ?? void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function extractWideroeFlightSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "wideroe.no" || !/^\/(?:[a-z]{2}\/)?book-flight\/flight\/?$/i.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    if (parsedUrl.searchParams.get("triptype") !== "1") return void 0;
+    const origin = readIataCodeValue(parsedUrl.searchParams.get("d_city")?.toUpperCase());
+    const destination = readIataCodeValue(parsedUrl.searchParams.get("a_city")?.toUpperCase());
+    const month = parsedUrl.searchParams.get("d_month")?.match(/^(\d{4})(\d{2})$/);
+    const day = readPositiveIntegerValue(parsedUrl.searchParams.get("d_day"));
+    const outboundDate = month !== null && month !== void 0 && day !== void 0 ? readIsoDateValue(`${month[1]}-${month[2]}-${String(day).padStart(2, "0")}`) : void 0;
+    const paxTokens = (parsedUrl.searchParams.get("pax") ?? "").toLowerCase().split(/[,;]/).filter(Boolean);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    if (paxTokens.length === 0 || paxTokens.some((token) => token !== "adt")) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      adults: paxTokens.length,
+      youths: 0,
+      children: 0,
+      infants: 0
+    });
   }
   function extractFinnFlightSearchMeta(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -11190,7 +11298,8 @@ ${darkProviderCss}
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0) return false;
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return isPanFlightsSearchPage(parsedUrl) || isSkyscannerFlightSearchPage(parsedUrl) || isGoogleFlightsSearchPage(parsedUrl) || hostname === "momondo.no" || hostname === "travellink.no" || hostname.endsWith("trip.com");
+    return isPanFlightsSearchPage(parsedUrl) || isSkyscannerFlightSearchPage(parsedUrl) || isGoogleFlightsSearchPage(parsedUrl) || hostname === "momondo.no" || hostname === "travellink.no" || hostname.endsWith("trip.com") || // Flyselskapene søker ofte by (Norwegian: originLocationType "city", KLM: type "city").
+    hostname === "booking.norwegian.com" || hostname === "shop.lufthansa.com" || isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase());
   }
   function buildFinnFlightSearchUrl(flightMeta, scope = "exact") {
     const params = new URLSearchParams({
@@ -15848,7 +15957,7 @@ ${darkProviderCss}
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "sas.no" || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "hotels.com" || hostname.endsWith(".hotels.com") || hostname === "expedia.com" || hostname.endsWith(".expedia.com") || hostname === "expedia.no" || hostname.endsWith(".expedia.no") || hostname === "agoda.com" || hostname.endsWith(".agoda.com") || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "sas.no" || hostname === "wideroe.no" || isAirFranceKlmHostname(hostname) || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "hotels.com" || hostname.endsWith(".hotels.com") || hostname === "expedia.com" || hostname.endsWith(".expedia.com") || hostname === "expedia.no" || hostname.endsWith(".expedia.no") || hostname === "agoda.com" || hostname.endsWith(".agoda.com") || hostname === "momondo.no" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;

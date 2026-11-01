@@ -1567,6 +1567,9 @@ function buildFlightDateFlexOffer(input: {
 
 function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
   const meta = extractSasFlightSearchMeta(parsedUrl) ??
+    extractWideroeFlightSearchMeta(parsedUrl) ??
+    extractAirFranceKlmFlightSearchMeta(parsedUrl) ??
+    extractAmadeusAirBoundsFlightSearchMeta(parsedUrl) ??
     extractFinnFlightSearchMeta(parsedUrl) ??
     extractPanFlightsFlightSearchMeta(parsedUrl) ??
     extractMomondoFlightSearchMeta(parsedUrl) ??
@@ -1716,6 +1719,150 @@ function extractSasFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefine
     children,
     infants,
   };
+}
+
+function isAirFranceKlmHostname(hostname: string): boolean {
+  return /^(?:www\.|wwws\.)?(?:klm|airfrance)\.[a-z.]+$/.test(hostname);
+}
+
+// KLM/Air France (/search/flights/0) har bare et indeks i URL-en. Søket ligger i
+// sessionStorage (verifisert på klm.no 2026-11-02): bwsfe-state-connections har rute og dato
+// per etappe, bwc-bw-tagging-state har kabin og antall reisende. localStorage-nøkkelen
+// ubc-search-RECENT_SEARCH brukes ikke, fordi den kan være et tidligere søk.
+function extractAirFranceKlmFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  if (!isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase()) || !/^\/search\/flights\/\d+\/?$/i.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+
+  const connections = readRecordArray(parseJsonValue(readSessionStorageValue("bwsfe-state-connections") ?? ""));
+  const outbound = connections[0];
+  const inbound = connections[1];
+  const readCode = (place: unknown): string | undefined => readIataCodeValue(isRecord(place) ? place.code : undefined);
+  const origin = readCode(outbound?.origin);
+  const destination = readCode(outbound?.destination);
+  const outboundDate = readIsoDateValue(outbound?.departureDate);
+  if (origin === undefined || destination === undefined || outboundDate === undefined || connections.length > 2) return undefined;
+  // Tur/retur bare når andre etappe går motsatt vei; åpne kjever og flere byer støttes ikke.
+  const inboundDate = inbound === undefined ? undefined : readIsoDateValue(inbound.departureDate);
+  if (inbound !== undefined && (inboundDate === undefined || readCode(inbound.origin) !== destination || readCode(inbound.destination) !== origin)) {
+    return undefined;
+  }
+
+  const tagging = parseJsonValue(readSessionStorageValue("bwc-bw-tagging-state") ?? "");
+  const flow = isRecord(tagging) && isRecord(tagging.flow) ? tagging.flow : undefined;
+  if (flow === undefined || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return undefined;
+  const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    // Seniorer og ungdom er voksne hos sammenligningskildene.
+    adults: (readNonNegativeIntegerValue(flow.z_nb_adults) ?? 0) + (readNonNegativeIntegerValue(flow.z_nb_seniors) ?? 0),
+    youths: readNonNegativeIntegerValue(flow.z_nb_youth) ?? 0,
+    children: readNonNegativeIntegerValue(flow.z_nb_children) ?? 0,
+    infants: readNonNegativeIntegerValue(flow.z_nb_infants) ?? 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
+  });
+}
+
+// Norwegian (booking.norwegian.com/booking/flight/0) og Lufthansa (shop.lufthansa.com/booking/
+// availability/0) bruker samme Amadeus-løsning. sessionStorage-nøkkelen airBoundsSearch har det
+// valgte søket (verifisert 2026-11-02): itineraries per etappe, travelers med passasjerkoder,
+// cabin (bare Lufthansa) og directFlights.
+function extractAmadeusAirBoundsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  const isAmadeusBookingPage = (hostname === "booking.norwegian.com" && /^\/booking\/flight\/\d+\/?$/i.test(parsedUrl.pathname)) ||
+    (hostname === "shop.lufthansa.com" && /^\/booking\/availability\/\d+\/?$/i.test(parsedUrl.pathname));
+  if (!isAmadeusBookingPage) return undefined;
+
+  const state = parseJsonValue(readSessionStorageValue("airBoundsSearch") ?? "");
+  if (!isRecord(state) || !isRecord(state.entities)) return undefined;
+  const selectedId = readStringValue(state.selectedAirBoundsSearchId);
+  const search = selectedId !== undefined && isRecord(state.entities[selectedId]) ? state.entities[selectedId] : undefined;
+  if (search === undefined) return undefined;
+
+  const itineraries = readRecordArray(search.itineraries);
+  const outbound = itineraries[0];
+  const inbound = itineraries[1];
+  const origin = readIataCodeValue(outbound?.originLocationCode);
+  const destination = readIataCodeValue(outbound?.destinationLocationCode);
+  // departureDateTime er "2026-11-20T00:00:00.000"; datoen er de ti første tegnene.
+  const readDate = (value: unknown): string | undefined => readIsoDateValue(readStringValue(value)?.slice(0, 10));
+  const outboundDate = readDate(outbound?.departureDateTime);
+  if (origin === undefined || destination === undefined || outboundDate === undefined || itineraries.length > 2) return undefined;
+  const inboundDate = inbound === undefined ? undefined : readDate(inbound.departureDateTime);
+  if (inbound !== undefined && (
+    inboundDate === undefined ||
+    readIataCodeValue(inbound.originLocationCode) !== destination ||
+    readIataCodeValue(inbound.destinationLocationCode) !== origin
+  )) {
+    return undefined;
+  }
+
+  // ADT/YTH/SRC er voksne hos sammenligningskildene, CHD barn og INF spedbarn; ukjente koder
+  // gir ingen treff fremfor et feil antall reisende.
+  const passengerCodes = readRecordArray(search.travelers).map((traveler) => readStringValue(traveler.passengerTypeCode)?.toUpperCase());
+  const countCodes = (codes: string[]): number => passengerCodes.filter((code) => code !== undefined && codes.includes(code)).length;
+  const adults = countCodes(["ADT", "YTH", "YCD", "SRC"]);
+  const children = countCodes(["CHD"]);
+  const infants = countCodes(["INF"]);
+  if (passengerCodes.length === 0 || adults + children + infants !== passengerCodes.length) return undefined;
+  const cabinClass = readFlightCabinClassValue(search.cabin);
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    ...(inboundDate !== undefined ? { inboundDate } : {}),
+    adults,
+    youths: 0,
+    children,
+    infants,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...(outbound?.directFlights === true ? { maxStops: 0 } : {}),
+  });
+}
+
+function readSessionStorageValue(key: string): string | undefined {
+  try {
+    return window.sessionStorage.getItem(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Widerøe: /en/book-flight/flight?d_city=bgo&a_city=osl&pax=adt&triptype=1&d_day=23&d_month=202612
+// (verifisert for én vei, 2026-11-02). Tur/retur og flere reisende godtas først når formatet
+// er sett; ukjente verdier gir ingen treff fremfor feil søk.
+function extractWideroeFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "wideroe.no" || !/^\/(?:[a-z]{2}\/)?book-flight\/flight\/?$/i.test(parsedUrl.pathname)) {
+    return undefined;
+  }
+  if (parsedUrl.searchParams.get("triptype") !== "1") return undefined;
+
+  const origin = readIataCodeValue(parsedUrl.searchParams.get("d_city")?.toUpperCase());
+  const destination = readIataCodeValue(parsedUrl.searchParams.get("a_city")?.toUpperCase());
+  const month = parsedUrl.searchParams.get("d_month")?.match(/^(\d{4})(\d{2})$/);
+  const day = readPositiveIntegerValue(parsedUrl.searchParams.get("d_day"));
+  const outboundDate = month !== null && month !== undefined && day !== undefined
+    ? readIsoDateValue(`${month[1]}-${month[2]}-${String(day).padStart(2, "0")}`)
+    : undefined;
+  const paxTokens = (parsedUrl.searchParams.get("pax") ?? "").toLowerCase().split(/[,;]/).filter(Boolean);
+  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+  if (paxTokens.length === 0 || paxTokens.some((token) => token !== "adt")) return undefined;
+
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate,
+    adults: paxTokens.length,
+    youths: 0,
+    children: 0,
+    infants: 0,
+  });
 }
 
 function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -3068,7 +3215,11 @@ function shouldUseFinnMetropolitanSearchForCurrentPage(): boolean {
     isGoogleFlightsSearchPage(parsedUrl) ||
     hostname === "momondo.no" ||
     hostname === "travellink.no" ||
-    hostname.endsWith("trip.com");
+    hostname.endsWith("trip.com") ||
+    // Flyselskapene søker ofte by (Norwegian: originLocationType "city", KLM: type "city").
+    hostname === "booking.norwegian.com" ||
+    hostname === "shop.lufthansa.com" ||
+    isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase());
 }
 
 function buildFinnFlightSearchUrl(
@@ -9740,6 +9891,8 @@ function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
 function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return hostname === "sas.no" ||
+    hostname === "wideroe.no" ||
+    isAirFranceKlmHostname(hostname) ||
     hostname === "finn.no" ||
     hostname === "hotell.finn.no" ||
     hostname === "booking.com" ||
