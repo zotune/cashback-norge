@@ -262,6 +262,8 @@ type PriceMatchOffer = {
   searchIncomplete?: boolean;
   // Hotelltreff gjenbruker fly-kildene (finnreise/skyscanner/momondo) men trenger egen tooltip-tekst.
   travelKind?: "hotel";
+  // Flysøk med fleksible datoer: prisen gjelder datoene her, som kan avvike fra valgt søk.
+  dateFlex?: FlightDateFlexResult;
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -289,6 +291,40 @@ type FlightSearchMeta = {
   maxStops?: number;
   includeCabinBag?: boolean;
   includeCheckedBag?: boolean;
+  dateFlex?: FlightDateFlex;
+};
+// Dager før/etter valgt utreise- og hjemreisedato (PanFlights' ff:/tf: i v2-URL-en).
+type FlightDateFlex = {
+  outboundBefore: number;
+  outboundAfter: number;
+  inboundBefore: number;
+  inboundAfter: number;
+};
+type FlightDateFlexResult = FlightDateFlex & {
+  outboundDate: string;
+  inboundDate?: string;
+  selectedDatesAmount?: number;
+  matchedCombinationCount: number;
+  checkedCombinationCount: number;
+  totalCombinationCount: number;
+};
+type FlightDateCombination = {
+  outboundDate: string;
+  inboundDate?: string;
+};
+// Billigste treff for én datokombinasjon hos én kilde.
+type FlightDateFlexOption = PriceMatchAlternative & FlightDateCombination & {
+  productUrl: string;
+  offerUrl?: string;
+};
+type FinnFlightDateFlexJob = {
+  key: string;
+  startedAt: number;
+  combinations: FlightDateCombination[];
+  results: Map<string, PriceMatchOffer | undefined>;
+  done: boolean;
+  cancelled: boolean;
+  selectedDatesSearched: Promise<void>;
 };
 type FlightSearchFilterState = {
   maxStops?: number;
@@ -321,6 +357,8 @@ type PanFlightsOfferCandidate = PriceMatchAlternative & {
   sourceRank: number;
   sourceSortOrder: PanFlightsSearchVariant["sortOrder"];
   sourceVersion: PanFlightsSearchVariant["version"];
+  outboundDate?: string;
+  inboundDate?: string;
 };
 type PanFlightsSearchVariant = {
   sortOrder: "duration" | "quality" | "price";
@@ -454,12 +492,22 @@ const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
 const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
 const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
 const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
+const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
 const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
 const FLIGHT_TOOLTIP_MAX_ROWS = 6;
+// FINN har ikke fleksible datoer i API-et: hver kombinasjon er et eget søk.
+// ±3/±3 tur/retur = 49 søk; større vinduer begrenses til kombinasjonene nærmest valgt dato.
+const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
+const FINN_FLIGHT_DATE_FLEX_CONCURRENCY = 6;
+// Transporten skiller ikke 429/5xx fra «ingen treff», så kombinasjoner uten svar får ett nytt forsøk.
+const FINN_FLIGHT_DATE_FLEX_RETRY_DELAY_MS = 3000;
+const FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS = 15 * 60 * 1000;
+// Modningsrunder etter de vanlige, mens datovinduet fortsatt søkes.
+const FLIGHT_DATE_FLEX_EXTRA_MATURATION_DELAYS_MS = Array.from({ length: 15 }, () => 8000);
 const FLIGHT_OFFER_CANDIDATE_LIMIT = 10;
 // Sikkerhetsgrense for alle høyre-tooltips, slik at ingen blir absurd høy.
 const TOOLTIP_MAX_LINES = 35;
-const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = false;
+const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = true;
 const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
 const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
@@ -1085,6 +1133,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
   if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return undefined;
 
   const airportLookup = await buildFlightAirportLookup(flightMeta);
+  const dateFlex = flightMeta.dateFlex;
   const routeTitle = `${flightMeta.origin} → ${flightMeta.destination}`;
   const fullSearchDetails = [
     formatFlightDateRange(flightMeta),
@@ -1129,11 +1178,23 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
   ];
 
   const liveOfferFinders: FlightLiveOfferFinder[] = [
-    { source: "finnreise", sourceName: "FINN", findOffer: (options?: FlightOfferFindOptions) => findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, options) },
+    {
+      source: "finnreise",
+      sourceName: "FINN",
+      findOffer: (options?: FlightOfferFindOptions) => dateFlex !== undefined
+        ? findFinnFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex, options)
+        : findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, options),
+    },
     ...(ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE
-      ? [{ source: "panflights" as const, sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
+      ? [{ source: "panflights" as const, sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, dateFlex) }]
       : []),
-    { source: "momondo", sourceName: "momondo", findOffer: () => findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+    {
+      source: "momondo",
+      sourceName: "momondo",
+      findOffer: () => dateFlex !== undefined
+        ? findMomondoFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex)
+        : findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup),
+    },
     { source: "skyscanner", sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
     ...(ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE
       ? [{ source: "travellink" as const, sourceName: "Travellink", findOffer: () => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
@@ -1180,7 +1241,10 @@ async function matureFlightPriceMatches(
   regionPrices: PlayStationRegionPriceResult | undefined,
 ): Promise<void> {
   let currentMatches = priceMatches;
-  for (const delayMs of FLIGHT_PRICE_MATURATION_DELAYS_MS) {
+  const maturationDelays = priceMatches.some((offer) => offer.dateFlex !== undefined && offer.searchIncomplete === true)
+    ? [...FLIGHT_PRICE_MATURATION_DELAYS_MS, ...FLIGHT_DATE_FLEX_EXTRA_MATURATION_DELAYS_MS]
+    : FLIGHT_PRICE_MATURATION_DELAYS_MS;
+  for (const delayMs of maturationDelays) {
     await sleep(delayMs);
     if (generation !== renderGeneration) return;
 
@@ -1235,6 +1299,121 @@ async function safelyFindFlightPriceMatchOffer(
     console.warn(`[Cashback Norge] Kunne ikke hente flypris fra ${sourceName}.`, error);
     return undefined;
   }
+}
+
+function isIsoDateWithinDays(date: string | undefined, centerDate: string, daysBefore: number, daysAfter: number): boolean {
+  if (date === undefined) return false;
+  const time = new Date(`${date}T00:00:00Z`).getTime();
+  const centerTime = new Date(`${centerDate}T00:00:00Z`).getTime();
+  if (Number.isNaN(time) || Number.isNaN(centerTime)) return false;
+  const dayOffset = Math.round((time - centerTime) / (24 * 60 * 60 * 1000));
+  return dayOffset >= -daysBefore && dayOffset <= daysAfter;
+}
+
+function formatFlightDateFlexWindow(before: number, after: number): string {
+  return before === after ? `±${before}` : `-${before}/+${after}`;
+}
+
+function formatFlightDateFlexDays(dateFlex: FlightDateFlex, roundTrip: boolean): string {
+  const outbound = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
+  const inbound = formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter);
+  return !roundTrip || outbound === inbound ? `${outbound} d` : `${outbound}/${inbound} d`;
+}
+
+// Alle dato-kombinasjoner i vinduet, valgt dato først og deretter nærmeste.
+function listFlightDateFlexCombinations(flightMeta: FlightSearchMeta, dateFlex: FlightDateFlex): FlightDateCombination[] {
+  const listDates = (centerDate: string, before: number, after: number): Array<{ date: string; offset: number }> => {
+    const firstDate = shiftFlightDateNotBeforeToday(centerDate, -before);
+    const dates: Array<{ date: string; offset: number }> = [];
+    for (let offset = -before; offset <= after; offset++) {
+      const date = addDaysToIsoDate(centerDate, offset);
+      if (date !== undefined && date >= firstDate) dates.push({ date, offset });
+    }
+    return dates;
+  };
+
+  const outboundDates = listDates(flightMeta.outboundDate, dateFlex.outboundBefore, dateFlex.outboundAfter);
+  const { inboundDate } = flightMeta;
+  const combinations: Array<FlightDateCombination & { distance: number }> = inboundDate === undefined
+    ? outboundDates.map(({ date, offset }) => ({ outboundDate: date, distance: Math.abs(offset) }))
+    : outboundDates.flatMap((outbound) => {
+      return listDates(inboundDate, dateFlex.inboundBefore, dateFlex.inboundAfter)
+        .filter((inbound) => inbound.date >= outbound.date)
+        .map((inbound) => ({
+          outboundDate: outbound.date,
+          inboundDate: inbound.date,
+          distance: Math.abs(outbound.offset) + Math.abs(inbound.offset),
+        }));
+    });
+  return combinations
+    .sort((left, right) => left.distance - right.distance)
+    .map(({ distance: _distance, ...combination }) => combination);
+}
+
+function buildFlightDateCombinationKey(combination: { outboundDate: string; inboundDate?: string | undefined }): string {
+  return `${combination.outboundDate}|${combination.inboundDate ?? ""}`;
+}
+
+// Felles rad for fleksible datoer: billigste kombinasjon på raden, alle i tooltipen.
+function buildFlightDateFlexOffer(input: {
+  source: NonNullable<PriceMatchOffer["source"]>;
+  sourceName: string;
+  flightMeta: FlightSearchMeta;
+  dateFlex: FlightDateFlex;
+  routeTitle: string;
+  searchDetails: string;
+  options: FlightDateFlexOption[];
+  checkedCombinationCount: number;
+  totalCombinationCount: number;
+  searchIncomplete?: boolean;
+}): PriceMatchOffer | undefined {
+  const { flightMeta } = input;
+  const options = [...input.options].sort(comparePriceMatchesBySortAmount);
+  const best = options[0];
+  if (best === undefined) return undefined;
+
+  const isSelectedDates = (option: { outboundDate: string; inboundDate?: string | undefined }): boolean => {
+    return option.outboundDate === flightMeta.outboundDate && option.inboundDate === flightMeta.inboundDate;
+  };
+  const selected = options.find(isSelectedDates);
+  return {
+    source: input.source,
+    sourceName: input.sourceName,
+    details: input.searchDetails,
+    matchedExactProduct: isSelectedDates(best),
+    // Datoene vises sammen med butikken på raden; reisetid står per dato i tooltipen.
+    shopName: best.shopName,
+    price: best.price,
+    amount: best.amount,
+    sortAmount: best.sortAmount ?? best.amount,
+    currency: best.currency,
+    productName: `${input.routeTitle} · ${formatFlightDateFlexDays(input.dateFlex, flightMeta.inboundDate !== undefined)}`,
+    productUrl: best.productUrl,
+    ...(best.offerUrl !== undefined ? { offerUrl: best.offerUrl } : {}),
+    ...(input.searchIncomplete === true ? { searchIncomplete: true } : {}),
+    dateFlex: {
+      ...input.dateFlex,
+      outboundDate: best.outboundDate,
+      ...(best.inboundDate !== undefined ? { inboundDate: best.inboundDate } : {}),
+      ...(selected !== undefined ? { selectedDatesAmount: selected.sortAmount ?? selected.amount } : {}),
+      matchedCombinationCount: options.length,
+      checkedCombinationCount: input.checkedCombinationCount,
+      totalCombinationCount: input.totalCombinationCount,
+    },
+    alternatives: options.map(({
+      outboundDate,
+      inboundDate,
+      productUrl: _productUrl,
+      offerUrl: _offerUrl,
+      shopName,
+      platform,
+      ...option
+    }) => ({
+      ...option,
+      shopName: `${formatFlightShortDateRange(outboundDate, inboundDate)}${isSelectedDates({ outboundDate, inboundDate }) ? " (valgt)" : ""}:`,
+      platform: [shopName, platform].filter((part): part is string => part !== undefined && part.length > 0).join(", "),
+    })),
+  };
 }
 
 function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -1417,12 +1596,14 @@ function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
   const outboundDate = readCompactIsoDateValue(parts[2]);
   const inboundDate = readCompactIsoDateValue(parts[3]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+  const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== undefined ? 4 : 3), inboundDate !== undefined);
 
   return normalizeFlightSearchMeta({
     origin,
     destination,
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
+    ...(dateFlex !== undefined ? { dateFlex } : {}),
     adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ??
       readPositiveIntegerValue(parsedUrl.searchParams.get("ad")) ??
       1,
@@ -1430,6 +1611,21 @@ function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
   });
+}
+
+// v2-tillegg: ff:<før>,<etter> for utreise og tf:<før>,<etter> for hjemreise (som
+// PanFlights' «+/- N dager»). Manuelle tidsrom (td:/ud:) støttes ikke ennå.
+function readPanFlightsDateFlex(extraParts: string[], roundTrip: boolean): FlightDateFlex | undefined {
+  const readWindow = (key: string): [number, number] => {
+    const value = extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+    const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
+    return before !== undefined ? [before, after ?? before] : [0, 0];
+  };
+  const [outboundBefore, outboundAfter] = readWindow("ff");
+  const [inboundBefore, inboundAfter] = roundTrip ? readWindow("tf") : [0, 0];
+  return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0
+    ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter }
+    : undefined;
 }
 
 function readPanFlightsPlaceIataCode(value: string | undefined): string | undefined {
@@ -1443,7 +1639,9 @@ function readPanFlightsPlaceIataCode(value: string | undefined): string | undefi
   return readIataCodeValue(sid2CodesMatch?.[1]?.split(",")[0]);
 }
 
-const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:\/\d{4}-\d{2}-\d{2})?(?:\/(?:economy|premium|business|first))?\/?$/i;
+const MOMONDO_FLIGHT_SEARCH_PATH_PATTERN = /^\/flight-search\/[^/]+\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?(?:\/\d{4}-\d{2}-\d{2}(?:-flexible-\d+days?)?)?(?:\/(?:economy|premium|business|first))?\/?$/i;
+// momondo støtter ±1–3 dager per etappe, både i URL-en og i poll-API-ets flex-felt.
+const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"] as const;
 
 function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -1456,23 +1654,47 @@ function extractMomondoFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
   const routeParts = routePart?.split("-");
   const origin = readIataCodeValue(routeParts?.[0]);
   const destination = readIataCodeValue(routeParts?.[1]);
-  const outboundDate = readIsoDateValue(parts[2]);
-  const inboundDate = readIsoDateValue(parts[3]);
+  const [outboundDatePart, outboundFlexDays] = readMomondoFlexibleDatePart(parts[2]);
+  const [inboundDatePart, inboundFlexDays] = readMomondoFlexibleDatePart(parts[3]);
+  const outboundDate = readIsoDateValue(outboundDatePart);
+  const inboundDate = readIsoDateValue(inboundDatePart);
   // Kabinklassen er et eget path-segment etter datoene (".../2026-07-25/business").
   const cabinClass = readFlightCabinClassValue(parts[parts.length - 1]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+  const hasDateFlex = outboundFlexDays > 0 || (inboundDate !== undefined && inboundFlexDays > 0);
 
   return normalizeFlightSearchMeta({
     origin,
     destination,
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
+    ...(hasDateFlex
+      ? {
+        dateFlex: {
+          outboundBefore: outboundFlexDays,
+          outboundAfter: outboundFlexDays,
+          inboundBefore: inboundDate !== undefined ? inboundFlexDays : 0,
+          inboundAfter: inboundDate !== undefined ? inboundFlexDays : 0,
+        },
+      }
+      : {}),
     adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
     youths: 0,
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
     ...(cabinClass !== undefined ? { cabinClass } : {}),
   });
+}
+
+// "2026-11-10-flexible-3days" → ["2026-11-10", 3].
+function readMomondoFlexibleDatePart(value: string | undefined): [string | undefined, number] {
+  const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
+  if (match === null || match === undefined) return [value, 0];
+  return [match[1], match[2] !== undefined ? Number(match[2]) : 0];
+}
+
+function readMomondoFlightFlexDays(before: number, after: number): number {
+  return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
 }
 
 function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -1889,6 +2111,7 @@ function normalizeFlightSearchMeta(meta: FlightSearchMeta): FlightSearchMeta | u
     ...(meta.maxStops !== undefined ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {}),
     ...(meta.includeCabinBag === true ? { includeCabinBag: true } : {}),
     ...(meta.includeCheckedBag === true ? { includeCheckedBag: true } : {}),
+    ...(meta.dateFlex !== undefined ? { dateFlex: meta.dateFlex } : {}),
   };
   return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : undefined;
 }
@@ -2048,6 +2271,119 @@ async function findFinnFlightPriceMatchOffer(
     ...(progress !== undefined && progress < 100 ? { searchIncomplete: true } : {}),
     alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
+}
+
+let finnFlightDateFlexJob: FinnFlightDateFlexJob | undefined;
+
+// Søker alle datokombinasjoner i bakgrunnen (begrenset samtidighet). Første kall
+// venter på valgt dato; modningsrundene henter fortløpende øyeblikksbilder.
+async function findFinnFlexibleDatesOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
+  dateFlex: FlightDateFlex,
+  options?: FlightOfferFindOptions,
+): Promise<PriceMatchOffer | undefined> {
+  const job = getOrStartFinnFlightDateFlexJob(flightMeta, routeTitle, searchDetails, airportLookup, dateFlex);
+  if (options?.refresh !== true) await job.selectedDatesSearched;
+
+  const dateOptions: FlightDateFlexOption[] = [];
+  for (const combination of job.combinations) {
+    const offer = job.results.get(buildFlightDateCombinationKey(combination));
+    if (offer === undefined) continue;
+    dateOptions.push({
+      ...combination,
+      shopName: offer.shopName,
+      price: offer.price,
+      amount: offer.amount,
+      sortAmount: offer.sortAmount ?? offer.amount,
+      currency: offer.currency,
+      productUrl: offer.productUrl,
+      ...(offer.offerUrl !== undefined ? { offerUrl: offer.offerUrl } : {}),
+      ...(offer.durationText !== undefined ? { durationText: offer.durationText } : {}),
+    });
+  }
+  return buildFlightDateFlexOffer({
+    source: "finnreise",
+    sourceName: "FINN",
+    flightMeta,
+    dateFlex,
+    routeTitle,
+    searchDetails,
+    options: dateOptions,
+    checkedCombinationCount: job.results.size,
+    totalCombinationCount: listFlightDateFlexCombinations(flightMeta, dateFlex).length,
+    searchIncomplete: !job.done,
+  });
+}
+
+function getOrStartFinnFlightDateFlexJob(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
+  dateFlex: FlightDateFlex,
+): FinnFlightDateFlexJob {
+  const key = buildFlightSearchMetaKey(flightMeta);
+  const existingJob = finnFlightDateFlexJob;
+  if (existingJob !== undefined && existingJob.key === key && Date.now() - existingJob.startedAt < FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS) {
+    return existingJob;
+  }
+  if (existingJob !== undefined) existingJob.cancelled = true;
+
+  const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
+  const combinations = listFlightDateFlexCombinations(flightMeta, dateFlex).slice(0, FLIGHT_DATE_FLEX_MAX_COMBINATIONS);
+  const selectedKey = buildFlightDateCombinationKey(flightMeta);
+  let markSelectedDatesSearched = (): void => undefined;
+  const job: FinnFlightDateFlexJob = {
+    key,
+    startedAt: Date.now(),
+    combinations,
+    results: new Map(),
+    done: false,
+    cancelled: false,
+    selectedDatesSearched: new Promise((resolveValue) => {
+      markSelectedDatesSearched = resolveValue;
+    }),
+  };
+
+  const searchCombinations = async (queue: FlightDateCombination[]): Promise<void> => {
+    let nextIndex = 0;
+    const searchNextCombinations = async (): Promise<void> => {
+      while (!job.cancelled && nextIndex < queue.length) {
+        await searchCombination(queue[nextIndex++]!);
+      }
+    };
+    await Promise.all(Array.from({ length: FINN_FLIGHT_DATE_FLEX_CONCURRENCY }, searchNextCombinations));
+  };
+  const searchCombination = async (combination: FlightDateCombination): Promise<void> => {
+    const combinationKey = buildFlightDateCombinationKey(combination);
+    const combinationMeta: FlightSearchMeta = {
+      ...exactFlightMeta,
+      outboundDate: combination.outboundDate,
+      ...(combination.inboundDate !== undefined ? { inboundDate: combination.inboundDate } : {}),
+    };
+    const offer = await safelyFindFlightPriceMatchOffer(
+      `FINN (${formatFlightDateRange(combinationMeta)})`,
+      () => findFinnFlightPriceMatchOffer(combinationMeta, routeTitle, searchDetails, airportLookup),
+    );
+    if (offer !== undefined || !job.results.has(combinationKey)) job.results.set(combinationKey, offer);
+    if (combinationKey === selectedKey) markSelectedDatesSearched();
+  };
+  void (async () => {
+    await searchCombinations(combinations);
+    const missingCombinations = combinations.filter((combination) => job.results.get(buildFlightDateCombinationKey(combination)) === undefined);
+    if (missingCombinations.length > 0 && !job.cancelled) {
+      await sleep(FINN_FLIGHT_DATE_FLEX_RETRY_DELAY_MS);
+      await searchCombinations(missingCombinations);
+    }
+  })().finally(() => {
+    job.done = true;
+    markSelectedDatesSearched();
+  });
+  finnFlightDateFlexJob = job;
+  return job;
 }
 
 async function fetchFinnFlightSearchData(resultUrl: string): Promise<FinnFlightSearchData | undefined> {
@@ -2428,7 +2764,12 @@ async function findPanFlightsFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
+  dateFlex?: FlightDateFlex,
 ): Promise<PriceMatchOffer | undefined> {
+  if (dateFlex !== undefined) {
+    return findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex);
+  }
+
   const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
   const [pageCandidates, resultDataList] = await Promise.all([
     readCurrentPanFlightsPageOfferCandidates(flightMeta, resultUrl),
@@ -2475,12 +2816,75 @@ async function findPanFlightsFlightPriceMatchOffer(
   };
 }
 
+// PanFlights (Kiwi-data) tar et datointervall per etappe, så ett kall per sortering
+// dekker alle datokombinasjoner. Innen hver kombinasjon brukes samme rangering som
+// i eksakt søk; raden viser billigste kombinasjon og tooltipen resten.
+async function findPanFlightsFlexibleDatesOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+  dateFlex: FlightDateFlex,
+): Promise<PriceMatchOffer | undefined> {
+  const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
+  const resultDataList = await fetchPanFlightsFlightSearchResults(flightMeta, dateFlex);
+  const candidates = dedupePanFlightsOfferCandidates(
+    resultDataList.flatMap((resultData) => {
+      return resultData === undefined
+        ? []
+        : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, dateFlex);
+    }),
+  );
+
+  const candidatesByDates = new Map<string, PanFlightsOfferCandidate[]>();
+  for (const candidate of candidates) {
+    if (candidate.outboundDate === undefined) continue;
+    const key = buildFlightDateCombinationKey({ outboundDate: candidate.outboundDate, inboundDate: candidate.inboundDate });
+    candidatesByDates.set(key, [...(candidatesByDates.get(key) ?? []), candidate]);
+  }
+  const dateOptions: FlightDateFlexOption[] = [];
+  for (const group of candidatesByDates.values()) {
+    const candidate = rankPanFlightsOfferCandidates(group)[0];
+    if (candidate?.outboundDate === undefined) continue;
+    dateOptions.push({
+      outboundDate: candidate.outboundDate,
+      ...(candidate.inboundDate !== undefined ? { inboundDate: candidate.inboundDate } : {}),
+      shopName: candidate.shopName,
+      price: candidate.price,
+      amount: candidate.amount,
+      sortAmount: candidate.sortAmount ?? candidate.amount,
+      currency: candidate.currency,
+      ...(candidate.platform !== undefined ? { platform: candidate.platform } : {}),
+      productUrl: buildPanFlightsFlightSearchUrl({
+        ...flightMeta,
+        outboundDate: candidate.outboundDate,
+        ...(candidate.inboundDate !== undefined ? { inboundDate: candidate.inboundDate } : {}),
+      }),
+      offerUrl: candidate.productUrl,
+    });
+  }
+
+  // Ett kall dekker hele vinduet; kombinasjoner uten treff er også sjekket.
+  const totalCombinationCount = listFlightDateFlexCombinations(flightMeta, dateFlex).length;
+  return buildFlightDateFlexOffer({
+    source: "panflights",
+    sourceName: "PanFlights",
+    flightMeta,
+    dateFlex,
+    routeTitle,
+    searchDetails,
+    options: dateOptions,
+    checkedCombinationCount: totalCombinationCount,
+    totalCombinationCount,
+  });
+}
+
 async function fetchPanFlightsFlightSearchResults(
   flightMeta: FlightSearchMeta,
+  dateFlex?: FlightDateFlex,
 ): Promise<Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined>> {
   const results: Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> = [];
   for (const variant of PANFLIGHTS_FLIGHT_SEARCH_VARIANTS) {
-    results.push(await fetchPanFlightsFlightSearchResult(flightMeta, variant));
+    results.push(await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex));
   }
   return results;
 }
@@ -2874,12 +3278,14 @@ function buildPanFlightsCandidateLooseKey(candidate: PanFlightsOfferCandidate): 
 async function fetchPanFlightsFlightSearchResult(
   flightMeta: FlightSearchMeta,
   variant: PanFlightsSearchVariant,
+  dateFlex?: FlightDateFlex,
 ): Promise<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> {
   const body = new URLSearchParams({
     data: JSON.stringify(buildPanFlightsFlightSearchPayload(
       flightMeta,
       variant,
       variant.searchId,
+      dateFlex,
     )),
   }).toString();
 
@@ -2905,16 +3311,24 @@ function buildPanFlightsFlightSearchPayload(
   flightMeta: FlightSearchMeta,
   variant: PanFlightsSearchVariant,
   searchId: number,
+  dateFlex?: FlightDateFlex,
 ): Record<string, unknown> {
-  const outboundDate = splitIsoDateParts(flightMeta.outboundDate);
-  const inboundDate = flightMeta.inboundDate !== undefined ? splitIsoDateParts(flightMeta.inboundDate) : undefined;
+  // dff*/dft* og dtf*/dtt* er fra/til-dato for utreise og hjemreise.
+  const outboundFrom = splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.outboundDate, -(dateFlex?.outboundBefore ?? 0)));
+  const outboundTo = splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.outboundDate, dateFlex?.outboundAfter ?? 0));
+  const inboundFrom = flightMeta.inboundDate !== undefined
+    ? splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.inboundDate, -(dateFlex?.inboundBefore ?? 0)))
+    : undefined;
+  const inboundTo = flightMeta.inboundDate !== undefined
+    ? splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.inboundDate, dateFlex?.inboundAfter ?? 0))
+    : undefined;
   const leg: Record<string, string> = {
-    dffd: outboundDate.day,
-    dftd: outboundDate.day,
-    dffm: outboundDate.month,
-    dftm: outboundDate.month,
-    dffy: outboundDate.year,
-    dfty: outboundDate.year,
+    dffd: outboundFrom.day,
+    dftd: outboundTo.day,
+    dffm: outboundFrom.month,
+    dftm: outboundTo.month,
+    dffy: outboundFrom.year,
+    dfty: outboundTo.year,
     fromlocsid: flightMeta.origin,
     fromlocrad: "0",
     fromloclat: "0",
@@ -2927,19 +3341,19 @@ function buildPanFlightsFlightSearchPayload(
     somax: "96",
   };
 
-  if (inboundDate !== undefined) {
-    leg.dtfd = inboundDate.day;
-    leg.dttd = inboundDate.day;
-    leg.dtfm = inboundDate.month;
-    leg.dttm = inboundDate.month;
-    leg.dtfy = inboundDate.year;
-    leg.dtty = inboundDate.year;
+  if (inboundFrom !== undefined && inboundTo !== undefined) {
+    leg.dtfd = inboundFrom.day;
+    leg.dttd = inboundTo.day;
+    leg.dtfm = inboundFrom.month;
+    leg.dttm = inboundTo.month;
+    leg.dtfy = inboundFrom.year;
+    leg.dtty = inboundTo.year;
   }
 
   return {
     getmode: "searchflights",
-    timefilters: inboundDate !== undefined ? [0, 24, 0, 24, 0, 24, 0, 24] : [0, 24, 0, 24],
-    typeFlight: inboundDate !== undefined ? "round" : "oneway",
+    timefilters: inboundFrom !== undefined ? [0, 24, 0, 24, 0, 24, 0, 24] : [0, 24, 0, 24],
+    typeFlight: inboundFrom !== undefined ? "round" : "oneway",
     sortorder: variant.sortOrder,
     sortradio: variant.sortRadio,
     mode: "findroute",
@@ -2975,6 +3389,21 @@ function buildPanFlightsFlightSearchPayload(
   };
 }
 
+// Datovinduet starter aldri før dagens dato; valgt dato beholdes uansett.
+function shiftFlightDateNotBeforeToday(isoDate: string, days: number): string {
+  if (days === 0) return isoDate;
+  const shiftedDate = addDaysToIsoDate(isoDate, days) ?? isoDate;
+  if (days > 0) return shiftedDate;
+  const now = new Date();
+  const today = [
+    String(now.getFullYear()),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  const earliestDate = today < isoDate ? today : isoDate;
+  return shiftedDate < earliestDate ? earliestDate : shiftedDate;
+}
+
 function buildPanFlightsCabinClass(flightMeta: FlightSearchMeta): string {
   switch (flightMeta.cabinClass) {
     case "premium": return "S";
@@ -2989,12 +3418,14 @@ function extractPanFlightsOfferCandidates(
   variant: PanFlightsSearchVariant,
   flightMeta: FlightSearchMeta,
   resultUrl: string,
+  dateFlex?: FlightDateFlex,
 ): PanFlightsOfferCandidate[] {
   const currency = readStringValue(resultData.currency) ?? "NOK";
   const candidates: PanFlightsOfferCandidate[] = [];
 
   for (const [sourceRank, item] of readRecordArray(resultData.flighttab).entries()) {
-    if (!isPanFlightsFlightMatchingSearch(item, flightMeta)) continue;
+    const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex);
+    if (matchedDates === undefined) continue;
 
     const packageRecord = readPanFlightsPackageRecord(item);
     const provider = readPanFlightsBestProvider(resultData, item);
@@ -3028,6 +3459,7 @@ function extractPanFlightsOfferCandidates(
       sourceRank,
       sourceSortOrder: variant.sortOrder,
       sourceVersion: variant.version,
+      ...matchedDates,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(qualityScore !== undefined ? { qualityScore } : {}),
       ...(routeFingerprint !== undefined ? { routeFingerprint } : {}),
@@ -3045,6 +3477,8 @@ function dedupePanFlightsOfferCandidates(candidates: PanFlightsOfferCandidate[])
       candidate.shopName,
       Math.round(candidate.amount),
       candidate.platform ?? "",
+      candidate.outboundDate ?? "",
+      candidate.inboundDate ?? "",
     ].join("|");
     const existingCandidate = uniqueCandidatesByKey.get(key);
     if (
@@ -3206,37 +3640,42 @@ function isReasonablePanFlightsDuration(
   return candidate.durationMinutes <= maxReasonableDuration;
 }
 
-function isPanFlightsFlightMatchingSearch(item: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+// Returnerer reisens faktiske datoer når rute og datoer passer søket (±dateFlex).
+function matchPanFlightsFlightSearchDates(
+  item: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  dateFlex: FlightDateFlex | undefined,
+): { outboundDate: string; inboundDate?: string } | undefined {
   const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
   const outboundRoute = routeList[0];
-  if (
-    outboundRoute === undefined ||
-    !isPanFlightsRouteLegMatch(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination, flightMeta.outboundDate)
-  ) {
-    return false;
+  if (outboundRoute === undefined) return undefined;
+  const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination);
+  if (outboundDate === undefined || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
+    return undefined;
   }
 
-  const inboundDate = flightMeta.inboundDate;
-  if (inboundDate === undefined) return true;
+  const requestedInboundDate = flightMeta.inboundDate;
+  if (requestedInboundDate === undefined) return { outboundDate };
 
-  return isPanFlightsRouteLegMatch(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin, inboundDate) ||
-    routeList.some((route) => {
-      return isPanFlightsRouteLegMatch(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin, inboundDate);
-    });
+  const inboundDate = [
+    readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin),
+    ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin)),
+  ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
+  return inboundDate !== undefined && inboundDate >= outboundDate ? { outboundDate, inboundDate } : undefined;
 }
 
-function isPanFlightsRouteLegMatch(
+function readPanFlightsRouteLegDate(
   route: Record<string, unknown>,
   dataKey: "tripdata" | "backdata",
   timeKey: "dTime" | "drTime",
   origin: string,
   destination: string,
-  date: string,
-): boolean {
+): string | undefined {
   const legData = isRecord(route[dataKey]) ? route[dataKey] : undefined;
   return readStringValue(legData?.flyFrom)?.toUpperCase() === origin &&
-    readStringValue(legData?.flyTo)?.toUpperCase() === destination &&
-    formatPanFlightsEpochDate(readNumberValue(route[timeKey])) === date;
+    readStringValue(legData?.flyTo)?.toUpperCase() === destination
+    ? formatPanFlightsEpochDate(readNumberValue(route[timeKey]))
+    : undefined;
 }
 
 function readPanFlightsBestProvider(
@@ -5369,13 +5808,21 @@ function readSkyscannerMoney(value: Record<string, unknown> | undefined): { amou
 }
 
 function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string {
+  const { dateFlex } = flightMeta;
+  const formatDate = (date: string, flexDays: number): string => {
+    if (flexDays === 0) return date;
+    return `${date}-flexible-${flexDays}${flexDays === 1 ? "day" : "days"}`;
+  };
   const pathParts = [
     `${flightMeta.origin}-${flightMeta.destination}`,
-    flightMeta.outboundDate,
-    flightMeta.inboundDate,
+    formatDate(flightMeta.outboundDate, dateFlex !== undefined ? readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter) : 0),
+    flightMeta.inboundDate !== undefined
+      ? formatDate(flightMeta.inboundDate, dateFlex !== undefined ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0)
+      : undefined,
     flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : undefined,
   ].filter((part): part is string => part !== undefined);
-  const params = new URLSearchParams({ sort: MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
+  // Med datovindu sorteres på pris, så de billigste kombinasjonene kommer med i svaret.
+  const params = new URLSearchParams({ sort: dateFlex !== undefined ? "price_a" : MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
   if (flightMeta.adults !== 1) {
     params.set("adults", String(flightMeta.adults));
   }
@@ -5517,6 +5964,64 @@ async function findMomondoFlightPriceMatchOffer(
     ...(searchIncomplete ? { searchIncomplete: true } : {}),
     alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
+}
+
+// Ett momondo-søk med flex per etappe; resultatene grupperes per datokombinasjon
+// med samme strenge rute-/datokontroll som eksakt søk.
+async function findMomondoFlexibleDatesOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
+  dateFlex: FlightDateFlex,
+): Promise<PriceMatchOffer | undefined> {
+  const searchData = await fetchMomondoFlightSearchData(buildMomondoFlightSearchUrl(flightMeta));
+  if (searchData === undefined) return undefined;
+  const resultData = await pollMomondoFlightResults({ ...searchData, sortMode: "price_a" }, flightMeta, airportLookup);
+  if (resultData === undefined) return undefined;
+
+  // momondo dekker maks ±3 dager; vinduet som faktisk ble søkt rapporteres.
+  const outboundFlexDays = readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter);
+  const inboundFlexDays = readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter);
+  const momondoDateFlex: FlightDateFlex = {
+    outboundBefore: Math.min(dateFlex.outboundBefore, outboundFlexDays),
+    outboundAfter: Math.min(dateFlex.outboundAfter, outboundFlexDays),
+    inboundBefore: Math.min(dateFlex.inboundBefore, inboundFlexDays),
+    inboundAfter: Math.min(dateFlex.inboundAfter, inboundFlexDays),
+  };
+  const combinations = listFlightDateFlexCombinations(flightMeta, momondoDateFlex);
+  const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
+  const dateOptions: FlightDateFlexOption[] = [];
+  for (const combination of combinations) {
+    const combinationMeta: FlightSearchMeta = {
+      ...exactFlightMeta,
+      outboundDate: combination.outboundDate,
+      ...(combination.inboundDate !== undefined ? { inboundDate: combination.inboundDate } : {}),
+    };
+    const candidate = dedupeMomondoFlightOfferCandidates(
+      collectMomondoFlightOfferCandidates(resultData, combinationMeta, airportLookup, searchData.resultUrl, true),
+    ).sort(comparePriceMatchesBySortAmount)[0];
+    if (candidate === undefined) continue;
+    dateOptions.push({
+      ...combination,
+      ...candidate,
+      offerUrl: candidate.productUrl,
+      productUrl: buildMomondoFlightSearchUrl(combinationMeta),
+    });
+  }
+
+  return buildFlightDateFlexOffer({
+    source: "momondo",
+    sourceName: "momondo",
+    flightMeta,
+    dateFlex: momondoDateFlex,
+    routeTitle,
+    searchDetails,
+    options: dateOptions,
+    checkedCombinationCount: combinations.length,
+    totalCombinationCount: combinations.length,
+    searchIncomplete: readStringValue(resultData.status) !== "complete" && resultData.isTopResultsRankingStable !== true,
+  });
 }
 
 async function fetchMomondoFlightSearchData(resultUrl: string): Promise<MomondoFlightSearchData | undefined> {
@@ -5747,41 +6252,52 @@ function collectMomondoAirportFilterCodesFromNode(value: unknown, codes: Set<str
 }
 
 function buildMomondoFlightRequestLegs(flightMeta: FlightSearchMeta, airportLookup: FlightAirportCodeLookup): Array<Record<string, unknown>> {
+  const [outboundFlex, inboundFlex] = readMomondoFlightLegFlexValues(flightMeta);
   const legs = [
-    buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, airportLookup, flightMeta.cabinClass),
+    buildMomondoFlightRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, airportLookup, flightMeta.cabinClass, outboundFlex),
   ];
   if (flightMeta.inboundDate !== undefined) {
-    legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, airportLookup, flightMeta.cabinClass));
+    legs.push(buildMomondoFlightRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, airportLookup, flightMeta.cabinClass, inboundFlex));
   }
   return legs;
 }
 
 function buildMomondoFlightDynamicRequestLegs(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
+  const [outboundFlex, inboundFlex] = readMomondoFlightLegFlexValues(flightMeta);
   const legs = [
-    buildMomondoFlightDynamicRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, flightMeta.cabinClass),
+    buildMomondoFlightDynamicRequestLeg(flightMeta.origin, flightMeta.destination, flightMeta.outboundDate, flightMeta.cabinClass, outboundFlex),
   ];
   if (flightMeta.inboundDate !== undefined) {
-    legs.push(buildMomondoFlightDynamicRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, flightMeta.cabinClass));
+    legs.push(buildMomondoFlightDynamicRequestLeg(flightMeta.destination, flightMeta.origin, flightMeta.inboundDate, flightMeta.cabinClass, inboundFlex));
   }
   return legs;
 }
 
-function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string, airportLookup: FlightAirportCodeLookup, cabinClass: FlightCabinClass | undefined): Record<string, unknown> {
+function readMomondoFlightLegFlexValues(flightMeta: FlightSearchMeta): [string, string] {
+  const { dateFlex } = flightMeta;
+  if (dateFlex === undefined) return ["exact", "exact"];
+  return [
+    MOMONDO_FLIGHT_FLEX_VALUES[readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter)] ?? "exact",
+    MOMONDO_FLIGHT_FLEX_VALUES[readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter)] ?? "exact",
+  ];
+}
+
+function buildMomondoFlightRequestLeg(origin: string, destination: string, date: string, airportLookup: FlightAirportCodeLookup, cabinClass: FlightCabinClass | undefined, flex: string): Record<string, unknown> {
   return {
     origin: buildMomondoFlightRequestPlace(origin, airportLookup),
     destination: buildMomondoFlightRequestPlace(destination, airportLookup),
     date,
-    flex: "exact",
+    flex,
     cabinClass: cabinClass ?? "economy",
   };
 }
 
-function buildMomondoFlightDynamicRequestLeg(origin: string, destination: string, date: string, cabinClass: FlightCabinClass | undefined): Record<string, unknown> {
+function buildMomondoFlightDynamicRequestLeg(origin: string, destination: string, date: string, cabinClass: FlightCabinClass | undefined, flex: string): Record<string, unknown> {
   return {
     origin: buildMomondoFlightDynamicRequestPlace(origin),
     destination: buildMomondoFlightDynamicRequestPlace(destination),
     date,
-    flex: "exact",
+    flex,
     // Dynamic-API-et bruker economy implisitt; feltet sendes kun når noe annet er valgt.
     ...(cabinClass !== undefined && cabinClass !== "economy" ? { cabinClass } : {}),
   };
@@ -8096,6 +8612,33 @@ function formatFlightDateRange(flightMeta: FlightSearchMeta): string {
   return `${formatFlightDate(flightMeta.outboundDate)} - ${formatFlightDate(flightMeta.inboundDate)}`;
 }
 
+function formatFlightCompactDateRange(outboundDate: string, inboundDate: string | undefined): string {
+  const format = (value: string): string => {
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isNaN(date.getTime())
+      ? value
+      : new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", timeZone: "UTC" }).format(date).replace(/\.$/, "");
+  };
+  return inboundDate === undefined ? format(outboundDate) : `${format(outboundDate)}–${format(inboundDate)}`;
+}
+
+function formatFlightShortDateRange(outboundDate: string, inboundDate: string | undefined): string {
+  return inboundDate === undefined
+    ? formatFlightShortDate(outboundDate)
+    : `${formatFlightShortDate(outboundDate)} – ${formatFlightShortDate(inboundDate)}`;
+}
+
+function formatFlightShortDate(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("nb-NO", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 function formatFlightDate(value: string): string {
   const date = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
@@ -8160,6 +8703,7 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
     flightMeta.maxStops ?? "",
     flightMeta.includeCabinBag === true ? "hb" : "",
     flightMeta.includeCheckedBag === true ? "cb" : "",
+    flightMeta.dateFlex !== undefined ? formatFlightDateFlexDays(flightMeta.dateFlex, true) : "",
   ].join("|");
 }
 
@@ -9791,6 +10335,11 @@ function renderNotice(
     }
     .notice.collapsed .side-tab-text {
       display: flex;
+    }
+    /* Flytende over nettsiden: lyst panel trenger skygge for å skille seg fra hvite sider. */
+    .notice .panel,
+    .notice .side-tab {
+      box-shadow: 0 0 0 1px rgba(23, 32, 38, 0.06), 0 8px 28px rgba(11, 25, 34, 0.18);
     }
     .panel {
       width: min(400px, calc(100vw - 70px));
@@ -12664,12 +13213,14 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchProduct.textContent = priceMatch.productName;
   const priceMatchShop = document.createElement("span");
   priceMatchShop.className = "price-match-shop";
-  priceMatchShop.textContent = priceMatch.shopName;
+  priceMatchShop.textContent = priceMatch.dateFlex === undefined
+    ? priceMatch.shopName
+    : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`;
   priceMatchTitle.append(priceMatchProduct, priceMatchShop);
 
   const priceMatchPrice = document.createElement("span");
   priceMatchPrice.className = "price-match-price";
-  const currentMomondoVisibleBestPrice = priceMatch.source === "momondo"
+  const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" && priceMatch.dateFlex === undefined
     ? readCurrentMomondoVisibleBestPriceForCurrentPage()
     : undefined;
   priceMatchPrice.textContent = currentMomondoVisibleBestPrice === undefined
@@ -12939,6 +13490,43 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
       "Åpner samme søk med datoer, gjester og rom.",
       "Romtype, frokost og avbestilling må sjekkes hos kilden.",
     ].join("\n");
+  }
+
+  if (priceMatch.dateFlex !== undefined) {
+    const { dateFlex } = priceMatch;
+    const bestAmount = priceMatch.sortAmount ?? priceMatch.amount;
+    const bestIsSelected = priceMatch.matchedExactProduct === true;
+    const selectedLine = bestIsSelected
+      ? "Valgt dato er billigst i datovinduet."
+      : dateFlex.selectedDatesAmount !== undefined
+        ? `Valgt dato: ${formatNokFlightPrice(dateFlex.selectedDatesAmount)} — sparer ${formatNokFlightPrice(dateFlex.selectedDatesAmount - bestAmount)}.`
+        : `Valgt dato: ingen treff hos ${getPriceMatchSourceName(priceMatch)}.`;
+    const outboundWindow = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
+    const windowLine = dateFlex.inboundDate !== undefined
+      ? `Søkte ${outboundWindow} dager rundt utreise og ${formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter)} rundt hjemreise.`
+      : `Søkte ${outboundWindow} dager rundt utreise.`;
+    return [
+      `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
+      [
+        `Billigste: ${formatFlightShortDateRange(dateFlex.outboundDate, dateFlex.inboundDate)} — ${priceMatch.price}`,
+        selectedLine,
+        windowLine,
+        priceMatch.details,
+      ].filter((line): line is string => line !== undefined).join("\n"),
+      [
+        `Billigste datoer (${dateFlex.matchedCombinationCount} med treff)`,
+        ...(priceMatch.alternatives ?? []).slice(0, FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS).map(formatPriceMatchTooltipOffer),
+      ].join("\n"),
+      [
+        dateFlex.checkedCombinationCount < Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)
+          ? `Søker fortsatt: ${dateFlex.checkedCombinationCount} av ${Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)} datokombinasjoner sjekket.`
+          : `Sjekket ${dateFlex.checkedCombinationCount} datokombinasjoner.`,
+        ...(dateFlex.totalCombinationCount > FLIGHT_DATE_FLEX_MAX_COMBINATIONS
+          ? [`Vinduet har ${dateFlex.totalCombinationCount} kombinasjoner; de ${FLIGHT_DATE_FLEX_MAX_COMBINATIONS} nærmeste valgt dato søkes.`]
+          : []),
+      ].join("\n"),
+      `Raden åpner ${getPriceMatchSourceName(priceMatch)} med de billigste datoene. Kilder uten datovindu søker bare valgt dato. Bagasje og valgt avgang må sjekkes hos kilden.`,
+    ].join("\n\n");
   }
 
   if (isFlightSearchPriceMatch(priceMatch)) {
