@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793578839
+// @version      1793581006
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9675,12 +9675,11 @@ ${darkProviderCss}
     "https://workb.panflights.com/skypickersearchsingle"
   ];
   const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS = [
-    { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1e3 },
     { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 },
-    { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1002 },
-    { sortOrder: "quality", sortRadio: "quality", version: 255, maxStops: 3, searchId: 1255 },
-    { sortOrder: "price", sortRadio: "quality", version: 255, maxStops: 3, searchId: 1256 }
+    { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1002 }
   ];
+  const PANFLIGHTS_FAILURE_BACKOFF_MS = 10 * 60 * 1e3;
+  let panFlightsBackoffUntil = 0;
   const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
   const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
@@ -11623,8 +11622,15 @@ ${darkProviderCss}
   }
   async function fetchPanFlightsFlightSearchResults(flightMeta, dateFlex) {
     const results = [];
+    if (Date.now() < panFlightsBackoffUntil) return results;
     for (const variant of PANFLIGHTS_FLIGHT_SEARCH_VARIANTS) {
-      results.push(await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex));
+      const result = await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex);
+      results.push(result);
+      if (result === void 0 && results.every((item) => item === void 0)) {
+        panFlightsBackoffUntil = Date.now() + PANFLIGHTS_FAILURE_BACKOFF_MS;
+        console.warn(`[Cashback Norge] PanFlights svarte ikke på ${PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS.join(", ")}; prøver igjen om ${PANFLIGHTS_FAILURE_BACKOFF_MS / 6e4} min.`);
+        break;
+      }
     }
     return results;
   }
@@ -11634,6 +11640,7 @@ ${darkProviderCss}
   }
   function readCurrentPanFlightsPageStateOfferCandidates(flightMeta, resultUrl) {
     if (!isCurrentPanFlightsSearchPageForMeta(flightMeta)) return Promise.resolve([]);
+    if (!isUserscriptRuntime()) return Promise.resolve([]);
     const scriptHost = document.documentElement ?? document.head ?? document.body;
     if (scriptHost === null) return Promise.resolve([]);
     const requestId = `panflights-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -11974,7 +11981,7 @@ ${darkProviderCss}
         body,
         credentials: "omit"
       });
-      if (isRecord(value) && Array.isArray(value.flighttab) && value.flighttab.length > 0) {
+      if (isRecord(value) && Array.isArray(value.flighttab)) {
         return { resultData: value, variant };
       }
     }

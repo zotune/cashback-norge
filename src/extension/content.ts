@@ -559,13 +559,15 @@ const PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS = [
   "https://panflights.com/skypickersearchsingle",
   "https://workb.panflights.com/skypickersearchsingle",
 ];
+// To sorteringer per søk: «quality» gir raden samme rekkefølge som PanFlights, «price» de billigste
+// (datovinduet). Flere varianter ga opptil 15 kall per søk og HTTP 500/503 fra PanFlights.
 const PANFLIGHTS_FLIGHT_SEARCH_VARIANTS: PanFlightsSearchVariant[] = [
-  { sortOrder: "duration", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1000 },
   { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 },
   { sortOrder: "price", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1002 },
-  { sortOrder: "quality", sortRadio: "quality", version: 255, maxStops: 3, searchId: 1255 },
-  { sortOrder: "price", sortRadio: "quality", version: 255, maxStops: 3, searchId: 1256 },
 ];
+// Når alle kall feiler, hviler PanFlights i ti minutter i stedet for å prøve ved hver oppdatering.
+const PANFLIGHTS_FAILURE_BACKOFF_MS = 10 * 60 * 1000;
+let panFlightsBackoffUntil = 0;
 const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
 const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
 const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
@@ -3066,8 +3068,16 @@ async function fetchPanFlightsFlightSearchResults(
   dateFlex?: FlightDateFlex,
 ): Promise<Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined>> {
   const results: Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> = [];
+  if (Date.now() < panFlightsBackoffUntil) return results;
   for (const variant of PANFLIGHTS_FLIGHT_SEARCH_VARIANTS) {
-    results.push(await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex));
+    const result = await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex);
+    results.push(result);
+    // Første variant uten svar betyr som regel at PanFlights avviser kall nå; ikke send flere.
+    if (result === undefined && results.every((item) => item === undefined)) {
+      panFlightsBackoffUntil = Date.now() + PANFLIGHTS_FAILURE_BACKOFF_MS;
+      console.warn(`[Cashback Norge] PanFlights svarte ikke på ${PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS.join(", ")}; prøver igjen om ${PANFLIGHTS_FAILURE_BACKOFF_MS / 60000} min.`);
+      break;
+    }
   }
   return results;
 }
@@ -3087,6 +3097,9 @@ function readCurrentPanFlightsPageStateOfferCandidates(
   resultUrl: string,
 ): Promise<PanFlightsOfferCandidate[]> {
   if (!isCurrentPanFlightsSearchPageForMeta(flightMeta)) return Promise.resolve([]);
+  // MV3-utvidelsens CSP for innholdsskript blokkerer innebygde <script>-elementer (feilen vises
+  // under Errors). Bare userscriptet kjører i sidens kontekst; utvidelsen leser de synlige radene.
+  if (!isUserscriptRuntime()) return Promise.resolve([]);
 
   const scriptHost = document.documentElement ?? document.head ?? document.body;
   if (scriptHost === null) return Promise.resolve([]);
@@ -3482,7 +3495,8 @@ async function fetchPanFlightsFlightSearchResult(
       body,
       credentials: "omit",
     });
-    if (isRecord(value) && Array.isArray(value.flighttab) && value.flighttab.length > 0) {
+    // Et gyldig svar uten reiser er «ingen treff», ikke en feil; da prøves ikke neste endepunkt.
+    if (isRecord(value) && Array.isArray(value.flighttab)) {
       return { resultData: value, variant };
     }
   }
