@@ -76,7 +76,31 @@ import {
   formatFlightDateFlexDays,
   formatFlightDateFlexWindow,
   buildSkyscannerFareAttributesParam,
+  applyFlightSortMode,
+  buildSkyscannerFlightSearchUrl,
+  buildSkyscannerCabinClass,
+  buildPanFlightsFlightSearchUrl,
+  buildGoogleFlightsSearchUrl,
+  buildTripComFlightSearchUrl,
+  buildMomondoFlightSearchUrl,
+  buildFinnFlightSearchUrl,
+  buildFinnFlightExactAirportParams,
+  compactIsoDate,
+  TRIP_COM_BASE_URL,
+  TRIP_COM_DEFAULT_CURRENCY,
+  PANFLIGHTS_AUTO_SEARCH_PARAM,
+  type FinnFlightSearchScope,
+  buildFlightSortUrlValue,
   buildTripComBaggageFilterFlags,
+  FLIGHT_LINK_SORT_PARAM,
+  type FlightSortMode,
+  type FlightSortVariant,
+  limitFlightCandidates,
+  readFlightSortLabel,
+  readFlightSortUrlValue,
+  readPanFlightsLegMinutes,
+  selectFlightSortCandidate,
+  sumFlightLegMinutes,
   buildSkyscannerSearchOptions,
   formatMomondoLuggageValue,
   formatPanFlightsEpochDate,
@@ -334,6 +358,9 @@ type PriceMatchOffer = {
   dateFlex?: FlightDateFlexResult;
   // Bagasje er valgt, men kilden oppgir ikke bagasjeavgift: prisen er uten bagasje.
   baggageExcluded?: boolean;
+  durationMinutes?: number;
+  // Radene for Billigst og Raskest; selve tilbudet er «Best».
+  flightSortVariants?: Partial<Record<"cheapest" | "fastest", FlightSortVariant>>;
 };
 type PriceMatchAlternative = {
   shopName: string;
@@ -343,6 +370,7 @@ type PriceMatchAlternative = {
   currency: string;
   platform?: string;
   durationText?: string;
+  durationMinutes?: number;
   shippingPrice?: string;
   totalPrice?: string;
 };
@@ -381,7 +409,6 @@ type FlightAirportData = {
   flightable: boolean;
 };
 type FlightAirportCodeLookup = Map<string, string[]>;
-type FinnFlightSearchScope = "exact" | "metropolitan";
 type FinnFlightSearchData = {
   searchId: string;
   flightApiUrl: string;
@@ -410,7 +437,7 @@ type PanFlightsSearchVariant = {
   maxStops: number;
   searchId: number;
 };
-type MomondoFlightSortMode = "bestflight_a" | "price_a";
+type MomondoFlightSortMode = "bestflight_a" | "price_a" | "duration_a";
 type MomondoFlightSearchData = {
   formToken: string;
   resultUrl: string;
@@ -581,7 +608,6 @@ const PANFLIGHTS_FAILURE_BACKOFF_MS = 10 * 60 * 1000;
 let panFlightsBackoffUntil = 0;
 const PANFLIGHTS_FLIGHT_HITS_LIMIT = 500;
 const PANFLIGHTS_REASONABLE_DURATION_BUFFER_MINUTES = 240;
-const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
 const PANFLIGHTS_PAGE_STATE_RESULT_MESSAGE = "cashback-varsler:panflights-page-state-result";
 const PANFLIGHTS_PAGE_STATE_TIMEOUT_MS = 900;
 // Sted-ID-er (f.eks. 2642 = Bergen) uten flyplasstabell i siden slås opp i PanFlights' sted-API.
@@ -657,10 +683,8 @@ const TRAVELLINK_COMMON_HEADERS: Record<string, string> = {
   Accept: "application/json, text/javascript, */*; q=0.01",
   "Content-Type": "application/json; charset=UTF-8",
 };
-const TRIP_COM_BASE_URL = "https://us.trip.com";
 const TRIP_COM_LOW_PRICE_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/14427/GetLowPriceInCalender`;
 const TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearchSSE`;
-const TRIP_COM_DEFAULT_CURRENCY = "USD";
 const TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS = 30000;
 const TRIP_COM_COMMON_HEADERS: Record<string, string> = {
   Accept: "text/event-stream, application/json",
@@ -827,6 +851,7 @@ function startContentScript(): void {
   installDynamicProductPageRefresh();
   installPanFlightsAutoSearch();
   installTripComLinkFilters();
+  installFlightLinkSort();
 }
 function renderNoticeWithStoredState(
   offers: CashbackOffer[],
@@ -1154,6 +1179,105 @@ function applyTripComMaxDuration(maxDurationMinutes: number): boolean {
   fire("pointerup", targetX, document, PointerEvent);
   fire("mouseup", targetX, document, MouseEvent);
   return true;
+}
+
+// Skyscanner og Trip.com har ikke sorteringen i URL-en: lenken bærer den, og utvidelsen velger fanen.
+function installFlightLinkSort(): void {
+  const parsedUrl = parseUrl(window.location.href);
+  const value = parsedUrl?.searchParams.get(FLIGHT_LINK_SORT_PARAM);
+  const mode = value === "cheapest" || value === "fastest" ? value : undefined;
+  if (parsedUrl === undefined || mode === undefined) return;
+  const isTrip = parsedUrl.hostname.endsWith("trip.com");
+  if (!isTrip && !isSkyscannerFlightSearchPage(parsedUrl)) return;
+  flightSortModeOverride = mode;
+
+  let attempts = 0;
+  const timerId = window.setInterval(() => {
+    attempts += 1;
+    // Trip laster listen på nytt når filtrene settes, så sorteringen velges etter dem.
+    if (isTrip && attempts < 12) return;
+    const applied = isTrip ? applyTripComLinkSort(mode) : applySkyscannerLinkSort(mode);
+    if (!applied && attempts < 80) return;
+    window.clearInterval(timerId);
+    if (!applied) console.warn(`[Cashback Norge] Fant ikke sorteringen ${mode} på ${window.location.href}.`);
+    const currentUrl = parseUrl(window.location.href);
+    if (currentUrl?.searchParams.has(FLIGHT_LINK_SORT_PARAM) === true) {
+      currentUrl.searchParams.delete(FLIGHT_LINK_SORT_PARAM);
+      window.history.replaceState(window.history.state, "", currentUrl.toString());
+    }
+  }, 500);
+}
+
+function applySkyscannerLinkSort(mode: "cheapest" | "fastest"): boolean {
+  const label = [...document.querySelectorAll<HTMLElement>('[class*="QuickSort"] [role="radiogroup"] label')]
+    .find((element) => (mode === "cheapest" ? /^Billigst/i : /^Raskest/i).test(element.innerText.trim()));
+  if (label === undefined) return false;
+  label.click();
+  return true;
+}
+
+function applyTripComLinkSort(mode: "cheapest" | "fastest"): boolean {
+  if (mode === "cheapest") {
+    const tab = [...document.querySelectorAll<HTMLElement>('[data-testid^="sort_type_item_"]')]
+      .find((element) => /^Cheapest/i.test(element.innerText.trim()));
+    if (tab === undefined) return false;
+    tab.click();
+    return true;
+  }
+  const fastestOption = (): HTMLElement | undefined => [...document.querySelectorAll<HTMLElement>('[data-testid="sort-dropdown-item"]')]
+    .find((element) => /^Fastest/i.test(element.innerText.trim()));
+  if (fastestOption() === undefined) {
+    [...document.querySelectorAll<HTMLElement>("div, span")]
+      .find((element) => element.children.length <= 4 && element.innerText?.trim() === "Sort by")
+      ?.click();
+  }
+  const option = fastestOption();
+  if (option === undefined) return false;
+  option.click();
+  return true;
+}
+
+let flightSortModeOverride: FlightSortMode | undefined;
+
+// Panelet starter på samme sortering som siden; et valg i panelet gjelder til siden lastes på nytt.
+function readActiveFlightSortMode(): FlightSortMode {
+  if (flightSortModeOverride !== undefined) return flightSortModeOverride;
+  const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl === undefined) return "best";
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  const urlMode = hostname === "finn.no"
+    ? readFlightSortUrlValue("finn", parsedUrl.searchParams.get("sortCriteria"))
+    : hostname === "momondo.no"
+      ? readFlightSortUrlValue("momondo", parsedUrl.searchParams.get("sort"))
+      : isPanFlightsSearchPage(parsedUrl)
+        ? readFlightSortUrlValue("panflights", parsedUrl.searchParams.get("order"))
+        : undefined;
+  if (urlMode !== undefined) return urlMode;
+  if (isSkyscannerFlightSearchPage(parsedUrl)) {
+    return readFlightSortLabel(document.body?.innerText.match(/sortert etter[^\n]{0,24}/i)?.[0]) ?? "best";
+  }
+  if (hostname.endsWith("trip.com")) {
+    return readFlightSortLabel(document.querySelector<HTMLElement>(".sort-type.is-selected")?.innerText) ?? "best";
+  }
+  return "best";
+}
+
+function buildFlightSortControl(activeMode: FlightSortMode, onSelect: (mode: FlightSortMode) => void): HTMLSpanElement {
+  const control = document.createElement("span");
+  control.className = "flight-sort-control";
+  control.setAttribute("role", "group");
+  control.setAttribute("aria-label", "Sorter prismatch");
+  const labels: Array<[FlightSortMode, string]> = [["best", "Best"], ["cheapest", "Billigst"], ["fastest", "Raskest"]];
+  for (const [mode, label] of labels) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cbn-button cbn-button--filter flight-sort-button";
+    button.textContent = label;
+    button.setAttribute("aria-pressed", String(mode === activeMode));
+    button.addEventListener("click", () => onSelect(mode));
+    control.append(button);
+  }
+  return control;
 }
 
 function isPanFlightsSearchPage(parsedUrl: URL): boolean {
@@ -2510,6 +2634,38 @@ function listFlightRequestAirportCodes(code: string, airportLookup: FlightAirpor
   return airportLookup.get(normalizedCode) ?? [normalizedCode];
 }
 
+type FlightSortPoolCandidate = PriceMatchAlternative & { productUrl: string };
+
+// Lager radene for Billigst og Raskest; hver sortering kan ha egen kandidatliste og lenke.
+function buildFlightSortVariants(input: {
+  cheapestPool: FlightSortPoolCandidate[];
+  fastestPool: FlightSortPoolCandidate[];
+  buildUrl: (mode: FlightSortMode) => string;
+  baggageExcluded?: boolean | undefined;
+}): NonNullable<PriceMatchOffer["flightSortVariants"]> {
+  const offset = input.baggageExcluded === true ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0;
+  const toVariant = (candidate: FlightSortPoolCandidate | undefined, mode: FlightSortMode): FlightSortVariant | undefined => {
+    if (candidate === undefined) return undefined;
+    return {
+      shopName: candidate.shopName,
+      price: candidate.price,
+      amount: candidate.amount,
+      sortAmount: (candidate.sortAmount ?? candidate.amount) + offset,
+      currency: candidate.currency,
+      productUrl: input.buildUrl(mode),
+      offerUrl: candidate.productUrl,
+      ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+      ...(candidate.durationMinutes !== undefined ? { durationMinutes: candidate.durationMinutes } : {}),
+    };
+  };
+  const cheapest = toVariant(selectFlightSortCandidate(input.cheapestPool, "cheapest"), "cheapest");
+  const fastest = toVariant(selectFlightSortCandidate(input.fastestPool, "fastest"), "fastest");
+  return {
+    ...(cheapest !== undefined ? { cheapest } : {}),
+    ...(fastest !== undefined ? { fastest } : {}),
+  };
+}
+
 function buildFlightPriceMatchOffer(input: {
   source: NonNullable<PriceMatchOffer["source"]>;
   sourceName: string;
@@ -2549,10 +2705,19 @@ async function findFinnFlightPriceMatchOffer(
   const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true, options?.sortByPrice !== false);
   if (resultData === undefined) return undefined;
 
-  const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
+  const priceCandidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
+  const progress = readNumberValue(resultData.progress);
+  // Datovinduet ber om én pris per kombinasjon; bare vanlig søk henter FINNs tre faner.
+  const wantsSortVariants = options?.sortByPrice === undefined;
+  const [bestCandidates, fastestCandidates] = wantsSortVariants
+    ? await Promise.all([
+      fetchFinnFlightSortedCandidates(searchData, flightMeta, airportLookup, progress ?? 100, "best"),
+      fetchFinnFlightSortedCandidates(searchData, flightMeta, airportLookup, progress ?? 100, "fastest"),
+    ])
+    : [[], []];
+  const candidates = bestCandidates.length > 0 ? bestCandidates : priceCandidates;
   const best = candidates[0];
   if (best === undefined) return undefined;
-  const progress = readNumberValue(resultData.progress);
 
   return {
     source: "finnreise",
@@ -2565,12 +2730,46 @@ async function findFinnFlightPriceMatchOffer(
     sortAmount: best.sortAmount ?? best.amount,
     currency: best.currency,
     productName: routeTitle,
-    productUrl: searchData.resultUrl,
+    productUrl: wantsSortVariants ? buildFinnFlightSortUrl(searchData.resultUrl, "best") : searchData.resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     ...(progress !== undefined && progress < 100 ? { searchIncomplete: true } : {}),
     alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
+    ...(wantsSortVariants
+      ? {
+        flightSortVariants: buildFlightSortVariants({
+          cheapestPool: [...priceCandidates, ...candidates],
+          fastestPool: [...fastestCandidates, ...candidates, ...priceCandidates],
+          buildUrl: (mode) => buildFinnFlightSortUrl(searchData.resultUrl, mode),
+        }),
+      }
+      : {}),
   };
+}
+
+function buildFinnFlightSortUrl(resultUrl: string, mode: FlightSortMode): string {
+  const parsedUrl = parseUrl(resultUrl);
+  if (parsedUrl === undefined) return resultUrl;
+  parsedUrl.searchParams.set("sortCriteria", buildFlightSortUrlValue("finn", mode));
+  return parsedUrl.toString();
+}
+
+// FINN deler resultatene i sider, så Best og Raskest hentes med hver sin sortering.
+async function fetchFinnFlightSortedCandidates(
+  searchData: FinnFlightSearchData,
+  flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+  progress: number,
+  mode: FlightSortMode,
+): Promise<FinnFlightOfferCandidate[]> {
+  const value = await userscriptJsonRequest(
+    buildFinnFlightResultApiUrl(searchData, flightMeta, progress, false, buildFlightSortUrlValue("finn", mode)),
+    { headers: { Accept: "application/json" }, credentials: "omit" },
+  );
+  return isRecord(value) && Array.isArray(value.trips)
+    ? extractFinnFlightOfferCandidates(value, searchData, flightMeta, airportLookup)
+    : [];
 }
 
 let finnFlightDateFlexJob: FinnFlightDateFlexJob | undefined;
@@ -2825,6 +3024,7 @@ function buildFinnFlightResultApiUrl(
   flightMeta: FlightSearchMeta,
   progress: number,
   sortByPrice = false,
+  sortCriteria?: string,
 ): string {
   const params = searchData.resultParams !== undefined
     ? new URLSearchParams(searchData.resultParams)
@@ -2837,6 +3037,7 @@ function buildFinnFlightResultApiUrl(
   if (flightMeta.maxDurationMinutes !== undefined) params.set("durationTo", String(flightMeta.maxDurationMinutes));
   // FINN sorterer på «Best» (agony_asc) som standard; priceAmount_asc gir billigste først (verifisert 2026-11-02).
   if (sortByPrice) params.set("sortCriteria", "priceAmount_asc");
+  if (sortCriteria !== undefined) params.set("sortCriteria", sortCriteria);
   params.set("cacheBuster", String(Date.now()));
   params.set("progress", String(progress));
   return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -2879,6 +3080,7 @@ function extractFinnFlightOfferCandidates(
       formatFinnFlightLuggageSummary(offer),
     ].filter((part): part is string => part !== undefined && part.length > 0).join(", ");
 
+    const durationMinutes = sumFlightLegMinutes(legs.map((leg) => readNumberValue(leg.duration)));
     candidates.push({
       shopName,
       price: formatNokFlightPrice(amount),
@@ -2887,12 +3089,12 @@ function extractFinnFlightOfferCandidates(
       currency: "NOK",
       productUrl: buildFinnFlightOfferUrl(searchData.searchId, offerId),
       ...(durationText !== undefined ? { durationText } : {}),
+      ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(platform.length > 0 ? { platform } : {}),
     });
   }
 
-  return rankFinnFlightOfferCandidates(dedupeFinnFlightOfferCandidates(candidates))
-    .slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+  return limitFlightCandidates(rankFinnFlightOfferCandidates(dedupeFinnFlightOfferCandidates(candidates)), FLIGHT_OFFER_CANDIDATE_LIMIT);
 }
 
 // Bagasjefilter valgt på opprinnelsessiden: sammenlign kun priser der bagasjen
@@ -3039,51 +3241,6 @@ function shouldUseFinnMetropolitanSearchForCurrentPage(): boolean {
     isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase());
 }
 
-function buildFinnFlightSearchUrl(
-  flightMeta: FlightSearchMeta,
-  scope: FinnFlightSearchScope = "exact",
-): string {
-  const params = new URLSearchParams({
-    adults: String(flightMeta.adults),
-    // FINN: barn 2–11 år og spedbarn 0–1 år som antall.
-    ...(flightMeta.children > 0 ? { children: String(flightMeta.children) } : {}),
-    ...(flightMeta.infants > 0 ? { infants: String(flightMeta.infants) } : {}),
-    // finn aksepterer economy|premium|business|first (verifisert mot søkeskjemaet).
-    cabinType: flightMeta.cabinClass ?? "economy",
-    requestedDepartureDate: flightMeta.outboundDate,
-    requestedDestination: `${flightMeta.destination}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
-    requestedOrigin: `${flightMeta.origin}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
-    tripType: flightMeta.inboundDate !== undefined ? "roundtrip" : "oneway",
-  });
-  if (scope === "exact") {
-    const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
-    for (const [key, value] of exactAirportParams.entries()) {
-      params.set(key, value);
-    }
-  }
-  if (flightMeta.inboundDate !== undefined) {
-    params.set("requestedReturnDate", flightMeta.inboundDate);
-  }
-  // Filtrene leses fra URL-en av FINNs resultatside, så lenken åpner samme filtrerte søk.
-  if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
-  if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
-  if (flightMeta.maxStops !== undefined) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
-  if (flightMeta.maxDurationMinutes !== undefined) params.set("durationTo", String(flightMeta.maxDurationMinutes));
-  return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
-}
-
-function buildFinnFlightExactAirportParams(flightMeta: FlightSearchMeta): URLSearchParams {
-  const params = new URLSearchParams({
-    departureAirportLeg1: flightMeta.origin,
-    arrivalAirportLeg1: flightMeta.destination,
-  });
-  if (flightMeta.inboundDate !== undefined) {
-    params.set("departureAirportLeg2", flightMeta.destination);
-    params.set("arrivalAirportLeg2", flightMeta.origin);
-  }
-  return params;
-}
-
 async function findPanFlightsFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
@@ -3127,9 +3284,15 @@ async function findPanFlightsFlightPriceMatchOffer(
     productName: routeTitle,
     productUrl: resultUrl,
     offerUrl: best.productUrl,
+    ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
+    flightSortVariants: buildFlightSortVariants({
+      cheapestPool: rankedCandidates,
+      fastestPool: rankedCandidates,
+      buildUrl: (mode) => buildPanFlightsFlightSearchUrl(flightMeta, mode),
+    }),
     alternatives: tooltipCandidates.map(({
       productUrl: _productUrl,
-      durationMinutes: _durationMinutes,
       qualityScore: _qualityScore,
       routeFingerprint: _routeFingerprint,
       sourceRank: _sourceRank,
@@ -3779,7 +3942,14 @@ function extractPanFlightsOfferCandidates(
       readPanFlightsProviderNameFromUrl(deepLink) ??
       readStringValue(resultData.provider) ??
       "PanFlights";
-    const durationMinutes = readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration);
+    const legMinutes = readPanFlightsLegMinutes(item, flightMeta.inboundDate !== undefined);
+    const durationMinutes = sumFlightLegMinutes(legMinutes) ??
+      (flightMeta.inboundDate === undefined ? readNumberValue(packageRecord?.duration) ?? readNumberValue(item.duration) : undefined);
+    const legStopCounts = readPanFlightsLegStopCounts(item);
+    const durationText = formatFlightLegDurationsWithStopsText(legMinutes.map((minutes, index) => {
+      const stopCount = legStopCounts[index];
+      return { durationMinutes: minutes, ...(stopCount !== undefined ? { stopCount } : {}) };
+    }));
     const qualityScore = readNumberValue(item.quality) ?? readNumberValue(packageRecord?.quality);
     const routeFingerprint = readStringValue(packageRecord?.routefingerprint) ??
       readStringValue(item.routefingerprint);
@@ -3797,6 +3967,7 @@ function extractPanFlightsOfferCandidates(
       sourceVersion: variant.version,
       ...matchedDates,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+      ...(durationText !== undefined ? { durationText } : {}),
       ...(qualityScore !== undefined ? { qualityScore } : {}),
       ...(routeFingerprint !== undefined ? { routeFingerprint } : {}),
       ...(platform !== undefined ? { platform } : {}),
@@ -4066,95 +4237,6 @@ function formatPanFlightsDuration(minutes: number | undefined): string | undefin
   return remainingMinutes === 0 ? `${hours} t` : `${hours} t ${remainingMinutes} min`;
 }
 
-function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta): string {
-  const outboundDate = compactIsoDate(flightMeta.outboundDate);
-  const inboundDate = flightMeta.inboundDate !== undefined ? compactIsoDate(flightMeta.inboundDate) : undefined;
-  const path = inboundDate !== undefined ? "roundtrip" : "oneway";
-  const v2 = inboundDate !== undefined
-    ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}`
-    : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
-  // pad/pch/pin = voksne, barn og spedbarn; PanFlights fyller ut skjemaet fra dem (verifisert 2026-11-02).
-  const params = new URLSearchParams({
-    v2,
-    order: "quality",
-    pad: String(flightMeta.adults),
-    ...(flightMeta.children > 0 ? { pch: String(flightMeta.children) } : {}),
-    ...(flightMeta.infants > 0 ? { pin: String(flightMeta.infants) } : {}),
-    [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1",
-  });
-  const linkFilters = buildFlightLinkFiltersValue(flightMeta);
-  if (linkFilters !== undefined) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
-  return `https://panflights.no/nb/${path}/?${params.toString()}`;
-}
-
-// Google Flights' q=-parameter forstår kun rute+datoer (kabin/passasjerer/stopp i
-// fritekst knekker parsingen). tfs=-parameteren er en base64url-protobuf som bærer
-// alt: legs (felt 3: dato f2, maks stopp f5, fra f13.f2, til f14.f2), passasjerer
-// (felt 8, 1=voksen), kabin (felt 9: 1=economy 2=premium 3=business 4=first) og
-// turtype (felt 19: 1=tur/retur 2=én vei). Felt 13 er bagasje (f2 hånd, f3 innsjekket), og felt 12
-// i hver etappe er maks minutter reisetid (verifisert 2026-11-02).
-function buildGoogleFlightsSearchUrl(flightMeta: FlightSearchMeta): string {
-  const params = new URLSearchParams({
-    tfs: buildGoogleFlightsTfsParam(flightMeta),
-    hl: "nb",
-    curr: "NOK",
-  });
-  return `https://www.google.com/travel/flights?${params.toString()}`;
-}
-
-function buildGoogleFlightsTfsParam(flightMeta: FlightSearchMeta): string {
-  const bytes: number[] = [
-    ...encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.outboundDate, flightMeta.origin, flightMeta.destination, flightMeta.maxStops, flightMeta.maxDurationMinutes)),
-    ...(flightMeta.inboundDate !== undefined
-      ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops, flightMeta.maxDurationMinutes))
-      : []),
-  ];
-  // Felt 8 per reisende: 1 = voksen, 2 = barn, 4 = spedbarn på fanget.
-  for (let index = 0; index < flightMeta.adults; index++) {
-    bytes.push(...encodeProtoVarintField(8, 1));
-  }
-  for (let index = 0; index < flightMeta.children; index++) {
-    bytes.push(...encodeProtoVarintField(8, 2));
-  }
-  for (let index = 0; index < flightMeta.infants; index++) {
-    bytes.push(...encodeProtoVarintField(8, 4));
-  }
-  bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
-  if (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) {
-    bytes.push(...encodeProtoBytesField(13, [
-      ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? 1 : 0),
-      ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? 1 : 0),
-    ]));
-  }
-  bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== undefined ? 1 : 2));
-  return encodeBase64Url(bytes);
-}
-
-function encodeGoogleFlightsLeg(
-  date: string,
-  origin: string,
-  destination: string,
-  maxStops: number | undefined,
-  maxDurationMinutes: number | undefined,
-): number[] {
-  return [
-    ...encodeProtoStringField(2, date),
-    ...(maxStops !== undefined ? encodeProtoVarintField(5, maxStops) : []),
-    ...(maxDurationMinutes !== undefined ? encodeProtoVarintField(12, maxDurationMinutes) : []),
-    ...encodeProtoBytesField(13, encodeProtoStringField(2, origin.toUpperCase())),
-    ...encodeProtoBytesField(14, encodeProtoStringField(2, destination.toUpperCase())),
-  ];
-}
-
-function readGoogleFlightsSeatValue(flightMeta: FlightSearchMeta): number {
-  switch (flightMeta.cabinClass) {
-    case "premium": return 2;
-    case "business": return 3;
-    case "first": return 4;
-    default: return 1;
-  }
-}
-
 function isGoogleFlightsSearchPage(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return (hostname === "google.com" || hostname.startsWith("google.") || hostname.endsWith(".google.com")) &&
@@ -4276,34 +4358,6 @@ function readProtoVarintField(fields: ProtoField[], fieldNumber: number): number
   return field !== undefined ? field.value as number : undefined;
 }
 
-function encodeProtoVarint(value: number): number[] {
-  const bytes: number[] = [];
-  let remaining = Math.max(0, Math.trunc(value));
-  do {
-    const byte = remaining % 128;
-    remaining = Math.floor(remaining / 128);
-    bytes.push(remaining > 0 ? byte | 0x80 : byte);
-  } while (remaining > 0);
-  return bytes;
-}
-
-function encodeProtoVarintField(fieldNumber: number, value: number): number[] {
-  return [...encodeProtoVarint(fieldNumber * 8), ...encodeProtoVarint(value)];
-}
-
-function encodeProtoStringField(fieldNumber: number, value: string): number[] {
-  const encoded = [...new TextEncoder().encode(value)];
-  return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(encoded.length), ...encoded];
-}
-
-function encodeProtoBytesField(fieldNumber: number, bytes: number[]): number[] {
-  return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(bytes.length), ...bytes];
-}
-
-function encodeBase64Url(bytes: number[]): string {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 function decodeBase64Url(value: string): Uint8Array | undefined {
   try {
     const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -4312,33 +4366,6 @@ function decodeBase64Url(value: string): Uint8Array | undefined {
   } catch {
     return undefined;
   }
-}
-
-function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
-  const pathParts = [
-    flightMeta.origin.toLowerCase(),
-    flightMeta.destination.toLowerCase(),
-    compactIsoDate(flightMeta.outboundDate).slice(2),
-    flightMeta.inboundDate !== undefined ? compactIsoDate(flightMeta.inboundDate).slice(2) : undefined,
-  ].filter((part): part is string => part !== undefined);
-  const params = new URLSearchParams({
-    adults: String(flightMeta.adults),
-    adultsv2: String(flightMeta.adults),
-    cabinclass: buildSkyscannerCabinClass(flightMeta).toLowerCase().replace(/_/g, ""),
-    childrenv2: [...readFlightChildAges(flightMeta), ...Array.from({ length: flightMeta.infants }, () => FLIGHT_INFANT_AGE)].join("|"),
-    inboundaltsenabled: "false",
-    outboundaltsenabled: "false",
-    preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
-    rtn: flightMeta.inboundDate !== undefined ? "1" : "0",
-  });
-  // Skyscanners stoppfilter ekskluderer kategorier: "!oneStop,!twoPlusStops" = kun direkte.
-  if (flightMeta.maxStops === 0) params.set("stops", "!oneStop,!twoPlusStops");
-  else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
-  const fareAttributes = buildSkyscannerFareAttributesParam(flightMeta);
-  if (fareAttributes !== undefined) params.set("fare-attributes", fareAttributes);
-  // duration = maks minutter per etappe; siden setter reisetidsfilteret ut fra den (verifisert 2026-11-02).
-  if (flightMeta.maxDurationMinutes !== undefined) params.set("duration", String(flightMeta.maxDurationMinutes));
-  return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
 }
 
 function buildTravellinkFlightSearchUrl(flightMeta: FlightSearchMeta): string {
@@ -4828,38 +4855,6 @@ function formatTravellinkFlightDurationSummary(legs: TravellinkFlightLegSummary[
   return durations.length > 0 ? durations.join(" / ") : undefined;
 }
 
-function buildTripComFlightSearchUrl(flightMeta: FlightSearchMeta): string {
-  const params = new URLSearchParams({
-    dcity: flightMeta.origin.toLowerCase(),
-    acity: flightMeta.destination.toLowerCase(),
-    ddate: flightMeta.outboundDate,
-    triptype: flightMeta.inboundDate !== undefined ? "rt" : "ow",
-    class: buildTripComCabinClassParam(flightMeta),
-    lowpricesource: "searchform",
-    quantity: String(flightMeta.adults),
-    // childqty/babyqty verifisert 2026-11-02; totalPrice gjelder da alle reisende.
-    ...(flightMeta.children > 0 ? { childqty: String(flightMeta.children) } : {}),
-    ...(flightMeta.infants > 0 ? { babyqty: String(flightMeta.infants) } : {}),
-    searchboxarg: "t",
-    nonstoponly: flightMeta.maxStops === 0 ? "on" : "off",
-    locale: "en-US",
-    curr: TRIP_COM_DEFAULT_CURRENCY,
-  });
-  if (flightMeta.inboundDate !== undefined) params.set("rdate", flightMeta.inboundDate);
-  // Trip husker filtre mellom søk; "none" lar utvidelsen fjerne filtre søket ikke har.
-  params.set(FLIGHT_LINK_FILTERS_PARAM, buildFlightLinkFiltersValue(flightMeta) ?? "none");
-  return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
-}
-
-function buildTripComCabinClassParam(flightMeta: FlightSearchMeta): string {
-  switch (flightMeta.cabinClass) {
-    case "premium": return "s";
-    case "business": return "c";
-    case "first": return "f";
-    default: return "y";
-  }
-}
-
 async function findTripComFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
@@ -4915,7 +4910,13 @@ async function findTripComFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     ...(listResult.stable ? {} : { searchIncomplete: true }),
+    flightSortVariants: buildFlightSortVariants({
+      cheapestPool: candidates,
+      fastestPool: candidates,
+      buildUrl: (mode) => buildTripComFlightSearchUrl(flightMeta, mode),
+    }),
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
 }
@@ -5205,10 +5206,19 @@ function extractTripComListOfferCandidates(
         durationMinutes: readNumberValue(journey.duration),
         stopCount: readTripComJourneyStopCount(journey),
       })));
-      return durationText !== undefined ? { ...candidate, durationText } : candidate;
+      // Listen for tur/retur viser bare utreisen, så den kan ikke sammenlignes på samlet reisetid.
+      const durationMinutes = sumFlightLegMinutes(
+        journeys.map((journey) => readNumberValue(journey.duration)),
+        flightMeta.inboundDate !== undefined ? 2 : 1,
+      );
+      return {
+        ...candidate,
+        ...(durationText !== undefined ? { durationText } : {}),
+        ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+      };
     })
     .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined);
-  return dedupeTripComOfferCandidates(candidates).slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+  return limitFlightCandidates(dedupeTripComOfferCandidates(candidates), FLIGHT_OFFER_CANDIDATE_LIMIT);
 }
 
 function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
@@ -5481,7 +5491,14 @@ async function findSkyscannerFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: resultUrl,
     ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+    ...(candidate.durationMinutes !== undefined ? { durationMinutes: candidate.durationMinutes } : {}),
     ...(searchComplete ? {} : { searchIncomplete: true }),
+    flightSortVariants: buildFlightSortVariants({
+      cheapestPool: candidates,
+      fastestPool: candidates,
+      buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode),
+      baggageExcluded,
+    }),
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
 }
@@ -5651,15 +5668,6 @@ function buildSkyscannerFlightSearchPayload(
   };
 }
 
-function buildSkyscannerCabinClass(flightMeta: FlightSearchMeta): string {
-  switch (flightMeta.cabinClass) {
-    case "premium": return "PREMIUM_ECONOMY";
-    case "business": return "BUSINESS";
-    case "first": return "FIRST";
-    default: return "ECONOMY";
-  }
-}
-
 function buildSkyscannerFlightSearchLeg(
   originPlace: SkyscannerFlightPlace,
   destinationPlace: SkyscannerFlightPlace,
@@ -5721,6 +5729,7 @@ function extractSkyscannerFlightSearchCandidates(
     }
     if (bestPricingOption === undefined || bestAmount === undefined) continue;
 
+    const durationMinutes = sumFlightLegMinutes(legSummaries.map((leg) => leg.durationMinutes));
     candidates.push({
       shopName: readSkyscannerAgentName(bestPricingOption, itineraries) ?? "Skyscanner",
       price: formatNokFlightPrice(bestAmount),
@@ -5730,13 +5739,15 @@ function extractSkyscannerFlightSearchCandidates(
       productUrl: readSkyscannerPricingOptionUrl(bestPricingOption, fallbackUrl),
       ...(score !== undefined ? { score } : {}),
       ...(durationText !== undefined ? { durationText } : {}),
+      ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(platform.length > 0 ? { platform } : {}),
     });
   }
 
-  return dedupeSkyscannerOfferCandidates(candidates)
-    .sort(compareSkyscannerOfferCandidates)
-    .slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+  return limitFlightCandidates(
+    dedupeSkyscannerOfferCandidates(candidates).sort(compareSkyscannerOfferCandidates),
+    FLIGHT_OFFER_CANDIDATE_LIMIT,
+  );
 }
 
 function readSkyscannerResultTags(result: Record<string, unknown>): string[] {
@@ -6150,28 +6161,6 @@ function readSkyscannerMoney(value: Record<string, unknown> | undefined): { amou
   return amount > 0 ? { amount, currency } : undefined;
 }
 
-function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string {
-  const { dateFlex } = flightMeta;
-  const formatDate = (date: string, flexDays: number): string => {
-    if (flexDays === 0) return date;
-    return `${date}-flexible-${flexDays}${flexDays === 1 ? "day" : "days"}`;
-  };
-  const pathParts = [
-    `${flightMeta.origin}-${flightMeta.destination}`,
-    formatDate(flightMeta.outboundDate, dateFlex !== undefined ? readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter) : 0),
-    flightMeta.inboundDate !== undefined
-      ? formatDate(flightMeta.inboundDate, dateFlex !== undefined ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0)
-      : undefined,
-    ...buildMomondoPassengerPathParts(flightMeta),
-    flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : undefined,
-  ].filter((part): part is string => part !== undefined);
-  // Med datovindu sorteres på pris, så de billigste kombinasjonene kommer med i svaret.
-  const params = new URLSearchParams({ sort: dateFlex !== undefined ? "price_a" : MOMONDO_DEFAULT_FLIGHT_SORT_MODE });
-  const momondoFilters = buildMomondoFlightFilterValue(flightMeta);
-  if (momondoFilters !== undefined) params.set("fs", momondoFilters);
-  return `https://www.momondo.no/flight-search/${pathParts.map(encodeURIComponent).join("/")}?${params.toString()}`;
-}
-
 function readCurrentMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string | undefined {
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined) return undefined;
@@ -6196,7 +6185,7 @@ function isSameFlightSearchMeta(left: FlightSearchMeta, right: FlightSearchMeta)
 
 function readMomondoFlightSortMode(url: string): MomondoFlightSortMode | undefined {
   const sortMode = parseUrl(url)?.searchParams.get("sort");
-  return sortMode === "price_a" || sortMode === "bestflight_a" ? sortMode : undefined;
+  return sortMode === "price_a" || sortMode === "bestflight_a" || sortMode === "duration_a" ? sortMode : undefined;
 }
 
 function readCurrentMomondoVisibleBestPrice(flightMeta: FlightSearchMeta): number | undefined {
@@ -6269,7 +6258,9 @@ async function findMomondoFlightPriceMatchOffer(
   const searchData = await fetchMomondoFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
-  const resultData = await pollMomondoFlightResults(searchData, flightMeta, airportLookup);
+  // «Best» er alltid momondos beste-sortering, også når siden står på en annen fane.
+  const bestSearchData: MomondoFlightSearchData = { ...searchData, sortMode: MOMONDO_DEFAULT_FLIGHT_SORT_MODE };
+  const resultData = await pollMomondoFlightResults(bestSearchData, flightMeta, airportLookup);
   if (resultData === undefined) return undefined;
 
   let candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
@@ -6282,6 +6273,12 @@ async function findMomondoFlightPriceMatchOffer(
   }
   const best = candidates[0];
   if (best === undefined) return undefined;
+  const { includeCabinBag: _sortCabinBag, includeCheckedBag: _sortCheckedBag, ...flightMetaForSortWithoutBaggage } = flightMeta;
+  const sortPoolMeta = baggageExcluded ? flightMetaForSortWithoutBaggage : flightMeta;
+  const [priceCandidates, durationCandidates] = await Promise.all([
+    fetchMomondoFlightSortedCandidates(bestSearchData, resultData, sortPoolMeta, airportLookup, "price_a"),
+    fetchMomondoFlightSortedCandidates(bestSearchData, resultData, sortPoolMeta, airportLookup, "duration_a"),
+  ]);
   const visibleBestPrice = baggageExcluded ? undefined : readCurrentMomondoVisibleBestPrice(flightMeta);
   const displayedBest: MomondoFlightOfferCandidate = visibleBestPrice === undefined
     ? best
@@ -6309,10 +6306,17 @@ async function findMomondoFlightPriceMatchOffer(
     sortAmount: (displayedBest.sortAmount ?? displayedBest.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
     currency: displayedBest.currency,
     productName: routeTitle,
-    productUrl: searchData.resultUrl,
+    productUrl: buildMomondoFlightSortUrl(searchData.resultUrl, "best"),
     offerUrl: displayedBest.productUrl,
     ...(displayedBest.durationText !== undefined ? { durationText: displayedBest.durationText } : {}),
+    ...(displayedBest.durationMinutes !== undefined ? { durationMinutes: displayedBest.durationMinutes } : {}),
     ...(searchIncomplete ? { searchIncomplete: true } : {}),
+    flightSortVariants: buildFlightSortVariants({
+      cheapestPool: [...priceCandidates, ...candidates],
+      fastestPool: [...durationCandidates, ...candidates],
+      buildUrl: (mode) => buildMomondoFlightSortUrl(searchData.resultUrl, mode),
+      baggageExcluded,
+    }),
     alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
 }
@@ -6395,6 +6399,35 @@ async function fetchMomondoFlightSearchData(resultUrl: string): Promise<MomondoF
 function parseMomondoFormToken(html: string): string | undefined {
   return html.match(/window\.R9\.formToken\s*=\s*'([^']+)'/)?.[1] ??
     html.match(/window\.R9\.formToken\s*=\s*"([^"]+)"/)?.[1];
+}
+
+function buildMomondoFlightSortUrl(resultUrl: string, mode: FlightSortMode): string {
+  const parsedUrl = parseUrl(resultUrl);
+  if (parsedUrl === undefined) return resultUrl;
+  parsedUrl.searchParams.set("sort", buildFlightSortUrlValue("momondo", mode));
+  return parsedUrl.toString();
+}
+
+// Samme søk med momondos andre sortering; svaret inneholder bare de øverste reisene for hver.
+async function fetchMomondoFlightSortedCandidates(
+  searchData: MomondoFlightSearchData,
+  resultData: Record<string, unknown>,
+  flightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+  sortMode: MomondoFlightSortMode,
+): Promise<MomondoFlightOfferCandidate[]> {
+  const searchId = readStringValue(resultData.searchId);
+  if (searchId === undefined) return [];
+  const value = await requestMomondoFlightPoll(
+    { ...searchData, sortMode },
+    flightMeta,
+    airportLookup,
+    searchId,
+    buildMomondoExactAirportFilterState(resultData, flightMeta, airportLookup),
+  );
+  return isRecord(value) && Array.isArray(value.results)
+    ? extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl)
+    : [];
 }
 
 async function pollMomondoFlightResults(
@@ -6670,12 +6703,13 @@ function extractMomondoFlightOfferCandidates(
 ): MomondoFlightOfferCandidate[] {
   const strictCandidates = collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, true);
   if (strictCandidates.length > 0) {
-    return dedupeMomondoFlightOfferCandidates(strictCandidates).slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+    return limitFlightCandidates(dedupeMomondoFlightOfferCandidates(strictCandidates), FLIGHT_OFFER_CANDIDATE_LIMIT);
   }
 
-  return dedupeMomondoFlightOfferCandidates(
-    collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, false),
-  ).slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
+  return limitFlightCandidates(
+    dedupeMomondoFlightOfferCandidates(collectMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, fallbackUrl, false)),
+    FLIGHT_OFFER_CANDIDATE_LIMIT,
+  );
 }
 
 function collectMomondoFlightOfferCandidates(
@@ -6697,6 +6731,7 @@ function collectMomondoFlightOfferCandidates(
 
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
     const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
+    const durationMinutes = sumFlightLegMinutes(legSummaries.map((leg) => leg.durationMinutes));
     const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
     const bookingOptions = readRecordArray(result.bookingOptions)
       .filter(isMomondoBookingOptionAvailable)
@@ -6730,6 +6765,7 @@ function collectMomondoFlightOfferCandidates(
         currency,
         productUrl,
         ...(durationText !== undefined ? { durationText } : {}),
+        ...(durationMinutes !== undefined ? { durationMinutes } : {}),
         ...(platform.length > 0 ? { platform } : {}),
       });
       break;
@@ -7143,10 +7179,6 @@ function splitIsoDateParts(value: string): { year: string; month: string; day: s
     month: value.slice(5, 7),
     day: value.slice(8, 10),
   };
-}
-
-function compactIsoDate(value: string): string {
-  return value.replace(/-/g, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -10546,10 +10578,12 @@ function renderNotice(
   initialPriceMatchCollapsed: boolean,
   initialRegionPricesCollapsed: boolean,
   activatedOffers: Readonly<Record<string, number>>,
-  priceMatches: PriceMatchOffer[] = [],
+  unsortedPriceMatches: PriceMatchOffer[] = [],
   regionPrices?: PlayStationRegionPriceResult,
 ): void {
   clearNotice();
+  const flightSortMode = readActiveFlightSortMode();
+  const priceMatches = applyFlightSortMode(unsortedPriceMatches, flightSortMode);
   const host = document.createElement("div");
   host.id = HOST_ID;
   applyHostOverlayStyle(host);
@@ -11412,6 +11446,17 @@ function renderNotice(
       flex: 1 0 auto;
       margin-bottom: 0;
       width: auto;
+    }
+    .flight-sort-control {
+      display: inline-flex;
+      flex-basis: 100%;
+      gap: 2px;
+    }
+    .flight-sort-button {
+      flex: 1 1 0;
+      font-size: 11px;
+      min-height: 22px;
+      padding: 2px 6px;
     }
     .flight-filter-chips {
       display: inline-flex;
@@ -12748,6 +12793,16 @@ function renderNotice(
       : undefined;
     const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta, shadowRoot) : undefined;
     if (flightFilterChips !== undefined) priceMatchHeader.append(flightFilterChips);
+    // Datovinduet viser allerede billigste kombinasjon og har ikke egne sorteringer.
+    if (
+      unsortedPriceMatches.some((priceMatch) => priceMatch.flightSortVariants !== undefined) &&
+      !unsortedPriceMatches.some((priceMatch) => priceMatch.dateFlex !== undefined)
+    ) {
+      priceMatchHeader.append(buildFlightSortControl(flightSortMode, (mode) => {
+        flightSortModeOverride = mode;
+        renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices);
+      }));
+    }
 
     priceMatchSection.append(
       priceMatchHeader,

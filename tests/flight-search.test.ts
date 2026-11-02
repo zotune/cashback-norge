@@ -1,7 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  applyFlightSortMode,
+  buildFinnFlightSearchUrl,
   buildFlightLinkFiltersValue,
+  buildFlightSortUrlValue,
+  buildGoogleFlightsTfsParam,
+  buildMomondoFlightSearchUrl,
+  buildPanFlightsFlightSearchUrl,
+  buildSkyscannerFlightSearchUrl,
+  buildTripComFlightSearchUrl,
+  FLIGHT_LINK_FILTERS_PARAM,
+  FLIGHT_LINK_SORT_PARAM,
+  type FlightSortMode,
+  limitFlightCandidates,
+  readFlightSortLabel,
+  readFlightSortUrlValue,
+  readPanFlightsLegMinutes,
+  selectFlightSortCandidate,
+  sumFlightLegMinutes,
   buildTripComBaggageFilterFlags,
   buildSkyscannerFareAttributesParam,
   buildSkyscannerSearchOptions,
@@ -305,4 +322,211 @@ test("reads Trip.com duration labels and Skyscanner stop filters", () => {
   assert.equal(readSkyscannerMaxStopsParam("!twoPlusStops"), 1);
   assert.equal(readSkyscannerMaxStopsParam("!oneStop,!twoPlusStops"), 0);
   assert.equal(readSkyscannerMaxStopsParam(null), undefined);
+});
+
+const SORT_MODES: FlightSortMode[] = ["best", "cheapest", "fastest"];
+const SORT_CANDIDATES = [
+  { id: "best", amount: 200, durationMinutes: 400 },
+  { id: "cheap", amount: 100, durationMinutes: 900 },
+  { id: "fast", amount: 300, durationMinutes: 300 },
+  { id: "fastDear", amount: 500, durationMinutes: 300 },
+  { id: "unknown", amount: 90 },
+];
+
+test("selects best, cheapest and fastest candidate", () => {
+  assert.equal(selectFlightSortCandidate(SORT_CANDIDATES, "best")?.id, "best");
+  assert.equal(selectFlightSortCandidate(SORT_CANDIDATES, "cheapest")?.id, "unknown");
+  assert.equal(selectFlightSortCandidate(SORT_CANDIDATES, "fastest")?.id, "fast");
+  assert.equal(selectFlightSortCandidate([{ amount: 1 }], "fastest"), undefined);
+  for (const mode of SORT_MODES) assert.equal(selectFlightSortCandidate([], mode), undefined);
+
+  const manyRows = [...Array.from({ length: 12 }, (_, index) => ({ id: `row${index}`, amount: 1000 + index, durationMinutes: 1000 + index })), ...SORT_CANDIDATES];
+  const limited = limitFlightCandidates(manyRows, 10);
+  assert.deepEqual(limited.slice(0, 10), manyRows.slice(0, 10));
+  assert.deepEqual(limited.slice(10).map((candidate) => candidate.id), ["unknown", "fast"]);
+  assert.equal(limitFlightCandidates(SORT_CANDIDATES, 10).length, SORT_CANDIDATES.length);
+});
+
+test("sums travel time only when every leg is known", () => {
+  assert.equal(sumFlightLegMinutes([100, 200]), 300);
+  assert.equal(sumFlightLegMinutes([100, undefined]), undefined);
+  assert.equal(sumFlightLegMinutes([]), undefined);
+  assert.equal(sumFlightLegMinutes([100], 2), undefined);
+  assert.deepEqual(readPanFlightsLegMinutes({ package: { routelist: [{ fly_duration_secs: 3600, return_duration_secs: 7200 }] } }, true), [60, 120]);
+  assert.deepEqual(readPanFlightsLegMinutes({ package: { routelist: [{ fly_duration_secs: 3600 }] } }, false), [60]);
+  assert.deepEqual(readPanFlightsLegMinutes({}, true), [undefined, undefined]);
+});
+
+test("switches rows without losing sources", () => {
+  const variant = (amount: number, durationMinutes?: number) => ({
+    shopName: `shop${amount}`,
+    price: `${amount} kr`,
+    amount,
+    sortAmount: amount,
+    currency: "NOK",
+    productUrl: `https://example.test/${amount}`,
+    ...(durationMinutes !== undefined ? { durationMinutes, durationText: `${durationMinutes} min` } : {}),
+  });
+  const offers = [
+    { source: "a", ...variant(300, 500), flightSortVariants: { cheapest: variant(250, 900), fastest: variant(400, 200) } },
+    { source: "b", ...variant(350, 450), flightSortVariants: { cheapest: variant(200), fastest: variant(600, 300) } },
+    { source: "noVariant", ...variant(100, 700) },
+    { source: "excluded", ...variant(50, 100), sortAmount: 1_000_000_050, baggageExcluded: true, flightSortVariants: { cheapest: { ...variant(40), sortAmount: 1_000_000_040 }, fastest: { ...variant(60, 90), sortAmount: 1_000_000_060 } } },
+    { source: "google", ...variant(1), sortAmount: Number.MAX_SAFE_INTEGER, durationText: undefined },
+  ];
+  assert.equal(applyFlightSortMode(offers, "best"), offers);
+
+  const cheapest = applyFlightSortMode(offers, "cheapest");
+  assert.deepEqual(cheapest.map((offer) => offer.source), ["noVariant", "b", "a", "google", "excluded"]);
+  assert.equal(cheapest.find((offer) => offer.source === "b")?.durationText, undefined);
+
+  const fastest = applyFlightSortMode(offers, "fastest");
+  assert.deepEqual(fastest.map((offer) => offer.source), ["a", "b", "noVariant", "google", "excluded"]);
+  assert.equal(fastest[0]?.productUrl, "https://example.test/400");
+  for (const mode of SORT_MODES) assert.equal(applyFlightSortMode(offers, mode).length, offers.length);
+  const hotels = [{ amount: 2 }, { amount: 1 }];
+  assert.equal(applyFlightSortMode(hotels, "fastest"), hotels);
+});
+
+test("maps sort values in both directions", () => {
+  for (const source of ["finn", "momondo", "panflights"] as const) {
+    for (const mode of SORT_MODES) assert.equal(readFlightSortUrlValue(source, buildFlightSortUrlValue(source, mode)), mode);
+    assert.equal(readFlightSortUrlValue(source, "ukjent"), undefined);
+    assert.equal(readFlightSortUrlValue(source, null), undefined);
+  }
+  assert.equal(readFlightSortLabel("sortert etter beste"), "best");
+  assert.equal(readFlightSortLabel("sortert etter «Rimeligste»"), "cheapest");
+  assert.equal(readFlightSortLabel("sortert etter «Raskeste»"), "fastest");
+  assert.equal(readFlightSortLabel("Recommended"), "best");
+  assert.equal(readFlightSortLabel("Cheapest"), "cheapest");
+  assert.equal(readFlightSortLabel(undefined), undefined);
+});
+
+function decodeProtoFields(bytes: number[]): Array<[number, number | number[]]> {
+  const fields: Array<[number, number | number[]]> = [];
+  let index = 0;
+  const varint = (): number => {
+    let value = 0;
+    let shift = 0;
+    for (;;) {
+      const byte = bytes[index++] ?? 0;
+      value += (byte & 0x7f) * 2 ** shift;
+      shift += 7;
+      if ((byte & 0x80) === 0) return value;
+    }
+  };
+  while (index < bytes.length) {
+    const tag = varint();
+    if ((tag & 7) === 0) {
+      fields.push([tag >> 3, varint()]);
+    } else {
+      const length = varint();
+      fields.push([tag >> 3, bytes.slice(index, index + length)]);
+      index += length;
+    }
+  }
+  return fields;
+}
+
+test("every link keeps every search choice", () => {
+  const passengerSets = [
+    { adults: 1, children: 0, infants: 0 },
+    { adults: 2, children: 1, infants: 0, childAges: [8] },
+    { adults: 2, children: 2, infants: 1, childAges: [4, 11] },
+  ];
+  const inbounds = [undefined, "2026-12-14"];
+  const stops = [undefined, 0, 1, 2];
+  const durations = [undefined, 1500];
+  let combinations = 0;
+  for (const passengers of passengerSets) for (const inboundDate of inbounds) for (const maxStops of stops) for (const maxDurationMinutes of durations)
+    for (const includeCabinBag of [false, true]) for (const includeCheckedBag of [false, true]) for (const mode of SORT_MODES) {
+      combinations += 1;
+      const flight = meta({
+        ...passengers,
+        ...(inboundDate !== undefined ? { inboundDate } : {}),
+        ...(maxStops !== undefined ? { maxStops } : {}),
+        ...(maxDurationMinutes !== undefined ? { maxDurationMinutes } : {}),
+        ...(includeCabinBag ? { includeCabinBag } : {}),
+        ...(includeCheckedBag ? { includeCheckedBag } : {}),
+      });
+      const label = JSON.stringify({ passengers, inboundDate, maxStops, maxDurationMinutes, includeCabinBag, includeCheckedBag, mode });
+      const ages = [...(passengers.childAges ?? []), ...Array.from({ length: passengers.infants }, () => 1)];
+
+      const skyscanner = new URL(buildSkyscannerFlightSearchUrl(flight, mode)).searchParams;
+      assert.equal(skyscanner.get("adults"), String(passengers.adults), label);
+      assert.equal(skyscanner.get("childrenv2"), ages.join("|"), label);
+      assert.equal(skyscanner.get("rtn"), inboundDate !== undefined ? "1" : "0", label);
+      assert.equal(skyscanner.get("stops"), maxStops === 0 ? "!oneStop,!twoPlusStops" : maxStops === 1 ? "!twoPlusStops" : null, label);
+      assert.equal(skyscanner.get("fare-attributes"), [includeCabinBag ? "cabin-bag" : "", includeCheckedBag ? "checked-bag" : ""].filter(Boolean).join(",") || null, label);
+      assert.equal(skyscanner.get("duration"), maxDurationMinutes !== undefined ? String(maxDurationMinutes) : null, label);
+      assert.equal(skyscanner.get(FLIGHT_LINK_SORT_PARAM), mode === "best" ? null : mode, label);
+
+      const finn = new URL(buildFinnFlightSearchUrl(flight)).searchParams;
+      assert.equal(finn.get("adults"), String(passengers.adults), label);
+      assert.equal(finn.get("children"), passengers.children > 0 ? String(passengers.children) : null, label);
+      assert.equal(finn.get("infants"), passengers.infants > 0 ? String(passengers.infants) : null, label);
+      assert.equal(finn.get("requestedReturnDate"), inboundDate ?? null, label);
+      assert.equal(finn.get("handLuggage"), includeCabinBag ? "true" : null, label);
+      assert.equal(finn.get("checkedLuggage"), includeCheckedBag ? "true" : null, label);
+      assert.equal(finn.get("maximumNumberOfStops"), maxStops !== undefined ? String(maxStops) : null, label);
+      assert.equal(finn.get("durationTo"), maxDurationMinutes !== undefined ? String(maxDurationMinutes) : null, label);
+
+      const momondo = new URL(buildMomondoFlightSearchUrl(flight, mode));
+      const momondoFilters = momondo.searchParams.get("fs") ?? "";
+      assert.equal(momondo.searchParams.get("sort"), buildFlightSortUrlValue("momondo", mode), label);
+      assert.equal(momondo.pathname.includes(`/${passengers.adults}adults`), passengers.adults > 1 || passengers.children + passengers.infants > 0, label);
+      assert.equal(momondo.pathname.includes("children-"), passengers.children + passengers.infants > 0, label);
+      assert.equal(momondoFilters.includes("bfc=1"), includeCabinBag, label);
+      assert.equal(momondoFilters.includes("cfc=1"), includeCheckedBag, label);
+      assert.equal(momondoFilters.includes("legdur=-1500"), maxDurationMinutes !== undefined, label);
+      assert.equal(momondoFilters.includes("stops="), maxStops === 0 || maxStops === 1, label);
+
+      const panflights = new URL(buildPanFlightsFlightSearchUrl(flight, mode));
+      assert.equal(panflights.searchParams.get("order"), buildFlightSortUrlValue("panflights", mode), label);
+      assert.equal(panflights.searchParams.get("pad"), String(passengers.adults), label);
+      assert.equal(panflights.searchParams.get("pch"), passengers.children > 0 ? String(passengers.children) : null, label);
+      assert.equal(panflights.searchParams.get("pin"), passengers.infants > 0 ? String(passengers.infants) : null, label);
+      assert.deepEqual(readFlightLinkFilters(panflights) ?? {}, {
+        ...(maxStops !== undefined ? { maxStops } : {}),
+        ...(includeCabinBag ? { includeCabinBag } : {}),
+        ...(includeCheckedBag ? { includeCheckedBag } : {}),
+        ...(maxDurationMinutes !== undefined ? { maxDurationMinutes } : {}),
+      }, label);
+
+      const trip = new URL(buildTripComFlightSearchUrl(flight, mode));
+      assert.equal(trip.searchParams.get("quantity"), String(passengers.adults), label);
+      assert.equal(trip.searchParams.get("childqty"), passengers.children > 0 ? String(passengers.children) : null, label);
+      assert.equal(trip.searchParams.get("babyqty"), passengers.infants > 0 ? String(passengers.infants) : null, label);
+      assert.equal(trip.searchParams.get("triptype"), inboundDate !== undefined ? "rt" : "ow", label);
+      assert.equal(trip.searchParams.get("nonstoponly"), maxStops === 0 ? "on" : "off", label);
+      assert.equal(trip.searchParams.get(FLIGHT_LINK_SORT_PARAM), mode === "best" ? null : mode, label);
+      assert.ok(trip.searchParams.has(FLIGHT_LINK_FILTERS_PARAM), label);
+      assert.deepEqual(readFlightLinkFilters(trip), {
+        ...(maxStops !== undefined ? { maxStops } : {}),
+        ...(includeCabinBag ? { includeCabinBag } : {}),
+        ...(includeCheckedBag ? { includeCheckedBag } : {}),
+        ...(maxDurationMinutes !== undefined ? { maxDurationMinutes } : {}),
+      }, label);
+
+      const google = decodeProtoFields([...Buffer.from(buildGoogleFlightsTfsParam(flight), "base64url")]);
+      assert.deepEqual(google.filter(([field]) => field === 8).map(([, value]) => value), [
+        ...Array.from({ length: passengers.adults }, () => 1),
+        ...Array.from({ length: passengers.children }, () => 2),
+        ...Array.from({ length: passengers.infants }, () => 4),
+      ], label);
+      const legs = google.filter(([field]) => field === 3).map(([, value]) => decodeProtoFields(value as number[]));
+      assert.equal(legs.length, inboundDate !== undefined ? 2 : 1, label);
+      for (const leg of legs) {
+        assert.equal(leg.find(([field]) => field === 5)?.[1], maxStops, label);
+        assert.equal(leg.find(([field]) => field === 12)?.[1], maxDurationMinutes, label);
+      }
+      const bags = google.find(([field]) => field === 13)?.[1] as number[] | undefined;
+      assert.equal(bags !== undefined, includeCabinBag || includeCheckedBag, label);
+      if (bags !== undefined) {
+        const bagFields = decodeProtoFields(bags);
+        assert.equal(bagFields.find(([field]) => field === 2)?.[1], includeCabinBag ? 1 : 0, label);
+        assert.equal(bagFields.find(([field]) => field === 3)?.[1], includeCheckedBag ? 1 : 0, label);
+      }
+    }
+  assert.equal(combinations, 3 * 2 * 4 * 2 * 2 * 2 * 3);
 });
