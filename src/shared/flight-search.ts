@@ -1,6 +1,7 @@
 /** Ren flysøk-logikk som deles av utvidelsen og testene: søkeparametre, reisende,
  * datovindu, stopp-/bagasje-/reisetidsfilter og kildenes URL-/dataformater. */
 import { isRecord } from "./cashback.js";
+import { readPriceAmount } from "./price.js";
 import {
   addDaysToIsoDate,
   isString,
@@ -481,6 +482,46 @@ export function readMomondoFlightFlexDays(before: number, after: number): number
 }
 
 export type MomondoFlexibleDateOption = FlightDateCombination & { amount: number; sortAmount?: number };
+
+export type MomondoVisibleFlightLeg = {
+  dateText: string | undefined;
+  origin: string | undefined;
+  destination: string | undefined;
+  durationText: string | undefined;
+  stopsText: string | undefined;
+};
+
+// Kun konkrete resultatkort. Kalenderens minimum og datoen i søke-URL-en
+// dokumenterer verken reisens dato, rute eller pris.
+export function readMomondoVisibleFlexibleDateOption(
+  input: { priceText: string | undefined; currency: string | undefined; legs: MomondoVisibleFlightLeg[] },
+  flightMeta: FlightSearchMeta,
+  combinations: FlightDateCombination[],
+): (MomondoFlexibleDateOption & { currency: "NOK"; legs: Array<{ durationMinutes: number; stopCount: number }> }) | undefined {
+  if (input.currency !== "NOK" || input.priceText === undefined || !/\s(?:kr|NOK)$/i.test(input.priceText.trim())) return undefined;
+  const amount = readPriceAmount(input.priceText.replace(/\s*(?:kr|NOK)\s*$/i, ""));
+  if (amount === undefined || amount <= 0 || input.legs.length !== (flightMeta.inboundDate === undefined ? 1 : 2)) return undefined;
+  const dates: string[] = [];
+  const legs: Array<{ durationMinutes: number; stopCount: number }> = [];
+  for (const [index, leg] of input.legs.entries()) {
+    if (leg.origin !== (index === 0 ? flightMeta.origin : flightMeta.destination) ||
+      leg.destination !== (index === 0 ? flightMeta.destination : flightMeta.origin)) return undefined;
+    const date = leg.dateText?.trim().match(/^(\d{1,2})\.(\d{1,2})\.$/);
+    const duration = leg.durationText?.trim().match(/^(?:(\d+)\s*[th]\s*)?(?:(\d+)\s*m)?$/i);
+    const durationMinutes = duration === undefined || duration === null ? 0 : Number(duration[1] ?? 0) * 60 + Number(duration[2] ?? 0);
+    const stops = leg.stopsText?.trim().match(/^(\d+)\s*(?:stopp?|stops?)$/i);
+    const stopCount = /^(?:direkte|nonstop|direct)$/i.test(leg.stopsText?.trim() ?? "") ? 0 : stops?.[1] === undefined ? undefined : Number(stops[1]);
+    if (date === undefined || date === null || durationMinutes <= 0 || stopCount === undefined) return undefined;
+    dates.push(`${Number(date[1])}.${Number(date[2])}`);
+    legs.push({ durationMinutes, stopCount });
+  }
+  if (exceedsFlightMaxStops(flightMeta, legs.map((leg) => leg.stopCount)) ||
+    exceedsFlightMaxDuration(flightMeta, legs.map((leg) => leg.durationMinutes))) return undefined;
+  const shortDate = (date: string): string => `${Number(date.slice(8, 10))}.${Number(date.slice(5, 7))}`;
+  const combination = combinations.find((candidate) => shortDate(candidate.outboundDate) === dates[0] &&
+    (candidate.inboundDate === undefined ? dates.length === 1 : shortDate(candidate.inboundDate) === dates[1]));
+  return combination === undefined ? undefined : { ...combination, amount, currency: "NOK", legs };
+}
 
 export type MomondoFlexibleDatePollState<T extends MomondoFlexibleDateOption> = {
   searchId?: string;
@@ -1146,6 +1187,19 @@ export function readKiwiBagsParam(value: string | null): Pick<FlightSearchMeta, 
     ...((cabinBags ?? 0) > 0 ? { includeCabinBag: true } : {}),
     ...((checkedBags ?? 0) > 0 ? { includeCheckedBag: true } : {}),
   };
+}
+
+// Fanene på Kiwi: «Beste kr 5750 · 27h 15m», «Kortest kr 11 732 · 15h 35m». Prisen gjelder alle passasjerer med valgt bagasje.
+export const KIWI_PRICE_PROBE_PARAM = "cbvPriceProbe";
+export type KiwiSortPrice = { amount: number; durationMinutes: number };
+export type KiwiSortPrices = Partial<Record<FlightSortMode, KiwiSortPrice>>;
+
+export function readKiwiSortTabText(text: string | undefined): KiwiSortPrice | undefined {
+  const match = text?.replace(/\s+/g, " ").match(/\bkr (\d[\d ]*?) · (?:(\d+)h)? ?(?:(\d+)m)?\s*$/);
+  if (match?.[1] === undefined || (match[2] === undefined && match[3] === undefined)) return undefined;
+  const amount = Number(match[1].replace(/ /g, ""));
+  const durationMinutes = Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
+  return amount > 0 && durationMinutes > 0 ? { amount, durationMinutes } : undefined;
 }
 
 export type KiwiSearchPath = { origin: string; destination: string; outbound: string; inbound?: string };

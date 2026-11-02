@@ -19,6 +19,7 @@ import {
   readKiwiBagsParam,
   readKiwiDatePart,
   readKiwiSearchPath,
+  readKiwiSortTabText,
   readFlightSortUrlValue,
   readPanFlightsLegMinutes,
   selectFlightSortCandidate,
@@ -48,6 +49,7 @@ import {
   pollMomondoFlexibleDateOptions,
   type MomondoFlexibleDatePollState,
   readMomondoFlightFilters,
+  readMomondoVisibleFlexibleDateOption,
   readMomondoPassengerPathParts,
   readPanFlightsBaggageFee,
   readPanFlightsDateFlex,
@@ -230,6 +232,45 @@ test("builds and reads momondo passenger paths, filters and flexible dates", () 
 });
 
 type FlexibleDatePrice = { outboundDate: string; inboundDate?: string; amount: number };
+
+// Offentlig resultatkort på BGO–FOR ±3 dager, 2026-11-02. Kalenderprisen
+// alene brukes ikke: kortet dokumenterer 6.12., ruten og selvbetjent transfer.
+const visibleMomondoResult = {
+  priceText: "3\u00a0799\u00a0kr", currency: "NOK",
+  legs: [{ dateText: "6.12.", origin: "BGO", destination: "FOR", durationText: "40t 20m", stopsText: "3 stopp" }],
+};
+
+test("momondo visible flexible fares belong to the result's date, not the selected date", () => {
+  const flight = meta({ origin: "BGO", destination: "FOR", outboundDate: "2026-12-09" });
+  const combinations = listFlightDateFlexCombinations(flight, { outboundBefore: 3, outboundAfter: 3, inboundBefore: 0, inboundAfter: 0 }, NOW);
+  assert.deepEqual(readMomondoVisibleFlexibleDateOption(visibleMomondoResult, flight, combinations), {
+    outboundDate: "2026-12-06", amount: 3799, currency: "NOK", legs: [{ durationMinutes: 2420, stopCount: 3 }],
+  });
+  assert.equal(readMomondoVisibleFlexibleDateOption(visibleMomondoResult, { ...flight, maxStops: 2 }, combinations), undefined);
+  assert.equal(readMomondoVisibleFlexibleDateOption(visibleMomondoResult, { ...flight, maxDurationMinutes: 2400 }, combinations), undefined);
+  for (const leg of [
+    { ...visibleMomondoResult.legs[0]!, dateText: undefined },
+    { ...visibleMomondoResult.legs[0]!, dateText: "5.12." },
+    { ...visibleMomondoResult.legs[0]!, origin: "OSL" },
+    { ...visibleMomondoResult.legs[0]!, durationText: undefined },
+    { ...visibleMomondoResult.legs[0]!, stopsText: undefined },
+  ]) assert.equal(readMomondoVisibleFlexibleDateOption({ ...visibleMomondoResult, legs: [leg] }, flight, combinations), undefined);
+  for (const price of [
+    { priceText: undefined, currency: "NOK" }, { priceText: "0 kr", currency: "NOK" },
+    { priceText: "3 799", currency: "NOK" }, { priceText: "3 799 kr", currency: undefined },
+    { priceText: "3 799 kr", currency: "SEK" }, { priceText: "fra 3 799 kr", currency: "NOK" },
+  ]) assert.equal(readMomondoVisibleFlexibleDateOption({ ...visibleMomondoResult, ...price }, flight, combinations), undefined);
+});
+
+test("momondo visible round trips require both dates and both airport pairs", () => {
+  const flight = meta({ origin: "BGO", destination: "FOR", outboundDate: "2026-12-09", inboundDate: "2026-12-19" });
+  const combinations = listFlightDateFlexCombinations(flight, { outboundBefore: 3, outboundAfter: 3, inboundBefore: 3, inboundAfter: 3 }, NOW);
+  const inbound = { dateText: "20.12.", origin: "FOR", destination: "BGO", durationText: "16t", stopsText: "1 stopp" };
+  const input = { ...visibleMomondoResult, legs: [...visibleMomondoResult.legs, inbound] };
+  assert.equal(readMomondoVisibleFlexibleDateOption(visibleMomondoResult, flight, combinations), undefined);
+  assert.equal(readMomondoVisibleFlexibleDateOption(input, flight, combinations)?.inboundDate, "2026-12-20");
+  assert.equal(readMomondoVisibleFlexibleDateOption({ ...input, legs: [visibleMomondoResult.legs[0]!, { ...inbound, destination: "OSL" }] }, flight, combinations), undefined);
+});
 
 function momondoFlexPollFixture(responses: unknown[]) {
   const state: MomondoFlexibleDatePollState<FlexibleDatePrice> = { options: [], complete: false };
@@ -709,4 +750,13 @@ test("Kiwi links keep cabin, date window and readable search paths", () => {
   );
   assert.equal(readKiwiSearchPath(new URL("https://www.kiwi.no/no/search/results/a/b/2026-12-01")), undefined);
   assert.equal(readFlightSortUrlValue("kiwi", "duration"), "fastest");
+});
+
+test("Kiwi's sort tabs give price and duration", () => {
+  assert.deepEqual(readKiwiSortTabText("Beste\nkr 5750 · 27h 15m"), { amount: 5750, durationMinutes: 1635 });
+  assert.deepEqual(readKiwiSortTabText("Kortest kr 11\u00a0732 · 15h 35m"), { amount: 11732, durationMinutes: 935 });
+  assert.deepEqual(readKiwiSortTabText("Billigst kr 5073 · 54h"), { amount: 5073, durationMinutes: 3240 });
+  assert.equal(readKiwiSortTabText("Andre alternativer Tidligste avreise"), undefined);
+  assert.equal(readKiwiSortTabText("Beste"), undefined);
+  assert.equal(readKiwiSortTabText(undefined), undefined);
 });

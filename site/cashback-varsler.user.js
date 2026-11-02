@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793649218
+// @version      1793650426
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -8798,6 +8798,11 @@ ${darkProviderCss}
       return () => chrome.storage.onChanged?.removeListener(onStorage);
     }
   });
+  function createContentScriptContextGuard(readRuntimeId, onInvalidated, isUserscript) {
+    return () => {
+      return true;
+    };
+  }
   let nextTooltipId = 0;
   function tooltipPosition(anchor, width, height, viewport) {
     const left = Math.max(8, Math.min(anchor.left, viewport.width - width - 8));
@@ -9437,6 +9442,28 @@ ${darkProviderCss}
   }
   function readMomondoFlightFlexDays(before, after) {
     return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
+  }
+  function readMomondoVisibleFlexibleDateOption(input, flightMeta, combinations) {
+    if (input.currency !== "NOK" || input.priceText === void 0 || !/\s(?:kr|NOK)$/i.test(input.priceText.trim())) return void 0;
+    const amount = readPriceAmount(input.priceText.replace(/\s*(?:kr|NOK)\s*$/i, ""));
+    if (amount === void 0 || amount <= 0 || input.legs.length !== (flightMeta.inboundDate === void 0 ? 1 : 2)) return void 0;
+    const dates = [];
+    const legs = [];
+    for (const [index, leg] of input.legs.entries()) {
+      if (leg.origin !== (index === 0 ? flightMeta.origin : flightMeta.destination) || leg.destination !== (index === 0 ? flightMeta.destination : flightMeta.origin)) return void 0;
+      const date = leg.dateText?.trim().match(/^(\d{1,2})\.(\d{1,2})\.$/);
+      const duration = leg.durationText?.trim().match(/^(?:(\d+)\s*[th]\s*)?(?:(\d+)\s*m)?$/i);
+      const durationMinutes = duration === void 0 || duration === null ? 0 : Number(duration[1] ?? 0) * 60 + Number(duration[2] ?? 0);
+      const stops = leg.stopsText?.trim().match(/^(\d+)\s*(?:stopp?|stops?)$/i);
+      const stopCount = /^(?:direkte|nonstop|direct)$/i.test(leg.stopsText?.trim() ?? "") ? 0 : stops?.[1] === void 0 ? void 0 : Number(stops[1]);
+      if (date === void 0 || date === null || durationMinutes <= 0 || stopCount === void 0) return void 0;
+      dates.push(`${Number(date[1])}.${Number(date[2])}`);
+      legs.push({ durationMinutes, stopCount });
+    }
+    if (exceedsFlightMaxStops(flightMeta, legs.map((leg) => leg.stopCount)) || exceedsFlightMaxDuration(flightMeta, legs.map((leg) => leg.durationMinutes))) return void 0;
+    const shortDate = (date) => `${Number(date.slice(8, 10))}.${Number(date.slice(5, 7))}`;
+    const combination = combinations.find((candidate) => shortDate(candidate.outboundDate) === dates[0] && (candidate.inboundDate === void 0 ? dates.length === 1 : shortDate(candidate.inboundDate) === dates[1]));
+    return combination === void 0 ? void 0 : { ...combination, amount, currency: "NOK", legs };
   }
   async function pollMomondoFlexibleDateOptions(state, input) {
     for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
@@ -10326,7 +10353,7 @@ ${darkProviderCss}
   ]);
   function startContentScript() {
     if (isNoticeBlockedHost(CURRENT_HOST)) return;
-    watchCardBenefitDate(requestCurrentOffers);
+    disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
     installOfferActivationClickTracker();
     chrome.runtime.onMessage.addListener((message) => {
       if (isNoticeBlockedHost(CURRENT_HOST)) {
@@ -10361,29 +10388,33 @@ ${darkProviderCss}
     installKiwiLinkPlaces();
   }
   const PRICE_MATCH_PROGRESS_PERIOD_MS = 1800;
+  const disposeContentWatchers = [];
+  const isContentScriptActive = createContentScriptContextGuard();
+  let pendingFlightPriceMatchSearch;
   function syncPriceMatchProgressAnimation(element) {
     element.style.setProperty("--price-match-progress-delay", `-${Math.round(performance.now() % PRICE_MATCH_PROGRESS_PERIOD_MS)}ms`);
   }
   function renderNoticeWithStoredState(offers, priceMatches = [], regionPrices) {
+    if (!isContentScriptActive()) return;
     if (isNoticeBlockedHost(CURRENT_HOST)) {
       clearNotice();
       return;
     }
-    const isUserscript = chrome.runtime.id === void 0;
     chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, REGION_PRICES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result) => {
-      const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
-      if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
+      Array.isArray(result[HIDDEN_HOSTS_KEY]) ? result[HIDDEN_HOSTS_KEY] : [];
       const collapsed = result[COLLAPSED_STORAGE_KEY] === true;
       const chipsCollapsed = result[CHIPS_COLLAPSED_KEY] === true;
       const codesCollapsed = result[CODES_COLLAPSED_KEY] === true;
       const priceMatchCollapsed = result[PRICE_MATCH_COLLAPSED_KEY] === true;
       const regionPricesCollapsed = result[REGION_PRICES_COLLAPSED_KEY] === true;
       void readActivatedOffers().catch(() => ({})).then((activatedOffers) => {
+        if (!isContentScriptActive()) return;
         renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, regionPricesCollapsed, activatedOffers, priceMatches, regionPrices);
       });
     });
   }
   function requestCurrentOffers() {
+    if (!isContentScriptActive()) return;
     lastOffersRequestUrl = window.location.href;
     if (isNoticeBlockedHost(CURRENT_HOST)) {
       clearNotice();
@@ -10404,10 +10435,12 @@ ${darkProviderCss}
     let latestMetaKey = "";
     let latestUrl = window.location.href;
     const scheduleRefresh = () => {
+      if (!isContentScriptActive()) return;
       if (timerId !== void 0) {
         window.clearTimeout(timerId);
       }
       timerId = window.setTimeout(() => {
+        if (!isContentScriptActive()) return;
         const currentUrl = parseUrl(window.location.href);
         if (currentUrl === void 0 || !isDynamicPriceMatchProductPage(currentUrl)) {
           latestMetaKey = "";
@@ -10471,6 +10504,12 @@ ${darkProviderCss}
       }
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    disposeContentWatchers.push(() => {
+      observer.disconnect();
+      if (timerId !== void 0) window.clearTimeout(timerId);
+      window.removeEventListener("popstate", scheduleLocationRefresh);
+      window.removeEventListener("hashchange", scheduleLocationRefresh);
+    });
     scheduleRefresh();
   }
   function isNoticeBlockedHost(hostname) {
@@ -10654,20 +10693,25 @@ ${darkProviderCss}
     return flightMeta !== void 0 && buildFlightSearchMetaKey(flightMeta) === lastFlightSortRender?.searchKey;
   }
   function rerenderFlightSortIfChanged() {
+    if (!isContentScriptActive()) return;
     if (lastFlightSortRender === void 0 || lastFlightSortRender.mode === readActiveFlightSortMode()) return;
     flightSortSettlesAt = Date.now() + FLIGHT_SORT_SETTLE_MS;
     lastFlightSortRender.rerender();
   }
   const FLIGHT_SORT_CLICK_CHECK_DELAYS_MS = [50, 300, 1e3, 2500];
   function installFlightSortClickWatcher() {
-    document.addEventListener("click", () => {
+    const onClick = () => {
+      if (!isContentScriptActive()) return;
       if (lastFlightSortRender === void 0) return;
       for (const delayMs of FLIGHT_SORT_CLICK_CHECK_DELAYS_MS) {
         window.setTimeout(() => {
+          if (!isContentScriptActive()) return;
           if (lastFlightSortRender?.mode !== readActiveFlightSortMode() && isSameFlightSearchAsLastRender()) rerenderFlightSortIfChanged();
         }, delayMs);
       }
-    }, true);
+    };
+    document.addEventListener("click", onClick, true);
+    disposeContentWatchers.push(() => document.removeEventListener("click", onClick, true));
   }
   function rerenderIfOnlyFlightSortChanged() {
     const currentUrl = window.location.href;
@@ -10894,6 +10938,7 @@ ${darkProviderCss}
     const generation = renderGeneration;
     const liveOffers = [];
     const pendingSources = new Set(session.liveOfferFinders.map((finder) => finder.source));
+    pendingFlightPriceMatchSearch = { generation, sources: pendingSources };
     const reportProgress = () => {
       onProgress(mergeFlightPriceMatchOffers(session.staticOffers, liveOffers).map((offer) => {
         return offer.source !== void 0 && pendingSources.has(offer.source) ? { ...offer, searchIncomplete: true } : offer;
@@ -14370,6 +14415,12 @@ ${darkProviderCss}
     return void 0;
   }
   function readCurrentMomondoVisiblePriceKey() {
+    const currentUrl = parseUrl(window.location.href);
+    const meta = currentUrl === void 0 ? void 0 : extractMomondoFlightSearchMeta(currentUrl);
+    if (meta?.dateFlex !== void 0) {
+      const visible = readCurrentMomondoFlexibleDateOptions(meta, listFlightDateFlexCombinations(meta, meta.dateFlex));
+      return JSON.stringify(visible);
+    }
     return String(readCurrentMomondoVisibleBestPriceForCurrentPage() ?? "");
   }
   function isMomondoFlightSearchPage(parsedUrl) {
@@ -14449,6 +14500,31 @@ ${darkProviderCss}
     const combinations = listFlightDateFlexCombinations(flightMeta, momondoDateFlex);
     const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
     const resultUrl = buildMomondoFlightSearchUrl(flightMeta);
+    const visible = readCurrentMomondoFlexibleDateOptions(flightMeta, combinations);
+    if (visible !== void 0) {
+      return buildFlightDateFlexOffer({
+        source: "momondo",
+        sourceName: "momondo",
+        flightMeta,
+        dateFlex: momondoDateFlex,
+        routeTitle,
+        searchDetails,
+        options: visible.options,
+        checkedCombinationCount: visible.options.length,
+        totalCombinationCount: combinations.length,
+        searchIncomplete: !visible.complete
+      }) ?? {
+        ...buildFlightPriceMatchOffer({
+          source: "momondo",
+          sourceName: "momondo",
+          productUrl: resultUrl,
+          routeTitle,
+          cardSearchDetails: formatFlightCardSearchDetails(flightMeta),
+          fullSearchDetails: searchDetails
+        }),
+        ...!visible.complete ? { searchIncomplete: true } : {}
+      };
+    }
     const key = buildFlightSearchMetaKey(flightMeta);
     if (momondoFlexibleDateJob === void 0 || momondoFlexibleDateJob.key !== key || Date.now() - momondoFlexibleDateJob.startedAt >= FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS) {
       momondoFlexibleDateJob = {
@@ -14502,6 +14578,55 @@ ${darkProviderCss}
       }),
       matchedExactProduct: false,
       ...!job.state.complete ? { searchIncomplete: true } : {}
+    };
+  }
+  function readCurrentMomondoFlexibleDateOptions(flightMeta, combinations) {
+    const url = parseUrl(window.location.href);
+    const currentMeta = url === void 0 ? void 0 : extractMomondoFlightSearchMeta(url);
+    if (currentMeta === void 0 || currentMeta.dateFlex === void 0 || buildFlightSearchMetaKey(withVisibleFlightSearchFilters(currentMeta)) !== buildFlightSearchMetaKey(flightMeta) || flightMeta.adults !== 1 || flightMeta.children !== 0 || flightMeta.infants !== 0 || flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) return void 0;
+    const currency = document.querySelector('[aria-label="Velg språk"]')?.innerText.trim();
+    const byDate = /* @__PURE__ */ new Map();
+    for (const card of [...document.querySelectorAll(".Fxw9-result-item-container")].slice(0, 200)) {
+      if (!isVisibleElement(card) || /\b(?:Annonse|Sponsored)\b/i.test(card.innerText)) continue;
+      const legs = [...card.querySelectorAll(".c3J0r-container")].map((leg) => {
+        const airports = [...leg.querySelectorAll(".VY2U .fTBz-name")].map((name) => name.previousElementSibling?.textContent?.trim());
+        return {
+          dateText: leg.querySelector(".tdCx-short-departure-date")?.innerText,
+          origin: airports[0],
+          destination: airports[1],
+          durationText: leg.querySelector(".xdW8")?.innerText,
+          stopsText: leg.querySelector(".JWEO > .vmXl")?.innerText
+        };
+      });
+      const parsed = readMomondoVisibleFlexibleDateOption({
+        priceText: card.querySelector(".e2GB-price-text")?.innerText,
+        currency,
+        legs
+      }, flightMeta, combinations);
+      if (parsed === void 0) continue;
+      const { legs: summaries, ...option } = parsed;
+      const { dateFlex: _dateFlex, ...exactMeta } = flightMeta;
+      const productUrl = buildMomondoFlightSearchUrl({ ...exactMeta, ...option });
+      const candidate = {
+        ...option,
+        shopName: "momondo",
+        price: formatFlightPrice(option.amount, option.currency),
+        sortAmount: option.amount,
+        productUrl,
+        durationMinutes: sumFlightLegMinutes(summaries.map((leg) => leg.durationMinutes)),
+        durationText: formatFlightLegDurationsWithStopsText(summaries),
+        platform: [
+          card.querySelector(".J0g6-operator-text")?.innerText,
+          /selvbetjent transfer|self.transfer/i.test(card.innerText) ? "Selvbetjent transfer" : void 0
+        ].filter(Boolean).join(", ")
+      };
+      const key = buildFlightDateCombinationKey(option);
+      const previous = byDate.get(key);
+      if (previous === void 0 || candidate.amount < previous.amount) byDate.set(key, candidate);
+    }
+    return {
+      options: [...byDate.values()],
+      complete: /^Ferdig$/m.test(document.querySelector("#flight-results-list-wrapper")?.innerText ?? "")
     };
   }
   function readMomondoFlexibleDateOptions(resultData, combinations, exactFlightMeta, airportLookup, resultUrl) {
@@ -18484,6 +18609,16 @@ ${darkProviderCss}
       gap: 4px 6px;
       margin-bottom: 1px;
     }
+    .price-match-progress {
+      animation: price-match-updating-sweep 1.8s linear var(--price-match-progress-delay, 0s) infinite;
+      background-color: var(--cbn-soft, #f7faf8);
+      background-image: linear-gradient(90deg, transparent, var(--cbn-accent, #22794f), transparent);
+      background-repeat: no-repeat;
+      background-size: 45% 100%;
+      border-radius: 2px;
+      flex-basis: 100%;
+      height: 3px;
+    }
     /* Etiketten krymper ikke; chipene brytes til egen linje på smale skjermer. */
     .price-match-header .price-match-toggle {
       flex: 1 0 100%;
@@ -18685,7 +18820,16 @@ ${darkProviderCss}
         background-color: color-mix(in srgb, var(--cbn-accent, #22794f) 16%, var(--cbn-soft, #f7faf8));
       }
     }
+    @keyframes price-match-progress-pulse {
+      50% { opacity: .35; }
+    }
     @media (prefers-reduced-motion: reduce) {
+      .price-match-progress {
+        animation-name: price-match-progress-pulse;
+        animation-timing-function: ease-in-out;
+        background-color: var(--cbn-accent, #22794f);
+        background-image: none;
+      }
       .price-match-section .price-match-card.price-match-card--updating {
         animation: price-match-updating-pulse 1.8s ease-in-out var(--price-match-progress-delay, 0s) infinite;
         background-image: none;
@@ -19836,6 +19980,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const flightMeta = currentUrl !== void 0 && priceMatches.some((priceMatch2) => priceMatch2.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch2)) ? extractFlightSearchMeta(currentUrl) : void 0;
       const flightFilterChips = flightMeta !== void 0 ? buildFlightFilterChips(flightMeta, shadowRoot, flightSortMode) : void 0;
       if (flightFilterChips !== void 0) priceMatchHeader.append(flightFilterChips);
+      const flightSearchIsUpdating = flightMeta !== void 0 && (pendingFlightPriceMatchSearch?.generation === renderGeneration && pendingFlightPriceMatchSearch.sources.size > 0 || unsortedPriceMatches.some((priceMatch2) => priceMatch2.searchIncomplete === true));
+      if (flightSearchIsUpdating) {
+        const progress = document.createElement("div");
+        progress.className = "price-match-progress";
+        progress.setAttribute("role", "progressbar");
+        progress.setAttribute("aria-label", "Henter flypriser");
+        syncPriceMatchProgressAnimation(progress);
+        priceMatchHeader.append(progress);
+      }
       priceMatchSection.append(
         priceMatchHeader,
         ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
@@ -20760,7 +20913,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const { dateFlex } = priceMatch;
       const bestAmount = priceMatch.sortAmount ?? priceMatch.amount;
       const bestIsSelected = priceMatch.matchedExactProduct === true;
-      const selectedLine = bestIsSelected ? "Valgt dato er billigst i datovinduet." : dateFlex.selectedDatesAmount !== void 0 ? `Valgt dato: ${formatNokFlightPrice(dateFlex.selectedDatesAmount)} — sparer ${formatNokFlightPrice(dateFlex.selectedDatesAmount - bestAmount)}.` : `Valgt dato: ingen treff hos ${getPriceMatchSourceName(priceMatch)}.`;
+      const selectedLine = bestIsSelected ? "Valgt dato er billigst i datovinduet." : dateFlex.selectedDatesAmount !== void 0 ? `Valgt dato: ${formatNokFlightPrice(dateFlex.selectedDatesAmount)} — sparer ${formatNokFlightPrice(dateFlex.selectedDatesAmount - bestAmount)}.` : "Valgt dato: ingen bekreftet pris.";
       const outboundWindow = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
       const windowLine = dateFlex.inboundDate !== void 0 ? `Søkte ${outboundWindow} dager rundt utreise og ${formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter)} rundt hjemreise.` : `Søkte ${outboundWindow} dager rundt utreise.`;
       return [
@@ -20776,7 +20929,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           ...(priceMatch.alternatives ?? []).slice(0, FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS).map(formatPriceMatchTooltipOffer)
         ].join("\n"),
         [
-          dateFlex.checkedCombinationCount < Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS) ? `Søker fortsatt: ${dateFlex.checkedCombinationCount} av ${Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)} datokombinasjoner sjekket.` : `Sjekket ${dateFlex.checkedCombinationCount} datokombinasjoner.`,
+          dateFlex.checkedCombinationCount < Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS) ? priceMatch.searchIncomplete === true ? `Søker fortsatt: ${dateFlex.checkedCombinationCount} av ${Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)} datokombinasjoner sjekket.` : `Viser ${dateFlex.checkedCombinationCount} bekreftede datokombinasjoner.` : `Sjekket ${dateFlex.checkedCombinationCount} datokombinasjoner.`,
           ...dateFlex.totalCombinationCount > FLIGHT_DATE_FLEX_MAX_COMBINATIONS ? [`Vinduet har ${dateFlex.totalCombinationCount} kombinasjoner; de ${FLIGHT_DATE_FLEX_MAX_COMBINATIONS} nærmeste valgt dato søkes.`] : []
         ].join("\n"),
         `Raden åpner ${getPriceMatchSourceName(priceMatch)} med de billigste datoene. Kilder uten datovindu søker bare valgt dato. Bagasje og valgt avgang må sjekkes hos kilden.`

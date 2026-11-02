@@ -39,7 +39,9 @@ import noWords from "naughty-words/no.json";
 import enWords from "naughty-words/en.json";
 import { bindThemeTarget, installThemeStyles, mountThemeControl } from "../shared/theme";
 import { extensionTheme } from "./theme";
+import { createContentScriptContextGuard } from "./runtime-context";
 import { createMutedChip } from "../shared/ui";
+import type { KiwiFlightPricesResponse } from "../shared/extension-messages";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, type TooltipController } from "../shared/tooltips";
 import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
@@ -81,6 +83,10 @@ import {
   buildSkyscannerFlightSearchUrl,
   buildSkyscannerCabinClass,
   buildKiwiFlightSearchUrl,
+  KIWI_PRICE_PROBE_PARAM,
+  type KiwiSortPrice,
+  type KiwiSortPrices,
+  readKiwiSortTabText,
   buildPanFlightsFlightSearchUrl,
   buildGoogleFlightsSearchUrl,
   buildTripComFlightSearchUrl,
@@ -124,6 +130,7 @@ import {
   readMomondoFlexibleDatePart,
   readMomondoFlightFilters,
   readMomondoFlightFlexDays,
+  readMomondoVisibleFlexibleDateOption,
   pollMomondoFlexibleDateOptions,
   type MomondoFlexibleDatePollState,
   readMomondoPassengerPathParts,
@@ -635,7 +642,7 @@ const SKYSCANNER_WEB_SEARCH_POLL_ATTEMPTS = 8;
 const SKYSCANNER_WEB_SEARCH_POLL_INTERVAL_MS = 1200;
 const SKYSCANNER_FLIGHT_OFFER_CACHE_TTL_MS = 5 * 60 * 1000;
 // Tomme svar er som regel transiente (kald PerimeterX-cookie / treg poll); kort TTL
-// så neste sidelasting får et nytt forsøk i stedet for å vise statisk «Sjekk pris».
+// så neste sidelasting får et nytt forsøk i stedet for å vise statisk «?».
 const SKYSCANNER_EMPTY_FLIGHT_OFFER_CACHE_TTL_MS = 45 * 1000;
 const SKYSCANNER_FLIGHT_PLACE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const SKYSCANNER_EMPTY_FLIGHT_PLACE_CACHE_TTL_MS = 90 * 1000;
@@ -823,7 +830,8 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
 ]);
 function startContentScript(): void {
   if (isNoticeBlockedHost(CURRENT_HOST)) return;
-  watchCardBenefitDate(requestCurrentOffers);
+  if (installKiwiPriceProbe()) return;
+  disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
     if (isNoticeBlockedHost(CURRENT_HOST)) {
@@ -860,6 +868,17 @@ function startContentScript(): void {
   installKiwiLinkPlaces();
 }
 const PRICE_MATCH_PROGRESS_PERIOD_MS = 1800;
+const disposeContentWatchers: Array<() => void> = [];
+const isContentScriptActive = createContentScriptContextGuard(
+  () => chrome.runtime.id,
+  () => {
+    renderGeneration++;
+    lastFlightSortRender = undefined;
+    for (const dispose of disposeContentWatchers.splice(0)) dispose();
+    clearNotice();
+  },
+  __USERSCRIPT_BUILD__,
+);
 
 // Panelet bygges på nytt for hvert svar; uten dette ville animasjonene startet forfra hver gang.
 function syncPriceMatchProgressAnimation(element: HTMLElement): void {
@@ -871,12 +890,13 @@ function renderNoticeWithStoredState(
   priceMatches: PriceMatchOffer[] = [],
   regionPrices?: PlayStationRegionPriceResult,
 ): void {
+  if (!isContentScriptActive()) return;
   if (isNoticeBlockedHost(CURRENT_HOST)) {
     clearNotice();
     return;
   }
 
-  const isUserscript = (chrome.runtime as { id?: string }).id === undefined;
+  const isUserscript = __USERSCRIPT_BUILD__;
   chrome.storage.local.get([COLLAPSED_STORAGE_KEY, CHIPS_COLLAPSED_KEY, CODES_COLLAPSED_KEY, PRICE_MATCH_COLLAPSED_KEY, REGION_PRICES_COLLAPSED_KEY, HIDDEN_HOSTS_KEY], (result: Record<string, unknown>) => {
     const hidden = Array.isArray(result[HIDDEN_HOSTS_KEY]) ? (result[HIDDEN_HOSTS_KEY] as string[]) : [];
     if (!isUserscript && hidden.includes(CURRENT_HOST)) return;
@@ -888,11 +908,13 @@ function renderNoticeWithStoredState(
     void readActivatedOffers()
       .catch(() => ({}))
       .then((activatedOffers) => {
+        if (!isContentScriptActive()) return;
         renderNotice(offers, collapsed, chipsCollapsed, codesCollapsed, priceMatchCollapsed, regionPricesCollapsed, activatedOffers, priceMatches, regionPrices);
       });
   });
 }
 function requestCurrentOffers(): void {
+  if (!isContentScriptActive()) return;
   lastOffersRequestUrl = window.location.href;
   if (isNoticeBlockedHost(CURRENT_HOST)) {
     clearNotice();
@@ -917,11 +939,13 @@ function installDynamicProductPageRefresh(): void {
   let latestMetaKey = "";
   let latestUrl = window.location.href;
   const scheduleRefresh = (): void => {
+    if (!isContentScriptActive()) return;
     if (timerId !== undefined) {
       window.clearTimeout(timerId);
     }
 
     timerId = window.setTimeout(() => {
+      if (!isContentScriptActive()) return;
       const currentUrl = parseUrl(window.location.href);
       if (currentUrl === undefined || !isDynamicPriceMatchProductPage(currentUrl)) {
         latestMetaKey = "";
@@ -997,6 +1021,12 @@ function installDynamicProductPageRefresh(): void {
   });
 
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  disposeContentWatchers.push(() => {
+    observer.disconnect();
+    if (timerId !== undefined) window.clearTimeout(timerId);
+    window.removeEventListener("popstate", scheduleLocationRefresh);
+    window.removeEventListener("hashchange", scheduleLocationRefresh);
+  });
   scheduleRefresh();
 }
 
@@ -1220,6 +1250,7 @@ function isSameFlightSearchAsLastRender(): boolean {
 }
 
 function rerenderFlightSortIfChanged(): void {
+  if (!isContentScriptActive()) return;
   if (lastFlightSortRender === undefined || lastFlightSortRender.mode === readActiveFlightSortMode()) return;
   flightSortSettlesAt = Date.now() + FLIGHT_SORT_SETTLE_MS;
   lastFlightSortRender.rerender();
@@ -1230,14 +1261,18 @@ function rerenderFlightSortIfChanged(): void {
 const FLIGHT_SORT_CLICK_CHECK_DELAYS_MS = [50, 300, 1000, 2500];
 
 function installFlightSortClickWatcher(): void {
-  document.addEventListener("click", () => {
+  const onClick = (): void => {
+    if (!isContentScriptActive()) return;
     if (lastFlightSortRender === undefined) return;
     for (const delayMs of FLIGHT_SORT_CLICK_CHECK_DELAYS_MS) {
       window.setTimeout(() => {
+        if (!isContentScriptActive()) return;
         if (lastFlightSortRender?.mode !== readActiveFlightSortMode() && isSameFlightSearchAsLastRender()) rerenderFlightSortIfChanged();
       }, delayMs);
     }
-  }, true);
+  };
+  document.addEventListener("click", onClick, true);
+  disposeContentWatchers.push(() => document.removeEventListener("click", onClick, true));
 }
 
 function rerenderIfOnlyFlightSortChanged(): boolean {
@@ -1627,7 +1662,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
         fullSearchDetails,
       })]
       : []),
-    // Ren deeplink: Kiwi gir bare riktige priser til sin egen side (se KIWI_PLACE_LOOKUP_URL).
+    // Kiwi gir bare riktige priser til sin egen side; raden får pris fra bakgrunnsfanen (kiwi-price-probe).
     ...(readKiwiSearchPath(parsedUrl) !== undefined ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)]),
     // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
     // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
@@ -1636,7 +1671,6 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       : [buildFlightPriceMatchOffer({
         source: "googleflights",
         sourceName: "Google",
-        priceLabel: "?",
         productUrl: buildGoogleFlightsSearchUrl(flightMeta),
         routeTitle,
         cardSearchDetails,
@@ -1700,6 +1734,14 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       }]
       : []),
   ];
+  // Ikke i userscriptet (ingen bakgrunnsfaner), og ikke på Kiwi selv.
+  if (!__USERSCRIPT_BUILD__ && readKiwiSearchPath(parsedUrl) === undefined) {
+    liveOfferFinders.push({
+      source: "kiwi",
+      sourceName: "KIWI",
+      findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
+    });
+  }
   return { staticOffers, liveOfferFinders };
 }
 
@@ -2791,7 +2833,6 @@ function buildFlightPriceMatchOffer(input: {
   routeTitle: string;
   cardSearchDetails: string;
   fullSearchDetails: string;
-  priceLabel?: string;
 }): PriceMatchOffer {
   return {
     source: input.source,
@@ -2799,7 +2840,7 @@ function buildFlightPriceMatchOffer(input: {
     details: input.fullSearchDetails,
     matchedExactProduct: true,
     shopName: input.cardSearchDetails,
-    price: input.priceLabel ?? "Sjekk pris",
+    price: "?",
     amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
     sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
     currency: "NOK",
@@ -2817,7 +2858,6 @@ function buildKiwiFlightPriceMatchOffer(
   const offer = buildFlightPriceMatchOffer({
     source: "kiwi",
     sourceName: "KIWI",
-    priceLabel: "?",
     productUrl: buildKiwiFlightSearchUrl(flightMeta),
     routeTitle,
     cardSearchDetails,
@@ -4562,6 +4602,86 @@ function readKiwiCityCode(slug: string): string | undefined {
     }
   })().catch(() => undefined);
   return undefined;
+}
+
+const KIWI_PROBE_POLL_MS = 1000;
+const KIWI_PROBE_STABLE_POLLS = 3;
+const KIWI_PROBE_LOADING_GRACE_MS = 15_000;
+const KIWI_PROBE_DEADLINE_MS = 25_000;
+const KIWI_SORT_TABS: Record<FlightSortMode, string> = { best: "quality", cheapest: "price", fastest: "duration" };
+
+function readVisibleKiwiSortPrices(): KiwiSortPrices {
+  const prices: KiwiSortPrices = {};
+  for (const mode of ["best", "cheapest", "fastest"] as const) {
+    const text = document.querySelector<HTMLElement>(`[data-test="SortBy-${KIWI_SORT_TABS[mode]}"]`)?.innerText;
+    const price = readKiwiSortTabText(text);
+    if (price !== undefined) prices[mode] = price;
+  }
+  return prices;
+}
+
+// Bakgrunnsfanen fra kiwi-price-probe: viser ikke panelet og starter ingen egne søk,
+// den venter bare til fanene på siden har rolig pris og melder dem fra.
+function installKiwiPriceProbe(): boolean {
+  const parsedUrl = parseUrl(window.location.href);
+  const path = parsedUrl !== undefined ? readKiwiSearchPath(parsedUrl) : undefined;
+  if (parsedUrl?.searchParams.get(KIWI_PRICE_PROBE_PARAM) !== "1" || path === undefined) return false;
+  installKiwiLinkPlaces();
+  if (/^[A-Z]{3}$/.test(path.origin) && /^[A-Z]{3}$/.test(path.destination)) return true;
+
+  const startedAt = Date.now();
+  let lastKey = "";
+  let stablePolls = 0;
+  const timerId = window.setInterval(() => {
+    const prices = readVisibleKiwiSortPrices();
+    const key = JSON.stringify(prices);
+    stablePolls = key === lastKey && key !== "{}" ? stablePolls + 1 : 0;
+    lastKey = key;
+    const elapsedMs = Date.now() - startedAt;
+    const loading = document.querySelector('[data-test="LoadingLine"]') !== null && elapsedMs < KIWI_PROBE_LOADING_GRACE_MS;
+    if ((stablePolls < KIWI_PROBE_STABLE_POLLS || loading) && elapsedMs < KIWI_PROBE_DEADLINE_MS) return;
+    window.clearInterval(timerId);
+    // Andre valutaer og tomme svar gir ingen pris; raden beholder da «?».
+    const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
+    void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...(isNok && key !== "{}" ? { prices } : {}) });
+  }, KIWI_PROBE_POLL_MS);
+  return true;
+}
+
+async function findKiwiFlightPriceMatchOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  cardSearchDetails: string,
+  fullSearchDetails: string,
+): Promise<PriceMatchOffer | undefined> {
+  const response = await sendRuntimeMessage<KiwiFlightPricesResponse>({
+    type: "get-kiwi-flight-prices",
+    url: buildKiwiFlightSearchUrl(flightMeta),
+  });
+  const prices = response?.prices;
+  const bestPrice = prices?.best ?? prices?.cheapest;
+  if (bestPrice === undefined) return undefined;
+  const buildVariant = (price: KiwiSortPrice, mode: FlightSortMode): FlightSortVariant => {
+    const durationText = formatFlightLegDurationsText([price.durationMinutes]);
+    return {
+      shopName: "Kiwi.com",
+      price: formatNokFlightPrice(price.amount),
+      amount: price.amount,
+      sortAmount: price.amount,
+      currency: "NOK",
+      productUrl: buildKiwiFlightSearchUrl(flightMeta, mode),
+      ...(durationText !== undefined ? { durationText } : {}),
+      durationMinutes: price.durationMinutes,
+    };
+  };
+  return {
+    ...buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
+    ...buildVariant(bestPrice, "best"),
+    flightSortVariants: {
+      ...(prices?.cheapest !== undefined ? { cheapest: buildVariant(prices.cheapest, "cheapest") } : {}),
+      ...(prices?.fastest !== undefined ? { fastest: buildVariant(prices.fastest, "fastest") } : {}),
+    },
+  };
 }
 
 function extractKiwiFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -6601,6 +6721,12 @@ function readCurrentMomondoVisibleBestPriceForCurrentPage(): number | undefined 
 }
 
 function readCurrentMomondoVisiblePriceKey(): string {
+  const currentUrl = parseUrl(window.location.href);
+  const meta = currentUrl === undefined ? undefined : extractMomondoFlightSearchMeta(currentUrl);
+  if (meta?.dateFlex !== undefined) {
+    const visible = readCurrentMomondoFlexibleDateOptions(meta, listFlightDateFlexCombinations(meta, meta.dateFlex));
+    return JSON.stringify(visible);
+  }
   return String(readCurrentMomondoVisibleBestPriceForCurrentPage() ?? "");
 }
 
@@ -6718,6 +6844,24 @@ async function findMomondoFlexibleDatesOffer(
   const combinations = listFlightDateFlexCombinations(flightMeta, momondoDateFlex);
   const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
   const resultUrl = buildMomondoFlightSearchUrl(flightMeta);
+  // Det offentlige API-et krever formToken. På den åpne momondo-siden leser vi
+  // derfor konkrete, synlige kort uten tokens eller ekstra nettverkskall.
+  const visible = readCurrentMomondoFlexibleDateOptions(flightMeta, combinations);
+  if (visible !== undefined) {
+    return buildFlightDateFlexOffer({
+      source: "momondo", sourceName: "momondo", flightMeta, dateFlex: momondoDateFlex,
+      routeTitle, searchDetails, options: visible.options,
+      checkedCombinationCount: visible.options.length,
+      totalCombinationCount: combinations.length,
+      searchIncomplete: !visible.complete,
+    }) ?? {
+      ...buildFlightPriceMatchOffer({
+        source: "momondo", sourceName: "momondo", productUrl: resultUrl,
+        routeTitle, cardSearchDetails: formatFlightCardSearchDetails(flightMeta), fullSearchDetails: searchDetails,
+      }),
+      ...(!visible.complete ? { searchIncomplete: true } : {}),
+    };
+  }
   const key = buildFlightSearchMetaKey(flightMeta);
   if (momondoFlexibleDateJob === undefined || momondoFlexibleDateJob.key !== key ||
     Date.now() - momondoFlexibleDateJob.startedAt >= FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS) {
@@ -6768,6 +6912,59 @@ async function findMomondoFlexibleDatesOffer(
     }),
     matchedExactProduct: false,
     ...(!job.state.complete ? { searchIncomplete: true } : {}),
+  };
+}
+
+function readCurrentMomondoFlexibleDateOptions(
+  flightMeta: FlightSearchMeta,
+  combinations: FlightDateCombination[],
+): { options: FlightDateFlexOption[]; complete: boolean } | undefined {
+  const url = parseUrl(window.location.href);
+  const currentMeta = url === undefined ? undefined : extractMomondoFlightSearchMeta(url);
+  if (currentMeta === undefined || currentMeta.dateFlex === undefined ||
+    buildFlightSearchMetaKey(withVisibleFlightSearchFilters(currentMeta)) !== buildFlightSearchMetaKey(flightMeta) ||
+    flightMeta.adults !== 1 || flightMeta.children !== 0 || flightMeta.infants !== 0 ||
+    flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) return undefined;
+  const currency = document.querySelector<HTMLElement>('[aria-label="Velg språk"]')?.innerText.trim();
+  const byDate = new Map<string, FlightDateFlexOption>();
+  // DOM-fallback verifisert på momondos norske resultatliste. Ingen kalenderpriser,
+  // annonser eller bookinglenker med skjulte parametere brukes som tilbud.
+  for (const card of [...document.querySelectorAll<HTMLElement>(".Fxw9-result-item-container")].slice(0, 200)) {
+    if (!isVisibleElement(card) || /\b(?:Annonse|Sponsored)\b/i.test(card.innerText)) continue;
+    const legs = [...card.querySelectorAll<HTMLElement>(".c3J0r-container")].map((leg) => {
+      const airports = [...leg.querySelectorAll<HTMLElement>(".VY2U .fTBz-name")]
+        .map((name) => name.previousElementSibling?.textContent?.trim());
+      return {
+        dateText: leg.querySelector<HTMLElement>(".tdCx-short-departure-date")?.innerText,
+        origin: airports[0], destination: airports[1],
+        durationText: leg.querySelector<HTMLElement>(".xdW8")?.innerText,
+        stopsText: leg.querySelector<HTMLElement>(".JWEO > .vmXl")?.innerText,
+      };
+    });
+    const parsed = readMomondoVisibleFlexibleDateOption({
+      priceText: card.querySelector<HTMLElement>(".e2GB-price-text")?.innerText, currency, legs,
+    }, flightMeta, combinations);
+    if (parsed === undefined) continue;
+    const { legs: summaries, ...option } = parsed;
+    const { dateFlex: _dateFlex, ...exactMeta } = flightMeta;
+    const productUrl = buildMomondoFlightSearchUrl({ ...exactMeta, ...option });
+    const candidate: FlightDateFlexOption = {
+      ...option, shopName: "momondo", price: formatFlightPrice(option.amount, option.currency),
+      sortAmount: option.amount, productUrl,
+      durationMinutes: sumFlightLegMinutes(summaries.map((leg) => leg.durationMinutes))!,
+      durationText: formatFlightLegDurationsWithStopsText(summaries)!,
+      platform: [
+        card.querySelector<HTMLElement>(".J0g6-operator-text")?.innerText,
+        /selvbetjent transfer|self.transfer/i.test(card.innerText) ? "Selvbetjent transfer" : undefined,
+      ].filter(Boolean).join(", "),
+    };
+    const key = buildFlightDateCombinationKey(option);
+    const previous = byDate.get(key);
+    if (previous === undefined || candidate.amount < previous.amount) byDate.set(key, candidate);
+  }
+  return {
+    options: [...byDate.values()],
+    complete: /^Ferdig$/m.test(document.querySelector<HTMLElement>("#flight-results-list-wrapper")?.innerText ?? ""),
   };
 }
 
@@ -8515,7 +8712,7 @@ function buildHotelPriceMatchOffer(input: {
       details: input.searchDetails,
       matchedExactProduct: true,
       shopName: input.searchDetails,
-      price: "Sjekk pris",
+      price: "?",
       amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       currency: "NOK",
@@ -11442,7 +11639,7 @@ function renderNotice(
     }
     .provider-panflights {
       background: #ffffff;
-      color: #1375f7;
+      color: #f84a00;
     }
     .provider-momondo {
       background: #2e0b59;
@@ -14400,7 +14597,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
       ? "Valgt dato er billigst i datovinduet."
       : dateFlex.selectedDatesAmount !== undefined
         ? `Valgt dato: ${formatNokFlightPrice(dateFlex.selectedDatesAmount)} — sparer ${formatNokFlightPrice(dateFlex.selectedDatesAmount - bestAmount)}.`
-        : `Valgt dato: ingen treff hos ${getPriceMatchSourceName(priceMatch)}.`;
+        : "Valgt dato: ingen bekreftet pris.";
     const outboundWindow = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
     const windowLine = dateFlex.inboundDate !== undefined
       ? `Søkte ${outboundWindow} dager rundt utreise og ${formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter)} rundt hjemreise.`
@@ -14419,7 +14616,9 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
       ].join("\n"),
       [
         dateFlex.checkedCombinationCount < Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)
-          ? `Søker fortsatt: ${dateFlex.checkedCombinationCount} av ${Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)} datokombinasjoner sjekket.`
+          ? priceMatch.searchIncomplete === true
+            ? `Søker fortsatt: ${dateFlex.checkedCombinationCount} av ${Math.min(dateFlex.totalCombinationCount, FLIGHT_DATE_FLEX_MAX_COMBINATIONS)} datokombinasjoner sjekket.`
+            : `Viser ${dateFlex.checkedCombinationCount} bekreftede datokombinasjoner.`
           : `Sjekket ${dateFlex.checkedCombinationCount} datokombinasjoner.`,
         ...(dateFlex.totalCombinationCount > FLIGHT_DATE_FLEX_MAX_COMBINATIONS
           ? [`Vinduet har ${dateFlex.totalCombinationCount} kombinasjoner; de ${FLIGHT_DATE_FLEX_MAX_COMBINATIONS} nærmeste valgt dato søkes.`]

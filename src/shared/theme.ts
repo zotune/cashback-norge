@@ -53,8 +53,8 @@ export function createThemeStore(options: ThemeOptions = {}) {
 export type ThemeStore = ReturnType<typeof createThemeStore>;
 
 const darkProviderColors = { ...PROVIDER_COLORS,
-  prisradar: { bg: "#ffffff", fg: "#0c4598" }, google: { bg: "#ffffff", fg: "#1a73e8" },
-  panflights: { bg: "#ffffff", fg: "#1375f7" }, enhver: { bg: "#ffffff", fg: "#162333" },
+  prisradar: { bg: "#ffffff", fg: "#0c4598" }, google: { bg: "#ffffff", fg: "#1a73e8", preserveInDark: true },
+  panflights: { bg: "#ffffff", fg: "#f84a00", preserveInDark: true }, enhver: { bg: "#ffffff", fg: "#162333" },
   sesum: { bg: "#f3f4f6", fg: "#111827" },
 };
 const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {

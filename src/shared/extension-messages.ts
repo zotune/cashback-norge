@@ -5,6 +5,7 @@ import {
   isProviderMeta,
   isRecord,
 } from "./cashback.js";
+import type { KiwiSortPrices } from "./flight-search.js";
 import type {
   PlayStationRegionPriceResult,
 } from "./playstation-region-prices.js";
@@ -61,6 +62,21 @@ export type HttpRequestMessage = {
   headers?: Record<string, string>;
   body?: string;
   credentials?: RequestCredentials;
+};
+
+export type GetKiwiFlightPricesMessage = {
+  type: "get-kiwi-flight-prices";
+  url: string;
+};
+
+export type KiwiFlightPricesResultMessage = {
+  type: "kiwi-flight-prices-result";
+  prices?: KiwiSortPrices;
+};
+
+export type KiwiFlightPricesResponse = {
+  ok: true;
+  prices?: KiwiSortPrices;
 };
 
 export type ToggleNoticeMessage = {
@@ -173,6 +189,14 @@ export function isCashbackNoneMessage(
   value: unknown,
 ): value is CashbackNoneMessage {
   return isRecord(value) && value.type === "cashback-none";
+}
+
+export function isGetKiwiFlightPricesMessage(value: unknown): value is GetKiwiFlightPricesMessage {
+  return isRecord(value) && value.type === "get-kiwi-flight-prices" && typeof value.url === "string";
+}
+
+export function isKiwiFlightPricesResultMessage(value: unknown): value is KiwiFlightPricesResultMessage {
+  return isRecord(value) && value.type === "kiwi-flight-prices-result" && (value.prices === undefined || isRecord(value.prices));
 }
 
 export function isGetOffersForUrlMessage(

@@ -30,11 +30,15 @@ import {
   type OffersForUrlResponse,
   type PlayStationRegionPricesResponse,
   type PriceMatchForProductResponse,
+  type KiwiFlightPricesResponse,
+  isGetKiwiFlightPricesMessage,
   isHttpRequestMessage,
+  isKiwiFlightPricesResultMessage,
   isGetPlayStationRegionPricesMessage,
   isGetOffersForUrlMessage,
   isGetPriceMatchForProductMessage,
 } from "../shared/extension-messages.js";
+import { finishKiwiPriceProbe, getKiwiFlightPrices, installKiwiPriceProbeCleanup } from "./kiwi-price-probe.js";
 
 const STORAGE_KEY = "cashback-index";
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
@@ -103,7 +107,23 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+installKiwiPriceProbeCleanup();
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (isKiwiFlightPricesResultMessage(message)) {
+    finishKiwiPriceProbe(sender.tab?.id, message.prices);
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (isGetKiwiFlightPricesMessage(message)) {
+    void getKiwiFlightPrices(message.url, sender.tab?.windowId)
+      .catch(() => undefined)
+      .then((prices) => {
+        const response: KiwiFlightPricesResponse = { ok: true, ...(prices !== undefined ? { prices } : {}) };
+        sendResponse(response);
+      });
+    return true;
+  }
   void handleRuntimeMessage(message, sendResponse);
   return true;
 });
