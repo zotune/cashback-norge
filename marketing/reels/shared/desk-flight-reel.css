@@ -1,0 +1,23 @@
+/* Desktop browser frame for video 49–: screenshots are scaled to the 1020 px frame width (window.FRAME.k). */
+.browser { position: absolute; left: 30px; top: 628px; width: 1020px; border-radius: 22px; overflow: hidden; background: #dfe3e7; box-shadow: 0 50px 110px rgba(0,0,0,.55), 0 0 0 2px rgba(255,255,255,.08); }
+.bar { height: 92px; display: flex; align-items: center; gap: 18px; padding: 0 22px; background: #e9edf1; }
+.dots { display: flex; gap: 10px; }
+.dots i { width: 18px; height: 18px; border-radius: 50%; display: block; }
+.addr { flex: 1; height: 56px; border-radius: 28px; background: #fff; display: flex; align-items: center; padding: 0 24px; font: 500 28px/1 -apple-system, system-ui, sans-serif; color: #3c4043; white-space: nowrap; overflow: hidden; }
+.ext { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+.ext img { width: 46px; height: 46px; }
+.screen.desk { position: relative; width: 1020px; height: 566px; overflow: hidden; background: #fff; border-radius: 0; }
+.screen.desk > .layer { position: absolute; left: 0; top: 0; width: 1020px; height: 100%; overflow: hidden; background: transparent; }
+.screen.desk > .layer img { display: block; max-width: none; }
+.label { position: absolute; left: 50%; top: 300px; z-index: 62; background: #fff; color: var(--ink); font-weight: 900; font-size: 44px; padding: 18px 28px; border-radius: 28px; box-shadow: 0 14px 40px #0006; white-space: nowrap; opacity: 0; }
+#hook { max-width: 960px; font-size: 64px !important; }
+#hook small { font-size: 30px; }
+.captions { top: 1360px !important; }
+.card .row { font-size: 42px; }
+.card .row .lbl { font-size: 34px; }
+.card .total { font-size: 88px; }
+.card .total small { font-size: 40px; letter-spacing: 0; }
+.card .fine { line-height: 1.35; font-size: 26px; }
+.fineprint { top: 905px; bottom: auto; left: 80px; right: 80px; background: rgba(4,20,14,.94); border-radius: 18px; padding: 18px 24px; color: #fff; line-height: 1.45; font-size: 27px; }
+.endcard .pill { font-size: 40px; }
+.endcard .pill.cta { font-size: 50px; }

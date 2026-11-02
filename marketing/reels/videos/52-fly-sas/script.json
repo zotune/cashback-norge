@@ -1,0 +1,64 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Oslo til Bergen tur retur for *{570 kr.|fem hundre og sytti kroner.}* Hele turen.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "{SAS|S A S} viser {398 kr,|tre hundre og nittiåtte kroner,} men det er bare utreisen.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker hele turen hos fem andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{570 kr|fem hundre og sytti kroner}* tur retur, via {FINN.|Finn.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: Norwegian direkte begge veier, med alle avgangene.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "Det er *{285 kr|to hundre og åttifem kroner}* per vei.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Annet flyselskap, og uten bagasje. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "capture": "Skjermbilder tatt av brukeren i egen nettleser med utvidelsen 2. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser)",
+  "comparison": {
+    "route": "Oslo (OSL) – Bergen (BGO), tur/retur 18.11.–27.11.2026, 1 voksen, økonomi",
+    "airlineNok": 398,
+    "airlineBasis": "SAS Economy for utreisen 18. nov.; returen velges og prises i neste steg",
+    "finnNok": 570,
+    "finnItinerary": "Sembo via FINN: Norwegian direkte begge veier, uten bagasje",
+    "tripNok": 617,
+    "panflightsNok": 642,
+    "momondoNok": 673,
+    "skyscannerNok": 680,
+    "perDirectionNok": 285,
+    "basis": "Hele turen hos FINN delt på to. SAS-prisen er bare én vei, så ingen besparelse mot SAS er påstått."
+  },
+  "sources": [
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2026-11-18&requestedReturnDate=2026-11-27&requestedDestination=BGO.AIRPORT&requestedOrigin=OSL.AIRPORT&tripType=roundtrip"
+  ]
+}

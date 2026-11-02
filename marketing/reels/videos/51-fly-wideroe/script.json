@@ -1,0 +1,65 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Bergen til Oslo: *{350 kr|tre hundre og femti kroner}* i stedet for {659.|seks hundre og femtini.}",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Widerøe sin billigste billett den fjortende november: *{659 kr.|seks hundre og femtini kroner.}*",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker samme strekning og dato hos fem andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "{momondo|Momondo} har *{350 kr,|tre hundre og femti kroner,}* og Trip rundt {332.|tre hundre og trettito.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Trip viser dollar, så vi regner om til kroner. Hold over raden for alle avgangene.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{309 kr|Tre hundre og ni kroner}* billigere med {momondo.|Momondo.}",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Andre avganger, ofte {SAS.|S A S.} Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "capture": "Skjermbilder tatt av brukeren i egen nettleser med utvidelsen 2. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser)",
+  "comparison": {
+    "route": "Bergen (BGO) – Oslo (OSL), en vei 14.11.2026, 1 voksen, økonomi",
+    "airlineNok": 659,
+    "airlineBasis": "Widerøe Mini kl. 08:45, laveste pris for lør. 14. nov.",
+    "momondoNok": 350,
+    "momondoBasis": "Trip.com via momondo, 55 min direkte",
+    "tripNok": 332,
+    "tripBasis": "Trip.com viser 36 USD, omregnet (vist som ~): SAS 18:50–19:45",
+    "finnNok": 376,
+    "panflightsNok": 378,
+    "skyscannerNok": 399,
+    "differenceNok": 309,
+    "basis": "Widerøe Mini mot momondo samme strekning og dato. Ikke samme fly; bagasje må sjekkes hos kilden."
+  },
+  "sources": [
+    "https://us.trip.com/flights/showfarefirst?dcity=bgo&acity=osl&ddate=2026-11-14&triptype=ow&class=y&quantity=1&nonstoponly=off&curr=USD"
+  ]
+}

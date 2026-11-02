@@ -1,0 +1,61 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Bergen til Shanghai i desember: *{1 276 kr|tusen to hundre og syttiseks kroner}* billigere.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Lufthansa viser *{8 181 kr|åtte tusen hundre og åttien kroner}* for niende til attende desember.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker de samme datoene hos fem andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{6 905 kr|seks tusen ni hundre og fem kroner}* via {FINN.|Finn.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: flytider, stopp og bagasje for hver avgang.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{1 276 kr|Tusen to hundre og syttiseks kroner}* billigere.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Andre flyselskap og flere stopp. Sjekk bagasjen før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "capture": "Skjermbilder tatt av brukeren i egen nettleser med utvidelsen 2. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser)",
+  "comparison": {
+    "route": "Bergen (BGO) – Shanghai (SHA), tur/retur 09.12.–18.12.2026, 1 voksen, økonomi",
+    "airlineNok": 8181,
+    "airlineBasis": "Lufthansas pris for ons. 9. des. i datovelgeren for søket 9.–18. des.",
+    "finnNok": 6905,
+    "finnItinerary": "Travelis via FINN: KLM + China Eastern, 1 stopp ut / 2 stopp hjem, 14 t 30 min / 23 t 25 min, bagasje ukjent",
+    "skyscannerNok": 7165,
+    "tripNok": 8476,
+    "panflightsNok": 9065,
+    "differenceNok": 1276,
+    "basis": "Samme strekning og datoer. Ikke samme fly; bagasje ukjent hos FINN-kilden; ikke påstand om laveste pris i hele markedet."
+  },
+  "sources": []
+}

@@ -1,0 +1,61 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Shanghai til Bergen: *{4 187 kr|fire tusen hundre og åttisju kroner}* i stedet for {11 209.|elleve tusen to hundre og ni.}",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "{KLM|K L M} sin laveste pris den sjette november: *{11 209 kr.|elleve tusen to hundre og ni kroner.}*",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker samme strekning og dato hos fem andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{4 187 kr|fire tusen hundre og åttisju kroner}* via {FINN.|Finn.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: flytider, stopp og bagasje for hver avgang.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{7 022 kr|Sju tusen og tjueto kroner}* billigere.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Men to stopp og lengre reise. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "capture": "Skjermbilder tatt av brukeren i egen nettleser med utvidelsen 2. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser)",
+  "comparison": {
+    "route": "Shanghai (SHA) – Bergen (BGO), en vei 06.11.2026, 1 voksen, økonomi",
+    "airlineNok": 11209,
+    "airlineBasis": "KLMs laveste pris i datovelgeren for fre. 6. nov. (Billettpris for 1 passasjer)",
+    "finnNok": 4187,
+    "finnItinerary": "Flightnetwork via FINN: Hainan Airlines + SAS, 2 stopp, 29 t 5 min, håndbagasje og innsjekket ikke inkludert",
+    "skyscannerNok": 4382,
+    "differenceNok": 7022,
+    "basis": "Laveste pris samme strekning og dato. Ikke samme fly eller bagasje; ikke påstand om laveste pris i hele markedet."
+  },
+  "sources": [
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2026-11-06&requestedDestination=BGO.METROPOLITAN_AREA&requestedOrigin=SHA.METROPOLITAN_AREA&tripType=oneway"
+  ]
+}

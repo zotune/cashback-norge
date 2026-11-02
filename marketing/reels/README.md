@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-48 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 og video 45–48 2. nov. 2026.
+54 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 og video 45–54 2. nov. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -52,6 +52,12 @@
 | `out/46-fly-reisetid.mp4` | Maks reisetid: Oslo–Bali billigste 7 691 kr (34 t / 26 t, 3 stopp, uten bagasje) mot 9 360 kr med maks 24 t per vei (Qatar, 1 stopp, bagasje inkludert) | «Billigste fly til Bali? 34 timer 😵» |
 | `out/47-fly-bagasje.mp4` | Bagasje regnet inn: Oslo–Bergen tur/retur med hånd- og innsjekket bagasje. FINN 945 kr, Trip ~1 843 kr, PanFlights 2 160 kr; Skyscanner merket «ekskl. bagasje» | «Skal du ha bagasje? 🧳 945 kr eller 2 160 kr?» |
 | `out/48-fly-barn.mp4` | Familie: Oslo–Alicante i påsken, 2 voksne + 2 barn, kun direktefly. FINN 12 376 kr, Skyscanner 12 411 kr, PanFlights 12 447 kr, Trip ~13 831 kr | «Påsketur med barna? 🐣 1 455 kr forskjell» |
+| `out/49-fly-klm.mp4` | KLM-siden: Shanghai–Bergen 6. nov. KLM laveste 11 209 kr, FINN 4 187 kr (Hainan + SAS, 2 stopp, 29 t, uten bagasje), Skyscanner 4 382 kr | «Flyr du med KLM? ✈️ 4 187 kr i stedet for 11 209» |
+| `out/50-fly-lufthansa.mp4` | Lufthansa-siden: Bergen–Shanghai 9.–18. des. Lufthansa 8 181 kr, FINN 6 905 kr (KLM + China Eastern, 1/2 stopp, bagasje ukjent) | «Lufthansa til Shanghai? ✈️ 1 276 kr billigere» |
+| `out/51-fly-wideroe.mp4` | Widerøe-siden: Bergen–Oslo 14. nov. Widerøe Mini 659 kr, momondo 350 kr, Trip ~332 kr (omregnet fra USD). Ikke samme fly | «Widerøe: 659 kr ✈️ 350 kr samme dag?» |
+| `out/52-fly-sas.mp4` | SAS-siden: Oslo–Bergen 18.–27. nov. SAS viser 398 kr bare for utreisen; FINN 570 kr for hele turen (Norwegian). Ingen besparelse mot SAS påstått | «Oslo–Bergen tur/retur ✈️ 570 kr for hele turen» |
+| `out/53-fly-norwegian.mp4` | Norwegian-siden: Bergen–Oslo 11.–19. des. Norwegian viser 398 kr per vei; FINN 702 kr tur/retur, 254 kr mellom billigste og dyreste kilde | «Bergen–Oslo tur/retur ✈️ 702 kr for hele turen» |
+| `out/54-fly-panflights-filtre.mp4` | PanFlights-søk med ±7 dager, maks 1 stopp, maks 21 t og begge bagasjene: PanFlights' billigste 6 624 kr, FINN 5 169 kr 24. nov. med samme filtre | «Søker du på PanFlights? 🔎 1 455 kr billigere» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -101,6 +107,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - `appstore-capture.mjs <url> <out.png> "<tekst>"` åpner «Kjøp i app» på apps.apple.com og scroller til teksten.
   - `feature-capture.mjs <url> <video-name> <region|pokepris>` fanger dagens bygde userscript på en ekte side, avslår valgfrie samtykker og nyhetsbrev, åpner riktig info-tooltip og lagrer skjermbilder, kilde, tidspunkt, forespørselsstatus og DOM-koordinater i `videos/<video-name>/assets/`. `capture.js` driver zoom og markeringer i `shared/feature-reel.js` for video 43–44. Claude-videoen bruker i tillegg `appstore-capture.mjs` for `assets/apple-no.png` og dokumentasjonen `assets/apple-pk.png`.
   - `flight-capture.mjs <url> <video-name> <prefix> [kilde] [maks-ventetid-ms]` fanger dagens bygde userscript på et ekte flysøk (FINN, PanFlights m.fl.) på iPhone. Bruker GM-shimmen fra `overlay-flights.mjs`, venter til ingen rader oppdateres (datovinduet tar et par minutter), og lagrer `<prefix>-before/after/panel/tip.png`, DOM-bokser og alle proxyede forespørsler i `assets/capture.json` og `window.CAPTURES[prefix]`. `SCROLLY=230` scroller forbi FINNs fanerad, der «Billigst» ignorerer stopp- og bagasjefilteret og ellers ville motsagt panelet. Video 45–48 deler scenen i `shared/flight-reel.js`. momondo gir 403 til den automatiserte nettleseren, så momondo mangler i disse opptakene.
+  - Video 49–54 bruker skjermbilder brukeren tok i egen nettleser med utvidelsen (`assets/a.png` med panelet, `assets/b.png` med tooltipen), fordi flyselskapenes sider blokkerer automatisert nettleser. Kopier ligger i `shots/airlines/`. Boksene i `scene.js` er skjermbildepiksler, og scenen ligger i `shared/desk-flight-reel.js`/`.css`. Når flyselskapet viser pris per vei (SAS, Norwegian), påstår videoen ingen besparelse mot flyselskapet.
   - Flyvideoene sier «samme strekning og dato», aldri «samme fly», og viser stopp, reisetid og bagasje. FINN-radene er sortert på pris (`priceAmount_asc`), som FINNs egen «Billigst»-fane.
   - Bursdagsvideoene bruker bare tilbud som er bekreftet hos gratisbursdag.no, viser kilden og kaller dem ikke cashback. cubus.com, lindex.com og komplett.no blokkerer automatisert nettleser.
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.

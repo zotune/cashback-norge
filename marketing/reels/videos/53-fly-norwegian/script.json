@@ -1,0 +1,64 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Bergen til Oslo tur retur for *{702 kr.|sju hundre og to kroner.}*",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Norwegian viser {398 kr|tre hundre og nittiåtte kroner} – bare for utreisen.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker hele turen hos fem andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{702 kr|sju hundre og to kroner}* via {FINN.|Finn.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: Norwegian ut, Widerøe hjem, med alle avgangene.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{254 kr|To hundre og femtifire kroner}* mellom billigste og dyreste.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Uten bagasje. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "capture": "Skjermbilder tatt av brukeren i egen nettleser med utvidelsen 2. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser)",
+  "comparison": {
+    "route": "Bergen (BGO) – Oslo (OSL), tur/retur 11.12.–19.12.2026, 1 voksen, økonomi",
+    "airlineNok": 398,
+    "airlineBasis": "Norwegian «Fra NOK 398» for utreisen 11. des.; returen prises separat",
+    "finnNok": 702,
+    "finnItinerary": "Ticket via FINN: Norwegian 19:45 ut, Widerøe 08:55 hjem, direkte, uten bagasje",
+    "tripNok": 802,
+    "panflightsNok": 912,
+    "momondoNok": 918,
+    "skyscannerNok": 956,
+    "differenceNok": 254,
+    "basis": "Forskjell mellom billigste og dyreste kilde i panelet for hele turen. Ingen besparelse mot Norwegian er påstått."
+  },
+  "sources": [
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2026-12-11&requestedReturnDate=2026-12-19&requestedDestination=OSL.METROPOLITAN_AREA&requestedOrigin=BGO.METROPOLITAN_AREA&tripType=roundtrip"
+  ]
+}
