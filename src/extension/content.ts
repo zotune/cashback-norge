@@ -13701,7 +13701,7 @@ function renderNotice(
     loadDbCodes();
   }
 
-  const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
+  const pick = currentSupportLink;
   if (pick !== undefined) {
     const support = document.createElement("div");
     support.className = "support";
@@ -14392,6 +14392,9 @@ function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
   }
   return chips;
 }
+
+// Velges én gang per side, ellers bytter annonsen hver gang panelet tegnes på nytt.
+const currentSupportLink = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
 
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
