@@ -5,6 +5,7 @@ import {
   buildFinnFlightSearchUrl,
   buildFlightLinkFiltersValue,
   buildFlightSortUrlValue,
+  buildKiwiFlightSearchUrl,
   buildGoogleFlightsTfsParam,
   buildMomondoFlightSearchUrl,
   buildPanFlightsFlightSearchUrl,
@@ -15,11 +16,15 @@ import {
   type FlightSortMode,
   limitFlightCandidates,
   readFlightSortLabel,
+  readKiwiBagsParam,
+  readKiwiDatePart,
+  readKiwiSearchPath,
   readFlightSortUrlValue,
   readPanFlightsLegMinutes,
   selectFlightSortCandidate,
   sumFlightLegMinutes,
   buildTripComBaggageFilterFlags,
+  capFlightDateFlexForSeparateSearches,
   buildSkyscannerFareAttributesParam,
   buildSkyscannerSearchOptions,
   buildMomondoFlightFilterValue,
@@ -338,6 +343,8 @@ test("selects best, cheapest and fastest candidate", () => {
   assert.equal(selectFlightSortCandidate(SORT_CANDIDATES, "cheapest")?.id, "unknown");
   assert.equal(selectFlightSortCandidate(SORT_CANDIDATES, "fastest")?.id, "fast");
   assert.equal(selectFlightSortCandidate([{ amount: 1 }], "fastest"), undefined);
+  // Raskest skal ikke velge en reise til mange ganger prisen.
+  assert.equal(selectFlightSortCandidate([{ id: "normal", amount: 15000, durationMinutes: 1000 }, { id: "absurd", amount: 233000, durationMinutes: 900 }], "fastest")?.id, "normal");
   for (const mode of SORT_MODES) assert.equal(selectFlightSortCandidate([], mode), undefined);
 
   const manyRows = [...Array.from({ length: 12 }, (_, index) => ({ id: `row${index}`, amount: 1000 + index, durationMinutes: 1000 + index })), ...SORT_CANDIDATES];
@@ -471,6 +478,23 @@ test("every link keeps every search choice", () => {
       assert.equal(finn.get("maximumNumberOfStops"), maxStops !== undefined ? String(maxStops) : null, label);
       assert.equal(finn.get("durationTo"), maxDurationMinutes !== undefined ? String(maxDurationMinutes) : null, label);
 
+      const kiwi = new URL(buildKiwiFlightSearchUrl(flight, mode));
+      const kiwiBag = `${includeCabinBag ? 1 : 0}.${includeCheckedBag ? 1 : 0}`;
+      assert.equal(kiwi.pathname, `/no/search/results/OSL/BGO/${flight.outboundDate}/${inboundDate ?? "no-return"}`, label);
+      assert.equal(kiwi.searchParams.get("adults"), String(passengers.adults), label);
+      assert.equal(kiwi.searchParams.get("children"), String(passengers.children), label);
+      assert.equal(kiwi.searchParams.get("infants"), String(passengers.infants), label);
+      assert.equal(kiwi.searchParams.get("sortBy"), mode === "best" ? null : buildFlightSortUrlValue("kiwi", mode), label);
+      assert.equal(kiwi.searchParams.get("stopNumber"), maxStops !== undefined ? `${maxStops}~true` : null, label);
+      assert.equal(kiwi.searchParams.get("flightDurationMax"), maxDurationMinutes !== undefined ? String(maxDurationMinutes / 60) : null, label);
+      assert.equal(
+        kiwi.searchParams.get("bags"),
+        includeCabinBag || includeCheckedBag
+          ? [Array(passengers.adults).fill(kiwiBag).join("_"), ...(passengers.children > 0 ? [Array(passengers.children).fill(kiwiBag).join("_")] : [])].join("-")
+          : null,
+        label,
+      );
+
       const momondo = new URL(buildMomondoFlightSearchUrl(flight, mode));
       const momondoFilters = momondo.searchParams.get("fs") ?? "";
       assert.equal(momondo.searchParams.get("sort"), buildFlightSortUrlValue("momondo", mode), label);
@@ -529,4 +553,46 @@ test("every link keeps every search choice", () => {
       }
     }
   assert.equal(combinations, 3 * 2 * 4 * 2 * 2 * 2 * 3);
+});
+
+test("keeps separate date searches to a handful per source", () => {
+  const wide = { outboundBefore: 14, outboundAfter: 14, inboundBefore: 14, inboundAfter: 14 };
+  const oneWay = capFlightDateFlexForSeparateSearches(wide, false);
+  assert.deepEqual(oneWay, { outboundBefore: 3, outboundAfter: 3, inboundBefore: 3, inboundAfter: 3 });
+  assert.equal(listFlightDateFlexCombinations(meta({ outboundDate: "2026-12-05" }), oneWay, NOW).length, 7);
+  const roundTrip = capFlightDateFlexForSeparateSearches(wide, true);
+  assert.equal(listFlightDateFlexCombinations(meta({ outboundDate: "2026-12-05", inboundDate: "2026-12-20" }), roundTrip, NOW).length, 9);
+  assert.deepEqual(capFlightDateFlexForSeparateSearches({ outboundBefore: 0, outboundAfter: 1, inboundBefore: 0, inboundAfter: 0 }, false), {
+    outboundBefore: 0, outboundAfter: 1, inboundBefore: 0, inboundAfter: 0,
+  });
+});
+
+test("Kiwi links keep cabin, date window and readable search paths", () => {
+  const url = new URL(buildKiwiFlightSearchUrl(meta({
+    inboundDate: "2026-12-14",
+    cabinClass: "business",
+    dateFlex: { outboundBefore: 3, outboundAfter: 3, inboundBefore: 3, inboundAfter: 3 },
+    maxDurationMinutes: 1530,
+  })));
+  assert.equal(url.searchParams.get("cabinClass"), "BUSINESS-false");
+  assert.equal(url.searchParams.get("flightDurationMax"), "25");
+  assert.deepEqual(readKiwiSearchPath(url), {
+    origin: "OSL",
+    destination: "BGO",
+    outbound: "2026-12-02_2026-12-08",
+    inbound: "2026-12-11_2026-12-17",
+  });
+  assert.deepEqual(readKiwiDatePart("2026-12-11_2026-12-17"), { date: "2026-12-14", flexDays: 3 });
+  assert.deepEqual(readKiwiDatePart("2026-12-14"), { date: "2026-12-14", flexDays: 0 });
+  assert.equal(readKiwiDatePart("no-return"), undefined);
+  assert.deepEqual(readKiwiBagsParam("1.0_1.0-0.0"), { includeCabinBag: true });
+  assert.deepEqual(readKiwiBagsParam("0.1"), { includeCheckedBag: true });
+  assert.deepEqual(readKiwiBagsParam(null), {});
+  assert.equal(new URL(buildKiwiFlightSearchUrl(meta({ maxStops: 3 }))).searchParams.get("stopNumber"), null);
+  assert.deepEqual(
+    readKiwiSearchPath(new URL("https://www.kiwi.com/no/search/results/oslo-norge/shanghai-kina/2026-12-01/no-return/")),
+    { origin: "oslo-norge", destination: "shanghai-kina", outbound: "2026-12-01" },
+  );
+  assert.equal(readKiwiSearchPath(new URL("https://www.kiwi.no/no/search/results/a/b/2026-12-01")), undefined);
+  assert.equal(readFlightSortUrlValue("kiwi", "duration"), "fastest");
 });

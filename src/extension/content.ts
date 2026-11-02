@@ -77,8 +77,10 @@ import {
   formatFlightDateFlexWindow,
   buildSkyscannerFareAttributesParam,
   applyFlightSortMode,
+  capFlightDateFlexForSeparateSearches,
   buildSkyscannerFlightSearchUrl,
   buildSkyscannerCabinClass,
+  buildKiwiFlightSearchUrl,
   buildPanFlightsFlightSearchUrl,
   buildGoogleFlightsSearchUrl,
   buildTripComFlightSearchUrl,
@@ -98,6 +100,9 @@ import {
   limitFlightCandidates,
   readFlightSortLabel,
   readFlightSortUrlValue,
+  readKiwiBagsParam,
+  readKiwiDatePart,
+  readKiwiSearchPath,
   readPanFlightsLegMinutes,
   selectFlightSortCandidate,
   sumFlightLegMinutes,
@@ -335,7 +340,7 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "googleflights" | "googleshopping";
+  source?: "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -849,7 +854,16 @@ function startContentScript(): void {
   installPanFlightsAutoSearch();
   installTripComLinkFilters();
   installFlightLinkSort();
+  installFlightSortClickWatcher();
+  installKiwiLinkPlaces();
 }
+const PRICE_MATCH_PROGRESS_PERIOD_MS = 1800;
+
+// Panelet bygges på nytt for hvert svar; uten dette ville animasjonene startet forfra hver gang.
+function syncPriceMatchProgressAnimation(element: HTMLElement): void {
+  element.style.setProperty("--price-match-progress-delay", `-${Math.round(performance.now() % PRICE_MATCH_PROGRESS_PERIOD_MS)}ms`);
+}
+
 function renderNoticeWithStoredState(
   offers: CashbackOffer[],
   priceMatches: PriceMatchOffer[] = [],
@@ -929,10 +943,16 @@ function installDynamicProductPageRefresh(): void {
             ? ""
             : [productMeta.searchTerm, productMeta.productLanguage, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
       // Bytter siden bare sortering, viser panelet radene det allerede har.
-      if (flightMeta !== undefined && lastFlightSortRender !== undefined && lastFlightSortRender.mode !== readActiveFlightSortMode()) {
-        latestMetaKey = metaKey;
-        lastFlightSortRender.rerender();
-        return;
+      if (flightMeta !== undefined && isSameFlightSearchAsLastRender()) {
+        if (lastFlightSortRender?.mode !== readActiveFlightSortMode()) {
+          latestMetaKey = metaKey;
+          rerenderFlightSortIfChanged();
+          return;
+        }
+        if (Date.now() < flightSortSettlesAt) {
+          latestMetaKey = metaKey;
+          return;
+        }
       }
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
@@ -943,9 +963,8 @@ function installDynamicProductPageRefresh(): void {
 
   const scheduleLocationRefresh = (): void => {
     if (window.location.href !== latestUrl) {
-      const onlySortChanged = removeFlightSortParams(window.location.href) === removeFlightSortParams(latestUrl);
       latestUrl = window.location.href;
-      if (!onlySortChanged) latestMetaKey = "";
+      if (!isSameFlightSearchAsLastRender()) latestMetaKey = "";
     }
     scheduleRefresh();
   };
@@ -1186,24 +1205,46 @@ function applyTripComMaxDuration(maxDurationMinutes: number): boolean {
   return true;
 }
 
-let lastFlightSortRender: { mode: FlightSortMode; rerender: () => void } | undefined;
+let lastFlightSortRender: { mode: FlightSortMode; searchKey: string; rerender: () => void } | undefined;
 let lastOffersRequestUrl: string | undefined;
+// Sidens egne priser endres en stund etter et fanebytte; det er ikke et nytt søk.
+let flightSortSettlesAt = 0;
+const FLIGHT_SORT_SETTLE_MS = 6000;
+
+function isSameFlightSearchAsLastRender(): boolean {
+  const parsedUrl = parseUrl(window.location.href);
+  const flightMeta = parsedUrl !== undefined && lastFlightSortRender !== undefined ? extractFlightSearchMeta(parsedUrl) : undefined;
+  return flightMeta !== undefined && buildFlightSearchMetaKey(flightMeta) === lastFlightSortRender?.searchKey;
+}
+
+function rerenderFlightSortIfChanged(): void {
+  if (lastFlightSortRender === undefined || lastFlightSortRender.mode === readActiveFlightSortMode()) return;
+  flightSortSettlesAt = Date.now() + FLIGHT_SORT_SETTLE_MS;
+  lastFlightSortRender.rerender();
+}
+
+// Fanebytte gir ikke alltid en DOM-endring eller melding fra bakgrunnen med en gang
+// (momondo: over 40 s), så klikket selv må også utløse en sjekk.
+const FLIGHT_SORT_CLICK_CHECK_DELAYS_MS = [50, 300, 1000, 2500];
+
+function installFlightSortClickWatcher(): void {
+  document.addEventListener("click", () => {
+    if (lastFlightSortRender === undefined) return;
+    for (const delayMs of FLIGHT_SORT_CLICK_CHECK_DELAYS_MS) {
+      window.setTimeout(() => {
+        if (lastFlightSortRender?.mode !== readActiveFlightSortMode() && isSameFlightSearchAsLastRender()) rerenderFlightSortIfChanged();
+      }, delayMs);
+    }
+  }, true);
+}
 
 function rerenderIfOnlyFlightSortChanged(): boolean {
   const currentUrl = window.location.href;
   // Samme URL betyr nye cashback-data fra bakgrunnen, og de må fortsatt hentes.
-  if (lastFlightSortRender === undefined || lastOffersRequestUrl === undefined || currentUrl === lastOffersRequestUrl) return false;
-  if (removeFlightSortParams(currentUrl) !== removeFlightSortParams(lastOffersRequestUrl)) return false;
+  if (lastOffersRequestUrl === undefined || currentUrl === lastOffersRequestUrl || !isSameFlightSearchAsLastRender()) return false;
   lastOffersRequestUrl = currentUrl;
-  if (lastFlightSortRender.mode !== readActiveFlightSortMode()) lastFlightSortRender.rerender();
+  rerenderFlightSortIfChanged();
   return true;
-}
-
-function removeFlightSortParams(url: string): string {
-  const parsedUrl = parseUrl(url);
-  if (parsedUrl === undefined) return url;
-  for (const key of ["sortCriteria", "sort", "order", FLIGHT_LINK_SORT_PARAM]) parsedUrl.searchParams.delete(key);
-  return parsedUrl.toString();
 }
 
 // Skyscanner og Trip.com har ikke sorteringen i URL-en: lenken bærer den, og utvidelsen velger fanen.
@@ -1268,14 +1309,16 @@ function readActiveFlightSortMode(): FlightSortMode {
   const linkMode = parsedUrl.searchParams.get(FLIGHT_LINK_SORT_PARAM);
   if (linkMode === "cheapest" || linkMode === "fastest") return linkMode;
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-  // FINN, momondo og PanFlights har sorteringen i URL-en; PanFlights fjerner order ved «Beste».
+  // FINN, momondo, PanFlights og Kiwi har sorteringen i URL-en; PanFlights og Kiwi fjerner den ved «Beste».
   const urlMode = hostname === "finn.no"
     ? readFlightSortUrlValue("finn", parsedUrl.searchParams.get("sortCriteria"))
     : hostname === "momondo.no"
       ? readFlightSortUrlValue("momondo", parsedUrl.searchParams.get("sort"))
       : isPanFlightsSearchPage(parsedUrl)
         ? readFlightSortUrlValue("panflights", parsedUrl.searchParams.get("order"))
-        : undefined;
+        : hostname === "kiwi.com"
+          ? readFlightSortUrlValue("kiwi", parsedUrl.searchParams.get("sortBy"))
+          : undefined;
   if (urlMode !== undefined) return urlMode;
   if (isSkyscannerFlightSearchPage(parsedUrl)) {
     return readFlightSortLabel(document.body?.innerText.match(/sortert etter[^\n]{0,24}/i)?.[0]) ?? "best";
@@ -1497,6 +1540,7 @@ async function findFlightPriceMatchOffers(onProgress?: (offers: PriceMatchOffer[
     return mergeFlightPriceMatchOffers(session.staticOffers, await runFlightLiveOfferFinders(session.liveOfferFinders));
   }
 
+  const generation = renderGeneration;
   const liveOffers: PriceMatchOffer[] = [];
   const pendingSources = new Set(session.liveOfferFinders.map((finder) => finder.source));
   const reportProgress = (): void => {
@@ -1507,9 +1551,39 @@ async function findFlightPriceMatchOffers(onProgress?: (offers: PriceMatchOffer[
   reportProgress();
   await Promise.all(session.liveOfferFinders.map(async ({ source, sourceName, findOffer }) => {
     const offer = await safelyFindFlightPriceMatchOffer(sourceName, () => findOffer());
+    if (generation !== renderGeneration) return;
     if (offer !== undefined) liveOffers.push(offer);
     pendingSources.delete(source);
-    if (pendingSources.size > 0) reportProgress();
+    reportProgress();
+    if (offer?.searchIncomplete !== true) return;
+
+    // Hver kilde modnes for seg, så raden blir ferdig når kilden er det og ikke venter på den tregeste.
+    const replaceOffer = (nextOffer: PriceMatchOffer): void => {
+      liveOffers[liveOffers.findIndex((liveOffer) => liveOffer.source === source)] = nextOffer;
+      reportProgress();
+    };
+    let currentOffer = offer;
+    const maturationDelays = offer.dateFlex !== undefined
+      ? [...FLIGHT_PRICE_MATURATION_DELAYS_MS, ...FLIGHT_DATE_FLEX_EXTRA_MATURATION_DELAYS_MS]
+      : FLIGHT_PRICE_MATURATION_DELAYS_MS;
+    for (const delayMs of maturationDelays) {
+      await sleep(delayMs);
+      if (generation !== renderGeneration) return;
+      const refreshedOffer = await safelyFindFlightPriceMatchOffer(sourceName, () => findOffer({ refresh: true }));
+      if (generation !== renderGeneration) return;
+      if (refreshedOffer === undefined) continue;
+      // Umodne øyeblikksbilder kan mangle de billigste resultatene; behold beste pris til søket er ferdig.
+      const nextOffer = refreshedOffer.searchIncomplete === true &&
+        (currentOffer.sortAmount ?? currentOffer.amount) < (refreshedOffer.sortAmount ?? refreshedOffer.amount)
+        ? currentOffer
+        : refreshedOffer;
+      if (JSON.stringify(nextOffer) !== JSON.stringify(currentOffer)) replaceOffer(nextOffer);
+      currentOffer = nextOffer;
+      if (nextOffer.searchIncomplete !== true) return;
+    }
+    // Backoff-budsjettet er brukt opp – fjern «oppdaterer»-indikatoren fra raden.
+    const { searchIncomplete: _searchIncomplete, ...settledOffer } = currentOffer;
+    replaceOffer(settledOffer);
   }));
   return mergeFlightPriceMatchOffers(session.staticOffers, liveOffers);
 }
@@ -1551,6 +1625,8 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
         fullSearchDetails,
       })]
       : []),
+    // Ren deeplink: Kiwi gir bare riktige priser til sin egen side (se KIWI_PLACE_LOOKUP_URL).
+    ...(readKiwiSearchPath(parsedUrl) !== undefined ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)]),
     // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
     // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
     ...(isGoogleFlightsSearchPage(parsedUrl)
@@ -1584,12 +1660,42 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
         ? findMomondoFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex)
         : findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup),
     },
-    { source: "skyscanner", sourceName: "Skyscanner", findOffer: () => findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) },
+    {
+      source: "skyscanner",
+      sourceName: "Skyscanner",
+      findOffer: (options?: FlightOfferFindOptions) => dateFlex !== undefined
+        ? findSeparateSearchFlexibleDatesOffer({
+          source: "skyscanner",
+          sourceName: "Skyscanner",
+          flightMeta,
+          routeTitle,
+          searchDetails: fullSearchDetails,
+          dateFlex,
+          options,
+          findExactOffer: (exactMeta) => findSkyscannerFlightPriceMatchOffer(exactMeta, routeTitle, fullSearchDetails, airportLookup),
+        })
+        : findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup),
+    },
     ...(ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE
       ? [{ source: "travellink" as const, sourceName: "Travellink", findOffer: () => findTravellinkFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails) }]
       : []),
     ...(ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE
-      ? [{ source: "tripcom" as const, sourceName: "Trip", findOffer: () => findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup) }]
+      ? [{
+        source: "tripcom" as const,
+        sourceName: "Trip",
+        findOffer: (options?: FlightOfferFindOptions) => dateFlex !== undefined
+          ? findSeparateSearchFlexibleDatesOffer({
+            source: "tripcom",
+            sourceName: "Trip",
+            flightMeta,
+            routeTitle,
+            searchDetails: fullSearchDetails,
+            dateFlex,
+            options,
+            findExactOffer: (exactMeta) => findTripComFlightPriceMatchOffer(exactMeta, routeTitle, fullSearchDetails, airportLookup),
+          })
+          : findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup),
+      }]
       : []),
   ];
   return { staticOffers, liveOfferFinders };
@@ -1763,6 +1869,7 @@ function extractFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
     extractSkyscannerFlightSearchMeta(parsedUrl) ??
     extractTravellinkFlightSearchMeta(parsedUrl) ??
     extractTripComFlightSearchMeta(parsedUrl) ??
+    extractKiwiFlightSearchMeta(parsedUrl) ??
     extractGoogleFlightsSearchMeta(parsedUrl) ??
     extractStoredFlightSearchMeta(parsedUrl) ??
     extractVisibleFlightSearchMeta(parsedUrl);
@@ -1958,14 +2065,14 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
     return undefined;
   }
 
-  const origin = readIataCodeFromValues([
-    parsedUrl.searchParams.get("departureAirportLeg1"),
-    parsedUrl.searchParams.get("requestedOrigin"),
-  ]);
-  const destination = readIataCodeFromValues([
-    parsedUrl.searchParams.get("arrivalAirportLeg1"),
-    parsedUrl.searchParams.get("requestedDestination"),
-  ]);
+  // Ved søk på by fyller FINN etappefeltet med alle flyplassene («TRF,OSL») etter at siden har lastet.
+  // Da gjelder det opprinnelige valget, ellers ville de andre kildene søkt fra den første flyplassen.
+  const readFinnAirport = (legKey: string, requestedKey: string): string | undefined => {
+    const legValue = parsedUrl.searchParams.get(legKey);
+    return readIataCodeFromValues([legValue?.includes(",") === true ? undefined : legValue, parsedUrl.searchParams.get(requestedKey)]);
+  };
+  const origin = readFinnAirport("departureAirportLeg1", "requestedOrigin");
+  const destination = readFinnAirport("arrivalAirportLeg1", "requestedDestination");
   const outboundDate = readIsoDateFromValues([
     parsedUrl.searchParams.get("requestedDepartureDate"),
     parsedUrl.searchParams.get("departureDate"),
@@ -2699,6 +2806,32 @@ function buildFlightPriceMatchOffer(input: {
   };
 }
 
+function buildKiwiFlightPriceMatchOffer(
+  flightMeta: FlightSearchMeta,
+  routeTitle: string,
+  cardSearchDetails: string,
+  fullSearchDetails: string,
+): PriceMatchOffer {
+  const offer = buildFlightPriceMatchOffer({
+    source: "kiwi",
+    sourceName: "KIWI",
+    priceLabel: "?",
+    productUrl: buildKiwiFlightSearchUrl(flightMeta),
+    routeTitle,
+    cardSearchDetails,
+    fullSearchDetails,
+  });
+  const buildVariant = (mode: FlightSortMode): FlightSortVariant => ({
+    shopName: offer.shopName,
+    price: offer.price,
+    amount: offer.amount,
+    sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
+    currency: offer.currency,
+    productUrl: buildKiwiFlightSearchUrl(flightMeta, mode),
+  });
+  return { ...offer, flightSortVariants: { cheapest: buildVariant("cheapest"), fastest: buildVariant("fastest") } };
+}
+
 async function findFinnFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
@@ -2824,6 +2957,118 @@ async function findFinnFlexibleDatesOffer(
     totalCombinationCount: listFlightDateFlexCombinations(flightMeta, dateFlex).length,
     searchIncomplete: !job.done,
   });
+}
+
+const SEPARATE_SEARCH_FLEX_CONCURRENCY = 2;
+const separateSearchFlexJobs = new Map<string, FinnFlightDateFlexJob>();
+
+// Kilder uten datovindu: ett søk per dato, nærmeste datoer først og få om gangen.
+async function findSeparateSearchFlexibleDatesOffer(input: {
+  source: "skyscanner" | "tripcom";
+  sourceName: string;
+  flightMeta: FlightSearchMeta;
+  routeTitle: string;
+  searchDetails: string;
+  dateFlex: FlightDateFlex;
+  options: FlightOfferFindOptions | undefined;
+  findExactOffer: (flightMeta: FlightSearchMeta) => Promise<PriceMatchOffer | undefined>;
+}): Promise<PriceMatchOffer | undefined> {
+  const { flightMeta } = input;
+  const cappedFlex = capFlightDateFlexForSeparateSearches(input.dateFlex, flightMeta.inboundDate !== undefined);
+  const job = getOrStartSeparateSearchFlexJob(input, cappedFlex);
+  if (input.options?.refresh !== true) await job.selectedDatesSearched;
+
+  const dateOptions: FlightDateFlexOption[] = [];
+  for (const combination of job.combinations) {
+    const offer = job.results.get(buildFlightDateCombinationKey(combination));
+    // Priser uten bekreftet bagasje kan ikke sammenlignes med de andre datoene.
+    if (offer === undefined || offer.baggageExcluded === true) continue;
+    dateOptions.push({
+      ...combination,
+      shopName: offer.shopName,
+      price: offer.price,
+      amount: offer.amount,
+      sortAmount: offer.sortAmount ?? offer.amount,
+      currency: offer.currency,
+      productUrl: offer.productUrl,
+      ...(offer.offerUrl !== undefined ? { offerUrl: offer.offerUrl } : {}),
+      ...(offer.durationText !== undefined ? { durationText: offer.durationText } : {}),
+    });
+  }
+  if (dateOptions.length === 0) {
+    const selectedOffer = job.results.get(buildFlightDateCombinationKey(flightMeta));
+    return selectedOffer !== undefined && !job.done ? { ...selectedOffer, searchIncomplete: true } : selectedOffer;
+  }
+  return buildFlightDateFlexOffer({
+    source: input.source,
+    sourceName: input.sourceName,
+    flightMeta,
+    dateFlex: cappedFlex,
+    routeTitle: input.routeTitle,
+    searchDetails: input.searchDetails,
+    options: dateOptions,
+    checkedCombinationCount: job.results.size,
+    totalCombinationCount: job.combinations.length,
+    searchIncomplete: !job.done,
+  });
+}
+
+function getOrStartSeparateSearchFlexJob(
+  input: {
+    source: string;
+    sourceName: string;
+    flightMeta: FlightSearchMeta;
+    findExactOffer: (flightMeta: FlightSearchMeta) => Promise<PriceMatchOffer | undefined>;
+  },
+  cappedFlex: FlightDateFlex,
+): FinnFlightDateFlexJob {
+  const key = buildFlightSearchMetaKey(input.flightMeta);
+  const existingJob = separateSearchFlexJobs.get(input.source);
+  if (existingJob !== undefined && existingJob.key === key && Date.now() - existingJob.startedAt < FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS) {
+    return existingJob;
+  }
+  if (existingJob !== undefined) existingJob.cancelled = true;
+
+  const { dateFlex: _dateFlex, ...exactFlightMeta } = input.flightMeta;
+  const combinations = listFlightDateFlexCombinations(input.flightMeta, cappedFlex);
+  const selectedKey = buildFlightDateCombinationKey(input.flightMeta);
+  let markSelectedDatesSearched = (): void => undefined;
+  const job: FinnFlightDateFlexJob = {
+    key,
+    startedAt: Date.now(),
+    combinations,
+    results: new Map(),
+    done: false,
+    cancelled: false,
+    selectedDatesSearched: new Promise((resolveValue) => {
+      markSelectedDatesSearched = resolveValue;
+    }),
+  };
+
+  let nextIndex = 0;
+  const searchNext = async (): Promise<void> => {
+    while (!job.cancelled && nextIndex < combinations.length) {
+      const combination = combinations[nextIndex++]!;
+      const combinationMeta: FlightSearchMeta = {
+        ...exactFlightMeta,
+        outboundDate: combination.outboundDate,
+        ...(combination.inboundDate !== undefined ? { inboundDate: combination.inboundDate } : {}),
+      };
+      const offer = await safelyFindFlightPriceMatchOffer(
+        `${input.sourceName} (${formatFlightDateRange(combinationMeta)})`,
+        () => input.findExactOffer(combinationMeta),
+      );
+      const combinationKey = buildFlightDateCombinationKey(combination);
+      job.results.set(combinationKey, offer);
+      if (combinationKey === selectedKey) markSelectedDatesSearched();
+    }
+  };
+  void Promise.all(Array.from({ length: SEPARATE_SEARCH_FLEX_CONCURRENCY }, searchNext)).finally(() => {
+    job.done = true;
+    markSelectedDatesSearched();
+  });
+  separateSearchFlexJobs.set(input.source, job);
+  return job;
 }
 
 function getOrStartFinnFlightDateFlexJob(
@@ -3242,6 +3487,7 @@ function shouldUseFinnMetropolitanSearchForCurrentPage(): boolean {
     isSkyscannerFlightSearchPage(parsedUrl) ||
     isGoogleFlightsSearchPage(parsedUrl) ||
     hostname === "momondo.no" ||
+    hostname === "kiwi.com" ||
     hostname === "travellink.no" ||
     hostname.endsWith("trip.com") ||
     // Flyselskapene søker ofte by (Norwegian: originLocationType "city", KLM: type "city").
@@ -4252,6 +4498,114 @@ function isGoogleFlightsSearchPage(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return (hostname === "google.com" || hostname.startsWith("google.") || hostname.endsWith(".google.com")) &&
     /^\/travel\/flights/i.test(parsedUrl.pathname);
+}
+
+// Kiwis søke-API svarer uten siden sine sikkerhetstokener, men da med ett dyrt treff i stedet for
+// resultatlisten (92 468 mot 61 224 kr, 2026-11-02). Derfor brukes API-et bare til stedsoppslag.
+const KIWI_PLACE_LOOKUP_URL = "https://api.skypicker.com/umbrella/v2/graphql";
+const KIWI_PLACE_LOOKUP_QUERY = "query KiwiPlace($search: PlacesSearchInput, $filter: PlacesFilterInput, $options: PlacesOptionsInput) { places(search: $search, filter: $filter, options: $options, first: 5) { ... on PlaceConnection { edges { node { __typename legacyId slug ... on City { code } } } } } }";
+type KiwiPlace = { code?: string; slug: string };
+const kiwiCityCodes = new Map<string, string | undefined>();
+
+async function fetchKiwiPlaces(term: string, placeType: "AIRPORT" | "CITY"): Promise<KiwiPlace[]> {
+  const params = new URLSearchParams({
+    featureName: "UmbrellaPlacesQuery",
+    query: KIWI_PLACE_LOOKUP_QUERY,
+    variables: JSON.stringify({ search: { term }, filter: { onlyTypes: [placeType] }, options: { locale: "no" } }),
+  });
+  const response = await fetch(`${KIWI_PLACE_LOOKUP_URL}?${params.toString()}`, { credentials: "omit" });
+  const value: unknown = await response.json();
+  const places = isRecord(value) && isRecord(value.data) && isRecord(value.data.places) ? value.data.places : undefined;
+  return readRecordArray(places?.edges).flatMap((edge) => {
+    const node = isRecord(edge.node) ? edge.node : undefined;
+    const slug = readStringValue(node?.slug);
+    const code = readStringValue(placeType === "AIRPORT" ? node?.legacyId : node?.code);
+    return slug !== undefined ? [{ slug, ...(code !== undefined ? { code } : {}) }] : [];
+  });
+}
+
+async function findKiwiPlaceSlug(code: string): Promise<string | undefined> {
+  const airport = (await fetchKiwiPlaces(code, "AIRPORT")).find((place) => place.code === code);
+  return airport?.slug ?? (await fetchKiwiPlaces(code, "CITY")).find((place) => place.code === code)?.slug;
+}
+
+// Lenker fra panelet har IATA-koder i stien, som Kiwi selv ikke forstår.
+function installKiwiLinkPlaces(): void {
+  const parsedUrl = parseUrl(window.location.href);
+  const path = parsedUrl !== undefined ? readKiwiSearchPath(parsedUrl) : undefined;
+  if (parsedUrl === undefined || path === undefined || !/^[A-Z]{3}$/.test(path.origin) || !/^[A-Z]{3}$/.test(path.destination)) return;
+  void Promise.all([findKiwiPlaceSlug(path.origin), findKiwiPlaceSlug(path.destination)])
+    .then(([origin, destination]) => {
+      if (origin === undefined || destination === undefined) throw new Error(`Fant ikke ${path.origin}/${path.destination}`);
+      parsedUrl.pathname = parsedUrl.pathname.replace(`/${path.origin}/${path.destination}/`, `/${origin}/${destination}/`);
+      window.location.replace(parsedUrl.toString());
+    })
+    .catch((error: unknown) => console.warn("[Cashback Norge] Kunne ikke åpne Kiwi-søket:", error));
+}
+
+// Byer har ingen kode i sidetittelen, så de slås opp én gang; panelet oppdateres når svaret kommer.
+function readKiwiCityCode(slug: string): string | undefined {
+  if (kiwiCityCodes.has(slug)) return kiwiCityCodes.get(slug);
+  kiwiCityCodes.set(slug, undefined);
+  const parts = slug.split("-");
+  // Siste ord er landet («oslo-norge»); landnavn med flere ord prøves med kortere søkeord.
+  const terms = [parts.slice(0, -1).join(" "), parts.slice(0, -2).join(" "), parts[0] ?? ""].filter((term) => term.length > 0);
+  void (async () => {
+    for (const term of new Set(terms)) {
+      const code = (await fetchKiwiPlaces(term, "CITY")).find((place) => place.slug === slug)?.code;
+      if (code === undefined) continue;
+      kiwiCityCodes.set(slug, code);
+      requestCurrentOffers();
+      return;
+    }
+  })().catch(() => undefined);
+  return undefined;
+}
+
+function extractKiwiFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
+  const path = readKiwiSearchPath(parsedUrl);
+  if (path === undefined) return undefined;
+  const outbound = readKiwiDatePart(path.outbound);
+  const inbound = path.inbound !== undefined ? readKiwiDatePart(path.inbound) : undefined;
+  if (outbound === undefined || (path.inbound !== undefined && inbound === undefined)) return undefined;
+  // Flyplasser står med kode i tittelen: «Reiser Bergen BGO – Fortaleza FOR».
+  const titleSides = document.title.replace(/\u200e/g, "").split(/\s[–-]\s/);
+  if (titleSides.length < 2) return undefined;
+  const readCode = (slug: string, titleSide: string | undefined): string | undefined => {
+    if (/^[A-Z]{3}$/.test(slug)) return slug;
+    return titleSide?.match(/\b([A-Z]{3})\s*$/)?.[1] ?? (slug.includes(",") || slug === "-" ? undefined : readKiwiCityCode(slug));
+  };
+  const origin = readCode(path.origin, titleSides[0]);
+  const destination = readCode(path.destination, titleSides[1]);
+  if (origin === undefined || destination === undefined) return undefined;
+  const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinClass")?.split("-")[0]);
+  const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("stopNumber")?.split("~")[0]);
+  const maxDurationHours = readPositiveIntegerValue(parsedUrl.searchParams.get("flightDurationMax"));
+  const hasDateFlex = outbound.flexDays > 0 || (inbound?.flexDays ?? 0) > 0;
+  return normalizeFlightSearchMeta({
+    origin,
+    destination,
+    outboundDate: outbound.date,
+    ...(inbound !== undefined ? { inboundDate: inbound.date } : {}),
+    ...(hasDateFlex
+      ? {
+        dateFlex: {
+          outboundBefore: outbound.flexDays,
+          outboundAfter: outbound.flexDays,
+          inboundBefore: inbound?.flexDays ?? 0,
+          inboundAfter: inbound?.flexDays ?? 0,
+        },
+      }
+      : {}),
+    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
+    youths: 0,
+    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...(maxStops !== undefined ? { maxStops } : {}),
+    ...(maxDurationHours !== undefined ? { maxDurationMinutes: maxDurationHours * 60 } : {}),
+    ...readKiwiBagsParam(parsedUrl.searchParams.get("bags")),
+  });
 }
 
 function extractGoogleFlightsSearchMeta(parsedUrl: URL): FlightSearchMeta | undefined {
@@ -9609,6 +9963,7 @@ function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
     hostname === "agoda.com" ||
     hostname.endsWith(".agoda.com") ||
     hostname === "momondo.no" ||
+    hostname === "kiwi.com" ||
     hostname === "panflights.no" ||
     hostname === "panflights.com" ||
     hostname === "travellink.no" ||
@@ -10606,8 +10961,13 @@ function renderNotice(
     ? readActiveFlightSortMode()
     : undefined;
   const priceMatches = flightSortMode !== undefined ? applyFlightSortMode(unsortedPriceMatches, flightSortMode) : unsortedPriceMatches;
-  lastFlightSortRender = flightSortMode !== undefined
-    ? { mode: flightSortMode, rerender: () => renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices) }
+  const noticeFlightMeta = noticeUrl !== undefined && flightSortMode !== undefined ? extractFlightSearchMeta(noticeUrl) : undefined;
+  lastFlightSortRender = flightSortMode !== undefined && noticeFlightMeta !== undefined
+    ? {
+      mode: flightSortMode,
+      searchKey: buildFlightSearchMetaKey(noticeFlightMeta),
+      rerender: () => renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices),
+    }
     : undefined;
   const host = document.createElement("div");
   host.id = HOST_ID;
@@ -11043,6 +11403,11 @@ function renderNotice(
     .provider-google {
       background: #ffffff;
       color: #1a73e8;
+    }
+    .provider-kiwi {
+      background: #ffffff;
+      color: #000000;
+      font-weight: 800;
     }
     .provider-tripcom {
       background: #2563eb;
@@ -11646,9 +12011,10 @@ function renderNotice(
         grid-column: 3;
       }
     }
-    .price-match-card--updating {
-      animation: price-match-updating-sweep 1.8s linear infinite;
-      background-image: linear-gradient(90deg, rgba(58, 125, 85, 0) 0%, rgba(58, 125, 85, 0.14) 50%, rgba(58, 125, 85, 0) 100%);
+    /* Felles .cbn-row setter background og lastes etter denne stilen, så regelen må være mer spesifikk. */
+    .price-match-section .price-match-card.price-match-card--updating {
+      animation: price-match-updating-sweep 1.8s linear var(--price-match-progress-delay, 0s) infinite;
+      background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--cbn-accent, #22794f) 24%, transparent) 50%, transparent 100%);
       background-repeat: no-repeat;
       background-size: 45% 100%;
     }
@@ -11658,6 +12024,18 @@ function renderNotice(
       }
       100% {
         background-position: 200% 0;
+      }
+    }
+    /* «Reduser bevegelse» i systemet: ingen vandring, bare en rolig puls. */
+    @keyframes price-match-updating-pulse {
+      50% {
+        background-color: color-mix(in srgb, var(--cbn-accent, #22794f) 16%, var(--cbn-soft, #f7faf8));
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .price-match-section .price-match-card.price-match-card--updating {
+        animation: price-match-updating-pulse 1.8s ease-in-out var(--price-match-progress-delay, 0s) infinite;
+        background-image: none;
       }
     }
     .codes-list {
@@ -13690,6 +14068,7 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
     : formatNokFlightPrice(currentMomondoVisibleBestPrice);
   if (priceMatch.searchIncomplete === true) {
     priceMatchCard.classList.add("price-match-card--updating");
+    syncPriceMatchProgressAnimation(priceMatchCard);
     priceMatchCard.title = "Søket pågår fortsatt – prisen kan bli oppdatert";
   }
 
@@ -13890,6 +14269,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "skyscanner") return "skyscanner";
   if (priceMatch.source === "travellink") return "travellink";
   if (priceMatch.source === "tripcom") return "tripcom";
+  if (priceMatch.source === "kiwi") return "kiwi";
   if (priceMatch.source === "isthereanydeal") return "isthereanydeal";
   if (priceMatch.source === "ggdeals") return "ggdeals";
   if (priceMatch.source === "allkeyshop") return "allkeyshop";
@@ -13913,6 +14293,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "skyscanner") return "Skyscanner";
   if (priceMatch.source === "travellink") return "Travellink";
   if (priceMatch.source === "tripcom") return "Trip";
+  if (priceMatch.source === "kiwi") return "KIWI";
   if (priceMatch.source === "isthereanydeal") return "IsThereAnyDeal";
   if (priceMatch.source === "ggdeals") return "GG Deals";
   if (priceMatch.source === "allkeyshop") return "ALLKEYSHOP";

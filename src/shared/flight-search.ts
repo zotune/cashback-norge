@@ -237,6 +237,8 @@ export function readPanFlightsDateFlex(extraParts: string[], outboundDate: strin
 export type FlightSortMode = "best" | "cheapest" | "fastest";
 export const FLIGHT_LINK_SORT_PARAM = "cbvSort";
 
+const FLIGHT_FASTEST_MAX_PRICE_FACTOR = 4;
+
 type FlightSortableCandidate = { amount: number; sortAmount?: number; durationMinutes?: number };
 
 // Samlet reisetid krever tid for alle etapper; ellers kan ikke reisen sammenlignes på varighet.
@@ -254,13 +256,15 @@ export function sumFlightLegMinutes(legMinutes: Array<number | undefined>, expec
 export function selectFlightSortCandidate<T extends FlightSortableCandidate>(candidates: T[], mode: FlightSortMode): T | undefined {
   if (mode === "best") return candidates[0];
   const amountOf = (candidate: T): number => candidate.sortAmount ?? candidate.amount;
+  // En reise til mange ganger prisen (f.eks. 233 000 mot 15 000 kr) er ikke et reelt «raskest»-valg.
+  const fastestPriceLimit = Math.min(...candidates.map(amountOf)) * FLIGHT_FASTEST_MAX_PRICE_FACTOR;
   let selected: T | undefined;
   for (const candidate of candidates) {
     if (mode === "cheapest") {
       if (selected === undefined || amountOf(candidate) < amountOf(selected)) selected = candidate;
       continue;
     }
-    if (candidate.durationMinutes === undefined) continue;
+    if (candidate.durationMinutes === undefined || amountOf(candidate) > fastestPriceLimit) continue;
     if (
       selected === undefined ||
       candidate.durationMinutes < (selected.durationMinutes ?? Number.POSITIVE_INFINITY) ||
@@ -331,13 +335,14 @@ const FLIGHT_SORT_URL_VALUES: Record<string, Record<FlightSortMode, string>> = {
   finn: { best: "agony_asc", cheapest: "priceAmount_asc", fastest: "tripDuration_asc" },
   momondo: { best: "bestflight_a", cheapest: "price_a", fastest: "duration_a" },
   panflights: { best: "quality", cheapest: "price", fastest: "duration" },
+  kiwi: { best: "quality", cheapest: "price", fastest: "duration" },
 };
 
-export function buildFlightSortUrlValue(source: "finn" | "momondo" | "panflights", mode: FlightSortMode): string {
+export function buildFlightSortUrlValue(source: "finn" | "momondo" | "panflights" | "kiwi", mode: FlightSortMode): string {
   return FLIGHT_SORT_URL_VALUES[source]?.[mode] ?? "";
 }
 
-export function readFlightSortUrlValue(source: "finn" | "momondo" | "panflights", value: string | null): FlightSortMode | undefined {
+export function readFlightSortUrlValue(source: "finn" | "momondo" | "panflights" | "kiwi", value: string | null): FlightSortMode | undefined {
   const values = FLIGHT_SORT_URL_VALUES[source];
   if (value === null || values === undefined) return undefined;
   return (["best", "cheapest", "fastest"] as const).find((mode) => values[mode] === value);
@@ -819,6 +824,18 @@ export function readAmadeusAirBoundsFlightSearchMeta(stateText: string | undefin
   });
 }
 
+// Skyscanner og Trip.com har ikke datovindu i søket, så hver dato er et eget søk. Tur/retur ganger
+// datoene, så der holdes vinduet mindre: ±3 dager ville gitt 49 søk per kilde.
+export function capFlightDateFlexForSeparateSearches(dateFlex: FlightDateFlex, roundTrip: boolean): FlightDateFlex {
+  const maxDays = roundTrip ? 1 : 3;
+  return {
+    outboundBefore: Math.min(dateFlex.outboundBefore, maxDays),
+    outboundAfter: Math.min(dateFlex.outboundAfter, maxDays),
+    inboundBefore: Math.min(dateFlex.inboundBefore, maxDays),
+    inboundAfter: Math.min(dateFlex.inboundAfter, maxDays),
+  };
+}
+
 // Lenkene panelet åpner. De bærer søket, filtrene og sorteringen til hver kilde.
 export type FinnFlightSearchScope = "exact" | "metropolitan";
 
@@ -1014,6 +1031,93 @@ export function buildTripComCabinClassParam(flightMeta: FlightSearchMeta): strin
     case "first": return "f";
     default: return "y";
   }
+}
+
+const KIWI_CABIN_CLASSES: Record<FlightCabinClass, string> = {
+  economy: "ECONOMY",
+  premium: "PREMIUM_ECONOMY",
+  business: "BUSINESS",
+  first: "FIRST_CLASS",
+};
+
+// Kiwi krever stedsnavn i stien. Lenken bærer IATA-koder, og innholdsskriptet bytter dem mot
+// navnene når siden åpnes. Parametrene er verifisert mot kiwi.com (2026-11-02).
+export function buildKiwiFlightSearchUrl(flightMeta: FlightSearchMeta, sortMode: FlightSortMode = "best"): string {
+  const { dateFlex } = flightMeta;
+  const formatDate = (date: string, before = 0, after = 0): string => {
+    return before === 0 && after === 0
+      ? date
+      : `${shiftFlightDateNotBeforeToday(date, -before)}_${shiftFlightDateNotBeforeToday(date, after)}`;
+  };
+  const pathParts = [
+    flightMeta.origin,
+    flightMeta.destination,
+    formatDate(flightMeta.outboundDate, dateFlex?.outboundBefore, dateFlex?.outboundAfter),
+    flightMeta.inboundDate !== undefined
+      ? formatDate(flightMeta.inboundDate, dateFlex?.inboundBefore, dateFlex?.inboundAfter)
+      : "no-return",
+  ];
+  const params = new URLSearchParams({
+    adults: String(flightMeta.adults),
+    children: String(flightMeta.children),
+    infants: String(flightMeta.infants),
+  });
+  if (flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy") {
+    params.set("cabinClass", `${KIWI_CABIN_CLASSES[flightMeta.cabinClass]}-false`);
+  }
+  const bags = buildKiwiBagsParam(flightMeta);
+  if (bags !== undefined) params.set("bags", bags);
+  // Kiwi tilbyr bare direkte, opptil 1 og opptil 2 stopp. «true» tillater stopp med overnatting, som «Alle».
+  if (flightMeta.maxStops !== undefined && flightMeta.maxStops <= 2) params.set("stopNumber", `${flightMeta.maxStops}~true`);
+  // Hele timer per etappe. Runder ned, så ingen reise blir lengre enn valgt grense.
+  if (flightMeta.maxDurationMinutes !== undefined) {
+    params.set("flightDurationMax", String(Math.max(1, Math.floor(flightMeta.maxDurationMinutes / 60))));
+  }
+  if (sortMode !== "best") params.set("sortBy", buildFlightSortUrlValue("kiwi", sortMode));
+  return `https://www.kiwi.com/no/search/results/${pathParts.join("/")}?${params.toString()}`;
+}
+
+// «håndbagasje.innsjekket» per passasjer: _ mellom passasjerer og - mellom voksne og barn. Spedbarn har ingen.
+function buildKiwiBagsParam(flightMeta: FlightSearchMeta): string | undefined {
+  if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return undefined;
+  const bag = `${flightMeta.includeCabinBag === true ? 1 : 0}.${flightMeta.includeCheckedBag === true ? 1 : 0}`;
+  return [flightMeta.adults, flightMeta.children]
+    .filter((count) => count > 0)
+    .map((count) => Array.from({ length: count }, () => bag).join("_"))
+    .join("-");
+}
+
+export function readKiwiBagsParam(value: string | null): Pick<FlightSearchMeta, "includeCabinBag" | "includeCheckedBag"> {
+  const [cabinBags, checkedBags] = (value?.split(/[_-]/)[0] ?? "").split(".").map(Number);
+  return {
+    ...((cabinBags ?? 0) > 0 ? { includeCabinBag: true } : {}),
+    ...((checkedBags ?? 0) > 0 ? { includeCheckedBag: true } : {}),
+  };
+}
+
+export type KiwiSearchPath = { origin: string; destination: string; outbound: string; inbound?: string };
+
+export function readKiwiSearchPath(parsedUrl: URL): KiwiSearchPath | undefined {
+  if (parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "kiwi.com") return undefined;
+  const match = parsedUrl.pathname.match(/^\/[a-z]{2}\/search\/results\/([^/]+)\/([^/]+)\/([^/]+)(?:\/([^/]+))?\/?$/);
+  if (match?.[1] === undefined || match[2] === undefined || match[3] === undefined) return undefined;
+  return {
+    origin: match[1],
+    destination: match[2],
+    outbound: match[3],
+    ...(match[4] !== undefined && match[4] !== "no-return" ? { inbound: match[4] } : {}),
+  };
+}
+
+// «2026-11-08_2026-11-14» er et datovindu; midtpunktet regnes som valgt dato.
+export function readKiwiDatePart(value: string): { date: string; flexDays: number } | undefined {
+  const [start, end] = value.split("_");
+  if (start === undefined || readIsoDateValue(start) === undefined) return undefined;
+  if (end === undefined) return { date: start, flexDays: 0 };
+  if (readIsoDateValue(end) === undefined) return undefined;
+  const flexDays = Math.floor((Date.parse(end) - Date.parse(start)) / 86_400_000 / 2);
+  const date = addDaysToIsoDate(start, flexDays);
+  return date !== undefined && flexDays >= 0 ? { date, flexDays } : undefined;
 }
 
 export function buildMomondoFlightSearchUrl(flightMeta: FlightSearchMeta, sortMode: FlightSortMode = "best"): string {
