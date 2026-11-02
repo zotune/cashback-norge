@@ -124,6 +124,8 @@ import {
   readMomondoFlexibleDatePart,
   readMomondoFlightFilters,
   readMomondoFlightFlexDays,
+  pollMomondoFlexibleDateOptions,
+  type MomondoFlexibleDatePollState,
   readMomondoPassengerPathParts,
   readPanFlightsBaggageFee,
   readSkyscannerFareAttributesParam,
@@ -1656,8 +1658,8 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
     {
       source: "momondo",
       sourceName: "momondo",
-      findOffer: () => dateFlex !== undefined
-        ? findMomondoFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex)
+      findOffer: (options?: FlightOfferFindOptions) => dateFlex !== undefined
+        ? findMomondoFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex, options)
         : findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup),
     },
     {
@@ -6688,18 +6690,22 @@ async function findMomondoFlightPriceMatchOffer(
 
 // Ett momondo-søk med flex per etappe; resultatene grupperes per datokombinasjon
 // med samme strenge rute-/datokontroll som eksakt søk.
+let momondoFlexibleDateJob: {
+  key: string;
+  startedAt: number;
+  searchData: Promise<MomondoFlightSearchData | undefined>;
+  state: MomondoFlexibleDatePollState<FlightDateFlexOption>;
+  poll: Promise<void> | undefined;
+} | undefined;
+
 async function findMomondoFlexibleDatesOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
   airportLookup: FlightAirportCodeLookup,
   dateFlex: FlightDateFlex,
+  options?: FlightOfferFindOptions,
 ): Promise<PriceMatchOffer | undefined> {
-  const searchData = await fetchMomondoFlightSearchData(buildMomondoFlightSearchUrl(flightMeta));
-  if (searchData === undefined) return undefined;
-  const resultData = await pollMomondoFlightResults({ ...searchData, sortMode: "price_a" }, flightMeta, airportLookup);
-  if (resultData === undefined) return undefined;
-
   // momondo dekker maks ±3 dager; vinduet som faktisk ble søkt rapporteres.
   const outboundFlexDays = readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter);
   const inboundFlexDays = readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter);
@@ -6711,6 +6717,67 @@ async function findMomondoFlexibleDatesOffer(
   };
   const combinations = listFlightDateFlexCombinations(flightMeta, momondoDateFlex);
   const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
+  const resultUrl = buildMomondoFlightSearchUrl(flightMeta);
+  const key = buildFlightSearchMetaKey(flightMeta);
+  if (momondoFlexibleDateJob === undefined || momondoFlexibleDateJob.key !== key ||
+    Date.now() - momondoFlexibleDateJob.startedAt >= FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS) {
+    momondoFlexibleDateJob = {
+      key,
+      startedAt: Date.now(),
+      searchData: fetchMomondoFlightSearchData(resultUrl),
+      state: { options: [], complete: false },
+      poll: undefined,
+    };
+  }
+  const job = momondoFlexibleDateJob;
+  const searchData = await job.searchData;
+  if (searchData === undefined) return undefined;
+
+  job.poll ??= pollMomondoFlexibleDateOptions(job.state, {
+    requestResults: (searchId, filterState) => requestMomondoFlightPoll(
+      { ...searchData, sortMode: "price_a" }, flightMeta, airportLookup, searchId, filterState,
+    ),
+    readOptions: (resultData) => readMomondoFlexibleDateOptions(resultData, combinations, exactFlightMeta, airportLookup, resultUrl),
+    readFilterState: (resultData) => buildMomondoExactAirportFilterState(resultData, flightMeta, airportLookup),
+    wait: sleep,
+    attempts: options?.refresh === true ? 1 : MOMONDO_FLIGHT_POLL_ATTEMPTS,
+    intervalMs: MOMONDO_FLIGHT_POLL_INTERVAL_MS,
+  }).finally(() => { job.poll = undefined; });
+  await job.poll;
+
+  return buildFlightDateFlexOffer({
+    source: "momondo",
+    sourceName: "momondo",
+    flightMeta,
+    dateFlex: momondoDateFlex,
+    routeTitle,
+    searchDetails,
+    options: job.state.options,
+    checkedCombinationCount: job.state.complete ? combinations.length : job.state.options.length,
+    totalCombinationCount: combinations.length,
+    searchIncomplete: !job.state.complete,
+  }) ?? {
+    // Et tomt delresultat skal fortsatt modnes; uten rad ble kilden aldri pollet igjen.
+    ...buildFlightPriceMatchOffer({
+      source: "momondo",
+      sourceName: "momondo",
+      productUrl: resultUrl,
+      routeTitle,
+      cardSearchDetails: formatFlightCardSearchDetails(flightMeta),
+      fullSearchDetails: searchDetails,
+    }),
+    matchedExactProduct: false,
+    ...(!job.state.complete ? { searchIncomplete: true } : {}),
+  };
+}
+
+function readMomondoFlexibleDateOptions(
+  resultData: Record<string, unknown>,
+  combinations: FlightDateCombination[],
+  exactFlightMeta: FlightSearchMeta,
+  airportLookup: FlightAirportCodeLookup,
+  resultUrl: string,
+): FlightDateFlexOption[] {
   const dateOptions: FlightDateFlexOption[] = [];
   for (const combination of combinations) {
     const combinationMeta: FlightSearchMeta = {
@@ -6719,7 +6786,7 @@ async function findMomondoFlexibleDatesOffer(
       ...(combination.inboundDate !== undefined ? { inboundDate: combination.inboundDate } : {}),
     };
     const candidate = dedupeMomondoFlightOfferCandidates(
-      collectMomondoFlightOfferCandidates(resultData, combinationMeta, airportLookup, searchData.resultUrl, true),
+      collectMomondoFlightOfferCandidates(resultData, combinationMeta, airportLookup, resultUrl, true),
     ).sort(comparePriceMatchesBySortAmount)[0];
     if (candidate === undefined) continue;
     dateOptions.push({
@@ -6730,18 +6797,7 @@ async function findMomondoFlexibleDatesOffer(
     });
   }
 
-  return buildFlightDateFlexOffer({
-    source: "momondo",
-    sourceName: "momondo",
-    flightMeta,
-    dateFlex: momondoDateFlex,
-    routeTitle,
-    searchDetails,
-    options: dateOptions,
-    checkedCombinationCount: combinations.length,
-    totalCombinationCount: combinations.length,
-    searchIncomplete: readStringValue(resultData.status) !== "complete" && resultData.isTopResultsRankingStable !== true,
-  });
+  return dateOptions;
 }
 
 async function fetchMomondoFlightSearchData(resultUrl: string): Promise<MomondoFlightSearchData | undefined> {
@@ -14060,7 +14116,8 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
 
   const priceMatchPrice = document.createElement("span");
   priceMatchPrice.className = "price-match-price";
-  const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" && priceMatch.dateFlex === undefined
+  const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" && priceMatch.dateFlex === undefined &&
+    priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT
     ? readCurrentMomondoVisibleBestPriceForCurrentPage()
     : undefined;
   priceMatchPrice.textContent = currentMomondoVisibleBestPrice === undefined

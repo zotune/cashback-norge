@@ -45,6 +45,8 @@ import {
   readAmadeusAirBoundsFlightSearchMeta,
   readFlightLinkFilters,
   readMomondoFlexibleDatePart,
+  pollMomondoFlexibleDateOptions,
+  type MomondoFlexibleDatePollState,
   readMomondoFlightFilters,
   readMomondoPassengerPathParts,
   readPanFlightsBaggageFee,
@@ -225,6 +227,118 @@ test("builds and reads momondo passenger paths, filters and flexible dates", () 
   );
   assert.deepEqual(readMomondoFlexibleDatePart("2026-11-10-flexible-3days"), ["2026-11-10", 3]);
   assert.deepEqual(readMomondoFlexibleDatePart("2026-11-10"), ["2026-11-10", 0]);
+});
+
+type FlexibleDatePrice = { outboundDate: string; inboundDate?: string; amount: number };
+
+function momondoFlexPollFixture(responses: unknown[]) {
+  const state: MomondoFlexibleDatePollState<FlexibleDatePrice> = { options: [], complete: false };
+  const requests: Array<{ searchId: string | undefined; filterState: string | undefined }> = [];
+  const waits: number[] = [];
+  const poll = (attempts: number) => pollMomondoFlexibleDateOptions(state, {
+    requestResults: async (searchId, filterState) => {
+      requests.push({ searchId, filterState });
+      return responses.shift();
+    },
+    readOptions: (result) => result.results as FlexibleDatePrice[],
+    readFilterState: (result) => typeof result.airportFilter === "string" ? result.airportFilter : undefined,
+    wait: async (milliseconds) => { waits.push(milliseconds); },
+    attempts,
+    intervalMs: 1100,
+  });
+  return { state, requests, waits, poll };
+}
+
+test("momondo flexible dates wait for completion beyond a stable selected-date price", async () => {
+  const selected = { outboundDate: "2026-12-09", amount: 9214 };
+  const cheaper = { outboundDate: "2026-12-07", amount: 3799 };
+  const fixture = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "pending", isTopResultsRankingStable: true, results: [selected] },
+    { searchId: "fixture-search", status: "pending", results: [] },
+    { searchId: "fixture-search", status: "pending", results: [selected] },
+    { searchId: "fixture-search", status: "complete", results: [cheaper, selected] },
+  ]);
+  await fixture.poll(7);
+  assert.equal(fixture.requests.length, 4);
+  assert.deepEqual(fixture.requests.map((request) => request.searchId), [undefined, "fixture-search", "fixture-search", "fixture-search"]);
+  assert.equal(fixture.state.complete, true);
+  assert.deepEqual(fixture.state.options, [cheaper, selected]);
+});
+
+test("momondo flexible dates resume an empty initial search with the same search ID", async () => {
+  const fixture = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "pending", results: [] },
+    undefined,
+    { searchId: "fixture-search", status: "complete", results: [{ outboundDate: "2026-12-07", amount: 3799 }] },
+  ]);
+  await fixture.poll(2);
+  assert.equal(fixture.state.complete, false);
+  assert.deepEqual(fixture.state.options, []);
+  assert.equal(fixture.requests.length, 2);
+  await fixture.poll(1);
+  assert.equal(fixture.requests[2]?.searchId, "fixture-search");
+  assert.equal(fixture.state.options[0]?.amount, 3799);
+  assert.equal(fixture.state.complete, true);
+  await fixture.poll(7);
+  assert.equal(fixture.requests.length, 3);
+});
+
+test("momondo keeps flexible date combinations through partial or malformed polls", async () => {
+  const first = { outboundDate: "2026-12-07", inboundDate: "2026-12-14", amount: 4000 };
+  const second = { outboundDate: "2026-12-07", inboundDate: "2026-12-15", amount: 5000 };
+  const fixture = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "pending", results: [first] },
+    { error: "temporary upstream error" },
+    { status: "pending", results: [] },
+    { status: "pending", results: [{ ...first, amount: 6000 }, second] },
+  ]);
+  await fixture.poll(4);
+  assert.equal(fixture.state.complete, false);
+  assert.deepEqual(fixture.state.options, [first, second]);
+  assert.deepEqual(fixture.waits, [1100, 1100, 1100]);
+});
+
+test("momondo applies airport exclusions before accepting a complete flexible result", async () => {
+  const fixture = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "complete", airportFilter: "airports=-TRF", results: [{ outboundDate: "2026-12-07", amount: 1000 }] },
+    { searchId: "fixture-search", status: "complete", results: [{ outboundDate: "2026-12-07", amount: 4000 }] },
+  ]);
+  await fixture.poll(7);
+  assert.deepEqual(fixture.requests, [
+    { searchId: undefined, filterState: undefined },
+    { searchId: "fixture-search", filterState: "airports=-TRF" },
+  ]);
+  assert.equal(fixture.state.options[0]?.amount, 4000);
+  assert.equal(fixture.state.complete, true);
+});
+
+test("momondo final results replace stale fares and can confirm no available dates", async () => {
+  const fixture = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "pending", results: [{ outboundDate: "2026-12-07", amount: 3799 }] },
+    { searchId: "fixture-search", status: "complete", results: [{ outboundDate: "2026-12-07", amount: 4100 }] },
+  ]);
+  await fixture.poll(2);
+  assert.equal(fixture.state.options[0]?.amount, 4100);
+
+  const empty = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "pending", results: [{ outboundDate: "2026-12-07", amount: 3799 }] },
+    { searchId: "fixture-search", status: "complete", results: [] },
+  ]);
+  await empty.poll(2);
+  assert.deepEqual(empty.state.options, []);
+  assert.equal(empty.state.complete, true);
+});
+
+test("momondo discards earlier unfiltered date prices when airport filters arrive later", async () => {
+  const fixture = momondoFlexPollFixture([
+    { searchId: "fixture-search", status: "pending", results: [{ outboundDate: "2026-12-07", amount: 1000 }] },
+    { searchId: "fixture-search", status: "pending", airportFilter: "airports=-TRF", results: [] },
+    { searchId: "fixture-search", status: "pending", results: [{ outboundDate: "2026-12-07", amount: 4000 }] },
+  ]);
+  await fixture.poll(3);
+  assert.equal(fixture.requests[2]?.filterState, "airports=-TRF");
+  assert.equal(fixture.state.options[0]?.amount, 4000);
+  assert.equal(fixture.state.complete, false);
 });
 
 test("requires bags confirmed included at momondo and Trip.com", () => {

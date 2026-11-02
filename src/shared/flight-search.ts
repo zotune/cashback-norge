@@ -480,6 +480,59 @@ export function readMomondoFlightFlexDays(before: number, after: number): number
   return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
 }
 
+export type MomondoFlexibleDateOption = FlightDateCombination & { amount: number; sortAmount?: number };
+
+export type MomondoFlexibleDatePollState<T extends MomondoFlexibleDateOption> = {
+  searchId?: string;
+  filterState?: string;
+  options: T[];
+  complete: boolean;
+};
+
+// Et fleksibelt søk må fortsette med samme searchId. Stabil topprangering betyr
+// ikke at de andre datoene er ferdige, og et tomt delresultat erstatter ikke treff.
+export async function pollMomondoFlexibleDateOptions<T extends MomondoFlexibleDateOption>(
+  state: MomondoFlexibleDatePollState<T>,
+  input: {
+    requestResults: (searchId: string | undefined, filterState: string | undefined) => Promise<unknown>;
+    readOptions: (result: Record<string, unknown>) => T[];
+    readFilterState: (result: Record<string, unknown>) => string | undefined;
+    wait: (milliseconds: number) => Promise<void>;
+    attempts: number;
+    intervalMs: number;
+  },
+): Promise<void> {
+  for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
+    if (attempt > 0) await input.wait(input.intervalMs);
+    const value = await input.requestResults(state.searchId, state.filterState);
+    if (!isRecord(value) || !Array.isArray(value.results)) continue;
+    const searchId = readStringValue(value.searchId);
+    if (searchId !== undefined) state.searchId = searchId;
+
+    // Ikke vis det ufiltrerte øyeblikksbildet når flyplassfilter må settes først.
+    const nextFilterState = state.filterState ?? input.readFilterState(value);
+    if (state.filterState === undefined && nextFilterState !== undefined) {
+      state.filterState = nextFilterState;
+      state.options = [];
+      continue;
+    }
+
+    const options = input.readOptions(value);
+    state.complete = readStringValue(value.status) === "complete";
+    // Ferdige svar er autoritative, også når tilbud er blitt dyrere eller borte.
+    // Under lasting beholdes billigste bekreftede treff for hver datokombinasjon.
+    const byDate = new Map<string, T>();
+    for (const option of state.complete ? options : [...state.options, ...options]) {
+      const key = buildFlightDateCombinationKey(option);
+      const previous = byDate.get(key);
+      if (previous === undefined || (option.sortAmount ?? option.amount) < (previous.sortAmount ?? previous.amount)) {
+        byDate.set(key, option);
+      }
+    }
+    state.options = [...byDate.values()];
+  }
+}
+
 export function formatMomondoLuggageValue(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   const cleaned = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

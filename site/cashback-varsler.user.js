@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793639938
+// @version      1793649218
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9438,6 +9438,32 @@ ${darkProviderCss}
   function readMomondoFlightFlexDays(before, after) {
     return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
   }
+  async function pollMomondoFlexibleDateOptions(state, input) {
+    for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
+      if (attempt > 0) await input.wait(input.intervalMs);
+      const value = await input.requestResults(state.searchId, state.filterState);
+      if (!isRecord$5(value) || !Array.isArray(value.results)) continue;
+      const searchId = readStringValue(value.searchId);
+      if (searchId !== void 0) state.searchId = searchId;
+      const nextFilterState = state.filterState ?? input.readFilterState(value);
+      if (state.filterState === void 0 && nextFilterState !== void 0) {
+        state.filterState = nextFilterState;
+        state.options = [];
+        continue;
+      }
+      const options = input.readOptions(value);
+      state.complete = readStringValue(value.status) === "complete";
+      const byDate = /* @__PURE__ */ new Map();
+      for (const option of state.complete ? options : [...state.options, ...options]) {
+        const key = buildFlightDateCombinationKey(option);
+        const previous = byDate.get(key);
+        if (previous === void 0 || (option.sortAmount ?? option.amount) < (previous.sortAmount ?? previous.amount)) {
+          byDate.set(key, option);
+        }
+      }
+      state.options = [...byDate.values()];
+    }
+  }
   function formatMomondoLuggageValue(value) {
     if (value === void 0) return void 0;
     const cleaned = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -10959,7 +10985,7 @@ ${darkProviderCss}
       {
         source: "momondo",
         sourceName: "momondo",
-        findOffer: () => dateFlex !== void 0 ? findMomondoFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex) : findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup)
+        findOffer: (options) => dateFlex !== void 0 ? findMomondoFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex, options) : findMomondoFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup)
       },
       {
         source: "skyscanner",
@@ -14410,11 +14436,8 @@ ${darkProviderCss}
       alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate)
     };
   }
-  async function findMomondoFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, airportLookup, dateFlex) {
-    const searchData = await fetchMomondoFlightSearchData(buildMomondoFlightSearchUrl(flightMeta));
-    if (searchData === void 0) return void 0;
-    const resultData = await pollMomondoFlightResults({ ...searchData, sortMode: "price_a" }, flightMeta, airportLookup);
-    if (resultData === void 0) return void 0;
+  let momondoFlexibleDateJob;
+  async function findMomondoFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, airportLookup, dateFlex, options) {
     const outboundFlexDays = readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter);
     const inboundFlexDays = readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter);
     const momondoDateFlex = {
@@ -14425,6 +14448,63 @@ ${darkProviderCss}
     };
     const combinations = listFlightDateFlexCombinations(flightMeta, momondoDateFlex);
     const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
+    const resultUrl = buildMomondoFlightSearchUrl(flightMeta);
+    const key = buildFlightSearchMetaKey(flightMeta);
+    if (momondoFlexibleDateJob === void 0 || momondoFlexibleDateJob.key !== key || Date.now() - momondoFlexibleDateJob.startedAt >= FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS) {
+      momondoFlexibleDateJob = {
+        key,
+        startedAt: Date.now(),
+        searchData: fetchMomondoFlightSearchData(resultUrl),
+        state: { options: [], complete: false },
+        poll: void 0
+      };
+    }
+    const job = momondoFlexibleDateJob;
+    const searchData = await job.searchData;
+    if (searchData === void 0) return void 0;
+    job.poll ??= pollMomondoFlexibleDateOptions(job.state, {
+      requestResults: (searchId, filterState) => requestMomondoFlightPoll(
+        { ...searchData, sortMode: "price_a" },
+        flightMeta,
+        airportLookup,
+        searchId,
+        filterState
+      ),
+      readOptions: (resultData) => readMomondoFlexibleDateOptions(resultData, combinations, exactFlightMeta, airportLookup, resultUrl),
+      readFilterState: (resultData) => buildMomondoExactAirportFilterState(resultData, flightMeta, airportLookup),
+      wait: sleep,
+      attempts: options?.refresh === true ? 1 : MOMONDO_FLIGHT_POLL_ATTEMPTS,
+      intervalMs: MOMONDO_FLIGHT_POLL_INTERVAL_MS
+    }).finally(() => {
+      job.poll = void 0;
+    });
+    await job.poll;
+    return buildFlightDateFlexOffer({
+      source: "momondo",
+      sourceName: "momondo",
+      flightMeta,
+      dateFlex: momondoDateFlex,
+      routeTitle,
+      searchDetails,
+      options: job.state.options,
+      checkedCombinationCount: job.state.complete ? combinations.length : job.state.options.length,
+      totalCombinationCount: combinations.length,
+      searchIncomplete: !job.state.complete
+    }) ?? {
+      // Et tomt delresultat skal fortsatt modnes; uten rad ble kilden aldri pollet igjen.
+      ...buildFlightPriceMatchOffer({
+        source: "momondo",
+        sourceName: "momondo",
+        productUrl: resultUrl,
+        routeTitle,
+        cardSearchDetails: formatFlightCardSearchDetails(flightMeta),
+        fullSearchDetails: searchDetails
+      }),
+      matchedExactProduct: false,
+      ...!job.state.complete ? { searchIncomplete: true } : {}
+    };
+  }
+  function readMomondoFlexibleDateOptions(resultData, combinations, exactFlightMeta, airportLookup, resultUrl) {
     const dateOptions = [];
     for (const combination of combinations) {
       const combinationMeta = {
@@ -14433,7 +14513,7 @@ ${darkProviderCss}
         ...combination.inboundDate !== void 0 ? { inboundDate: combination.inboundDate } : {}
       };
       const candidate = dedupeMomondoFlightOfferCandidates(
-        collectMomondoFlightOfferCandidates(resultData, combinationMeta, airportLookup, searchData.resultUrl, true)
+        collectMomondoFlightOfferCandidates(resultData, combinationMeta, airportLookup, resultUrl, true)
       ).sort(comparePriceMatchesBySortAmount)[0];
       if (candidate === void 0) continue;
       dateOptions.push({
@@ -14443,18 +14523,7 @@ ${darkProviderCss}
         productUrl: buildMomondoFlightSearchUrl(combinationMeta)
       });
     }
-    return buildFlightDateFlexOffer({
-      source: "momondo",
-      sourceName: "momondo",
-      flightMeta,
-      dateFlex: momondoDateFlex,
-      routeTitle,
-      searchDetails,
-      options: dateOptions,
-      checkedCombinationCount: combinations.length,
-      totalCombinationCount: combinations.length,
-      searchIncomplete: readStringValue(resultData.status) !== "complete" && resultData.isTopResultsRankingStable !== true
-    });
+    return dateOptions;
   }
   async function fetchMomondoFlightSearchData(resultUrl) {
     const html = await userscriptTextRequest(resultUrl, {
@@ -20452,7 +20521,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     priceMatchTitle.append(priceMatchProduct, priceMatchShop);
     const priceMatchPrice = document.createElement("span");
     priceMatchPrice.className = "price-match-price";
-    const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" && priceMatch.dateFlex === void 0 ? readCurrentMomondoVisibleBestPriceForCurrentPage() : void 0;
+    const currentMomondoVisibleBestPrice = priceMatch.source === "momondo" && priceMatch.dateFlex === void 0 && priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? readCurrentMomondoVisibleBestPriceForCurrentPage() : void 0;
     priceMatchPrice.textContent = currentMomondoVisibleBestPrice === void 0 ? priceMatch.price : formatNokFlightPrice(currentMomondoVisibleBestPrice);
     if (priceMatch.searchIncomplete === true) {
       priceMatchCard.classList.add("price-match-card--updating");
