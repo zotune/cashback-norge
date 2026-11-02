@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-01T12:20:08.717Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-02T14:13:48.124Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1103,7 +1103,8 @@
 {"id":25734,"canonicalId":"jp_character_first_partners_collection_box","name":"First Partner Illustration Collection [JP]","category":"collection","setName":"Celebration Collection (30th Anniversary)","language":"jp"},
 {"id":25791,"canonicalId":"en_delta_reign_checklane_blister","name":"Delta Reign Checklane Blister","category":"blister","setName":"Delta Reign","language":"en"},
 {"id":25823,"canonicalId":"en_double_blaze_booster_box","name":"Double Blaze Booster Box","category":"booster_box","language":"en"},
-{"id":25898,"canonicalId":"en_delta_reign_blister","name":"Delta Reign Blister","category":"blister","setName":"Delta Reign","language":"en"}
+{"id":25898,"canonicalId":"en_delta_reign_blister","name":"Delta Reign Blister","category":"blister","setName":"Delta Reign","language":"en"},
+{"id":26067,"canonicalId":"en_prismatic_evolutions_booster_box","name":"Prismatic Evolutions Booster Box","category":"booster_box","setName":"Prismatic Evolutions","language":"en"}
 ],"urls":{
 "24collectcards.no/products/pokemon-prismatic-evolutions-elite-trainer-box":3594,
 "24collectcards.no/products/pokemon-prismatic-evolutions-poster-collection":5364,
@@ -2387,6 +2388,7 @@
 "elkjop.no/product/sport-hobby-og-fritid/samleobjekter-merchandise/samlekort/pokemon-tcg-vstar-universe-booster-box-s12a-japansk/1135932":3586,
 "elkjop.no/product/sport-hobby-og-fritid/samleobjekter-merchandise/samlekort/pokemon-tcg-white-flare-booster-box-sv11w-japansk/1135940":3759,
 "elkjop.no/product/sport-hobby-og-fritid/samleobjekter-merchandise/samlekort/pokemon-tcg-wild-force-booster-box-sv5k-japansk/1135933":3798,
+"elkjop.no/product/sport-hobby-og-fritid/samleobjekter-merchandise/samlekort/the-acrylic-box-case-display-for-pokemon-super-premium-collection-prismatic-evolutions/1155271":26067,
 "epicards.no/products/151-booster-pakke":3333,
 "epicards.no/products/https-epicards-no-no-products-pokemon-white-flare-booster-pakke-_pos-1-_psq-white-flare-_ss-e-_v-1-0":3394,
 "epicards.no/products/ionos-bellibolt-ex-premium-collection":3433,
@@ -2886,7 +2888,10 @@
 "gamezone.no/samlekort/171167/pokemon-30th-celebration-tin-box--hash-2-greninja-ex":13011,
 "gamezone.no/samlekort/171228/pok%c3%a9mon-ninja-spinner-booster-box-japansk-m4":10673,
 "gamezone.no/samlekort/171229/pokemon-storm-emeralda-booster-box-japansk-m6":5782,
+"gamezone.no/samlekort/171688/pokemon-30th-celebration-upc-day-ultra-premium-collection":13005,
+"gamezone.no/samlekort/171689/pokemon-30th-celebration-upc-night-ultra-premium-collection":13006,
 "gamezone.no/samlekort/171690/pokemon-30th-celebration-booster-bundle":12994,
+"gamezone.no/samlekort/171691/pokemon-30th-celebration-figure-coll--hash-1-mew-figure-collection":13008,
 "gamezone.no/samlekort/171693/pokemon-30th-celebration-mini-tin-x10":9021,
 "gamingsjappa.no/products/pokemon-tcg-30th-celebration-2-pack-blister":12988,
 "gamingsjappa.no/products/pokemon-tcg-30th-celebration-binder-collection":12993,
@@ -4656,6 +4661,7 @@
 "pokelageret.no/products/crimson-haze-booster-box":4195,
 "pokelageret.no/products/crown-zenith-booster-pakke":3331,
 "pokelageret.no/products/cyber-judge-booster-box":4197,
+"pokelageret.no/products/delta-reign-booster-pack":22035,
 "pokelageret.no/products/destined-rivals-booster-box":3691,
 "pokelageret.no/products/destined-rivals-booster-pakke":3321,
 "pokelageret.no/products/destined-rivals-checklane-blister":4057,
