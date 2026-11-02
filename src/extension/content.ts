@@ -76,6 +76,7 @@ import {
   formatFlightDateFlexDays,
   formatFlightDateFlexWindow,
   buildSkyscannerFareAttributesParam,
+  buildTripComBaggageFilterFlags,
   buildSkyscannerSearchOptions,
   formatMomondoLuggageValue,
   formatPanFlightsEpochDate,
@@ -97,6 +98,8 @@ import {
   readMomondoPassengerPathParts,
   readPanFlightsBaggageFee,
   readSkyscannerFareAttributesParam,
+  readSkyscannerMaxStopsParam,
+  readTripComTotalDurationRange,
   readTripComJourneyStopCount,
   readPanFlightsDateFlex,
   readPanFlightsLegDurationsMinutes,
@@ -668,6 +671,8 @@ const STATIC_FLIGHT_METROPOLITAN_AIRPORTS: Record<string, string[]> = {
   NYC: ["EWR", "JFK", "LGA"],
   OSA: ["ITM", "KIX", "UKB"],
   SEL: ["GMP", "ICN"],
+  // Både byen Shanghai og flyplassen Hongqiao; søk på koden skal dekke begge flyplassene.
+  SHA: ["PVG", "SHA"],
   TYO: ["HND", "NRT"],
 };
 let flightAirportDataPromise: Promise<FlightAirportData[] | undefined> | undefined;
@@ -970,6 +975,7 @@ function installPanFlightsAutoSearch(): void {
       if (linkFilters !== undefined) applyPanFlightsLinkFilters(linkFilters);
       removePanFlightsAutoSearchParam();
       searchButton.click();
+      if (linkFilters?.maxDurationMinutes !== undefined) void applyPanFlightsMaxDuration(linkFilters.maxDurationMinutes);
       return true;
     }
     return attempts >= 80;
@@ -981,6 +987,42 @@ function installPanFlightsAutoSearch(): void {
       window.clearInterval(timerId);
     }
   }, 250);
+}
+
+// Glidebryterens skala følger søkeresultatene og finnes ikke i URL-en, så den settes etter søket:
+// klikk på sporet og juster til feltet viser grensen eller litt under.
+async function applyPanFlightsMaxDuration(maxDurationMinutes: number): Promise<void> {
+  const maxHours = Math.floor(maxDurationMinutes / 60);
+  for (let attempt = 0; attempt < 80; attempt++) {
+    if ([...document.querySelectorAll<HTMLElement>(".packagewrap")].some(isPanFlightsVisiblePackageElement)) break;
+    await sleep(250);
+  }
+  const slider = document.querySelector<HTMLElement>("#routedur-slider-range");
+  const amountField = document.querySelector<HTMLInputElement>("#routedur-amount");
+  if (slider === null || amountField === null) {
+    console.warn(`[Cashback Norge] Fant ikke reisetidsfilteret på ${window.location.href}.`);
+    return;
+  }
+
+  let fraction = Math.min(1, maxHours / 60);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const rect = slider.getBoundingClientRect();
+    const init = {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width * fraction,
+      clientY: rect.top + rect.height / 2,
+      button: 0,
+      buttons: 1,
+    };
+    slider.dispatchEvent(new MouseEvent("mousedown", init));
+    document.dispatchEvent(new MouseEvent("mouseup", init));
+    await sleep(400);
+    const hours = readPositiveIntegerValue(amountField.value.match(/(\d+)\s*timer/i)?.[1]);
+    if (hours === undefined) return;
+    if (hours <= maxHours && hours >= maxHours - 2) return;
+    fraction = Math.max(0, Math.min(1, hours > maxHours ? fraction * (maxHours / hours) - 0.01 : fraction * (maxHours / hours) + 0.01));
+  }
 }
 
 // PanFlights: stopp er radioknapper (#radiostops0–3), bagasje er tellere med +/-.
@@ -1006,10 +1048,11 @@ function installTripComLinkFilters(): void {
   const filters = readFlightLinkFilters(parsedUrl);
   if (filters === undefined) return;
 
-  const pending = new Set<"stops" | "cabin" | "checked">([
+  const pending = new Set<"stops" | "cabin" | "checked" | "duration">([
     ...(filters.maxStops !== undefined && filters.maxStops > 0 ? ["stops" as const] : []),
     ...(filters.includeCabinBag === true ? ["cabin" as const] : []),
     ...(filters.includeCheckedBag === true ? ["checked" as const] : []),
+    ...(filters.maxDurationMinutes !== undefined ? ["duration" as const] : []),
   ]);
   const clickedKeys = new Set<string>();
   const checkOnce = (key: "stops" | "cabin" | "checked", element: HTMLElement | null | undefined): void => {
@@ -1027,6 +1070,7 @@ function installTripComLinkFilters(): void {
   let attempts = 0;
   const timerId = window.setInterval(() => {
     attempts += 1;
+    removeUnrequestedTripComFilters(filters, clickedKeys);
     if (pending.has("stops")) {
       checkOnce("stops", document.querySelector<HTMLElement>(
         `[data-testid="filter_stops"] .filter-item[data-code="${filters.maxStops}"] [role="checkbox"]`,
@@ -1041,7 +1085,12 @@ function installTripComLinkFilters(): void {
     if (pending.has("checked")) {
       checkOnce("checked", baggageOptions.find((option) => /checked/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
     }
-    if (pending.size === 0 || attempts >= 120) {
+    // Varighetsspennet endrer seg med de andre filtrene, så grensen settes til slutt.
+    if (pending.size === 1 && pending.has("duration") && filters.maxDurationMinutes !== undefined &&
+      attempts % 4 === 0 && applyTripComMaxDuration(filters.maxDurationMinutes)) {
+      pending.delete("duration");
+    }
+    if ((pending.size === 0 && attempts >= 8) || attempts >= 120) {
       window.clearInterval(timerId);
       if (pending.size > 0) {
         console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending].join(", ")} på ${window.location.href}.`);
@@ -1053,6 +1102,58 @@ function installTripComLinkFilters(): void {
       }
     }
   }, 500);
+}
+
+// Trip husker filtre fra forrige søk og viser dem som brikker; fjern dem søket ikke ber om.
+function removeUnrequestedTripComFilters(filters: FlightLinkFilters, clickedKeys: Set<string>): void {
+  for (const chip of document.querySelectorAll<HTMLElement>('.filter-item.is-quick-area-v2[aria-label^="Remove the filter:"]')) {
+    const name = chip.getAttribute("aria-label")?.replace(/^Remove the filter:\s*/i, "") ?? "";
+    const stopValue = readNonNegativeIntegerValue(name.match(/^Up to (\d+) stops?$/i)?.[1]);
+    const isUnrequested = (/^Carry-on baggage$/i.test(name) && filters.includeCabinBag !== true) ||
+      (/^Checked baggage$/i.test(name) && filters.includeCheckedBag !== true) ||
+      (stopValue !== undefined && stopValue !== filters.maxStops) ||
+      (/^Total\s/i.test(name) && filters.maxDurationMinutes === undefined);
+    const key = `remove:${name}`;
+    if (!isUnrequested || clickedKeys.has(key)) continue;
+    clickedKeys.add(key);
+    (chip.querySelector<HTMLElement>("i") ?? chip).click();
+  }
+}
+
+// Varighetsfilteret er en glidebryter uten URL-parameter: dra håndtaket for total reisetid.
+// Returnerer true når grensen er satt eller allerede dekker hele spennet.
+function applyTripComMaxDuration(maxDurationMinutes: number): boolean {
+  const section = document.querySelector<HTMLElement>('[data-testid="filter_duration"]');
+  const range = section !== null ? readTripComTotalDurationRange(section.innerText.replace(/\s+/g, " ")) : undefined;
+  if (section === null || range === undefined) return false;
+  if (range.maxMinutes <= maxDurationMinutes) return true;
+
+  const leftHandles = section.querySelectorAll<HTMLElement>('[data-testid="filter_left_point"]');
+  const rightHandles = section.querySelectorAll<HTMLElement>('[data-testid="filter_right_point"]');
+  const leftHandle = leftHandles[leftHandles.length - 1];
+  const rightHandle = rightHandles[rightHandles.length - 1];
+  if (leftHandle === undefined || rightHandle === undefined) return false;
+
+  const leftRect = leftHandle.getBoundingClientRect();
+  const rightRect = rightHandle.getBoundingClientRect();
+  if (rightRect.width === 0 || rightRect.x <= leftRect.x) return false;
+  const fraction = Math.max(0, (maxDurationMinutes - range.minMinutes) / (range.maxMinutes - range.minMinutes));
+  const startX = rightRect.x + rightRect.width / 2;
+  const targetX = leftRect.x + (rightRect.x - leftRect.x) * fraction;
+  const clientY = rightRect.y + rightRect.height / 2;
+  const fire = (type: string, clientX: number, target: EventTarget, EventClass: typeof MouseEvent): void => {
+    target.dispatchEvent(new EventClass(type, { bubbles: true, cancelable: true, clientX, clientY, button: 0, buttons: 1 }));
+  };
+  fire("pointerdown", startX, rightHandle, PointerEvent);
+  fire("mousedown", startX, rightHandle, MouseEvent);
+  for (let step = 1; step <= 6; step++) {
+    const clientX = startX + (targetX - startX) * (step / 6);
+    fire("pointermove", clientX, document, PointerEvent);
+    fire("mousemove", clientX, document, MouseEvent);
+  }
+  fire("pointerup", targetX, document, PointerEvent);
+  fire("mouseup", targetX, document, MouseEvent);
+  return true;
 }
 
 function isPanFlightsSearchPage(parsedUrl: URL): boolean {
@@ -1604,6 +1705,9 @@ function readVisibleFlightSearchFilterState(): FlightSearchFilterState {
 
   // PanFlights har bagasje som tellere (span.qty), ikke avkrysningsbokser.
   const parsedUrl = parseUrl(window.location.href);
+  if (parsedUrl !== undefined && parsedUrl.hostname.endsWith("trip.com")) {
+    Object.assign(state, readTripComVisibleFilterState());
+  }
   if (parsedUrl !== undefined && isPanFlightsSearchPage(parsedUrl)) {
     if ((readNonNegativeIntegerValue(document.getElementById("carryons")?.textContent?.trim()) ?? 0) > 0) state.includeCabinBag = true;
     if ((readNonNegativeIntegerValue(document.getElementById("checkedluggages")?.textContent?.trim()) ?? 0) > 0) state.includeCheckedBag = true;
@@ -1617,6 +1721,24 @@ function readVisibleFlightSearchFilterState(): FlightSearchFilterState {
     }
   }
   return state;
+}
+
+// Trip.coms filtre er div-er med role="checkbox", ikke input-elementer, og speiles ikke i URL-en.
+function readTripComVisibleFilterState(): FlightSearchFilterState {
+  const isChecked = (selector: string): boolean => document.querySelector(`${selector} [role="checkbox"]`)?.getAttribute("aria-checked") === "true";
+  const stopCodes = [...document.querySelectorAll<HTMLElement>('[data-testid="filter_stops"] .filter-item')]
+    .filter((item) => item.querySelector('[role="checkbox"]')?.getAttribute("aria-checked") === "true")
+    .map((item) => readNonNegativeIntegerValue(item.getAttribute("data-code")))
+    .filter((code): code is number => code !== undefined);
+  const durationChip = [...document.querySelectorAll<HTMLElement>('.filter-item.is-quick-area-v2[aria-label^="Remove the filter:"]')]
+    .map((chip) => readTripComTotalDurationRange(chip.innerText.replace(/\s+/g, " ")))
+    .find((range) => range !== undefined);
+  return {
+    ...(stopCodes.length > 0 ? { maxStops: Math.max(...stopCodes) } : {}),
+    ...(isChecked('.filter-item[data-code="FreeCarryOnBaggage"]') ? { includeCabinBag: true } : {}),
+    ...(isChecked('.filter-item[data-code="FreeCheckedBaggage"]') ? { includeCheckedBag: true } : {}),
+    ...(durationChip !== undefined ? { maxDurationMinutes: durationChip.maxMinutes } : {}),
+  };
 }
 
 function readFlightStopCountWord(value: string | undefined): number | undefined {
@@ -1763,12 +1885,16 @@ function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
     ...(dateFlex !== undefined ? { dateFlex } : {}),
-    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ??
+    adults: readPositiveIntegerValue(parsedUrl.searchParams.get("pad")) ??
+      readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ??
       readPositiveIntegerValue(parsedUrl.searchParams.get("ad")) ??
       1,
     youths: 0,
-    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
-    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+    children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("pch")) ??
+      readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
+    infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("pin")) ??
+      readNonNegativeIntegerValue(parsedUrl.searchParams.get("infants")) ?? 0,
+    ...readFlightLinkFilters(parsedUrl),
   });
 }
 
@@ -1907,6 +2033,8 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
 
   const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinclass"));
   const prefersDirect = parsedUrl.searchParams.get("preferdirects") === "true";
+  const skyscannerMaxStops = prefersDirect ? 0 : readSkyscannerMaxStopsParam(parsedUrl.searchParams.get("stops"));
+  const skyscannerMaxDuration = readPositiveIntegerValue(parsedUrl.searchParams.get("duration"));
   return normalizeFlightSearchMeta({
     origin,
     destination,
@@ -1922,8 +2050,9 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
       .map((age) => readNonNegativeIntegerValue(age))
       .filter((age): age is number => age !== undefined)),
     ...(cabinClass !== undefined ? { cabinClass } : {}),
-    ...(prefersDirect ? { maxStops: 0 } : {}),
+    ...(skyscannerMaxStops !== undefined ? { maxStops: skyscannerMaxStops } : {}),
     ...readSkyscannerFareAttributesParam(parsedUrl.searchParams.get("fare-attributes")),
+    ...(skyscannerMaxDuration !== undefined ? { maxDurationMinutes: skyscannerMaxDuration } : {}),
   });
 }
 
@@ -1994,6 +2123,7 @@ function extractTripComFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | unde
     children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("childqty")) ?? 0,
     infants: readNonNegativeIntegerValue(parsedUrl.searchParams.get("babyqty")) ?? 0,
     ...(cabinClass !== undefined ? { cabinClass } : {}),
+    ...readFlightLinkFilters(parsedUrl),
     ...(nonstopOnly ? { maxStops: 0 } : {}),
   });
 }
@@ -3351,8 +3481,10 @@ function extractCurrentPanFlightsPageOfferCandidates(
     const offerElement = element.querySelector<HTMLElement>(".offer") ?? element;
     if (offerElement === null) return [];
 
-    const amount = readPanFlightsVisibleOfferAmount(offerElement);
-    if (amount === undefined) return [];
+    // Radene viser pris per passasjer; API-et og de andre kildene oppgir totalen.
+    const passengerAmount = readPanFlightsVisibleOfferAmount(offerElement);
+    if (passengerAmount === undefined) return [];
+    const amount = passengerAmount * (flightMeta.adults + flightMeta.children + flightMeta.infants);
 
     const providerText = cleanPanFlightsVisibleText(
       offerElement.querySelector<HTMLElement>(".service, .provider, .providername")?.innerText,
@@ -3399,8 +3531,10 @@ function isCurrentPanFlightsSearchPageForMeta(flightMeta: FlightSearchMeta): boo
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined || !isPanFlightsSearchPage(parsedUrl)) return false;
 
+  // flightMeta har også filtrene fra skjemaet, så samme filtre må med i sammenligningen.
   const currentMeta = extractPanFlightsFlightSearchMeta(parsedUrl);
-  return currentMeta !== undefined && buildFlightSearchMetaKey(currentMeta) === buildFlightSearchMetaKey(flightMeta);
+  return currentMeta !== undefined &&
+    buildFlightSearchMetaKey(withVisibleFlightSearchFilters(currentMeta)) === buildFlightSearchMetaKey(flightMeta);
 }
 
 function readCurrentPanFlightsVisiblePriceKey(flightMeta: FlightSearchMeta): string {
@@ -3583,7 +3717,11 @@ function buildPanFlightsFlightSearchPayload(
     airports: "",
     endairports: "",
     stopovers: "",
-    maxstops: flightMeta.maxStops !== undefined ? Math.min(variant.maxStops, flightMeta.maxStops) : variant.maxStops,
+    // Tur/retur med maxstops under variantens grense gir tomt svar (verifisert 2026-11-02);
+    // stopp filtreres uansett per etappe i svaret.
+    maxstops: flightMeta.maxStops !== undefined && inboundFrom === undefined
+      ? Math.min(variant.maxStops, flightMeta.maxStops)
+      : variant.maxStops,
     useragent: navigator.userAgent,
     devicetype: "PC",
     bundle: JSON.stringify({ addc: "1" }),
@@ -3591,7 +3729,8 @@ function buildPanFlightsFlightSearchPayload(
     maxprice: 999999999999,
     leglist: [leg],
     searchid: searchId,
-    user_ip: "127.0.0.1",
+    // PanFlights svarer HTTP 500 på 127.0.0.1 og uten feltet, men godtar tom verdi (verifisert 2026-11-02).
+    user_ip: "",
     version: variant.version,
   };
 }
@@ -3934,7 +4073,15 @@ function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta): string {
   const v2 = inboundDate !== undefined
     ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}`
     : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
-  const params = new URLSearchParams({ v2, order: "quality", [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1" });
+  // pad/pch/pin = voksne, barn og spedbarn; PanFlights fyller ut skjemaet fra dem (verifisert 2026-11-02).
+  const params = new URLSearchParams({
+    v2,
+    order: "quality",
+    pad: String(flightMeta.adults),
+    ...(flightMeta.children > 0 ? { pch: String(flightMeta.children) } : {}),
+    ...(flightMeta.infants > 0 ? { pin: String(flightMeta.infants) } : {}),
+    [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1",
+  });
   const linkFilters = buildFlightLinkFiltersValue(flightMeta);
   if (linkFilters !== undefined) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
   return `https://panflights.no/nb/${path}/?${params.toString()}`;
@@ -3944,7 +4091,8 @@ function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta): string {
 // fritekst knekker parsingen). tfs=-parameteren er en base64url-protobuf som bærer
 // alt: legs (felt 3: dato f2, maks stopp f5, fra f13.f2, til f14.f2), passasjerer
 // (felt 8, 1=voksen), kabin (felt 9: 1=economy 2=premium 3=business 4=first) og
-// turtype (felt 19: 1=tur/retur 2=én vei). Bagasje finnes ikke i skjemaet.
+// turtype (felt 19: 1=tur/retur 2=én vei). Felt 13 er bagasje (f2 hånd, f3 innsjekket), og felt 12
+// i hver etappe er maks minutter reisetid (verifisert 2026-11-02).
 function buildGoogleFlightsSearchUrl(flightMeta: FlightSearchMeta): string {
   const params = new URLSearchParams({
     tfs: buildGoogleFlightsTfsParam(flightMeta),
@@ -3956,9 +4104,9 @@ function buildGoogleFlightsSearchUrl(flightMeta: FlightSearchMeta): string {
 
 function buildGoogleFlightsTfsParam(flightMeta: FlightSearchMeta): string {
   const bytes: number[] = [
-    ...encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.outboundDate, flightMeta.origin, flightMeta.destination, flightMeta.maxStops)),
+    ...encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.outboundDate, flightMeta.origin, flightMeta.destination, flightMeta.maxStops, flightMeta.maxDurationMinutes)),
     ...(flightMeta.inboundDate !== undefined
-      ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops))
+      ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops, flightMeta.maxDurationMinutes))
       : []),
   ];
   // Felt 8 per reisende: 1 = voksen, 2 = barn, 4 = spedbarn på fanget.
@@ -3972,14 +4120,27 @@ function buildGoogleFlightsTfsParam(flightMeta: FlightSearchMeta): string {
     bytes.push(...encodeProtoVarintField(8, 4));
   }
   bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
+  if (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) {
+    bytes.push(...encodeProtoBytesField(13, [
+      ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? 1 : 0),
+      ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? 1 : 0),
+    ]));
+  }
   bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== undefined ? 1 : 2));
   return encodeBase64Url(bytes);
 }
 
-function encodeGoogleFlightsLeg(date: string, origin: string, destination: string, maxStops: number | undefined): number[] {
+function encodeGoogleFlightsLeg(
+  date: string,
+  origin: string,
+  destination: string,
+  maxStops: number | undefined,
+  maxDurationMinutes: number | undefined,
+): number[] {
   return [
     ...encodeProtoStringField(2, date),
     ...(maxStops !== undefined ? encodeProtoVarintField(5, maxStops) : []),
+    ...(maxDurationMinutes !== undefined ? encodeProtoVarintField(12, maxDurationMinutes) : []),
     ...encodeProtoBytesField(13, encodeProtoStringField(2, origin.toUpperCase())),
     ...encodeProtoBytesField(14, encodeProtoStringField(2, destination.toUpperCase())),
   ];
@@ -4175,6 +4336,8 @@ function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
   else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
   const fareAttributes = buildSkyscannerFareAttributesParam(flightMeta);
   if (fareAttributes !== undefined) params.set("fare-attributes", fareAttributes);
+  // duration = maks minutter per etappe; siden setter reisetidsfilteret ut fra den (verifisert 2026-11-02).
+  if (flightMeta.maxDurationMinutes !== undefined) params.set("duration", String(flightMeta.maxDurationMinutes));
   return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
 }
 
@@ -4683,8 +4846,8 @@ function buildTripComFlightSearchUrl(flightMeta: FlightSearchMeta): string {
     curr: TRIP_COM_DEFAULT_CURRENCY,
   });
   if (flightMeta.inboundDate !== undefined) params.set("rdate", flightMeta.inboundDate);
-  const linkFilters = buildFlightLinkFiltersValue(flightMeta);
-  if (linkFilters !== undefined) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
+  // Trip husker filtre mellom søk; "none" lar utvidelsen fjerne filtre søket ikke har.
+  params.set(FLIGHT_LINK_FILTERS_PARAM, buildFlightLinkFiltersValue(flightMeta) ?? "none");
   return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
 }
 
@@ -4904,7 +5067,7 @@ function buildTripComFlightListSearchPayload(
       topList: [],
     },
     filterType: {
-      filterFlagTypes: [],
+      filterFlagTypes: buildTripComBaggageFilterFlags(flightMeta),
       queryItemSettings: [],
       studentsSelectedStatus: true,
     },
@@ -5886,6 +6049,9 @@ function selectSkyscannerFlightPlace(
   cityPlaces: SkyscannerFlightPlace[],
 ): SkyscannerFlightPlace | undefined {
   const normalizedCode = iataCode.toUpperCase();
+  const isMetropolitanCode = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[normalizedCode] !== undefined;
+  const cityPlace = cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A`);
+  if (isMetropolitanCode && cityPlace !== undefined) return cityPlace;
   return airportPlaces.find((place) => place.skyId === normalizedCode && place.flightPlaceType === "AIRPORT") ??
     cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A` || place.skyId.startsWith(normalizedCode)) ??
     airportPlaces[0] ??

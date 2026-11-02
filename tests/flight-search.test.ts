@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildFlightLinkFiltersValue,
+  buildTripComBaggageFilterFlags,
   buildSkyscannerFareAttributesParam,
   buildSkyscannerSearchOptions,
   buildMomondoFlightFilterValue,
@@ -29,6 +30,8 @@ import {
   readPanFlightsLegDurationsMinutes,
   readPanFlightsLegStopCounts,
   readSkyscannerFareAttributesParam,
+  readSkyscannerMaxStopsParam,
+  readTripComTotalDurationRange,
   readTripComJourneyStopCount,
 } from "../src/shared/flight-search.js";
 
@@ -269,4 +272,37 @@ test("requests and reads Skyscanner baggage per pricing option", () => {
   assert.equal(isSkyscannerPricingOptionMatchingBaggage(option("UNKNOWN", "INCLUDED"), bags), false);
   assert.equal(isSkyscannerPricingOptionMatchingBaggage({ fareAttributes: {} }, bags), false);
   assert.equal(isSkyscannerPricingOptionMatchingBaggage({ fareAttributes: {} }, meta()), true);
+});
+
+test("carries max travel time in link filters", () => {
+  const filtered = meta({ maxStops: 1, includeCabinBag: true, maxDurationMinutes: 1500 });
+  const value = buildFlightLinkFiltersValue(filtered);
+  assert.equal(value, "stops:1,cabin,dur:1500");
+  assert.deepEqual(readFlightLinkFilters(new URL(`https://panflights.no/nb/oneway/?cbvFilters=${encodeURIComponent(value ?? "")}`)), {
+    maxStops: 1,
+    includeCabinBag: true,
+    maxDurationMinutes: 1500,
+  });
+  assert.deepEqual(readFlightLinkFilters(new URL("https://us.trip.com/flights/showfarefirst?cbvFilters=none")), {});
+});
+
+test("asks Trip.com for fares with the selected baggage", () => {
+  assert.deepEqual(buildTripComBaggageFilterFlags(meta()), []);
+  assert.deepEqual(buildTripComBaggageFilterFlags(meta({ includeCabinBag: true, includeCheckedBag: true })), [
+    { flag: "FreeCarryOnBaggage", allow: true, journeyNoList: [1] },
+    { flag: "FreeCheckedBaggage", allow: true, journeyNoList: [1] },
+  ]);
+  assert.deepEqual(buildTripComBaggageFilterFlags(meta({ includeCheckedBag: true })), [
+    { flag: "FreeCheckedBaggage", allow: true, journeyNoList: [1] },
+  ]);
+});
+
+test("reads Trip.com duration labels and Skyscanner stop filters", () => {
+  assert.deepEqual(readTripComTotalDurationRange("Duration Stopover 0m 24h Total 16h 30m 46h 30m"), { minMinutes: 990, maxMinutes: 2790 });
+  assert.deepEqual(readTripComTotalDurationRange("Total 16h 30m–30h"), { minMinutes: 990, maxMinutes: 1800 });
+  assert.equal(readTripComTotalDurationRange("Carry-on baggage"), undefined);
+
+  assert.equal(readSkyscannerMaxStopsParam("!twoPlusStops"), 1);
+  assert.equal(readSkyscannerMaxStopsParam("!oneStop,!twoPlusStops"), 0);
+  assert.equal(readSkyscannerMaxStopsParam(null), undefined);
 });

@@ -234,14 +234,15 @@ export function readPanFlightsDateFlex(extraParts: string[], outboundDate: strin
     : undefined;
 }
 
-export type FlightLinkFilters = Pick<FlightSearchMeta, "maxStops" | "includeCabinBag" | "includeCheckedBag">;
+export type FlightLinkFilters = Pick<FlightSearchMeta, "maxStops" | "includeCabinBag" | "includeCheckedBag" | "maxDurationMinutes">;
 
-// "stops:1,cabin,checked" ↔ maks stopp og bagasje.
+// "stops:1,cabin,checked,dur:1500" ↔ maks stopp, bagasje og maks minutter per etappe.
 export function buildFlightLinkFiltersValue(flightMeta: FlightSearchMeta): string | undefined {
   const parts = [
     flightMeta.maxStops !== undefined ? `stops:${flightMeta.maxStops}` : undefined,
     flightMeta.includeCabinBag === true ? "cabin" : undefined,
     flightMeta.includeCheckedBag === true ? "checked" : undefined,
+    flightMeta.maxDurationMinutes !== undefined ? `dur:${flightMeta.maxDurationMinutes}` : undefined,
   ].filter((part): part is string => part !== undefined);
   return parts.length > 0 ? parts.join(",") : undefined;
 }
@@ -251,10 +252,12 @@ export function readFlightLinkFilters(parsedUrl: URL): FlightLinkFilters | undef
   if (value === null) return undefined;
   const parts = value.split(",");
   const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
+  const maxDurationMinutes = readPositiveIntegerValue(parts.find((part) => part.startsWith("dur:"))?.slice("dur:".length));
   return {
     ...(maxStops !== undefined ? { maxStops } : {}),
     ...(parts.includes("cabin") ? { includeCabinBag: true } : {}),
     ...(parts.includes("checked") ? { includeCheckedBag: true } : {}),
+    ...(maxDurationMinutes !== undefined ? { maxDurationMinutes } : {}),
   };
 }
 
@@ -282,13 +285,12 @@ export function readMomondoFlightFilters(parsedUrl: URL): FlightLinkFilters {
   const maxStops = filters.has("stops") && stopValues.every((value): value is number => value !== undefined && value < 2)
     ? Math.max(...stopValues.filter((value): value is number => value !== undefined))
     : undefined;
+  const maxDurationMinutes = readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, ""));
   return {
     ...(maxStops !== undefined ? { maxStops } : {}),
     ...((readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {}),
     ...((readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {}),
-    ...(readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) !== undefined
-      ? { maxDurationMinutes: readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, "")) }
-      : {}),
+    ...(maxDurationMinutes !== undefined ? { maxDurationMinutes } : {}),
   };
 }
 
@@ -386,6 +388,34 @@ export function readTripComJourneyStopCount(journey: Record<string, unknown>): n
     return count + readRecordArray(flightInfo?.stopList).length;
   }, 0);
   return Math.max(0, sections.length - 1) + intermediateStops;
+}
+
+// Uten flaggene svarer Trip.com med billigste billett uten bagasje, og reiser med bagasje mot
+// høyere pris mangler. Siden selv sender journeyNoList [1], også for tur/retur (verifisert 2026-11-02).
+export function buildTripComBaggageFilterFlags(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
+  return [
+    flightMeta.includeCabinBag === true ? "FreeCarryOnBaggage" : undefined,
+    flightMeta.includeCheckedBag === true ? "FreeCheckedBaggage" : undefined,
+  ]
+    .filter((flag): flag is string => flag !== undefined)
+    .map((flag) => ({ flag, allow: true, journeyNoList: [1] }));
+}
+
+// "Total 16h 30m 46h 30m" i varighetsfilteret og "Total 16h 30m–30h 30m" i filterbrikken.
+export function readTripComTotalDurationRange(text: string): { minMinutes: number; maxMinutes: number } | undefined {
+  const match = text.match(/Total\s+(\d+)h(?:\s+(\d+)m)?\s*[–-]?\s*(\d+)h(?:\s+(\d+)m)?/i);
+  if (match === null) return undefined;
+  return {
+    minMinutes: Number(match[1]) * 60 + Number(match[2] ?? 0),
+    maxMinutes: Number(match[3]) * 60 + Number(match[4] ?? 0),
+  };
+}
+
+// Skyscanners stopps-parameter ekskluderer kategorier: "!oneStop,!twoPlusStops" = kun direkte.
+export function readSkyscannerMaxStopsParam(value: string | null): number | undefined {
+  const excluded = (value ?? "").split(",").map((part) => part.trim().replace(/^!/, "").toLowerCase());
+  if (!excluded.includes("twoplusstops")) return undefined;
+  return excluded.includes("onestop") ? 0 : 1;
 }
 
 export function buildSkyscannerFareAttributesParam(flightMeta: FlightSearchMeta): string | undefined {
