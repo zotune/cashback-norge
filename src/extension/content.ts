@@ -75,10 +75,13 @@ import {
   type FlightSearchMeta,
   formatFlightDateFlexDays,
   formatFlightDateFlexWindow,
+  buildSkyscannerFareAttributesParam,
+  buildSkyscannerSearchOptions,
   formatMomondoLuggageValue,
   formatPanFlightsEpochDate,
   isFlightSearchPassengerMatchSupported,
   isMomondoBookingOptionMatchingBaggage,
+  isSkyscannerPricingOptionMatchingBaggage,
   isTripComPolicyMatchingBaggage,
   listFlightDateFlexCombinations,
   matchPanFlightsFlightSearchDates,
@@ -93,6 +96,8 @@ import {
   readMomondoFlightFlexDays,
   readMomondoPassengerPathParts,
   readPanFlightsBaggageFee,
+  readSkyscannerFareAttributesParam,
+  readTripComJourneyStopCount,
   readPanFlightsDateFlex,
   readPanFlightsLegDurationsMinutes,
   readPanFlightsLegStopCounts,
@@ -418,6 +423,7 @@ type SkyscannerFlightOfferCandidate = PriceMatchAlternative & {
 type SkyscannerFlightOfferSearchResult = {
   candidates: SkyscannerFlightOfferCandidate[];
   searchComplete: boolean;
+  baggageExcluded?: boolean;
 };
 type SkyscannerFlightPlace = {
   entityId: string;
@@ -1917,6 +1923,7 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
       .filter((age): age is number => age !== undefined)),
     ...(cabinClass !== undefined ? { cabinClass } : {}),
     ...(prefersDirect ? { maxStops: 0 } : {}),
+    ...readSkyscannerFareAttributesParam(parsedUrl.searchParams.get("fare-attributes")),
   });
 }
 
@@ -4166,6 +4173,8 @@ function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta): string {
   // Skyscanners stoppfilter ekskluderer kategorier: "!oneStop,!twoPlusStops" = kun direkte.
   if (flightMeta.maxStops === 0) params.set("stops", "!oneStop,!twoPlusStops");
   else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
+  const fareAttributes = buildSkyscannerFareAttributesParam(flightMeta);
+  if (fareAttributes !== undefined) params.set("fare-attributes", fareAttributes);
   return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
 }
 
@@ -5039,10 +5048,6 @@ function extractTripComListOfferCandidates(
   return dedupeTripComOfferCandidates(candidates).slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT);
 }
 
-function readTripComJourneyStopCount(journey: Record<string, unknown>): number {
-  return Math.max(0, readRecordArray(journey.transSectionList).length - 1);
-}
-
 function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
   const price = isRecord(policy.price) ? policy.price : undefined;
   return readTripComPriceAmount(price);
@@ -5159,7 +5164,7 @@ function formatTripComTimeSummary(journeys: Array<Record<string, unknown>>): str
 function formatTripComStopsSummary(journeys: Array<Record<string, unknown>>): string | undefined {
   if (journeys.length === 0) return undefined;
   const stopTexts = journeys
-    .map((journey) => Math.max(0, readRecordArray(journey.transSectionList).length - 1))
+    .map(readTripComJourneyStopCount)
     .map((stopCount) => stopCount === 0 ? "direkte" : `${stopCount} stopp`);
   return uniqueStrings(stopTexts).join(" / ");
 }
@@ -5293,11 +5298,9 @@ async function findSkyscannerFlightPriceMatchOffer(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-  const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
+  const { candidates, searchComplete, baggageExcluded } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
-  // web-unified-search har tomme fareAttributes (verifisert 2026-11-01): bagasjeavgift er ukjent.
-  const baggageExcluded = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
 
   return {
     ...(baggageExcluded ? { baggageExcluded: true } : {}),
@@ -5406,9 +5409,19 @@ async function fetchSkyscannerFlightSearchCandidates(
 
   const finalContext = isRecord(latestResult.context) ? latestResult.context : undefined;
   const finalStatus = readStringValue(finalContext?.status)?.toLowerCase();
+  const searchComplete = finalStatus === undefined || finalStatus === "complete";
+  const candidates = extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl);
+  if (candidates.length > 0 || (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true)) {
+    return { candidates, searchComplete };
+  }
+
+  // Ingen pris med bekreftet bagasje: vis prisen uten bagasje, tydelig merket og sortert sist.
+  const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
+  const candidatesWithoutBaggage = extractSkyscannerFlightSearchCandidates(latestResult, flightMetaWithoutBaggage, airportLookup, resultUrl);
   return {
-    candidates: extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl),
-    searchComplete: finalStatus === undefined || finalStatus === "complete",
+    candidates: candidatesWithoutBaggage,
+    searchComplete,
+    ...(candidatesWithoutBaggage.length > 0 ? { baggageExcluded: true } : {}),
   };
 }
 
@@ -5465,11 +5478,13 @@ function buildSkyscannerFlightSearchPayload(
     legs.push(buildSkyscannerFlightSearchLeg(destinationPlace, originPlace, flightMeta.inboundDate));
   }
 
+  const searchOptions = buildSkyscannerSearchOptions(flightMeta);
   return {
     cabinClass: buildSkyscannerCabinClass(flightMeta),
     childAges: [...readFlightChildAges(flightMeta), ...Array.from({ length: flightMeta.infants }, () => FLIGHT_INFANT_AGE)],
     adults: flightMeta.adults,
     legs,
+    ...(searchOptions !== undefined ? { options: searchOptions } : {}),
   };
 }
 
@@ -5533,6 +5548,7 @@ function extractSkyscannerFlightSearchCandidates(
     let bestPricingOption: Record<string, unknown> | undefined;
     let bestAmount: number | undefined;
     for (const pricingOption of readSkyscannerPricingOptions(result)) {
+      if (!isSkyscannerPricingOptionMatchingBaggage(pricingOption, flightMeta)) continue;
       const amount = readSkyscannerPricingOptionAmount(pricingOption, result);
       if (amount === undefined) continue;
       if (bestAmount === undefined || amount < bestAmount) {

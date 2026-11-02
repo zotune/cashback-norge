@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildFlightLinkFiltersValue,
+  buildSkyscannerFareAttributesParam,
+  buildSkyscannerSearchOptions,
   buildMomondoFlightFilterValue,
   buildMomondoPassengerDetails,
   buildMomondoPassengerPathParts,
@@ -11,6 +13,7 @@ import {
   extractWideroeFlightSearchMeta,
   type FlightSearchMeta,
   isMomondoBookingOptionMatchingBaggage,
+  isSkyscannerPricingOptionMatchingBaggage,
   isTripComPolicyMatchingBaggage,
   listFlightDateFlexCombinations,
   matchPanFlightsFlightSearchDates,
@@ -25,6 +28,8 @@ import {
   readPanFlightsDateFlex,
   readPanFlightsLegDurationsMinutes,
   readPanFlightsLegStopCounts,
+  readSkyscannerFareAttributesParam,
+  readTripComJourneyStopCount,
 } from "../src/shared/flight-search.js";
 
 const NOW = new Date("2026-11-02T12:00:00Z");
@@ -224,4 +229,44 @@ test("round-trips link filters for sites that tick filters on open", () => {
     includeCheckedBag: true,
   });
   assert.equal(buildFlightLinkFiltersValue(meta()), undefined);
+});
+
+test("counts Trip.com intermediate stops on the same flight number", () => {
+  const section = (stops: number) => ({ flightInfo: { stopList: Array.from({ length: stops }, () => ({ airportCode: "ARN" })) } });
+  // HO1607 PVG-HEL + AY817 HEL-ARN-BGO: ett flybytte og én mellomlanding.
+  assert.equal(readTripComJourneyStopCount({ transSectionList: [section(0), section(1)] }), 2);
+  assert.equal(readTripComJourneyStopCount({ transSectionList: [section(0), section(0)] }), 1);
+  assert.equal(readTripComJourneyStopCount({ transSectionList: [section(0)] }), 0);
+  assert.equal(readTripComJourneyStopCount({ transSectionList: [{}] }), 0);
+  assert.equal(readTripComJourneyStopCount({}), 0);
+});
+
+test("requests and reads Skyscanner baggage per pricing option", () => {
+  const bags = meta({ includeCabinBag: true, includeCheckedBag: true });
+  const cabin = meta({ includeCabinBag: true });
+  const option = (cabinAssessment: string, checkedAssessment: string, checkedFee = 0) => ({
+    fareAttributes: {
+      cabinBaggage: { assessment: cabinAssessment, pieces: 1, fee: { currencyCode: "NOK", amount: 0, unit: "UNIT_MICRO" } },
+      checkedBaggage: { assessment: checkedAssessment, pieces: 1, fee: { currencyCode: "NOK", amount: checkedFee, unit: "UNIT_MICRO" } },
+    },
+  });
+
+  assert.deepEqual(buildSkyscannerSearchOptions(bags), { fareAttributes: { selectedFareAttributes: ["CABIN_BAG", "CHECKED_BAG"] } });
+  assert.deepEqual(buildSkyscannerSearchOptions(cabin), { fareAttributes: { selectedFareAttributes: ["CABIN_BAG"] } });
+  assert.equal(buildSkyscannerSearchOptions(meta()), undefined);
+
+  assert.equal(buildSkyscannerFareAttributesParam(bags), "cabin-bag,checked-bag");
+  assert.equal(buildSkyscannerFareAttributesParam(meta()), undefined);
+  assert.deepEqual(readSkyscannerFareAttributesParam("cabin-bag,checked-bag"), { includeCabinBag: true, includeCheckedBag: true });
+  assert.deepEqual(readSkyscannerFareAttributesParam("checked-bag"), { includeCheckedBag: true });
+  assert.deepEqual(readSkyscannerFareAttributesParam(null), {});
+
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage(option("INCLUDED", "INCLUDED"), bags), true);
+  // Gebyret er lagt inn i prisen når bagasjen er INCLUDED med fee.amount over 0.
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage(option("INCLUDED", "INCLUDED", 1_210_000_000), bags), true);
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage(option("INCLUDED", "FEE", 1_210_000_000), bags), false);
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage(option("INCLUDED", "FEE", 1_210_000_000), cabin), true);
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage(option("UNKNOWN", "INCLUDED"), bags), false);
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage({ fareAttributes: {} }, bags), false);
+  assert.equal(isSkyscannerPricingOptionMatchingBaggage({ fareAttributes: {} }, meta()), true);
 });

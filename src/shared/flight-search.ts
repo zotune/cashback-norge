@@ -377,6 +377,53 @@ export function isTripComPolicyMatchingBaggage(policy: Record<string, unknown>, 
   return true;
 }
 
+// Trip.com: transSectionList[] er flyvningene, og flightInfo.stopList[] er mellomlandinger på
+// samme flynummer (f.eks. AY817 HEL-ARN-BGO). Trips eget stoppfilter teller begge.
+export function readTripComJourneyStopCount(journey: Record<string, unknown>): number {
+  const sections = readRecordArray(journey.transSectionList);
+  const intermediateStops = sections.reduce((count, section) => {
+    const flightInfo = isRecord(section.flightInfo) ? section.flightInfo : undefined;
+    return count + readRecordArray(flightInfo?.stopList).length;
+  }, 0);
+  return Math.max(0, sections.length - 1) + intermediateStops;
+}
+
+export function buildSkyscannerFareAttributesParam(flightMeta: FlightSearchMeta): string | undefined {
+  const attributes = [
+    flightMeta.includeCabinBag === true ? "cabin-bag" : undefined,
+    flightMeta.includeCheckedBag === true ? "checked-bag" : undefined,
+  ].filter((attribute): attribute is string => attribute !== undefined);
+  return attributes.length > 0 ? attributes.join(",") : undefined;
+}
+
+export function readSkyscannerFareAttributesParam(value: string | null): Pick<FlightSearchMeta, "includeCabinBag" | "includeCheckedBag"> {
+  const attributes = (value ?? "").toLowerCase().split(",");
+  return {
+    ...(attributes.includes("cabin-bag") ? { includeCabinBag: true } : {}),
+    ...(attributes.includes("checked-bag") ? { includeCheckedBag: true } : {}),
+  };
+}
+
+// Uten options.fareAttributes er fareAttributes tom i web-unified-search (verifisert 2026-11-02).
+export function buildSkyscannerSearchOptions(flightMeta: FlightSearchMeta): Record<string, unknown> | undefined {
+  const selectedFareAttributes = [
+    flightMeta.includeCabinBag === true ? "CABIN_BAG" : undefined,
+    flightMeta.includeCheckedBag === true ? "CHECKED_BAG" : undefined,
+  ].filter((attribute): attribute is string => attribute !== undefined);
+  return selectedFareAttributes.length > 0 ? { fareAttributes: { selectedFareAttributes } } : undefined;
+}
+
+// assessment "INCLUDED" = bagasjen er med i prisen, også når fee.amount viser at den er et gebyr
+// (samme regel som momondo). FEE, UNAVAILABLE og UNKNOWN betyr at prisen ikke dekker bagasjen.
+export function isSkyscannerPricingOptionMatchingBaggage(pricingOption: Record<string, unknown>, flightMeta: FlightSearchMeta): boolean {
+  if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+  const fareAttributes = isRecord(pricingOption.fareAttributes) ? pricingOption.fareAttributes : undefined;
+  const isIncluded = (baggage: unknown): boolean => isRecord(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
+  if (flightMeta.includeCabinBag === true && !isIncluded(fareAttributes?.cabinBaggage)) return false;
+  if (flightMeta.includeCheckedBag === true && !isIncluded(fareAttributes?.checkedBaggage)) return false;
+  return true;
+}
+
 export function readPanFlightsPackageRecord(item: Record<string, unknown>): Record<string, unknown> | undefined {
   return isRecord(item.package) ? item.package : undefined;
 }
