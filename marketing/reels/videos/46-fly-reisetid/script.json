@@ -1,0 +1,28 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook", "line": "Billigste fly til Bali? *{34 timer|Trettifire timer}* og tre stopp.", "gap": 0.25 },
+    { "id": "store", "line": "Jeg setter maks tjuefire timer reisetid på {FINN.|Finn.}", "gap": 0.2 },
+    { "id": "popup", "line": "Cashback Norge bruker samme grense hos alle kildene.", "gap": 0.2 },
+    { "id": "best", "line": "Billigste innen grensen: *{9 360 kr|ni tusen tre hundre og seksti kroner}* med Qatar.", "gap": 0.2 },
+    { "id": "info", "line": "Trykk på info: nitten timer, ett stopp.", "gap": 0.2 },
+    { "id": "sum", "line": "Nesten *{22 timer|tjueto timer}* kortere, for *{1 669 kr|seksten hundre og sekstini kroner}* mer.", "gap": 0.2 },
+    { "id": "terms", "line": "Og bagasjen er med. Sjekk før du bestiller.", "gap": 0.25 },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ],
+  "verifiedAt": "2026-11-02",
+  "comparison": {
+    "route": "Oslo (OSL, metroområde) – Bali (DPS), tur/retur 14.01.–28.01.2027, 1 voksen, økonomi, FINN-søk sortert på pris",
+    "cheapestWithoutLimit": { "nok": 7691, "agency": "Kiwi.com via FINN", "durations": "34 t 5 min / 25 t 40 min", "stops": "3 / 3", "carriers": "KLM+Scoot / Scoot+Wizz Air+Norwegian", "baggage": "håndbagasje og innsjekket ikke inkludert" },
+    "cheapestWithin24h": { "nok": 9360, "agency": "Sembo via FINN", "durations": "19 t 15 min / 18 t 45 min", "stops": "1 / 1", "carriers": "Qatar Airways", "baggage": "håndbagasje og innsjekket inkludert", "filter": "durationTo=1440" },
+    "extraNok": 1669,
+    "shorterTravel": "21 t 45 min kortere totalt (14 t 50 min ut, 6 t 55 min hjem)",
+    "basis": "FINNs billigste reise med og uten maks 24 timer per vei. Priser for 1 voksen. Ikke påstand om laveste pris i hele markedet."
+  },
+  "sources": [
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2027-01-14&requestedReturnDate=2027-01-28&requestedDestination=DPS.METROPOLITAN_AREA&requestedOrigin=OSL.METROPOLITAN_AREA&tripType=roundtrip",
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2027-01-14&requestedReturnDate=2027-01-28&requestedDestination=DPS.METROPOLITAN_AREA&requestedOrigin=OSL.METROPOLITAN_AREA&tripType=roundtrip&durationTo=1440"
+  ]
+}

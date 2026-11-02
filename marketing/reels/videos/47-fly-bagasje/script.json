@@ -1,0 +1,33 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook", "line": "Skal du ha bagasje? Samme tur: *{945 kr|ni hundre og førtifem}* eller *{2 160 kr|to tusen hundre og seksti kroner}*.", "gap": 0.25 },
+    { "id": "store", "line": "Jeg søker Oslo – Bergen tur retur, med håndbagasje og innsjekket koffert.", "gap": 0.2 },
+    { "id": "popup", "line": "Cashback Norge regner bagasjen inn i prisen hos alle kildene.", "gap": 0.2 },
+    { "id": "best", "line": "Billigste med bagasje: *{945 kr|ni hundre og førtifem kroner}*, direkte med {SAS|sas}.", "gap": 0.2 },
+    { "id": "info", "line": "Trykk på info: bagasjen er inkludert.", "gap": 0.2 },
+    { "id": "sum", "line": "*{1 215 kr|Tusen to hundre og femten kroner}* mellom billigste og dyreste.", "gap": 0.2 },
+    { "id": "terms", "line": "Kilder som ikke oppgir bagasje, blir merket.", "gap": 0.25 },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ],
+  "verifiedAt": "2026-11-02",
+  "comparison": {
+    "route": "Oslo (OSL) – Bergen (BGO), tur/retur 05.12.–12.12.2026, 1 voksen, økonomi, 1 håndbagasje + 1 innsjekket bagasje, FINNs standard maks 2 stopp",
+    "finnNok": 945,
+    "finnItinerary": "Sembo via FINN, SAS direkte begge veier, håndbagasje og innsjekket inkludert (FINN-søk med handLuggage=true&checkedLuggage=true)",
+    "tripNok": 1843,
+    "tripBasis": "Trip.com-pris med FREE_CARRY_ON_BAGGAGE og FREE_CHECKED_BAGGAGE, omregnet fra USD (vist som ~)",
+    "panflightsNok": 2160,
+    "panflightsBasis": "PanFlights/Kiwi-pris pluss PanFlights' oppgitte bagasjeavgift for håndbagasje og én innsjekket",
+    "differenceNok": 1215,
+    "skyscanner": "886 kr vist som «ekskl. bagasje» og sortert sist fordi Skyscanner ikke oppgir bagasjeavgift",
+    "basis": "Totalpriser for 1 voksen med valgt bagasje. Ikke nødvendigvis samme fly; ikke påstand om laveste pris i hele markedet."
+  },
+  "sources": [
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2026-12-05&requestedReturnDate=2026-12-12&requestedDestination=BGO.AIRPORT&requestedOrigin=OSL.AIRPORT&tripType=roundtrip&handLuggage=true&checkedLuggage=true",
+    "https://us.trip.com/flights/showfarefirst?dcity=osl&acity=bgo&ddate=2026-12-05&rdate=2026-12-12&triptype=rt&class=y&quantity=1",
+    "https://panflights.no/nb/roundtrip/?v2=OSL_BGO_20261205_20261212"
+  ]
+}

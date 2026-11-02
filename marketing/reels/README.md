@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-44 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 og video 40–44 31. okt. 2026.
+48 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 og video 45–48 2. nov. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -48,6 +48,10 @@
 | `out/42-duolingo-regionpriser.mp4` | Super Duolingo 1 år: Norge 1 039 kr, Tyrkia ≈ 179 kr, via info-tooltipen i panelet. AppStorePrice oppgir også TRY 34,99/mnd, men den finnes ikke i Apples offentlige liste og er ikke brukt | «Super Duolingo 🦉 1 039 kr eller 179 kr?» |
 | `out/43-claude-regionpriser.mp4` | Claude Pro i App Store: Norge 249 kr/mnd mot Pakistan ≈ 163 kr/mnd, vist på ekte claude.ai med den oppdaterte info-knappen. Begge lokale priser bekreftet hos Apple | «Claude Pro 🤖 249 kr eller 163 kr?» |
 | `out/44-pokepris.mp4` | Samme forseglede japanske Mega Dream ex-boks: Wasteland 1 699 kr mot MaxGaming 1 249 kr via Pokepris. Tooltip viser butikkene på lager; 450 kr gjelder varepris, frakt er ukjent | «Samme Pokémon-boks 📦 450 kr forskjell?» |
+| `out/45-fly-datovindu.mp4` | Datovindu fra PanFlights (±3 dager): Oslo–Gran Canaria i jula, FINN sjekker alle 49 datopar. 19.12–2.1: 6 048 kr, 16.–30.12: 2 842 kr (1 stopp hver vei, uten bagasje) | «Juletur til Gran Canaria? 🌴 3 206 kr billigere» |
+| `out/46-fly-reisetid.mp4` | Maks reisetid: Oslo–Bali billigste 7 691 kr (34 t / 26 t, 3 stopp, uten bagasje) mot 9 360 kr med maks 24 t per vei (Qatar, 1 stopp, bagasje inkludert) | «Billigste fly til Bali? 34 timer 😵» |
+| `out/47-fly-bagasje.mp4` | Bagasje regnet inn: Oslo–Bergen tur/retur med hånd- og innsjekket bagasje. FINN 945 kr, Trip ~1 843 kr, PanFlights 2 160 kr; Skyscanner merket «ekskl. bagasje» | «Skal du ha bagasje? 🧳 945 kr eller 2 160 kr?» |
+| `out/48-fly-barn.mp4` | Familie: Oslo–Alicante i påsken, 2 voksne + 2 barn, kun direktefly. FINN 12 376 kr, Skyscanner 12 411 kr, PanFlights 12 447 kr, Trip ~13 831 kr | «Påsketur med barna? 🐣 1 455 kr forskjell» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -96,6 +100,8 @@ node render.mjs <navn>                         # full mp4 til out/
   - `yt-capture.mjs <url> <navn>` er games-capture for youtube.com med samtykke-cookie. `PRESET='{"cashback-varsler-region-prices-collapsed":true}'` lukker regionlisten, `TAPINFO=1` åpner første tooltip og `SCROLL=text:<tekst>` scroller til teksten.
   - `appstore-capture.mjs <url> <out.png> "<tekst>"` åpner «Kjøp i app» på apps.apple.com og scroller til teksten.
   - `feature-capture.mjs <url> <video-name> <region|pokepris>` fanger dagens bygde userscript på en ekte side, avslår valgfrie samtykker og nyhetsbrev, åpner riktig info-tooltip og lagrer skjermbilder, kilde, tidspunkt, forespørselsstatus og DOM-koordinater i `videos/<video-name>/assets/`. `capture.js` driver zoom og markeringer i `shared/feature-reel.js` for video 43–44. Claude-videoen bruker i tillegg `appstore-capture.mjs` for `assets/apple-no.png` og dokumentasjonen `assets/apple-pk.png`.
+  - `flight-capture.mjs <url> <video-name> <prefix> [kilde] [maks-ventetid-ms]` fanger dagens bygde userscript på et ekte flysøk (FINN, PanFlights m.fl.) på iPhone. Bruker GM-shimmen fra `overlay-flights.mjs`, venter til ingen rader oppdateres (datovinduet tar et par minutter), og lagrer `<prefix>-before/after/panel/tip.png`, DOM-bokser og alle proxyede forespørsler i `assets/capture.json` og `window.CAPTURES[prefix]`. `SCROLLY=230` scroller forbi FINNs fanerad, der «Billigst» ignorerer stopp- og bagasjefilteret og ellers ville motsagt panelet. Video 45–48 deler scenen i `shared/flight-reel.js`. momondo gir 403 til den automatiserte nettleseren, så momondo mangler i disse opptakene.
+  - Flyvideoene sier «samme strekning og dato», aldri «samme fly», og viser stopp, reisetid og bagasje. FINN-radene er sortert på pris (`priceAmount_asc`), som FINNs egen «Billigst»-fane.
   - Bursdagsvideoene bruker bare tilbud som er bekreftet hos gratisbursdag.no, viser kilden og kaller dem ikke cashback. cubus.com, lindex.com og komplett.no blokkerer automatisert nettleser.
   - sas.no gir blank side i automatisert nettleser, så flyvideoen (08) er tatt opp på momondo.no.
 - Kontroller stemmen med `.venv/bin/python stt.py build/<navn>/voice.wav` (Whisper-transkripsjon).

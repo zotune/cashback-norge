@@ -1,0 +1,61 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Påsketur til Alicante med barna? *{1 455 kr|Tusen fire hundre og femtifem kroner}* forskjell på direktefly.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "To voksne og to barn, bare direktefly, tur retur fra Oslo.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge sammenligner totalprisen for hele familien.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{12 376 kr|tolv tusen tre hundre og syttiseks kroner}* for alle fire, via {FINN.|Finn.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Trykk på info for flytider.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{1 455 kr|Tusen fire hundre og femtifem kroner}* mellom billigste og dyreste.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Bagasje kommer i tillegg. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "comparison": {
+    "route": "Oslo (OSL) – Alicante (ALC), tur/retur 24.03.–31.03.2027, 2 voksne + 2 barn (2–11 år), økonomi, kun direkte (FINN maximumNumberOfStops=0)",
+    "finnNok": 12376,
+    "finnItinerary": "Sembo via FINN: Norwegian direkte begge veier (3 t 55 min / 3 t 40 min), uten bagasje",
+    "skyscannerNok": 12411,
+    "panflightsNok": 12447,
+    "tripNok": 13831,
+    "tripBasis": "Trip.com totalPrice for alle reisende, omregnet fra USD (vist som ~)",
+    "differenceNok": 1455,
+    "basis": "Totalpris for hele familien hos hver kilde, kun direktefly, uten bagasje. Ikke nødvendigvis samme avgang; ikke påstand om laveste pris i hele markedet."
+  },
+  "sources": [
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=2&children=2&cabinType=economy&requestedDepartureDate=2027-03-24&requestedReturnDate=2027-03-31&requestedDestination=ALC.AIRPORT&requestedOrigin=OSL.AIRPORT&tripType=roundtrip&maximumNumberOfStops=0"
+  ]
+}

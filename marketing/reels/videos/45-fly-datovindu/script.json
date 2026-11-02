@@ -1,0 +1,61 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Juletur til Gran Canaria? *{3 206 kr|Tre tusen to hundre og seks kroner}* billigere.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Jeg søker nittende desember til andre januar, pluss minus tre dager.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge sjekker alle datoene på {FINN|Finn} og flere sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{2 842 kr|to tusen åtte hundre og førtito kroner}*, sekstende til trettiende desember.",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Trykk på info for alle førtini datoparene.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{3 206 kr|Tre tusen to hundre og seks kroner}* mindre enn på dine datoer.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Ett stopp hver vei. Sjekk tider og bagasje.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-02",
+  "comparison": {
+    "route": "Oslo (OSL, metroområde) – Gran Canaria (LPA), tur/retur, 1 voksen, økonomi, maks 1 stopp (PanFlights' stoppfilter)",
+    "searchedDates": "19.12.2026–02.01.2027, ±3 dager ut og hjem (PanFlights ff:3,3 tf:3,3)",
+    "selectedDatesFinnNok": 6048,
+    "cheapestFinnNok": 2842,
+    "cheapestDates": "16.12.2026–30.12.2026",
+    "cheapestItinerary": "Travelis via FINN, 1 stopp hver vei, 16 t 5 min ut og 13 t 35 min hjem",
+    "differenceNok": 3206,
+    "basis": "FINN-søk sortert på pris (priceAmount_asc) for alle 49 datokombinasjoner. Totalpris for 1 voksen uten innsjekket bagasje. Ikke samme fly; ikke påstand om laveste pris i hele markedet."
+  },
+  "sources": [
+    "https://panflights.no/nb/roundtrip/?v2=OSL_LPA_20261219_20270102_ff:3,3_tf:3,3",
+    "https://www.finn.no/reise/flybilletter/resultat/?adults=1&cabinType=economy&requestedDepartureDate=2026-12-16&requestedReturnDate=2026-12-30&requestedDestination=LPA.AIRPORT&requestedOrigin=OSL.METROPOLITAN_AREA&tripType=roundtrip&maximumNumberOfStops=1"
+  ]
+}
