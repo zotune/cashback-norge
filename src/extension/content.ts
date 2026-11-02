@@ -824,12 +824,9 @@ function startContentScript(): void {
       return;
     }
 
-    if (isCashbackFoundMessage(message)) {
-      requestCurrentOffers();
-      return;
-    }
-    if (isCashbackNoneMessage(message)) {
-      requestCurrentOffers();
+    if (isCashbackFoundMessage(message) || isCashbackNoneMessage(message)) {
+      // Bakgrunnen melder fra ved hver URL-endring, også når siden bare bytter sortering.
+      if (!rerenderIfOnlyFlightSortChanged()) requestCurrentOffers();
       return;
     }
     if (isRecord(message) && message.type === "toggle-notice") {
@@ -880,6 +877,7 @@ function renderNoticeWithStoredState(
   });
 }
 function requestCurrentOffers(): void {
+  lastOffersRequestUrl = window.location.href;
   if (isNoticeBlockedHost(CURRENT_HOST)) {
     clearNotice();
     return;
@@ -930,6 +928,12 @@ function installDynamicProductPageRefresh(): void {
           : productMeta === undefined
             ? ""
             : [productMeta.searchTerm, productMeta.productLanguage, productMeta.price, productMeta.currency, productMeta.packageAmount, productMeta.packageUnit, productMeta.volumeMl, productMeta.alcoholPercent, productMeta.codes?.join(",")].join("|");
+      // Bytter siden bare sortering, viser panelet radene det allerede har.
+      if (flightMeta !== undefined && lastFlightSortRender !== undefined && lastFlightSortRender.mode !== readActiveFlightSortMode()) {
+        latestMetaKey = metaKey;
+        lastFlightSortRender.rerender();
+        return;
+      }
       if (metaKey.length > 0 && metaKey !== latestMetaKey) {
         latestMetaKey = metaKey;
         requestCurrentOffers();
@@ -939,8 +943,9 @@ function installDynamicProductPageRefresh(): void {
 
   const scheduleLocationRefresh = (): void => {
     if (window.location.href !== latestUrl) {
+      const onlySortChanged = removeFlightSortParams(window.location.href) === removeFlightSortParams(latestUrl);
       latestUrl = window.location.href;
-      latestMetaKey = "";
+      if (!onlySortChanged) latestMetaKey = "";
     }
     scheduleRefresh();
   };
@@ -1181,6 +1186,26 @@ function applyTripComMaxDuration(maxDurationMinutes: number): boolean {
   return true;
 }
 
+let lastFlightSortRender: { mode: FlightSortMode; rerender: () => void } | undefined;
+let lastOffersRequestUrl: string | undefined;
+
+function rerenderIfOnlyFlightSortChanged(): boolean {
+  const currentUrl = window.location.href;
+  // Samme URL betyr nye cashback-data fra bakgrunnen, og de må fortsatt hentes.
+  if (lastFlightSortRender === undefined || lastOffersRequestUrl === undefined || currentUrl === lastOffersRequestUrl) return false;
+  if (removeFlightSortParams(currentUrl) !== removeFlightSortParams(lastOffersRequestUrl)) return false;
+  lastOffersRequestUrl = currentUrl;
+  if (lastFlightSortRender.mode !== readActiveFlightSortMode()) lastFlightSortRender.rerender();
+  return true;
+}
+
+function removeFlightSortParams(url: string): string {
+  const parsedUrl = parseUrl(url);
+  if (parsedUrl === undefined) return url;
+  for (const key of ["sortCriteria", "sort", "order", FLIGHT_LINK_SORT_PARAM]) parsedUrl.searchParams.delete(key);
+  return parsedUrl.toString();
+}
+
 // Skyscanner og Trip.com har ikke sorteringen i URL-en: lenken bærer den, og utvidelsen velger fanen.
 function installFlightLinkSort(): void {
   const parsedUrl = parseUrl(window.location.href);
@@ -1189,7 +1214,6 @@ function installFlightLinkSort(): void {
   if (parsedUrl === undefined || mode === undefined) return;
   const isTrip = parsedUrl.hostname.endsWith("trip.com");
   if (!isTrip && !isSkyscannerFlightSearchPage(parsedUrl)) return;
-  flightSortModeOverride = mode;
 
   let attempts = 0;
   const timerId = window.setInterval(() => {
@@ -1237,14 +1261,14 @@ function applyTripComLinkSort(mode: "cheapest" | "fastest"): boolean {
   return true;
 }
 
-let flightSortModeOverride: FlightSortMode | undefined;
-
-// Panelet starter på samme sortering som siden; et valg i panelet gjelder til siden lastes på nytt.
+// Panelet følger sorteringen siden står på. Sider uten kjent sortering regnes som «Best».
 function readActiveFlightSortMode(): FlightSortMode {
-  if (flightSortModeOverride !== undefined) return flightSortModeOverride;
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined) return "best";
+  const linkMode = parsedUrl.searchParams.get(FLIGHT_LINK_SORT_PARAM);
+  if (linkMode === "cheapest" || linkMode === "fastest") return linkMode;
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  // FINN, momondo og PanFlights har sorteringen i URL-en; PanFlights fjerner order ved «Beste».
   const urlMode = hostname === "finn.no"
     ? readFlightSortUrlValue("finn", parsedUrl.searchParams.get("sortCriteria"))
     : hostname === "momondo.no"
@@ -1257,27 +1281,12 @@ function readActiveFlightSortMode(): FlightSortMode {
     return readFlightSortLabel(document.body?.innerText.match(/sortert etter[^\n]{0,24}/i)?.[0]) ?? "best";
   }
   if (hostname.endsWith("trip.com")) {
-    return readFlightSortLabel(document.querySelector<HTMLElement>(".sort-type.is-selected")?.innerText) ?? "best";
+    // Recommended og Cheapest er faner; Fastest ligger i «Sort by» og vises i new-m-sort-selected.
+    return readFlightSortLabel(
+      document.querySelector<HTMLElement>(".sort-type.is-selected, .new-m-sort-selected.is-selected")?.innerText,
+    ) ?? "best";
   }
   return "best";
-}
-
-function buildFlightSortControl(activeMode: FlightSortMode, onSelect: (mode: FlightSortMode) => void): HTMLSpanElement {
-  const control = document.createElement("span");
-  control.className = "flight-sort-control";
-  control.setAttribute("role", "group");
-  control.setAttribute("aria-label", "Sorter prismatch");
-  const labels: Array<[FlightSortMode, string]> = [["best", "Best"], ["cheapest", "Billigst"], ["fastest", "Raskest"]];
-  for (const [mode, label] of labels) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "cbn-button cbn-button--filter flight-sort-button";
-    button.textContent = label;
-    button.setAttribute("aria-pressed", String(mode === activeMode));
-    button.addEventListener("click", () => onSelect(mode));
-    control.append(button);
-  }
-  return control;
 }
 
 function isPanFlightsSearchPage(parsedUrl: URL): boolean {
@@ -3388,6 +3397,8 @@ async function readCurrentPanFlightsPageOfferCandidates(
   flightMeta: FlightSearchMeta,
   resultUrl: string,
 ): Promise<PanFlightsOfferCandidate[]> {
+  // Radene står i sidens sortering, mens tilbudet bygges fra PanFlights' «Beste».
+  if (readActiveFlightSortMode() !== "best") return [];
   const stateCandidates = await readCurrentPanFlightsPageStateOfferCandidates(flightMeta, resultUrl);
   return stateCandidates.length > 0
     ? stateCandidates
@@ -9025,7 +9036,9 @@ const FLIGHT_CHECKED_BAG_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"
 
 // Søket som prisene gjelder (reisende, klasse, bagasje, stopp) som små chips ved
 // «Prismatch», med én felles hover-tooltip.
-function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: ShadowRoot): HTMLSpanElement {
+const FLIGHT_SORT_CHIP_TEXT: Record<FlightSortMode, string> = { best: "Beste", cheapest: "Billigst", fastest: "Raskest" };
+
+function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: ShadowRoot, sortMode?: FlightSortMode): HTMLSpanElement {
   const passengerCount = flightMeta.adults + flightMeta.youths + flightMeta.children + flightMeta.infants;
   const cabinClassText = formatFlightCabinClassText(flightMeta) ?? "Økonomi";
   const chips: Array<{ iconSvg?: string; text: string; tip: string }> = [
@@ -9054,6 +9067,9 @@ function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: Shadow
         text: `≤${formatFlightDurationHours(flightMeta.maxDurationMinutes).replace(" t", "t").replace(" min", "m")}`,
         tip: formatFlightDurationFilterText(flightMeta) ?? "",
       }]
+      : []),
+    ...(sortMode !== undefined
+      ? [{ text: FLIGHT_SORT_CHIP_TEXT[sortMode], tip: `sortert som på siden: ${FLIGHT_SORT_CHIP_TEXT[sortMode].toLowerCase()}` }]
       : []),
   ];
   const container = document.createElement("span");
@@ -10582,8 +10598,17 @@ function renderNotice(
   regionPrices?: PlayStationRegionPriceResult,
 ): void {
   clearNotice();
-  const flightSortMode = readActiveFlightSortMode();
-  const priceMatches = applyFlightSortMode(unsortedPriceMatches, flightSortMode);
+  // Chipen avhenger av søket, ikke av hvilke kilder som har svart, så den forsvinner ikke underveis.
+  // Rader fra datovinduet har ingen varianter og beholder billigste kombinasjon.
+  const noticeUrl = parseUrl(window.location.href);
+  const flightSortMode = noticeUrl !== undefined && extractFlightSearchMeta(noticeUrl) !== undefined &&
+    unsortedPriceMatches.some((priceMatch) => priceMatch.travelKind !== "hotel")
+    ? readActiveFlightSortMode()
+    : undefined;
+  const priceMatches = flightSortMode !== undefined ? applyFlightSortMode(unsortedPriceMatches, flightSortMode) : unsortedPriceMatches;
+  lastFlightSortRender = flightSortMode !== undefined
+    ? { mode: flightSortMode, rerender: () => renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices) }
+    : undefined;
   const host = document.createElement("div");
   host.id = HOST_ID;
   applyHostOverlayStyle(host);
@@ -11443,27 +11468,18 @@ function renderNotice(
     }
     /* Etiketten krymper ikke; chipene brytes til egen linje på smale skjermer. */
     .price-match-header .price-match-toggle {
-      flex: 1 0 auto;
+      flex: 1 0 100%;
       margin-bottom: 0;
       width: auto;
     }
-    .flight-sort-control {
-      display: inline-flex;
-      flex-basis: 100%;
-      gap: 2px;
-    }
-    .flight-sort-button {
-      flex: 1 1 0;
-      font-size: 11px;
-      min-height: 22px;
-      padding: 2px 6px;
-    }
+    /* Chipene har egen linje under «Prismatch», så radene får full bredde. */
     .flight-filter-chips {
       display: inline-flex;
+      flex-basis: 100%;
       flex-shrink: 0;
       flex-wrap: wrap;
       gap: 4px;
-      justify-content: flex-end;
+      justify-content: flex-start;
     }
     .flight-filter-chips .flight-filter-chip {
       align-items: center;
@@ -12791,19 +12807,8 @@ function renderNotice(
     const flightMeta = currentUrl !== undefined && priceMatches.some((priceMatch) => priceMatch.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch))
       ? extractFlightSearchMeta(currentUrl)
       : undefined;
-    const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta, shadowRoot) : undefined;
+    const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta, shadowRoot, flightSortMode) : undefined;
     if (flightFilterChips !== undefined) priceMatchHeader.append(flightFilterChips);
-    // Datovinduet viser allerede billigste kombinasjon og har ikke egne sorteringer.
-    if (
-      unsortedPriceMatches.some((priceMatch) => priceMatch.flightSortVariants !== undefined) &&
-      !unsortedPriceMatches.some((priceMatch) => priceMatch.dateFlex !== undefined)
-    ) {
-      priceMatchHeader.append(buildFlightSortControl(flightSortMode, (mode) => {
-        flightSortModeOverride = mode;
-        renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices);
-      }));
-    }
-
     priceMatchSection.append(
       priceMatchHeader,
       ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0)),
