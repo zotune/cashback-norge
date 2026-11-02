@@ -86,6 +86,8 @@ import {
   KIWI_PRICE_PROBE_PARAM,
   type KiwiSortPrice,
   type KiwiSortPrices,
+  readKiwiCardDate,
+  readKiwiCardLeg,
   readKiwiSortTabText,
   buildPanFlightsFlightSearchUrl,
   buildGoogleFlightsSearchUrl,
@@ -1357,6 +1359,10 @@ function readActiveFlightSortMode(): FlightSortMode {
           ? readFlightSortUrlValue("kiwi", parsedUrl.searchParams.get("sortBy"))
           : undefined;
   if (urlMode !== undefined) return urlMode;
+  if (isGoogleFlightsSearchPage(parsedUrl)) {
+    if (document.querySelector('[aria-label^="Sortert etter flytid"]') !== null) return "fastest";
+    return /^Billigst/.test(document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.innerText.trim() ?? "") ? "cheapest" : "best";
+  }
   if (isSkyscannerFlightSearchPage(parsedUrl)) {
     return readFlightSortLabel(document.body?.innerText.match(/sortert etter[^\n]{0,24}/i)?.[0]) ?? "best";
   }
@@ -1668,14 +1674,14 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
     // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
     ...(isGoogleFlightsSearchPage(parsedUrl)
       ? []
-      : [buildFlightPriceMatchOffer({
+      : [withFlightSortLinks(buildFlightPriceMatchOffer({
         source: "googleflights",
         sourceName: "Google",
         productUrl: buildGoogleFlightsSearchUrl(flightMeta),
         routeTitle,
         cardSearchDetails,
         fullSearchDetails,
-      })]),
+      }), (mode) => buildGoogleFlightsSearchUrl(flightMeta, mode))]),
   ];
 
   const liveOfferFinders: FlightLiveOfferFinder[] = [
@@ -1867,8 +1873,10 @@ function buildFlightDateFlexOffer(input: {
     sourceName: input.sourceName,
     details: input.searchDetails,
     matchedExactProduct: isSelectedDates(best),
-    // Datoene vises sammen med butikken på raden; reisetid står per dato i tooltipen.
+    // Datoene vises sammen med butikken på raden, og reisetiden som på vanlige søk.
     shopName: best.shopName,
+    ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     price: best.price,
     amount: best.amount,
     sortAmount: best.sortAmount ?? best.amount,
@@ -2863,13 +2871,18 @@ function buildKiwiFlightPriceMatchOffer(
     cardSearchDetails,
     fullSearchDetails,
   });
+  return withFlightSortLinks(offer, (mode) => buildKiwiFlightSearchUrl(flightMeta, mode));
+}
+
+// Rader uten pris: bare lenken følger valgt sortering.
+function withFlightSortLinks(offer: PriceMatchOffer, buildUrl: (mode: FlightSortMode) => string): PriceMatchOffer {
   const buildVariant = (mode: FlightSortMode): FlightSortVariant => ({
     shopName: offer.shopName,
     price: offer.price,
     amount: offer.amount,
     sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
     currency: offer.currency,
-    productUrl: buildKiwiFlightSearchUrl(flightMeta, mode),
+    productUrl: buildUrl(mode),
   });
   return { ...offer, flightSortVariants: { cheapest: buildVariant("cheapest"), fastest: buildVariant("fastest") } };
 }
@@ -3638,6 +3651,8 @@ async function findPanFlightsFlexibleDatesOffer(
       sortAmount: candidate.sortAmount ?? candidate.amount,
       currency: candidate.currency,
       ...(candidate.platform !== undefined ? { platform: candidate.platform } : {}),
+      ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+      ...(candidate.durationMinutes !== undefined ? { durationMinutes: candidate.durationMinutes } : {}),
       productUrl: buildPanFlightsFlightSearchUrl({
         ...flightMeta,
         outboundDate: candidate.outboundDate,
@@ -4567,8 +4582,9 @@ async function fetchKiwiPlaces(term: string, placeType: "AIRPORT" | "CITY"): Pro
 }
 
 async function findKiwiPlaceSlug(code: string): Promise<string | undefined> {
-  const airport = (await fetchKiwiPlaces(code, "AIRPORT")).find((place) => place.code === code);
-  return airport?.slug ?? (await fetchKiwiPlaces(code, "CITY")).find((place) => place.code === code)?.slug;
+  // Byen først: FINN og de andre kildene søker hele området, og SHA alene ville bare vært Hongqiao.
+  const city = (await fetchKiwiPlaces(code, "CITY")).find((place) => place.code === code);
+  return city?.slug ?? (await fetchKiwiPlaces(code, "AIRPORT")).find((place) => place.code === code)?.slug;
 }
 
 // Lenker fra panelet har IATA-koder i stien, som Kiwi selv ikke forstår.
@@ -4643,6 +4659,8 @@ function installKiwiPriceProbe(): boolean {
     window.clearInterval(timerId);
     // Andre valutaer og tomme svar gir ingen pris; raden beholder da «?».
     const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
+    const sectors = document.querySelector('[data-test="ResultCardWrapper"]')?.querySelectorAll<HTMLElement>('[data-test="ResultCardSectorWrapper"]');
+    if (sectors !== undefined && sectors.length > 0) prices.topCardSectors = [...sectors].map((sector) => sector.innerText);
     void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...(isNok && key !== "{}" ? { prices } : {}) });
   }, KIWI_PROBE_POLL_MS);
   return true;
@@ -4654,15 +4672,20 @@ async function findKiwiFlightPriceMatchOffer(
   cardSearchDetails: string,
   fullSearchDetails: string,
 ): Promise<PriceMatchOffer | undefined> {
+  const { dateFlex } = flightMeta;
   const response = await sendRuntimeMessage<KiwiFlightPricesResponse>({
     type: "get-kiwi-flight-prices",
-    url: buildKiwiFlightSearchUrl(flightMeta),
+    // Med datovindu sorteres på pris, så det øverste kortet viser datoene for den billigste reisen.
+    url: buildKiwiFlightSearchUrl(flightMeta, dateFlex !== undefined ? "cheapest" : "best"),
   });
   const prices = response?.prices;
   const bestPrice = prices?.best ?? prices?.cheapest;
   if (bestPrice === undefined) return undefined;
+  // Det øverste kortet tilhører sorteringen søket ble åpnet med, og gir tid og stopp per etappe.
+  const topCardMode: FlightSortMode = dateFlex !== undefined ? "cheapest" : "best";
+  const topCardText = formatFlightLegDurationsWithStopsText((prices?.topCardSectors ?? []).map((sector) => readKiwiCardLeg(sector)));
   const buildVariant = (price: KiwiSortPrice, mode: FlightSortMode): FlightSortVariant => {
-    const durationText = formatFlightLegDurationsText([price.durationMinutes]);
+    const durationText = (mode === topCardMode ? topCardText : undefined) ?? formatFlightLegDurationsText([price.durationMinutes]);
     return {
       shopName: "Kiwi.com",
       price: formatNokFlightPrice(price.amount),
@@ -4674,6 +4697,30 @@ async function findKiwiFlightPriceMatchOffer(
       durationMinutes: price.durationMinutes,
     };
   };
+  if (dateFlex !== undefined) {
+    // Som de andre kildene med datovindu: billigste reise i vinduet, uansett valgt sortering.
+    const cheapest = buildVariant(prices?.cheapest ?? bestPrice, "cheapest");
+    const outboundDate = readKiwiCardDate(prices?.topCardSectors?.[0], flightMeta.outboundDate);
+    const inboundDate = flightMeta.inboundDate !== undefined ? readKiwiCardDate(prices?.topCardSectors?.[1], flightMeta.inboundDate) : undefined;
+    if (outboundDate === undefined || (flightMeta.inboundDate !== undefined && inboundDate === undefined)) {
+      const { flightSortVariants: _flightSortVariants, ...staticOffer } = buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails);
+      return { ...staticOffer, ...cheapest, productName: `${routeTitle} · ${formatFlightDateFlexDays(dateFlex, flightMeta.inboundDate !== undefined)}` };
+    }
+    const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
+    const dates = { outboundDate, ...(inboundDate !== undefined ? { inboundDate } : {}) };
+    const totalCombinationCount = listFlightDateFlexCombinations(flightMeta, dateFlex).length;
+    return buildFlightDateFlexOffer({
+      source: "kiwi",
+      sourceName: "KIWI",
+      flightMeta,
+      dateFlex,
+      routeTitle,
+      searchDetails: fullSearchDetails,
+      options: [{ ...cheapest, ...dates, productUrl: buildKiwiFlightSearchUrl({ ...exactFlightMeta, ...dates }) }],
+      checkedCombinationCount: totalCombinationCount,
+      totalCombinationCount,
+    });
+  }
   return {
     ...buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
     ...buildVariant(bestPrice, "best"),
@@ -11639,7 +11686,7 @@ function renderNotice(
     }
     .provider-panflights {
       background: #ffffff;
-      color: #f84a00;
+      color: #0078f8;
     }
     .provider-momondo {
       background: #2e0b59;
@@ -11658,9 +11705,8 @@ function renderNotice(
       color: #1a73e8;
     }
     .provider-kiwi {
-      background: #ffffff;
-      color: #000000;
-      font-weight: 800;
+      background: #00a58e;
+      color: #ffffff;
     }
     .provider-tripcom {
       background: #2563eb;
@@ -12143,6 +12189,36 @@ function renderNotice(
     }
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
+    }
+    .price-match-card--chips .price-match-side {
+      align-items: flex-end;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      grid-column: -2;
+    }
+    .price-match-card--chips .price-match-side--inline {
+      align-items: center;
+      flex-direction: row;
+      gap: 8px;
+    }
+    .price-match-chip-line {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 0;
+    }
+    .price-match-section .price-match-info-chip {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 18px;
+      max-width: 100%;
+      overflow: hidden;
+      padding: 0 5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .price-match-section .price-match-tooltip-row {
       align-items: center;
@@ -14286,6 +14362,37 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "points") return 1;
   return 0;
 }
+function isFlightPanelRow(priceMatch: PriceMatchOffer): boolean {
+  return priceMatch.travelKind !== "hotel" &&
+    (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "kiwi" || priceMatch.source === "googleflights");
+}
+
+// Flyrader: rute, datoer, datovindu, reisetid, stopp og butikk som chiper, med pris og kilde til høyre.
+// Passasjerer og filtre står allerede i chipene over radene.
+function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
+  const [route, dateWindow] = priceMatch.productName.split(" · ");
+  const texts = [
+    route,
+    priceMatch.dateFlex !== undefined
+      ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)
+      : undefined,
+    dateWindow,
+    ...(priceMatch.durationText?.split(" · ") ?? []),
+    priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : undefined,
+    priceMatch.baggageExcluded === true ? "ekskl. bagasje" : undefined,
+  ];
+  const chips = document.createElement("span");
+  chips.className = "price-match-chip-line";
+  for (const text of texts) {
+    if (text === undefined || text.length === 0) continue;
+    const chip = document.createElement("span");
+    chip.className = "cbn-chip cbn-chip--muted price-match-info-chip";
+    chip.textContent = text;
+    chips.append(chip);
+  }
+  return chips;
+}
+
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
   priceMatchCard.className = "cbn-row price-match-card";
@@ -14306,7 +14413,7 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchShop.textContent = [
     priceMatch.dateFlex === undefined
       ? priceMatch.shopName
-      : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
+      : `${formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
     priceMatch.baggageExcluded === true ? "ekskl. bagasje" : undefined,
   ].filter((part): part is string => part !== undefined).join(" · ");
   priceMatchTitle.append(priceMatchProduct, priceMatchShop);
@@ -14329,6 +14436,17 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   const priceMatchBadge = document.createElement("span");
   priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
+
+  if (isFlightPanelRow(priceMatch)) {
+    priceMatchCard.classList.add("price-match-card--chips");
+    const chips = buildFlightPriceMatchChips(priceMatch);
+    const side = document.createElement("span");
+    side.className = "price-match-side";
+    if (priceMatch.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) side.classList.add("price-match-side--inline");
+    side.append(priceMatchPrice, priceMatchBadge);
+    priceMatchCard.append(chips, side);
+    return priceMatchCard;
+  }
 
   const hasDuration = priceMatch.durationText !== undefined && priceMatch.durationText.length > 0;
   if (hasDuration) {

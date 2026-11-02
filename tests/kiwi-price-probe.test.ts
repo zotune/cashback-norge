@@ -35,11 +35,12 @@ Object.assign(globalThis, {
 const { finishKiwiPriceProbe, getKiwiFlightPrices, installKiwiPriceProbeCleanup } = await import("../src/extension/kiwi-price-probe.js");
 const url = (origin: string): string => `https://www.kiwi.com/no/search/results/${origin}/FOR/2026-12-09/no-return?adults=1`;
 const prices = { best: { amount: 5750, durationMinutes: 1635 } };
+const requester = { tabId: 10, windowId: 7 };
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 installKiwiPriceProbeCleanup();
 
 test("a search opens one hidden tab, closes it and reuses the price", async () => {
-  const [first, second] = [getKiwiFlightPrices(url("BGO"), 7), getKiwiFlightPrices(url("BGO"), 7)];
+  const [first, second] = [getKiwiFlightPrices(url("BGO"), requester), getKiwiFlightPrices(url("BGO"), requester)];
   await flush();
   assert.equal(created.length, 1);
   assert.match(created[0]!, /cbvPriceProbe=1/);
@@ -47,29 +48,48 @@ test("a search opens one hidden tab, closes it and reuses the price", async () =
   assert.deepEqual(await first, prices);
   assert.deepEqual(await second, prices);
   assert.deepEqual(removed, [1]);
-  assert.deepEqual(await getKiwiFlightPrices(url("BGO"), 7), prices);
+  assert.deepEqual(await getKiwiFlightPrices(url("BGO"), requester), prices);
   assert.equal(created.length, 1);
 });
 
-test("a newer search closes the older tab", async () => {
-  const older = getKiwiFlightPrices(url("OSL"), 7);
+test("a newer search in the same tab replaces the older one without remembering it as empty", async () => {
+  const older = getKiwiFlightPrices(url("OSL"), requester);
   await flush();
-  const newer = getKiwiFlightPrices(url("TRD"), 7);
+  const newer = getKiwiFlightPrices(url("TRD"), requester);
   await flush();
   assert.equal(await older, undefined);
   assert.deepEqual(removed, [1, 2]);
   finishKiwiPriceProbe(3, prices);
   assert.deepEqual(await newer, prices);
   assert.deepEqual(removed, [1, 2, 3]);
+  const retry = getKiwiFlightPrices(url("OSL"), requester);
+  await flush();
+  assert.equal(created.length, 4);
+  finishKiwiPriceProbe(4, prices);
+  assert.deepEqual(await retry, prices);
+});
+
+test("searches in different tabs do not stop each other, up to a limit", async () => {
+  const pending = ["AES", "ALF", "EVE"].map((origin, index) => getKiwiFlightPrices(url(origin), { tabId: 20 + index }));
+  await flush();
+  const [firstTabId, ...otherTabIds] = created.slice(4).map((_, index) => 5 + index);
+  assert.equal(created.length, 7);
+  assert.equal(removed.includes(firstTabId!), false);
+  assert.equal(await getKiwiFlightPrices(url("HAU"), { tabId: 30 }), undefined);
+  assert.equal(created.length, 7);
+  for (const [index, tabId] of [firstTabId!, ...otherTabIds].entries()) {
+    finishKiwiPriceProbe(tabId, prices);
+    assert.deepEqual(await pending[index], prices);
+  }
 });
 
 test("a closed tab ends the search, and other sites are never opened", async () => {
-  const pending = getKiwiFlightPrices(url("SVG"), 7);
+  const pending = getKiwiFlightPrices(url("SVG"), requester);
   await flush();
-  removedListeners[0]!(4);
+  removedListeners[0]!(nextTabId - 1);
   assert.equal(await pending, undefined);
   const before = created.length;
-  assert.equal(await getKiwiFlightPrices("https://example.com/no/search/results/a/b", 7), undefined);
+  assert.equal(await getKiwiFlightPrices("https://example.com/no/search/results/a/b", requester), undefined);
   assert.equal(created.length, before);
 });
 

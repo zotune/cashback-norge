@@ -116,7 +116,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   if (isGetKiwiFlightPricesMessage(message)) {
-    void getKiwiFlightPrices(message.url, sender.tab?.windowId)
+    void getKiwiFlightPrices(message.url, {
+      ...(sender.tab?.id !== undefined ? { tabId: sender.tab.id } : {}),
+      ...(sender.tab?.windowId !== undefined ? { windowId: sender.tab.windowId } : {}),
+    })
       .catch(() => undefined)
       .then((prices) => {
         const response: KiwiFlightPricesResponse = { ok: true, ...(prices !== undefined ? { prices } : {}) };

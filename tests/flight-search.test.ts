@@ -6,6 +6,7 @@ import {
   buildFlightLinkFiltersValue,
   buildFlightSortUrlValue,
   buildKiwiFlightSearchUrl,
+  buildGoogleFlightsSearchUrl,
   buildGoogleFlightsTfsParam,
   buildMomondoFlightSearchUrl,
   buildPanFlightsFlightSearchUrl,
@@ -17,6 +18,8 @@ import {
   limitFlightCandidates,
   readFlightSortLabel,
   readKiwiBagsParam,
+  readKiwiCardDate,
+  readKiwiCardLeg,
   readKiwiDatePart,
   readKiwiSearchPath,
   readKiwiSortTabText,
@@ -703,8 +706,8 @@ test("every link keeps every search choice", () => {
       assert.equal(bags !== undefined, includeCabinBag || includeCheckedBag, label);
       if (bags !== undefined) {
         const bagFields = decodeProtoFields(bags);
-        assert.equal(bagFields.find(([field]) => field === 2)?.[1], includeCabinBag ? 1 : 0, label);
-        assert.equal(bagFields.find(([field]) => field === 3)?.[1], includeCheckedBag ? 1 : 0, label);
+        assert.equal(bagFields.find(([field]) => field === 2)?.[1], includeCabinBag ? passengers.adults + passengers.children : 0, label);
+        assert.equal(bagFields.find(([field]) => field === 3)?.[1], includeCheckedBag ? passengers.adults + passengers.children : 0, label);
       }
     }
   assert.equal(combinations, 3 * 2 * 4 * 2 * 2 * 2 * 3);
@@ -759,4 +762,27 @@ test("Kiwi's sort tabs give price and duration", () => {
   assert.equal(readKiwiSortTabText("Andre alternativer Tidligste avreise"), undefined);
   assert.equal(readKiwiSortTabText("Beste"), undefined);
   assert.equal(readKiwiSortTabText(undefined), undefined);
+});
+
+test("Kiwi's card dates get the year nearest the search", () => {
+  assert.equal(readKiwiCardDate("man. 18. jan. • Utgående", "2027-01-14"), "2027-01-18");
+  assert.equal(readKiwiCardDate("søn. 3. jan.", "2026-12-30"), "2027-01-03");
+  assert.equal(readKiwiCardDate("tir. 29. des.", "2027-01-02"), "2026-12-29");
+  assert.equal(readKiwiCardDate("Utgående", "2027-01-14"), undefined);
+  assert.equal(readKiwiCardDate(undefined, "2027-01-14"), undefined);
+});
+
+test("Google links keep the sort as Google's own tfu value", () => {
+  const read = (mode?: FlightSortMode): string | null => new URL(buildGoogleFlightsSearchUrl(meta(), mode)).searchParams.get("tfu");
+  assert.equal(read(), null);
+  assert.equal(read("best"), null);
+  assert.equal(read("cheapest"), "EgoIARAAGAAgAigB");
+  assert.equal(read("fastest"), "EgYIBRAAGAA");
+});
+
+test("Kiwi's cards give duration and stops per leg", () => {
+  assert.deepEqual(readKiwiCardLeg("man. 18. jan. • Utgående 02:15 25h 55m 21:10 PVG 1 stopp · Manchester BGO"), { durationMinutes: 1555, stopCount: 1 });
+  assert.deepEqual(readKiwiCardLeg("07:00\n16h 05m\n06:05 +1 BGO 2 stopp · London, Paris PVG"), { durationMinutes: 965, stopCount: 2 });
+  assert.deepEqual(readKiwiCardLeg("07:00 3h 10:00 OSL Direkte BGO"), { durationMinutes: 180, stopCount: 0 });
+  assert.deepEqual(readKiwiCardLeg("ingen data"), {});
 });

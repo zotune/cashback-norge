@@ -1004,9 +1004,18 @@ export function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta, sor
 // (felt 8, 1=voksen), kabin (felt 9: 1=economy 2=premium 3=business 4=first) og
 // turtype (felt 19: 1=tur/retur 2=én vei). Felt 13 er bagasje (f2 hånd, f3 innsjekket), og felt 12
 // i hver etappe er maks minutter reisetid (verifisert 2026-11-02).
-export function buildGoogleFlightsSearchUrl(flightMeta: FlightSearchMeta): string {
+// tfu velger fane og sortering, hentet fra Googles egne URL-er (2026-11-02):
+// Billigst-fanen og «Sortert etter flytid». Google har ingen Raskest-fane.
+const GOOGLE_FLIGHTS_SORT_PARAMS: Partial<Record<FlightSortMode, string>> = {
+  cheapest: "EgoIARAAGAAgAigB",
+  fastest: "EgYIBRAAGAA",
+};
+
+export function buildGoogleFlightsSearchUrl(flightMeta: FlightSearchMeta, sortMode: FlightSortMode = "best"): string {
+  const sortParam = GOOGLE_FLIGHTS_SORT_PARAMS[sortMode];
   const params = new URLSearchParams({
     tfs: buildGoogleFlightsTfsParam(flightMeta),
+    ...(sortParam !== undefined ? { tfu: sortParam } : {}),
     hl: "nb",
     curr: "NOK",
   });
@@ -1031,10 +1040,12 @@ export function buildGoogleFlightsTfsParam(flightMeta: FlightSearchMeta): string
     bytes.push(...encodeProtoVarintField(8, 4));
   }
   bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
+  // Google teller bagasje totalt for reisefølget; spedbarn har ingen egen.
+  const bagCount = flightMeta.adults + flightMeta.children;
   if (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) {
     bytes.push(...encodeProtoBytesField(13, [
-      ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? 1 : 0),
-      ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? 1 : 0),
+      ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? bagCount : 0),
+      ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? bagCount : 0),
     ]));
   }
   bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== undefined ? 1 : 2));
@@ -1192,7 +1203,24 @@ export function readKiwiBagsParam(value: string | null): Pick<FlightSearchMeta, 
 // Fanene på Kiwi: «Beste kr 5750 · 27h 15m», «Kortest kr 11 732 · 15h 35m». Prisen gjelder alle passasjerer med valgt bagasje.
 export const KIWI_PRICE_PROBE_PARAM = "cbvPriceProbe";
 export type KiwiSortPrice = { amount: number; durationMinutes: number };
-export type KiwiSortPrices = Partial<Record<FlightSortMode, KiwiSortPrice>>;
+// topCardSectors: teksten per etappe på det øverste kortet (datoer vises bare ved datovindu).
+export type KiwiSortPrices = Partial<Record<FlightSortMode, KiwiSortPrice>> & { topCardSectors?: string[] };
+
+const KIWI_MONTHS = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
+
+// «man. 18. jan.» har ikke år, så året som ligger nærmest søkedatoen velges.
+export function readKiwiCardDate(text: string | undefined, nearDate: string): string | undefined {
+  const match = text?.toLowerCase().match(/(\d{1,2})\.\s*(jan|feb|mar|apr|mai|jun|jul|aug|sep|okt|nov|des)/);
+  if (match?.[1] === undefined || match[2] === undefined) return undefined;
+  const month = String(KIWI_MONTHS.indexOf(match[2]) + 1).padStart(2, "0");
+  const day = match[1].padStart(2, "0");
+  const nearYear = Number(nearDate.slice(0, 4));
+  const distance = (date: string): number => Math.abs(Date.parse(date) - Date.parse(nearDate));
+  return [nearYear - 1, nearYear, nearYear + 1]
+    .map((year) => `${year}-${month}-${day}`)
+    .filter((date) => readIsoDateValue(date) !== undefined)
+    .sort((left, right) => distance(left) - distance(right))[0];
+}
 
 export function readKiwiSortTabText(text: string | undefined): KiwiSortPrice | undefined {
   const match = text?.replace(/\s+/g, " ").match(/\bkr (\d[\d ]*?) · (?:(\d+)h)? ?(?:(\d+)m)?\s*$/);
@@ -1200,6 +1228,17 @@ export function readKiwiSortTabText(text: string | undefined): KiwiSortPrice | u
   const amount = Number(match[1].replace(/ /g, ""));
   const durationMinutes = Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
   return amount > 0 && durationMinutes > 0 ? { amount, durationMinutes } : undefined;
+}
+
+// «02:15 25h 55m 21:10 PVG 1 stopp · Manchester BGO»; direkte reiser står uten antall stopp.
+export function readKiwiCardLeg(text: string): { durationMinutes?: number; stopCount?: number } {
+  const normalized = text.replace(/\s+/g, " ");
+  const duration = normalized.match(/\b(\d+)h(?: (\d+)m)?\b|\b(\d+)m\b/);
+  const stops = normalized.match(/\b(\d+) stopp\b/);
+  return {
+    ...(duration !== null ? { durationMinutes: Number(duration[1] ?? 0) * 60 + Number(duration[2] ?? duration[3] ?? 0) } : {}),
+    ...(stops?.[1] !== undefined ? { stopCount: Number(stops[1]) } : /\bdirekte\b/i.test(normalized) ? { stopCount: 0 } : {}),
+  };
 }
 
 export type KiwiSearchPath = { origin: string; destination: string; outbound: string; inbound?: string };
