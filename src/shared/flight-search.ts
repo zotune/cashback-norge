@@ -213,14 +213,22 @@ export function buildFlightDateCombinationKey(combination: { outboundDate: strin
 
 // v2-tillegg: ff:<før>,<etter> for utreise og tf:<før>,<etter> for hjemreise (som
 // PanFlights' «+/- N dager»). Manuelle tidsrom (td:/ud:) støttes ikke ennå.
-export function readPanFlightsDateFlex(extraParts: string[], roundTrip: boolean): FlightDateFlex | undefined {
-  const readWindow = (key: string): [number, number] => {
-    const value = extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+export function readPanFlightsDateFlex(extraParts: string[], outboundDate: string, inboundDate?: string): FlightDateFlex | undefined {
+  const readValue = (key: string): string | undefined => extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+  // «+/- N dager» er ff:<før>,<etter>. «Tidsrom» er ff:manual med sluttdatoen i td: (utreise)
+  // eller tf:manual med ud: (hjemreise), fra PanFlights' egen URL-bygger.
+  const readWindow = (flexKey: string, endKey: string, startDate: string | undefined): [number, number] => {
+    const value = readValue(flexKey);
+    if (value === "manual" && startDate !== undefined) {
+      const endDate = readIsoDateValue(readValue(endKey)?.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"));
+      const days = endDate === undefined ? undefined : Math.round((Date.parse(endDate) - Date.parse(startDate)) / 86400000);
+      return days !== undefined && days >= 0 ? [0, days] : [0, 0];
+    }
     const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
     return before !== undefined ? [before, after ?? before] : [0, 0];
   };
-  const [outboundBefore, outboundAfter] = readWindow("ff");
-  const [inboundBefore, inboundAfter] = roundTrip ? readWindow("tf") : [0, 0];
+  const [outboundBefore, outboundAfter] = readWindow("ff", "td", outboundDate);
+  const [inboundBefore, inboundAfter] = inboundDate !== undefined ? readWindow("tf", "ud", inboundDate) : [0, 0];
   return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0
     ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter }
     : undefined;

@@ -146,6 +146,7 @@ const chrome = {
 };`;
 
 export default defineConfig({
+  define: { __USERSCRIPT_BUILD__: "true" },
   build: {
     outDir: resolve("site"),
     emptyOutDir: false,

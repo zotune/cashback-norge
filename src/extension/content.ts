@@ -121,6 +121,8 @@ type UserscriptHttpResponse = {
   responseHeaders?: string;
 };
 
+// Settes av byggekonfigurasjonen: true i userscriptet, false i Chrome-utvidelsen.
+declare const __USERSCRIPT_BUILD__: boolean;
 declare const GM_xmlhttpRequest: undefined | ((options: UserscriptHttpRequestOptions) => unknown);
 declare const GM: undefined | {
   xmlHttpRequest?: (options: UserscriptHttpRequestOptions) => unknown;
@@ -1747,7 +1749,7 @@ function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
   const outboundDate = readCompactIsoDateValue(parts[2]);
   const inboundDate = readCompactIsoDateValue(parts[3]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
-  const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== undefined ? 4 : 3), inboundDate !== undefined);
+  const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== undefined ? 4 : 3), outboundDate, inboundDate);
 
   return normalizeFlightSearchMeta({
     origin,
@@ -3097,9 +3099,10 @@ function readCurrentPanFlightsPageStateOfferCandidates(
   resultUrl: string,
 ): Promise<PanFlightsOfferCandidate[]> {
   if (!isCurrentPanFlightsSearchPageForMeta(flightMeta)) return Promise.resolve([]);
-  // MV3-utvidelsens CSP for innholdsskript blokkerer innebygde <script>-elementer (feilen vises
-  // under Errors). Bare userscriptet kjører i sidens kontekst; utvidelsen leser de synlige radene.
-  if (!isUserscriptRuntime()) return Promise.resolve([]);
+  // MV3-utvidelsens CSP for innholdsskript blokkerer innebygde <script>-elementer, og Chrome Web
+  // Store skal ikke se kode som kjører tekst som skript. Bare userscript-bygget tar med leseren;
+  // utvidelsen leser de synlige radene.
+  if (!__USERSCRIPT_BUILD__) return Promise.resolve([]);
 
   const scriptHost = document.documentElement ?? document.head ?? document.body;
   if (scriptHost === null) return Promise.resolve([]);

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793581006
+// @version      1793581190
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9254,14 +9254,20 @@ ${darkProviderCss}
   function buildFlightDateCombinationKey(combination) {
     return `${combination.outboundDate}|${combination.inboundDate ?? ""}`;
   }
-  function readPanFlightsDateFlex(extraParts, roundTrip) {
-    const readWindow = (key) => {
-      const value = extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+  function readPanFlightsDateFlex(extraParts, outboundDate, inboundDate) {
+    const readValue = (key) => extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+    const readWindow = (flexKey, endKey, startDate) => {
+      const value = readValue(flexKey);
+      if (value === "manual" && startDate !== void 0) {
+        const endDate = readIsoDateValue(readValue(endKey)?.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"));
+        const days = endDate === void 0 ? void 0 : Math.round((Date.parse(endDate) - Date.parse(startDate)) / 864e5);
+        return days !== void 0 && days >= 0 ? [0, days] : [0, 0];
+      }
       const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
       return before !== void 0 ? [before, after ?? before] : [0, 0];
     };
-    const [outboundBefore, outboundAfter] = readWindow("ff");
-    const [inboundBefore, inboundAfter] = roundTrip ? readWindow("tf") : [0, 0];
+    const [outboundBefore, outboundAfter] = readWindow("ff", "td", outboundDate);
+    const [inboundBefore, inboundAfter] = inboundDate !== void 0 ? readWindow("tf", "ud", inboundDate) : [0, 0];
     return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0 ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter } : void 0;
   }
   function buildFlightLinkFiltersValue(flightMeta) {
@@ -10591,7 +10597,7 @@ ${darkProviderCss}
     const outboundDate = readCompactIsoDateValue(parts[2]);
     const inboundDate = readCompactIsoDateValue(parts[3]);
     if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
-    const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== void 0 ? 4 : 3), inboundDate !== void 0);
+    const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== void 0 ? 4 : 3), outboundDate, inboundDate);
     return normalizeFlightSearchMeta({
       origin,
       destination,
@@ -11640,7 +11646,6 @@ ${darkProviderCss}
   }
   function readCurrentPanFlightsPageStateOfferCandidates(flightMeta, resultUrl) {
     if (!isCurrentPanFlightsSearchPageForMeta(flightMeta)) return Promise.resolve([]);
-    if (!isUserscriptRuntime()) return Promise.resolve([]);
     const scriptHost = document.documentElement ?? document.head ?? document.body;
     if (scriptHost === null) return Promise.resolve([]);
     const requestId = `panflights-${Date.now()}-${Math.random().toString(36).slice(2)}`;

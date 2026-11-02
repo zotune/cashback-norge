@@ -137,9 +137,11 @@ test("reads Norwegian and Lufthansa airBoundsSearch with timestamped dates", () 
 });
 
 test("parses PanFlights date windows and lists every combination nearest first", () => {
-  assert.deepEqual(readPanFlightsDateFlex(["ff:3,3", "tf:2,2"], true), { outboundBefore: 3, outboundAfter: 3, inboundBefore: 2, inboundAfter: 2 });
-  assert.deepEqual(readPanFlightsDateFlex(["ff:0,1"], false), { outboundBefore: 0, outboundAfter: 1, inboundBefore: 0, inboundAfter: 0 });
-  assert.equal(readPanFlightsDateFlex(["ff:0,0"], false), undefined);
+  assert.deepEqual(readPanFlightsDateFlex(["ff:3,3", "tf:2,2"], "2026-11-10", "2026-11-20"), { outboundBefore: 3, outboundAfter: 3, inboundBefore: 2, inboundAfter: 2 });
+  assert.deepEqual(readPanFlightsDateFlex(["ff:0,1"], "2026-11-10"), { outboundBefore: 0, outboundAfter: 1, inboundBefore: 0, inboundAfter: 0 });
+  assert.equal(readPanFlightsDateFlex(["ff:0,0"], "2026-11-10"), undefined);
+  // «Tidsrom»: utreise 10.–14. nov og hjemreise 20.–22. nov.
+  assert.deepEqual(readPanFlightsDateFlex(["td:20261114", "ff:manual", "ud:20261122", "tf:manual"], "2026-11-10", "2026-11-20"), { outboundBefore: 0, outboundAfter: 4, inboundBefore: 0, inboundAfter: 2 });
 
   const roundTrip = meta({ outboundDate: "2026-11-10", inboundDate: "2026-11-20" });
   const combinations = listFlightDateFlexCombinations(roundTrip, { outboundBefore: 3, outboundAfter: 3, inboundBefore: 3, inboundAfter: 3 }, NOW);

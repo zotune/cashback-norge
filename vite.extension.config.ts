@@ -39,6 +39,8 @@ function buildContentScriptPlugin(outDir: string): Plugin {
           target: "es2022",
         },
         configFile: false,
+        // Kode som bare gjelder userscriptet (innebygde <script> i siden) tas ut av utvidelsespakken.
+        define: { __USERSCRIPT_BUILD__: "false" },
         publicDir: false,
       });
     },
