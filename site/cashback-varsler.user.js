@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793576335
+// @version      1793578839
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -11139,7 +11139,7 @@ ${darkProviderCss}
     const resultUrl = readCurrentFinnFlightSearchUrl(flightMeta) ?? buildDefaultFinnFlightSearchUrl(flightMeta);
     const searchData = await fetchFinnFlightSearchData(resultUrl);
     if (searchData === void 0) return void 0;
-    const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true);
+    const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true, options?.sortByPrice !== false);
     if (resultData === void 0) return void 0;
     const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
     const best = candidates[0];
@@ -11236,7 +11236,8 @@ ${darkProviderCss}
       };
       const offer = await safelyFindFlightPriceMatchOffer(
         `FINN (${formatFlightDateRange(combinationMeta)})`,
-        () => findFinnFlightPriceMatchOffer(combinationMeta, routeTitle, searchDetails, airportLookup)
+        // Datovinduet skal finne billigste datoer, så hver kombinasjon sorteres på pris.
+        () => findFinnFlightPriceMatchOffer(combinationMeta, routeTitle, searchDetails, airportLookup, { sortByPrice: true })
       );
       if (offer !== void 0 || !job.results.has(combinationKey)) job.results.set(combinationKey, offer);
       if (combinationKey === selectedKey) markSelectedDatesSearched();
@@ -11337,13 +11338,13 @@ ${darkProviderCss}
       return void 0;
     }
   }
-  async function pollFinnFlightResults(searchData, flightMeta, quickRefresh = false) {
+  async function pollFinnFlightResults(searchData, flightMeta, quickRefresh = false, sortByPrice = false) {
     let latestResult;
     let progress = 0;
     const maxAttempts = quickRefresh ? FINN_FLIGHT_REFRESH_POLL_ATTEMPTS : FINN_FLIGHT_POLL_ATTEMPTS;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (!quickRefresh || attempt > 0) await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
-      const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress);
+      const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress, sortByPrice);
       const value = await userscriptJsonRequest(resultUrl, {
         headers: { Accept: "application/json" },
         credentials: "omit"
@@ -11355,12 +11356,13 @@ ${darkProviderCss}
     }
     return latestResult;
   }
-  function buildFinnFlightResultApiUrl(searchData, flightMeta, progress) {
+  function buildFinnFlightResultApiUrl(searchData, flightMeta, progress, sortByPrice = false) {
     const params = searchData.resultParams !== void 0 ? new URLSearchParams(searchData.resultParams) : buildFinnFlightExactAirportParams(flightMeta);
     if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
     if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
     if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
     if (flightMeta.maxDurationMinutes !== void 0) params.set("durationTo", String(flightMeta.maxDurationMinutes));
+    if (sortByPrice) params.set("sortCriteria", "priceAmount_asc");
     params.set("cacheBuster", String(Date.now()));
     params.set("progress", String(progress));
     return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -17709,6 +17711,21 @@ ${darkProviderCss}
       font-weight: 600;
       justify-self: end;
       white-space: nowrap;
+    }
+    /* På mobil skjøv reisetiden ruten og kildechipen ut av raden; den står fortsatt i tooltipen. */
+    @media (max-width: 520px) {
+      .price-match-duration {
+        display: none;
+      }
+      .price-match-card.price-match-card--with-duration {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+      }
+      .price-match-section .price-match-tooltip-row--with-duration {
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+      }
+      .price-match-tooltip-row--with-duration > .cbn-tooltip-trigger {
+        grid-column: 3;
+      }
     }
     .price-match-card--updating {
       animation: price-match-updating-sweep 1.8s linear infinite;

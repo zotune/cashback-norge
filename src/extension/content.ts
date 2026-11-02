@@ -1229,6 +1229,8 @@ function withGoogleShoppingOffer(offers: PriceMatchOffer[], searchTerm: string):
 type FlightOfferFindOptions = {
   // Modningsrunde: hent et kjapt øyeblikksbilde i stedet for full poll-løkke.
   refresh?: boolean;
+  // Billigste reise først i stedet for kildens standardrekkefølge («Best»).
+  sortByPrice?: boolean;
 };
 
 type FlightLiveOfferFinder = {
@@ -2402,7 +2404,8 @@ async function findFinnFlightPriceMatchOffer(
   const searchData = await fetchFinnFlightSearchData(resultUrl);
   if (searchData === undefined) return undefined;
 
-  const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true);
+  // Billigste først, som FINNs egen «Billigst»-fane; standardrekkefølgen «Best» kan være dyrere.
+  const resultData = await pollFinnFlightResults(searchData, flightMeta, options?.refresh === true, options?.sortByPrice !== false);
   if (resultData === undefined) return undefined;
 
   const candidates = extractFinnFlightOfferCandidates(resultData, searchData, flightMeta, airportLookup);
@@ -2522,7 +2525,8 @@ function getOrStartFinnFlightDateFlexJob(
     };
     const offer = await safelyFindFlightPriceMatchOffer(
       `FINN (${formatFlightDateRange(combinationMeta)})`,
-      () => findFinnFlightPriceMatchOffer(combinationMeta, routeTitle, searchDetails, airportLookup),
+      // Datovinduet skal finne billigste datoer, så hver kombinasjon sorteres på pris.
+      () => findFinnFlightPriceMatchOffer(combinationMeta, routeTitle, searchDetails, airportLookup, { sortByPrice: true }),
     );
     if (offer !== undefined || !job.results.has(combinationKey)) job.results.set(combinationKey, offer);
     if (combinationKey === selectedKey) markSelectedDatesSearched();
@@ -2652,6 +2656,7 @@ async function pollFinnFlightResults(
   searchData: FinnFlightSearchData,
   flightMeta: FlightSearchMeta,
   quickRefresh = false,
+  sortByPrice = false,
 ): Promise<Record<string, unknown> | undefined> {
   let latestResult: Record<string, unknown> | undefined;
   let progress = 0;
@@ -2659,7 +2664,7 @@ async function pollFinnFlightResults(
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (!quickRefresh || attempt > 0) await sleep(FINN_FLIGHT_POLL_INTERVAL_MS);
-    const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress);
+    const resultUrl = buildFinnFlightResultApiUrl(searchData, flightMeta, progress, sortByPrice);
     const value = await userscriptJsonRequest(resultUrl, {
       headers: { Accept: "application/json" },
       credentials: "omit",
@@ -2678,6 +2683,7 @@ function buildFinnFlightResultApiUrl(
   searchData: FinnFlightSearchData,
   flightMeta: FlightSearchMeta,
   progress: number,
+  sortByPrice = false,
 ): string {
   const params = searchData.resultParams !== undefined
     ? new URLSearchParams(searchData.resultParams)
@@ -2688,6 +2694,8 @@ function buildFinnFlightResultApiUrl(
   if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
   if (flightMeta.maxStops !== undefined) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
   if (flightMeta.maxDurationMinutes !== undefined) params.set("durationTo", String(flightMeta.maxDurationMinutes));
+  // FINN sorterer på «Best» (agony_asc) som standard; priceAmount_asc gir billigste først (verifisert 2026-11-02).
+  if (sortByPrice) params.set("sortCriteria", "priceAmount_asc");
   params.set("cacheBuster", String(Date.now()));
   params.set("progress", String(progress));
   return `${searchData.flightApiUrl.replace(/\/$/, "")}/result/${encodeURIComponent(searchData.searchId)}?${params.toString()}`;
@@ -11362,6 +11370,21 @@ function renderNotice(
       font-weight: 600;
       justify-self: end;
       white-space: nowrap;
+    }
+    /* På mobil skjøv reisetiden ruten og kildechipen ut av raden; den står fortsatt i tooltipen. */
+    @media (max-width: 520px) {
+      .price-match-duration {
+        display: none;
+      }
+      .price-match-card.price-match-card--with-duration {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+      }
+      .price-match-section .price-match-tooltip-row--with-duration {
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+      }
+      .price-match-tooltip-row--with-duration > .cbn-tooltip-trigger {
+        grid-column: 3;
+      }
     }
     .price-match-card--updating {
       animation: price-match-updating-sweep 1.8s linear infinite;
