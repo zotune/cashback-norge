@@ -1,4 +1,5 @@
 import { normalizeRewardLabel } from "./reward.js";
+import { getVisibleOfferKey } from "./offer-context.js";
 
 const EB_PER_TRUMF_KR = 13.5;
 
@@ -249,15 +250,15 @@ export function findOffersForHostname(
     uniqueOffers([...indexMatches, ...suffixMatches, ...childDomainMatches]),
   );
 
-  // Keep only the best offer per provider (highest reward wins),
-  // but discount codes are always kept individually regardless of provider
+  // Keep the best ordinary cashback per provider, but retain distinct support
+  // campaigns and individual discount codes.
   const bestByProvider = new Map<string, CashbackOffer>();
   const discountCodeOffers: CashbackOffer[] = [];
   for (const offer of all) {
     if (offer.discountCode !== undefined && offer.discountCode.length > 0) {
       discountCodeOffers.push(offer);
-    } else if (!bestByProvider.has(offer.provider)) {
-      bestByProvider.set(offer.provider, offer);
+    } else if (!bestByProvider.has(getVisibleOfferKey(offer))) {
+      bestByProvider.set(getVisibleOfferKey(offer), offer);
     }
   }
   return sortOffersByReward([...bestByProvider.values(), ...discountCodeOffers]);
@@ -339,19 +340,19 @@ export function buildCashbackIndex(
       const dstOffers = domainIndex[dst] ?? [];
       // Copy src offers to dst and vice versa (both domains should show all offers)
       for (const offer of srcOffers) {
-        if (!dstOffers.some((o) => o.provider === offer.provider && o.reward === offer.reward)) {
+        if (!dstOffers.some((o) => getVisibleOfferKey(o) === getVisibleOfferKey(offer) && o.reward === offer.reward)) {
           domainIndex[dst] = [...(domainIndex[dst] ?? []), offer];
         }
       }
       for (const offer of dstOffers) {
-        if (!srcOffers.some((o) => o.provider === offer.provider && o.reward === offer.reward)) {
+        if (!srcOffers.some((o) => getVisibleOfferKey(o) === getVisibleOfferKey(offer) && o.reward === offer.reward)) {
           domainIndex[src] = [...(domainIndex[src] ?? []), offer];
         }
       }
     }
   }
 
-  // Deduplicate within each domain: keep one offer per provider+reward+code
+  // Keep distinct affiliate campaigns even when they pay the same amount.
   for (const domain of Object.keys(domainIndex)) {
     const offersForDomain = domainIndex[domain];
     if (offersForDomain === undefined) continue;
@@ -359,7 +360,7 @@ export function buildCashbackIndex(
     const seen = new Set<string>();
     domainIndex[domain] = offersForDomain.filter((offer) => {
       const codePart = offer.discountCode ?? "";
-      const key = `${offer.provider}:${offer.reward}:${codePart}`;
+      const key = `${getVisibleOfferKey(offer)}:${offer.reward}:${codePart}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -386,7 +387,7 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
 
   for (const offer of offers) {
     const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
-    const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
+    const key = offer.provider === "cbn" ? getVisibleOfferKey(offer) : `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
     // Keep the offer with the best reward value; prefer range over single when equal
     const newVal = parseRewardValue(offer);

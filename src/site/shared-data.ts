@@ -18,6 +18,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters";
+import { getOfferCampaignLabel, getVisibleOfferKey } from "../shared/offer-context";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 
 // Expose shared data as globals for the inline site script
@@ -36,6 +37,8 @@ Object.assign(window, {
     MERCHANT_ALIASES,
     QUICK_FILTERS,
     matchesOfferQuickFilters,
+    getOfferCampaignLabel,
+    getVisibleOfferKey,
     calculateCashback,
     calculateCashbackMaxKr,
     formatBreakdownWithAmounts,

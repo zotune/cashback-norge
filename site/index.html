@@ -281,6 +281,14 @@ a.merchant-name:hover { text-decoration: underline; }
 }
 .offer .offer-reward { flex: 1; }
 .offer-action { align-items: center; align-self: stretch; color: inherit; display: flex; flex: 1; gap: 8px; min-width: 0; text-decoration: none; }
+.offer-campaign { font-size: 12px; font-weight: 500; }
+.offer-heading { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.offer:has(.offer-campaign) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+@media (max-width: 520px) {
+  .offer:has(.offer-campaign) { grid-template-columns: minmax(0, 1fr) auto; }
+  .offer:has(.offer-campaign) .cbn-offer-details { grid-column: 1; grid-row: 2; justify-self: start; }
+  .offer:has(.offer-campaign) .support-campaign-link { grid-column: 2; grid-row: 1 / span 2; }
+}
 .provider-filter-link { color: inherit; flex-shrink: 0; text-decoration: none; }
 a.code-reward { color: inherit; text-decoration: none; }
 .offer--best { color: var(--cbn-accent, #3a7d55); }
@@ -936,11 +944,11 @@ a.code-reward { color: inherit; text-decoration: none; }
     <div class="invite-card-header">
       <span class="cbn-chip cbn-chip--muted">Annonse</span>
       <span id="support-invite-provider"></span>
-      <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul invitasjonen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul annonsen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </div>
     <h2 id="support-invite-title"></h2>
     <p id="support-invite-description"></p>
-    <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="noopener noreferrer" data-goatcounter-click="support-invite-card" data-goatcounter-title="Invitasjon"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+    <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer" data-goatcounter-click="support-invite-card" data-goatcounter-title="Annonse"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
   </aside>
   <div class="sticky-header">
   <div class="filter-bar">
@@ -1005,7 +1013,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, getOfferCampaignLabel, getVisibleOfferKey } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -1263,7 +1271,7 @@ function getVisibleMerchantOffers(merchant) {
   const seen = new Set();
   return merchant.offers.filter(offer => {
     if (!matchesActiveFilters(offer)) return false;
-    const key = offer.provider + ":" + (offer.discountCode || "");
+    const key = getVisibleOfferKey(offer);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1424,10 +1432,10 @@ function applyProviderMeta(providers) {
 
 async function init() {
   renderTips();
-  setupSupportInvite();
   setupBonusToggle();
   const res = await fetch("cashback-index.json", { cache: "no-cache" });
   const data = await res.json();
+  setupSupportInvite(data.offers);
   applyProviderMeta(data.providers);
   cardBenefitOffers = getCardBenefitOffers(data.offers);
   renderBonusChips();
@@ -1655,6 +1663,7 @@ function groupByMerchant(offers) {
       "tryg.no": "Tryg",
       "fremtind.no": "Fremtind",
       "dekkmann.no": "Bestdrive",
+      "unoscore.no": "Uno Score",
     };
     const primaryDomain = m.domains[0];
     if (primaryDomain && DOMAIN_DISPLAY_NAMES[primaryDomain]) {
@@ -1831,10 +1840,16 @@ function merchantCardHtml(m) {
     const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>` : "";
     const welcomeChipHtml = welcome ? `<span class="cbn-chip cbn-chip--highlight">${esc(welcome.label)}</span>` : "";
     const supportChipHtml = o.provider === "cbn" ? `<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span><span class="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>` : "";
+    const campaignLabel = getOfferCampaignLabel(o);
+    const actionTitle = `Åpne ${campaignLabel || o.merchantName} – annonselenke`;
+    const campaignHtml = campaignLabel ? `<span class="offer-campaign">${esc(campaignLabel)}</span>` : "";
+    const providerChip = o.provider === "cbn"
+      ? `<a class="cbn-chip badge badge-cbn support-campaign-link" href="${esc(url)}" target="_blank" rel="sponsored noopener noreferrer" title="${esc(actionTitle)}" aria-label="${esc(actionTitle)}">${esc(PROVIDER_NAMES.cbn)}</a>`
+      : providerFilterChip(o.provider);
     const bestClass = idx === 0 ? " offer--best" : "";
-    return `<span class="offer-wrap">${tooltipHtml}<span class="cbn-row offer${bestClass} ${cardOnly ? "offer-card-only" : ""}"><a class="offer-action" href="${esc(url)}" target="_blank" rel="noreferrer">
-      <span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span>
-      ${warnIconHtml}${welcomeChipHtml}${adChipHtml}${supportChipHtml}</a>${providerFilterChip(o.provider)}
+    return `<span class="offer-wrap">${tooltipHtml}<span class="cbn-row offer${bestClass} ${cardOnly ? "offer-card-only" : ""}"><a class="offer-action" href="${esc(url)}" target="_blank" rel="${o.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer"}"${o.provider === "cbn" ? ` aria-label="${esc(actionTitle)}"` : ""}>
+      ${campaignLabel ? '<span class="offer-heading offer-label">' : ''}<span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span>${campaignHtml}${campaignLabel ? '</span>' : ''}
+      ${warnIconHtml}${welcomeChipHtml}${adChipHtml}${supportChipHtml}</a>${providerChip}
     </span></span>`;
   }).join("");
   const cryptoSubDomain = m.domains.find(d => CRYPTO_SUBSCRIPTIONS[d]);
@@ -2391,11 +2406,20 @@ function makeDeleteBtn(codeId, row, hostname) {
   return btn;
 }
 
-function setupSupportInvite() {
+function setupSupportInvite(offers) {
   const card = document.getElementById("support-invite");
+  // Bruk samme kampanjelenke som tilbudsindeksen. Beløpet er vår provisjon,
+  // og skal ikke presenteres som en registreringsbonus til besøkende.
+  const debtOffer = offers.find(offer => offer.provider === "cbn" && offer.merchantName === "Uno Score - Gjeldsoversikt" && offer.activationUrl);
+  const featuredAd = debtOffer ? {
+    id: "uno-score-debt", name: "Uno Score", url: debtOffer.activationUrl,
+    title: "Se gjeldsoversikten din gratis",
+    description: "Få oversikt over kredittkort, kredittgrenser og forbrukslån hos Uno Score. Cashback Norge kan motta provisjon når du bruker lenken.",
+    action: "Se gjeldsoversikten hos Uno Score",
+  } : undefined;
   const invites = SUPPORT_INVITES.filter(invite => invite.url);
-  if (invites.length === 0) return;
-  const invite = invites[Math.floor(Math.random() * invites.length)];
+  if (!featuredAd && invites.length === 0) return;
+  const invite = featuredAd ?? invites[Math.floor(Math.random() * invites.length)];
   card.dataset.invite = invite.id;
   document.getElementById("support-invite-provider").textContent = invite.name;
   document.getElementById("support-invite-title").textContent = invite.title;
@@ -2404,7 +2428,7 @@ function setupSupportInvite() {
   action.href = invite.url;
   action.querySelector("span").textContent = invite.action;
   action.dataset.goatcounterClick = `${invite.id}-invite-card`;
-  action.dataset.goatcounterTitle = `${invite.name}: invitasjon`;
+  action.dataset.goatcounterTitle = `${invite.name}: annonse`;
   card.hidden = false;
   card.querySelector("button").addEventListener("click", () => {
     card.hidden = true;

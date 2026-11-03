@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793650426
+// @version      1793715129
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -390,18 +390,18 @@
     "laundryheap.com": "Laundryheap+"
   };
   const SUPPORT_LINKS = [
-    { text: "Kron: 100 kr i fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
+    { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
     { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
     { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
-    { text: "Wise: Gratis internasjonal overføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
-    { text: "Tibber strøm: 1 000 kr i Tibber Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
+    { text: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
+    { text: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
     { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
     { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
     { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
-    { text: "Curve: Samle alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
-    { text: "NordVPN: 1 mnd gratis + tryggere på offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
+    { text: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
+    { text: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-    { text: "Sparebørsen: Få 50 kr i startsaldo når du registrerer deg med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
+    { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
   ];
   const PROVIDER_WELCOME_BONUSES = {
     spareborsen: {
@@ -707,6 +707,46 @@
   }
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
+  }
+  const UNO_CAMPAIGNS = {
+    "451581": { label: "Gjeldsoversikt", paths: ["/gjeldfri", "/gjeldsoversikt", "/statistikk/gjeldsoversikt"] },
+    "451327": { label: "Kredittscore", paths: ["/kredittscore"] }
+  };
+  const ORION_CLICK_HOSTS = /* @__PURE__ */ new Set(["orsearchlink.com", "oriomed.com", "ormarkmed.com", "orionious.com"]);
+  function unoCampaignId(offer) {
+    if (offer.provider !== "cbn" || !offer.domains.some((domain) => domain.replace(/^www\./, "") === "unoscore.no")) return void 0;
+    try {
+      const url = new URL(offer.activationUrl);
+      if (!ORION_CLICK_HOSTS.has(url.hostname) || url.pathname !== "/click.track") return void 0;
+      const id = url.searchParams.get("CID") ?? "";
+      return UNO_CAMPAIGNS[id] ? id : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function getOfferCampaignLabel(offer) {
+    const id = unoCampaignId(offer);
+    return id ? UNO_CAMPAIGNS[id].label : void 0;
+  }
+  function getVisibleOfferKey(offer) {
+    if (offer.provider === "cbn") {
+      return `cbn:${unoCampaignId(offer) ?? (offer.activationUrl || offer.merchantName)}`;
+    }
+    return `${offer.provider}:${offer.discountCode ?? ""}`;
+  }
+  function prioritizeOffersForPage(offers, pageUrl) {
+    let page;
+    try {
+      page = new URL(pageUrl);
+    } catch {
+      return offers;
+    }
+    if (!/^https?:$/.test(page.protocol) || !["unoscore.no", "www.unoscore.no", "app.unoscore.no"].includes(page.hostname)) return offers;
+    const relevant = (offer) => {
+      const id = unoCampaignId(offer);
+      return id !== void 0 && UNO_CAMPAIGNS[id].paths.some((path) => page.pathname === path || page.pathname.startsWith(`${path}/`));
+    };
+    return [...offers.filter(relevant), ...offers.filter((offer) => !relevant(offer))];
   }
   function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -8660,7 +8700,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     ...PROVIDER_COLORS,
     prisradar: { bg: "#ffffff", fg: "#0c4598" },
     google: { bg: "#ffffff", fg: "#1a73e8" },
-    panflights: { bg: "#ffffff", fg: "#1375f7" },
+    panflights: { bg: "#ffffff", fg: "#0078f8" },
+    kiwi: { bg: "#00a58e", fg: "#ffffff" },
     enhver: { bg: "#ffffff", fg: "#162333" },
     sesum: { bg: "#f3f4f6", fg: "#111827" }
   };
@@ -9805,9 +9846,15 @@ ${darkProviderCss}
     if (linkFilters !== void 0) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
     return `https://panflights.no/nb/${path}/?${params.toString()}`;
   }
-  function buildGoogleFlightsSearchUrl(flightMeta) {
+  const GOOGLE_FLIGHTS_SORT_PARAMS = {
+    cheapest: "EgoIARAAGAAgAigB",
+    fastest: "EgYIBRAAGAA"
+  };
+  function buildGoogleFlightsSearchUrl(flightMeta, sortMode = "best") {
+    const sortParam = GOOGLE_FLIGHTS_SORT_PARAMS[sortMode];
     const params = new URLSearchParams({
       tfs: buildGoogleFlightsTfsParam(flightMeta),
+      ...sortParam !== void 0 ? { tfu: sortParam } : {},
       hl: "nb",
       curr: "NOK"
     });
@@ -9828,10 +9875,11 @@ ${darkProviderCss}
       bytes.push(...encodeProtoVarintField(8, 4));
     }
     bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
+    const bagCount = flightMeta.adults + flightMeta.children;
     if (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) {
       bytes.push(...encodeProtoBytesField(13, [
-        ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? 1 : 0),
-        ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? 1 : 0)
+        ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? bagCount : 0),
+        ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? bagCount : 0)
       ]));
     }
     bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== void 0 ? 1 : 2));
@@ -9960,6 +10008,14 @@ ${darkProviderCss}
       ...(cabinBags ?? 0) > 0 ? { includeCabinBag: true } : {},
       ...(checkedBags ?? 0) > 0 ? { includeCheckedBag: true } : {}
     };
+  }
+  const KIWI_PRICE_PROBE_PARAM = "cbvPriceProbe";
+  function readKiwiSortTabText(text) {
+    const match = text?.replace(/\s+/g, " ").match(/\bkr (\d[\d ]*?) · (?:(\d+)h)? ?(?:(\d+)m)?\s*$/);
+    if (match?.[1] === void 0 || match[2] === void 0 && match[3] === void 0) return void 0;
+    const amount = Number(match[1].replace(/ /g, ""));
+    const durationMinutes = Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
+    return amount > 0 && durationMinutes > 0 ? { amount, durationMinutes } : void 0;
   }
   function readKiwiSearchPath(parsedUrl) {
     if (parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "kiwi.com") return void 0;
@@ -10353,6 +10409,7 @@ ${darkProviderCss}
   ]);
   function startContentScript() {
     if (isNoticeBlockedHost(CURRENT_HOST)) return;
+    if (installKiwiPriceProbe()) return;
     disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
     installOfferActivationClickTracker();
     chrome.runtime.onMessage.addListener((message) => {
@@ -10390,7 +10447,6 @@ ${darkProviderCss}
   const PRICE_MATCH_PROGRESS_PERIOD_MS = 1800;
   const disposeContentWatchers = [];
   const isContentScriptActive = createContentScriptContextGuard();
-  let pendingFlightPriceMatchSearch;
   function syncPriceMatchProgressAnimation(element) {
     element.style.setProperty("--price-match-progress-delay", `-${Math.round(performance.now() % PRICE_MATCH_PROGRESS_PERIOD_MS)}ms`);
   }
@@ -10772,6 +10828,10 @@ ${darkProviderCss}
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     const urlMode = hostname === "finn.no" ? readFlightSortUrlValue("finn", parsedUrl.searchParams.get("sortCriteria")) : hostname === "momondo.no" ? readFlightSortUrlValue("momondo", parsedUrl.searchParams.get("sort")) : isPanFlightsSearchPage(parsedUrl) ? readFlightSortUrlValue("panflights", parsedUrl.searchParams.get("order")) : hostname === "kiwi.com" ? readFlightSortUrlValue("kiwi", parsedUrl.searchParams.get("sortBy")) : void 0;
     if (urlMode !== void 0) return urlMode;
+    if (isGoogleFlightsSearchPage(parsedUrl)) {
+      if (document.querySelector('[aria-label^="Sortert etter flytid"]') !== null) return "fastest";
+      return /^Billigst/.test(document.querySelector('[role="tab"][aria-selected="true"]')?.innerText.trim() ?? "") ? "cheapest" : "best";
+    }
     if (isSkyscannerFlightSearchPage(parsedUrl)) {
       return readFlightSortLabel(document.body?.innerText.match(/sortert etter[^\n]{0,24}/i)?.[0]) ?? "best";
     }
@@ -10938,7 +10998,6 @@ ${darkProviderCss}
     const generation = renderGeneration;
     const liveOffers = [];
     const pendingSources = new Set(session.liveOfferFinders.map((finder) => finder.source));
-    pendingFlightPriceMatchSearch = { generation, sources: pendingSources };
     const reportProgress = () => {
       onProgress(mergeFlightPriceMatchOffers(session.staticOffers, liveOffers).map((offer) => {
         return offer.source !== void 0 && pendingSources.has(offer.source) ? { ...offer, searchIncomplete: true } : offer;
@@ -11006,19 +11065,18 @@ ${darkProviderCss}
         cardSearchDetails,
         fullSearchDetails
       })],
-      // Ren deeplink: Kiwi gir bare riktige priser til sin egen side (se KIWI_PLACE_LOOKUP_URL).
+      // Kiwi gir bare riktige priser til sin egen side; raden får pris fra bakgrunnsfanen (kiwi-price-probe).
       ...readKiwiSearchPath(parsedUrl) !== void 0 ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)],
       // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
       // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
-      ...isGoogleFlightsSearchPage(parsedUrl) ? [] : [buildFlightPriceMatchOffer({
+      ...isGoogleFlightsSearchPage(parsedUrl) ? [] : [withFlightSortLinks(buildFlightPriceMatchOffer({
         source: "googleflights",
         sourceName: "Google",
-        priceLabel: "?",
         productUrl: buildGoogleFlightsSearchUrl(flightMeta),
         routeTitle,
         cardSearchDetails,
         fullSearchDetails
-      })]
+      }), (mode) => buildGoogleFlightsSearchUrl(flightMeta, mode))]
     ];
     const liveOfferFinders = [
       {
@@ -11139,8 +11197,10 @@ ${darkProviderCss}
       sourceName: input.sourceName,
       details: input.searchDetails,
       matchedExactProduct: isSelectedDates(best),
-      // Datoene vises sammen med butikken på raden; reisetid står per dato i tooltipen.
+      // Datoene vises sammen med butikken på raden, og reisetiden som på vanlige søk.
       shopName: best.shopName,
+      ...best.durationText !== void 0 ? { durationText: best.durationText } : {},
+      ...best.durationMinutes !== void 0 ? { durationMinutes: best.durationMinutes } : {},
       price: best.price,
       amount: best.amount,
       sortAmount: best.sortAmount ?? best.amount,
@@ -11930,7 +11990,7 @@ ${darkProviderCss}
       details: input.fullSearchDetails,
       matchedExactProduct: true,
       shopName: input.cardSearchDetails,
-      price: input.priceLabel ?? "Sjekk pris",
+      price: "?",
       amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       currency: "NOK",
@@ -11942,19 +12002,21 @@ ${darkProviderCss}
     const offer = buildFlightPriceMatchOffer({
       source: "kiwi",
       sourceName: "KIWI",
-      priceLabel: "?",
       productUrl: buildKiwiFlightSearchUrl(flightMeta),
       routeTitle,
       cardSearchDetails,
       fullSearchDetails
     });
+    return withFlightSortLinks(offer, (mode) => buildKiwiFlightSearchUrl(flightMeta, mode));
+  }
+  function withFlightSortLinks(offer, buildUrl) {
     const buildVariant = (mode) => ({
       shopName: offer.shopName,
       price: offer.price,
       amount: offer.amount,
       sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
       currency: offer.currency,
-      productUrl: buildKiwiFlightSearchUrl(flightMeta, mode)
+      productUrl: buildUrl(mode)
     });
     return { ...offer, flightSortVariants: { cheapest: buildVariant("cheapest"), fastest: buildVariant("fastest") } };
   }
@@ -12507,6 +12569,8 @@ ${darkProviderCss}
         sortAmount: candidate.sortAmount ?? candidate.amount,
         currency: candidate.currency,
         ...candidate.platform !== void 0 ? { platform: candidate.platform } : {},
+        ...candidate.durationText !== void 0 ? { durationText: candidate.durationText } : {},
+        ...candidate.durationMinutes !== void 0 ? { durationMinutes: candidate.durationMinutes } : {},
         productUrl: buildPanFlightsFlightSearchUrl({
           ...flightMeta,
           outboundDate: candidate.outboundDate,
@@ -13242,8 +13306,8 @@ ${darkProviderCss}
     });
   }
   async function findKiwiPlaceSlug(code) {
-    const airport = (await fetchKiwiPlaces(code, "AIRPORT")).find((place) => place.code === code);
-    return airport?.slug ?? (await fetchKiwiPlaces(code, "CITY")).find((place) => place.code === code)?.slug;
+    const city = (await fetchKiwiPlaces(code, "CITY")).find((place) => place.code === code);
+    return city?.slug ?? (await fetchKiwiPlaces(code, "AIRPORT")).find((place) => place.code === code)?.slug;
   }
   function installKiwiLinkPlaces() {
     const parsedUrl = parseUrl(window.location.href);
@@ -13270,6 +13334,45 @@ ${darkProviderCss}
       }
     })().catch(() => void 0);
     return void 0;
+  }
+  const KIWI_PROBE_POLL_MS = 1e3;
+  const KIWI_PROBE_STABLE_POLLS = 3;
+  const KIWI_PROBE_LOADING_GRACE_MS = 15e3;
+  const KIWI_PROBE_DEADLINE_MS = 25e3;
+  const KIWI_SORT_TABS = { best: "quality", cheapest: "price", fastest: "duration" };
+  function readVisibleKiwiSortPrices() {
+    const prices = {};
+    for (const mode of ["best", "cheapest", "fastest"]) {
+      const text = document.querySelector(`[data-test="SortBy-${KIWI_SORT_TABS[mode]}"]`)?.innerText;
+      const price = readKiwiSortTabText(text);
+      if (price !== void 0) prices[mode] = price;
+    }
+    return prices;
+  }
+  function installKiwiPriceProbe() {
+    const parsedUrl = parseUrl(window.location.href);
+    const path = parsedUrl !== void 0 ? readKiwiSearchPath(parsedUrl) : void 0;
+    if (parsedUrl?.searchParams.get(KIWI_PRICE_PROBE_PARAM) !== "1" || path === void 0) return false;
+    installKiwiLinkPlaces();
+    if (/^[A-Z]{3}$/.test(path.origin) && /^[A-Z]{3}$/.test(path.destination)) return true;
+    const startedAt = Date.now();
+    let lastKey = "";
+    let stablePolls = 0;
+    const timerId = window.setInterval(() => {
+      const prices = readVisibleKiwiSortPrices();
+      const key = JSON.stringify(prices);
+      stablePolls = key === lastKey && key !== "{}" ? stablePolls + 1 : 0;
+      lastKey = key;
+      const elapsedMs = Date.now() - startedAt;
+      const loading = document.querySelector('[data-test="LoadingLine"]') !== null && elapsedMs < KIWI_PROBE_LOADING_GRACE_MS;
+      if ((stablePolls < KIWI_PROBE_STABLE_POLLS || loading) && elapsedMs < KIWI_PROBE_DEADLINE_MS) return;
+      window.clearInterval(timerId);
+      const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
+      const sectors = document.querySelector('[data-test="ResultCardWrapper"]')?.querySelectorAll('[data-test="ResultCardSectorWrapper"]');
+      if (sectors !== void 0 && sectors.length > 0) prices.topCardSectors = [...sectors].map((sector) => sector.innerText);
+      void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...isNok && key !== "{}" ? { prices } : {} });
+    }, KIWI_PROBE_POLL_MS);
+    return true;
   }
   function extractKiwiFlightSearchMeta(parsedUrl) {
     const path = readKiwiSearchPath(parsedUrl);
@@ -15885,7 +15988,7 @@ ${darkProviderCss}
         details: input.searchDetails,
         matchedExactProduct: true,
         shopName: input.searchDetails,
-        price: "Sjekk pris",
+        price: "?",
         amount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
         sortAmount: FLIGHT_STATIC_PRICE_SORT_AMOUNT,
         currency: "NOK",
@@ -17254,10 +17357,10 @@ ${darkProviderCss}
     providerWrap.className = "provider-wrap";
     const providerBadge = document.createElement("a");
     providerBadge.className = `cbn-chip provider-badge provider-${offer.provider} provider-filter-link`;
-    providerBadge.href = getProviderPageUrl(offer.provider);
+    providerBadge.href = offer.provider === "cbn" ? offer.activationUrl : getProviderPageUrl(offer.provider);
     providerBadge.target = "_blank";
-    providerBadge.rel = "noreferrer";
-    providerBadge.title = `Se alle ${offer.provider === "cbn" ? "Cashback Norge" : formatProviderName(offer.provider)}-fordeler`;
+    providerBadge.rel = offer.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer";
+    providerBadge.title = offer.provider === "cbn" ? `Åpne ${getOfferCampaignLabel(offer) ?? offer.merchantName} – annonselenke` : `Se alle ${formatProviderName(offer.provider)}-fordeler`;
     providerBadge.setAttribute("aria-label", providerBadge.title);
     providerBadge.textContent = formatProviderName(offer.provider);
     if (isOfferActivated(offer, activeOfferKey)) {
@@ -18011,6 +18114,12 @@ ${darkProviderCss}
       line-height: 1.2;
       overflow-wrap: anywhere;
     }
+    @media (max-width: 520px) {
+      .offer-link:has(.offer-campaign) { grid-template-columns: auto minmax(0, 1fr); row-gap: 4px; }
+      .offer-link:has(.offer-campaign) .offer-action { grid-column: 1 / -1; }
+      .offer-link:has(.offer-campaign) > .cbn-offer-details { grid-column: 1; grid-row: 2; }
+      .offer-link:has(.offer-campaign) .provider-wrap { flex-wrap: wrap; grid-column: 2; grid-row: 2; }
+    }
     .provider-badge {
       align-items: center;
       border-radius: 5px;
@@ -18164,7 +18273,7 @@ ${darkProviderCss}
     }
     .provider-panflights {
       background: #ffffff;
-      color: #1375f7;
+      color: #0078f8;
     }
     .provider-momondo {
       background: #2e0b59;
@@ -18183,9 +18292,8 @@ ${darkProviderCss}
       color: #1a73e8;
     }
     .provider-kiwi {
-      background: #ffffff;
-      color: #000000;
-      font-weight: 800;
+      background: #00a58e;
+      color: #ffffff;
     }
     .provider-tripcom {
       background: #2563eb;
@@ -18609,16 +18717,6 @@ ${darkProviderCss}
       gap: 4px 6px;
       margin-bottom: 1px;
     }
-    .price-match-progress {
-      animation: price-match-updating-sweep 1.8s linear var(--price-match-progress-delay, 0s) infinite;
-      background-color: var(--cbn-soft, #f7faf8);
-      background-image: linear-gradient(90deg, transparent, var(--cbn-accent, #22794f), transparent);
-      background-repeat: no-repeat;
-      background-size: 45% 100%;
-      border-radius: 2px;
-      flex-basis: 100%;
-      height: 3px;
-    }
     /* Etiketten krymper ikke; chipene brytes til egen linje på smale skjermer. */
     .price-match-header .price-match-toggle {
       flex: 1 0 100%;
@@ -18678,6 +18776,36 @@ ${darkProviderCss}
     }
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
+    }
+    .price-match-card--chips .price-match-side {
+      align-items: flex-end;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      grid-column: -2;
+    }
+    .price-match-card--chips .price-match-side--inline {
+      align-items: center;
+      flex-direction: row;
+      gap: 8px;
+    }
+    .price-match-chip-line {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 0;
+    }
+    .price-match-section .price-match-info-chip {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 18px;
+      max-width: 100%;
+      overflow: hidden;
+      padding: 0 5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .price-match-section .price-match-tooltip-row {
       align-items: center;
@@ -18820,16 +18948,7 @@ ${darkProviderCss}
         background-color: color-mix(in srgb, var(--cbn-accent, #22794f) 16%, var(--cbn-soft, #f7faf8));
       }
     }
-    @keyframes price-match-progress-pulse {
-      50% { opacity: .35; }
-    }
     @media (prefers-reduced-motion: reduce) {
-      .price-match-progress {
-        animation-name: price-match-progress-pulse;
-        animation-timing-function: ease-in-out;
-        background-color: var(--cbn-accent, #22794f);
-        background-image: none;
-      }
       .price-match-section .price-match-card.price-match-card--updating {
         animation: price-match-updating-pulse 1.8s ease-in-out var(--price-match-progress-delay, 0s) infinite;
         background-image: none;
@@ -19062,7 +19181,7 @@ ${darkProviderCss}
     }
   `;
     style.textContent += buildRuntimeProviderCss();
-    const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
+    const mainOffers = prioritizeOffersForPage(offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank"), window.location.href);
     const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
     const priceMatch = priceMatches[0];
     const bestRegionPrice = regionPrices?.prices[0];
@@ -19183,7 +19302,7 @@ ${darkProviderCss}
       offerLink.className = "offer-action";
       offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
       offerLink.target = "_blank";
-      offerLink.rel = "noreferrer";
+      offerLink.rel = currentOffer.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer";
       const offerLabel = document.createElement("span");
       offerLabel.className = "offer-label";
       const offerReward = document.createElement("span");
@@ -19191,15 +19310,26 @@ ${darkProviderCss}
       rewardLabels.push({ element: offerReward, offer: currentOffer });
       const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
       if (shouldMarkOfferClick(currentOffer)) {
-        offerLink.addEventListener("click", () => {
+        const onActivationClick = () => {
           showOfferActivated(currentOffer, providerWrap, shadowRoot);
           void markOfferActivated(currentOffer.provider, currentOffer.activationUrl);
-        });
+        };
+        offerLink.addEventListener("click", onActivationClick);
+        providerWrap.querySelector("a")?.addEventListener("click", onActivationClick);
       }
       if (shouldShowAffiliateDisclosure(currentOffer)) {
         addAffiliateDisclosure(providerWrap, currentOffer);
       }
       offerLabel.append(offerReward);
+      const campaignLabel = getOfferCampaignLabel(currentOffer);
+      if (campaignLabel !== void 0) {
+        const campaign = document.createElement("span");
+        campaign.className = "offer-campaign";
+        campaign.style.cssText = "font-size:12px;font-weight:500;";
+        campaign.textContent = campaignLabel;
+        offerLabel.append(campaign);
+        offerLink.setAttribute("aria-label", `Åpne ${campaignLabel} hos Uno Score – annonselenke`);
+      }
       if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
         const warnIcon = document.createElement("span");
         warnIcon.className = "card-only-warn";
@@ -19980,15 +20110,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const flightMeta = currentUrl !== void 0 && priceMatches.some((priceMatch2) => priceMatch2.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch2)) ? extractFlightSearchMeta(currentUrl) : void 0;
       const flightFilterChips = flightMeta !== void 0 ? buildFlightFilterChips(flightMeta, shadowRoot, flightSortMode) : void 0;
       if (flightFilterChips !== void 0) priceMatchHeader.append(flightFilterChips);
-      const flightSearchIsUpdating = flightMeta !== void 0 && (pendingFlightPriceMatchSearch?.generation === renderGeneration && pendingFlightPriceMatchSearch.sources.size > 0 || unsortedPriceMatches.some((priceMatch2) => priceMatch2.searchIncomplete === true));
-      if (flightSearchIsUpdating) {
-        const progress = document.createElement("div");
-        progress.className = "price-match-progress";
-        progress.setAttribute("role", "progressbar");
-        progress.setAttribute("aria-label", "Henter flypriser");
-        syncPriceMatchProgressAnimation(progress);
-        priceMatchHeader.append(progress);
-      }
       priceMatchSection.append(
         priceMatchHeader,
         ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
@@ -20136,7 +20257,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (!codesSection.classList.contains("collapsed")) {
       loadDbCodes();
     }
-    const pick = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
+    const pick = currentSupportLink;
     if (pick !== void 0) {
       const support = document.createElement("div");
       support.className = "support";
@@ -20556,7 +20677,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const byKey = /* @__PURE__ */ new Map();
     for (const offer of offers) {
       const codeSuffix = offer.discountCode !== void 0 ? `:${offer.discountCode}` : "";
-      const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
+      const key = offer.provider === "cbn" ? getVisibleOfferKey(offer) : `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
       const existing = byKey.get(key);
       const newVal = parseRewardValue(offer);
       const existingVal = existing !== void 0 ? parseRewardValue(existing) : null;
@@ -20651,6 +20772,31 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (kind === "points") return 1;
     return 0;
   }
+  function isFlightPanelRow(priceMatch) {
+    return priceMatch.travelKind !== "hotel" && (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "kiwi" || priceMatch.source === "googleflights");
+  }
+  function buildFlightPriceMatchChips(priceMatch) {
+    const [route, dateWindow] = priceMatch.productName.split(" · ");
+    const texts = [
+      route,
+      priceMatch.dateFlex !== void 0 ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate) : void 0,
+      dateWindow,
+      ...priceMatch.durationText?.split(" · ") ?? [],
+      priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : void 0,
+      priceMatch.baggageExcluded === true ? "ekskl. bagasje" : void 0
+    ];
+    const chips = document.createElement("span");
+    chips.className = "price-match-chip-line";
+    for (const text of texts) {
+      if (text === void 0 || text.length === 0) continue;
+      const chip = document.createElement("span");
+      chip.className = "cbn-chip cbn-chip--muted price-match-info-chip";
+      chip.textContent = text;
+      chips.append(chip);
+    }
+    return chips;
+  }
+  const currentSupportLink = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "cbn-row price-match-card";
@@ -20668,7 +20814,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const priceMatchShop = document.createElement("span");
     priceMatchShop.className = "price-match-shop";
     priceMatchShop.textContent = [
-      priceMatch.dateFlex === void 0 ? priceMatch.shopName : `${priceMatch.matchedExactProduct === true ? "Valgt dato" : formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
+      priceMatch.dateFlex === void 0 ? priceMatch.shopName : `${formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
       priceMatch.baggageExcluded === true ? "ekskl. bagasje" : void 0
     ].filter((part) => part !== void 0).join(" · ");
     priceMatchTitle.append(priceMatchProduct, priceMatchShop);
@@ -20684,6 +20830,16 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
+    if (isFlightPanelRow(priceMatch)) {
+      priceMatchCard.classList.add("price-match-card--chips");
+      const chips = buildFlightPriceMatchChips(priceMatch);
+      const side = document.createElement("span");
+      side.className = "price-match-side";
+      if (priceMatch.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) side.classList.add("price-match-side--inline");
+      side.append(priceMatchPrice, priceMatchBadge);
+      priceMatchCard.append(chips, side);
+      return priceMatchCard;
+    }
     const hasDuration = priceMatch.durationText !== void 0 && priceMatch.durationText.length > 0;
     if (hasDuration) {
       const priceMatchDuration = document.createElement("span");

@@ -46,6 +46,7 @@ import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_UR
 import { createTooltipController, type TooltipController } from "../shared/tooltips";
 import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
+import { getOfferCampaignLabel, getVisibleOfferKey, prioritizeOffersForPage } from "../shared/offer-context";
 import {
   addDaysToIsoDate,
   isString,
@@ -10576,10 +10577,12 @@ function createProviderBadgeWithActivation(
 
   const providerBadge = document.createElement("a");
   providerBadge.className = `cbn-chip provider-badge provider-${offer.provider} provider-filter-link`;
-  providerBadge.href = getProviderPageUrl(offer.provider);
+  providerBadge.href = offer.provider === "cbn" ? offer.activationUrl : getProviderPageUrl(offer.provider);
   providerBadge.target = "_blank";
-  providerBadge.rel = "noreferrer";
-  providerBadge.title = `Se alle ${offer.provider === "cbn" ? "Cashback Norge" : formatProviderName(offer.provider)}-fordeler`;
+  providerBadge.rel = offer.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer";
+  providerBadge.title = offer.provider === "cbn"
+    ? `Åpne ${getOfferCampaignLabel(offer) ?? offer.merchantName} – annonselenke`
+    : `Se alle ${formatProviderName(offer.provider)}-fordeler`;
   providerBadge.setAttribute("aria-label", providerBadge.title);
   providerBadge.textContent = formatProviderName(offer.provider);
 
@@ -11532,6 +11535,12 @@ function renderNotice(
       gap: 6px;
       line-height: 1.2;
       overflow-wrap: anywhere;
+    }
+    @media (max-width: 520px) {
+      .offer-link:has(.offer-campaign) { grid-template-columns: auto minmax(0, 1fr); row-gap: 4px; }
+      .offer-link:has(.offer-campaign) .offer-action { grid-column: 1 / -1; }
+      .offer-link:has(.offer-campaign) > .cbn-offer-details { grid-column: 1; grid-row: 2; }
+      .offer-link:has(.offer-campaign) .provider-wrap { flex-wrap: wrap; grid-column: 2; grid-row: 2; }
     }
     .provider-badge {
       align-items: center;
@@ -12594,7 +12603,7 @@ function renderNotice(
     }
   `;
   style.textContent += buildRuntimeProviderCss();
-  const mainOffers = offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
+  const mainOffers = prioritizeOffersForPage(offers.filter((o) => o.provider !== "curve" && o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank"), window.location.href);
   const activeOfferKey = getLastActivatedOfferKey(mainOffers, activatedOffers);
   const priceMatch = priceMatches[0];
   const bestRegionPrice = regionPrices?.prices[0];
@@ -12726,7 +12735,7 @@ function renderNotice(
     offerLink.className = "offer-action";
     offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
     offerLink.target = "_blank";
-    offerLink.rel = "noreferrer";
+    offerLink.rel = currentOffer.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer";
     const offerLabel = document.createElement("span");
     offerLabel.className = "offer-label";
     const offerReward = document.createElement("span");
@@ -12735,15 +12744,26 @@ function renderNotice(
     rewardLabels.push({ element: offerReward, offer: currentOffer });
     const providerWrap = createProviderBadgeWithActivation(currentOffer, activeOfferKey, shadowRoot);
     if (shouldMarkOfferClick(currentOffer)) {
-      offerLink.addEventListener("click", () => {
+      const onActivationClick = (): void => {
         showOfferActivated(currentOffer, providerWrap, shadowRoot);
         void markOfferActivated(currentOffer.provider, currentOffer.activationUrl);
-      });
+      };
+      offerLink.addEventListener("click", onActivationClick);
+      providerWrap.querySelector("a")?.addEventListener("click", onActivationClick);
     }
     if (shouldShowAffiliateDisclosure(currentOffer)) {
       addAffiliateDisclosure(providerWrap, currentOffer);
     }
     offerLabel.append(offerReward);
+    const campaignLabel = getOfferCampaignLabel(currentOffer);
+    if (campaignLabel !== undefined) {
+      const campaign = document.createElement("span");
+      campaign.className = "offer-campaign";
+      campaign.style.cssText = "font-size:12px;font-weight:500;";
+      campaign.textContent = campaignLabel;
+      offerLabel.append(campaign);
+      offerLink.setAttribute("aria-label", `Åpne ${campaignLabel} hos Uno Score – annonselenke`);
+    }
     if (CARD_ONLY_PROVIDERS.has(currentOffer.provider)) {
       const warnIcon = document.createElement("span");
       warnIcon.className = "card-only-warn";
@@ -14249,7 +14269,7 @@ function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
   const byKey = new Map<string, CashbackOffer>();
   for (const offer of offers) {
     const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
-    const key = `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
+    const key = offer.provider === "cbn" ? getVisibleOfferKey(offer) : `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
     const newVal = parseRewardValue(offer);
     const existingVal = existing !== undefined ? parseRewardValue(existing) : null;
