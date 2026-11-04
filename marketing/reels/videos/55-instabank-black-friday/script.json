@@ -1,0 +1,42 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-04",
+  "offer": "https://instabank.no/kredittkort/rabatter (november: 3 % på netthandel; desember: 3 % på alle kjøp; fast 5 % på kollektivtransport og elbillading; maks 500 kr/mnd og 3 000 kr/år)",
+  "costs": "https://instabank.no/kredittkort (nominell rente 18,9 %, termingebyr 40 kr, ingen rentefri periode)",
+  "example": "Orion/Instabank representativt eksempel: eff. rente 22,85 %, 45 000 kr over 1 år, totalt 50 219 kr",
+  "approval": "Orion Media (Kasper Møller) godkjente Instabank-kampanjen for cashbacknorge.no 4. nov. 2026",
+  "site": "https://cashbacknorge.no/ (Instabank-annonsen, Ekstra cashback → Gratis, tooltip)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Black Friday? Få *{3 %|tre prosent}* rabatt på all *netthandel.*",
+   "gap": 0.3
+  },
+  {
+   "id": "site",
+   "line": "På Cashback Norge finner du nå *Instabank* kredittkort."
+  },
+  {
+   "id": "source",
+   "line": "Hele *november* gir kortet {3 %|tre prosent} på alt du kjøper på nett, også på varer som allerede er på salg."
+  },
+  {
+   "id": "caps",
+   "line": "Rabatten er maks *{500 kr|fem hundre kroner}* i måneden, og renter løper fra første dag."
+  },
+  {
+   "id": "card",
+   "line": "Handler du for *{5 000 kr|fem tusen kroner},* får du *{150 kr|hundre og femti kroner}* trukket fra fakturaen."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

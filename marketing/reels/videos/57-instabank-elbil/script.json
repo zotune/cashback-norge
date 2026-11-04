@@ -1,0 +1,46 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-04",
+  "offer": "https://instabank.no/kredittkort/rabatter (november: 3 % på netthandel; desember: 3 % på alle kjøp; fast 5 % på kollektivtransport og elbillading; maks 500 kr/mnd og 3 000 kr/år)",
+  "costs": "https://instabank.no/kredittkort (nominell rente 18,9 %, termingebyr 40 kr, ingen rentefri periode)",
+  "example": "Orion/Instabank representativt eksempel: eff. rente 22,85 %, 45 000 kr over 1 år, totalt 50 219 kr",
+  "approval": "Orion Media (Kasper Møller) godkjente Instabank-kampanjen for cashbacknorge.no 4. nov. 2026",
+  "site": "https://cashbacknorge.no/ (Instabank-annonsen, Ekstra cashback → Gratis, tooltip)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Lader du *elbilen?* Få *{5 %|fem prosent}* tilbake hver måned.",
+   "gap": 0.3
+  },
+  {
+   "id": "source",
+   "line": "Instabank kredittkort gir *fast* {5 %|fem prosent} rabatt på elbillading og kollektivtransport."
+  },
+  {
+   "id": "extra",
+   "line": "Det kommer i *tillegg* til månedsrabatten, som er {3 %|tre prosent} på netthandel i november."
+  },
+  {
+   "id": "caps",
+   "line": "Maks *{500 kr|fem hundre kroner}* i måneden, og renter løper fra første dag."
+  },
+  {
+   "id": "site",
+   "line": "Du finner kortet på *Cashback* Norge."
+  },
+  {
+   "id": "card",
+   "line": "Lader du for *{1 000 kr|tusen kroner}* i måneden, er det *{600 kr|seks hundre kroner}* i året."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}
