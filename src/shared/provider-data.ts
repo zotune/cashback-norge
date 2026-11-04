@@ -216,6 +216,8 @@ export type BonusCard = {
   approx: boolean;
   /** Applies to some purchases only (such as a merchant category), so no kroner amount is calculated from the sum. */
   conditional?: boolean;
+  /** Paid advertisement: the url is an affiliate link and the chip is highlighted with an Ad label. */
+  ad?: boolean;
   tip: string;
 };
 
@@ -270,7 +272,7 @@ export const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
 };
 
 // Approved Orion creative. This is an advertisement, not cashback paid to the
-// visitor. Keep the credit example and conditions identical in both clients.
+// visitor. Site and extension show the same bottom line and example.
 export const INSTABANK_AD = {
   id: "instabank",
   text: "Instabank kredittkort",
@@ -279,16 +281,13 @@ export const INSTABANK_AD = {
   affiliate: true,
   validFrom: "2026-11-01",
   validUntil: "2026-12-31",
-  example: "Effektiv rente 22,85 %. Eksempel: 45 000 kr over 1 år. Kostnad 5 219 kr. Totalt 50 219 kr.",
-  costs: "Ingen rentefri periode – renter fra første dag ved bruk av kreditt. Nominell rente 18,9 %. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
-  footerCosts: "Ingen rentefri periode. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
-  benefits: [
-    { text: "November 2026: 3 % rabatt på netthandel.", validUntil: "2026-11-30" },
-    { text: "Desember 2026: 3 % rabatt på alle kjøp, også romjulstilbud.", validUntil: "2026-12-31" },
-    { text: "Fast 5 % rabatt på kollektivtransport og elbillading.", validUntil: "2026-12-31" },
+  // Short sign-up incentive per month, shown as the ad text.
+  incentives: [
+    { text: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
+    { text: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" },
   ],
-  limits: "Maks samlet rabatt 500 kr per måned og 3 000 kr per år. Renter og gebyrer kan spise opp rabatten. Uttak, overføringer og regningsbetaling gir ikke rabatt.",
-  disclosure: "Kredittyter: Instabank ASA. Annonselenke – Cashback Norge kan motta provisjon fra Instabank.",
+  // Credit ads must carry the representative example. Keep it to one line.
+  example: "Eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr.",
 } as const;
 
 export const SUPPORT_LINKS = [

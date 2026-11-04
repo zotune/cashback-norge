@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793794320
+// @version      1793796387
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -397,16 +397,13 @@
     affiliate: true,
     validFrom: "2026-11-01",
     validUntil: "2026-12-31",
-    example: "Effektiv rente 22,85 %. Eksempel: 45 000 kr over 1 år. Kostnad 5 219 kr. Totalt 50 219 kr.",
-    costs: "Ingen rentefri periode – renter fra første dag ved bruk av kreditt. Nominell rente 18,9 %. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
-    footerCosts: "Ingen rentefri periode. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
-    benefits: [
-      { text: "November 2026: 3 % rabatt på netthandel.", validUntil: "2026-11-30" },
-      { text: "Desember 2026: 3 % rabatt på alle kjøp, også romjulstilbud.", validUntil: "2026-12-31" },
-      { text: "Fast 5 % rabatt på kollektivtransport og elbillading.", validUntil: "2026-12-31" }
+    // Short sign-up incentive per month, shown as the ad text.
+    incentives: [
+      { text: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
+      { text: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" }
     ],
-    limits: "Maks samlet rabatt 500 kr per måned og 3 000 kr per år. Renter og gebyrer kan spise opp rabatten. Uttak, overføringer og regningsbetaling gir ikke rabatt.",
-    disclosure: "Kredittyter: Instabank ASA. Annonselenke – Cashback Norge kan motta provisjon fra Instabank."
+    // Credit ads must carry the representative example. Keep it to one line.
+    example: "Eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr."
   };
   const SUPPORT_LINKS = [
     { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
@@ -955,14 +952,17 @@
     if (benefit === void 0) return FREE_CARDS;
     const pct = getMaxRewardPercent(benefit) / 100;
     const allPurchases = /^(?:alle kjøp|(?:all )?netthandel)\b/i.test(benefit.cardBenefit.category);
+    const today = osloDate(now);
+    const ad = benefit.provider === "instabank" && today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
     const card = {
       pct,
       ...allPurchases ? {} : { minPct: 0, maxPct: pct },
       label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
       badge: benefit.provider,
-      url: benefit.activationUrl,
+      url: ad ? INSTABANK_AD.url : benefit.activationUrl,
       approx: false,
       conditional: true,
+      ...ad ? { ad: true } : {},
       tip: describeCardBenefits(benefit, offers, now)
     };
     return [...FREE_CARDS, card].sort((a, b) => b.pct - a.pct);
@@ -992,6 +992,11 @@
   function isInstabankAdActive(now = /* @__PURE__ */ new Date()) {
     const today = osloDate(now);
     return today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
+  }
+  function getSupportAdvertisementText(ad, now = /* @__PURE__ */ new Date()) {
+    if (ad !== INSTABANK_AD) return ad.text;
+    const today = osloDate(now);
+    return INSTABANK_AD.incentives.find((incentive) => incentive.validUntil >= today)?.text ?? INSTABANK_AD.text;
   }
   function selectSupportAdvertisement(draw, now = /* @__PURE__ */ new Date()) {
     const sample = Number.isFinite(draw) ? Math.min(1 - Number.EPSILON, Math.max(0, draw)) : 0;
@@ -19182,9 +19187,6 @@ ${darkProviderCss}
     .support-logo:hover {
       opacity: 1;
     }
-    .support-credit-details { padding: 0 14px 6px; }
-    .support-credit-details p { color: var(--cbn-muted); font-size: 11px; line-height: 1.4; margin: 0 0 5px; }
-    .support-credit-details .support-credit-example { color: var(--cbn-text); font-weight: 600; }
     .conflict-warning {
       color: #d4830a;
       cursor: help;
@@ -19460,7 +19462,18 @@ ${darkProviderCss}
       const badge = document.createElement("span");
       badge.className = `cbn-chip provider-badge provider-${card.badge}`;
       badge.textContent = card.label;
-      chip.append(label, badge);
+      if (card.ad) {
+        chip.rel = "sponsored noopener noreferrer";
+        const wrapper = document.createElement("span");
+        wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+        const party = document.createElement("span");
+        party.textContent = "🥳";
+        party.setAttribute("aria-hidden", "true");
+        wrapper.append(party, makeAdChip(), badge);
+        chip.append(label, wrapper);
+      } else {
+        chip.append(label, badge);
+      }
       return { chip, label };
     }
     const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0].provider);
@@ -20299,7 +20312,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       supportLink.href = pick.url;
       supportLink.target = "_blank";
       supportLink.rel = pick.affiliate ? "sponsored noopener noreferrer" : "noopener noreferrer";
-      supportLink.textContent = pick.text;
+      supportLink.textContent = getSupportAdvertisementText(pick);
       const logoLink = document.createElement("a");
       logoLink.href = "https://cashbacknorge.no";
       logoLink.target = "_blank";
@@ -20314,7 +20327,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       else supportLink.style.cssText = "flex:1;text-align:center;";
       support.append(supportLink, logoLink);
       const disclosure = document.createElement("p");
-      disclosure.textContent = pick === INSTABANK_AD ? INSTABANK_AD.disclosure : "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
+      disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
       disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
       const quokkaLove = document.createElement("span");
       quokkaLove.className = "quokka-love quokka-love--couple";
@@ -20325,22 +20338,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       couple.alt = "";
       quokkaLove.append(couple);
       disclosure.append(" ", quokkaLove);
-      panel.append(body, support);
-      if (pick === INSTABANK_AD) {
-        const details = document.createElement("div");
-        details.className = "support-credit-details";
-        for (const [className, text] of [
-          ["support-credit-example", INSTABANK_AD.example],
-          ["support-credit-costs", INSTABANK_AD.footerCosts]
-        ]) {
-          const line = document.createElement("p");
-          line.className = className;
-          line.textContent = text;
-          details.append(line);
-        }
-        panel.append(details);
-      }
-      panel.append(disclosure);
+      panel.append(body, support, disclosure);
     } else {
       panel.append(body);
     }

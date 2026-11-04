@@ -1,5 +1,5 @@
-import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, INSTABANK_AD, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS } from "../shared/provider-data";
-import { selectSupportAdvertisement } from "../shared/support-advertisements";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS } from "../shared/provider-data";
+import { getSupportAdvertisementText, selectSupportAdvertisement } from "../shared/support-advertisements";
 import {
   calculateCashback,
   calculateCashbackMaxKr,
@@ -12574,9 +12574,6 @@ function renderNotice(
     .support-logo:hover {
       opacity: 1;
     }
-    .support-credit-details { padding: 0 14px 6px; }
-    .support-credit-details p { color: var(--cbn-muted); font-size: 11px; line-height: 1.4; margin: 0 0 5px; }
-    .support-credit-details .support-credit-example { color: var(--cbn-text); font-weight: 600; }
     .conflict-warning {
       color: #d4830a;
       cursor: help;
@@ -12870,7 +12867,18 @@ function renderNotice(
     const badge = document.createElement("span");
     badge.className = `cbn-chip provider-badge provider-${card.badge}`;
     badge.textContent = card.label;
-    chip.append(label, badge);
+    if (card.ad) {
+      chip.rel = "sponsored noopener noreferrer";
+      const wrapper = document.createElement("span");
+      wrapper.style.cssText = "display:inline-flex;align-items:center;gap:4px;";
+      const party = document.createElement("span");
+      party.textContent = "🥳";
+      party.setAttribute("aria-hidden", "true");
+      wrapper.append(party, makeAdChip(), badge);
+      chip.append(label, wrapper);
+    } else {
+      chip.append(label, badge);
+    }
     return { chip, label };
   }
   const firstOfferIsCardOnly = mainOffers.length > 0 && CARD_ONLY_PROVIDERS.has(mainOffers[0]!.provider);
@@ -13733,7 +13741,7 @@ function renderNotice(
     supportLink.href = pick.url;
     supportLink.target = "_blank";
     supportLink.rel = pick.affiliate ? "sponsored noopener noreferrer" : "noopener noreferrer";
-    supportLink.textContent = pick.text;
+    supportLink.textContent = getSupportAdvertisementText(pick);
     const logoLink = document.createElement("a");
     logoLink.href = "https://cashbacknorge.no";
     logoLink.target = "_blank";
@@ -13748,7 +13756,7 @@ function renderNotice(
     else supportLink.style.cssText = "flex:1;text-align:center;";
     support.append(supportLink, logoLink);
     const disclosure = document.createElement("p");
-    disclosure.textContent = pick === INSTABANK_AD ? INSTABANK_AD.disclosure : "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
+    disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
     const quokkaLove = document.createElement("span");
     quokkaLove.className = "quokka-love quokka-love--couple";
@@ -13759,22 +13767,7 @@ function renderNotice(
     couple.alt = "";
     quokkaLove.append(couple);
     disclosure.append(" ", quokkaLove);
-    panel.append(body, support);
-    if (pick === INSTABANK_AD) {
-      const details = document.createElement("div");
-      details.className = "support-credit-details";
-      for (const [className, text] of [
-        ["support-credit-example", INSTABANK_AD.example],
-        ["support-credit-costs", INSTABANK_AD.footerCosts],
-      ]) {
-        const line = document.createElement("p");
-        line.className = className!;
-        line.textContent = text!;
-        details.append(line);
-      }
-      panel.append(details);
-    }
-    panel.append(disclosure);
+    panel.append(body, support, disclosure);
   } else {
     panel.append(body);
   }

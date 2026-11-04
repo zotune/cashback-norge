@@ -1,6 +1,6 @@
 import { type CashbackOffer, isCashbackOffer } from "./cashback.js";
 import { formatCompactRewardLabel, getMaxRewardPercent } from "./reward-calculation.js";
-import { type BonusCard, FREE_CARDS, PROVIDER_NAMES, PROVIDER_TIPS } from "./provider-data.js";
+import { type BonusCard, FREE_CARDS, INSTABANK_AD, PROVIDER_NAMES, PROVIDER_TIPS } from "./provider-data.js";
 
 export const INSTABANK_CARD_URL = "https://instabank.no/kredittkort";
 export const INSTABANK_DISCOUNTS_URL = "https://instabank.no/kredittkort/rabatter";
@@ -56,14 +56,18 @@ export function getFreeCards(offers: CashbackOffer[], now = new Date()): BonusCa
   // A category month gives nothing outside its MCC codes, so the chip shows
   // 0 % as the lower bound. All purchases and all online shopping apply here.
   const allPurchases = /^(?:alle kjøp|(?:all )?netthandel)\b/i.test(benefit.cardBenefit!.category);
+  // While the Instabank campaign runs, the chip uses the affiliate link.
+  const today = osloDate(now);
+  const ad = benefit.provider === "instabank" && today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
   const card: BonusCard = {
     pct,
     ...(allPurchases ? {} : { minPct: 0, maxPct: pct }),
     label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
     badge: benefit.provider,
-    url: benefit.activationUrl,
+    url: ad ? INSTABANK_AD.url : benefit.activationUrl,
     approx: false,
     conditional: true,
+    ...(ad ? { ad: true } : {}),
     tip: describeCardBenefits(benefit, offers, now),
   };
   return [...FREE_CARDS, card].sort((a, b) => b.pct - a.pct);

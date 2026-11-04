@@ -9,10 +9,10 @@ export function isInstabankAdActive(now = new Date()): boolean {
   return today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
 }
 
-export function getInstabankAdBenefits(now = new Date()): string[] {
-  if (!isInstabankAdActive(now)) return [];
+export function getSupportAdvertisementText(ad: SupportAdvertisement, now = new Date()): string {
+  if (ad !== INSTABANK_AD) return ad.text;
   const today = osloDate(now);
-  return INSTABANK_AD.benefits.filter(benefit => benefit.validUntil >= today).map(benefit => benefit.text);
+  return INSTABANK_AD.incentives.find(incentive => incentive.validUntil >= today)?.text ?? INSTABANK_AD.text;
 }
 
 // Keep the draw once per page and reuse it on every render. The remaining 20 %

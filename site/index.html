@@ -186,12 +186,9 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .invite-card-dismiss { align-items: center; display: inline-flex; flex-shrink: 0; justify-content: center; margin-left: auto; min-height: 32px; width: 32px; }
 .invite-card h2 { font-size: 18px; font-weight: 700; line-height: 1.3; }
 .invite-card p { color: var(--cbn-muted); font-size: 13px; line-height: 1.5; margin: 7px 0 12px; }
+.invite-card .invite-card-fine-print { font-size: 10px; line-height: 1.35; margin: 8px 0 0; }
+.invite-card .invite-card-fine-print[hidden] { display: none; }
 .invite-card-action { align-items: center; display: flex; font-size: 13px; font-weight: 650; gap: 8px; justify-content: center; min-height: 44px; padding: 10px 12px; text-align: center; }
-.credit-ad .credit-example, .credit-ad .credit-costs { color: var(--cbn-text); font-size: 14px; }
-.credit-ad .credit-example { font-weight: 600; }
-.credit-ad .credit-benefits { color: var(--cbn-text); font-size: 13px; line-height: 1.5; margin: 10px 0; padding-left: 20px; }
-.credit-ad .credit-benefits li + li { margin-top: 4px; }
-.credit-ad .credit-disclosure { font-size: 11px; margin-bottom: 0; }
 .quick-filters { display: flex; flex: 1; gap: 6px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding: 3px; scrollbar-width: thin; }
 .quick-filter { flex: 1 0 auto; font: inherit; font-size: 12px; font-weight: 600; min-height: 36px; padding: 0 11px; white-space: nowrap; }
 @media (max-width: 380px) {
@@ -945,20 +942,6 @@ a.code-reward { color: inherit; text-decoration: none; }
   </nav>
   <p style="font-size:11px;color:var(--cbn-muted);text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
-  <aside class="cbn-card invite-card credit-ad" id="instabank-ad" aria-labelledby="instabank-ad-title" hidden>
-    <div class="invite-card-header">
-      <span class="cbn-chip cbn-chip--muted">Annonse</span>
-      <span>Instabank</span>
-      <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul Instabank-annonsen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-    </div>
-    <h2 id="instabank-ad-title">Instabank kredittkort</h2>
-    <p class="credit-example"></p>
-    <p class="credit-costs"></p>
-    <ul class="credit-benefits"></ul>
-    <p class="credit-limits"></p>
-    <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer" data-goatcounter-click="instabank-card-ad" data-goatcounter-title="Instabank: annonse"><span>Les om Instabank kredittkort</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
-    <p class="credit-disclosure"></p>
-  </aside>
   <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
     <div class="invite-card-header">
       <span class="cbn-chip cbn-chip--muted">Annonse</span>
@@ -968,6 +951,7 @@ a.code-reward { color: inherit; text-decoration: none; }
     <h2 id="support-invite-title"></h2>
     <p id="support-invite-description"></p>
     <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer" data-goatcounter-click="support-invite-card" data-goatcounter-title="Annonse"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+    <p class="invite-card-fine-print" id="support-invite-fine-print" hidden></p>
   </aside>
   <div class="sticky-header">
   <div class="filter-bar">
@@ -1019,17 +1003,20 @@ a.code-reward { color: inherit; text-decoration: none; }
   <div class="results" id="results"></div>
   <div id="results-more" aria-hidden="true"></div>
   <div class="az-bar" id="az-bar"></div>
-  <footer class="footer">
+  <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
       <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a> · <a class="js-email" data-u="c" data-d="adoretunes.com" data-keep-text href="#">Kontakt</a>
     </nav>
     <div>© 2026 Cashback Norge · Uavhengig cashback-oversikt for norske nettbutikker</div>
   </footer>
 </div>
+<div class="fixed-footer">
+  <div class="tip-line"></div>
+</div>
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, getInstabankAdBenefits, selectSupportAdvertisement, getOfferCampaignLabel, getVisibleOfferKey } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getOfferCampaignLabel, getVisibleOfferKey } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -1450,11 +1437,14 @@ async function init() {
   setupBonusToggle();
   const res = await fetch("cashback-index.json", { cache: "no-cache" });
   const data = await res.json();
-  const updateAdvertisements = setupAdvertisementSlot(data.offers);
+  // One draw per page, so the top card and the bottom line agree.
+  const adDraw = Math.random();
+  setupSupportInvite(data.offers, adDraw);
+  const updateFooterAd = setupFooterAd(adDraw);
   applyProviderMeta(data.providers);
   cardBenefitOffers = getCardBenefitOffers(data.offers);
   renderBonusChips();
-  watchCardBenefitDate(() => { window.CashbackTooltips.close(); renderBonusChips(); updateAdvertisements(); });
+  watchCardBenefitDate(() => { window.CashbackTooltips.close(); renderBonusChips(); updateFooterAd(); });
   allMerchants = groupByMerchant(data.offers.filter(offer => !offer.cardBenefit));
   curveDomains = new Set(data.offers.filter(o => o.provider === "curve").flatMap(o => o.domains));
   for (const [domain, name] of Object.entries(CRYPTO_SUBSCRIPTIONS)) {
@@ -2421,41 +2411,40 @@ function makeDeleteBtn(codeId, row, hostname) {
   return btn;
 }
 
-function setupAdvertisementSlot(offers) {
-  const card = document.getElementById("instabank-ad");
-  const fallback = document.getElementById("support-invite");
-  const hasFallback = setupSupportInvite(offers);
-  const draw = Math.random();
-  let dismissed = false;
-  card.querySelector(".credit-example").textContent = INSTABANK_AD.example;
-  card.querySelector(".credit-costs").textContent = INSTABANK_AD.costs;
-  card.querySelector(".credit-limits").textContent = INSTABANK_AD.limits;
-  card.querySelector(".credit-disclosure").textContent = INSTABANK_AD.disclosure;
-  card.querySelector(".invite-card-action").href = INSTABANK_AD.url;
+// Same slot and rule as the bottom line in the extension: one draw per page,
+// 80 % Instabank while the campaign runs, otherwise a support link.
+function setupFooterAd(draw) {
+  const footer = document.querySelector(".fixed-footer");
   const update = () => {
-    const showInstabank = selectSupportAdvertisement(draw) === INSTABANK_AD;
-    card.hidden = dismissed || !showInstabank;
-    fallback.hidden = dismissed || showInstabank || !hasFallback;
-    const list = card.querySelector(".credit-benefits");
-    list.replaceChildren();
-    for (const text of getInstabankAdBenefits()) {
-      const benefit = document.createElement("li");
-      benefit.textContent = text;
-      list.append(benefit);
+    const pick = selectSupportAdvertisement(draw);
+    const line = footer.querySelector(".tip-line");
+    line.replaceChildren();
+    if (pick.affiliate) {
+      const ad = document.createElement("span");
+      ad.className = "cbn-chip cbn-chip--muted ad-chip";
+      ad.textContent = "Ad";
+      line.append(ad);
     }
+    const link = document.createElement("a");
+    link.href = pick.url;
+    link.target = "_blank";
+    link.rel = pick.affiliate ? "sponsored noopener noreferrer" : "noopener noreferrer";
+    link.textContent = getSupportAdvertisementText(pick);
+    const mascot = document.createElement("span");
+    mascot.className = "quokka-love quokka-love--couple";
+    mascot.setAttribute("role", "img");
+    mascot.setAttribute("aria-label", "To quokkaer støtter veldedighet sammen");
+    const image = document.createElement("img");
+    image.src = "quokka-couple.png?v=quokka-1";
+    image.alt = "";
+    mascot.append(image);
+    line.append(link, mascot);
   };
   update();
-  for (const ad of [card, fallback]) {
-    ad.querySelector("button").addEventListener("click", () => {
-      dismissed = true;
-      update();
-      document.querySelector(".search").focus({ preventScroll: true });
-    });
-  }
   return update;
 }
 
-function setupSupportInvite(offers) {
+function setupSupportInvite(offers, draw) {
   const card = document.getElementById("support-invite");
   // Bruk samme kampanjelenke som tilbudsindeksen. Beløpet er vår provisjon,
   // og skal ikke presenteres som en registreringsbonus til besøkende.
@@ -2467,18 +2456,32 @@ function setupSupportInvite(offers) {
     action: "Se gjeldsoversikten hos Uno Score",
   } : undefined;
   const invites = SUPPORT_INVITES.filter(invite => invite.url);
-  if (!featuredAd && invites.length === 0) return false;
-  const invite = featuredAd ?? invites[Math.floor(Math.random() * invites.length)];
+  const instabankAd = selectSupportAdvertisement(draw) === INSTABANK_AD ? {
+    id: "instabank", name: "Instabank", url: INSTABANK_AD.url,
+    title: getSupportAdvertisementText(INSTABANK_AD).replace(/^Instabank: /, "").replace(/^./, c => c.toUpperCase()),
+    description: "Pluss fast 5 % rabatt på kollektivtransport og elbillading.",
+    finePrint: INSTABANK_AD.example,
+    action: "Få Instabank kredittkort",
+  } : undefined;
+  if (!featuredAd && invites.length === 0 && !instabankAd) return;
+  const invite = instabankAd ?? featuredAd ?? invites[Math.floor(Math.random() * invites.length)];
   card.dataset.invite = invite.id;
   document.getElementById("support-invite-provider").textContent = invite.name;
   document.getElementById("support-invite-title").textContent = invite.title;
   document.getElementById("support-invite-description").textContent = invite.description;
+  const finePrint = document.getElementById("support-invite-fine-print");
+  finePrint.textContent = invite.finePrint ?? "";
+  finePrint.hidden = !invite.finePrint;
   const action = card.querySelector(".invite-card-action");
   action.href = invite.url;
   action.querySelector("span").textContent = invite.action;
   action.dataset.goatcounterClick = `${invite.id}-invite-card`;
   action.dataset.goatcounterTitle = `${invite.name}: annonse`;
-  return true;
+  card.hidden = false;
+  card.querySelector("button").addEventListener("click", () => {
+    card.hidden = true;
+    document.querySelector(".search").focus({ preventScroll: true });
+  });
 }
 
 function installQuokkaRunner() {
@@ -2530,8 +2533,8 @@ function renderChipGroup(cards, container) {
     }
     return `<span class="tooltip-wrap">
       <span class="tooltip">${esc(c.tip)}</span>
-      <a class="cbn-row bonus-chip" href="${esc(c.url)}" target="_blank" rel="noreferrer">
-        <span class="bonus-chip-label">${rewardText}</span> <span style="display:inline-flex;align-items:center;gap:6px;">${(c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
+      <a class="cbn-row bonus-chip" href="${esc(c.url)}" target="_blank" rel="${c.ad ? 'sponsored noopener noreferrer' : 'noreferrer'}">
+        <span class="bonus-chip-label">${rewardText}</span> <span style="display:inline-flex;align-items:center;gap:6px;">${c.ad ? '<span aria-hidden="true">🥳</span>' : ''}${(c.ad || c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
       </a>
     </span>`;
   }).join("");

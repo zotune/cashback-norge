@@ -5,7 +5,7 @@ import { fetchInstabank } from "../src/backend/providers/instabank.js";
 import { collectProviderOffers } from "../src/backend/provider-offers.js";
 import { buildCashbackIndex, findOffersForHostname, isCashbackIndex, isCashbackOffer, type CashbackOffer } from "../src/shared/cashback.js";
 import { getActiveCardBenefits, getCardBenefitOffers, getFreeCards, osloDate, watchCardBenefitDate } from "../src/shared/card-benefits.js";
-import { buildProviderMeta, FREE_CARDS, PROVIDER_TIPS } from "../src/shared/provider-data.js";
+import { buildProviderMeta, FREE_CARDS, INSTABANK_AD, PROVIDER_TIPS } from "../src/shared/provider-data.js";
 import { calculateCashback, calculateCashbackMaxKr } from "../src/shared/reward-calculation.js";
 import { isCashbackFoundMessage, isOffersForUrlResponse } from "../src/shared/extension-messages.js";
 import { createCashbackIndexCache, type CachedIndex } from "../src/extension/cashback-index-cache.js";
@@ -114,6 +114,8 @@ test("dated November announcement overrides the stale calendar without taking th
     assert.equal(card.pct, 0.03);
     assert.equal(card.minPct, undefined);
     assert.match(card.tip, /November: 3 % på netthandel/);
+    // The campaign runs in November, so the chip is a marked ad with the affiliate link.
+    assert.deepEqual([card.ad, card.url], [true, INSTABANK_AD.url]);
   }, { body });
 });
 
