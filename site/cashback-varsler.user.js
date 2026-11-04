@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793796387
+// @version      1793800609
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -417,7 +417,9 @@
     { text: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
     { text: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
     { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-    { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true }
+    { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
+    // Bulder's referral terms: 500 kr to both when the referred mortgage is paid out (bulder.no/om-oss/vilkaar/bonus-verving).
+    { text: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true }
   ];
   const PROVIDER_WELCOME_BONUSES = {
     spareborsen: {
