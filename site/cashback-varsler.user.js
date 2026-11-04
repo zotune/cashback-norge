@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793715129
+// @version      1793794320
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -389,6 +389,25 @@
     "theathletic.com": "The Athletic",
     "laundryheap.com": "Laundryheap+"
   };
+  const INSTABANK_AD = {
+    id: "instabank",
+    text: "Instabank kredittkort",
+    emoji: "💳",
+    url: "https://oriomed.com/click.track?CID=452956&AFID=570033&ADID=2608370&SID=",
+    affiliate: true,
+    validFrom: "2026-11-01",
+    validUntil: "2026-12-31",
+    example: "Effektiv rente 22,85 %. Eksempel: 45 000 kr over 1 år. Kostnad 5 219 kr. Totalt 50 219 kr.",
+    costs: "Ingen rentefri periode – renter fra første dag ved bruk av kreditt. Nominell rente 18,9 %. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
+    footerCosts: "Ingen rentefri periode. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
+    benefits: [
+      { text: "November 2026: 3 % rabatt på netthandel.", validUntil: "2026-11-30" },
+      { text: "Desember 2026: 3 % rabatt på alle kjøp, også romjulstilbud.", validUntil: "2026-12-31" },
+      { text: "Fast 5 % rabatt på kollektivtransport og elbillading.", validUntil: "2026-12-31" }
+    ],
+    limits: "Maks samlet rabatt 500 kr per måned og 3 000 kr per år. Renter og gebyrer kan spise opp rabatten. Uttak, overføringer og regningsbetaling gir ikke rabatt.",
+    disclosure: "Kredittyter: Instabank ASA. Annonselenke – Cashback Norge kan motta provisjon fra Instabank."
+  };
   const SUPPORT_LINKS = [
     { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
     { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
@@ -409,6 +428,197 @@
       tip: "Ny hos Sparebørsen? Du får 50 kr i startsaldo når du registrerer deg med Vipps via vår invitasjon."
     }
   };
+  const UNO_CAMPAIGNS = {
+    "451581": { label: "Gjeldsoversikt", paths: ["/gjeldfri", "/gjeldsoversikt", "/statistikk/gjeldsoversikt"] },
+    "451327": { label: "Kredittscore", paths: ["/kredittscore"] }
+  };
+  const ORION_CLICK_HOSTS = /* @__PURE__ */ new Set(["orsearchlink.com", "oriomed.com", "ormarkmed.com", "orionious.com"]);
+  function unoCampaignId(offer) {
+    if (offer.provider !== "cbn" || !offer.domains.some((domain) => domain.replace(/^www\./, "") === "unoscore.no")) return void 0;
+    try {
+      const url = new URL(offer.activationUrl);
+      if (!ORION_CLICK_HOSTS.has(url.hostname) || url.pathname !== "/click.track") return void 0;
+      const id = url.searchParams.get("CID") ?? "";
+      return UNO_CAMPAIGNS[id] ? id : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function getOfferCampaignLabel(offer) {
+    const id = unoCampaignId(offer);
+    return id ? UNO_CAMPAIGNS[id].label : void 0;
+  }
+  function getVisibleOfferKey(offer) {
+    if (offer.provider === "cbn") {
+      return `cbn:${unoCampaignId(offer) ?? (offer.activationUrl || offer.merchantName)}`;
+    }
+    return `${offer.provider}:${offer.discountCode ?? ""}`;
+  }
+  function prioritizeOffersForPage(offers, pageUrl) {
+    let page;
+    try {
+      page = new URL(pageUrl);
+    } catch {
+      return offers;
+    }
+    if (!/^https?:$/.test(page.protocol) || !["unoscore.no", "www.unoscore.no", "app.unoscore.no"].includes(page.hostname)) return offers;
+    const relevant = (offer) => {
+      const id = unoCampaignId(offer);
+      return id !== void 0 && UNO_CAMPAIGNS[id].paths.some((path) => page.pathname === path || page.pathname.startsWith(`${path}/`));
+    };
+    return [...offers.filter(relevant), ...offers.filter((offer) => !relevant(offer))];
+  }
+  function isRecord$6(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function isCashbackProvider(value) {
+    return typeof value === "string" && value.length > 0;
+  }
+  function isProviderMeta(value) {
+    if (!isRecord$6(value)) {
+      return false;
+    }
+    return typeof value.name === "string" && (value.tip === void 0 || typeof value.tip === "string") && (value.bg === void 0 || typeof value.bg === "string") && (value.fg === void 0 || typeof value.fg === "string") && (value.border === void 0 || typeof value.border === "string");
+  }
+  function isCashbackOffer(value) {
+    if (!isRecord$6(value)) {
+      return false;
+    }
+    return isCashbackProvider(value.provider) && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every((domain) => typeof domain === "string") && typeof value.reward === "string" && (value.rewardSortValueNok === void 0 || typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok)) && (value.rewardCalculation === void 0 || isRewardCalculationRules(value.rewardCalculation)) && (value.cardBenefit === void 0 || isCardBenefit(value.cardBenefit)) && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
+  }
+  function isCardBenefit(value) {
+    if (!isRecord$6(value) || typeof value.category !== "string" || !value.category.trim()) return false;
+    if (value.kind === "ongoing") return value.validFrom === void 0 && value.validUntil === void 0;
+    const isDate = (date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+    return value.kind === "monthly" && isDate(value.validFrom) && isDate(value.validUntil) && value.validFrom <= value.validUntil;
+  }
+  function isRewardCalculationRules(value) {
+    return isRecord$6(value) && (value.minimumPurchaseNok === void 0 || typeof value.minimumPurchaseNok === "number" && Number.isFinite(value.minimumPurchaseNok) && value.minimumPurchaseNok >= 0) && (value.minimumPurchaseExclusive === void 0 || typeof value.minimumPurchaseExclusive === "boolean") && (value.singleItemOnly === void 0 || typeof value.singleItemOnly === "boolean");
+  }
+  function isCashbackIndex(value) {
+    if (!isRecord$6(value)) {
+      return false;
+    }
+    if (typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord$6(value.domainIndex) || value.providers !== void 0 && !(isRecord$6(value.providers) && Object.values(value.providers).every(isProviderMeta))) {
+      return false;
+    }
+    return value.offers.every(isCashbackOffer) && Object.values(value.domainIndex).every((offers) => {
+      return Array.isArray(offers) && offers.every(isCashbackOffer);
+    });
+  }
+  function parseUrl$1(input) {
+    try {
+      return new URL(input);
+    } catch {
+      return void 0;
+    }
+  }
+  const HTML_ENTITIES = new Map(Object.entries({
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    nbsp: " ",
+    shy: "",
+    aring: "å",
+    Aring: "Å",
+    aelig: "æ",
+    AElig: "Æ",
+    oslash: "ø",
+    Oslash: "Ø",
+    auml: "ä",
+    Auml: "Ä",
+    ouml: "ö",
+    Ouml: "Ö",
+    uuml: "ü",
+    Uuml: "Ü",
+    aacute: "á",
+    Aacute: "Á",
+    eacute: "é",
+    Eacute: "É",
+    egrave: "è",
+    Egrave: "È",
+    agrave: "à",
+    acirc: "â",
+    atilde: "ã",
+    ecirc: "ê",
+    euml: "ë",
+    igrave: "ì",
+    iuml: "ï",
+    ograve: "ò",
+    ocirc: "ô",
+    otilde: "õ",
+    ugrave: "ù",
+    ucirc: "û",
+    Ccedil: "Ç",
+    iacute: "í",
+    oacute: "ó",
+    Oacute: "Ó",
+    uacute: "ú",
+    ntilde: "ñ",
+    ccedil: "ç",
+    szlig: "ß",
+    zwj: "‍",
+    zwnj: "‌",
+    lrm: "",
+    rlm: "",
+    ensp: " ",
+    emsp: " ",
+    thinsp: " ",
+    bull: "•",
+    middot: "·",
+    hellip: "…",
+    ndash: "–",
+    mdash: "—",
+    minus: "−",
+    lsquo: "‘",
+    rsquo: "’",
+    sbquo: "‚",
+    ldquo: "“",
+    rdquo: "”",
+    bdquo: "„",
+    laquo: "«",
+    raquo: "»",
+    rarr: "→",
+    larr: "←",
+    uarr: "↑",
+    darr: "↓",
+    harr: "↔",
+    check: "✓",
+    euro: "€",
+    pound: "£",
+    dollar: "$",
+    cent: "¢",
+    percnt: "%",
+    times: "×",
+    divide: "÷",
+    plusmn: "±",
+    deg: "°",
+    frac12: "½",
+    frac14: "¼",
+    frac34: "¾",
+    sup2: "²",
+    sup3: "³",
+    copy: "©",
+    reg: "®",
+    trade: "™",
+    sect: "§",
+    para: "¶",
+    star: "☆",
+    hearts: "♥"
+  }));
+  function decodeHtmlEntities(value) {
+    if (!value.includes("&")) return value;
+    return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
+      if (entity.startsWith("#")) {
+        const isHex = entity[1] === "x" || entity[1] === "X";
+        const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+        return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : match;
+      }
+      return HTML_ENTITIES.get(entity) ?? HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
+    });
+  }
   const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
   const STATIC_NOK_BASE_RATES = {
     rates: {
@@ -427,7 +637,7 @@
     const value = await requestJson(EXCHANGE_RATES_URL$1, {
       headers: { "Accept": "application/json" }
     });
-    if (!isRecord$6(value) || value.result !== "success" || !isRecord$6(value.rates)) return void 0;
+    if (!isRecord$5(value) || value.result !== "success" || !isRecord$5(value.rates)) return void 0;
     const rates = {};
     for (const [currency, rate] of Object.entries(value.rates)) {
       if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
@@ -453,7 +663,7 @@
     if (!response.ok) return void 0;
     return response.json();
   }
-  function isRecord$6(value) {
+  function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const EB_PER_TRUMF_KR = 13.5;
@@ -708,196 +918,87 @@
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
-  const UNO_CAMPAIGNS = {
-    "451581": { label: "Gjeldsoversikt", paths: ["/gjeldfri", "/gjeldsoversikt", "/statistikk/gjeldsoversikt"] },
-    "451327": { label: "Kredittscore", paths: ["/kredittscore"] }
-  };
-  const ORION_CLICK_HOSTS = /* @__PURE__ */ new Set(["orsearchlink.com", "oriomed.com", "ormarkmed.com", "orionious.com"]);
-  function unoCampaignId(offer) {
-    if (offer.provider !== "cbn" || !offer.domains.some((domain) => domain.replace(/^www\./, "") === "unoscore.no")) return void 0;
-    try {
-      const url = new URL(offer.activationUrl);
-      if (!ORION_CLICK_HOSTS.has(url.hostname) || url.pathname !== "/click.track") return void 0;
-      const id = url.searchParams.get("CID") ?? "";
-      return UNO_CAMPAIGNS[id] ? id : void 0;
-    } catch {
-      return void 0;
-    }
+  const MAX_BENEFIT_AGE_MS = 14 * 864e5;
+  const LISTED_MONTHS = 3;
+  function osloDate(now) {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    return ["year", "month", "day"].map((kind) => parts.find((part) => part.type === kind).value).join("-");
   }
-  function getOfferCampaignLabel(offer) {
-    const id = unoCampaignId(offer);
-    return id ? UNO_CAMPAIGNS[id].label : void 0;
-  }
-  function getVisibleOfferKey(offer) {
-    if (offer.provider === "cbn") {
-      return `cbn:${unoCampaignId(offer) ?? (offer.activationUrl || offer.merchantName)}`;
-    }
-    return `${offer.provider}:${offer.discountCode ?? ""}`;
-  }
-  function prioritizeOffersForPage(offers, pageUrl) {
-    let page;
-    try {
-      page = new URL(pageUrl);
-    } catch {
-      return offers;
-    }
-    if (!/^https?:$/.test(page.protocol) || !["unoscore.no", "www.unoscore.no", "app.unoscore.no"].includes(page.hostname)) return offers;
-    const relevant = (offer) => {
-      const id = unoCampaignId(offer);
-      return id !== void 0 && UNO_CAMPAIGNS[id].paths.some((path) => page.pathname === path || page.pathname.startsWith(`${path}/`));
-    };
-    return [...offers.filter(relevant), ...offers.filter((offer) => !relevant(offer))];
-  }
-  function isRecord$5(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function isCashbackProvider(value) {
-    return typeof value === "string" && value.length > 0;
-  }
-  function isProviderMeta(value) {
-    if (!isRecord$5(value)) {
-      return false;
-    }
-    return typeof value.name === "string" && (value.tip === void 0 || typeof value.tip === "string") && (value.bg === void 0 || typeof value.bg === "string") && (value.fg === void 0 || typeof value.fg === "string") && (value.border === void 0 || typeof value.border === "string");
-  }
-  function isCashbackOffer(value) {
-    if (!isRecord$5(value)) {
-      return false;
-    }
-    return isCashbackProvider(value.provider) && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every((domain) => typeof domain === "string") && typeof value.reward === "string" && (value.rewardSortValueNok === void 0 || typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok)) && (value.rewardCalculation === void 0 || isRewardCalculationRules(value.rewardCalculation)) && (value.cardBenefit === void 0 || isCardBenefit(value.cardBenefit)) && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
-  }
-  function isCardBenefit(value) {
-    if (!isRecord$5(value) || typeof value.category !== "string" || !value.category.trim()) return false;
-    if (value.kind === "ongoing") return value.validFrom === void 0 && value.validUntil === void 0;
-    const isDate = (date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
-    return value.kind === "monthly" && isDate(value.validFrom) && isDate(value.validUntil) && value.validFrom <= value.validUntil;
-  }
-  function isRewardCalculationRules(value) {
-    return isRecord$5(value) && (value.minimumPurchaseNok === void 0 || typeof value.minimumPurchaseNok === "number" && Number.isFinite(value.minimumPurchaseNok) && value.minimumPurchaseNok >= 0) && (value.minimumPurchaseExclusive === void 0 || typeof value.minimumPurchaseExclusive === "boolean") && (value.singleItemOnly === void 0 || typeof value.singleItemOnly === "boolean");
-  }
-  function isCashbackIndex(value) {
-    if (!isRecord$5(value)) {
-      return false;
-    }
-    if (typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord$5(value.domainIndex) || value.providers !== void 0 && !(isRecord$5(value.providers) && Object.values(value.providers).every(isProviderMeta))) {
-      return false;
-    }
-    return value.offers.every(isCashbackOffer) && Object.values(value.domainIndex).every((offers) => {
-      return Array.isArray(offers) && offers.every(isCashbackOffer);
-    });
-  }
-  function parseUrl$1(input) {
-    try {
-      return new URL(input);
-    } catch {
-      return void 0;
-    }
-  }
-  const HTML_ENTITIES = new Map(Object.entries({
-    amp: "&",
-    lt: "<",
-    gt: ">",
-    quot: '"',
-    apos: "'",
-    nbsp: " ",
-    shy: "",
-    aring: "å",
-    Aring: "Å",
-    aelig: "æ",
-    AElig: "Æ",
-    oslash: "ø",
-    Oslash: "Ø",
-    auml: "ä",
-    Auml: "Ä",
-    ouml: "ö",
-    Ouml: "Ö",
-    uuml: "ü",
-    Uuml: "Ü",
-    aacute: "á",
-    Aacute: "Á",
-    eacute: "é",
-    Eacute: "É",
-    egrave: "è",
-    Egrave: "È",
-    agrave: "à",
-    acirc: "â",
-    atilde: "ã",
-    ecirc: "ê",
-    euml: "ë",
-    igrave: "ì",
-    iuml: "ï",
-    ograve: "ò",
-    ocirc: "ô",
-    otilde: "õ",
-    ugrave: "ù",
-    ucirc: "û",
-    Ccedil: "Ç",
-    iacute: "í",
-    oacute: "ó",
-    Oacute: "Ó",
-    uacute: "ú",
-    ntilde: "ñ",
-    ccedil: "ç",
-    szlig: "ß",
-    zwj: "‍",
-    zwnj: "‌",
-    lrm: "",
-    rlm: "",
-    ensp: " ",
-    emsp: " ",
-    thinsp: " ",
-    bull: "•",
-    middot: "·",
-    hellip: "…",
-    ndash: "–",
-    mdash: "—",
-    minus: "−",
-    lsquo: "‘",
-    rsquo: "’",
-    sbquo: "‚",
-    ldquo: "“",
-    rdquo: "”",
-    bdquo: "„",
-    laquo: "«",
-    raquo: "»",
-    rarr: "→",
-    larr: "←",
-    uarr: "↑",
-    darr: "↓",
-    harr: "↔",
-    check: "✓",
-    euro: "€",
-    pound: "£",
-    dollar: "$",
-    cent: "¢",
-    percnt: "%",
-    times: "×",
-    divide: "÷",
-    plusmn: "±",
-    deg: "°",
-    frac12: "½",
-    frac14: "¼",
-    frac34: "¾",
-    sup2: "²",
-    sup3: "³",
-    copy: "©",
-    reg: "®",
-    trade: "™",
-    sect: "§",
-    para: "¶",
-    star: "☆",
-    hearts: "♥"
-  }));
-  function decodeHtmlEntities(value) {
-    if (!value.includes("&")) return value;
-    return value.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
-      if (entity.startsWith("#")) {
-        const isHex = entity[1] === "x" || entity[1] === "X";
-        const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
-        return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : match;
+  function watchCardBenefitDate(onChange) {
+    let day = osloDate(/* @__PURE__ */ new Date());
+    const timer = setInterval(() => {
+      const nextDay = osloDate(/* @__PURE__ */ new Date());
+      if (nextDay !== day) {
+        day = nextDay;
+        onChange();
       }
-      return HTML_ENTITIES.get(entity) ?? HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
-    });
+    }, 6e4);
+    return () => clearInterval(timer);
+  }
+  function getCardBenefitOffers(offers) {
+    return offers.filter((offer) => offer.cardBenefit !== void 0);
+  }
+  function isRecentCardBenefit(offer, now) {
+    const age = now.getTime() - Date.parse(offer.updatedAt);
+    return isCashbackOffer(offer) && Number.isFinite(age) && age <= MAX_BENEFIT_AGE_MS;
+  }
+  function getActiveCardBenefits(offers, now = /* @__PURE__ */ new Date()) {
+    const today = osloDate(now);
+    return getCardBenefitOffers(offers).filter((offer) => {
+      if (!isRecentCardBenefit(offer, now)) return false;
+      const benefit = offer.cardBenefit;
+      return benefit.kind === "ongoing" || benefit.validFrom <= today && benefit.validUntil >= today;
+    }).sort((a, b) => Number(b.cardBenefit.kind === "monthly") - Number(a.cardBenefit.kind === "monthly"));
+  }
+  function getFreeCards(offers, now = /* @__PURE__ */ new Date()) {
+    const [benefit] = getActiveCardBenefits(offers, now);
+    if (benefit === void 0) return FREE_CARDS;
+    const pct = getMaxRewardPercent(benefit) / 100;
+    const allPurchases = /^(?:alle kjøp|(?:all )?netthandel)\b/i.test(benefit.cardBenefit.category);
+    const card = {
+      pct,
+      ...allPurchases ? {} : { minPct: 0, maxPct: pct },
+      label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
+      badge: benefit.provider,
+      url: benefit.activationUrl,
+      approx: false,
+      conditional: true,
+      tip: describeCardBenefits(benefit, offers, now)
+    };
+    return [...FREE_CARDS, card].sort((a, b) => b.pct - a.pct);
+  }
+  function describeCardBenefits(current, offers, now) {
+    const today = osloDate(now);
+    const benefits = getCardBenefitOffers(offers).filter((offer) => offer.provider === current.provider && isRecentCardBenefit(offer, now));
+    const months = benefits.filter((offer) => offer.cardBenefit.kind === "monthly" && offer.cardBenefit.validUntil >= today).sort((a, b) => a.cardBenefit.validFrom.localeCompare(b.cardBenefit.validFrom)).slice(0, LISTED_MONTHS);
+    const ongoing = benefits.filter((offer) => offer.cardBenefit.kind === "ongoing");
+    const describe = (name, offer) => `${name}: ${formatCompactRewardLabel(offer) ?? offer.reward} på ${offer.cardBenefit.category}`;
+    const caps = current.terms.split("\n").filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line)).map((line) => line.replace(/\s*\(.*\)$/, "").replace(/\bkr (?=\d)/g, "kr ").replace(/(\d) (?=\d{3}\b)/g, "$1 "));
+    const rebates = [
+      ...months.map((offer) => describe(monthName(offer.cardBenefit.validFrom), offer)),
+      ...ongoing.map((offer) => describe("Alltid", offer))
+    ];
+    return [
+      rebates.join("\n"),
+      caps.length > 0 ? `${caps.join(". ")}.` : "",
+      PROVIDER_TIPS[current.provider] ?? ""
+    ].filter((section) => section !== "").join("\n\n");
+  }
+  function monthName(date) {
+    const name = new Intl.DateTimeFormat("nb-NO", { month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${date}T12:00:00Z`));
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  const INSTABANK_AD_SHARE = 0.8;
+  function isInstabankAdActive(now = /* @__PURE__ */ new Date()) {
+    const today = osloDate(now);
+    return today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
+  }
+  function selectSupportAdvertisement(draw, now = /* @__PURE__ */ new Date()) {
+    const sample = Number.isFinite(draw) ? Math.min(1 - Number.EPSILON, Math.max(0, draw)) : 0;
+    const active = isInstabankAdActive(now);
+    if (active && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
+    const rest = active ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
+    return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))];
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
     /\s+\|\s+/,
@@ -1716,7 +1817,7 @@
   }
   function readAllKeyShopData(html) {
     const gamePageTrans = readAssignedJsonObject(html, "gamePageTrans");
-    if (!isRecord$5(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
+    if (!isRecord$6(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
     const prices = gamePageTrans.prices.map(readAllKeyShopRawPrice).filter((price) => price !== void 0);
     if (prices.length === 0) return void 0;
     return {
@@ -1728,7 +1829,7 @@
     };
   }
   function readAllKeyShopRawPrice(value) {
-    if (!isRecord$5(value)) return void 0;
+    if (!isRecord$6(value)) return void 0;
     const merchantName = readString$1(value.merchantName);
     const amount = readAmount$1(value.price);
     if (merchantName === void 0 || amount === void 0 || amount <= 0) return void 0;
@@ -1762,9 +1863,9 @@
   }
   function readAllKeyShopEditions(value) {
     const editions = /* @__PURE__ */ new Map();
-    if (!isRecord$5(value)) return editions;
+    if (!isRecord$6(value)) return editions;
     for (const [id, edition] of Object.entries(value)) {
-      if (!isRecord$5(edition)) continue;
+      if (!isRecord$6(edition)) continue;
       const name = readString$1(edition.name);
       if (name !== void 0) editions.set(id, name);
     }
@@ -1772,9 +1873,9 @@
   }
   function readAllKeyShopRegions(value) {
     const regions = /* @__PURE__ */ new Map();
-    if (!isRecord$5(value)) return regions;
+    if (!isRecord$6(value)) return regions;
     for (const [id, region] of Object.entries(value)) {
-      if (!isRecord$5(region)) continue;
+      if (!isRecord$6(region)) continue;
       const name = readString$1(region.region_name) ?? readString$1(region.filter_name);
       if (name !== void 0) regions.set(id, name);
     }
@@ -2137,13 +2238,13 @@
     return shopName;
   }
   function readGgDealsApiPriceData(value, id) {
-    if (!isRecord$5(value) || value.success !== true || !isRecord$5(value.data)) return void 0;
+    if (!isRecord$6(value) || value.success !== true || !isRecord$6(value.data)) return void 0;
     const rawData = value.data[id];
-    if (!isRecord$5(rawData)) return void 0;
+    if (!isRecord$6(rawData)) return void 0;
     return readGgDealsPriceData(rawData);
   }
   function readGgDealsPriceData(value) {
-    const prices = isRecord$5(value.prices) ? value.prices : void 0;
+    const prices = isRecord$6(value.prices) ? value.prices : void 0;
     if (prices === void 0) return void 0;
     const currency = typeof prices.currency === "string" && prices.currency.length > 0 ? prices.currency.toUpperCase() : "NOK";
     return {
@@ -2938,7 +3039,7 @@
     for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
       const item = pending[visited];
       if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$5(item)) {
+      else if (isRecord$6(item)) {
         if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
         pending.push(...Object.values(item));
       }
@@ -2959,8 +3060,8 @@
     if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return void 0;
     const product = readNextProductData(html, rawUrl);
     if (product === void 0) return void 0;
-    const brand = isRecord$5(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
-    const attributes = isRecord$5(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$5).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$5) : []) : [];
+    const brand = isRecord$6(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
+    const attributes = isRecord$6(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$6).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$6) : []) : [];
     return {
       "@type": "Product",
       name: product.title,
@@ -2975,7 +3076,7 @@
     for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
       const item = pending.pop();
       if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$5(item)) {
+      else if (isRecord$6(item)) {
         if (Object.hasOwn(item, name)) return item[name];
         pending.push(...Object.values(item));
       }
@@ -2983,7 +3084,7 @@
     return void 0;
   }
   function readProductLanguage(product, titles) {
-    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$5) : [];
+    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$6) : [];
     const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
     const languages = new Set(values.filter((value) => typeof value === "string").flatMap((value) => readTcgLanguages(value).map((language) => language.code)));
     return languages.size === 1 ? [...languages][0] : void 0;
@@ -2991,7 +3092,7 @@
   function readProductOfferLanguage(html, productId) {
     const rows = findStructuredProperty(readNextFlightValues(html), "offerRows");
     if (!Array.isArray(rows)) return void 0;
-    const names = rows.filter(isRecord$5).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
+    const names = rows.filter(isRecord$6).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
     return readProductLanguage(void 0, names);
   }
   function findTypedLdJson(value, type) {
@@ -3002,7 +3103,7 @@
       }
       return void 0;
     }
-    if (!isRecord$5(value)) return void 0;
+    if (!isRecord$6(value)) return void 0;
     const found = Array.isArray(value["@graph"]) ? findTypedLdJson(value["@graph"], type) : void 0;
     if (found !== void 0) return found;
     const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
@@ -3016,7 +3117,7 @@
       }
       return void 0;
     }
-    if (!isRecord$5(value)) return void 0;
+    if (!isRecord$6(value)) return void 0;
     const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
     if (types.includes("Product") && typeof value.name === "string" && value.name.trim().length > 0) return value;
     return Array.isArray(value["@graph"]) ? selectProductLdJson(value["@graph"]) : void 0;
@@ -3024,7 +3125,7 @@
   function decodeLdJsonStrings(value) {
     if (typeof value === "string") return decodeHtmlEntities(value);
     if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
-    if (isRecord$5(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
+    if (isRecord$6(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
     return value;
   }
   function isExplicitPreorder(...values) {
@@ -3138,15 +3239,15 @@
     if (structured !== void 0) {
       const productName2 = withLeadingBrand$1(
         readStringLike$5(structured.name),
-        readStringLike$5(isRecord$5(structured.brand) ? structured.brand.name : structured.brand)
+        readStringLike$5(isRecord$6(structured.brand) ? structured.brand.name : structured.brand)
       );
       if (productName2 === void 0 || hasProductVariantConflict(anchor, productName2) || scoreProductCandidateMatch(anchor, { title: productName2 }) < MIN_PRODUCT_MATCH_SCORE) return void 0;
-      const aggregate = isRecord$5(structured.offers) ? structured.offers : void 0;
+      const aggregate = isRecord$6(structured.offers) ? structured.offers : void 0;
       const rawOffers = Array.isArray(structured.offers) ? structured.offers : Array.isArray(aggregate?.offers) ? aggregate.offers : [];
-      const offers2 = rawOffers.filter(isRecord$5).flatMap((item) => {
+      const offers2 = rawOffers.filter(isRecord$6).flatMap((item) => {
         const stock = readStringLike$5(item.availability)?.replace(/^https?:\/\/schema\.org\//, "");
         const amount = readPriceAmount(item.price);
-        const shopName = readStringLike$5(isRecord$5(item.seller) ? item.seller.name : void 0);
+        const shopName = readStringLike$5(isRecord$6(item.seller) ? item.seller.name : void 0);
         const currency = readStringLike$5(item.priceCurrency);
         if (stock !== "InStock" || isExplicitPreorder(item.isPreorder, item.is_preorder) || item.itemCondition === "https://schema.org/UsedCondition" || amount === void 0 || amount <= 0 || shopName === void 0 || currency !== "NOK") return [];
         const url = parseUrl$1(readStringLike$5(item.url) ?? "");
@@ -5103,15 +5204,15 @@ query SearchSuggestions($query: String!, $category: Int) {
     for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
       const item = pending[visited];
       if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$5(item)) {
-        if (isRecord$5(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
+      else if (isRecord$6(item)) {
+        if (isRecord$6(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
         pending.push(...Object.values(item));
       }
     }
     const rowLists = components.map((item) => [item.lowestPrice, ...item.otherInStockPrices, ...item.outOfStockPrices]);
     if (rowLists.length === 0) return { issue: "missing-product-price-data" };
     if (new Set(rowLists.map((rows) => JSON.stringify(rows))).size !== 1) return { issue: "ambiguous-product-price-data" };
-    return { rows: rowLists[0].filter(isRecord$5) };
+    return { rows: rowLists[0].filter(isRecord$6) };
   }
   function readPokeprisOffers(html, rawOffers, productUrl, productName, language, onDiagnostic) {
     const scoped = readPriceRows(html, productUrl);
@@ -5119,8 +5220,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       onDiagnostic({ reason: scoped.issue });
       return void 0;
     }
-    const verified = rawOffers.filter(isRecord$5).flatMap((offer) => {
-      const shopName = isRecord$5(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
+    const verified = rawOffers.filter(isRecord$6).flatMap((offer) => {
+      const shopName = isRecord$6(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
       const url = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
       const diagnostic = { reason: "", ...url !== void 0 ? { offerUrl: url.href } : {}, ...shopName ? { shopName } : {} };
       const reject = (reason) => {
@@ -5158,7 +5259,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         preorder
       }];
     });
-    const judgedUrls = rawOffers.filter(isRecord$5).map((offer) => typeof offer.url === "string" ? offer.url : "");
+    const judgedUrls = rawOffers.filter(isRecord$6).map((offer) => typeof offer.url === "string" ? offer.url : "");
     const rowIdentity = /* @__PURE__ */ new Map();
     for (const row of scoped.rows) {
       const url = typeof row.product_url === "string" ? parseUrl$1(row.product_url) : void 0;
@@ -5179,12 +5280,12 @@ query SearchSuggestions($query: String!, $category: Int) {
   const POKEPRIS_CATALOG_URL = "https://cashbacknorge.no/pokepris-catalog.json";
   const POKEPRIS_CATALOG_MAX_AGE_MS = 14 * 864e5;
   function isPokeprisCatalog(value) {
-    if (!isRecord$5(value) || value.version !== 1 || typeof value.source !== "string") return false;
+    if (!isRecord$6(value) || value.version !== 1 || typeof value.source !== "string") return false;
     if (typeof value.generatedAt !== "string" || !Number.isFinite(Date.parse(value.generatedAt))) return false;
-    if (!Array.isArray(value.products) || !isRecord$5(value.urls)) return false;
+    if (!Array.isArray(value.products) || !isRecord$6(value.urls)) return false;
     const ids = /* @__PURE__ */ new Set();
     for (const product of value.products) {
-      if (!isRecord$5(product) || !Number.isSafeInteger(product.id) || product.id <= 0) return false;
+      if (!isRecord$6(product) || !Number.isSafeInteger(product.id) || product.id <= 0) return false;
       if (typeof product.canonicalId !== "string" || typeof product.name !== "string" || typeof product.category !== "string") return false;
       if (product.setName !== void 0 && typeof product.setName !== "string") return false;
       if (product.language !== void 0 && typeof product.language !== "string") return false;
@@ -5266,7 +5367,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (products.length === 0 && apiFailure !== void 0) throw apiFailure;
     }
     const anchor = buildProductMatchAnchor(message);
-    const candidates = products.filter(isRecord$5).filter((product) => /^[1-9]\d*$/.test(String(product.id ?? "")) && typeof product.name === "string").filter((product) => readTcgProductKind(String(product.name)) === kind).map((product) => ({ product, score: scoreProductCandidateMatch(anchor, { title: `Pokémon ${product.name}` }) })).filter(({ score }) => score >= MIN_PRODUCT_MATCH_SCORE).sort((a, b) => b.score - a.score).slice(0, MAX_PRODUCT_REQUESTS);
+    const candidates = products.filter(isRecord$6).filter((product) => /^[1-9]\d*$/.test(String(product.id ?? "")) && typeof product.name === "string").filter((product) => readTcgProductKind(String(product.name)) === kind).map((product) => ({ product, score: scoreProductCandidateMatch(anchor, { title: `Pokémon ${product.name}` }) })).filter(({ score }) => score >= MIN_PRODUCT_MATCH_SCORE).sort((a, b) => b.score - a.score).slice(0, MAX_PRODUCT_REQUESTS);
     if (candidates.length === 0) options.onDiagnostic?.({ reason: "no-matching-catalog-product" });
     for (const { product } of candidates) {
       const productUrl = `${ORIGIN}/produkt/${encodeURIComponent(String(product.id))}`;
@@ -5335,7 +5436,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       throw new Error("Pokepris: empty getProducts response");
     }
     const data = readPokeprisSearchResult(result);
-    if (!isRecord$5(data) || !Array.isArray(data.products)) {
+    if (!isRecord$6(data) || !Array.isArray(data.products)) {
       actionCache.delete(requestText);
       throw new Error("Pokepris: invalid getProducts response");
     }
@@ -5348,7 +5449,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (featured.length > 0) return featured;
     const taxonomy = findStructuredProperty(readNextFlightValues(home), "seriesWithSets");
     const query = normalizeTcgProductTitle(message.searchTerm);
-    const knownSetNames = Array.isArray(taxonomy) ? taxonomy.filter(isRecord$5).flatMap((series) => Array.isArray(series.sets) ? series.sets.filter(isRecord$5).map((set) => set.name).filter((name) => typeof name === "string") : []) : [];
+    const knownSetNames = Array.isArray(taxonomy) ? taxonomy.filter(isRecord$6).flatMap((series) => Array.isArray(series.sets) ? series.sets.filter(isRecord$6).map((set) => set.name).filter((name) => typeof name === "string") : []) : [];
     const setNames = knownSetNames.filter((name) => query.includes(normalizeTcgProductTitle(name))).sort((a, b) => query.lastIndexOf(normalizeTcgProductTitle(b)) - query.lastIndexOf(normalizeTcgProductTitle(a)) || b.length - a.length);
     for (const setName of setNames.slice(0, 2)) {
       const path = normalizeTcgText(setName).replace(/ /g, "-");
@@ -5378,8 +5479,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     return readLdJsonScripts(html).flatMap((entry) => {
       const list = findTypedLdJson(entry, "ItemList");
       return Array.isArray(list?.itemListElement) ? list.itemListElement : [];
-    }).filter(isRecord$5).flatMap((entry) => {
-      const item = isRecord$5(entry.item) ? entry.item : void 0;
+    }).filter(isRecord$6).flatMap((entry) => {
+      const item = isRecord$6(entry.item) ? entry.item : void 0;
       if (typeof item?.name !== "string" || typeof item.url !== "string" || !isPokeprisProductUrl(item.url)) return [];
       if (readTcgProductKind(item.name) !== kind || !isNameWithinSearchTerm(item.name, message.searchTerm)) return [];
       return [{ id: new URL(item.url).pathname.split("/")[2], name: item.name }];
@@ -5423,7 +5524,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (separator < 0) continue;
       try {
         const value = JSON.parse(line.slice(separator + 1));
-        if (isRecord$5(value) && Array.isArray(value.products)) return value;
+        if (isRecord$6(value) && Array.isArray(value.products)) return value;
       } catch {
       }
     }
@@ -5432,7 +5533,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   async function readProductPage(html, productUrl, message, mode, options) {
     const product = selectProductLdJson(readLdJsonScripts(html));
     if (product === void 0 || typeof product.name !== "string") return void 0;
-    const brand = isRecord$5(product.brand) ? product.brand.name : product.brand;
+    const brand = isRecord$6(product.brand) ? product.brand.name : product.brand;
     if (typeof brand !== "string" || !/pok[eé]mon/i.test(brand)) return void 0;
     const name = `Pokémon ${product.name.replace(/^pok[eé]mon\s+/i, "")}`;
     const reject = (reason) => {
@@ -5442,7 +5543,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const kind = readTcgProductKind(name);
     if (kind === void 0 || mode === "search" && readTcgProductKind(message.searchTerm) !== kind) return void 0;
     if (mode === "merchant-url" && hasTcgProductVariantConflict(message.searchTerm, name)) return reject("product-variant-mismatch");
-    const properties = Array.isArray(product.additionalProperty) ? product.additionalProperty.filter(isRecord$5) : [];
+    const properties = Array.isArray(product.additionalProperty) ? product.additionalProperty.filter(isRecord$6) : [];
     const setName = properties.find((item) => item.name === "Kortsett")?.value;
     const languageName = properties.find((item) => item.name === "Språk")?.value;
     const language = typeof languageName === "string" ? readTcgLanguage(languageName) : void 0;
@@ -5456,7 +5557,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (scoreProductCandidateMatch(buildProductMatchAnchor(message), { title: name }) < MIN_PRODUCT_MATCH_SCORE) return reject("product-variant-mismatch");
     }
     const aggregate = product.offers;
-    const rawOffers = isRecord$5(aggregate) && Array.isArray(aggregate.offers) ? aggregate.offers : Array.isArray(aggregate) ? aggregate : [];
+    const rawOffers = isRecord$6(aggregate) && Array.isArray(aggregate.offers) ? aggregate.offers : Array.isArray(aggregate) ? aggregate : [];
     const validated = readPokeprisOffers(
       html,
       rawOffers,
@@ -9055,76 +9156,6 @@ ${darkProviderCss}
       }
     };
   }
-  const MAX_BENEFIT_AGE_MS = 14 * 864e5;
-  const LISTED_MONTHS = 3;
-  function osloDate(now) {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-    return ["year", "month", "day"].map((kind) => parts.find((part) => part.type === kind).value).join("-");
-  }
-  function watchCardBenefitDate(onChange) {
-    let day = osloDate(/* @__PURE__ */ new Date());
-    const timer = setInterval(() => {
-      const nextDay = osloDate(/* @__PURE__ */ new Date());
-      if (nextDay !== day) {
-        day = nextDay;
-        onChange();
-      }
-    }, 6e4);
-    return () => clearInterval(timer);
-  }
-  function getCardBenefitOffers(offers) {
-    return offers.filter((offer) => offer.cardBenefit !== void 0);
-  }
-  function isRecentCardBenefit(offer, now) {
-    const age = now.getTime() - Date.parse(offer.updatedAt);
-    return isCashbackOffer(offer) && Number.isFinite(age) && age <= MAX_BENEFIT_AGE_MS;
-  }
-  function getActiveCardBenefits(offers, now = /* @__PURE__ */ new Date()) {
-    const today = osloDate(now);
-    return getCardBenefitOffers(offers).filter((offer) => {
-      if (!isRecentCardBenefit(offer, now)) return false;
-      const benefit = offer.cardBenefit;
-      return benefit.kind === "ongoing" || benefit.validFrom <= today && benefit.validUntil >= today;
-    }).sort((a, b) => Number(b.cardBenefit.kind === "monthly") - Number(a.cardBenefit.kind === "monthly"));
-  }
-  function getFreeCards(offers, now = /* @__PURE__ */ new Date()) {
-    const [benefit] = getActiveCardBenefits(offers, now);
-    if (benefit === void 0) return FREE_CARDS;
-    const pct = getMaxRewardPercent(benefit) / 100;
-    const allPurchases = /^(?:alle kjøp|all netthandel)\b/i.test(benefit.cardBenefit.category);
-    const card = {
-      pct,
-      ...allPurchases ? {} : { minPct: 0, maxPct: pct },
-      label: PROVIDER_NAMES[benefit.provider] ?? benefit.provider,
-      badge: benefit.provider,
-      url: benefit.activationUrl,
-      approx: false,
-      conditional: true,
-      tip: describeCardBenefits(benefit, offers, now)
-    };
-    return [...FREE_CARDS, card].sort((a, b) => b.pct - a.pct);
-  }
-  function describeCardBenefits(current, offers, now) {
-    const today = osloDate(now);
-    const benefits = getCardBenefitOffers(offers).filter((offer) => offer.provider === current.provider && isRecentCardBenefit(offer, now));
-    const months = benefits.filter((offer) => offer.cardBenefit.kind === "monthly" && offer.cardBenefit.validUntil >= today).sort((a, b) => a.cardBenefit.validFrom.localeCompare(b.cardBenefit.validFrom)).slice(0, LISTED_MONTHS);
-    const ongoing = benefits.filter((offer) => offer.cardBenefit.kind === "ongoing");
-    const describe = (name, offer) => `${name}: ${formatCompactRewardLabel(offer) ?? offer.reward} på ${offer.cardBenefit.category}`;
-    const caps = current.terms.split("\n").filter((line) => /^Maks rabatt pr (?:måned|år)/i.test(line)).map((line) => line.replace(/\s*\(.*\)$/, "").replace(/\bkr (?=\d)/g, "kr ").replace(/(\d) (?=\d{3}\b)/g, "$1 "));
-    const rebates = [
-      ...months.map((offer) => describe(monthName(offer.cardBenefit.validFrom), offer)),
-      ...ongoing.map((offer) => describe("Alltid", offer))
-    ];
-    return [
-      rebates.join("\n"),
-      caps.length > 0 ? `${caps.join(". ")}.` : "",
-      PROVIDER_TIPS[current.provider] ?? ""
-    ].filter((section) => section !== "").join("\n\n");
-  }
-  function monthName(date) {
-    const name = new Intl.DateTimeFormat("nb-NO", { month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${date}T12:00:00Z`));
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  }
   function readStringValue(value) {
     if (typeof value !== "string") return void 0;
     const trimmed = value.trim();
@@ -9178,7 +9209,7 @@ ${darkProviderCss}
     }
   }
   function readRecordArray(value) {
-    return Array.isArray(value) ? value.filter(isRecord$5) : [];
+    return Array.isArray(value) ? value.filter(isRecord$6) : [];
   }
   function isString(value) {
     return typeof value === "string";
@@ -9391,7 +9422,7 @@ ${darkProviderCss}
     return void 0;
   }
   function readPanFlightsLegMinutes(item, roundTrip) {
-    const packageRecord = isRecord$5(item.package) ? item.package : void 0;
+    const packageRecord = isRecord$6(item.package) ? item.package : void 0;
     const routes = readRecordArray(packageRecord?.routelist);
     const route = routes[0];
     const minutes = (seconds) => {
@@ -9510,7 +9541,7 @@ ${darkProviderCss}
     for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
       if (attempt > 0) await input.wait(input.intervalMs);
       const value = await input.requestResults(state.searchId, state.filterState);
-      if (!isRecord$5(value) || !Array.isArray(value.results)) continue;
+      if (!isRecord$6(value) || !Array.isArray(value.results)) continue;
       const searchId = readStringValue(value.searchId);
       if (searchId !== void 0) state.searchId = searchId;
       const nextFilterState = state.filterState ?? input.readFilterState(value);
@@ -9542,9 +9573,9 @@ ${darkProviderCss}
   }
   function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fees = isRecord$5(bookingOption.fees) ? bookingOption.fees : void 0;
+    const fees = isRecord$6(bookingOption.fees) ? bookingOption.fees : void 0;
     const isIncluded = (bagData, display) => {
-      const status = isRecord$5(bagData) ? readStringValue(bagData.status) : void 0;
+      const status = isRecord$6(bagData) ? readStringValue(bagData.status) : void 0;
       return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
     };
     if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
@@ -9561,7 +9592,7 @@ ${darkProviderCss}
   function readTripComJourneyStopCount(journey) {
     const sections = readRecordArray(journey.transSectionList);
     const intermediateStops = sections.reduce((count, section) => {
-      const flightInfo = isRecord$5(section.flightInfo) ? section.flightInfo : void 0;
+      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
       return count + readRecordArray(flightInfo?.stopList).length;
     }, 0);
     return Math.max(0, sections.length - 1) + intermediateStops;
@@ -9608,17 +9639,17 @@ ${darkProviderCss}
   }
   function isSkyscannerPricingOptionMatchingBaggage(pricingOption, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fareAttributes = isRecord$5(pricingOption.fareAttributes) ? pricingOption.fareAttributes : void 0;
-    const isIncluded = (baggage) => isRecord$5(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
+    const fareAttributes = isRecord$6(pricingOption.fareAttributes) ? pricingOption.fareAttributes : void 0;
+    const isIncluded = (baggage) => isRecord$6(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
     if (flightMeta.includeCabinBag === true && !isIncluded(fareAttributes?.cabinBaggage)) return false;
     if (flightMeta.includeCheckedBag === true && !isIncluded(fareAttributes?.checkedBaggage)) return false;
     return true;
   }
   function readPanFlightsPackageRecord(item) {
-    return isRecord$5(item.package) ? item.package : void 0;
+    return isRecord$6(item.package) ? item.package : void 0;
   }
   function readPanFlightsRouteLegStopCount(route, dataKey) {
-    const legData = isRecord$5(route[dataKey]) ? route[dataKey] : void 0;
+    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
     const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
     return specs.length > 0 ? Math.max(0, specs.length - 1) : void 0;
   }
@@ -9637,7 +9668,7 @@ ${darkProviderCss}
   }
   function readPanFlightsBaggageFee(baggage, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
-    if (!isRecord$5(baggage)) return void 0;
+    if (!isRecord$6(baggage)) return void 0;
     let feePerPassenger = 0;
     if (flightMeta.includeCabinBag === true) {
       const cabinFee = readNumberValue(baggage.bin);
@@ -9662,7 +9693,7 @@ ${darkProviderCss}
     return Number.isNaN(date.getTime()) ? void 0 : date.toISOString().slice(0, 10);
   }
   function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
-    const legData = isRecord$5(route[dataKey]) ? route[dataKey] : void 0;
+    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
     return readStringValue(legData?.flyFrom)?.toUpperCase() === origin && readStringValue(legData?.flyTo)?.toUpperCase() === destination ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
   }
   function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex) {
@@ -9716,7 +9747,7 @@ ${darkProviderCss}
     const connections = readRecordArray(parseJsonValue(connectionsText ?? ""));
     const outbound = connections[0];
     const inbound = connections[1];
-    const readCode = (place) => readIataCodeValue(isRecord$5(place) ? place.code : void 0);
+    const readCode = (place) => readIataCodeValue(isRecord$6(place) ? place.code : void 0);
     const origin = readCode(outbound?.origin);
     const destination = readCode(outbound?.destination);
     const outboundDate = readIsoDateValue(outbound?.departureDate);
@@ -9726,7 +9757,7 @@ ${darkProviderCss}
       return void 0;
     }
     const tagging = parseJsonValue(taggingText ?? "");
-    const flow = isRecord$5(tagging) && isRecord$5(tagging.flow) ? tagging.flow : void 0;
+    const flow = isRecord$6(tagging) && isRecord$6(tagging.flow) ? tagging.flow : void 0;
     if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
     const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
     return normalizeFlightSearchMeta({
@@ -9744,9 +9775,9 @@ ${darkProviderCss}
   }
   function readAmadeusAirBoundsFlightSearchMeta(stateText) {
     const state = parseJsonValue(stateText ?? "");
-    if (!isRecord$5(state) || !isRecord$5(state.entities)) return void 0;
+    if (!isRecord$6(state) || !isRecord$6(state.entities)) return void 0;
     const selectedId = readStringValue(state.selectedAirBoundsSearchId);
-    const search = selectedId !== void 0 && isRecord$5(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
+    const search = selectedId !== void 0 && isRecord$6(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
     if (search === void 0) return void 0;
     const itineraries = readRecordArray(search.itineraries);
     const outbound = itineraries[0];
@@ -19151,6 +19182,9 @@ ${darkProviderCss}
     .support-logo:hover {
       opacity: 1;
     }
+    .support-credit-details { padding: 0 14px 6px; }
+    .support-credit-details p { color: var(--cbn-muted); font-size: 11px; line-height: 1.4; margin: 0 0 5px; }
+    .support-credit-details .support-credit-example { color: var(--cbn-text); font-weight: 600; }
     .conflict-warning {
       color: #d4830a;
       cursor: help;
@@ -20257,14 +20291,14 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (!codesSection.classList.contains("collapsed")) {
       loadDbCodes();
     }
-    const pick = currentSupportLink;
+    const pick = selectSupportAdvertisement(supportAdvertisementDraw);
     if (pick !== void 0) {
       const support = document.createElement("div");
       support.className = "support";
       const supportLink = document.createElement("a");
       supportLink.href = pick.url;
       supportLink.target = "_blank";
-      supportLink.rel = "noreferrer";
+      supportLink.rel = pick.affiliate ? "sponsored noopener noreferrer" : "noopener noreferrer";
       supportLink.textContent = pick.text;
       const logoLink = document.createElement("a");
       logoLink.href = "https://cashbacknorge.no";
@@ -20280,7 +20314,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       else supportLink.style.cssText = "flex:1;text-align:center;";
       support.append(supportLink, logoLink);
       const disclosure = document.createElement("p");
-      disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
+      disclosure.textContent = pick === INSTABANK_AD ? INSTABANK_AD.disclosure : "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
       disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
       const quokkaLove = document.createElement("span");
       quokkaLove.className = "quokka-love quokka-love--couple";
@@ -20291,7 +20325,22 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       couple.alt = "";
       quokkaLove.append(couple);
       disclosure.append(" ", quokkaLove);
-      panel.append(body, support, disclosure);
+      panel.append(body, support);
+      if (pick === INSTABANK_AD) {
+        const details = document.createElement("div");
+        details.className = "support-credit-details";
+        for (const [className, text] of [
+          ["support-credit-example", INSTABANK_AD.example],
+          ["support-credit-costs", INSTABANK_AD.footerCosts]
+        ]) {
+          const line = document.createElement("p");
+          line.className = className;
+          line.textContent = text;
+          details.append(line);
+        }
+        panel.append(details);
+      }
+      panel.append(disclosure);
     } else {
       panel.append(body);
     }
@@ -20796,7 +20845,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     return chips;
   }
-  const currentSupportLink = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
+  const supportAdvertisementDraw = Math.random();
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "cbn-row price-match-card";

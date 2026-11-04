@@ -1,5 +1,6 @@
 import {
   FREE_CARDS,
+  INSTABANK_AD,
   MERCHANT_ALIASES,
   PREMIUM_CARDS,
   PROVIDER_NAMES,
@@ -20,6 +21,7 @@ import {
 import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters";
 import { getOfferCampaignLabel, getVisibleOfferKey } from "../shared/offer-context";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
+import { getInstabankAdBenefits, selectSupportAdvertisement } from "../shared/support-advertisements";
 
 // Expose shared data as globals for the inline site script
 Object.assign(window, {
@@ -32,6 +34,9 @@ Object.assign(window, {
     getCardBenefitOffers,
     getFreeCards,
     watchCardBenefitDate,
+    INSTABANK_AD,
+    getInstabankAdBenefits,
+    selectSupportAdvertisement,
     PREMIUM_CARDS,
     SUPPORT_LINKS,
     MERCHANT_ALIASES,

@@ -1,4 +1,5 @@
-import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS, SUPPORT_LINKS } from "../shared/provider-data";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, INSTABANK_AD, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS } from "../shared/provider-data";
+import { selectSupportAdvertisement } from "../shared/support-advertisements";
 import {
   calculateCashback,
   calculateCashbackMaxKr,
@@ -12573,6 +12574,9 @@ function renderNotice(
     .support-logo:hover {
       opacity: 1;
     }
+    .support-credit-details { padding: 0 14px 6px; }
+    .support-credit-details p { color: var(--cbn-muted); font-size: 11px; line-height: 1.4; margin: 0 0 5px; }
+    .support-credit-details .support-credit-example { color: var(--cbn-text); font-weight: 600; }
     .conflict-warning {
       color: #d4830a;
       cursor: help;
@@ -13721,14 +13725,14 @@ function renderNotice(
     loadDbCodes();
   }
 
-  const pick = currentSupportLink;
+  const pick = selectSupportAdvertisement(supportAdvertisementDraw);
   if (pick !== undefined) {
     const support = document.createElement("div");
     support.className = "support";
     const supportLink = document.createElement("a");
     supportLink.href = pick.url;
     supportLink.target = "_blank";
-    supportLink.rel = "noreferrer";
+    supportLink.rel = pick.affiliate ? "sponsored noopener noreferrer" : "noopener noreferrer";
     supportLink.textContent = pick.text;
     const logoLink = document.createElement("a");
     logoLink.href = "https://cashbacknorge.no";
@@ -13744,7 +13748,7 @@ function renderNotice(
     else supportLink.style.cssText = "flex:1;text-align:center;";
     support.append(supportLink, logoLink);
     const disclosure = document.createElement("p");
-    disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
+    disclosure.textContent = pick === INSTABANK_AD ? INSTABANK_AD.disclosure : "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
     const quokkaLove = document.createElement("span");
     quokkaLove.className = "quokka-love quokka-love--couple";
@@ -13755,7 +13759,22 @@ function renderNotice(
     couple.alt = "";
     quokkaLove.append(couple);
     disclosure.append(" ", quokkaLove);
-    panel.append(body, support, disclosure);
+    panel.append(body, support);
+    if (pick === INSTABANK_AD) {
+      const details = document.createElement("div");
+      details.className = "support-credit-details";
+      for (const [className, text] of [
+        ["support-credit-example", INSTABANK_AD.example],
+        ["support-credit-costs", INSTABANK_AD.footerCosts],
+      ]) {
+        const line = document.createElement("p");
+        line.className = className!;
+        line.textContent = text!;
+        details.append(line);
+      }
+      panel.append(details);
+    }
+    panel.append(disclosure);
   } else {
     panel.append(body);
   }
@@ -14414,7 +14433,7 @@ function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
 }
 
 // Velges én gang per side, ellers bytter annonsen hver gang panelet tegnes på nytt.
-const currentSupportLink = SUPPORT_LINKS[Math.floor(Math.random() * SUPPORT_LINKS.length)];
+const supportAdvertisementDraw = Math.random();
 
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");

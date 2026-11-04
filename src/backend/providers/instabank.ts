@@ -103,6 +103,30 @@ function readCalendar($: InstabankCheerio, generatedAt: string): Calendar {
     months.set(month, { month, reward, category, mcc: "" });
   });
   if (months.size !== 12) throw new Error(`Instabank: expected 12 calendar months, found ${months.size}`);
+  // The dated announcement is updated before the annual calendar. In November
+  // 2026 it says 3 % on online shopping while the calendar still says 5 %.
+  // Read only that sentence, so the separate green 5 % benefit cannot take over.
+  const announcements = new Map<number, { reward: string; category: string | undefined }>();
+  $("p").each((_index, element) => {
+    const line = clean($(element).text());
+    const match = line.match(new RegExp(`^I\\s+(${MONTHS.join("|")})\\s+${year}\\s+gir vi deg\\s+([^.!?]+)`, "i"));
+    if (!match) return;
+    const month = MONTHS.indexOf(match[1]!.toLowerCase()) + 1;
+    const description = match[2]!.split(/\s+når du betaler\b/i)[0]!;
+    const reward = extractPercentageReward(description);
+    if (!reward || reward.includes("-")) throw new Error(`Instabank: invalid dated announcement for ${match[1]}`);
+    const category = description.match(/%\s*(?:rabatt\s*)?på\s+(.+)$/i)?.[1]?.trim();
+    const existing = announcements.get(month);
+    if (existing && (existing.reward !== reward || existing.category !== category)) {
+      throw new Error(`Instabank: conflicting dated announcements for ${match[1]}`);
+    }
+    announcements.set(month, { reward, category });
+  });
+  for (const [month, announcement] of announcements) {
+    const entry = months.get(month)!;
+    entry.reward = announcement.reward;
+    if (announcement.category) entry.category = announcement.category;
+  }
   $(".elementor-widget-text-editor").each((_index, element) => {
     const description = clean($(element).html() ?? "");
     const heading = description.match(new RegExp(`^(${MONTHS.join("|")}):`, "i"));

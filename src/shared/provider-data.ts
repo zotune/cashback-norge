@@ -269,6 +269,28 @@ export const REVOLUT_SUBSCRIPTIONS: Record<string, string> = {
   "laundryheap.com": "Laundryheap+",
 };
 
+// Approved Orion creative. This is an advertisement, not cashback paid to the
+// visitor. Keep the credit example and conditions identical in both clients.
+export const INSTABANK_AD = {
+  id: "instabank",
+  text: "Instabank kredittkort",
+  emoji: "💳",
+  url: "https://oriomed.com/click.track?CID=452956&AFID=570033&ADID=2608370&SID=",
+  affiliate: true,
+  validFrom: "2026-11-01",
+  validUntil: "2026-12-31",
+  example: "Effektiv rente 22,85 %. Eksempel: 45 000 kr over 1 år. Kostnad 5 219 kr. Totalt 50 219 kr.",
+  costs: "Ingen rentefri periode – renter fra første dag ved bruk av kreditt. Nominell rente 18,9 %. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
+  footerCosts: "Ingen rentefri periode. Termingebyr 40 kr. Kredittramme opptil 100 000 kr, etter kredittvurdering.",
+  benefits: [
+    { text: "November 2026: 3 % rabatt på netthandel.", validUntil: "2026-11-30" },
+    { text: "Desember 2026: 3 % rabatt på alle kjøp, også romjulstilbud.", validUntil: "2026-12-31" },
+    { text: "Fast 5 % rabatt på kollektivtransport og elbillading.", validUntil: "2026-12-31" },
+  ],
+  limits: "Maks samlet rabatt 500 kr per måned og 3 000 kr per år. Renter og gebyrer kan spise opp rabatten. Uttak, overføringer og regningsbetaling gir ikke rabatt.",
+  disclosure: "Kredittyter: Instabank ASA. Annonselenke – Cashback Norge kan motta provisjon fra Instabank.",
+} as const;
+
 export const SUPPORT_LINKS = [
   { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
   { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },

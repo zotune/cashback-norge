@@ -99,6 +99,31 @@ test("calendar selection changes at Oslo midnight and never promotes an old year
   assert.equal(getActiveCardBenefits(refreshed, new Date("2026-12-31T23:00:00Z")).filter((offer) => offer.cardBenefit?.kind === "monthly").length, 0);
 });
 
+test("dated November announcement overrides the stale calendar without taking the green rate", async () => {
+  const body = catalogue().replace("I oktober 2026 gir vi deg 5 % rabatt.",
+    "I november 2026 gir vi deg 3 % rabatt på netthandel når du betaler med ditt Instabank kredittkort. Rabatten kommer i tillegg til allerede rabatterte varer!");
+  await withSource(async (urls) => {
+    const date = "2026-11-04T12:00:00Z";
+    const offers = await fetchInstabank({ ...urls, generatedAt: date, logger });
+    const november = getActiveCardBenefits(offers, new Date(date))[0]!;
+    assert.deepEqual([november.reward, november.cardBenefit?.category], ["3 %", "netthandel"]);
+    assert.equal(offers.find(o => o.cardBenefit?.validFrom === "2026-12-01")?.reward, "3 %");
+    assert.equal(offers.find(o => o.cardBenefit?.kind === "ongoing")?.reward, "5 %");
+    assert.match(november.terms, /2026-11-01 til 2026-11-30/);
+    const card = getFreeCards(offers, new Date(date)).find(c => c.badge === "instabank")!;
+    assert.equal(card.pct, 0.03);
+    assert.equal(card.minPct, undefined);
+    assert.match(card.tip, /November: 3 % på netthandel/);
+  }, { body });
+});
+
+test("conflicting dated announcements fail instead of advertising the higher calendar rate", async () => {
+  const body = catalogue().replace("</body>", "<p>I oktober 2026 gir vi deg 3 % rabatt.</p></body>");
+  await withSource(async (urls) => {
+    await assert.rejects(fetchInstabank({ ...urls, generatedAt, logger }), /conflicting dated announcements/);
+  }, { body });
+});
+
 test("invalid benefit metadata is rejected all the way through persisted indexes and extension messages", async () => {
   const [offer] = await offersFromSource();
   for (const cardBenefit of [

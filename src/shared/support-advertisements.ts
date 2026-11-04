@@ -1,0 +1,26 @@
+import { INSTABANK_AD, SUPPORT_LINKS } from "./provider-data.js";
+import { osloDate } from "./card-benefits.js";
+
+export const INSTABANK_AD_SHARE = 0.8;
+export type SupportAdvertisement = typeof INSTABANK_AD | typeof SUPPORT_LINKS[number];
+
+export function isInstabankAdActive(now = new Date()): boolean {
+  const today = osloDate(now);
+  return today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
+}
+
+export function getInstabankAdBenefits(now = new Date()): string[] {
+  if (!isInstabankAdActive(now)) return [];
+  const today = osloDate(now);
+  return INSTABANK_AD.benefits.filter(benefit => benefit.validUntil >= today).map(benefit => benefit.text);
+}
+
+// Keep the draw once per page and reuse it on every render. The remaining 20 %
+// is split evenly between the existing links, without a second random draw.
+export function selectSupportAdvertisement(draw: number, now = new Date()): SupportAdvertisement {
+  const sample = Number.isFinite(draw) ? Math.min(1 - Number.EPSILON, Math.max(0, draw)) : 0;
+  const active = isInstabankAdActive(now);
+  if (active && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
+  const rest = active ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
+  return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))]!;
+}
