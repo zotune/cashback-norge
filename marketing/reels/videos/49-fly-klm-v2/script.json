@@ -1,0 +1,66 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Shanghai til Bergen med ett stopp: *{6 718 kr|seks tusen sju hundre og atten kroner}* i stedet for {8 852.|åtte tusen åtte hundre og femtito.}",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "{KLM|K L M} sin laveste billettpris den tjuefemte november: *{8 852 kr.|åtte tusen åtte hundre og femtito kroner.}* Ett stopp.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker samme strekning og dato hos andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Med ett stopp, som {KLM:|K L M:} *{6 718 kr|seks tusen sju hundre og atten kroner}* via Skyscanner, og *{6 767|seks tusen sju hundre og sekstisju}* med bagasje via {momondo.|Momondo.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Med to stopp er det enda billigere, men reisen tar fra {22|tjueto} til nesten {26|tjueseks} timer.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{2 134 kr|To tusen hundre og trettifire kroner}* mindre, også med ett stopp.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Ikke samme fly. Sjekk bagasje og tider før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-04",
+  "capture": "Skjermbilder tatt i brukerens egen Brave-nettleser med Cashback Norge 0.2.29 4. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser); se shots/airlines-2026-11/RAPPORT.md",
+  "comparison": {
+    "route": "Shanghai (PVG) – Bergen (BGO), en vei 25.11.2026, 1 voksen, økonomi",
+    "airlineNok": 8852,
+    "airlineBasis": "KLMs «Laveste billettpris» for ons. 25. nov. (1 passasjer), én transfer, 19 t 15 min ifølge RAPPORT.md",
+    "skyscannerNok": 6718,
+    "skyscannerItinerary": "Flightnetwork via Skyscanner: Lufthansa, 1 stopp, 18 t 5 min, bagasje ikke oppgitt",
+    "momondoNok": 6767,
+    "momondoItinerary": "Travelis via momondo: Lufthansa, 1 stopp, 18 t 5 min, hånd- og innsjekket bagasje inkludert",
+    "cheapestAnyStopsNok": 4306,
+    "cheapestAnyStopsNote": "Trip ~4 306 kr (omregnet fra 464 USD), 2 stopp, 25 t 45 min – ikke brukt som besparelse fordi KLM har 1 stopp",
+    "differenceNok": 2134,
+    "basis": "KLMs laveste pris mot billigste rad i panelet med samme antall stopp (1). Ikke samme fly; ikke påstand om laveste pris i markedet."
+  },
+  "sources": [
+    "https://www.klm.no/",
+    "shots/airlines-2026-11/49-fly-klm-a.png",
+    "shots/airlines-2026-11/49-fly-klm-b.png"
+  ]
+}

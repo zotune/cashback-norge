@@ -1,0 +1,63 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Samme filtre, *{651 kr|seks hundre og femtien kroner}* billigere.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "På PanFlights søker jeg Shanghai til Bergen, pluss minus sju dager, maks ett stopp, under {21|tjueen} timer og med bagasje. Billigste: *{5 808 kr.|fem tusen åtte hundre og åtte kroner.}*",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge bruker de samme filtrene hos de andre kildene.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "{FINN|Finn} finner *{5 157 kr|fem tusen hundre og femtisju kroner}* den tjuefjerde november.",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Tooltipen viser alle datoene i vinduet, sortert på pris.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{651 kr|Seks hundre og femtien kroner}* billigere med samme filtre.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Andre datoer og flyselskap. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-04",
+  "capture": "Skjermbilder tatt i brukerens egen Brave-nettleser med Cashback Norge 0.2.29 4. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser); se shots/airlines-2026-11/RAPPORT.md",
+  "comparison": {
+    "route": "Shanghai (PVG) – Bergen (BGO), en vei 25.11.2026 ±7 dager, 1 voksen, økonomi, maks 1 stopp, maks 21 t, håndbagasje + innsjekket",
+    "airlineNok": 5808,
+    "airlineBasis": "PanFlights' billigste i søket: 5 808,- (2. des., China Eastern + Norwegian, 19 t 5 min, via Kiwi.com)",
+    "finnNok": 5157,
+    "finnItinerary": "Bravofly via FINN, tir. 24. nov.: 1 stopp, 16 t 35 min, med hånd- og innsjekket bagasje (FINN sjekket 15 datoer)",
+    "kiwiNok": 5599,
+    "differenceNok": 651,
+    "basis": "Billigste dato i samme ±7-dagersvindu med samme filtre. Andre datoer og flyselskap; ikke samme fly."
+  },
+  "sources": [
+    "https://panflights.no/nb/oneway/",
+    "shots/airlines-2026-11/54-fly-panflights-filtre-a.png",
+    "shots/airlines-2026-11/54-fly-panflights-filtre-b.png"
+  ]
+}

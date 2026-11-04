@@ -1,0 +1,66 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Bergen til Oslo den attende november: direkte for *{698 kr.|seks hundre og nittiåtte kroner.}*",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Widerøe sin billigste billett den dagen: *{1 732 kr,|sytten hundre og trettito kroner,}* med ett flybytte.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker samme strekning og dato hos andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{698 kr|seks hundre og nittiåtte kroner}* via {FINN,|Finn,} direkte med Norwegian.",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: seks direkte avganger til samme pris.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{698 kr|Seks hundre og nittiåtte kroner}* for femti minutter, direkte.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Annet flyselskap, og uten bagasje. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-04",
+  "capture": "Skjermbilder tatt i brukerens egen Brave-nettleser med Cashback Norge 0.2.29 4. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser); se shots/airlines-2026-11/RAPPORT.md",
+  "comparison": {
+    "route": "Bergen (BGO) – Oslo (OSL), en vei 18.11.2026, 1 voksen, økonomi",
+    "airlineNok": 1732,
+    "airlineBasis": "Widerøes laveste: Smart 1 732,- (10:40–13:10, ett flybytte). Mini 3 099,- (2 stopp).",
+    "finnNok": 698,
+    "finnItinerary": "Ticket via FINN: Norwegian, direkte, 50 min, hånd- og innsjekket bagasje ikke inkludert (seks avganger til 698 kr)",
+    "kiwiNok": 758,
+    "panflightsNok": 785,
+    "tripNok": 789,
+    "skyscannerNok": 797,
+    "momondoNok": 798,
+    "basis": "Billigste rad i panelet. Annet flyselskap og direkte mot Widerøes flybytte, så ingen besparelse mot Widerøe er påstått. Omio/FlixBus-buss i momondos treffliste er ikke vist."
+  },
+  "sources": [
+    "https://www.wideroe.no/",
+    "shots/airlines-2026-11/51-fly-wideroe-a.png",
+    "shots/airlines-2026-11/51-fly-wideroe-b.png"
+  ]
+}

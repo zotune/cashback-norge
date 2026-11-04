@@ -1,0 +1,66 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Oslo til Bergen tur retur for *{1 054 kr.|tusen og femtifire kroner.}* Hele turen.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "{SAS|S A S} viser {741 kr,|sju hundre og førtien kroner,} men det er bare utreisen.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker hele turen hos andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{1 054 kr|tusen og femtifire kroner}* tur retur, via PanFlights.",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: Norwegian direkte begge veier.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{1 054 kr|Tusen og femtifire kroner}* for begge veier.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Annet flyselskap, og bagasje er ikke oppgitt. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-04",
+  "capture": "Skjermbilder tatt i brukerens egen Brave-nettleser med Cashback Norge 0.2.29 4. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser); se shots/airlines-2026-11/RAPPORT.md",
+  "comparison": {
+    "route": "Oslo (OSL) – Bergen (BGO), tur/retur 18.11.–27.11.2026, 1 voksen, økonomi",
+    "airlineNok": 741,
+    "airlineBasis": "SAS 741,- for utreisen 18. nov. (Economy, 1 sete igjen); returen prises separat",
+    "panflightsNok": 1054,
+    "panflightsItinerary": "Kiwi.com via PanFlights: Norwegian direkte begge veier, 55 min / 50 min, bagasje ikke oppgitt",
+    "kiwiNok": 1095,
+    "finnNok": 1227,
+    "momondoNok": 1251,
+    "tripNok": 1466,
+    "skyscannerNok": 1495,
+    "basis": "Billigste rad i panelet for hele turen. SAS viser bare én vei, så ingen besparelse mot SAS er påstått."
+  },
+  "sources": [
+    "https://www.sas.no/",
+    "shots/airlines-2026-11/52-fly-sas-a.png",
+    "shots/airlines-2026-11/52-fly-sas-b.png"
+  ]
+}

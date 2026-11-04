@@ -1,0 +1,67 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Bergen til Oslo med Norwegian: *{537 kr|fem hundre og trettisju kroner}* i stedet for {699.|seks hundre og nittini.}",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Norwegian sin billigste den tiende desember: *{699 kr.|seks hundre og nittini kroner.}*",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker samme strekning og dato hos andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{537 kr|fem hundre og trettisju kroner}* via {momondo|Momondo} og {FINN.|Finn.}",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: direkte avganger med Norwegian, solgt av Ticket.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{162 kr|Hundre og sekstito kroner}* mindre, også direkte.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Andre avganger, og håndbagasje er ikke med. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-04",
+  "capture": "Skjermbilder tatt i brukerens egen Brave-nettleser med Cashback Norge 0.2.29 4. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser); se shots/airlines-2026-11/RAPPORT.md",
+  "comparison": {
+    "route": "Bergen (BGO) – Oslo (OSL), en vei 10.12.2026, 1 voksen, økonomi",
+    "airlineNok": 699,
+    "airlineBasis": "Norwegian «Fra NOK 699» (06:30–07:30, direkte) og 699 i datostripen for tor. 10. des.",
+    "momondoNok": 537,
+    "finnNok": 537,
+    "finnItinerary": "Ticket via momondo og FINN: Norwegian, direkte, 50 min–1 t (bl.a. 18:20, 19:45, 08:00, 07:15), håndbagasje ikke inkl., innsjekket ukjent",
+    "kiwiNok": 616,
+    "panflightsNok": 620,
+    "skyscannerNok": 630,
+    "tripNok": 640,
+    "differenceNok": 162,
+    "basis": "Norwegians laveste pris den dagen mot billigste rad i panelet, begge direkte med Norwegian. Andre avganger; bagasjen hos Norwegian er ikke sammenlignet."
+  },
+  "sources": [
+    "https://www.norwegian.no/",
+    "shots/airlines-2026-11/53-fly-norwegian-a.png",
+    "shots/airlines-2026-11/53-fly-norwegian-b.png"
+  ]
+}

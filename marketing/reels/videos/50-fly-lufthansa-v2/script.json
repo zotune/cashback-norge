@@ -1,0 +1,63 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    {
+      "id": "hook",
+      "line": "Bergen til Shanghai tur retur i desember: *{7 887 kr|sju tusen åtte hundre og åttisju kroner}* med håndbagasje.",
+      "gap": 0.25
+    },
+    {
+      "id": "store",
+      "line": "Lufthansa viser fra {8 188 kr|åtte tusen hundre og åttiåtte kroner} den niende, men sier ikke om det gjelder hele turen.",
+      "gap": 0.2
+    },
+    {
+      "id": "popup",
+      "line": "Cashback Norge søker hele turen hos andre sider.",
+      "gap": 0.2
+    },
+    {
+      "id": "best",
+      "line": "Billigste: *{7 887 kr|sju tusen åtte hundre og åttisju kroner}* via {FINN,|Finn,} med Lufthansa.",
+      "gap": 0.2
+    },
+    {
+      "id": "info",
+      "line": "Hold over raden: to stopp ut, ett hjem, og håndbagasje inkludert.",
+      "gap": 0.2
+    },
+    {
+      "id": "sum",
+      "line": "*{7 887 kr|Sju tusen åtte hundre og åttisju kroner}* for hele turen.",
+      "gap": 0.2
+    },
+    {
+      "id": "terms",
+      "line": "Innsjekket bagasje kommer i tillegg. Sjekk før du bestiller.",
+      "gap": 0.25
+    },
+    {
+      "id": "cta",
+      "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*"
+    }
+  ],
+  "verifiedAt": "2026-11-04",
+  "capture": "Skjermbilder tatt i brukerens egen Brave-nettleser med Cashback Norge 0.2.29 4. nov. 2026 (flyselskapenes sider blokkerer automatisert nettleser); se shots/airlines-2026-11/RAPPORT.md",
+  "comparison": {
+    "route": "Bergen (BGO) – Shanghai (PVG), tur/retur 09.12.–18.12.2026, 1 voksen, økonomi",
+    "airlineNok": 8188,
+    "airlineBasis": "Lufthansa «NOK 8,188» i datostripen og «Economy from» for 9. des. Siden sier ikke om prisen er tur/retur-total, så ingen besparelse påstås.",
+    "finnNok": 7887,
+    "finnItinerary": "Gotogate via FINN: Lufthansa, 2 stopp ut / 1 stopp hjem, 20 t 55 min / 18 t 5 min, håndbagasje inkl., innsjekket ikke",
+    "skyscannerNok": 7998,
+    "momondoNok": 8007,
+    "basis": "Billigste rad i panelet for hele turen. Ingen besparelse mot Lufthansa er påstått."
+  },
+  "sources": [
+    "https://www.lufthansa.com/no/en/",
+    "shots/airlines-2026-11/50-fly-lufthansa-a.png",
+    "shots/airlines-2026-11/50-fly-lufthansa-b.png"
+  ]
+}

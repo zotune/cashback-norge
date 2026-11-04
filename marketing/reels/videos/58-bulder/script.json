@@ -1,0 +1,46 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-04",
+  "offer": "https://www.bulder.no/boliglan (videresendes til /lan/flytte-boliglan): «Når boligen din går opp i verdi får du automatisk lavere rente.» og «Vi sjekker boligverdien og lånesummen hver måned og flytter deg ned til en lavere rente når du kvalifiserer for det.»",
+  "bonus": "https://www.bulder.no/om-oss/vilkaar/bonus-verving: både den som verver og den som blir vervet (hovedlåntaker) får 500 kr i bonus når lånet er utbetalt. Søknaden må startes via den personlige lenken. Bonusen gis til veldedighet eller veksles til valgfri konto i Bulder. Kan være skattepliktig.",
+  "referral": "https://www.bulder.no/referral/mikaelell-25 (åpner Bulders lånesøknad med BankID-innlogging)",
+  "rates": "Ingen rentetall i video eller skjermbilder: bulder-capture.mjs skjuler alle blokker med prosent, kr/mnd og renteendring, og scenen viser ikke rentetabellen.",
+  "ad": "Annonse: Cashback Norge får 500 kr i vervebonus når lånet er utbetalt. Lånet gis etter kredittvurdering."
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Har boligen din steget i *verdi?*",
+   "gap": 0.3
+  },
+  {
+   "id": "auto",
+   "line": "I *Bulder* får du da automatisk lavere rente, uten å prute."
+  },
+  {
+   "id": "month",
+   "line": "Banken sjekker boligverdien og lånesummen *hver måned.*"
+  },
+  {
+   "id": "bonus",
+   "line": "Søker du via vervelenken vår, får du *{500 kr|fem hundre kroner}* når lånet er utbetalt. Vi får også {500 kr|fem hundre kroner}."
+  },
+  {
+   "id": "link",
+   "line": "Søknaden må startes fra *lenken,* ellers registreres ikke bonusen."
+  },
+  {
+   "id": "card",
+   "line": "Bonusen går til en *Bulder-konto* eller til veldedighet, ikke til lånet."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}
