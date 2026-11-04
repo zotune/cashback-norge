@@ -3,7 +3,11 @@
   "name": "Cashback Norge",
   "description": "Shows cashback offers for supported stores.",
   "version": "0.2.29",
-  "permissions": ["storage", "unlimitedStorage", "tabs"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "tabs"
+  ],
   "host_permissions": [
     "https://strom-api.forbrukerradet.no/*",
     "https://www.pokepris.no/*",
@@ -45,7 +49,8 @@
     "https://worka.panflights.com/*",
     "https://workb.panflights.com/*",
     "https://typeb.panflights.com/*",
-    "https://panflights.com/*"
+    "https://panflights.com/*",
+    "https://www.tek.no/*"
   ],
   "background": {
     "service_worker": "assets/background.js",
@@ -53,9 +58,17 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "exclude_matches": ["*://cashbacknorge.no/*", "*://www.cashbacknorge.no/*"],
-      "js": ["assets/content.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "exclude_matches": [
+        "*://cashbacknorge.no/*",
+        "*://www.cashbacknorge.no/*"
+      ],
+      "js": [
+        "assets/content.js"
+      ],
       "run_at": "document_idle"
     }
   ],

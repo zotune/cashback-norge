@@ -1,3 +1,6 @@
+import { createAutomaticComparison } from "./automatic-comparison";
+import { getMobileSupplier, loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers";
+import { isMobilePriceDetails, mobileTierLabel, type MobilePriceDetails } from "../shared/mobile-price-match";
 import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS } from "../shared/provider-data";
 import { getSupportAdvertisementText, selectSupportAdvertisement } from "../shared/support-advertisements";
 import {
@@ -10,7 +13,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
-import { ELECTRICITY_EXAMPLE, ELECTRICITY_MIN_GUARANTEE_MONTHS, ELECTRICITY_MAX_OFFERS, getElectricitySupplier, isElectricityPriceDetails, type ElectricityPriceDetails } from "../shared/electricity-price-match";
+import { ELECTRICITY_MAX_OFFERS, getElectricitySupplier, isElectricityPriceDetails, type ElectricityPriceDetails } from "../shared/electricity-price-match";
 import { createElectricityComparison } from "./electricity-comparison";
 import { ELECTRICITY_SUPPLIER_CACHE_KEY } from "../shared/electricity-suppliers";
 import { decodeHtmlEntities, readProductCodesFromUrl } from "../shared/product-match";
@@ -47,7 +50,7 @@ import { createContentScriptContextGuard } from "./runtime-context";
 import { createMutedChip } from "../shared/ui";
 import type { KiwiFlightPricesResponse } from "../shared/extension-messages";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
-import { createTooltipController, type TooltipController } from "../shared/tooltips";
+import { createTooltipController, DETAILS_TOOLTIP_WIDTH, type TooltipController } from "../shared/tooltips";
 import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 import { getOfferCampaignLabel, getVisibleOfferKey, prioritizeOffersForPage } from "../shared/offer-context";
@@ -111,6 +114,7 @@ import {
   type FlightSortMode,
   type FlightSortVariant,
   limitFlightCandidates,
+  flightTooltipChipTexts,
   readFlightSortLabel,
   readFlightSortUrlValue,
   readKiwiBagsParam,
@@ -357,8 +361,10 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
+  mobileBroadband?: PriceMatchAlternative;
   electricity?: ElectricityPriceDetails;
-  source?: "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
+  mobile?: MobilePriceDetails;
+  source?: "tek" | "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -379,14 +385,13 @@ type PriceMatchOffer = {
   travelKind?: "hotel";
   // Flysøk med fleksible datoer: prisen gjelder datoene her, som kan avvike fra valgt søk.
   dateFlex?: FlightDateFlexResult;
-  // Bagasje er valgt, men kilden oppgir ikke bagasjeavgift: prisen er uten bagasje.
-  baggageExcluded?: boolean;
   durationMinutes?: number;
   // Radene for Billigst og Raskest; selve tilbudet er «Best».
   flightSortVariants?: Partial<Record<"cheapest" | "fastest", FlightSortVariant>>;
 };
 type PriceMatchAlternative = {
   electricity?: ElectricityPriceDetails;
+  mobile?: MobilePriceDetails;
   productName?: string;
   offerUrl?: string;
   matchedCurrentMerchant?: boolean;
@@ -480,7 +485,6 @@ type SkyscannerFlightOfferCandidate = PriceMatchAlternative & {
 type SkyscannerFlightOfferSearchResult = {
   candidates: SkyscannerFlightOfferCandidate[];
   searchComplete: boolean;
-  baggageExcluded?: boolean;
 };
 type SkyscannerFlightPlace = {
   entityId: string;
@@ -593,7 +597,6 @@ const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
 const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
 const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
 const FLIGHT_TOOLTIP_MAX_ROWS = 6;
-const FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET = 1_000_000_000;
 // FINN har ikke fleksible datoer i API-et: hver kombinasjon er et eget søk.
 // ±3/±3 tur/retur = 49 søk; større vinduer begrenses til kombinasjonene nærmest valgt dato.
 const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
@@ -1430,6 +1433,24 @@ const electricityComparison = createElectricityComparison({
   },
 });
 
+const mobileComparison = createAutomaticComparison({
+  getUrl: () => location.href, sourceName: "Tek.no",
+  prepare: () => loadMobileSuppliers(userscriptJsonRequest, {
+    read: async () => (await chrome.storage.local.get(MOBILE_SUPPLIER_CACHE_KEY))[MOBILE_SUPPLIER_CACHE_KEY],
+    write: async (catalog) => { await chrome.storage.local.set({ [MOBILE_SUPPLIER_CACHE_KEY]: catalog }); },
+  }),
+  isSupported: () => getMobileSupplier(location.href) !== undefined && !extractProductPageMeta()?.codes?.length,
+  load: async (url) => {
+    const message = { type: "get-price-match-for-product" as const, url, searchTerm: "Mobilabonnement", mobile: true };
+    if (isUserscriptRuntime()) return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
+    const response = await sendRuntimeMessage<PriceMatchForProductResponse>(message);
+    if (!response || !isPriceMatchForProductResponse(response)) throw new Error("Fikk ikke svar fra extensionen");
+    if (!response.ok) throw new Error(response.reason);
+    return response.offers ?? (response.offer ? [response.offer] : []);
+  },
+});
+function isAutomaticComparisonSupported(): boolean { return electricityComparison.isSupported() || mobileComparison.isSupported(); }
+
 async function renderCurrentContext(): Promise<void> {
   const generation = ++renderGeneration;
   const offersPromise = getCurrentOffers().catch(() => []);
@@ -1448,7 +1469,7 @@ async function renderCurrentContext(): Promise<void> {
   ]);
   priceMatchesSettled = true;
   if (generation !== renderGeneration) return;
-  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || electricityComparison.isSupported()) {
+  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported()) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
     scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
     return;
@@ -1529,8 +1550,9 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
 }
 
 async function getPriceMatchesForCurrentPage(onFlightProgress?: (offers: PriceMatchOffer[]) => void): Promise<PriceMatchOffer[]> {
-  await electricityComparison.prepare();
+  await Promise.all([electricityComparison.prepare(), mobileComparison.prepare()]);
   if (electricityComparison.isSupported()) return electricityComparison.getOffers();
+  if (mobileComparison.isSupported()) return mobileComparison.getOffers();
   const flightOffers = await findFlightPriceMatchOffers(onFlightProgress);
   if (flightOffers.length > 0) return flightOffers;
 
@@ -2837,16 +2859,14 @@ function buildFlightSortVariants(input: {
   cheapestPool: FlightSortPoolCandidate[];
   fastestPool: FlightSortPoolCandidate[];
   buildUrl: (mode: FlightSortMode) => string;
-  baggageExcluded?: boolean | undefined;
 }): NonNullable<PriceMatchOffer["flightSortVariants"]> {
-  const offset = input.baggageExcluded === true ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0;
   const toVariant = (candidate: FlightSortPoolCandidate | undefined, mode: FlightSortMode): FlightSortVariant | undefined => {
     if (candidate === undefined) return undefined;
     return {
       shopName: candidate.shopName,
       price: candidate.price,
       amount: candidate.amount,
-      sortAmount: (candidate.sortAmount ?? candidate.amount) + offset,
+      sortAmount: candidate.sortAmount ?? candidate.amount,
       currency: candidate.currency,
       productUrl: input.buildUrl(mode),
       offerUrl: candidate.productUrl,
@@ -3065,7 +3085,7 @@ async function findSeparateSearchFlexibleDatesOffer(input: {
   for (const combination of job.combinations) {
     const offer = job.results.get(buildFlightDateCombinationKey(combination));
     // Priser uten bekreftet bagasje kan ikke sammenlignes med de andre datoene.
-    if (offer === undefined || offer.baggageExcluded === true) continue;
+    if (offer === undefined) continue;
     dateOptions.push({
       ...combination,
       shopName: offer.shopName,
@@ -6033,12 +6053,11 @@ async function findSkyscannerFlightPriceMatchOffer(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-  const { candidates, searchComplete, baggageExcluded } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
+  const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
 
   return {
-    ...(baggageExcluded ? { baggageExcluded: true } : {}),
     source: "skyscanner",
     sourceName: "Skyscanner",
     details: searchDetails,
@@ -6046,8 +6065,7 @@ async function findSkyscannerFlightPriceMatchOffer(
     shopName: candidate.shopName,
     price: candidate.price,
     amount: candidate.amount,
-    // Uten bagasje er prisen ikke sammenlignbar: sorteres etter kilder med bekreftet bagasje.
-    sortAmount: (candidate.sortAmount ?? candidate.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
+    sortAmount: candidate.sortAmount ?? candidate.amount,
     currency: candidate.currency,
     productName: routeTitle,
     productUrl: resultUrl,
@@ -6059,7 +6077,6 @@ async function findSkyscannerFlightPriceMatchOffer(
       cheapestPool: candidates,
       fastestPool: candidates,
       buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode),
-      baggageExcluded,
     }),
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
@@ -6153,18 +6170,8 @@ async function fetchSkyscannerFlightSearchCandidates(
   const finalStatus = readStringValue(finalContext?.status)?.toLowerCase();
   const searchComplete = finalStatus === undefined || finalStatus === "complete";
   const candidates = extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl);
-  if (candidates.length > 0 || (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true)) {
-    return { candidates, searchComplete };
-  }
-
-  // Ingen pris med bekreftet bagasje: vis prisen uten bagasje, tydelig merket og sortert sist.
-  const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
-  const candidatesWithoutBaggage = extractSkyscannerFlightSearchCandidates(latestResult, flightMetaWithoutBaggage, airportLookup, resultUrl);
-  return {
-    candidates: candidatesWithoutBaggage,
-    searchComplete,
-    ...(candidatesWithoutBaggage.length > 0 ? { baggageExcluded: true } : {}),
-  };
+  // Behold bagasjekravene også når ingen priser oppfyller dem.
+  return { candidates, searchComplete };
 }
 
 function requestSkyscannerFlightSearch(
@@ -6751,6 +6758,7 @@ function readMomondoFlightSortMode(url: string): MomondoFlightSortMode | undefin
 }
 
 function readCurrentMomondoVisibleBestPrice(flightMeta: FlightSearchMeta): number | undefined {
+  if (hasFlightSearchResultFilters(flightMeta)) return undefined;
   const parsedUrl = parseUrl(window.location.href);
   if (parsedUrl === undefined || readCurrentMomondoFlightSearchUrl(flightMeta) === undefined) return undefined;
   if (readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return undefined;
@@ -6777,6 +6785,8 @@ function readCurrentMomondoVisibleBestPriceForCurrentPage(): number | undefined 
   if (parsedUrl === undefined) return undefined;
 
   if (!isMomondoFlightSearchPage(parsedUrl) || readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return undefined;
+  const flightMeta = extractMomondoFlightSearchMeta(parsedUrl);
+  if (flightMeta === undefined || hasFlightSearchResultFilters(flightMeta)) return undefined;
 
   const text = document.body?.innerText;
   if (text === undefined || text.length === 0) return undefined;
@@ -6831,23 +6841,14 @@ async function findMomondoFlightPriceMatchOffer(
   const resultData = await pollMomondoFlightResults(bestSearchData, flightMeta, airportLookup);
   if (resultData === undefined) return undefined;
 
-  let candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
-  // Ingen pris med bekreftet bagasje: vis prisen uten bagasje, tydelig merket og sortert sist.
-  let baggageExcluded = false;
-  if (candidates.length === 0 && (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true)) {
-    const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
-    candidates = extractMomondoFlightOfferCandidates(resultData, flightMetaWithoutBaggage, airportLookup, searchData.resultUrl);
-    baggageExcluded = candidates.length > 0;
-  }
+  const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
   const best = candidates[0];
   if (best === undefined) return undefined;
-  const { includeCabinBag: _sortCabinBag, includeCheckedBag: _sortCheckedBag, ...flightMetaForSortWithoutBaggage } = flightMeta;
-  const sortPoolMeta = baggageExcluded ? flightMetaForSortWithoutBaggage : flightMeta;
   const [priceCandidates, durationCandidates] = await Promise.all([
-    fetchMomondoFlightSortedCandidates(bestSearchData, resultData, sortPoolMeta, airportLookup, "price_a"),
-    fetchMomondoFlightSortedCandidates(bestSearchData, resultData, sortPoolMeta, airportLookup, "duration_a"),
+    fetchMomondoFlightSortedCandidates(bestSearchData, resultData, flightMeta, airportLookup, "price_a"),
+    fetchMomondoFlightSortedCandidates(bestSearchData, resultData, flightMeta, airportLookup, "duration_a"),
   ]);
-  const visibleBestPrice = baggageExcluded ? undefined : readCurrentMomondoVisibleBestPrice(flightMeta);
+  const visibleBestPrice = readCurrentMomondoVisibleBestPrice(flightMeta);
   const displayedBest: MomondoFlightOfferCandidate = visibleBestPrice === undefined
     ? best
     : {
@@ -6867,11 +6868,10 @@ async function findMomondoFlightPriceMatchOffer(
     sourceName: "momondo",
     details: searchDetails,
     matchedExactProduct: true,
-    ...(baggageExcluded ? { baggageExcluded: true } : {}),
     shopName: displayedBest.shopName,
     price: displayedBest.price,
     amount: displayedBest.amount,
-    sortAmount: (displayedBest.sortAmount ?? displayedBest.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
+    sortAmount: displayedBest.sortAmount ?? displayedBest.amount,
     currency: displayedBest.currency,
     productName: routeTitle,
     productUrl: buildMomondoFlightSortUrl(searchData.resultUrl, "best"),
@@ -6883,7 +6883,6 @@ async function findMomondoFlightPriceMatchOffer(
       cheapestPool: [...priceCandidates, ...candidates],
       fastestPool: [...durationCandidates, ...candidates],
       buildUrl: (mode) => buildMomondoFlightSortUrl(searchData.resultUrl, mode),
-      baggageExcluded,
     }),
     alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
   };
@@ -9763,11 +9762,9 @@ function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: Shadow
     element.append(chip.text);
     container.append(element);
   }
-  const hasBaggage = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
   addHoverChipTooltip(container, [
     "Prisene gjelder søket ditt:",
     ...chips.map((chip) => `- ${chip.tip}`),
-    ...(hasBaggage ? ["Kilder som ikke bekrefter bagasjen er merket «ekskl. bagasje»."] : []),
   ].join("\n"), shadowRoot);
   return container;
 }
@@ -9794,20 +9791,19 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
 
 function buildElectricityBasisChips(e: ElectricityPriceDetails, shadowRoot: ShadowRoot): HTMLElement {
   const chips = buildPriceMatchInfoChips([
-    `${ELECTRICITY_EXAMPLE.municipality} · ${ELECTRICITY_EXAMPLE.areaCode}`,
     `${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år`,
     "Spotpris",
-    e.scheme === "norgespris" ? `Norgespris · ${formatKr(e.energyOrePerKwh)} øre/kWh` : "Strømstøtte",
+    e.scheme === "norgespris" ? "Norgespris" : "Strømstøtte",
   ]);
   chips.classList.add("electricity-basis-chips");
   addHoverChipTooltip(chips, [
     "Prisene gjelder et regneeksempel:",
-    `- Husholdning i ${ELECTRICITY_EXAMPLE.municipality}, prisområde ${ELECTRICITY_EXAMPLE.areaCode}, som i Forbrukerrådets standardeksempel.`,
+    "- Én rad per prisområde, NO1–NO5. Kommuneeksemplet står i hver rad. Ingen posisjonstilgang brukes.",
     `- ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år, som i Forbrukerrådets standardeksempel. Dette er ikke ditt målte forbruk.`,
-    `- Kildens forbruksprofil gir ${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh i ${e.period}.`,
-    `- Spotavtaler uten binding, medlemskrav eller kampanjevilkår, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti, som portalens standardfilter.`,
+    "- Månedsforbruk og energipris for hvert område står i radens tooltip.",
+    "- Spotavtaler uten binding, medlemskrav eller kampanjevilkår. Alle garantiperioder er med, også under 6 måneder.",
     e.scheme === "norgespris"
-      ? `- Med Norgespris: ${formatKr(e.energyOrePerKwh)} øre/kWh inkl. mva., før leverandørens påslag og månedsgebyr. Eksemplet forutsetter Norgespris; vi vet ikke om du har valgt ordningen.`
+      ? "- Eksemplene forutsetter Norgespris. Satsen fra kilden står i hver tooltip, med områdets avgiftsregler. Vi vet ikke om du har valgt ordningen."
       : `- Spotpris etter strømstøtte i eksemplet: ${formatKr(e.energyOrePerKwh)} øre/kWh før påslag og månedsgebyr.`,
     "- Nettleie kommer i tillegg. Prisene hentes live fra Forbrukerrådets strømprisportal.",
   ].join("\n"), shadowRoot);
@@ -11719,6 +11715,7 @@ function renderNotice(
       background: ${PROVIDER_COLORS.pokepris!.bg};
       color: ${PROVIDER_COLORS.pokepris!.fg};
     }
+    .provider-tek { background: ${PROVIDER_COLORS.tek!.bg}; color: ${PROVIDER_COLORS.tek!.fg}; }
     .provider-forbrukerradet {
       background: ${PROVIDER_COLORS.forbrukerradet!.bg};
       color: ${PROVIDER_COLORS.forbrukerradet!.fg};
@@ -12261,11 +12258,12 @@ function renderNotice(
     .electricity-tooltip-basis { color: inherit; opacity: .82; font-size: 10px; line-height: 1.4; margin: 0 0 8px; }
     .comparison-tooltip-option { color: var(--cbn-text); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 6px; padding: 7px; margin: 4px 0; }
     .comparison-tooltip-option > :first-child { font-weight: 600; min-width: 0; }
-    .comparison-tooltip-option > strong { color: var(--cbn-accent); white-space: nowrap; }
+    .comparison-tooltip-option > strong { color: var(--cbn-text); white-space: nowrap; }
+    .comparison-tooltip-option--best > strong { color: var(--cbn-accent); }
     .comparison-tooltip-option > .price-match-chip-line { grid-column: 1 / -1; }
     .comparison-tooltip-option .price-match-info-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-    .electricity-tooltip-plan > strong { color: var(--cbn-accent); white-space: nowrap; }
     .electricity-tooltip-plan > .price-match-chip-line, .electricity-tooltip-terms { grid-column: 1 / -1; }
+    .price-match-subheading { color: var(--cbn-muted); font-size: 11px; font-weight: 700; margin: 14px 0 4px; }
     .electricity-tooltip-terms { color: var(--cbn-muted); font-size: 10px; line-height: 1.4; }
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
@@ -12586,6 +12584,10 @@ function renderNotice(
       width: max-content;
       z-index: 2147483647;
     }
+    .offer-tooltip.price-match-tooltip {
+      width: ${DETAILS_TOOLTIP_WIDTH}px;
+      max-width: calc(100vw - 16px);
+    }
     .offer-tooltip-section + .offer-tooltip-section {
       margin-top: 8px;
     }
@@ -12691,11 +12693,11 @@ function renderNotice(
   const cryptoSub = cryptoSubEntry?.[1];
   const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
   const offer = mainOffers[0];
-  if (offer === undefined && codeOffers.length === 0 && priceMatch === undefined && bestRegionPrice === undefined && !electricityComparison.isSupported()) {
+  if (offer === undefined && codeOffers.length === 0 && priceMatch === undefined && bestRegionPrice === undefined && !isAutomaticComparisonSupported()) {
     return;
   }
   const primaryOffer = offer ?? codeOffers[0];
-  if (primaryOffer === undefined && priceMatch === undefined && bestRegionPrice === undefined && !electricityComparison.isSupported()) {
+  if (primaryOffer === undefined && priceMatch === undefined && bestRegionPrice === undefined && !isAutomaticComparisonSupported()) {
     return;
   }
   const tooltipControls = createTooltipController(shadowRoot);
@@ -12707,7 +12709,7 @@ function renderNotice(
     (readRewardSortValueNok(offer) ?? 0) >= 250
   );
   if (hasFantasticOffer) notice.classList.add("has-fantastic-offer");
-  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : electricityComparison.isSupported() ? "forbrukerradet" : "region");
+  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : electricityComparison.isSupported() ? "forbrukerradet" : mobileComparison.isSupported() ? "tek" : "region");
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
   sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
@@ -12743,11 +12745,12 @@ function renderNotice(
       chipSpan.textContent = formatProviderName(codeProvider);
       sideTabText.append(chipSpan);
     }
-  } else if (electricityComparison.isSupported()) {
+  } else if (isAutomaticComparisonSupported()) {
     const chipSpan = document.createElement("span");
-    chipSpan.className = "cbn-chip side-tab-chip provider-forbrukerradet";
-    chipSpan.textContent = PROVIDER_NAMES.forbrukerradet!;
-    sideTabText.append("Strøm", chipSpan);
+    const provider = electricityComparison.isSupported() ? "forbrukerradet" : "tek";
+    chipSpan.className = `cbn-chip side-tab-chip provider-${provider}`;
+    chipSpan.textContent = PROVIDER_NAMES[provider]!;
+    sideTabText.append(provider === "tek" ? "Mobil" : "Strøm", chipSpan);
   } else if (priceMatch !== undefined) {
     const rewardSpan = document.createElement("span");
     rewardSpan.className = "side-tab-reward";
@@ -12784,7 +12787,7 @@ function renderNotice(
     ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}`
       : primaryOffer !== undefined
         ? `Rabattkode hos ${primaryOffer.merchantName}`
-      : electricityComparison.isSupported() ? `Prismatch hos ${getElectricitySupplier(location.href)!.name}` : priceMatch !== undefined
+      : electricityComparison.isSupported() ? `Prismatch hos ${getElectricitySupplier(location.href)!.name}` : mobileComparison.isSupported() ? `Prismatch hos ${getMobileSupplier(location.href)!.name}` : priceMatch !== undefined
         ? `Prismatch hos ${priceMatch.shopName}`
         : "Regionpriser";
   header.append(siteIcon, title);
@@ -12796,7 +12799,7 @@ function renderNotice(
   sumInput.addEventListener("keydown", (e) => {
     if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
   });
-  if (!electricityComparison.isSupported() || mainOffers.length > 0) header.append(sumInput);
+  if (!isAutomaticComparisonSupported() || mainOffers.length > 0) header.append(sumInput);
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
   const offerList = document.createElement("div");
@@ -13595,7 +13598,7 @@ function renderNotice(
 
   const priceMatchSection = document.createElement("div");
   priceMatchSection.className = "price-match-section";
-  if (priceMatches.length > 0 || electricityComparison.isSupported()) {
+  if (priceMatches.length > 0 || isAutomaticComparisonSupported()) {
     if (initialPriceMatchCollapsed) {
       priceMatchSection.classList.add("collapsed");
     }
@@ -13627,12 +13630,12 @@ function renderNotice(
     if (electricity !== undefined) priceMatchHeader.append(buildElectricityBasisChips(electricity, shadowRoot));
     priceMatchSection.append(
       priceMatchHeader,
-      ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0)),
+      ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0 && !priceMatch.mobile && !priceMatch.electricity)),
     );
-    if (electricityComparison.isSupported() && priceMatches.length === 0) {
+    if (isAutomaticComparisonSupported() && priceMatches.length === 0) {
       const status = document.createElement("p");
       status.className = "electricity-error";
-      status.textContent = electricityComparison.getError() || "Ingen sammenlignbare strømavtaler akkurat nå.";
+      status.textContent = (electricityComparison.isSupported() ? electricityComparison : mobileComparison).getError() || "Ingen sammenlignbare avtaler akkurat nå.";
       priceMatchSection.append(status);
     }
   }
@@ -13640,7 +13643,7 @@ function renderNotice(
   body.append(header);
   if (mainOffers.length > 0) body.append(offerList);
   if (regionPrices !== undefined && regionPrices.prices.length > 0) body.append(regionPricesSection);
-  if (priceMatches.length > 0 || electricityComparison.isSupported()) body.append(priceMatchSection);
+  if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
   body.append(chipsSection);
   if (offers.length > 0) body.append(codesSection);
 
@@ -13968,6 +13971,105 @@ function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
 }
 
+function buildProductPriceMatchChips(offer: Pick<PriceMatchAlternative, "shopName" | "shippingPrice" | "totalPrice" | "platform">): HTMLElement {
+  return buildPriceMatchInfoChips([
+    offer.shopName,
+    ...(offer.shippingPrice ? [offer.shippingPrice] : []),
+    ...(offer.totalPrice ? [`Totalt ${offer.totalPrice}`] : []),
+    ...(offer.platform ? [offer.platform] : []),
+  ]);
+}
+
+function buildProductPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
+  tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
+  if (offer.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) {
+    setTooltipContent(tooltip, [buildPriceMatchTooltip(offer)]);
+    return;
+  }
+  const heading = document.createElement("p");
+  heading.className = "electricity-tooltip-heading";
+  heading.textContent = `${getPriceMatchSourceName(offer)}: ${offer.productName}`;
+  tooltip.append(heading);
+  const alternatives = offer.alternatives?.length ? offer.alternatives : [offer];
+  alternatives.forEach((alternative, index) => {
+    const row = document.createElement("div");
+    row.className = "cbn-row cbn-row--details comparison-tooltip-option product-tooltip-option";
+    row.classList.toggle("comparison-tooltip-option--best", index === 0);
+    const name = document.createElement("span");
+    name.textContent = alternative.shopName;
+    const price = document.createElement("strong");
+    price.textContent = alternative.price;
+    // The merchant is already the row title; the chips retain known shipping,
+    // totals and platform information without inventing free/unknown shipping.
+    const chips = buildProductPriceMatchChips({ ...alternative, shopName: "" });
+    row.append(name, price);
+    if (chips.childElementCount) row.append(chips);
+    tooltip.append(row);
+  });
+  if (offer.details) {
+    const details = createTooltipSection(offer.details);
+    if (details) tooltip.append(details);
+  }
+}
+
+function buildMobilePriceMatchChips(m: MobilePriceDetails, supplier: string, actualAllowance = false): HTMLElement {
+  return buildPriceMatchInfoChips([
+    actualAllowance ? (m.meteredData ? "Bruksbasert data" : m.unlimitedData ? "Fri data" : `${m.includedGb.toLocaleString("nb-NO")} GB`) : mobileTierLabel(m),
+    supplier,
+    `${m.network}-nett`,
+    ...(m.speedMbps !== undefined ? [`${formatKr(m.speedMbps)} Mbit/s`] : []),
+  ]);
+}
+
+function appendComparisonStatus(tooltip: HTMLElement, offer: PriceMatchOffer): void {
+  const incomplete = offer.details?.split("\n\n").find((part) => part.startsWith("Ufullstendig oppslag:"));
+  if (incomplete) { const status = document.createElement("p"); status.className = "electricity-tooltip-basis"; status.textContent = incomplete; tooltip.append(status); }
+}
+
+function buildMobileTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
+  tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
+  const heading = document.createElement("p");
+  heading.className = "electricity-tooltip-heading";
+  heading.textContent = `${mobileTierLabel(offer.mobile!)} · billigste per nett`;
+  const basis = document.createElement("p");
+  basis.className = "electricity-tooltip-basis";
+  basis.textContent = offer.mobile!.requestedGb === 0
+    ? "Beregnet uten databruk, med 5 000 ringeminutter og 5 000 meldinger i Norge. Bruksbasert data koster ekstra."
+    : "Beregnet månedspris for datatrinnet, 5 000 ringeminutter og 5 000 meldinger i Norge. Eventuelle datapakker er inkludert i estimatet.";
+  tooltip.append(heading, basis);
+  const addPlan = (plan: PriceMatchAlternative, best = false) => {
+    const m = plan.mobile;
+    if (!m) return;
+    const row = document.createElement("div");
+    row.className = "cbn-row cbn-row--details comparison-tooltip-option";
+    row.classList.toggle("comparison-tooltip-option--best", best);
+    const title = document.createElement("span");
+    title.textContent = plan.shopName;
+    const amount = document.createElement("strong");
+    amount.textContent = plan.price;
+    row.append(title, amount, buildMobilePriceMatchChips(m, plan.productName ?? plan.shopName, true));
+    if (m.afterQuotaMbps !== undefined && (m.category === "unlimited" || m.afterQuotaMbps >= 1)) {
+      const cap = document.createElement("span");
+      cap.className = "electricity-tooltip-terms";
+      cap.textContent = `Etter ${m.includedGb.toLocaleString("nb-NO")} GB: ${formatKr(m.afterQuotaMbps)} Mbit/s.`;
+      row.append(cap);
+    }
+    tooltip.append(row);
+  };
+  (offer.alternatives ?? []).forEach((plan, index) => addPlan(plan, index === 0));
+  if (offer.mobileBroadband?.mobile) {
+    const broadbandHeading = document.createElement("p");
+    broadbandHeading.className = "electricity-tooltip-heading";
+    broadbandHeading.textContent = mobileTierLabel(offer.mobileBroadband.mobile);
+    const broadbandBasis = document.createElement("p");
+    broadbandBasis.className = "electricity-tooltip-basis";
+    broadbandBasis.textContent = "Egen tjeneste til ruter, uten tale/SMS.";
+    tooltip.append(broadbandHeading, broadbandBasis);
+    addPlan(offer.mobileBroadband);
+  }
+  appendComparisonStatus(tooltip, offer);
+}
+
 function buildElectricityTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
   tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
   const heading = document.createElement("p");
@@ -13976,13 +14078,15 @@ function buildElectricityTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): 
   const basis = document.createElement("p");
   basis.className = "electricity-tooltip-basis";
   const e = offer.electricity!;
-  basis.textContent = `Total strømpris for ${e.period}, inkl. ${e.scheme === "norgespris" ? `Norgespris (${formatKr(e.energyOrePerKwh)} øre/kWh)` : "spotpris og strømstøtte"}, påslag og månedsgebyr. Regneeksempel ${ELECTRICITY_EXAMPLE.municipality} · ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år (${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh denne måneden). Nettleie kommer i tillegg.`;
+  basis.textContent = `Total strømpris for ${e.period}, inkl. ${e.scheme === "norgespris" ? `Norgespris (${formatKr(e.energyOrePerKwh)} øre/kWh)` : "spotpris og strømstøtte"}, påslag og månedsgebyr. Regneeksempel ${e.municipality} · ${e.areaCode} · ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år (${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh denne måneden). Nettleie kommer i tillegg.`;
   tooltip.append(heading, basis);
   const alternatives = (offer.alternatives ?? []).filter((row) => row.electricity !== undefined);
-  const sorted = [...alternatives].sort((a, b) => a.amount - b.amount);
-  const addPlan = (plan: PriceMatchAlternative) => {
+  const sorted = alternatives.filter((plan) => plan.electricity?.comparisonOnly !== true).sort((a, b) => a.amount - b.amount);
+  const comparison = alternatives.filter((plan) => plan.electricity?.comparisonOnly === true).sort((a, b) => a.amount - b.amount);
+  const addPlan = (plan: PriceMatchAlternative, best = false) => {
     const row = document.createElement("div");
     row.className = "cbn-row cbn-row--details comparison-tooltip-option electricity-tooltip-plan";
+    row.classList.toggle("comparison-tooltip-option--best", best);
     const title = document.createElement("span");
     title.textContent = plan.shopName;
     const amount = document.createElement("strong");
@@ -14015,14 +14119,22 @@ function buildElectricityTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): 
     none.textContent = "Ingen sammenlignbare avtaler i dette utvalget.";
     tooltip.append(none);
   }
-  sorted.forEach(addPlan);
+  sorted.forEach((plan, index) => addPlan(plan, index === 0));
+  if (comparison.length > 0) {
+    const current = document.createElement("p");
+    current.className = "electricity-tooltip-heading";
+    current.textContent = `Til sammenligning: ${comparison[0]!.productName}`;
+    tooltip.append(current);
+    comparison.forEach((plan) => addPlan(plan));
+  }
   const terms = document.createElement("p");
   terms.className = "electricity-tooltip-basis";
-  terms.textContent = `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen. Inkl. mva. ${e.scheme === "norgespris" ? "Eksemplet forutsetter at du har valgt Norgespris." : "Estimatet varierer med spotpris og forbruk."}`;
+  terms.textContent = `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav. Alle garantiperioder er med. Kampanjer er utelatt; øvrige vilkår står ved avtalen. ${e.vatExempt ? "Uten mva. i kommuneeksemplet." : "Inkl. mva."} ${e.scheme === "norgespris" ? "Eksemplet forutsetter at du har valgt Norgespris." : "Estimatet varierer med spotpris og forbruk."}`;
   const source = document.createElement("p");
   source.className = "electricity-tooltip-basis";
   source.textContent = "Kilde: Forbrukerrådets strømprisportal og forbruksprofil. Eventuelt papirfakturagebyr kommer i tillegg.";
   tooltip.append(terms, source);
+  appendComparisonStatus(tooltip, offer);
 }
 
 function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
@@ -14046,17 +14158,15 @@ function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOff
     heading.textContent = part.split("\n")[0]!;
     section.append(heading);
     const limit = offer.dateFlex === undefined ? FLIGHT_TOOLTIP_MAX_ROWS : FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS;
-    for (const alternative of offer.alternatives.slice(0, limit)) {
+    for (const [index, alternative] of offer.alternatives.slice(0, limit).entries()) {
       const row = document.createElement("div");
       row.className = "cbn-row cbn-row--details comparison-tooltip-option flight-tooltip-option";
+      row.classList.toggle("comparison-tooltip-option--best", index === 0);
       const name = document.createElement("span");
       name.textContent = alternative.shopName.replace(/:$/, "");
       const price = document.createElement("strong");
       price.textContent = alternative.price;
-      const chips = buildPriceMatchInfoChips([...new Set([
-        ...(alternative.durationText?.split(" · ") ?? []),
-        ...(alternative.platform?.split(/,\s*/) ?? []),
-      ])]);
+      const chips = buildPriceMatchInfoChips(flightTooltipChipTexts(alternative));
       row.append(name, price);
       if (chips.childElementCount > 0) row.append(chips);
       section.append(row);
@@ -14075,10 +14185,12 @@ function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMat
     if (card === undefined || priceMatch === undefined) continue;
 
     const tooltip = document.createElement("div");
-    tooltip.className = "offer-tooltip";
-    if (priceMatch.electricity !== undefined) buildElectricityTooltip(tooltip, priceMatch);
+    tooltip.className = "offer-tooltip price-match-tooltip";
+    if (priceMatch.mobile !== undefined) buildMobileTooltip(tooltip, priceMatch);
+    else if (priceMatch.electricity !== undefined) buildElectricityTooltip(tooltip, priceMatch);
     else if (isFlightPanelRow(priceMatch)) buildFlightPriceMatchTooltip(tooltip, priceMatch);
-    else setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+    else if (priceMatch.travelKind === "hotel") setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+    else buildProductPriceMatchTooltip(tooltip, priceMatch);
     shadowRoot.append(tooltip);
     const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
     // Share the card's columns while keeping the details button outside its link.
@@ -14337,7 +14449,9 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
     (value.electricity === undefined || isElectricityPriceDetails(value.electricity)) &&
-    (value.source === undefined || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
+    (value.mobile === undefined || isMobilePriceDetails(value.mobile)) &&
+    (value.mobileBroadband === undefined || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") &&
+    (value.source === undefined || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.details === undefined || typeof value.details === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
@@ -14358,6 +14472,7 @@ function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative
   return (
     isRecord(value) &&
     (value.electricity === undefined || isElectricityPriceDetails(value.electricity)) &&
+    (value.mobile === undefined || isMobilePriceDetails(value.mobile)) &&
     (value.productName === undefined || typeof value.productName === "string") &&
     (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
@@ -14602,7 +14717,6 @@ function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
     dateWindow,
     ...(priceMatch.durationText?.split(" · ") ?? []),
     priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : undefined,
-    priceMatch.baggageExcluded === true ? "ekskl. bagasje" : undefined,
   ];
   return buildPriceMatchInfoChips(texts);
 }
@@ -14625,7 +14739,7 @@ const supportAdvertisementDraw = Math.random();
 
 function buildElectricityPriceMatchChips(priceMatch: Pick<PriceMatchOffer, "electricity" | "productName">): HTMLElement {
   const e = priceMatch.electricity!;
-  return buildPriceMatchInfoChips([`${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
+  return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
 }
 
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
@@ -14649,7 +14763,6 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
     priceMatch.dateFlex === undefined
       ? priceMatch.shopName
       : `${formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
-    priceMatch.baggageExcluded === true ? "ekskl. bagasje" : undefined,
   ].filter((part): part is string => part !== undefined).join(" · ");
   priceMatchTitle.append(priceMatchProduct, priceMatchShop);
 
@@ -14672,14 +14785,27 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
 
-  if (isFlightPanelRow(priceMatch) || priceMatch.electricity !== undefined) {
+  if (isFlightPanelRow(priceMatch) || priceMatch.electricity !== undefined || priceMatch.mobile !== undefined) {
     priceMatchCard.classList.add("price-match-card--chips");
-    const chips = priceMatch.electricity !== undefined ? buildElectricityPriceMatchChips(priceMatch) : buildFlightPriceMatchChips(priceMatch);
+    const chips = priceMatch.mobile !== undefined ? buildMobilePriceMatchChips(priceMatch.mobile, priceMatch.productName) : priceMatch.electricity !== undefined ? buildElectricityPriceMatchChips(priceMatch) : buildFlightPriceMatchChips(priceMatch);
     const side = document.createElement("span");
     side.className = "price-match-side";
     if (priceMatch.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) side.classList.add("price-match-side--inline");
     side.append(priceMatchPrice, priceMatchBadge);
     priceMatchCard.append(chips, side);
+    return priceMatchCard;
+  }
+
+  if (priceMatch.travelKind !== "hotel") {
+    priceMatchCard.classList.add("price-match-card--chips", "price-match-card--product");
+    const main = document.createElement("span");
+    main.className = "price-match-title";
+    const bestAlternative = priceMatch.alternatives?.find((a) => a.shopName === priceMatch.shopName && a.amount === priceMatch.amount);
+    main.append(priceMatchProduct, buildProductPriceMatchChips(bestAlternative ?? priceMatch));
+    const side = document.createElement("span");
+    side.className = "price-match-side";
+    side.append(priceMatchPrice, priceMatchBadge);
+    priceMatchCard.append(main, side);
     return priceMatchCard;
   }
 
@@ -14863,6 +14989,7 @@ function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): s
   ].join("\n");
 }
 function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "tek") return "tek";
   if (priceMatch.source === "forbrukerradet") return "forbrukerradet";
   if (priceMatch.source === "pokepris") return "pokepris";
   if (priceMatch.source === "godpris") return "godpris";
@@ -14887,6 +15014,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "tek") return PROVIDER_NAMES.tek!;
   if (priceMatch.source === "forbrukerradet") return PROVIDER_NAMES.forbrukerradet!;
   if (priceMatch.sourceName !== undefined) return priceMatch.sourceName;
   if (priceMatch.source === "pokepris") return PROVIDER_NAMES.pokepris!;
@@ -14913,6 +15041,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "tek") return priceMatch.details ?? PROVIDER_NAMES.tek!;
   if (priceMatch.source === "forbrukerradet") return priceMatch.details ?? PROVIDER_NAMES.forbrukerradet!;
   if (priceMatch.travelKind === "hotel") {
     const alternatives = priceMatch.alternatives ?? [];
@@ -15003,15 +15132,12 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
           isCalendarPrice
             ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.`
             : `Dato og ${airportScopeText} er filtrert til samme søk.`,
-          priceMatch.baggageExcluded === true
-            ? `Pris uten bagasje: ${getPriceMatchSourceName(priceMatch)} bekrefter ikke at valgt bagasje er inkludert, så den kan komme i tillegg.`
-            : undefined,
         ].filter((line): line is string => line !== undefined).join("\n"),
         [
           isCalendarPrice ? "Prisgrunnlag" : "Treffliste",
           ...alternatives.slice(0, FLIGHT_TOOLTIP_MAX_ROWS).map(formatPriceMatchTooltipOffer),
         ].join("\n"),
-        "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden.",
+        "Fareklasse og valgt avgang må sjekkes hos kilden.",
       ].join("\n\n");
     }
 
@@ -15019,7 +15145,7 @@ function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
       `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
       details,
       `Åpner prissøk med ${airportScopeText}, datoer og antall voksne.`,
-      "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden.",
+      "Fareklasse og valgt avgang må sjekkes hos kilden.",
     ].join("\n");
   }
 

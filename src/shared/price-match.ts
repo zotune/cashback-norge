@@ -1,3 +1,4 @@
+import { findMobilePriceMatches } from "./mobile-price-match.js";
 import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
@@ -62,6 +63,7 @@ export async function findPriceMatches(
   requestText?: TextRequest,
   options: PriceMatchRuntimeOptions = {},
 ): Promise<PriceMatchOffer[]> {
+  if (message.mobile === true) return findMobilePriceMatches(message, requestJson);
   if (isElectricityPriceMatchUrl(message.url)) {
     return findElectricityPriceMatches(message, requestJson);
   }

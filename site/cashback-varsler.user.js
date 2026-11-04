@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793829840
+// @version      1793835720
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -16,6 +16,7 @@
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
 // @connect      cashbacknorge.no
+// @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
 // @connect      www.pokepris.no
 // @connect      pokepris.no
@@ -139,300 +140,41 @@
       }
     }
   };
-  function getProviderPageUrl(provider) {
-    const url = new URL("https://cashbacknorge.no/");
-    url.searchParams.set("provider", provider);
-    return url.toString();
+  function createAutomaticComparison(options) {
+    let error = "";
+    let result;
+    return {
+      prepare: options.prepare,
+      isSupported: options.isSupported,
+      getError: () => error,
+      async getOffers() {
+        await options.prepare();
+        if (!options.isSupported()) return [];
+        const url = options.getUrl();
+        if (!result || result.url !== url || result.expiresAt <= Date.now()) {
+          result = { url, expiresAt: Date.now() + 15 * 6e4, promise: options.load(url) };
+        }
+        try {
+          const offers = await result.promise;
+          error = offers.length ? "" : "Ingen sammenlignbare avtaler akkurat nå.";
+          return offers;
+        } catch (cause) {
+          result = void 0;
+          error = `${options.sourceName}: ${cause instanceof Error ? cause.message : "kunne ikke hente avtaler"}`;
+          return [];
+        }
+      }
+    };
   }
-  const EB_PER_TRUMF_KR$1 = 13.5;
-  const PROVIDER_NAMES = {
-    forbrukerradet: "Forbrukerrådet",
-    bytt: "Bytt.no",
-    pokepris: "Pokepris",
-    trumf: "Trumf",
-    klarna: "Klarna",
-    coupert: "Coupert",
-    remember: "re:member",
-    sas: "SAS",
-    tfbank: "TF Bank",
-    dnb: "DNB",
-    curve: "Curve Pro",
-    rabattkode: "Rabattkode",
-    norskfamilie: "NF",
-    logbuy: "LogBuy",
-    obos: "OBOS",
-    bob: "BOB",
-    usbl: "USBL",
-    bate: "Bate",
-    tobb: "TOBB",
-    naf: "NAF",
-    tekna: "Tekna",
-    nito: "NITO",
-    sparebank1: "SB1 Ung",
-    studentkortet: "Studentkortet",
-    studenttorget: "StudentTorget",
-    nettbonus: "NettBonus",
-    spenn: "Spenn",
-    spareborsen: "Sparebørsen",
-    rabble: "rabble",
-    dreams: "Dreams",
-    utdanningibergen: "Utdanning i Bergen",
-    unidays: "UNiDAYS",
-    gratisbursdag: "Gratis bursdag",
-    cbn: "♥",
-    unio: "Unio",
-    coop: "Coop",
-    elkjop: "Elkjøp",
-    akademikerne: "Akademikerne+",
-    huseierne: "Huseierne",
-    huseierforbundet: "Huseierforbundet",
-    amcar: "AMCAR",
-    horselsforbundet: "Hørselsforbundet",
-    knbf: "KNBF",
-    njff: "NJFF",
-    pensjonistforbundet: "Pensjonistforbundet",
-    kna: "KNA",
-    syklistforeningen: "Syklistforeningen",
-    revmatikerforbundet: "Revmatikerforbundet",
-    redningsselskapet: "Redningsselskapet",
-    lhl: "LHL",
-    skiforeningen: "Skiforeningen",
-    agrol: "Agrol",
-    kondis: "Kondis",
-    santander: "Santander",
-    norwegian: "Norwegian",
-    instabank: "Instabank",
-    vestbo: "Vestbo",
-    bbl: "BBL",
-    elbilforeningen: "Elbilforeningen",
-    ys: "YS",
-    lofavor: "LOfavør"
-  };
-  const PROVIDER_TIPS = {
-    forbrukerradet: "Beregnet månedspris fra Forbrukerrådet, inkludert strøm, påslag og månedsgebyr. Grunnlagschipene viser område, forbruk og Norgespris/strømstøtte. Nettleie kommer i tillegg.",
-    bytt: "Sammenlign strømavtaler hos Bytt.no. Åpner kildens strømoversikt.",
-    pokepris: "Varepriser fra Pokepris. Frakt er ukjent og kommer eventuelt i tillegg. Klikk for hele prislisten hos Pokepris.",
-    trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
-    klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
-    coupert: "Coupert.\nGratis cashback. Logg inn hos Coupert og aktiver cashback før kjøpet.\nFullfør kjøpet på butikkens nettsted.",
-    remember: "re:member kredittkort.\nAktiver tilbud i re:member-appen før kjøp.",
-    sas: "SAS EuroBonus-poeng.\nAktiver tilbud på SAS sine sider.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
-    tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
-    dnb: "DNB Spare. Aktiver i DNB-appen.",
-    rabattkode: "Rabattkode fra rabattkode.no.\nLim inn koden i handlekurven.",
-    norskfamilie: "Norsk Familieøkonomi.\nKrever medlemskap. Aktiver kjøp via norskfamilie.no.",
-    usbl: "USBL-tilbud.\nKrever USBL-medlemskap og eventuell Bonabo-aktivering.",
-    bate: "Bate medlemsfordeler.\nKrever Bate-medlemskap. Aktiver eller vis fordelen via bate.no.",
-    tobb: "TOBB medlemsfordeler.\nKrever TOBB-medlemskap. Aktiver eller vis fordelen via tobb.no.",
-    bob: "BOB-medlemsfordel.\nKrever BOB-medlemskap og gyldig medlemsbevis i BOB-appen.",
-    tekna: "Tekna medlemsfordeler.\nKrever Tekna-medlemskap. Aktiver tilbud via tekna.no.",
-    nito: "NITO medlemsfordeler.\nKrever NITO-medlemskap. Aktiver tilbud via nito.no.",
-    sparebank1: "SpareBank 1 Mastercard Ung.\n20 % rabatt på utvalgte strømmetjenester.\nSamlet inntil 500 kr per kalenderår.",
-    studentkortet: "Studentkortet.no\nGratis medlemskap for studenter i Norge.\nAktiver rabatt via studentkortet.no.",
-    nettbonus: "NettBonus.no\nGratis cashback-program.\nKlikk deg via nettbonus.no til butikken for å tjene bonus.",
-    spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
-    spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
-    rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
-    dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
-    utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
-    unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
-    gratisbursdag: "Bursdagsgaver og bursdagsrabatter fra gratisbursdag.no.\nKan kreve kundeklubb, app eller registrert fødselsdato.\nSe vilkår, gyldighet og bekreftelsesstatus for hvert tilbud.",
-    unio: "Unio medlemsfordeler.\nKrever medlemskap i et Unio-forbund.\nOppgi rabattkode eller vis medlemsbevis.",
-    coop: "Coop medlemsfordeler.\nKrever Coop-medlemskap.\nBruk rabattkode eller aktiver via Coop-siden der det kreves.",
-    elkjop: "Elkjøps Kundeklubb.\nKrever gratis kundeklubbmedlemskap.\nAktiver eller hent kode via Elkjøp.",
-    akademikerne: "Akademikerne Pluss medlemsfordeler.\nKrever medlemskap i en tilknyttet fagforening.\nAktiver via akademikernepluss.no eller A+-appen.",
-    huseierne: "Huseiernes medlemsfordeler.\nKrever Huseierne-medlemskap.\nVis medlemskort eller hent rabattkode via huseierne.no.",
-    huseierforbundet: "Norges Huseierforbund og Bergen Huseierforening.\nKrever medlemskap i den aktuelle foreningen.\nBruk den offisielle medlemssiden for vilkår og aktivering.",
-    amcar: "AMCARs rabattavtaler.\nKrever gyldig AMCAR-medlemskap.\nSe vilkår og aktivering på amcar.no.",
-    horselsforbundet: "Hørselsforbundets medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på horselsforbundet.no.",
-    knbf: "Kongelig Norsk Båtforbunds medlemsfordeler.\nKrever KNBF-medlemskap.\nSe vilkår og aktivering på knbf.no.",
-    njff: "NJFF medlemsfordeler.\nKrever NJFF-medlemskap.\nSe vilkår og aktivering på njff.no.",
-    pensjonistforbundet: "Pensjonistforbundets medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på pensjonistforbundet.no.",
-    kna: "KNAs medlemsfordeler.\nKrever KNA-medlemskap.\nSe vilkår og aktivering på kna.no.",
-    syklistforeningen: "Syklistforeningens medlemsfordeler.\nKrever medlemskap i Syklistforeningen.\nSe vilkår og aktivering på syklistforeningen.no.",
-    revmatikerforbundet: "Norsk Revmatikerforbunds medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på revmatiker.no.",
-    redningsselskapet: "Redningsselskapets medlemsfordeler.\nKrever medlemskap i Redningsselskapet.\nSe vilkår og aktivering på rs.no.",
-    lhl: "LHLs medlemsfordeler (Landsforeningen for hjerte- og lungesyke).\nKrever LHL-medlemskap.\nSe vilkår og aktivering på lhl.no.",
-    skiforeningen: "Skiforeningens medlemsfordeler.\nKrever medlemskap i Skiforeningen.\nSe vilkår og aktivering på skiforeningen.no.",
-    agrol: "Agrol – fordelsprogram for medlemmer av Norges Bondelag m.fl.\nKrever medlemskap i en tilknyttet landbruksorganisasjon.\nSe vilkår og aktivering på agrol.no.",
-    kondis: "Kondis' medlemsfordeler (organisasjon for kondisjonsidrett).\nKrever Kondis-medlemskap.\nSe vilkår og aktivering på kondis.no.",
-    santander: "Santander-kredittkort.\nKrever kredittkort fra Santander.\nAktiver tilbudet via santander.dealpass.no.",
-    norwegian: "Norwegian Reward.\nGratis fordelsprogram.\nTjen CashPoints via partnersiden på norwegian.com.\n1 CashPoint = 1 kr på Norwegian-kjøp.",
-    instabank: "Instabank kredittkort.\nMånedsrabatt og faste grønne rabatter avhenger av vilkår og butikkens MCC-kode.\nIngen rentefri periode: renter fra første dag ved bruk av kreditt. Termingebyr kan påløpe.\nAvklar eventuell forskuddsbetaling med banken; dette er ingen garanti for rentefri bruk.",
-    vestbo: "Vestbo medlemsfordeler.\nKrever Vestbo-medlemskap.\nVis digitalt medlemskort via vestbo.no.",
-    bbl: "Boligbyggelagenes fordelsprogram.\nKrever medlemskap i et tilknyttet boligbyggelag.\nRegistrer betalingskort på fordelerformedlemmer.no for automatisk bonus.",
-    elbilforeningen: "Norsk elbilforening.\nKrever medlemskap i Elbilforeningen.\nAktiver via elbil.no/medlemsfordeler.",
-    ys: "YS medlemsfordeler.\nKrever medlemskap i et YS-forbund.\nSe vilkår på ys.no/medlemsfordeler.",
-    lofavor: "LOfavør.\nKrever medlemskap i et LO-forbund.\nSe vilkår på lofavor.no."
-  };
-  const PROVIDER_COLORS = {
-    forbrukerradet: { bg: "#004a66", fg: "#ffffff", preserveInDark: true },
-    bytt: { bg: "#0075f5", fg: "#ffffff", preserveInDark: true },
-    pokepris: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
-    crypto: { bg: "#002d74", fg: "#ffffff" },
-    remember: { bg: "#111111", fg: "#ff9900" },
-    klarna: { bg: "#ffa8cd", fg: "#0b051d" },
-    coupert: { bg: "#f03d30", fg: "#ffffff" },
-    trumf: { bg: "#07006b", fg: "#ffffff" },
-    sas: { bg: "#00005c", fg: "#ffffff" },
-    tfbank: { bg: "#e30613", fg: "#ffffff" },
-    dnb: { bg: "#14555a", fg: "#ffffff" },
-    curve: { bg: "#000000", fg: "#ffffff" },
-    rabattkode: { bg: "#e74c3c", fg: "#ffffff" },
-    norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
-    logbuy: { bg: "#d81939", fg: "#ffffff" },
-    obos: { bg: "#003087", fg: "#ffffff" },
-    bob: { bg: "#ffffff", fg: "#5b2486" },
-    usbl: { bg: "#34413e", fg: "#ffffff" },
-    bate: { bg: "#ffffff", fg: "#ef1c24" },
-    tobb: { bg: "#00466b", fg: "#ffffff" },
-    naf: { bg: "#FFD100", fg: "#000000" },
-    tekna: { bg: "#ffffff", fg: "#00a3ad" },
-    nito: { bg: "#c8e6b8", fg: "#003b00" },
-    sparebank1: { bg: "#005aa4", fg: "#ffffff" },
-    studentkortet: { bg: "#1B2838", fg: "#ffffff" },
-    studenttorget: { bg: "#009fe3", fg: "#ffffff" },
-    nettbonus: { bg: "#5b0f8c", fg: "#ffffff" },
-    spenn: { bg: "#E51454", fg: "#ffffff" },
-    spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
-    rabble: { bg: "#2d2145", fg: "#f8a6a6" },
-    dreams: { bg: "#a389d8", fg: "#1a1a1a" },
-    utdanningibergen: { bg: "#ffffff", fg: "#000000" },
-    unidays: { bg: "#00b140", fg: "#ffffff" },
-    gratisbursdag: { bg: "#7c3aed", fg: "#ffffff" },
-    unio: { bg: "#ffffff", fg: "#6b5330" },
-    coop: { bg: "#003366", fg: "#ffffff" },
-    elkjop: { bg: "#1d1b58", fg: "#ffffff" },
-    akademikerne: { bg: "#fff7f0", fg: "#113063" },
-    huseierne: { bg: "#ffffff", fg: "#0f1a18" },
-    huseierforbundet: { bg: "#ffffff", fg: "#0f1a18" },
-    amcar: { bg: "#c01921", fg: "#ffffff" },
-    horselsforbundet: { bg: "#ffffff", fg: "#f1774f" },
-    knbf: { bg: "#00205b", fg: "#ffffff" },
-    njff: { bg: "#ffffff", fg: "#003a5d" },
-    pensjonistforbundet: { bg: "#ffffff", fg: "#000000" },
-    kna: { bg: "#d60929", fg: "#ffffff" },
-    syklistforeningen: { bg: "#e61414", fg: "#ffffff" },
-    revmatikerforbundet: { bg: "#ffffff", fg: "#2d4f9e" },
-    redningsselskapet: { bg: "#ffffff", fg: "#0a2a66" },
-    lhl: { bg: "#ffffff", fg: "#4b1d6f" },
-    skiforeningen: { bg: "#ffffff", fg: "#0067b1" },
-    agrol: { bg: "#ffffff", fg: "#3d3d3d" },
-    kondis: { bg: "#ffffff", fg: "#8b1a1a" },
-    santander: { bg: "#ffffff", fg: "#ec0000" },
-    norwegian: { bg: "#d81939", fg: "#ffffff" },
-    instabank: { bg: "#00ff85", fg: "#333f48" },
-    vestbo: { bg: "#ffffff", fg: "#1dc1dd" },
-    bbl: { bg: "#1657e2", fg: "#ffffff" },
-    elbilforeningen: { bg: "#003a78", fg: "#ffffff" },
-    ys: { bg: "#006e26", fg: "#ffffff" },
-    lofavor: { bg: "#dc141a", fg: "#ffffff" },
-    cbn: { bg: "#ffe4e6", fg: "#be123c" }
-  };
-  const FREE_CARDS = [
-    {
-      pct: 74e-4,
-      ebPer100kr: 10,
-      label: "SAS Amex",
-      badge: "sas-amex",
-      approx: true,
-      url: "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/",
-      tip: "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)."
-    },
-    {
-      pct: 5e-3,
-      label: "Norwegian",
-      badge: "norwegian",
-      approx: false,
-      url: "https://www.banknorwegian.no/kredittkort/cashback/",
-      tip: "0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr på Norwegian.no).\nGratis kort, ingen årsavgift."
-    }
-  ];
-  const PREMIUM_CARDS = [
-    {
-      pct: 0.035,
-      minPct: 0.02,
-      maxPct: 0.05,
-      label: "Crypto",
-      badge: "crypto",
-      approx: false,
-      url: "https://crypto.com/app/ns3fma5hou",
-      tip: "Crypto.com Visa-kort.\nPlatin: +2 % (400 kr/mnd), Jade/Obsidian: +5 %.\nKombineres med annen cashback."
-    },
-    {
-      pct: 0.01,
-      label: "Curve",
-      badge: "curve",
-      approx: false,
-      url: "https://www.curve.com/join#D5GXXJJD",
-      tip: "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback."
-    },
-    {
-      pct: 75e-4,
-      minPct: 5e-3,
-      maxPct: 0.01,
-      label: "Klarna",
-      badge: "klarna",
-      approx: false,
-      url: "https://www.klarna.com/no/medlemskap/",
-      tip: "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback."
-    }
-  ];
-  const REVOLUT_SUBSCRIPTIONS = {
-    "nordvpn.com": "NordVPN Complete",
-    "tinder.com": "Tinder Gold",
-    "ft.com": "Financial Times Premium Digital",
-    "wework.com": "WeWork (3 pass/mnd)",
-    "masterclass.com": "MasterClass Unlimited",
-    "chess.com": "Chess.com Diamond",
-    "classpass.com": "ClassPass (20 credits/mnd)",
-    "makeheadway.com": "Headway",
-    "wolt.com": "Wolt+",
-    "headspace.com": "Headspace",
-    "freeletics.com": "Freeletics",
-    "sleepcycle.com": "Sleep Cycle",
-    "picsart.com": "Picsart",
-    "perplexity.ai": "Perplexity",
-    "theathletic.com": "The Athletic",
-    "laundryheap.com": "Laundryheap+"
-  };
-  const INSTABANK_AD = {
-    id: "instabank",
-    text: "Instabank kredittkort",
-    emoji: "💳",
-    url: "https://oriomed.com/click.track?CID=452956&AFID=570033&ADID=2608370&SID=",
-    affiliate: true,
-    validFrom: "2026-11-01",
-    validUntil: "2026-12-31",
-    // Short sign-up incentive per month, shown as the ad text.
-    incentives: [
-      { text: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
-      { text: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" }
-    ],
-    // Credit ads must carry the representative example. Keep it to one line.
-    example: "Eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr."
-  };
-  const SUPPORT_LINKS = [
-    { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
-    { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
-    { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
-    { text: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
-    { text: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
-    { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
-    { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
-    { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
-    { text: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
-    { text: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
-    { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-    { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
-    // Bulder's referral terms: 500 kr to both when the referred mortgage is paid out (bulder.no/om-oss/vilkaar/bonus-verving).
-    { text: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true }
-  ];
-  const PROVIDER_WELCOME_BONUSES = {
-    spareborsen: {
-      label: "Ny: +50 kr",
-      tip: "Ny hos Sparebørsen? Du får 50 kr i startsaldo når du registrerer deg med Vipps via vår invitasjon."
-    }
+  const version$1 = 1;
+  const source$1 = "https://www.tek.no/mobilabonnement/api";
+  const generatedAt$1 = "2026-11-04T22:32:00.717078+00:00";
+  const suppliers$1 = [{ "id": 5, "name": "Chilimobil", "hostname": "chilimobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://chilimobil.no/" }, { "id": 6, "name": "Fjordkraft Mobil", "hostname": "fjordkraft.no", "path": "/mobil", "evidence": "tek-destination", "supplierUrl": "https://fjordkraft.no/mobil" }, { "id": 1, "name": "Happybytes", "hostname": "happybytes.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://happybytes.no/" }, { "id": 7, "name": "Ice", "hostname": "ice.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://ice.no/" }, { "id": 28, "name": "Lyca Mobile", "hostname": "lyca-mobile.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://lyca-mobile.no/" }, { "id": 9, "name": "MyCall", "hostname": "mycall.no", "path": "/", "evidence": "verified-site", "supplierUrl": "https://mycall.no/" }, { "id": 10, "name": "OneCall", "hostname": "onecall.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://onecall.no/" }, { "id": 24, "name": "PlussMobil", "hostname": "plussmobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://plussmobil.no/" }, { "id": 12, "name": "Saga Mobil", "hostname": "sagamobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://sagamobil.no/" }, { "id": 14, "name": "Talkmore", "hostname": "talkmore.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://talkmore.no/" }, { "id": 15, "name": "Telenor", "hostname": "telenor.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://telenor.no/" }, { "id": 4, "name": "Telia", "hostname": "telia.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://telia.no/" }, { "id": 27, "name": "Verimo", "hostname": "verimo.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://verimo.no/" }, { "id": 26, "name": "Trøndermobil", "hostname": "xn--trndermobil-hgb.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://xn--trndermobil-hgb.no/" }, { "id": 11, "name": "Xplora", "hostname": "xplora.com", "path": "/", "evidence": "verified-site", "supplierUrl": "https://xplora.com/" }, { "id": 11, "name": "Xplora", "hostname": "xplora.no", "path": "/", "evidence": "verified-site", "supplierUrl": "https://xplora.no/" }];
+  const bundled$1 = {
+    version: version$1,
+    source: source$1,
+    generatedAt: generatedAt$1,
+    suppliers: suppliers$1
   };
   const UNO_CAMPAIGNS = {
     "451581": { label: "Gjeldsoversikt", paths: ["/gjeldfri", "/gjeldsoversikt", "/statistikk/gjeldsoversikt"] },
@@ -633,6 +375,154 @@
       return HTML_ENTITIES.get(entity) ?? HTML_ENTITIES.get(entity.toLowerCase()) ?? match;
     });
   }
+  function stripHtml$2(html) {
+    return decodeHtmlEntities(html.replace(/<!--[\s\S]*?-->/g, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/li>/gi, "\n").replace(/<li>/gi, "- ").replace(/<[^>]+>/g, "")).replace(/\n{2,}/g, "\n\n").trim();
+  }
+  function isFreshPublicCatalog(value, now = Date.now()) {
+    const age = now - Date.parse(value.generatedAt);
+    return age >= -864e5 && age <= 14 * 864e5;
+  }
+  function createPublicCatalogStore(bundled2, valid) {
+    let active = valid(bundled2) ? bundled2 : void 0;
+    let pending;
+    let loadedAt = 0;
+    const adopt = (value) => {
+      if (valid(value) && isFreshPublicCatalog(value) && (active === void 0 || Date.parse(value.generatedAt) > Date.parse(active.generatedAt))) active = value;
+    };
+    return {
+      get: () => active !== void 0 && isFreshPublicCatalog(active) ? active : void 0,
+      async load(fetchCatalog2, cache, refreshAfterMs = 15 * 6e4) {
+        if (pending !== void 0) return pending;
+        if (Date.now() - loadedAt < refreshAfterMs) return;
+        pending = (async () => {
+          if (cache !== void 0) {
+            try {
+              adopt(await cache.read());
+            } catch {
+            }
+          }
+          try {
+            adopt(await fetchCatalog2());
+          } catch {
+          }
+          if (cache !== void 0 && active !== void 0 && isFreshPublicCatalog(active)) {
+            try {
+              await cache.write(active);
+            } catch {
+            }
+          }
+          loadedAt = Date.now();
+        })();
+        try {
+          await pending;
+        } finally {
+          pending = void 0;
+        }
+      }
+    };
+  }
+  const TEK_MOBILE_API = "https://www.tek.no/mobilabonnement/api";
+  const MOBILE_DATA_TIERS = [0, 5, 10, 20, 30, 50, 100];
+  const TEK_MOBILE_NETWORKS = [{ id: 1, name: "Telenor" }, { id: 2, name: "Telia" }, { id: 3, name: "Ice" }];
+  function tekPlansUrl(gb, page = 1, broadband = false, networkId) {
+    const url = new URL(`${TEK_MOBILE_API}/${broadband ? "mobile-broadband-plans" : "plans"}`);
+    url.searchParams.set("usage[data]", String(gb * 1e3));
+    if (!broadband) {
+      url.searchParams.set("usage[messages]", "5000");
+      url.searchParams.set("usage[call_minutes]", "5000");
+      url.searchParams.set("filter[excluded_features][0]", "11");
+      url.searchParams.set("filter[excluded_features][1]", "13");
+    }
+    if (networkId !== void 0) url.searchParams.set("filter[network]", String(networkId));
+    url.searchParams.set("page", String(page));
+    return url.href;
+  }
+  function readTekPage(value) {
+    if (!isRecord$6(value) || !Array.isArray(value.data) || !value.data.every(isRecord$6) || !isRecord$6(value.meta) || !Number.isSafeInteger(value.meta.last_page) || value.meta.last_page < 1 || value.data.length > 100) throw new Error("Tek mobilabonnement: endret eller ugyldig plansvar");
+    return { rows: value.data, pages: value.meta.last_page };
+  }
+  async function requestTekJson(url) {
+    try {
+      const response = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(12e3) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      throw new Error(`Tek ${new URL(url).pathname}: ${error instanceof Error ? error.message : "nettverksfeil"}`);
+    }
+  }
+  async function getTekCataloguePlans(requestJson) {
+    const first = readTekPage(await requestJson(tekPlansUrl(1), { credentials: "omit" }));
+    if (first.pages > 8) throw new Error("Tek operatører: listen overstiger 8 sider");
+    const rows = [...first.rows];
+    for (let page = 2; page <= first.pages; page++) {
+      rows.push(...readTekPage(await requestJson(tekPlansUrl(1, page), { credentials: "omit" })).rows);
+    }
+    return rows;
+  }
+  const MOBILE_SUPPLIER_CACHE_KEY = "mobileSupplierCatalog";
+  function safeSite(value) {
+    const u = typeof value === "string" ? parseUrl$1(value) : void 0;
+    return u !== void 0 && u.protocol === "https:" && !u.username && !u.password && !u.port && /\.(?:no|com)$/.test(u.hostname) && !/[?]/.test(u.pathname) ? u : void 0;
+  }
+  function buildMobileSupplierCatalog(rows, generatedAt2, verified = []) {
+    const entries = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      if (row.type !== "mobile-plan" || !isRecord$6(row.operator) || !Number.isSafeInteger(row.operator.id) || typeof row.operator.name !== "string" || typeof row.operator.slug !== "string") continue;
+      const operator = row.operator;
+      let site = safeSite(row.affiliateSignupUrl);
+      if (site?.hostname === "linkfusion.no") site = safeSite(site.searchParams.get("url"));
+      const brand = String(operator.slug).replace(/[^a-z0-9]/gi, "").toLowerCase();
+      const brandParts = String(operator.slug).split("-").filter((s) => s.length >= 4 && s !== "mobil");
+      let internationalBrand = "";
+      try {
+        internationalBrand = new URL(`https://${String(operator.name).replace(/\s/g, "").toLowerCase()}.no`).hostname.split(".")[0] ?? "";
+      } catch {
+      }
+      const hostnameBrand = site === void 0 ? "" : normalizeHostname$1(site.hostname).replace(/[^a-z0-9]/gi, "");
+      if (!brand || !site || !(hostnameBrand.includes(brand) || brandParts.some((part) => hostnameBrand.includes(part)) || internationalBrand.startsWith("xn--") && normalizeHostname$1(site.hostname).startsWith(`${internationalBrand}.`))) site = void 0;
+      const fallback = verified.filter((v) => v.id === operator.id && v.name === operator.name && v.evidence === "verified-site");
+      if (site === void 0) {
+        for (const v of fallback) entries.set(`${v.id}:${v.hostname}:${v.path}`, v);
+        continue;
+      }
+      const hostname = normalizeHostname$1(site.hostname).replace(/^(?:signup|bestilling)\./, "");
+      const scope = site.pathname.match(/^\/(mobil)(?:\/|$)/)?.[0];
+      const entry = {
+        id: operator.id,
+        name: operator.name,
+        hostname,
+        path: scope ? "/mobil" : "/",
+        supplierUrl: `https://${hostname}${scope ? "/mobil/" : "/"}`,
+        evidence: "tek-destination"
+      };
+      entries.set(`${entry.id}:${hostname}:${entry.path}`, entry);
+    }
+    const suppliers2 = [...entries.values()].filter((row, _, all) => !all.some((other) => other.id !== row.id && other.hostname === row.hostname && other.path === row.path)).sort((a, b) => a.hostname.localeCompare(b.hostname));
+    const catalog = { version: 1, source: TEK_MOBILE_API, generatedAt: generatedAt2, suppliers: suppliers2 };
+    if (!isMobileSupplierCatalog(catalog)) throw new Error("Tek operatører: ingen verifiserte leverandørdomener");
+    return catalog;
+  }
+  function isMobileSupplierCatalog(value) {
+    return isRecord$6(value) && value.version === 1 && value.source === TEK_MOBILE_API && typeof value.generatedAt === "string" && Number.isFinite(Date.parse(value.generatedAt)) && Array.isArray(value.suppliers) && value.suppliers.length > 0 && value.suppliers.length <= 100 && value.suppliers.every((row) => isRecord$6(row) && Number.isSafeInteger(row.id) && row.id > 0 && typeof row.name === "string" && row.name.length > 0 && typeof row.hostname === "string" && normalizeHostname$1(row.hostname) === row.hostname && safeSite(row.supplierUrl)?.hostname === row.hostname && typeof row.path === "string" && /^\/(?:mobil)?$/.test(row.path) && (row.evidence === "tek-destination" || row.evidence === "verified-site"));
+  }
+  function findMobileSupplier(value, catalog) {
+    if (!catalog || !isFreshPublicCatalog(catalog)) return void 0;
+    const url = safeSite(value);
+    if (!url || /(?:^|\/)(?:minside|min-side|login|konto|account|bedrift|business|checkout|bestilling)(?:\/|$)/i.test(url.pathname)) return void 0;
+    return catalog.suppliers.find((s) => s.hostname === normalizeHostname$1(url.hostname) && (s.path === "/" || url.pathname === s.path || url.pathname.startsWith(`${s.path}/`)));
+  }
+  const store$1 = createPublicCatalogStore(bundled$1, isMobileSupplierCatalog);
+  function getMobileSupplier(url) {
+    return findMobileSupplier(url, store$1.get());
+  }
+  function loadMobileSuppliers(requestJson = requestTekJson, cache) {
+    return store$1.load(async () => {
+      const current = store$1.get();
+      if (current && Date.now() - Date.parse(current.generatedAt) < 864e5) return current;
+      const plans = await getTekCataloguePlans(requestJson);
+      return buildMobileSupplierCatalog(plans, (/* @__PURE__ */ new Date()).toISOString(), isMobileSupplierCatalog(bundled$1) ? bundled$1.suppliers : []);
+    }, cache);
+  }
   const EXCHANGE_RATES_URL$1 = "https://open.er-api.com/v6/latest/NOK";
   const STATIC_NOK_BASE_RATES = {
     rates: {
@@ -680,7 +570,7 @@
   function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  const EB_PER_TRUMF_KR = 13.5;
+  const EB_PER_TRUMF_KR$1 = 13.5;
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
     if (trimmedReward.length === 0) return "?";
@@ -768,13 +658,13 @@
     if (sasRateMatch !== null) {
       const points = Number.parseInt((sasRateMatch[1] ?? "0").replace(/\s/g, ""), 10);
       const eb = Math.round(amount * points / 100);
-      const kr = amount * points / 100 / EB_PER_TRUMF_KR;
+      const kr = amount * points / 100 / EB_PER_TRUMF_KR$1;
       return `~${formatKr(kr)} kr (~${eb} EB)`;
     }
     const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
     if (sasFixedMatch !== null) {
       const points = Number.parseInt((sasFixedMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const kr = points / EB_PER_TRUMF_KR;
+      const kr = points / EB_PER_TRUMF_KR$1;
       return `~${formatKr(kr)} kr (~${points} EB)`;
     }
     const klarnaMatch = reward.match(/^([\d.]+)%$/);
@@ -805,7 +695,7 @@
     const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
     if (sasRateMatch !== null) {
       const points = Number.parseInt((sasRateMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      return points / EB_PER_TRUMF_KR;
+      return points / EB_PER_TRUMF_KR$1;
     }
     const krRangeMatch = reward.match(/^([\d.,]+)-([\d.,]+)\s*kr/i);
     if (krRangeMatch !== null) {
@@ -878,14 +768,14 @@
   }
   function addEbSuffix(label, minPct, maxPct, amount, provider) {
     if (provider === "trumf") {
-      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
-      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR$1);
+      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR$1);
       const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
       return `${label} (${ebStr})`;
     }
     if (provider === "sas") {
-      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
-      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
+      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR$1);
+      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR$1);
       const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
       return `~${label} (${ebStr})`;
     }
@@ -895,13 +785,13 @@
     const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
     if (fixedMatch !== null) {
       const points = Number.parseInt((fixedMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const kr = Math.round(points / EB_PER_TRUMF_KR);
+      const kr = Math.round(points / EB_PER_TRUMF_KR$1);
       return `~${kr} kr (~${points.toLocaleString("nb-NO")} EB)`;
     }
     const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
     if (rateMatch !== null) {
       const points = Number.parseInt((rateMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const pct = points / EB_PER_TRUMF_KR;
+      const pct = points / EB_PER_TRUMF_KR$1;
       return `~${formatNo(pct)} % (~${points} EB/100kr)`;
     }
     return "";
@@ -911,20 +801,20 @@
     if (rangeMatch !== null) {
       const minPct = Number.parseFloat((rangeMatch[1] ?? "0").replace(",", "."));
       const maxPct = Number.parseFloat((rangeMatch[2] ?? "0").replace(",", "."));
-      const minEb = Math.round(minPct * EB_PER_TRUMF_KR);
-      const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR);
+      const minEb = Math.round(minPct * EB_PER_TRUMF_KR$1);
+      const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR$1);
       return `~${minEb}-${maxEb} EB/100kr`;
     }
     const pctMatch = reward.match(/^([\d,.]+)\s*%$/);
     if (pctMatch !== null) {
       const pct = Number.parseFloat((pctMatch[1] ?? "0").replace(",", "."));
-      const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR);
+      const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR$1);
       return `~${ebPer100} EB/100kr`;
     }
     const krMatch = reward.match(/^([\d\s]+)\s*kr$/);
     if (krMatch !== null) {
       const kr = Number.parseInt((krMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const eb = Math.round(kr * EB_PER_TRUMF_KR);
+      const eb = Math.round(kr * EB_PER_TRUMF_KR$1);
       return `~${eb.toLocaleString("nb-NO")} EB`;
     }
     return "";
@@ -932,6 +822,488 @@
   function formatNo(value) {
     return value % 1 === 0 ? value.toString() : value.toFixed(1).replace(".", ",");
   }
+  function readStringValue(value) {
+    if (typeof value !== "string") return void 0;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function readNumberValue(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function readPositiveNumberValue(value) {
+    const numberValue = readNumberValue(value);
+    return numberValue !== void 0 && numberValue > 0 ? numberValue : void 0;
+  }
+  function readNonNegativeIntegerValue(value) {
+    const parsedValue = typeof value === "number" ? value : typeof value === "string" ? Number.parseInt(value, 10) : Number.NaN;
+    return Number.isInteger(parsedValue) && parsedValue >= 0 ? parsedValue : void 0;
+  }
+  function readPositiveIntegerValue(value) {
+    const parsedValue = readNonNegativeIntegerValue(value);
+    return parsedValue !== void 0 && parsedValue > 0 ? parsedValue : void 0;
+  }
+  function readIataCodeValue(value) {
+    if (typeof value !== "string") return void 0;
+    const trimmed = value.trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(trimmed)) return trimmed;
+    return trimmed.match(/\b[A-Z]{3}\b/)?.[0];
+  }
+  function readIsoDateValue(value) {
+    if (typeof value !== "string") return void 0;
+    const dateMatch = value.trim().match(/\b(\d{4}-\d{2}-\d{2})\b/);
+    const parsedValue = dateMatch?.[1];
+    if (parsedValue === void 0) return void 0;
+    const parsedDate = /* @__PURE__ */ new Date(`${parsedValue}T00:00:00Z`);
+    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== parsedValue) {
+      return void 0;
+    }
+    return parsedValue;
+  }
+  function addDaysToIsoDate(isoDate, days) {
+    const time = (/* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`)).getTime();
+    if (Number.isNaN(time)) return void 0;
+    return new Date(time + days * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+  }
+  function parseJsonValue(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return void 0;
+    }
+  }
+  function readRecordArray(value) {
+    return Array.isArray(value) ? value.filter(isRecord$6) : [];
+  }
+  function isString(value) {
+    return typeof value === "string";
+  }
+  function isMobilePriceDetails(value) {
+    return isRecord$6(value) && ["mobile", "unlimited", "broadband"].includes(String(value.category)) && finite(value.requestedGb) && value.requestedGb >= 0 && finite(value.includedGb) && value.includedGb >= 0 && typeof value.network === "string" && value.network.length <= 80 && typeof value.unlimitedData === "boolean" && TEK_MOBILE_NETWORKS.some((network) => network.id === value.networkId) && (value.meteredData === void 0 || typeof value.meteredData === "boolean") && (value.speedMbps === void 0 || finite(value.speedMbps) && value.speedMbps > 0) && (value.afterQuotaMbps === void 0 || finite(value.afterQuotaMbps) && value.afterQuotaMbps > 0) && (value.terms === void 0 || typeof value.terms === "string" && value.terms.length <= 1e4);
+  }
+  async function findMobilePriceMatches(message, requestJson = requestTekJson) {
+    if (message.mobile !== true || getMobileSupplier(message.url) === void 0) return [];
+    const lists = /* @__PURE__ */ new Map();
+    const errors = [];
+    let blocked = false;
+    for (let index = 0; index < MOBILE_DATA_TIERS.length && !blocked; index += 2) {
+      await Promise.all(MOBILE_DATA_TIERS.slice(index, index + 2).map(async (gb) => {
+        try {
+          lists.set(gb, readTekPage(await requestJson(tekPlansUrl(gb), { credentials: "omit" })).rows);
+        } catch (error) {
+          const text = error instanceof Error ? error.message : "nettverksfeil";
+          errors.push(`${gb} GB: ${text}`);
+          if (/HTTP (?:403|429)/.test(text)) blocked = true;
+        }
+      }));
+    }
+    const choices = [];
+    const addChoice = async (rows, gb, category) => {
+      const eligible = selectPlans(rows, gb, category);
+      if (!eligible.length) return;
+      const missing = TEK_MOBILE_NETWORKS.filter((network) => !eligible.some((plan) => plan.mobile?.networkId === network.id));
+      const warnings = [];
+      if (!blocked) await Promise.all(missing.map(async (network) => {
+        try {
+          const page = readTekPage(await requestJson(tekPlansUrl(gb, 1, category === "broadband", network.id), { credentials: "omit" }));
+          if (page.rows.some((row) => !isRecord$6(row.operator) || !isRecord$6(row.operator.network) || row.operator.network.id !== network.id)) {
+            throw new Error("nettfilteret returnerte feil mobilnett");
+          }
+          eligible.push(...selectPlans(page.rows, gb, category));
+        } catch (error) {
+          const text = error instanceof Error ? error.message : "nettverksfeil";
+          warnings.push(`${network.name}: ${text}`);
+          if (/HTTP (?:403|429)/.test(text)) blocked = true;
+        }
+      }));
+      const plans = eligible.sort((a, b) => a.amount - b.amount || a.productName.localeCompare(b.productName, "nb")).filter((plan, index, sorted) => sorted.findIndex((other) => other.mobile.networkId === plan.mobile.networkId) === index);
+      for (const network of TEK_MOBILE_NETWORKS) {
+        if (!plans.some((plan) => plan.mobile.networkId === network.id) && !warnings.some((text) => text.startsWith(`${network.name}:`))) {
+          warnings.push(`${network.name}: ${blocked ? "oppslag stoppet etter blokkering/ratebegrensning" : "ingen sammenlignbare treff"}`);
+        }
+      }
+      if (plans[0]?.mobile) choices.push({ mobile: plans[0].mobile, plans, warnings });
+    };
+    for (const gb of MOBILE_DATA_TIERS) {
+      if (gb !== 100) await addChoice(lists.get(gb) ?? [], gb, "mobile");
+    }
+    await addChoice(lists.get(100) ?? [], 100, "unlimited");
+    const withData = choices.filter((choice) => choice.mobile.requestedGb > 0);
+    for (let index = 0; index < withData.length && !blocked; index += 2) {
+      await Promise.all(withData.slice(index, index + 2).map(async (choice) => {
+        try {
+          const page = readTekPage(await requestJson(tekPlansUrl(choice.mobile.requestedGb, 1, true), { credentials: "omit" }));
+          const best = selectPlans(page.rows, choice.mobile.requestedGb, "broadband")[0];
+          if (best) choice.broadband = best;
+        } catch (error) {
+          const text = error instanceof Error ? error.message : "nettverksfeil";
+          choice.warnings.push(`Mobilt bredbånd: ${text}`);
+          if (/HTTP (?:403|429)/.test(text)) blocked = true;
+        }
+      }));
+    }
+    if (!choices.length && errors.length) throw new Error(`Tek: ${errors.join("; ")}`);
+    return choices.map(({ mobile, plans, warnings, broadband }) => {
+      const best = plans[0];
+      return {
+        source: "tek",
+        sourceName: "Tek.no",
+        shopName: best.shopName,
+        productName: best.productName,
+        amount: best.amount,
+        price: best.price,
+        currency: "NOK",
+        mobile,
+        productUrl: `https://www.tek.no/mobilabonnement?data=${mobile.requestedGb * 1e3}&network=-1&features=`,
+        alternatives: plans,
+        ...broadband ? { mobileBroadband: broadband } : {},
+        details: [
+          `${mobileTierLabel(mobile)} fra Tek.no. 5 000 ringeminutter og 5 000 meldinger i Norge per måned.`,
+          "Kildens beregnede månedspris inkluderer eventuelle datapakker og brukskostnader. Se hastighetsgrenser og vilkår. Unge-/kontantkort, familiepakker og egne dagskvoter er utelatt.",
+          ...errors.length || warnings.length ? [`Ufullstendig oppslag: ${[...errors, ...warnings].join("; ")}`] : []
+        ].join("\n\n")
+      };
+    });
+  }
+  function mobileTierLabel(m) {
+    return m.category === "broadband" ? `Mobilt bredbånd · ≥${m.requestedGb} GB` : m.category === "unlimited" ? "Fri data" : m.requestedGb === 0 ? "0 GB" : `≥${m.requestedGb} GB`;
+  }
+  function selectPlans(rows, gb, category) {
+    const plans = rows.flatMap((row) => {
+      const networkId = isRecord$6(row.operator) && isRecord$6(row.operator.network) ? row.operator.network.id : void 0;
+      if (row.type !== (category === "broadband" ? "mobile-broadband-plan" : "mobile-plan") || typeof row.name !== "string" || !isRecord$6(row.operator) || typeof row.operator.name !== "string" || !isRecord$6(row.operator.network) || typeof row.operator.network.name !== "string" || !TEK_MOBILE_NETWORKS.some((network) => network.id === networkId) || !Array.isArray(row.features) || !row.features.every(isRecord$6) || row.features.some((feature) => ["for-unge", "kontantkort", "familie"].includes(String(feature.slug))) || !isRecord$6(row.pricingModel) || !["regular", "incremental_data", "data_only"].includes(String(row.pricingModel.type)) || !isRecord$6(row.pricingModel.attributes) || !isRecord$6(row.estimatedInvoice) || row.estimatedInvoice.meetsUsageRequirements !== true || !finite(row.estimatedInvoice.total) || row.estimatedInvoice.total <= 0) return [];
+      const a = row.pricingModel.attributes;
+      if (typeof row.comment === "string" && /\b(?:MB|GB)\s+(?:data\s+)?(?:hver|per)\s+dag\b/i.test(stripHtml$2(row.comment))) return [];
+      const meteredData = row.pricingModel.type === "incremental_data" && Array.isArray(a.dataSteps) && isRecord$6(a.dataSteps[0]) && (numericField(a.dataSteps[0].length) ?? 0) > 0 && (readNumberValue(a.dataSteps[0].per_megabyte) ?? 0) > 0;
+      const included = meteredData ? 0 : numericField(a.dataIncluded);
+      if (included === void 0 || included < 0) return [];
+      const after = numericField(a.dataExhaustedSpeedLimit);
+      const unlimitedData = /(?:fri\s*data|ubegrenset|ice\s*max)/i.test(row.name) && after !== void 0 && after > 0;
+      if (category === "unlimited" && !unlimitedData) return [];
+      const speed = numericField(a.upperSpeedLimit);
+      const amount = row.estimatedInvoice.total / 100;
+      const mobile = {
+        category,
+        requestedGb: gb,
+        includedGb: included / 1e3,
+        network: row.operator.network.name,
+        networkId,
+        unlimitedData,
+        meteredData,
+        ...speed !== void 0 && speed > 0 ? { speedMbps: speed / 1e3 } : {},
+        ...after !== void 0 && after > 0 ? { afterQuotaMbps: after / 1e3 } : {},
+        ...typeof row.comment === "string" && row.comment.trim() ? { terms: stripHtml$2(row.comment).slice(0, 1e4) } : {}
+      };
+      return [{ shopName: row.name, productName: row.operator.name, amount, price: `${formatKr(amount)} kr/mnd`, currency: "NOK", mobile }];
+    });
+    return plans.sort((a, b) => a.amount - b.amount || a.productName.localeCompare(b.productName, "nb"));
+  }
+  function numericField(value) {
+    return typeof value === "number" ? finite(value) ? value : void 0 : typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value) ? readNumberValue(value) : void 0;
+  }
+  function finite(value) {
+    return typeof value === "number" && Number.isFinite(value);
+  }
+  function getProviderPageUrl(provider) {
+    const url = new URL("https://cashbacknorge.no/");
+    url.searchParams.set("provider", provider);
+    return url.toString();
+  }
+  const EB_PER_TRUMF_KR = 13.5;
+  const PROVIDER_NAMES = {
+    tek: "Tek.no",
+    forbrukerradet: "Forbrukerrådet",
+    bytt: "Bytt.no",
+    pokepris: "Pokepris",
+    trumf: "Trumf",
+    klarna: "Klarna",
+    coupert: "Coupert",
+    remember: "re:member",
+    sas: "SAS",
+    tfbank: "TF Bank",
+    dnb: "DNB",
+    curve: "Curve Pro",
+    rabattkode: "Rabattkode",
+    norskfamilie: "NF",
+    logbuy: "LogBuy",
+    obos: "OBOS",
+    bob: "BOB",
+    usbl: "USBL",
+    bate: "Bate",
+    tobb: "TOBB",
+    naf: "NAF",
+    tekna: "Tekna",
+    nito: "NITO",
+    sparebank1: "SB1 Ung",
+    studentkortet: "Studentkortet",
+    studenttorget: "StudentTorget",
+    nettbonus: "NettBonus",
+    spenn: "Spenn",
+    spareborsen: "Sparebørsen",
+    rabble: "rabble",
+    dreams: "Dreams",
+    utdanningibergen: "Utdanning i Bergen",
+    unidays: "UNiDAYS",
+    gratisbursdag: "Gratis bursdag",
+    cbn: "♥",
+    unio: "Unio",
+    coop: "Coop",
+    elkjop: "Elkjøp",
+    akademikerne: "Akademikerne+",
+    huseierne: "Huseierne",
+    huseierforbundet: "Huseierforbundet",
+    amcar: "AMCAR",
+    horselsforbundet: "Hørselsforbundet",
+    knbf: "KNBF",
+    njff: "NJFF",
+    pensjonistforbundet: "Pensjonistforbundet",
+    kna: "KNA",
+    syklistforeningen: "Syklistforeningen",
+    revmatikerforbundet: "Revmatikerforbundet",
+    redningsselskapet: "Redningsselskapet",
+    lhl: "LHL",
+    skiforeningen: "Skiforeningen",
+    agrol: "Agrol",
+    kondis: "Kondis",
+    santander: "Santander",
+    norwegian: "Norwegian",
+    instabank: "Instabank",
+    vestbo: "Vestbo",
+    bbl: "BBL",
+    elbilforeningen: "Elbilforeningen",
+    ys: "YS",
+    lofavor: "LOfavør"
+  };
+  const PROVIDER_TIPS = {
+    tek: "Mobilpriser fra Tek.no, én sammenligning per datatrinn. Tooltipen viser alternativer, nett, hastighet og vilkår. Mobilt bredbånd vises separat.",
+    forbrukerradet: "Beregnet månedspris fra Forbrukerrådet, inkludert strøm, påslag og månedsgebyr. Grunnlagschipene viser område, forbruk og Norgespris/strømstøtte. Nettleie kommer i tillegg.",
+    bytt: "Sammenlign strømavtaler hos Bytt.no. Åpner kildens strømoversikt.",
+    pokepris: "Varepriser fra Pokepris. Frakt er ukjent og kommer eventuelt i tillegg. Klikk for hele prislisten hos Pokepris.",
+    trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
+    klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
+    coupert: "Coupert.\nGratis cashback. Logg inn hos Coupert og aktiver cashback før kjøpet.\nFullfør kjøpet på butikkens nettsted.",
+    remember: "re:member kredittkort.\nAktiver tilbud i re:member-appen før kjøp.",
+    sas: "SAS EuroBonus-poeng.\nAktiver tilbud på SAS sine sider.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB).",
+    tfbank: "TF Bank Mastercard.\nAktiver tilbud i TF Bank-appen.",
+    dnb: "DNB Spare. Aktiver i DNB-appen.",
+    rabattkode: "Rabattkode fra rabattkode.no.\nLim inn koden i handlekurven.",
+    norskfamilie: "Norsk Familieøkonomi.\nKrever medlemskap. Aktiver kjøp via norskfamilie.no.",
+    usbl: "USBL-tilbud.\nKrever USBL-medlemskap og eventuell Bonabo-aktivering.",
+    bate: "Bate medlemsfordeler.\nKrever Bate-medlemskap. Aktiver eller vis fordelen via bate.no.",
+    tobb: "TOBB medlemsfordeler.\nKrever TOBB-medlemskap. Aktiver eller vis fordelen via tobb.no.",
+    bob: "BOB-medlemsfordel.\nKrever BOB-medlemskap og gyldig medlemsbevis i BOB-appen.",
+    tekna: "Tekna medlemsfordeler.\nKrever Tekna-medlemskap. Aktiver tilbud via tekna.no.",
+    nito: "NITO medlemsfordeler.\nKrever NITO-medlemskap. Aktiver tilbud via nito.no.",
+    sparebank1: "SpareBank 1 Mastercard Ung.\n20 % rabatt på utvalgte strømmetjenester.\nSamlet inntil 500 kr per kalenderår.",
+    studentkortet: "Studentkortet.no\nGratis medlemskap for studenter i Norge.\nAktiver rabatt via studentkortet.no.",
+    nettbonus: "NettBonus.no\nGratis cashback-program.\nKlikk deg via nettbonus.no til butikken for å tjene bonus.",
+    spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
+    spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
+    rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
+    dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
+    utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
+    unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
+    gratisbursdag: "Bursdagsgaver og bursdagsrabatter fra gratisbursdag.no.\nKan kreve kundeklubb, app eller registrert fødselsdato.\nSe vilkår, gyldighet og bekreftelsesstatus for hvert tilbud.",
+    unio: "Unio medlemsfordeler.\nKrever medlemskap i et Unio-forbund.\nOppgi rabattkode eller vis medlemsbevis.",
+    coop: "Coop medlemsfordeler.\nKrever Coop-medlemskap.\nBruk rabattkode eller aktiver via Coop-siden der det kreves.",
+    elkjop: "Elkjøps Kundeklubb.\nKrever gratis kundeklubbmedlemskap.\nAktiver eller hent kode via Elkjøp.",
+    akademikerne: "Akademikerne Pluss medlemsfordeler.\nKrever medlemskap i en tilknyttet fagforening.\nAktiver via akademikernepluss.no eller A+-appen.",
+    huseierne: "Huseiernes medlemsfordeler.\nKrever Huseierne-medlemskap.\nVis medlemskort eller hent rabattkode via huseierne.no.",
+    huseierforbundet: "Norges Huseierforbund og Bergen Huseierforening.\nKrever medlemskap i den aktuelle foreningen.\nBruk den offisielle medlemssiden for vilkår og aktivering.",
+    amcar: "AMCARs rabattavtaler.\nKrever gyldig AMCAR-medlemskap.\nSe vilkår og aktivering på amcar.no.",
+    horselsforbundet: "Hørselsforbundets medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på horselsforbundet.no.",
+    knbf: "Kongelig Norsk Båtforbunds medlemsfordeler.\nKrever KNBF-medlemskap.\nSe vilkår og aktivering på knbf.no.",
+    njff: "NJFF medlemsfordeler.\nKrever NJFF-medlemskap.\nSe vilkår og aktivering på njff.no.",
+    pensjonistforbundet: "Pensjonistforbundets medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på pensjonistforbundet.no.",
+    kna: "KNAs medlemsfordeler.\nKrever KNA-medlemskap.\nSe vilkår og aktivering på kna.no.",
+    syklistforeningen: "Syklistforeningens medlemsfordeler.\nKrever medlemskap i Syklistforeningen.\nSe vilkår og aktivering på syklistforeningen.no.",
+    revmatikerforbundet: "Norsk Revmatikerforbunds medlemsfordeler.\nKrever medlemskap.\nSe vilkår og aktivering på revmatiker.no.",
+    redningsselskapet: "Redningsselskapets medlemsfordeler.\nKrever medlemskap i Redningsselskapet.\nSe vilkår og aktivering på rs.no.",
+    lhl: "LHLs medlemsfordeler (Landsforeningen for hjerte- og lungesyke).\nKrever LHL-medlemskap.\nSe vilkår og aktivering på lhl.no.",
+    skiforeningen: "Skiforeningens medlemsfordeler.\nKrever medlemskap i Skiforeningen.\nSe vilkår og aktivering på skiforeningen.no.",
+    agrol: "Agrol – fordelsprogram for medlemmer av Norges Bondelag m.fl.\nKrever medlemskap i en tilknyttet landbruksorganisasjon.\nSe vilkår og aktivering på agrol.no.",
+    kondis: "Kondis' medlemsfordeler (organisasjon for kondisjonsidrett).\nKrever Kondis-medlemskap.\nSe vilkår og aktivering på kondis.no.",
+    santander: "Santander-kredittkort.\nKrever kredittkort fra Santander.\nAktiver tilbudet via santander.dealpass.no.",
+    norwegian: "Norwegian Reward.\nGratis fordelsprogram.\nTjen CashPoints via partnersiden på norwegian.com.\n1 CashPoint = 1 kr på Norwegian-kjøp.",
+    instabank: "Instabank kredittkort.\nMånedsrabatt og faste grønne rabatter avhenger av vilkår og butikkens MCC-kode.\nIngen rentefri periode: renter fra første dag ved bruk av kreditt. Termingebyr kan påløpe.\nAvklar eventuell forskuddsbetaling med banken; dette er ingen garanti for rentefri bruk.",
+    vestbo: "Vestbo medlemsfordeler.\nKrever Vestbo-medlemskap.\nVis digitalt medlemskort via vestbo.no.",
+    bbl: "Boligbyggelagenes fordelsprogram.\nKrever medlemskap i et tilknyttet boligbyggelag.\nRegistrer betalingskort på fordelerformedlemmer.no for automatisk bonus.",
+    elbilforeningen: "Norsk elbilforening.\nKrever medlemskap i Elbilforeningen.\nAktiver via elbil.no/medlemsfordeler.",
+    ys: "YS medlemsfordeler.\nKrever medlemskap i et YS-forbund.\nSe vilkår på ys.no/medlemsfordeler.",
+    lofavor: "LOfavør.\nKrever medlemskap i et LO-forbund.\nSe vilkår på lofavor.no."
+  };
+  const PROVIDER_COLORS = {
+    tek: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
+    forbrukerradet: { bg: "#004a66", fg: "#ffffff", preserveInDark: true },
+    bytt: { bg: "#0075f5", fg: "#ffffff", preserveInDark: true },
+    pokepris: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
+    crypto: { bg: "#002d74", fg: "#ffffff" },
+    remember: { bg: "#111111", fg: "#ff9900" },
+    klarna: { bg: "#ffa8cd", fg: "#0b051d" },
+    coupert: { bg: "#f03d30", fg: "#ffffff" },
+    trumf: { bg: "#07006b", fg: "#ffffff" },
+    sas: { bg: "#00005c", fg: "#ffffff" },
+    tfbank: { bg: "#e30613", fg: "#ffffff" },
+    dnb: { bg: "#14555a", fg: "#ffffff" },
+    curve: { bg: "#000000", fg: "#ffffff" },
+    rabattkode: { bg: "#e74c3c", fg: "#ffffff" },
+    norskfamilie: { bg: "#ff6600", fg: "#ffffff" },
+    logbuy: { bg: "#d81939", fg: "#ffffff" },
+    obos: { bg: "#003087", fg: "#ffffff" },
+    bob: { bg: "#ffffff", fg: "#5b2486" },
+    usbl: { bg: "#34413e", fg: "#ffffff" },
+    bate: { bg: "#ffffff", fg: "#ef1c24" },
+    tobb: { bg: "#00466b", fg: "#ffffff" },
+    naf: { bg: "#FFD100", fg: "#000000" },
+    tekna: { bg: "#ffffff", fg: "#00a3ad" },
+    nito: { bg: "#c8e6b8", fg: "#003b00" },
+    sparebank1: { bg: "#005aa4", fg: "#ffffff" },
+    studentkortet: { bg: "#1B2838", fg: "#ffffff" },
+    studenttorget: { bg: "#009fe3", fg: "#ffffff" },
+    nettbonus: { bg: "#5b0f8c", fg: "#ffffff" },
+    spenn: { bg: "#E51454", fg: "#ffffff" },
+    spareborsen: { bg: "#C9A24A", fg: "#1A1A1A" },
+    rabble: { bg: "#2d2145", fg: "#f8a6a6" },
+    dreams: { bg: "#a389d8", fg: "#1a1a1a" },
+    utdanningibergen: { bg: "#ffffff", fg: "#000000" },
+    unidays: { bg: "#00b140", fg: "#ffffff" },
+    gratisbursdag: { bg: "#7c3aed", fg: "#ffffff" },
+    unio: { bg: "#ffffff", fg: "#6b5330" },
+    coop: { bg: "#003366", fg: "#ffffff" },
+    elkjop: { bg: "#1d1b58", fg: "#ffffff" },
+    akademikerne: { bg: "#fff7f0", fg: "#113063" },
+    huseierne: { bg: "#ffffff", fg: "#0f1a18" },
+    huseierforbundet: { bg: "#ffffff", fg: "#0f1a18" },
+    amcar: { bg: "#c01921", fg: "#ffffff" },
+    horselsforbundet: { bg: "#ffffff", fg: "#f1774f" },
+    knbf: { bg: "#00205b", fg: "#ffffff" },
+    njff: { bg: "#ffffff", fg: "#003a5d" },
+    pensjonistforbundet: { bg: "#ffffff", fg: "#000000" },
+    kna: { bg: "#d60929", fg: "#ffffff" },
+    syklistforeningen: { bg: "#e61414", fg: "#ffffff" },
+    revmatikerforbundet: { bg: "#ffffff", fg: "#2d4f9e" },
+    redningsselskapet: { bg: "#ffffff", fg: "#0a2a66" },
+    lhl: { bg: "#ffffff", fg: "#4b1d6f" },
+    skiforeningen: { bg: "#ffffff", fg: "#0067b1" },
+    agrol: { bg: "#ffffff", fg: "#3d3d3d" },
+    kondis: { bg: "#ffffff", fg: "#8b1a1a" },
+    santander: { bg: "#ffffff", fg: "#ec0000" },
+    norwegian: { bg: "#d81939", fg: "#ffffff" },
+    instabank: { bg: "#00ff85", fg: "#333f48" },
+    vestbo: { bg: "#ffffff", fg: "#1dc1dd" },
+    bbl: { bg: "#1657e2", fg: "#ffffff" },
+    elbilforeningen: { bg: "#003a78", fg: "#ffffff" },
+    ys: { bg: "#006e26", fg: "#ffffff" },
+    lofavor: { bg: "#dc141a", fg: "#ffffff" },
+    cbn: { bg: "#ffe4e6", fg: "#be123c" }
+  };
+  const FREE_CARDS = [
+    {
+      pct: 74e-4,
+      ebPer100kr: 10,
+      label: "SAS Amex",
+      badge: "sas-amex",
+      approx: true,
+      url: "https://www.americanexpress.com/nb-no/kredittkort/sas-classic/",
+      tip: "10 EB/100 kr. Gratis kort.\n2-for-1 på SAS-flyvninger i Europa.\nKr-verdi basert på Trumf-kurs (1 kr = 13,5 EB)."
+    },
+    {
+      pct: 5e-3,
+      label: "Norwegian",
+      badge: "norwegian",
+      approx: false,
+      url: "https://www.banknorwegian.no/kredittkort/cashback/",
+      tip: "0,5 % cashback (1:1 kr mot faktura)\neller CashPoints (1:1 kr på Norwegian.no).\nGratis kort, ingen årsavgift."
+    }
+  ];
+  const PREMIUM_CARDS = [
+    {
+      pct: 0.035,
+      minPct: 0.02,
+      maxPct: 0.05,
+      label: "Crypto",
+      badge: "crypto",
+      approx: false,
+      url: "https://crypto.com/app/ns3fma5hou",
+      tip: "Crypto.com Visa-kort.\nPlatin: +2 % (400 kr/mnd), Jade/Obsidian: +5 %.\nKombineres med annen cashback."
+    },
+    {
+      pct: 0.01,
+      label: "Curve",
+      badge: "curve",
+      approx: false,
+      url: "https://www.curve.com/join#D5GXXJJD",
+      tip: "Velg butikken i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback."
+    },
+    {
+      pct: 75e-4,
+      minPct: 5e-3,
+      maxPct: 0.01,
+      label: "Klarna",
+      badge: "klarna",
+      approx: false,
+      url: "https://www.klarna.com/no/medlemskap/",
+      tip: "Plus: +0,5 % (49 kr/mnd)\nMax: +1 % (99 kr/mnd)\nKombineres med annen cashback."
+    }
+  ];
+  const REVOLUT_SUBSCRIPTIONS = {
+    "nordvpn.com": "NordVPN Complete",
+    "tinder.com": "Tinder Gold",
+    "ft.com": "Financial Times Premium Digital",
+    "wework.com": "WeWork (3 pass/mnd)",
+    "masterclass.com": "MasterClass Unlimited",
+    "chess.com": "Chess.com Diamond",
+    "classpass.com": "ClassPass (20 credits/mnd)",
+    "makeheadway.com": "Headway",
+    "wolt.com": "Wolt+",
+    "headspace.com": "Headspace",
+    "freeletics.com": "Freeletics",
+    "sleepcycle.com": "Sleep Cycle",
+    "picsart.com": "Picsart",
+    "perplexity.ai": "Perplexity",
+    "theathletic.com": "The Athletic",
+    "laundryheap.com": "Laundryheap+"
+  };
+  const INSTABANK_AD = {
+    id: "instabank",
+    text: "Instabank kredittkort",
+    emoji: "💳",
+    url: "https://oriomed.com/click.track?CID=452956&AFID=570033&ADID=2608370&SID=",
+    affiliate: true,
+    validFrom: "2026-11-01",
+    validUntil: "2026-12-31",
+    // Short sign-up incentive per month, shown as the ad text.
+    incentives: [
+      { text: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
+      { text: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" }
+    ],
+    // Credit ads must carry the representative example. Keep it to one line.
+    example: "Eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr."
+  };
+  const SUPPORT_LINKS = [
+    { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
+    { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
+    { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
+    { text: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
+    { text: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
+    { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
+    { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
+    { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
+    { text: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
+    { text: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
+    { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
+    { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
+    // Bulder's referral terms: 500 kr to both when the referred mortgage is paid out (bulder.no/om-oss/vilkaar/bonus-verving).
+    { text: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true }
+  ];
+  const PROVIDER_WELCOME_BONUSES = {
+    spareborsen: {
+      label: "Ny: +50 kr",
+      tip: "Ny hos Sparebørsen? Du får 50 kr i startsaldo når du registrerer deg med Vipps via vår invitasjon."
+    }
+  };
   const MAX_BENEFIT_AGE_MS = 14 * 864e5;
   const LISTED_MONTHS = 3;
   function osloDate(now) {
@@ -1017,9 +1389,9 @@
   }
   function selectSupportAdvertisement(draw, now = /* @__PURE__ */ new Date()) {
     const sample = Number.isFinite(draw) ? Math.min(1 - Number.EPSILON, Math.max(0, draw)) : 0;
-    const active2 = isInstabankAdActive(now);
-    if (active2 && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
-    const rest = active2 ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
+    const active = isInstabankAdActive(now);
+    if (active && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
+    const rest = active ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
     return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))];
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
@@ -2212,42 +2584,12 @@
     return locale === void 0 || url.pathname === "/" || url.pathname === `/${locale}` || url.pathname.startsWith(`/${locale}/`) ? supplier : void 0;
   }
   const ELECTRICITY_SUPPLIER_CACHE_KEY = "electricitySupplierCatalog";
-  let active = isElectricitySupplierCatalog(bundled) ? bundled : void 0;
-  let pending;
-  let loadedAt = 0;
+  const store = createPublicCatalogStore(bundled, isElectricitySupplierCatalog);
   function getElectricitySupplier(url) {
-    return findElectricitySupplier(url, active);
+    return findElectricitySupplier(url, store.get());
   }
   async function loadElectricitySuppliers(requestJson = fetchCatalog, cache) {
-    if (pending !== void 0) return pending;
-    if (Date.now() - loadedAt < 15 * 6e4) return;
-    const adopt = (value) => {
-      if (isElectricitySupplierCatalog(value) && isFreshElectricitySupplierCatalog(value) && (active === void 0 || Date.parse(value.generatedAt) > Date.parse(active.generatedAt))) active = value;
-    };
-    pending = (async () => {
-      if (cache !== void 0) {
-        try {
-          adopt(await cache.read());
-        } catch {
-        }
-      }
-      try {
-        adopt(await requestJson(ELECTRICITY_SUPPLIER_CATALOG_URL, { credentials: "omit" }));
-      } catch {
-      }
-      if (cache !== void 0 && active !== void 0 && isFreshElectricitySupplierCatalog(active)) {
-        try {
-          await cache.write(active);
-        } catch {
-        }
-      }
-      loadedAt = Date.now();
-    })();
-    try {
-      await pending;
-    } finally {
-      pending = void 0;
-    }
+    return store.load(() => requestJson(ELECTRICITY_SUPPLIER_CATALOG_URL, { credentials: "omit" }), cache);
   }
   async function fetchCatalog(url) {
     const response = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(1e4) });
@@ -2255,20 +2597,26 @@
     return response.json();
   }
   const ELECTRICITY_EXAMPLE = { municipality: "Oslo", areaCode: "NO1", yearlyKwh: 14400, norgespris: true };
+  const ELECTRICITY_AREAS = [
+    { municipality: "Oslo", areaCode: "NO1" },
+    { municipality: "Kristiansand", areaCode: "NO2" },
+    { municipality: "Trondheim - Tråante", areaCode: "NO3" },
+    { municipality: "Tromsø", areaCode: "NO4" },
+    { municipality: "Bergen", areaCode: "NO5" }
+  ];
   const API = "https://strom-api.forbrukerradet.no";
   const PORTAL = "https://www.forbrukerradet.no/strompris/";
   const REQUEST_TIMEOUT_MS = 15e3;
-  const ELECTRICITY_MIN_GUARANTEE_MONTHS = 6;
-  const ELECTRICITY_MAX_OFFERS = 10;
+  const ELECTRICITY_MAX_OFFERS = 5;
   const INVOICE_REQUIREMENTS = { none: "", electronicInvoice: "Krever eFaktura", directDebit: "Krever AvtaleGiro", both: "Krever eFaktura og AvtaleGiro" };
   function isElectricityPriceMatchUrl(value) {
     return getElectricitySupplier(value) !== void 0;
   }
   function isElectricitySearch(value) {
-    return isRecord$6(value) && typeof value.norgespris === "boolean" && Number.isSafeInteger(value.localGridId) && value.localGridId > 0 && value.localGridId < 1e5 && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
+    return isRecord$6(value) && typeof value.norgespris === "boolean" && Number.isSafeInteger(value.localGridId) && value.localGridId > 0 && value.localGridId < 1e5 && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5 && (value.municipality === void 0 || typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100) && (value.areaCode === void 0 || typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode));
   }
   function isElectricityPriceDetails(value) {
-    return isRecord$6(value) && nonNegative(value.monthlyFeeNok) && nonNegative(value.addonOrePerKwh) && (value.scheme === "norgespris" || value.scheme === "stromstotte") && nonNegative(value.energyOrePerKwh) && (value.stromstotteMonthlyNok === void 0 || positive(value.stromstotteMonthlyNok)) && (value.conditionsText === void 0 || typeof value.conditionsText === "string" && value.conditionsText.length <= 1e4) && (value.invoiceRequirement === void 0 || typeof value.invoiceRequirement === "string" && Object.values(INVOICE_REQUIREMENTS).includes(value.invoiceRequirement)) && positive(value.monthlyKwh) && typeof value.period === "string" && value.period.length > 0 && value.period.length <= 40 && (value.maximumYearlyKwh === void 0 || positive(value.maximumYearlyKwh)) && (value.guaranteeMonths === void 0 || nonNegative(value.guaranteeMonths)) && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
+    return isRecord$6(value) && nonNegative(value.monthlyFeeNok) && nonNegative(value.addonOrePerKwh) && typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100 && typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode) && typeof value.vatExempt === "boolean" && (value.scheme === "norgespris" || value.scheme === "stromstotte") && nonNegative(value.energyOrePerKwh) && (value.stromstotteMonthlyNok === void 0 || positive(value.stromstotteMonthlyNok)) && (value.conditionsText === void 0 || typeof value.conditionsText === "string" && value.conditionsText.length <= 1e4) && (value.invoiceRequirement === void 0 || typeof value.invoiceRequirement === "string" && Object.values(INVOICE_REQUIREMENTS).includes(value.invoiceRequirement)) && (value.comparisonOnly === void 0 || typeof value.comparisonOnly === "boolean") && positive(value.monthlyKwh) && typeof value.period === "string" && value.period.length > 0 && value.period.length <= 40 && (value.maximumYearlyKwh === void 0 || positive(value.maximumYearlyKwh)) && (value.guaranteeMonths === void 0 || nonNegative(value.guaranteeMonths)) && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
   }
   async function getElectricityLocalGrids(requestJson = fetchPublicJson) {
     const value = await requestJson(`${API}/local_grids/`, { credentials: "omit" });
@@ -2280,6 +2628,8 @@
   async function findElectricityPriceMatches(message, requestJson = fetchPublicJson, now = /* @__PURE__ */ new Date()) {
     if (!isElectricityPriceMatchUrl(message.url) || !isElectricitySearch(message.electricity)) return [];
     const { localGridId, yearlyKwh, norgespris } = message.electricity;
+    const municipality = message.electricity.municipality ?? ELECTRICITY_EXAMPLE.municipality;
+    const areaCode = message.electricity.areaCode ?? ELECTRICITY_EXAMPLE.areaCode;
     const url = `${API}/products/grid/${localGridId}?yearlyKwhConsumption=${yearlyKwh}&norgespris=${norgespris}&consumptionCode=35`;
     const [value, subsidyValue] = await Promise.all([
       requestJson(url, { credentials: "omit" }),
@@ -2297,8 +2647,12 @@
       return plan === void 0 ? [] : [plan];
     }) : [];
     const period = now.toLocaleDateString("nb-NO", { timeZone: "Europe/Oslo", month: "long", year: "numeric" });
-    const shortlist = plans.filter((plan) => plan.guaranteeMonths >= ELECTRICITY_MIN_GUARANTEE_MONTHS).sort((a, b) => a.amount - b.amount || a.id - b.id).filter((plan, index, list) => list.findIndex((other) => other.id === plan.id) === index).slice(0, ELECTRICITY_MAX_OFFERS);
-    return shortlist.map((plan) => ({
+    const ranked = plans.sort((a, b) => a.amount - b.amount || a.id - b.id).filter((plan, index, list) => list.findIndex((other) => other.id === plan.id) === index);
+    const shortlist = ranked.slice(0, ELECTRICITY_MAX_OFFERS);
+    const currentSupplierId = getElectricitySupplier(message.url).id;
+    const listedIds = new Set(shortlist.map((plan) => plan.id));
+    const comparison = ranked.filter((plan) => plan.supplierId === currentSupplierId && !listedIds.has(plan.id)).slice(0, 3);
+    return [...shortlist, ...comparison].map((plan) => ({
       source: "forbrukerradet",
       sourceName: "Forbrukerrådet",
       productName: plan.supplier,
@@ -2308,7 +2662,11 @@
       price: `~${formatKr(plan.amount)} kr/mnd`,
       amount: plan.amount,
       currency: "NOK",
+      matchedCurrentMerchant: plan.supplierId === currentSupplierId,
       electricity: {
+        municipality,
+        areaCode,
+        vatExempt: plan.vatExemption,
         monthlyFeeNok: plan.monthlyFee,
         addonOrePerKwh: plan.addon,
         yearlyKwh,
@@ -2319,6 +2677,7 @@
         energyOrePerKwh: norgespris ? plan.norgesprisRate : plan.subsidizedSpotRate,
         ...plan.conditionsText ? { conditionsText: plan.conditionsText } : {},
         ...plan.invoiceRequirement ? { invoiceRequirement: plan.invoiceRequirement } : {},
+        ...!listedIds.has(plan.id) ? { comparisonOnly: true } : {},
         ...(() => {
           const other = subsidyPlans.find((p) => p.id === plan.id && p.name === plan.name && p.supplierId === plan.supplierId && p.monthlyFee === plan.monthlyFee && p.addon === plan.addon && p.monthlyKwh === plan.monthlyKwh);
           return other === void 0 ? {} : { stromstotteMonthlyNok: other.amount };
@@ -2327,7 +2686,7 @@
       },
       details: [
         `${plan.supplier}: ${plan.name}`,
-        `Regneeksempel for ${ELECTRICITY_EXAMPLE.municipality} fra Forbrukerrådets strømprisportal.`,
+        `Regneeksempel for ${municipality} · ${areaCode} fra Forbrukerrådets strømprisportal.`,
         `${formatKr(plan.monthlyFee)} kr/mnd + ${formatKr(plan.addon)} øre/kWh. ${yearlyKwh.toLocaleString("nb-NO")} kWh/år.`,
         `Beregnet total strømpris for ${period}: ${formatKr(plan.amount)} kr, inkl. ${norgespris ? "Norgespris" : "spotpris og strømstøtte"}, påslag og månedsgebyr. ${plan.vatExemption ? "Uten mva. i valgt område." : "Inkl. mva."}`,
         `Timespot, etterskuddsvis, ingen bindingstid.${plan.guaranteeMonths > 0 ? ` Påslagsgaranti: ${plan.guaranteeMonths} mnd.` : ""}`,
@@ -2335,7 +2694,7 @@
         `Innrapporterte avtaledata fra Forbrukerrådet. Sist endret hos kilden: ${plan.updatedAt.slice(0, 10)}.`,
         plan.conditionsText,
         plan.invoiceRequirement,
-        `Utvalget utelater kampanjer og medlemsavtaler. Minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} måneders påslagsgaranti, som portalens standardfilter.`
+        "Utvalget inkluderer alle garantiperioder. Kampanjer og medlemsavtaler er utelatt."
       ].filter(Boolean).join("\n")
     }));
   }
@@ -2343,7 +2702,7 @@
     const example = offers[0]?.electricity;
     return [
       "Forbrukerrådet · strømavtaler",
-      `Regneeksempel: ${ELECTRICITY_EXAMPLE.municipality} · ${(example?.yearlyKwh ?? ELECTRICITY_EXAMPLE.yearlyKwh).toLocaleString("nb-NO")} kWh/år. Dette er ikke en beregning av din strømregning.`,
+      `Regneeksempel: ${example?.municipality ?? ELECTRICITY_EXAMPLE.municipality} · ${example?.areaCode ?? ELECTRICITY_EXAMPLE.areaCode} · ${(example?.yearlyKwh ?? ELECTRICITY_EXAMPLE.yearlyKwh).toLocaleString("nb-NO")} kWh/år. Dette er ikke en beregning av din strømregning.`,
       example ? `Beregnet total strømpris for ${example.period}, inkl. ${example.scheme === "norgespris" ? "Norgespris" : "spotpris og strømstøtte"}, påslag og månedsgebyr. Nettleie kommer i tillegg.` : "",
       offers.length > 0 ? ["Billigste sammenlignbare strømavtaler", ...offers.map((offer) => {
         const e = offer.electricity;
@@ -2359,8 +2718,8 @@
           e.conditionsText
         ].filter(Boolean).join("\n");
       })].join("\n") : error || "Ingen sammenlignbare avtaler akkurat nå.",
-      `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen.`,
-      "Inkl. mva. Nettleie og eventuelt papirfakturagebyr kommer i tillegg. Månedsprisen er et estimat, ikke en prisgaranti.",
+      `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav. Alle garantiperioder er inkludert. Avtaler hos leverandøren på siden vises også til sammenligning. Kampanjer er utelatt; øvrige vilkår står ved avtalen.`,
+      `${example?.vatExempt ? "Uten mva. i kommuneeksemplet." : "Inkl. mva."} Nettleie og eventuelt papirfakturagebyr kommer i tillegg. Månedsprisen er et estimat, ikke en prisgaranti.`,
       "Kilde: innrapporterte avtaledata fra Forbrukerrådet.",
       "Standardavtaler med kort påslagsgaranti finnes under «Under 6 måneder» i portalens garantifilter."
     ].filter(Boolean);
@@ -2376,6 +2735,7 @@
         productName: offer.productName,
         ...offer.offerUrl !== void 0 ? { offerUrl: offer.offerUrl } : {},
         ...offer.electricity !== void 0 ? { electricity: offer.electricity } : {},
+        matchedCurrentMerchant: offer.matchedCurrentMerchant === true,
         amount: offer.amount,
         price: offer.price,
         currency: offer.currency
@@ -2388,6 +2748,7 @@
     if (!isRecord$6(conditions) || !isRecord$6(fee) || !isRecord$6(price) || !isRecord$6(organization) || !isRecord$6(price.tax) || typeof organization.name !== "string" || !positive(organization.id) || !Number.isSafeInteger(organization.id) || !Array.isArray(conditions.associations) || conditions.associations.length > 0 || conditions.cabinProduct !== false || conditions.promotionalAgreement !== false || conditions.linkedProduct !== null || typeof conditions.feeMandatoryType !== "string" || !Object.hasOwn(INVOICE_REQUIREMENTS, conditions.feeMandatoryType) || conditions.agreementTime !== null && conditions.agreementTime !== 0 || conditions.otherConditions !== null && (typeof conditions.otherConditions !== "string" || conditions.otherConditions.length > 1e4) || conditions.maxKwhPerYear !== null && (!positive(conditions.maxKwhPerYear) || yearlyKwh > conditions.maxKwhPerYear) || fee.contractBreachFee !== false || !nonNegative(fee.finalMonthlyFee) || !nonNegative(price.finalAddonPrice) || typeof price.tax.vatExemption !== "boolean" || !positive(price.finalPriceMonthly) || !positive(value.monthlyConsumption) || price.gridTariff !== null || !nonNegative(price.finalKwPrice) || typeof price.subsidyPrice !== "number" || !Number.isFinite(price.subsidyPrice) || price.subsidyPrice > 0 || !nonNegative(price.norgesprisPrice) || !nonNegative(price.spotPriceIncludingSubsidy) || !isRecord$6(value.billing) || value.billing.frequency !== 1 || value.billing.unit !== "month") return void 0;
     const orderUrl = safeOrderUrl(value.orderUrl);
     if (orderUrl === void 0) return void 0;
+    if (typeof conditions.otherConditions === "string" && /(?:betinger|forutsetter|krever)[^.]{0,200}\bkjøp(?:er)?\b/i.test(conditions.otherConditions)) return void 0;
     const guarantee = isRecord$6(addonPrice) && nonNegative(addonPrice.addonPriceMinimumFixedFor) ? addonPrice.addonPriceMinimumFixedFor : 0;
     const guaranteeMonths = isRecord$6(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "year" ? guarantee * 12 : isRecord$6(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "month" ? guarantee : 0;
     const amount = price.finalPriceMonthly;
@@ -3333,13 +3694,13 @@
     return values;
   }
   function readNextProductData(html, productUrl) {
-    const pending2 = [...readNextFlightValues(html)];
-    for (let visited = 0; visited < pending2.length && visited < 5e4; visited += 1) {
-      const item = pending2[visited];
-      if (Array.isArray(item)) pending2.push(...item);
+    const pending = [...readNextFlightValues(html)];
+    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
+      const item = pending[visited];
+      if (Array.isArray(item)) pending.push(...item);
       else if (isRecord$6(item)) {
         if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
-        pending2.push(...Object.values(item));
+        pending.push(...Object.values(item));
       }
     }
     return void 0;
@@ -3370,13 +3731,13 @@
     };
   }
   function findStructuredProperty(value, name) {
-    const pending2 = [value];
-    for (let visited = 0; pending2.length > 0 && visited < 5e4; visited += 1) {
-      const item = pending2.pop();
-      if (Array.isArray(item)) pending2.push(...item);
+    const pending = [value];
+    for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
+      const item = pending.pop();
+      if (Array.isArray(item)) pending.push(...item);
       else if (isRecord$6(item)) {
         if (Object.hasOwn(item, name)) return item[name];
-        pending2.push(...Object.values(item));
+        pending.push(...Object.values(item));
       }
     }
     return void 0;
@@ -5497,14 +5858,14 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function readPriceRows(html, productUrl) {
     const id = new URL(productUrl).pathname.split("/")[2];
-    const pending2 = readNextFlightValues(html);
+    const pending = readNextFlightValues(html);
     const components = [];
-    for (let visited = 0; visited < pending2.length && visited < 5e4; visited += 1) {
-      const item = pending2[visited];
-      if (Array.isArray(item)) pending2.push(...item);
+    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
+      const item = pending[visited];
+      if (Array.isArray(item)) pending.push(...item);
       else if (isRecord$6(item)) {
         if (isRecord$6(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
-        pending2.push(...Object.values(item));
+        pending.push(...Object.values(item));
       }
     }
     const rowLists = components.map((item) => [item.lowestPrice, ...item.otherInStockPrices, ...item.outOfStockPrices]);
@@ -6968,6 +7329,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
   async function findPriceMatches(message, requestJson, requestText, options = {}) {
+    if (message.mobile === true) return findMobilePriceMatches(message, requestJson);
     if (isElectricityPriceMatchUrl(message.url)) {
       return findElectricityPriceMatches(message, requestJson);
     }
@@ -7191,39 +7553,50 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   const GENERIC_MERCHANT_KEYS = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
   function createElectricityComparison(options) {
-    let error = "";
-    let result;
-    const isSupported = () => isElectricityPriceMatchUrl(options.getUrl());
-    const prepare = () => loadElectricitySuppliers(options.requestJson, options.catalogCache);
-    async function getOffers() {
-      await prepare();
-      if (!isSupported()) return [];
-      const url = options.getUrl();
-      if (result === void 0 || result.url !== url || result.expiresAt <= Date.now()) {
-        result = { url, expiresAt: Date.now() + 15 * 6e4, promise: (async () => {
-          const grids = await getElectricityLocalGrids(options.requestJson);
-          const grid = grids.find((grid2) => grid2.name === ELECTRICITY_EXAMPLE.municipality && grid2.areaCode === ELECTRICITY_EXAMPLE.areaCode);
-          if (grid === void 0) throw new Error("Forbrukerrådet: regneeksempelets prisområde mangler");
-          return options.findOffers({
-            type: "get-price-match-for-product",
-            url,
-            searchTerm: "Strømavtaler",
-            electricity: { localGridId: grid.id, yearlyKwh: ELECTRICITY_EXAMPLE.yearlyKwh, norgespris: ELECTRICITY_EXAMPLE.norgespris }
-          });
-        })() };
+    return createAutomaticComparison({
+      getUrl: options.getUrl,
+      prepare: () => loadElectricitySuppliers(options.requestJson, options.catalogCache),
+      isSupported: () => isElectricityPriceMatchUrl(options.getUrl()),
+      sourceName: "Forbrukerrådet",
+      load: async (url) => {
+        const grids = await getElectricityLocalGrids(options.requestJson);
+        const results = [];
+        const errors = [];
+        for (const area of ELECTRICITY_AREAS) {
+          const grid = grids.find((grid2) => grid2.name === area.municipality && grid2.areaCode === area.areaCode);
+          if (!grid) {
+            errors.push(`${area.areaCode}: kommuneeksemplet mangler hos kilden`);
+            continue;
+          }
+          try {
+            const offers = await options.findOffers({
+              type: "get-price-match-for-product",
+              url,
+              searchTerm: "Strømavtaler",
+              electricity: {
+                localGridId: grid.id,
+                yearlyKwh: ELECTRICITY_EXAMPLE.yearlyKwh,
+                norgespris: ELECTRICITY_EXAMPLE.norgespris,
+                municipality: grid.name,
+                areaCode: grid.areaCode
+              }
+            });
+            const best = summarizeElectricityComparison(offers);
+            if (best) results.push(best);
+            else errors.push(`${area.areaCode}: ingen sammenlignbare avtaler`);
+          } catch (error) {
+            const text = error instanceof Error ? error.message : "nettverksfeil";
+            errors.push(`${area.areaCode}: ${text}`);
+            if (/HTTP (?:403|429)/.test(text)) break;
+          }
+        }
+        if (!results.length && errors.length) throw new Error(errors.join("; "));
+        if (errors.length) for (const result of results) result.details += `
+
+Ufullstendig oppslag: ${errors.join("; ")}`;
+        return results;
       }
-      try {
-        const offers = await result.promise;
-        error = offers.length === 0 ? "Ingen sammenlignbare strømavtaler akkurat nå." : "";
-        const best = summarizeElectricityComparison(offers);
-        return best === void 0 ? [] : [best];
-      } catch (cause) {
-        result = void 0;
-        error = cause instanceof Error ? cause.message : "Forbrukerrådet: kunne ikke hente strømavtaler";
-        return [];
-      }
-    }
-    return { prepare, isSupported, getOffers, getError: () => error };
+    });
   }
   const PLAYSTATION_REGIONS = [
     { region: "NO", countryName: "Norge", flag: "🇳🇴", locale: "no-no" },
@@ -9215,12 +9588,12 @@ ${darkProviderCss}
   const svg = (mode) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[mode]}</svg>`;
   const LABELS = { system: "Følg systemet", light: "Lys", dark: "Mørk" };
   let nextControl = 0;
-  function bindThemeTarget(store, target) {
-    return store.subscribe(({ resolved }) => {
+  function bindThemeTarget(store2, target) {
+    return store2.subscribe(({ resolved }) => {
       target.dataset.cbnTheme = resolved;
     });
   }
-  function mountThemeControl(store, slot, placement = "down") {
+  function mountThemeControl(store2, slot, placement = "down") {
     const control = document.createElement("div");
     control.className = "cbn-theme";
     control.dataset.placement = placement;
@@ -9244,7 +9617,7 @@ ${darkProviderCss}
       }
     });
     control.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
-      store.set(normalizeTheme(button.dataset.mode));
+      store2.set(normalizeTheme(button.dataset.mode));
       close();
       toggle.focus();
     }));
@@ -9252,7 +9625,7 @@ ${darkProviderCss}
       if (!event.composedPath().includes(control)) close();
     };
     document.addEventListener("pointerdown", outside, { passive: true });
-    const unsubscribe = store.subscribe(({ preference, resolved }) => {
+    const unsubscribe = store2.subscribe(({ preference, resolved }) => {
       toggle.innerHTML = svg(preference);
       const label = `Utseende: ${LABELS[preference]}${preference === "system" ? ` (${resolved === "dark" ? "mørk" : "lys"})` : ""}`;
       toggle.title = label;
@@ -9287,6 +9660,7 @@ ${darkProviderCss}
       return true;
     };
   }
+  const DETAILS_TOOLTIP_WIDTH = 340;
   let nextTooltipId = 0;
   function tooltipPosition(anchor, width, height, viewport) {
     const left = Math.max(8, Math.min(anchor.left, viewport.width - width - 8));
@@ -9299,7 +9673,7 @@ ${darkProviderCss}
     const view = doc.defaultView;
     const targets = /* @__PURE__ */ new WeakMap();
     const hoverHosts = /* @__PURE__ */ new WeakMap();
-    let active2;
+    let active;
     const addMascot = (tooltip) => {
       if (tooltip.querySelector(".cbn-tooltip-mascot")) return;
       tooltip.classList.add("cbn-has-quokka");
@@ -9313,8 +9687,8 @@ ${darkProviderCss}
       tooltip.prepend(mascot);
     };
     const close = () => {
-      if (!active2) return;
-      const { button, tooltip, style, topLayer } = active2;
+      if (!active) return;
+      const { button, tooltip, style, topLayer } = active;
       button.setAttribute("aria-expanded", "false");
       tooltip.classList.remove("cbn-tooltip-open", "visible");
       if (topLayer) {
@@ -9326,14 +9700,14 @@ ${darkProviderCss}
       }
       if (style === null) tooltip.removeAttribute("style");
       else tooltip.setAttribute("style", style);
-      active2 = void 0;
+      active = void 0;
     };
     const onClick = (event) => {
       const button = event.target.closest(".cbn-tooltip-trigger");
       if (!button || !targets.has(button)) return;
       event.preventDefault();
       event.stopPropagation();
-      if (active2?.button === button) {
+      if (active?.button === button) {
         close();
         return;
       }
@@ -9354,7 +9728,7 @@ ${darkProviderCss}
         bottom: "auto",
         right: "auto",
         transform: "none",
-        width: isBonusChipTooltip ? "max-content" : `${Math.min(340, availableWidth)}px`,
+        width: isBonusChipTooltip ? "max-content" : `${Math.min(DETAILS_TOOLTIP_WIDTH, availableWidth)}px`,
         maxWidth: isBonusChipTooltip ? `${Math.min(320, availableWidth)}px` : "none",
         maxHeight: `${Math.max(80, view.innerHeight - 32)}px`,
         overflowY: "auto",
@@ -9374,25 +9748,25 @@ ${darkProviderCss}
           }
         }
       }
-      active2 = { button, tooltip, style, topLayer };
+      active = { button, tooltip, style, topLayer };
       const rect = tooltip.getBoundingClientRect();
       const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
       tooltip.style.left = `${position.left}px`;
       tooltip.style.top = `${position.top}px`;
     };
     const outside = (event) => {
-      if (active2 && !event.composedPath().includes(active2.button) && !event.composedPath().includes(active2.tooltip)) close();
+      if (active && !event.composedPath().includes(active.button) && !event.composedPath().includes(active.tooltip)) close();
     };
     const onKey = (event) => {
-      if (event.key === "Escape" && active2) {
-        const button = active2.button;
+      if (event.key === "Escape" && active) {
+        const button = active.button;
         close();
         button.focus();
         event.stopPropagation();
       }
     };
     const onScroll = (event) => {
-      if (active2 && !(event.target instanceof Node && active2.tooltip.contains(event.target))) close();
+      if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
     };
     const onHover = (event) => {
       for (let element = event.target; element; element = element.parentElement) {
@@ -9410,7 +9784,7 @@ ${darkProviderCss}
               right: "auto",
               transform: "none",
               maxHeight: `${maxHeight}px`,
-              maxWidth: `${Math.min(340, Math.max(80, doc.documentElement.clientWidth - 16))}px`,
+              maxWidth: `${Math.min(DETAILS_TOOLTIP_WIDTH, Math.max(80, doc.documentElement.clientWidth - 16))}px`,
               overflowY: "auto",
               boxSizing: "border-box",
               pointerEvents: "auto"
@@ -9497,64 +9871,6 @@ ${darkProviderCss}
         view.removeEventListener("resize", close);
       }
     };
-  }
-  function readStringValue(value) {
-    if (typeof value !== "string") return void 0;
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function readNumberValue(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value !== "string") return void 0;
-    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
-    return Number.isFinite(parsed) ? parsed : void 0;
-  }
-  function readPositiveNumberValue(value) {
-    const numberValue = readNumberValue(value);
-    return numberValue !== void 0 && numberValue > 0 ? numberValue : void 0;
-  }
-  function readNonNegativeIntegerValue(value) {
-    const parsedValue = typeof value === "number" ? value : typeof value === "string" ? Number.parseInt(value, 10) : Number.NaN;
-    return Number.isInteger(parsedValue) && parsedValue >= 0 ? parsedValue : void 0;
-  }
-  function readPositiveIntegerValue(value) {
-    const parsedValue = readNonNegativeIntegerValue(value);
-    return parsedValue !== void 0 && parsedValue > 0 ? parsedValue : void 0;
-  }
-  function readIataCodeValue(value) {
-    if (typeof value !== "string") return void 0;
-    const trimmed = value.trim().toUpperCase();
-    if (/^[A-Z]{3}$/.test(trimmed)) return trimmed;
-    return trimmed.match(/\b[A-Z]{3}\b/)?.[0];
-  }
-  function readIsoDateValue(value) {
-    if (typeof value !== "string") return void 0;
-    const dateMatch = value.trim().match(/\b(\d{4}-\d{2}-\d{2})\b/);
-    const parsedValue = dateMatch?.[1];
-    if (parsedValue === void 0) return void 0;
-    const parsedDate = /* @__PURE__ */ new Date(`${parsedValue}T00:00:00Z`);
-    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== parsedValue) {
-      return void 0;
-    }
-    return parsedValue;
-  }
-  function addDaysToIsoDate(isoDate, days) {
-    const time = (/* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`)).getTime();
-    if (Number.isNaN(time)) return void 0;
-    return new Date(time + days * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
-  }
-  function parseJsonValue(value) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return void 0;
-    }
-  }
-  function readRecordArray(value) {
-    return Array.isArray(value) ? value.filter(isRecord$6) : [];
-  }
-  function isString(value) {
-    return typeof value === "string";
   }
   const FLIGHT_DEFAULT_CHILD_AGE = 7;
   const FLIGHT_INFANT_AGE = 1;
@@ -9725,6 +10041,12 @@ ${darkProviderCss}
     }
     return limited;
   }
+  function flightTooltipChipTexts(candidate) {
+    return [.../* @__PURE__ */ new Set([
+      ...candidate.durationText?.split(" · ") ?? [],
+      ...candidate.platform?.split(/,\s*/) ?? []
+    ])].filter((text) => !/bagasje|innsjekk|baggage|carry.?on|cabin.?bag|checked.?bag/i.test(text));
+  }
   function applyFlightSortMode(offers, mode) {
     if (mode === "best" || !offers.some((offer) => offer.flightSortVariants !== void 0)) return offers;
     const amountOf = (candidate) => candidate.sortAmount ?? candidate.amount;
@@ -9738,8 +10060,7 @@ ${darkProviderCss}
       const selected = variant !== void 0 ? { ...base, ...variant } : offer;
       return selected.alternatives !== void 0 ? { ...selected, alternatives: [...selected.alternatives].sort(compare) } : selected;
     }).sort((left, right) => {
-      const excluded = Number(left.baggageExcluded === true) - Number(right.baggageExcluded === true);
-      return excluded !== 0 ? excluded : compare(left, right);
+      return compare(left, right);
     });
   }
   const FLIGHT_SORT_URL_VALUES = {
@@ -10590,7 +10911,6 @@ ${darkProviderCss}
   const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
   const FLIGHT_STATIC_PRICE_SORT_AMOUNT = Number.MAX_SAFE_INTEGER;
   const FLIGHT_TOOLTIP_MAX_ROWS = 6;
-  const FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET = 1e9;
   const FLIGHT_DATE_FLEX_MAX_COMBINATIONS = 49;
   const FINN_FLIGHT_DATE_FLEX_CONCURRENCY = 6;
   const FINN_FLIGHT_DATE_FLEX_RETRY_DELAY_MS = 3e3;
@@ -11019,7 +11339,7 @@ ${darkProviderCss}
     if (parsedUrl === void 0 || !parsedUrl.hostname.endsWith("trip.com")) return;
     const filters = readFlightLinkFilters(parsedUrl);
     if (filters === void 0) return;
-    const pending2 = /* @__PURE__ */ new Set([
+    const pending = /* @__PURE__ */ new Set([
       ...filters.maxStops !== void 0 && filters.maxStops > 0 ? ["stops"] : [],
       ...filters.includeCabinBag === true ? ["cabin"] : [],
       ...filters.includeCheckedBag === true ? ["checked"] : [],
@@ -11029,7 +11349,7 @@ ${darkProviderCss}
     const checkOnce = (key, element) => {
       if (element === null || element === void 0) return;
       if (element.getAttribute("aria-checked") === "true") {
-        pending2.delete(key);
+        pending.delete(key);
         return;
       }
       if (clickedKeys.has(key)) return;
@@ -11040,7 +11360,7 @@ ${darkProviderCss}
     const timerId = window.setInterval(() => {
       attempts += 1;
       removeUnrequestedTripComFilters(filters, clickedKeys);
-      if (pending2.has("stops")) {
+      if (pending.has("stops")) {
         checkOnce("stops", document.querySelector(
           `[data-testid="filter_stops"] .filter-item[data-code="${filters.maxStops}"] [role="checkbox"]`
         ));
@@ -11048,19 +11368,19 @@ ${darkProviderCss}
       const baggageOptions = [...document.querySelectorAll(
         '[data-testid="filter_baggage"] [role="checkbox"], [data-testid="filter_others"] [role="checkbox"]'
       )];
-      if (pending2.has("cabin")) {
+      if (pending.has("cabin")) {
         checkOnce("cabin", baggageOptions.find((option) => /carry-on/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
       }
-      if (pending2.has("checked")) {
+      if (pending.has("checked")) {
         checkOnce("checked", baggageOptions.find((option) => /checked/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
       }
-      if (pending2.size === 1 && pending2.has("duration") && filters.maxDurationMinutes !== void 0 && attempts % 4 === 0 && applyTripComMaxDuration(filters.maxDurationMinutes)) {
-        pending2.delete("duration");
+      if (pending.size === 1 && pending.has("duration") && filters.maxDurationMinutes !== void 0 && attempts % 4 === 0 && applyTripComMaxDuration(filters.maxDurationMinutes)) {
+        pending.delete("duration");
       }
-      if (pending2.size === 0 && attempts >= 8 || attempts >= 120) {
+      if (pending.size === 0 && attempts >= 8 || attempts >= 120) {
         window.clearInterval(timerId);
-        if (pending2.size > 0) {
-          console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending2].join(", ")} på ${window.location.href}.`);
+        if (pending.size > 0) {
+          console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending].join(", ")} på ${window.location.href}.`);
         }
         const currentUrl = parseUrl(window.location.href);
         if (currentUrl !== void 0 && currentUrl.searchParams.has(FLIGHT_LINK_FILTERS_PARAM)) {
@@ -11252,6 +11572,28 @@ ${darkProviderCss}
       return response.offers ?? (response.offer !== void 0 ? [response.offer] : []);
     }
   });
+  const mobileComparison = createAutomaticComparison({
+    getUrl: () => location.href,
+    sourceName: "Tek.no",
+    prepare: () => loadMobileSuppliers(userscriptJsonRequest, {
+      read: async () => (await chrome.storage.local.get(MOBILE_SUPPLIER_CACHE_KEY))[MOBILE_SUPPLIER_CACHE_KEY],
+      write: async (catalog) => {
+        await chrome.storage.local.set({ [MOBILE_SUPPLIER_CACHE_KEY]: catalog });
+      }
+    }),
+    isSupported: () => getMobileSupplier(location.href) !== void 0 && !extractProductPageMeta()?.codes?.length,
+    load: async (url) => {
+      const message = { type: "get-price-match-for-product", url, searchTerm: "Mobilabonnement", mobile: true };
+      if (isUserscriptRuntime()) return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
+      const response = await sendRuntimeMessage(message);
+      if (!response || !isPriceMatchForProductResponse(response)) throw new Error("Fikk ikke svar fra extensionen");
+      if (!response.ok) throw new Error(response.reason);
+      return response.offers ?? (response.offer ? [response.offer] : []);
+    }
+  });
+  function isAutomaticComparisonSupported() {
+    return electricityComparison.isSupported() || mobileComparison.isSupported();
+  }
   async function renderCurrentContext() {
     const generation = ++renderGeneration;
     const offersPromise = getCurrentOffers().catch(() => []);
@@ -11270,7 +11612,7 @@ ${darkProviderCss}
     ]);
     priceMatchesSettled = true;
     if (generation !== renderGeneration) return;
-    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || electricityComparison.isSupported()) {
+    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported()) {
       renderNoticeWithStoredState(offers, priceMatches, regionPrices);
       scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
       return;
@@ -11336,8 +11678,9 @@ ${darkProviderCss}
     }
   }
   async function getPriceMatchesForCurrentPage(onFlightProgress) {
-    await electricityComparison.prepare();
+    await Promise.all([electricityComparison.prepare(), mobileComparison.prepare()]);
     if (electricityComparison.isSupported()) return electricityComparison.getOffers();
+    if (mobileComparison.isSupported()) return mobileComparison.getOffers();
     const flightOffers = await findFlightPriceMatchOffers(onFlightProgress);
     if (flightOffers.length > 0) return flightOffers;
     const hotelOffers = await findHotelPriceMatchOffers();
@@ -12353,14 +12696,13 @@ ${darkProviderCss}
     return airportLookup.get(normalizedCode) ?? [normalizedCode];
   }
   function buildFlightSortVariants(input) {
-    const offset = input.baggageExcluded === true ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0;
     const toVariant = (candidate, mode) => {
       if (candidate === void 0) return void 0;
       return {
         shopName: candidate.shopName,
         price: candidate.price,
         amount: candidate.amount,
-        sortAmount: (candidate.sortAmount ?? candidate.amount) + offset,
+        sortAmount: candidate.sortAmount ?? candidate.amount,
         currency: candidate.currency,
         productUrl: input.buildUrl(mode),
         offerUrl: candidate.productUrl,
@@ -12510,7 +12852,7 @@ ${darkProviderCss}
     const dateOptions = [];
     for (const combination of job.combinations) {
       const offer = job.results.get(buildFlightDateCombinationKey(combination));
-      if (offer === void 0 || offer.baggageExcluded === true) continue;
+      if (offer === void 0) continue;
       dateOptions.push({
         ...combination,
         shopName: offer.shopName,
@@ -14368,11 +14710,10 @@ ${darkProviderCss}
   }
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
     const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
-    const { candidates, searchComplete, baggageExcluded } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
+    const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;
     return {
-      ...baggageExcluded ? { baggageExcluded: true } : {},
       source: "skyscanner",
       sourceName: "Skyscanner",
       details: searchDetails,
@@ -14380,8 +14721,7 @@ ${darkProviderCss}
       shopName: candidate.shopName,
       price: candidate.price,
       amount: candidate.amount,
-      // Uten bagasje er prisen ikke sammenlignbar: sorteres etter kilder med bekreftet bagasje.
-      sortAmount: (candidate.sortAmount ?? candidate.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
+      sortAmount: candidate.sortAmount ?? candidate.amount,
       currency: candidate.currency,
       productName: routeTitle,
       productUrl: resultUrl,
@@ -14392,8 +14732,7 @@ ${darkProviderCss}
       flightSortVariants: buildFlightSortVariants({
         cheapestPool: candidates,
         fastestPool: candidates,
-        buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode),
-        baggageExcluded
+        buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode)
       }),
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
@@ -14459,16 +14798,7 @@ ${darkProviderCss}
     const finalStatus = readStringValue(finalContext?.status)?.toLowerCase();
     const searchComplete = finalStatus === void 0 || finalStatus === "complete";
     const candidates = extractSkyscannerFlightSearchCandidates(latestResult, flightMeta, airportLookup, resultUrl);
-    if (candidates.length > 0 || flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) {
-      return { candidates, searchComplete };
-    }
-    const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
-    const candidatesWithoutBaggage = extractSkyscannerFlightSearchCandidates(latestResult, flightMetaWithoutBaggage, airportLookup, resultUrl);
-    return {
-      candidates: candidatesWithoutBaggage,
-      searchComplete,
-      ...candidatesWithoutBaggage.length > 0 ? { baggageExcluded: true } : {}
-    };
+    return { candidates, searchComplete };
   }
   function requestSkyscannerFlightSearch(payload, headers) {
     return userscriptJsonRequest(SKYSCANNER_WEB_UNIFIED_SEARCH_ENDPOINT, {
@@ -14876,6 +15206,7 @@ ${darkProviderCss}
     return sortMode === "price_a" || sortMode === "bestflight_a" || sortMode === "duration_a" ? sortMode : void 0;
   }
   function readCurrentMomondoVisibleBestPrice(flightMeta) {
+    if (hasFlightSearchResultFilters(flightMeta)) return void 0;
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0 || readCurrentMomondoFlightSearchUrl(flightMeta) === void 0) return void 0;
     if (readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return void 0;
@@ -14896,6 +15227,8 @@ ${darkProviderCss}
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0) return void 0;
     if (!isMomondoFlightSearchPage(parsedUrl) || readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return void 0;
+    const flightMeta = extractMomondoFlightSearchMeta(parsedUrl);
+    if (flightMeta === void 0 || hasFlightSearchResultFilters(flightMeta)) return void 0;
     const text = document.body?.innerText;
     if (text === void 0 || text.length === 0) return void 0;
     const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
@@ -14932,22 +15265,14 @@ ${darkProviderCss}
     const bestSearchData = { ...searchData, sortMode: MOMONDO_DEFAULT_FLIGHT_SORT_MODE };
     const resultData = await pollMomondoFlightResults(bestSearchData, flightMeta, airportLookup);
     if (resultData === void 0) return void 0;
-    let candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
-    let baggageExcluded = false;
-    if (candidates.length === 0 && (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true)) {
-      const { includeCabinBag: _includeCabinBag, includeCheckedBag: _includeCheckedBag, ...flightMetaWithoutBaggage } = flightMeta;
-      candidates = extractMomondoFlightOfferCandidates(resultData, flightMetaWithoutBaggage, airportLookup, searchData.resultUrl);
-      baggageExcluded = candidates.length > 0;
-    }
+    const candidates = extractMomondoFlightOfferCandidates(resultData, flightMeta, airportLookup, searchData.resultUrl);
     const best = candidates[0];
     if (best === void 0) return void 0;
-    const { includeCabinBag: _sortCabinBag, includeCheckedBag: _sortCheckedBag, ...flightMetaForSortWithoutBaggage } = flightMeta;
-    const sortPoolMeta = baggageExcluded ? flightMetaForSortWithoutBaggage : flightMeta;
     const [priceCandidates, durationCandidates] = await Promise.all([
-      fetchMomondoFlightSortedCandidates(bestSearchData, resultData, sortPoolMeta, airportLookup, "price_a"),
-      fetchMomondoFlightSortedCandidates(bestSearchData, resultData, sortPoolMeta, airportLookup, "duration_a")
+      fetchMomondoFlightSortedCandidates(bestSearchData, resultData, flightMeta, airportLookup, "price_a"),
+      fetchMomondoFlightSortedCandidates(bestSearchData, resultData, flightMeta, airportLookup, "duration_a")
     ]);
-    const visibleBestPrice = baggageExcluded ? void 0 : readCurrentMomondoVisibleBestPrice(flightMeta);
+    const visibleBestPrice = readCurrentMomondoVisibleBestPrice(flightMeta);
     const displayedBest = visibleBestPrice === void 0 ? best : {
       ...best,
       price: formatNokFlightPrice(visibleBestPrice),
@@ -14961,11 +15286,10 @@ ${darkProviderCss}
       sourceName: "momondo",
       details: searchDetails,
       matchedExactProduct: true,
-      ...baggageExcluded ? { baggageExcluded: true } : {},
       shopName: displayedBest.shopName,
       price: displayedBest.price,
       amount: displayedBest.amount,
-      sortAmount: (displayedBest.sortAmount ?? displayedBest.amount) + (baggageExcluded ? FLIGHT_BAGGAGE_EXCLUDED_SORT_OFFSET : 0),
+      sortAmount: displayedBest.sortAmount ?? displayedBest.amount,
       currency: displayedBest.currency,
       productName: routeTitle,
       productUrl: buildMomondoFlightSortUrl(searchData.resultUrl, "best"),
@@ -14976,8 +15300,7 @@ ${darkProviderCss}
       flightSortVariants: buildFlightSortVariants({
         cheapestPool: [...priceCandidates, ...candidates],
         fastestPool: [...durationCandidates, ...candidates],
-        buildUrl: (mode) => buildMomondoFlightSortUrl(searchData.resultUrl, mode),
-        baggageExcluded
+        buildUrl: (mode) => buildMomondoFlightSortUrl(searchData.resultUrl, mode)
       }),
       alternatives: displayedCandidates.map(({ productUrl: _productUrl, ...candidate }) => candidate)
     };
@@ -17156,11 +17479,9 @@ ${darkProviderCss}
       element.append(chip.text);
       container.append(element);
     }
-    const hasBaggage = flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true;
     addHoverChipTooltip(container, [
       "Prisene gjelder søket ditt:",
-      ...chips.map((chip) => `- ${chip.tip}`),
-      ...hasBaggage ? ["Kilder som ikke bekrefter bagasjen er merket «ekskl. bagasje»."] : []
+      ...chips.map((chip) => `- ${chip.tip}`)
     ].join("\n"), shadowRoot);
     return container;
   }
@@ -17185,19 +17506,18 @@ ${darkProviderCss}
   }
   function buildElectricityBasisChips(e, shadowRoot) {
     const chips = buildPriceMatchInfoChips([
-      `${ELECTRICITY_EXAMPLE.municipality} · ${ELECTRICITY_EXAMPLE.areaCode}`,
       `${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år`,
       "Spotpris",
-      e.scheme === "norgespris" ? `Norgespris · ${formatKr(e.energyOrePerKwh)} øre/kWh` : "Strømstøtte"
+      e.scheme === "norgespris" ? "Norgespris" : "Strømstøtte"
     ]);
     chips.classList.add("electricity-basis-chips");
     addHoverChipTooltip(chips, [
       "Prisene gjelder et regneeksempel:",
-      `- Husholdning i ${ELECTRICITY_EXAMPLE.municipality}, prisområde ${ELECTRICITY_EXAMPLE.areaCode}, som i Forbrukerrådets standardeksempel.`,
+      "- Én rad per prisområde, NO1–NO5. Kommuneeksemplet står i hver rad. Ingen posisjonstilgang brukes.",
       `- ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år, som i Forbrukerrådets standardeksempel. Dette er ikke ditt målte forbruk.`,
-      `- Kildens forbruksprofil gir ${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh i ${e.period}.`,
-      `- Spotavtaler uten binding, medlemskrav eller kampanjevilkår, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti, som portalens standardfilter.`,
-      e.scheme === "norgespris" ? `- Med Norgespris: ${formatKr(e.energyOrePerKwh)} øre/kWh inkl. mva., før leverandørens påslag og månedsgebyr. Eksemplet forutsetter Norgespris; vi vet ikke om du har valgt ordningen.` : `- Spotpris etter strømstøtte i eksemplet: ${formatKr(e.energyOrePerKwh)} øre/kWh før påslag og månedsgebyr.`,
+      "- Månedsforbruk og energipris for hvert område står i radens tooltip.",
+      "- Spotavtaler uten binding, medlemskrav eller kampanjevilkår. Alle garantiperioder er med, også under 6 måneder.",
+      e.scheme === "norgespris" ? "- Eksemplene forutsetter Norgespris. Satsen fra kilden står i hver tooltip, med områdets avgiftsregler. Vi vet ikke om du har valgt ordningen." : `- Spotpris etter strømstøtte i eksemplet: ${formatKr(e.energyOrePerKwh)} øre/kWh før påslag og månedsgebyr.`,
       "- Nettleie kommer i tillegg. Prisene hentes live fra Forbrukerrådets strømprisportal."
     ].join("\n"), shadowRoot);
     return chips;
@@ -18659,6 +18979,7 @@ ${darkProviderCss}
       background: ${PROVIDER_COLORS.pokepris.bg};
       color: ${PROVIDER_COLORS.pokepris.fg};
     }
+    .provider-tek { background: ${PROVIDER_COLORS.tek.bg}; color: ${PROVIDER_COLORS.tek.fg}; }
     .provider-forbrukerradet {
       background: ${PROVIDER_COLORS.forbrukerradet.bg};
       color: ${PROVIDER_COLORS.forbrukerradet.fg};
@@ -19201,11 +19522,12 @@ ${darkProviderCss}
     .electricity-tooltip-basis { color: inherit; opacity: .82; font-size: 10px; line-height: 1.4; margin: 0 0 8px; }
     .comparison-tooltip-option { color: var(--cbn-text); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 6px; padding: 7px; margin: 4px 0; }
     .comparison-tooltip-option > :first-child { font-weight: 600; min-width: 0; }
-    .comparison-tooltip-option > strong { color: var(--cbn-accent); white-space: nowrap; }
+    .comparison-tooltip-option > strong { color: var(--cbn-text); white-space: nowrap; }
+    .comparison-tooltip-option--best > strong { color: var(--cbn-accent); }
     .comparison-tooltip-option > .price-match-chip-line { grid-column: 1 / -1; }
     .comparison-tooltip-option .price-match-info-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-    .electricity-tooltip-plan > strong { color: var(--cbn-accent); white-space: nowrap; }
     .electricity-tooltip-plan > .price-match-chip-line, .electricity-tooltip-terms { grid-column: 1 / -1; }
+    .price-match-subheading { color: var(--cbn-muted); font-size: 11px; font-weight: 700; margin: 14px 0 4px; }
     .electricity-tooltip-terms { color: var(--cbn-muted); font-size: 10px; line-height: 1.4; }
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
@@ -19526,6 +19848,10 @@ ${darkProviderCss}
       width: max-content;
       z-index: 2147483647;
     }
+    .offer-tooltip.price-match-tooltip {
+      width: ${DETAILS_TOOLTIP_WIDTH}px;
+      max-width: calc(100vw - 16px);
+    }
     .offer-tooltip-section + .offer-tooltip-section {
       margin-top: 8px;
     }
@@ -19631,11 +19957,11 @@ ${darkProviderCss}
     const cryptoSub = cryptoSubEntry?.[1];
     const codeOffers = offers.filter((o) => o.provider === "rabattkode" || o.discountCode !== void 0 && o.discountCode.length > 0);
     const offer = mainOffers[0];
-    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0 && bestRegionPrice === void 0 && !electricityComparison.isSupported()) {
+    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0 && bestRegionPrice === void 0 && !isAutomaticComparisonSupported()) {
       return;
     }
     const primaryOffer = offer ?? codeOffers[0];
-    if (primaryOffer === void 0 && priceMatch === void 0 && bestRegionPrice === void 0 && !electricityComparison.isSupported()) {
+    if (primaryOffer === void 0 && priceMatch === void 0 && bestRegionPrice === void 0 && !isAutomaticComparisonSupported()) {
       return;
     }
     const tooltipControls = createTooltipController(shadowRoot);
@@ -19644,7 +19970,7 @@ ${darkProviderCss}
     const bestReward = offer !== void 0 ? parseRewardValue(offer) : void 0;
     const hasFantasticOffer = offer !== void 0 && (bestReward?.kind === "percentage" && bestReward.amount >= 10 || (readRewardSortValueNok(offer) ?? 0) >= 250);
     if (hasFantasticOffer) notice.classList.add("has-fantastic-offer");
-    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : electricityComparison.isSupported() ? "forbrukerradet" : "region");
+    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : electricityComparison.isSupported() ? "forbrukerradet" : mobileComparison.isSupported() ? "tek" : "region");
     const sideTab = document.createElement("button");
     sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
@@ -19679,11 +20005,12 @@ ${darkProviderCss}
         chipSpan.textContent = formatProviderName(codeProvider);
         sideTabText.append(chipSpan);
       }
-    } else if (electricityComparison.isSupported()) {
+    } else if (isAutomaticComparisonSupported()) {
       const chipSpan = document.createElement("span");
-      chipSpan.className = "cbn-chip side-tab-chip provider-forbrukerradet";
-      chipSpan.textContent = PROVIDER_NAMES.forbrukerradet;
-      sideTabText.append("Strøm", chipSpan);
+      const provider = electricityComparison.isSupported() ? "forbrukerradet" : "tek";
+      chipSpan.className = `cbn-chip side-tab-chip provider-${provider}`;
+      chipSpan.textContent = PROVIDER_NAMES[provider];
+      sideTabText.append(provider === "tek" ? "Mobil" : "Strøm", chipSpan);
     } else if (priceMatch !== void 0) {
       const rewardSpan = document.createElement("span");
       rewardSpan.className = "side-tab-reward";
@@ -19715,7 +20042,7 @@ ${darkProviderCss}
     const siteIcon = createSiteIcon();
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : electricityComparison.isSupported() ? `Prismatch hos ${getElectricitySupplier(location.href).name}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Regionpriser";
+    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : electricityComparison.isSupported() ? `Prismatch hos ${getElectricitySupplier(location.href).name}` : mobileComparison.isSupported() ? `Prismatch hos ${getMobileSupplier(location.href).name}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Regionpriser";
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
     sumInput.className = "cbn-field sum-input";
@@ -19725,7 +20052,7 @@ ${darkProviderCss}
     sumInput.addEventListener("keydown", (e) => {
       if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
     });
-    if (!electricityComparison.isSupported() || mainOffers.length > 0) header.append(sumInput);
+    if (!isAutomaticComparisonSupported() || mainOffers.length > 0) header.append(sumInput);
     const rewardLabels = [];
     const tooltipElements = [];
     const offerList = document.createElement("div");
@@ -20535,7 +20862,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     const priceMatchSection = document.createElement("div");
     priceMatchSection.className = "price-match-section";
-    if (priceMatches.length > 0 || electricityComparison.isSupported()) {
+    if (priceMatches.length > 0 || isAutomaticComparisonSupported()) {
       if (initialPriceMatchCollapsed) {
         priceMatchSection.classList.add("collapsed");
       }
@@ -20563,19 +20890,19 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       if (electricity !== void 0) priceMatchHeader.append(buildElectricityBasisChips(electricity, shadowRoot));
       priceMatchSection.append(
         priceMatchHeader,
-        ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
+        ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0 && !priceMatch2.mobile && !priceMatch2.electricity))
       );
-      if (electricityComparison.isSupported() && priceMatches.length === 0) {
+      if (isAutomaticComparisonSupported() && priceMatches.length === 0) {
         const status = document.createElement("p");
         status.className = "electricity-error";
-        status.textContent = electricityComparison.getError() || "Ingen sammenlignbare strømavtaler akkurat nå.";
+        status.textContent = (electricityComparison.isSupported() ? electricityComparison : mobileComparison).getError() || "Ingen sammenlignbare avtaler akkurat nå.";
         priceMatchSection.append(status);
       }
     }
     body.append(header);
     if (mainOffers.length > 0) body.append(offerList);
     if (regionPrices !== void 0 && regionPrices.prices.length > 0) body.append(regionPricesSection);
-    if (priceMatches.length > 0 || electricityComparison.isSupported()) body.append(priceMatchSection);
+    if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
     body.append(chipsSection);
     if (offers.length > 0) body.append(codesSection);
     let userHasVoted = false;
@@ -20858,6 +21185,101 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     disposeNoticeTheme = void 0;
     document.getElementById(HOST_ID)?.remove();
   }
+  function buildProductPriceMatchChips(offer) {
+    return buildPriceMatchInfoChips([
+      offer.shopName,
+      ...offer.shippingPrice ? [offer.shippingPrice] : [],
+      ...offer.totalPrice ? [`Totalt ${offer.totalPrice}`] : [],
+      ...offer.platform ? [offer.platform] : []
+    ]);
+  }
+  function buildProductPriceMatchTooltip(tooltip, offer) {
+    tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
+    if (offer.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) {
+      setTooltipContent(tooltip, [buildPriceMatchTooltip(offer)]);
+      return;
+    }
+    const heading = document.createElement("p");
+    heading.className = "electricity-tooltip-heading";
+    heading.textContent = `${getPriceMatchSourceName(offer)}: ${offer.productName}`;
+    tooltip.append(heading);
+    const alternatives = offer.alternatives?.length ? offer.alternatives : [offer];
+    alternatives.forEach((alternative, index) => {
+      const row = document.createElement("div");
+      row.className = "cbn-row cbn-row--details comparison-tooltip-option product-tooltip-option";
+      row.classList.toggle("comparison-tooltip-option--best", index === 0);
+      const name = document.createElement("span");
+      name.textContent = alternative.shopName;
+      const price = document.createElement("strong");
+      price.textContent = alternative.price;
+      const chips = buildProductPriceMatchChips({ ...alternative, shopName: "" });
+      row.append(name, price);
+      if (chips.childElementCount) row.append(chips);
+      tooltip.append(row);
+    });
+    if (offer.details) {
+      const details = createTooltipSection(offer.details);
+      if (details) tooltip.append(details);
+    }
+  }
+  function buildMobilePriceMatchChips(m, supplier, actualAllowance = false) {
+    return buildPriceMatchInfoChips([
+      actualAllowance ? m.meteredData ? "Bruksbasert data" : m.unlimitedData ? "Fri data" : `${m.includedGb.toLocaleString("nb-NO")} GB` : mobileTierLabel(m),
+      supplier,
+      `${m.network}-nett`,
+      ...m.speedMbps !== void 0 ? [`${formatKr(m.speedMbps)} Mbit/s`] : []
+    ]);
+  }
+  function appendComparisonStatus(tooltip, offer) {
+    const incomplete = offer.details?.split("\n\n").find((part) => part.startsWith("Ufullstendig oppslag:"));
+    if (incomplete) {
+      const status = document.createElement("p");
+      status.className = "electricity-tooltip-basis";
+      status.textContent = incomplete;
+      tooltip.append(status);
+    }
+  }
+  function buildMobileTooltip(tooltip, offer) {
+    tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
+    const heading = document.createElement("p");
+    heading.className = "electricity-tooltip-heading";
+    heading.textContent = `${mobileTierLabel(offer.mobile)} · billigste per nett`;
+    const basis = document.createElement("p");
+    basis.className = "electricity-tooltip-basis";
+    basis.textContent = offer.mobile.requestedGb === 0 ? "Beregnet uten databruk, med 5 000 ringeminutter og 5 000 meldinger i Norge. Bruksbasert data koster ekstra." : "Beregnet månedspris for datatrinnet, 5 000 ringeminutter og 5 000 meldinger i Norge. Eventuelle datapakker er inkludert i estimatet.";
+    tooltip.append(heading, basis);
+    const addPlan = (plan, best = false) => {
+      const m = plan.mobile;
+      if (!m) return;
+      const row = document.createElement("div");
+      row.className = "cbn-row cbn-row--details comparison-tooltip-option";
+      row.classList.toggle("comparison-tooltip-option--best", best);
+      const title = document.createElement("span");
+      title.textContent = plan.shopName;
+      const amount = document.createElement("strong");
+      amount.textContent = plan.price;
+      row.append(title, amount, buildMobilePriceMatchChips(m, plan.productName ?? plan.shopName, true));
+      if (m.afterQuotaMbps !== void 0 && (m.category === "unlimited" || m.afterQuotaMbps >= 1)) {
+        const cap = document.createElement("span");
+        cap.className = "electricity-tooltip-terms";
+        cap.textContent = `Etter ${m.includedGb.toLocaleString("nb-NO")} GB: ${formatKr(m.afterQuotaMbps)} Mbit/s.`;
+        row.append(cap);
+      }
+      tooltip.append(row);
+    };
+    (offer.alternatives ?? []).forEach((plan, index) => addPlan(plan, index === 0));
+    if (offer.mobileBroadband?.mobile) {
+      const broadbandHeading = document.createElement("p");
+      broadbandHeading.className = "electricity-tooltip-heading";
+      broadbandHeading.textContent = mobileTierLabel(offer.mobileBroadband.mobile);
+      const broadbandBasis = document.createElement("p");
+      broadbandBasis.className = "electricity-tooltip-basis";
+      broadbandBasis.textContent = "Egen tjeneste til ruter, uten tale/SMS.";
+      tooltip.append(broadbandHeading, broadbandBasis);
+      addPlan(offer.mobileBroadband);
+    }
+    appendComparisonStatus(tooltip, offer);
+  }
   function buildElectricityTooltip(tooltip, offer) {
     tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
     const heading = document.createElement("p");
@@ -20866,13 +21288,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const basis = document.createElement("p");
     basis.className = "electricity-tooltip-basis";
     const e = offer.electricity;
-    basis.textContent = `Total strømpris for ${e.period}, inkl. ${e.scheme === "norgespris" ? `Norgespris (${formatKr(e.energyOrePerKwh)} øre/kWh)` : "spotpris og strømstøtte"}, påslag og månedsgebyr. Regneeksempel ${ELECTRICITY_EXAMPLE.municipality} · ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år (${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh denne måneden). Nettleie kommer i tillegg.`;
+    basis.textContent = `Total strømpris for ${e.period}, inkl. ${e.scheme === "norgespris" ? `Norgespris (${formatKr(e.energyOrePerKwh)} øre/kWh)` : "spotpris og strømstøtte"}, påslag og månedsgebyr. Regneeksempel ${e.municipality} · ${e.areaCode} · ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år (${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh denne måneden). Nettleie kommer i tillegg.`;
     tooltip.append(heading, basis);
     const alternatives = (offer.alternatives ?? []).filter((row) => row.electricity !== void 0);
-    const sorted = [...alternatives].sort((a, b) => a.amount - b.amount);
-    const addPlan = (plan) => {
+    const sorted = alternatives.filter((plan) => plan.electricity?.comparisonOnly !== true).sort((a, b) => a.amount - b.amount);
+    const comparison = alternatives.filter((plan) => plan.electricity?.comparisonOnly === true).sort((a, b) => a.amount - b.amount);
+    const addPlan = (plan, best = false) => {
       const row = document.createElement("div");
       row.className = "cbn-row cbn-row--details comparison-tooltip-option electricity-tooltip-plan";
+      row.classList.toggle("comparison-tooltip-option--best", best);
       const title = document.createElement("span");
       title.textContent = plan.shopName;
       const amount = document.createElement("strong");
@@ -20907,14 +21331,22 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       none.textContent = "Ingen sammenlignbare avtaler i dette utvalget.";
       tooltip.append(none);
     }
-    sorted.forEach(addPlan);
+    sorted.forEach((plan, index) => addPlan(plan, index === 0));
+    if (comparison.length > 0) {
+      const current = document.createElement("p");
+      current.className = "electricity-tooltip-heading";
+      current.textContent = `Til sammenligning: ${comparison[0].productName}`;
+      tooltip.append(current);
+      comparison.forEach((plan) => addPlan(plan));
+    }
     const terms = document.createElement("p");
     terms.className = "electricity-tooltip-basis";
-    terms.textContent = `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen. Inkl. mva. ${e.scheme === "norgespris" ? "Eksemplet forutsetter at du har valgt Norgespris." : "Estimatet varierer med spotpris og forbruk."}`;
+    terms.textContent = `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav. Alle garantiperioder er med. Kampanjer er utelatt; øvrige vilkår står ved avtalen. ${e.vatExempt ? "Uten mva. i kommuneeksemplet." : "Inkl. mva."} ${e.scheme === "norgespris" ? "Eksemplet forutsetter at du har valgt Norgespris." : "Estimatet varierer med spotpris og forbruk."}`;
     const source2 = document.createElement("p");
     source2.className = "electricity-tooltip-basis";
     source2.textContent = "Kilde: Forbrukerrådets strømprisportal og forbruksprofil. Eventuelt papirfakturagebyr kommer i tillegg.";
     tooltip.append(terms, source2);
+    appendComparisonStatus(tooltip, offer);
   }
   function buildFlightPriceMatchTooltip(tooltip, offer) {
     tooltip.classList.add("cbn-tooltip-details");
@@ -20937,17 +21369,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       heading.textContent = part.split("\n")[0];
       section.append(heading);
       const limit = offer.dateFlex === void 0 ? FLIGHT_TOOLTIP_MAX_ROWS : FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS;
-      for (const alternative of offer.alternatives.slice(0, limit)) {
+      for (const [index, alternative] of offer.alternatives.slice(0, limit).entries()) {
         const row = document.createElement("div");
         row.className = "cbn-row cbn-row--details comparison-tooltip-option flight-tooltip-option";
+        row.classList.toggle("comparison-tooltip-option--best", index === 0);
         const name = document.createElement("span");
         name.textContent = alternative.shopName.replace(/:$/, "");
         const price = document.createElement("strong");
         price.textContent = alternative.price;
-        const chips = buildPriceMatchInfoChips([.../* @__PURE__ */ new Set([
-          ...alternative.durationText?.split(" · ") ?? [],
-          ...alternative.platform?.split(/,\s*/) ?? []
-        ])]);
+        const chips = buildPriceMatchInfoChips(flightTooltipChipTexts(alternative));
         row.append(name, price);
         if (chips.childElementCount > 0) row.append(chips);
         section.append(row);
@@ -20963,10 +21393,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const priceMatch = priceMatches[index];
       if (card === void 0 || priceMatch === void 0) continue;
       const tooltip = document.createElement("div");
-      tooltip.className = "offer-tooltip";
-      if (priceMatch.electricity !== void 0) buildElectricityTooltip(tooltip, priceMatch);
+      tooltip.className = "offer-tooltip price-match-tooltip";
+      if (priceMatch.mobile !== void 0) buildMobileTooltip(tooltip, priceMatch);
+      else if (priceMatch.electricity !== void 0) buildElectricityTooltip(tooltip, priceMatch);
       else if (isFlightPanelRow(priceMatch)) buildFlightPriceMatchTooltip(tooltip, priceMatch);
-      else setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+      else if (priceMatch.travelKind === "hotel") setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+      else buildProductPriceMatchTooltip(tooltip, priceMatch);
       shadowRoot.append(tooltip);
       const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
       row.classList.add("price-match-tooltip-row");
@@ -21153,10 +21585,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return isRecord(value) && typeof value.planName === "string" && (value.formattedPrice === void 0 || typeof value.formattedPrice === "string") && (value.formattedNok === void 0 || typeof value.formattedNok === "string") && (value.unavailableReason === void 0 || typeof value.unavailableReason === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.source === void 0 || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
-    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.productName === void 0 || typeof value.productName === "string") && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.productName === void 0 || typeof value.productName === "string") && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -21281,7 +21713,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (pointsRateMatch !== null) {
       return {
         kind: "percentage",
-        amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR$1
+        amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR
       };
     }
     const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
@@ -21341,8 +21773,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       priceMatch.dateFlex !== void 0 ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate) : void 0,
       dateWindow,
       ...priceMatch.durationText?.split(" · ") ?? [],
-      priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : void 0,
-      priceMatch.baggageExcluded === true ? "ekskl. bagasje" : void 0
+      priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : void 0
     ];
     return buildPriceMatchInfoChips(texts);
   }
@@ -21361,7 +21792,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   const supportAdvertisementDraw = Math.random();
   function buildElectricityPriceMatchChips(priceMatch) {
     const e = priceMatch.electricity;
-    return buildPriceMatchInfoChips([`${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
+    return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
   }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
@@ -21380,8 +21811,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const priceMatchShop = document.createElement("span");
     priceMatchShop.className = "price-match-shop";
     priceMatchShop.textContent = [
-      priceMatch.dateFlex === void 0 ? priceMatch.shopName : `${formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`,
-      priceMatch.baggageExcluded === true ? "ekskl. bagasje" : void 0
+      priceMatch.dateFlex === void 0 ? priceMatch.shopName : `${formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)} · ${priceMatch.shopName}`
     ].filter((part) => part !== void 0).join(" · ");
     priceMatchTitle.append(priceMatchProduct, priceMatchShop);
     const priceMatchPrice = document.createElement("span");
@@ -21396,14 +21826,26 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-    if (isFlightPanelRow(priceMatch) || priceMatch.electricity !== void 0) {
+    if (isFlightPanelRow(priceMatch) || priceMatch.electricity !== void 0 || priceMatch.mobile !== void 0) {
       priceMatchCard.classList.add("price-match-card--chips");
-      const chips = priceMatch.electricity !== void 0 ? buildElectricityPriceMatchChips(priceMatch) : buildFlightPriceMatchChips(priceMatch);
+      const chips = priceMatch.mobile !== void 0 ? buildMobilePriceMatchChips(priceMatch.mobile, priceMatch.productName) : priceMatch.electricity !== void 0 ? buildElectricityPriceMatchChips(priceMatch) : buildFlightPriceMatchChips(priceMatch);
       const side = document.createElement("span");
       side.className = "price-match-side";
       if (priceMatch.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) side.classList.add("price-match-side--inline");
       side.append(priceMatchPrice, priceMatchBadge);
       priceMatchCard.append(chips, side);
+      return priceMatchCard;
+    }
+    if (priceMatch.travelKind !== "hotel") {
+      priceMatchCard.classList.add("price-match-card--chips", "price-match-card--product");
+      const main = document.createElement("span");
+      main.className = "price-match-title";
+      const bestAlternative = priceMatch.alternatives?.find((a) => a.shopName === priceMatch.shopName && a.amount === priceMatch.amount);
+      main.append(priceMatchProduct, buildProductPriceMatchChips(bestAlternative ?? priceMatch));
+      const side = document.createElement("span");
+      side.className = "price-match-side";
+      side.append(priceMatchPrice, priceMatchBadge);
+      priceMatchCard.append(main, side);
       return priceMatchCard;
     }
     const hasDuration = priceMatch.durationText !== void 0 && priceMatch.durationText.length > 0;
@@ -21557,6 +21999,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     ].join("\n");
   }
   function getPriceMatchProviderClass(priceMatch) {
+    if (priceMatch.source === "tek") return "tek";
     if (priceMatch.source === "forbrukerradet") return "forbrukerradet";
     if (priceMatch.source === "pokepris") return "pokepris";
     if (priceMatch.source === "godpris") return "godpris";
@@ -21581,6 +22024,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
+    if (priceMatch.source === "tek") return PROVIDER_NAMES.tek;
     if (priceMatch.source === "forbrukerradet") return PROVIDER_NAMES.forbrukerradet;
     if (priceMatch.sourceName !== void 0) return priceMatch.sourceName;
     if (priceMatch.source === "pokepris") return PROVIDER_NAMES.pokepris;
@@ -21607,6 +22051,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {
+    if (priceMatch.source === "tek") return priceMatch.details ?? PROVIDER_NAMES.tek;
     if (priceMatch.source === "forbrukerradet") return priceMatch.details ?? PROVIDER_NAMES.forbrukerradet;
     if (priceMatch.travelKind === "hotel") {
       const alternatives2 = priceMatch.alternatives ?? [];
@@ -21673,21 +22118,20 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
             priceMatch.shopName,
             details !== priceMatch.shopName ? details : void 0,
             `${isCalendarPrice ? "Kalenderpris" : "Beste treff"}: ${priceMatch.price}`,
-            isCalendarPrice ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.` : `Dato og ${airportScopeText} er filtrert til samme søk.`,
-            priceMatch.baggageExcluded === true ? `Pris uten bagasje: ${getPriceMatchSourceName(priceMatch)} bekrefter ikke at valgt bagasje er inkludert, så den kan komme i tillegg.` : void 0
+            isCalendarPrice ? `${getPriceMatchSourceName(priceMatch)} gir kalenderpris for eksakt dato; åpne søket for faktisk treffliste.` : `Dato og ${airportScopeText} er filtrert til samme søk.`
           ].filter((line) => line !== void 0).join("\n"),
           [
             isCalendarPrice ? "Prisgrunnlag" : "Treffliste",
             ...alternatives2.slice(0, FLIGHT_TOOLTIP_MAX_ROWS).map(formatPriceMatchTooltipOffer)
           ].join("\n"),
-          "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden."
+          "Fareklasse og valgt avgang må sjekkes hos kilden."
         ].join("\n\n");
       }
       return [
         `${getPriceMatchSourceName(priceMatch)}: ${priceMatch.productName}`,
         details,
         `Åpner prissøk med ${airportScopeText}, datoer og antall voksne.`,
-        "Bagasje, fareklasse og valgt avgang må sjekkes hos kilden."
+        "Fareklasse og valgt avgang må sjekkes hos kilden."
       ].join("\n");
     }
     const alternatives = priceMatch.alternatives?.length ? priceMatch.alternatives : [{ shopName: priceMatch.shopName, price: priceMatch.price }];

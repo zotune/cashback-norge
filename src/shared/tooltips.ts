@@ -2,6 +2,8 @@
 // One delegated controller per page/panel, with no observer or per-button document listeners.
 import { BRAND_QUOKKA_DATA_URL } from "./brand.js";
 
+export const DETAILS_TOOLTIP_WIDTH = 340;
+
 let nextTooltipId = 0;
 
 export function tooltipPosition(anchor: { left: number; bottom: number; top: number }, width: number, height: number, viewport: { width: number; height: number }) {
@@ -63,7 +65,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     const availableWidth = Math.max(80, doc.documentElement.clientWidth - 16);
     Object.assign(tooltip.style, {
       position: "fixed", left: "8px", top: "8px", bottom: "auto", right: "auto", transform: "none",
-      width: isBonusChipTooltip ? "max-content" : `${Math.min(340, availableWidth)}px`,
+      width: isBonusChipTooltip ? "max-content" : `${Math.min(DETAILS_TOOLTIP_WIDTH, availableWidth)}px`,
       maxWidth: isBonusChipTooltip ? `${Math.min(320, availableWidth)}px` : "none",
       maxHeight: `${Math.max(80, view.innerHeight - 32)}px`, overflowY: "auto", boxSizing: "border-box", whiteSpace, margin: "0",
     });
@@ -113,7 +115,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
           element.classList.add("cbn-tooltip-scrollable");
           Object.assign(tooltip.style, {
             position: "fixed", left: "8px", top: "8px", bottom: "auto", right: "auto", transform: "none",
-            maxHeight: `${maxHeight}px`, maxWidth: `${Math.min(340, Math.max(80, doc.documentElement.clientWidth - 16))}px`,
+            maxHeight: `${maxHeight}px`, maxWidth: `${Math.min(DETAILS_TOOLTIP_WIDTH, Math.max(80, doc.documentElement.clientWidth - 16))}px`,
             overflowY: "auto", boxSizing: "border-box", pointerEvents: "auto",
           });
           const rect = tooltip.getBoundingClientRect();

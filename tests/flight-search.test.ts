@@ -536,17 +536,16 @@ test("switches rows without losing sources", () => {
     { source: "a", ...variant(300, 500), flightSortVariants: { cheapest: variant(250, 900), fastest: variant(400, 200) } },
     { source: "b", ...variant(350, 450), flightSortVariants: { cheapest: variant(200), fastest: variant(600, 300) } },
     { source: "noVariant", ...variant(100, 700) },
-    { source: "excluded", ...variant(50, 100), sortAmount: 1_000_000_050, baggageExcluded: true, flightSortVariants: { cheapest: { ...variant(40), sortAmount: 1_000_000_040 }, fastest: { ...variant(60, 90), sortAmount: 1_000_000_060 } } },
     { source: "google", ...variant(1), sortAmount: Number.MAX_SAFE_INTEGER, durationText: undefined },
   ];
   assert.equal(applyFlightSortMode(offers, "best"), offers);
 
   const cheapest = applyFlightSortMode(offers, "cheapest");
-  assert.deepEqual(cheapest.map((offer) => offer.source), ["noVariant", "b", "a", "google", "excluded"]);
+  assert.deepEqual(cheapest.map((offer) => offer.source), ["noVariant", "b", "a", "google"]);
   assert.equal(cheapest.find((offer) => offer.source === "b")?.durationText, undefined);
 
   const fastest = applyFlightSortMode(offers, "fastest");
-  assert.deepEqual(fastest.map((offer) => offer.source), ["a", "b", "noVariant", "google", "excluded"]);
+  assert.deepEqual(fastest.map((offer) => offer.source), ["a", "b", "noVariant", "google"]);
   assert.equal(fastest[0]?.productUrl, "https://example.test/400");
   for (const mode of SORT_MODES) assert.equal(applyFlightSortMode(offers, mode).length, offers.length);
   const hotels = [{ amount: 2 }, { amount: 1 }];

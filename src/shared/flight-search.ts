@@ -287,6 +287,15 @@ export function limitFlightCandidates<T extends FlightSortableCandidate>(candida
   return limited;
 }
 
+// Bagasjevalget står i søkets felles chips. Treffradene viser bare detaljene
+// som skiller avgangene; bagasjekrav kontrolleres før priser blir valgt.
+export function flightTooltipChipTexts(candidate: { durationText?: string; platform?: string }): string[] {
+  return [...new Set([
+    ...(candidate.durationText?.split(" · ") ?? []),
+    ...(candidate.platform?.split(/,\s*/) ?? []),
+  ])].filter((text) => !/bagasje|innsjekk|baggage|carry.?on|cabin.?bag|checked.?bag/i.test(text));
+}
+
 export type FlightSortVariant = {
   shopName: string;
   price: string;
@@ -301,13 +310,12 @@ export type FlightSortVariant = {
 
 type FlightSortableOffer = FlightSortableCandidate & {
   durationText?: string;
-  baggageExcluded?: boolean;
   alternatives?: FlightSortableCandidate[];
   flightSortVariants?: Partial<Record<"cheapest" | "fastest", FlightSortVariant>>;
 };
 
 // Bytter hver kildes rad til valgt sortering uten nye kall. Kilder uten varianten (f.eks. Google,
-// eller ukjent reisetid) beholder «Best». Bagasje som ikke er bekreftet, og rader uten pris, står sist.
+// eller ukjent reisetid) beholder «Best». Rader uten pris står sist.
 export function applyFlightSortMode<T extends FlightSortableOffer>(offers: T[], mode: FlightSortMode): T[] {
   if (mode === "best" || !offers.some((offer) => offer.flightSortVariants !== undefined)) return offers;
   const amountOf = (candidate: FlightSortableCandidate): number => candidate.sortAmount ?? candidate.amount;
@@ -327,8 +335,7 @@ export function applyFlightSortMode<T extends FlightSortableOffer>(offers: T[], 
         : selected;
     })
     .sort((left, right) => {
-      const excluded = Number(left.baggageExcluded === true) - Number(right.baggageExcluded === true);
-      return excluded !== 0 ? excluded : compare(left, right);
+      return compare(left, right);
     });
 }
 

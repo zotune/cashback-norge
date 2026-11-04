@@ -5,21 +5,29 @@ import { formatKr } from "./reward-calculation.js";
 import { getElectricitySupplier } from "./electricity-suppliers.js";
 export { getElectricitySupplier } from "./electricity-suppliers.js";
 
-export type ElectricitySearch = { localGridId: number; yearlyKwh: number; norgespris: boolean };
+export type ElectricitySearch = { localGridId: number; yearlyKwh: number; norgespris: boolean; municipality?: string; areaCode?: string };
 export type ElectricityPriceDetails = { monthlyFeeNok: number; addonOrePerKwh: number; yearlyKwh: number; monthlyKwh: number; period: string;
   scheme: "norgespris" | "stromstotte"; energyOrePerKwh: number; stromstotteMonthlyNok?: number; maximumYearlyKwh?: number; guaranteeMonths?: number;
-  conditionsText?: string; invoiceRequirement?: string };
+  conditionsText?: string; invoiceRequirement?: string; comparisonOnly?: boolean; municipality: string; areaCode: string; vatExempt: boolean };
 export type ElectricityLocalGrid = { id: number; name: string; areaCode: string };
 // Same anonymous example as the public portal's initial store (Oslo, 14 400 kWh).
 // Verified in its current public app on 2026-11-04. Norgespris is our labelled
 // default scenario; the portal itself starts with ordinary electricity subsidy.
 export const ELECTRICITY_EXAMPLE = { municipality: "Oslo", areaCode: "NO1", yearlyKwh: 14_400, norgespris: true } as const;
+// Public example municipalities, resolved against the source's current grid list.
+// Area rows are independent examples, never the visitor's location.
+export const ELECTRICITY_AREAS = [
+  { municipality: "Oslo", areaCode: "NO1" },
+  { municipality: "Kristiansand", areaCode: "NO2" },
+  { municipality: "Trondheim - Tråante", areaCode: "NO3" },
+  { municipality: "Tromsø", areaCode: "NO4" },
+  { municipality: "Bergen", areaCode: "NO5" },
+] as const;
 
 const API = "https://strom-api.forbrukerradet.no";
 const PORTAL = "https://www.forbrukerradet.no/strompris/";
 const REQUEST_TIMEOUT_MS = 15_000;
-export const ELECTRICITY_MIN_GUARANTEE_MONTHS = 6; // Portal defaults: long + medium.
-export const ELECTRICITY_MAX_OFFERS = 10;
+export const ELECTRICITY_MAX_OFFERS = 5;
 const INVOICE_REQUIREMENTS: Record<string, string> = { none: "", electronicInvoice: "Krever eFaktura", directDebit: "Krever AvtaleGiro", both: "Krever eFaktura og AvtaleGiro" };
 
 // Public JSON used by Forbrukerrådet's comparison page, verified without cookies/auth.
@@ -34,15 +42,21 @@ export function isElectricityPriceMatchUrl(value: string): boolean {
 export function isElectricitySearch(value: unknown): value is ElectricitySearch {
   return isRecord(value) && typeof value.norgespris === "boolean" && Number.isSafeInteger(value.localGridId) && (value.localGridId as number) > 0 &&
     (value.localGridId as number) < 100_000 && Number.isSafeInteger(value.yearlyKwh) &&
-    (value.yearlyKwh as number) >= 100 && (value.yearlyKwh as number) <= 100_000;
+    (value.yearlyKwh as number) >= 100 && (value.yearlyKwh as number) <= 100_000 &&
+    (value.municipality === undefined || typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100) &&
+    (value.areaCode === undefined || typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode));
 }
 
 export function isElectricityPriceDetails(value: unknown): value is ElectricityPriceDetails {
   return isRecord(value) && nonNegative(value.monthlyFeeNok) && nonNegative(value.addonOrePerKwh) &&
+    typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100 &&
+    typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode) &&
+    typeof value.vatExempt === "boolean" &&
     (value.scheme === "norgespris" || value.scheme === "stromstotte") && nonNegative(value.energyOrePerKwh) &&
     (value.stromstotteMonthlyNok === undefined || positive(value.stromstotteMonthlyNok)) &&
     (value.conditionsText === undefined || (typeof value.conditionsText === "string" && value.conditionsText.length <= 10_000)) &&
     (value.invoiceRequirement === undefined || (typeof value.invoiceRequirement === "string" && Object.values(INVOICE_REQUIREMENTS).includes(value.invoiceRequirement))) &&
+    (value.comparisonOnly === undefined || typeof value.comparisonOnly === "boolean") &&
     positive(value.monthlyKwh) && typeof value.period === "string" && value.period.length > 0 && value.period.length <= 40 &&
     (value.maximumYearlyKwh === undefined || positive(value.maximumYearlyKwh)) &&
     (value.guaranteeMonths === undefined || nonNegative(value.guaranteeMonths)) &&
@@ -66,6 +80,8 @@ export async function findElectricityPriceMatches(
 ): Promise<PriceMatchOffer[]> {
   if (!isElectricityPriceMatchUrl(message.url) || !isElectricitySearch(message.electricity)) return [];
   const { localGridId, yearlyKwh, norgespris } = message.electricity;
+  const municipality = message.electricity.municipality ?? ELECTRICITY_EXAMPLE.municipality;
+  const areaCode = message.electricity.areaCode ?? ELECTRICITY_EXAMPLE.areaCode;
   const url = `${API}/products/grid/${localGridId}?yearlyKwhConsumption=${yearlyKwh}&norgespris=${norgespris}&consumptionCode=35`;
   // At most two anonymous requests: selected scenario plus an optional ordinary
   // subsidy estimate. A failed secondary estimate must not hide Norgespris offers.
@@ -85,11 +101,13 @@ export async function findElectricityPriceMatches(
     return plan === undefined ? [] : [plan];
   }) : [];
   const period = now.toLocaleDateString("nb-NO", { timeZone: "Europe/Oslo", month: "long", year: "numeric" });
-  const shortlist = plans.filter((plan) => plan.guaranteeMonths >= ELECTRICITY_MIN_GUARANTEE_MONTHS)
-    .sort((a, b) => a.amount - b.amount || a.id - b.id)
-    .filter((plan, index, list) => list.findIndex((other) => other.id === plan.id) === index)
-    .slice(0, ELECTRICITY_MAX_OFFERS);
-  return shortlist.map((plan) => ({
+  const ranked = plans.sort((a, b) => a.amount - b.amount || a.id - b.id)
+    .filter((plan, index, list) => list.findIndex((other) => other.id === plan.id) === index);
+  const shortlist = ranked.slice(0, ELECTRICITY_MAX_OFFERS);
+  const currentSupplierId = getElectricitySupplier(message.url)!.id;
+  const listedIds = new Set(shortlist.map((plan) => plan.id));
+  const comparison = ranked.filter((plan) => plan.supplierId === currentSupplierId && !listedIds.has(plan.id)).slice(0, 3);
+  return [...shortlist, ...comparison].map((plan) => ({
     source: "forbrukerradet",
     sourceName: "Forbrukerrådet",
     productName: plan.supplier,
@@ -99,10 +117,12 @@ export async function findElectricityPriceMatches(
     price: `~${formatKr(plan.amount)} kr/mnd`,
     amount: plan.amount,
     currency: "NOK",
-    electricity: { monthlyFeeNok: plan.monthlyFee, addonOrePerKwh: plan.addon, yearlyKwh, monthlyKwh: plan.monthlyKwh, period, guaranteeMonths: plan.guaranteeMonths,
+    matchedCurrentMerchant: plan.supplierId === currentSupplierId,
+    electricity: { municipality, areaCode, vatExempt: plan.vatExemption, monthlyFeeNok: plan.monthlyFee, addonOrePerKwh: plan.addon, yearlyKwh, monthlyKwh: plan.monthlyKwh, period, guaranteeMonths: plan.guaranteeMonths,
       scheme: norgespris ? "norgespris" : "stromstotte", energyOrePerKwh: norgespris ? plan.norgesprisRate : plan.subsidizedSpotRate,
       ...(plan.conditionsText ? { conditionsText: plan.conditionsText } : {}),
       ...(plan.invoiceRequirement ? { invoiceRequirement: plan.invoiceRequirement } : {}),
+      ...(!listedIds.has(plan.id) ? { comparisonOnly: true } : {}),
       ...(() => {
         const other = subsidyPlans.find((p) => p.id === plan.id && p.name === plan.name && p.supplierId === plan.supplierId &&
           p.monthlyFee === plan.monthlyFee && p.addon === plan.addon && p.monthlyKwh === plan.monthlyKwh);
@@ -111,7 +131,7 @@ export async function findElectricityPriceMatches(
       ...(plan.maximumYearlyKwh !== null ? { maximumYearlyKwh: plan.maximumYearlyKwh } : {}) },
     details: [
       `${plan.supplier}: ${plan.name}`,
-      `Regneeksempel for ${ELECTRICITY_EXAMPLE.municipality} fra Forbrukerrådets strømprisportal.`,
+      `Regneeksempel for ${municipality} · ${areaCode} fra Forbrukerrådets strømprisportal.`,
       `${formatKr(plan.monthlyFee)} kr/mnd + ${formatKr(plan.addon)} øre/kWh. ${yearlyKwh.toLocaleString("nb-NO")} kWh/år.`,
       `Beregnet total strømpris for ${period}: ${formatKr(plan.amount)} kr, inkl. ${norgespris ? "Norgespris" : "spotpris og strømstøtte"}, påslag og månedsgebyr. ${plan.vatExemption ? "Uten mva. i valgt område." : "Inkl. mva."}`,
       `Timespot, etterskuddsvis, ingen bindingstid.${plan.guaranteeMonths > 0 ? ` Påslagsgaranti: ${plan.guaranteeMonths} mnd.` : ""}`,
@@ -119,7 +139,7 @@ export async function findElectricityPriceMatches(
       `Innrapporterte avtaledata fra Forbrukerrådet. Sist endret hos kilden: ${plan.updatedAt.slice(0, 10)}.`,
       plan.conditionsText,
       plan.invoiceRequirement,
-      `Utvalget utelater kampanjer og medlemsavtaler. Minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} måneders påslagsgaranti, som portalens standardfilter.`,
+      "Utvalget inkluderer alle garantiperioder. Kampanjer og medlemsavtaler er utelatt.",
     ].filter(Boolean).join("\n"),
   }));
 }
@@ -128,7 +148,7 @@ export function buildElectricityComparisonTooltip(offers: PriceMatchOffer[], err
   const example = offers[0]?.electricity;
   return [
     "Forbrukerrådet · strømavtaler",
-    `Regneeksempel: ${ELECTRICITY_EXAMPLE.municipality} · ${(example?.yearlyKwh ?? ELECTRICITY_EXAMPLE.yearlyKwh).toLocaleString("nb-NO")} kWh/år. Dette er ikke en beregning av din strømregning.`,
+    `Regneeksempel: ${example?.municipality ?? ELECTRICITY_EXAMPLE.municipality} · ${example?.areaCode ?? ELECTRICITY_EXAMPLE.areaCode} · ${(example?.yearlyKwh ?? ELECTRICITY_EXAMPLE.yearlyKwh).toLocaleString("nb-NO")} kWh/år. Dette er ikke en beregning av din strømregning.`,
     example ? `Beregnet total strømpris for ${example.period}, inkl. ${example.scheme === "norgespris" ? "Norgespris" : "spotpris og strømstøtte"}, påslag og månedsgebyr. Nettleie kommer i tillegg.` : "",
     offers.length > 0 ? ["Billigste sammenlignbare strømavtaler", ...offers.map((offer) => {
       const e = offer.electricity!;
@@ -138,8 +158,8 @@ export function buildElectricityComparisonTooltip(offers: PriceMatchOffer[], err
         e.stromstotteMonthlyNok !== undefined ? `Med vanlig strømstøtte: ~${formatKr(e.stromstotteMonthlyNok)} kr/mnd` : undefined,
         e.invoiceRequirement, e.conditionsText].filter(Boolean).join("\n");
     })].join("\n") : error || "Ingen sammenlignbare avtaler akkurat nå.",
-    `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen.`,
-    "Inkl. mva. Nettleie og eventuelt papirfakturagebyr kommer i tillegg. Månedsprisen er et estimat, ikke en prisgaranti.",
+    `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav. Alle garantiperioder er inkludert. Avtaler hos leverandøren på siden vises også til sammenligning. Kampanjer er utelatt; øvrige vilkår står ved avtalen.`,
+    `${example?.vatExempt ? "Uten mva. i kommuneeksemplet." : "Inkl. mva."} Nettleie og eventuelt papirfakturagebyr kommer i tillegg. Månedsprisen er et estimat, ikke en prisgaranti.`,
     "Kilde: innrapporterte avtaledata fra Forbrukerrådet.",
     "Standardavtaler med kort påslagsgaranti finnes under «Under 6 måneder» i portalens garantifilter.",
   ].filter(Boolean);
@@ -158,6 +178,7 @@ export function summarizeElectricityComparison(offers: PriceMatchOffer[]): Price
       productName: offer.productName,
       ...(offer.offerUrl !== undefined ? { offerUrl: offer.offerUrl } : {}),
       ...(offer.electricity !== undefined ? { electricity: offer.electricity } : {}),
+      matchedCurrentMerchant: offer.matchedCurrentMerchant === true,
       amount: offer.amount,
       price: offer.price,
       currency: offer.currency,
@@ -187,6 +208,10 @@ function readPlan(value: unknown, yearlyKwh: number, now: Date) {
     !isRecord(value.billing) || value.billing.frequency !== 1 || value.billing.unit !== "month") return undefined;
   const orderUrl = safeOrderUrl(value.orderUrl);
   if (orderUrl === undefined) return undefined;
+  // Some suppliers report linkedProduct=null even though their written terms
+  // explicitly require buying another product. Ordinary examples must not rank
+  // these as available without that additional purchase.
+  if (typeof conditions.otherConditions === "string" && /(?:betinger|forutsetter|krever)[^.]{0,200}\bkjøp(?:er)?\b/i.test(conditions.otherConditions)) return undefined;
   const guarantee = isRecord(addonPrice) && nonNegative(addonPrice.addonPriceMinimumFixedFor) ? addonPrice.addonPriceMinimumFixedFor : 0;
   const guaranteeMonths = isRecord(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "year" ? guarantee * 12 :
     isRecord(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "month" ? guarantee : 0;

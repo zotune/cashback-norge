@@ -1,0 +1,2605 @@
+{
+  "1:3": {
+    "data": [
+      {
+        "id": 506,
+        "slug": "5-gb-2",
+        "name": "5 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "19900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "5000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 19900
+            }
+          ],
+          "total": 19900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 505,
+        "slug": "18-gb-1",
+        "name": "18 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "18000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29900
+            }
+          ],
+          "total": 29900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "5:2": {
+    "data": [
+      {
+        "id": 474,
+        "slug": "6-gb",
+        "name": "6 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "19900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "6000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 19900
+            }
+          ],
+          "total": 19900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Ved oppbrukt datamengde i løpet av måneden blir hastigheten strupet. Du kan fortsatt surfe gratis, med veldig lav hastighet. For å bruke mer data med normal hastighet inneværende måned må man kjøpe datapakker;",
+        "operator": {
+          "id": 5,
+          "slug": "chilimobil",
+          "name": "Chilimobil",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 39,
+        "slug": "8-gb",
+        "name": "8 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 7,
+            "slug": "overfakturering",
+            "name": "Overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "22900",
+            "callMinutesIncluded": "10000",
+            "callMinutePrice": "39",
+            "callStartupPrice": "39",
+            "messagesIncluded": "10000",
+            "messagePrice": "39",
+            "dataIncluded": "8000",
+            "dataPrice": "99",
+            "dataExhaustedMaxMonthlyPrice": "39900",
+            "dataExhaustedSpeedLimit": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "300000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 22900
+            }
+          ],
+          "total": 22900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Databruk utover inkludert mengde koster 0.99,- pr. MB inntil en maksgrense på 399,-. Fjordkraft tilbyr rabatterte priser om du også er strømkunde av selskapet.",
+        "operator": {
+          "id": 6,
+          "slug": "fjordkraft-mobil",
+          "name": "Fjordkraft Mobil",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 75,
+        "slug": "folkepakka-8-gb",
+        "name": "FolkePakka 8 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 7,
+            "slug": "overfakturering",
+            "name": "Overfakturering"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "22900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "8000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 22900
+            }
+          ],
+          "total": 22900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Når du går tom for mobildata kan du enten automatisk få en datapakke på 1 GB til redusert pris (79 kr). Du blir varslet når pakken aktiveres. Alternativt går hastigheten ned til 64 Kbit/s. Du kan kjøpe datapakker i tillegg, men da til full pris.",
+        "operator": {
+          "id": 10,
+          "slug": "onecall",
+          "name": "OneCall",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 2
+    }
+  },
+  "5:3": {
+    "data": [
+      {
+        "id": 506,
+        "slug": "5-gb-2",
+        "name": "5 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "19900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "5000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 19900
+            }
+          ],
+          "total": 19900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 505,
+        "slug": "18-gb-1",
+        "name": "18 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "18000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29900
+            }
+          ],
+          "total": 29900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "10:2": {
+    "data": [
+      {
+        "id": 219,
+        "slug": "20gb",
+        "name": "20GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "24900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "20000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 24900
+            }
+          ],
+          "total": 24900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Ved oppbrukt datamengde i løpet av måneden blir hastigheten strupet. Du kan fortsatt surfe gratis, med veldig lav hastighet. For å bruke mer data med normal hastighet inneværende måned må man kjøpe datapakker.",
+        "operator": {
+          "id": 5,
+          "slug": "chilimobil",
+          "name": "Chilimobil",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 419,
+        "slug": "folkepakka-158-gb",
+        "name": "FolkePakka 15,8 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "27900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "15800",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 27900
+            }
+          ],
+          "total": 27900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Når du går tom for mobildata kan du enten automatisk få en datapakke på 1 GB til redusert pris (79 kr). Du blir varslet når pakken aktiveres. Alternativt går hastigheten ned til 64 Kbit/s. Du kan kjøpe datapakker i tillegg, men da til full pris.",
+        "operator": {
+          "id": 10,
+          "slug": "onecall",
+          "name": "OneCall",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 528,
+        "slug": "fri-data-1",
+        "name": "Fri Data",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29800",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "10000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29800
+            }
+          ],
+          "total": 29800,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Med Chili Fri Data får du 10 Mbit/s, deretter 3 Mbit/s. Du kan dele data til dine egne enheter. Ekstra SIM er mulig å kjøpe i tillegg",
+        "operator": {
+          "id": 5,
+          "slug": "chilimobil",
+          "name": "Chilimobil",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 2
+    }
+  },
+  "10:3": {
+    "data": [
+      {
+        "id": 505,
+        "slug": "18-gb-1",
+        "name": "18 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "18000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29900
+            }
+          ],
+          "total": 29900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 522,
+        "slug": "iceung-max-med-netflix",
+        "name": "iceUng Max med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "100000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceUng Max for deg under 29 år har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "20:1": {
+    "data": [
+      {
+        "id": 186,
+        "slug": "1-om-dagen",
+        "name": "1 om dagen",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "27800",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "30000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "40",
+            "upperSpeedLimit": "10000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 27800
+            }
+          ],
+          "total": 27800,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Abonnementet gir deg 1 GB data hver dag. Bruker du opp dagskvoten på 1 GB betaler du ikke noe mer, men hastigheten reduseres til 40 kbit/s ut dagen. Trenger du mer data resten av dagen, kan du kjøpe dette til 19 kroner per GB, inntil fire ganger i døgnet.",
+        "operator": {
+          "id": 1,
+          "slug": "happybytes",
+          "name": "Happybytes",
+          "network": {
+            "id": 1,
+            "name": "Telenor"
+          }
+        }
+      },
+      {
+        "id": 536,
+        "slug": "trondermobil-fri-data",
+        "name": "Trøndermobil Fri Data",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29700",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "15000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29700
+            }
+          ],
+          "total": 29700,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Ubegrenset data med inntil 15 Mbit/s. Etter 100 GB reduseres hastigheten til 3 Mbit/s. Inntil 64 GB kan brukes i EU/EØS per måned. Abonnementet har ikke data rollover.",
+        "operator": {
+          "id": 26,
+          "slug": "trondermobil",
+          "name": "Trøndermobil",
+          "network": {
+            "id": 1,
+            "name": "Telenor"
+          }
+        }
+      },
+      {
+        "id": 517,
+        "slug": "fri-data-10-mbits",
+        "name": "Fri Data 10 Mbit/s",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29800",
+            "callMinutesIncluded": "10000",
+            "callMinutePrice": "49",
+            "callStartupPrice": "49",
+            "messagesIncluded": "10000",
+            "messagePrice": "49",
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "10000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29800
+            }
+          ],
+          "total": 29800,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Hastighet på 10 Mbit/s. Du kan bruke 40GB i EU/EØS. Du kan ha opptil 5 ekstra Data-SIM og 3 Tvilling-SIM tilknyttet samme nummer. Velg mellom fysisk SIM eller eSIM.\r\nAlle digitale utgaver av Dagbladet, Se og Hør, KK, Allers, Vakre Hjem & Interiør, VI OVER 60, Magasinet og PåTV er inkludert i abonnementet. Du får også 4 måneder plussabonnement hos Dagbladet, Elbil24, Vi.no, KK og Se og Hør som velkomstgave.\r\nAlle digitale utgaver av Dagbladet, Se og Hør, KK, Allers, Vakre Hjem &amp; Interiør, VI OVER 60.",
+        "operator": {
+          "id": 24,
+          "slug": "plussmobil",
+          "name": "PlussMobil",
+          "network": {
+            "id": 1,
+            "name": "Telenor"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 2
+    }
+  },
+  "20:3": {
+    "data": [
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 522,
+        "slug": "iceung-max-med-netflix",
+        "name": "iceUng Max med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "100000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceUng Max for deg under 29 år har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 521,
+        "slug": "icemax-med-netflix",
+        "name": "iceMax med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "44900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 44900
+            }
+          ],
+          "total": 44900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "30:2": {
+    "data": [
+      {
+        "id": 528,
+        "slug": "fri-data-1",
+        "name": "Fri Data",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29800",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "10000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29800
+            }
+          ],
+          "total": 29800,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Med Chili Fri Data får du 10 Mbit/s, deretter 3 Mbit/s. Du kan dele data til dine egne enheter. Ekstra SIM er mulig å kjøpe i tillegg",
+        "operator": {
+          "id": 5,
+          "slug": "chilimobil",
+          "name": "Chilimobil",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 455,
+        "slug": "fri-data-basis-10mbits",
+        "name": "Fri data basis (10mbit/s)",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "10000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29900
+            }
+          ],
+          "total": 29900,
+          "meetsUsageRequirements": true
+        },
+        "comment": null,
+        "operator": {
+          "id": 6,
+          "slug": "fjordkraft-mobil",
+          "name": "Fjordkraft Mobil",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 361,
+        "slug": "folkepakka-fri-data-10-mbps",
+        "name": "FolkePakka fri data (10 Mbps)",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 7,
+            "slug": "overfakturering",
+            "name": "Overfakturering"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          },
+          {
+            "id": 15,
+            "slug": "wifi-tale",
+            "name": "Wifi tale"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "10000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "10 mbit/s hastighet inntil 100 GB, deretter 3 mbit/s. I EU/EØS kan du bruke 35 GB, data koster 0,037 kr per MB etter det",
+        "operator": {
+          "id": 10,
+          "slug": "onecall",
+          "name": "OneCall",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 2
+    }
+  },
+  "30:3": {
+    "data": [
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 522,
+        "slug": "iceung-max-med-netflix",
+        "name": "iceUng Max med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "100000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceUng Max for deg under 29 år har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 521,
+        "slug": "icemax-med-netflix",
+        "name": "iceMax med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "44900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 44900
+            }
+          ],
+          "total": 44900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "50:3": {
+    "data": [
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 522,
+        "slug": "iceung-max-med-netflix",
+        "name": "iceUng Max med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "100000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceUng Max for deg under 29 år har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 521,
+        "slug": "icemax-med-netflix",
+        "name": "iceMax med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "44900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 44900
+            }
+          ],
+          "total": 44900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "100:3": {
+    "data": [
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert"
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS"
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 522,
+        "slug": "iceung-max-med-netflix",
+        "name": "iceUng Max med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "100000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceUng Max for deg under 29 år har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 521,
+        "slug": "icemax-med-netflix",
+        "name": "iceMax med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "44900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 44900
+            }
+          ],
+          "total": 44900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "slug": "ice",
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "broadband:2": {
+    "data": [
+      {
+        "id": 30,
+        "slug": "10-gb",
+        "name": "10 GB",
+        "type": "mobile-broadband-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "data_only",
+          "attributes": {
+            "monthlyFee": "22900",
+            "dataIncluded": "10000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "120",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 22900
+            }
+          ],
+          "total": 22900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Når datapakken er brukt opp reduseres hastigheten til 120 Kb/s, men du betaler ikke noe ekstra for videre bruk.",
+        "operator": {
+          "id": 19,
+          "slug": "telio",
+          "name": "Telio",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 17,
+        "slug": "10-gb",
+        "name": "10 GB",
+        "type": "mobile-broadband-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "data_only",
+          "attributes": {
+            "monthlyFee": "24900",
+            "dataIncluded": "10000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 24900
+            }
+          ],
+          "total": 24900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Overstiger bruken 1 GB mer enn det inkluderte innenfor en måned, kan hastigheten reduseres til 64 kbit/sek. Du kan og kjøpe ekstra datapakker. Dataen er kun tilgjengelig i Norge.",
+        "operator": {
+          "id": 10,
+          "slug": "onecall",
+          "name": "OneCall",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      },
+      {
+        "id": 50,
+        "slug": "10gb",
+        "name": "10GB",
+        "type": "mobile-broadband-plan",
+        "features": [
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover"
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering"
+          }
+        ],
+        "pricingModel": {
+          "type": "data_only",
+          "attributes": {
+            "monthlyFee": "24900",
+            "dataIncluded": "10000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "64",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 24900
+            }
+          ],
+          "total": 24900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Bruker du opp inkludert data kan du kjøpe ekstra datapakker, alternativt blir hastigheten redusert til 6 Mbit/s. Inkludert bruk i Norge, Norden og Baltikum.",
+        "operator": {
+          "id": 4,
+          "slug": "telia",
+          "name": "Telia",
+          "network": {
+            "id": 2,
+            "name": "Telia"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  },
+  "0:3": {
+    "data": [
+      {
+        "id": 506,
+        "slug": "5-gb-2",
+        "name": "5 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover",
+            "seo_title": null,
+            "seo_description": null
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "19900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "5000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 19900
+            }
+          ],
+          "total": 19900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 505,
+        "slug": "18-gb-1",
+        "name": "18 GB",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover",
+            "seo_title": null,
+            "seo_description": null
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "29900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "18000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "128",
+            "upperSpeedLimit": null,
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 29900
+            }
+          ],
+          "total": 29900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "For deg over 29 år.",
+        "operator": {
+          "id": 7,
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 388,
+        "slug": "icemax",
+        "name": "iceMax",
+        "type": "mobile-plan",
+        "features": [
+          {
+            "id": 2,
+            "slug": "eu-inkludert",
+            "name": "EU inkludert",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 3,
+            "slug": "fri-tale-sms",
+            "name": "Fri tale / SMS",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 4,
+            "slug": "data-rollover",
+            "name": "Data Rollover",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 6,
+            "slug": "familiefaktura",
+            "name": "Familie-faktura",
+            "seo_title": null,
+            "seo_description": null
+          },
+          {
+            "id": 8,
+            "slug": "ingen-overfakturering",
+            "name": "Ingen overfakturering",
+            "seo_title": null,
+            "seo_description": null
+          }
+        ],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "dataExhaustedMaxDailyPrice": null,
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "IceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 522,
+        "slug": "iceung-max-med-netflix",
+        "name": "iceUng Max med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "39900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "100000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 39900
+            }
+          ],
+          "total": 39900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceUng Max for deg under 29 år har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      },
+      {
+        "id": 521,
+        "slug": "icemax-med-netflix",
+        "name": "iceMax med Netflix",
+        "type": "mobile-plan",
+        "features": [],
+        "pricingModel": {
+          "type": "regular",
+          "attributes": {
+            "monthlyFee": "44900",
+            "callMinutesIncluded": null,
+            "callMinutePrice": null,
+            "callStartupPrice": null,
+            "messagesIncluded": null,
+            "messagePrice": null,
+            "dataIncluded": "100000",
+            "dataPrice": null,
+            "dataExhaustedMaxDailyPrice": null,
+            "dataExhaustedMaxMonthlyPrice": null,
+            "dataExhaustedSpeedLimit": "3000",
+            "upperSpeedLimit": "100000",
+            "dataBoosts": []
+          }
+        },
+        "estimatedInvoice": {
+          "lineItems": [
+            {
+              "type": "monthly_fee",
+              "label": "Fast månedspris",
+              "value": 44900
+            }
+          ],
+          "total": 44900,
+          "meetsUsageRequirements": true
+        },
+        "comment": "Netflix inkludert!\r\niceMax har 100 GB inkludert med en hastighet på opptil 100 mbit/s, bruker du opp dette vil hastigheten nedjusteres til 3 mbit/s. 45 GB i EU/EØS.",
+        "operator": {
+          "id": 7,
+          "name": "Ice",
+          "network": {
+            "id": 3,
+            "name": "ICE"
+          }
+        }
+      }
+    ],
+    "meta": {
+      "last_page": 1
+    }
+  }
+}

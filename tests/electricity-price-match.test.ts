@@ -20,7 +20,7 @@ test("electricity: first page load searches automatically, without user input, a
   const comparison = createElectricityComparison({
     getUrl: () => "https://klarkraft.no/",
     requestJson: async (url) => { if (url.includes("electricity-suppliers.json")) return JSON.parse(readFileSync(new URL("../data/electricity-suppliers.json", import.meta.url), "utf8")); gridsCalls++; return [{ id: 5, name: "Oslo", areaCode: "NO1" }]; },
-    findOffers: async (query) => { searchCalls++; assert.deepEqual(query.electricity, message.electricity); return findElectricityPriceMatches(query, async () => fixture(), NOW); },
+    findOffers: async (query) => { searchCalls++; assert.deepEqual(query.electricity, { ...message.electricity, municipality: "Oslo", areaCode: "NO1" }); return findElectricityPriceMatches(query, async () => fixture(), NOW); },
   });
   assert.equal(comparison.isSupported(), true);
   assert.equal((await comparison.getOffers()).length, 1);
@@ -29,9 +29,9 @@ test("electricity: first page load searches automatically, without user input, a
   assert.equal(best.amount, 729);
   assert.equal(best.price, "~729 kr/mnd");
   assert.equal(best.productName, "Agva Kraft");
-  assert.equal(best.alternatives?.length, 4);
+  assert.equal(best.alternatives?.length, 5);
   assert.match(best.details!, /total strømpris for november 2026/);
-  assert.doesNotMatch(best.details!, /besparelse|lavere|Klarkraft/);
+  assert.doesNotMatch(best.details!, /besparelse|lavere/);
   assert.equal(gridsCalls, 1);
   assert.equal(searchCalls, 1);
 });
@@ -46,7 +46,7 @@ test("electricity: defaults to Norgespris, keeps the ordinary subsidy estimate a
   }, NOW);
   assert.equal(calls.length, 2);
   assert.equal(calls[0], "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35");
-  assert.deepEqual(offers.map((offer) => offer.amount), [729, 729, 733, 763]);
+  assert.deepEqual(offers.map((offer) => offer.amount), [729, 729, 733, 763, 808]);
   assert.equal(offers[0]!.electricity?.addonOrePerKwh, 0);
   assert.equal(offers[0]!.electricity?.monthlyFeeNok, 15); // incl. VAT, not 12
   assert.equal(offers[0]!.electricity?.monthlyKwh, 1427.04);
@@ -58,7 +58,7 @@ test("electricity: defaults to Norgespris, keeps the ordinary subsidy estimate a
   assert.equal(offers[0]!.productUrl, "https://www.forbrukerradet.no/strompris/");
   assert.equal(offers[0]!.source, "forbrukerradet");
   const tooltip = buildElectricityComparisonTooltip(offers).join("\n");
-  assert.match(tooltip, /Oslo · 14\s400 kWh\/år/);
+  assert.match(tooltip, /Oslo · NO1 · 14\s400 kWh\/år/);
   assert.match(tooltip, /Agva Kraft/);
   assert.match(tooltip, /15 kr\/mnd gebyr · 0 øre\/kWh påslag/);
   assert.match(tooltip, /inkl\. Norgespris, påslag og månedsgebyr/);
@@ -132,12 +132,18 @@ test("electricity: excludes restricted, expired and unpriced contracts", async (
     (p: any) => { p.currentPrice.gridTariff = { amount: 300 }; },
     (p: any) => { p.billing.frequency = 3; },
     (p: any) => { p.orderUrl = "javascript:alert(1)"; },
-    (p: any) => { p.addonPrice.addonPriceMinimumFixedFor = 5; },
   ]) {
-    const rows = fixture().slice(0, 2);
-    mutate(rows[1]);
+    const rows = fixture().slice(1, 2);
+    mutate(rows[0]);
     const offers = await findElectricityPriceMatches(message, async () => rows, NOW);
     assert.equal(offers.length, 0);
+  }
+});
+
+test("electricity: written mandatory purchases override a missing linked-product flag", async () => {
+  for (const text of ["Avtalen betinger at du kjøper Varmepakken fra vår samarbeidspartner.", "Avtalen betinger kjøp av Varmepakken fra vår samarbeidspartner."]) {
+    const rows = fixture(); rows.forEach((row: any) => { row.conditions.otherConditions = text; row.conditions.linkedProduct = null; });
+    assert.deepEqual(await findElectricityPriceMatches(message, async () => rows, NOW), []);
   }
 });
 
@@ -156,12 +162,25 @@ test("electricity: accepts explicit free fees, handles VAT exemption and exact u
 
 test("electricity: the cheapest list is independent of the current supplier and deduplicates contracts", async () => {
   const rows = fixture();
-  const offers = await findElectricityPriceMatches(message, async () => rows.slice(1), NOW);
-  assert.deepEqual(offers.map((offer) => offer.amount), [729, 729, 733, 763]);
-  assert.ok(offers.every((offer) => offer.matchedCurrentMerchant === undefined));
+  const offers = await findElectricityPriceMatches(message, async () => rows, NOW);
+  assert.deepEqual(offers.map((offer) => offer.amount), [729, 729, 733, 763, 808]);
+  assert.ok(offers.some((offer) => offer.matchedCurrentMerchant === true));
   assert.deepEqual(await findElectricityPriceMatches(message, async () => [...rows, rows[1]], NOW), offers);
   const many = Array.from({ length: 20 }, (_, i) => ({ ...rows[1], id: 20000 + i }));
-  assert.equal((await findElectricityPriceMatches(message, async () => many, NOW)).length, 10);
+  assert.equal((await findElectricityPriceMatches(message, async () => many, NOW)).length, 5);
+});
+
+test("electricity: includes guarantees under six months and retains the visited supplier outside the top five", async () => {
+  const rows = fixture();
+  const cheaper = Array.from({ length: 12 }, (_, i) => ({ ...rows[1], id: 30000 + i }));
+  const offers = await findElectricityPriceMatches(message, async () => [rows[0], ...cheaper], NOW);
+  assert.equal(offers.length, 6);
+  const current = offers.at(-1)!;
+  assert.equal(current.shopName, "Standard spotavtale privat");
+  assert.equal(current.amount, 808);
+  assert.equal(current.matchedCurrentMerchant, true);
+  assert.equal(current.electricity?.guaranteeMonths, 1);
+  assert.equal(current.electricity?.comparisonOnly, true);
 });
 
 test("electricity: guarded public-page pipeline and runtime message validation", async () => {
@@ -174,7 +193,7 @@ test("electricity: guarded public-page pipeline and runtime message validation",
   let calls = 0;
   assert.deepEqual(await findPriceMatches({ ...message, electricity: undefined }, async () => { calls++; return fixture(); }), []);
   assert.equal(calls, 0);
-  assert.equal((await findPriceMatches(message, async () => fixture())).at(-1)?.amount, 763);
+  assert.equal((await findPriceMatches(message, async () => fixture())).at(-1)?.amount, 808);
 });
 
 test("electricity: Fjordkraft and Norwegian Fortum pages show the same cheapest market shortlist", async () => {
@@ -183,8 +202,8 @@ test("electricity: Fjordkraft and Norwegian Fortum pages show the same cheapest 
     assert.equal(isElectricityPriceMatchUrl(url), true);
     const offers = await findElectricityPriceMatches({ ...message, url }, async () => [...fixture(), ...suppliersFixture()], NOW);
     assert.equal(offers[0]!.amount, 729);
-    assert.ok(offers.every((offer) => offer.matchedCurrentMerchant === undefined));
-    assert.deepEqual(await findElectricityPriceMatches({ ...message, url }, async () => fixture(), NOW), offers);
+    const withoutOwnPlan = await findElectricityPriceMatches({ ...message, url }, async () => fixture(), NOW);
+    assert.deepEqual(offers.slice(0, 4).map((offer) => offer.amount), withoutOwnPlan.slice(0, 4).map((offer) => offer.amount));
   }
   for (const url of ["https://minside.fjordkraft.no/", "https://www.fjordkraft.no/mobil/", 
     "https://www.fortum.com/se/",  "https://www.fortum.com.evil.example/no/strom"]) {
@@ -199,9 +218,9 @@ test("electricity: page navigation refreshes the comparison for the new URL", as
     requestJson: async () => [{ id: 5, name: "Oslo", areaCode: "NO1" }],
     findOffers: async (query) => { calls++; return findElectricityPriceMatches(query, async () => [...fixture(), ...suppliersFixture()], NOW); },
   });
-  assert.equal((await comparison.getOffers())[0]!.alternatives?.at(-1)?.amount, 763);
+  assert.equal((await comparison.getOffers())[0]!.amount, 729);
   url = "https://www.fortum.com/no/strom";
-  assert.equal((await comparison.getOffers())[0]!.alternatives?.at(-1)?.amount, 763);
+  assert.equal((await comparison.getOffers())[0]!.amount, 729);
   assert.equal(calls, 2);
 });
 
@@ -223,4 +242,37 @@ test("electricity: shared source chip preserves the supplied blue in both themes
   assert.equal(buildProviderMeta().forbrukerradet?.name, "Forbrukerrådet");
   assert.deepEqual(PROVIDER_COLORS.bytt, { bg: "#0075f5", fg: "#ffffff", preserveInDark: true });
   assert.equal(buildProviderMeta().bytt?.name, "Bytt.no");
+});
+
+test("electricity: automatically requests all five source-resolved areas and keeps their examples distinct", async () => {
+  const grids = JSON.parse(readFileSync(new URL("./fixtures/forbrukerradet-grids.json", import.meta.url), "utf8"));
+  const queries: GetPriceMatchForProductMessage[] = [];
+  const comparison = createElectricityComparison({
+    getUrl: () => message.url,
+    requestJson: async (url) => url.includes("electricity-suppliers.json") ? JSON.parse(readFileSync(new URL("../data/electricity-suppliers.json", import.meta.url), "utf8")) : grids,
+    findOffers: async (query) => { queries.push(query); return findElectricityPriceMatches(query, async () => fixture(), NOW); },
+  });
+  const offers = await comparison.getOffers();
+  assert.deepEqual(queries.map((q) => q.electricity!.localGridId), [5, 212, 249, 416, 511]);
+  assert.deepEqual(offers.map((o) => o.electricity!.areaCode), ["NO1", "NO2", "NO3", "NO4", "NO5"]);
+  assert.equal(offers.at(-1)!.electricity!.municipality, "Bergen");
+  assert.match(offers.at(-1)!.details!, /Bergen · NO5/);
+  assert.ok(offers.at(-1)!.alternatives!.every((a) => a.electricity?.municipality === "Bergen" && a.electricity?.areaCode === "NO5"));
+  await comparison.getOffers(); assert.equal(queries.length, 5);
+});
+
+test("electricity: one area failure preserves other areas and source rate limits stop further lookups", async () => {
+  const grids = JSON.parse(readFileSync(new URL("./fixtures/forbrukerradet-grids.json", import.meta.url), "utf8"));
+  let count = 0;
+  const comparison = createElectricityComparison({
+    getUrl: () => message.url,
+    requestJson: async (url) => url.includes("electricity-suppliers.json") ? undefined : grids,
+    findOffers: async (query) => { count++; if (query.electricity!.areaCode === "NO2") throw new Error("HTTP 500"); return findElectricityPriceMatches(query, async () => fixture(), NOW); },
+  });
+  const offers = await comparison.getOffers();
+  assert.equal(offers.length, 4); assert.equal(count, 5); assert.match(offers[0]!.details!, /NO2: HTTP 500/);
+  count = 0;
+  const limited = createElectricityComparison({ getUrl: () => message.url, requestJson: async () => grids,
+    findOffers: async () => { count++; throw new Error("HTTP 429"); } });
+  assert.deepEqual(await limited.getOffers(), []); assert.equal(count, 1); assert.match(limited.getError(), /HTTP 429/);
 });

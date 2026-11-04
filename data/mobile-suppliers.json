@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "source": "https://www.tek.no/mobilabonnement/api",
+  "generatedAt": "2026-11-04T22:32:00.717078+00:00",
+  "suppliers": [
+    {
+      "id": 5,
+      "name": "Chilimobil",
+      "hostname": "chilimobil.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://chilimobil.no/"
+    },
+    {
+      "id": 6,
+      "name": "Fjordkraft Mobil",
+      "hostname": "fjordkraft.no",
+      "path": "/mobil",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://fjordkraft.no/mobil"
+    },
+    {
+      "id": 1,
+      "name": "Happybytes",
+      "hostname": "happybytes.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://happybytes.no/"
+    },
+    {
+      "id": 7,
+      "name": "Ice",
+      "hostname": "ice.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://ice.no/"
+    },
+    {
+      "id": 28,
+      "name": "Lyca Mobile",
+      "hostname": "lyca-mobile.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://lyca-mobile.no/"
+    },
+    {
+      "id": 9,
+      "name": "MyCall",
+      "hostname": "mycall.no",
+      "path": "/",
+      "evidence": "verified-site",
+      "supplierUrl": "https://mycall.no/"
+    },
+    {
+      "id": 10,
+      "name": "OneCall",
+      "hostname": "onecall.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://onecall.no/"
+    },
+    {
+      "id": 24,
+      "name": "PlussMobil",
+      "hostname": "plussmobil.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://plussmobil.no/"
+    },
+    {
+      "id": 12,
+      "name": "Saga Mobil",
+      "hostname": "sagamobil.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://sagamobil.no/"
+    },
+    {
+      "id": 14,
+      "name": "Talkmore",
+      "hostname": "talkmore.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://talkmore.no/"
+    },
+    {
+      "id": 15,
+      "name": "Telenor",
+      "hostname": "telenor.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://telenor.no/"
+    },
+    {
+      "id": 4,
+      "name": "Telia",
+      "hostname": "telia.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://telia.no/"
+    },
+    {
+      "id": 27,
+      "name": "Verimo",
+      "hostname": "verimo.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://verimo.no/"
+    },
+    {
+      "id": 26,
+      "name": "Trøndermobil",
+      "hostname": "xn--trndermobil-hgb.no",
+      "path": "/",
+      "evidence": "tek-destination",
+      "supplierUrl": "https://xn--trndermobil-hgb.no/"
+    },
+    {
+      "id": 11,
+      "name": "Xplora",
+      "hostname": "xplora.com",
+      "path": "/",
+      "evidence": "verified-site",
+      "supplierUrl": "https://xplora.com/"
+    },
+    {
+      "id": 11,
+      "name": "Xplora",
+      "hostname": "xplora.no",
+      "path": "/",
+      "evidence": "verified-site",
+      "supplierUrl": "https://xplora.no/"
+    }
+  ]
+}

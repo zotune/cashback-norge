@@ -1,3 +1,4 @@
+import { loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers.js";
 import {
   type CashbackIndex,
   findOffersForHostname,
@@ -189,6 +190,10 @@ async function findPriceMatchForProduct(
       read: async () => (await chrome.storage.local.get(ELECTRICITY_SUPPLIER_CACHE_KEY))[ELECTRICITY_SUPPLIER_CACHE_KEY],
       write: async (catalog) => { await chrome.storage.local.set({ [ELECTRICITY_SUPPLIER_CACHE_KEY]: catalog }); },
     });
+    if (message.mobile === true) await loadMobileSuppliers(undefined, {
+      read: async () => (await chrome.storage.local.get(MOBILE_SUPPLIER_CACHE_KEY))[MOBILE_SUPPLIER_CACHE_KEY],
+      write: async (catalog) => { await chrome.storage.local.set({ [MOBILE_SUPPLIER_CACHE_KEY]: catalog }); },
+    });
     const offers = await findPriceMatches(message);
     return { ok: true, ...(offers[0] !== undefined ? { offer: offers[0], offers } : {}) };
   } catch (error) {
@@ -237,6 +242,7 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
   const supportedHosts = new Set([
     "cashbacknorge.no",
     "strom-api.forbrukerradet.no",
+    "www.tek.no",
     "open.er-api.com",
     "api.travelpayouts.com",
     "www.finn.no",
@@ -257,6 +263,11 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     return { ok: false, reason: "Unsupported host" };
   }
 
+  const isMobileRequest = parsedUrl.hostname === "www.tek.no";
+  if (isMobileRequest && (parsedUrl.protocol !== "https:" || parsedUrl.port || (message.method ?? "GET") !== "GET" || message.body !== undefined ||
+    !/^\/mobilabonnement\/api\/(?:plans|mobile-broadband-plans)$/.test(parsedUrl.pathname))) {
+    return { ok: false, reason: "Unsupported mobile comparison request" };
+  }
   const isElectricityRequest = parsedUrl.hostname === "strom-api.forbrukerradet.no";
   const isCatalogRequest = parsedUrl.hostname === "cashbacknorge.no";
   if (isCatalogRequest && (parsedUrl.protocol !== "https:" || parsedUrl.port || parsedUrl.pathname !== "/electricity-suppliers.json" ||
@@ -284,7 +295,7 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     if (message.headers !== undefined) init.headers = message.headers;
     if (message.body !== undefined) init.body = message.body;
     if (message.credentials !== undefined) init.credentials = message.credentials;
-    if (isElectricityRequest || isCatalogRequest) {
+    if (isElectricityRequest || isCatalogRequest || isMobileRequest) {
       init.credentials = "omit";
       init.headers = { Accept: "application/json" };
       init.signal = AbortSignal.timeout(15_000);

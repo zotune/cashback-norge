@@ -36,6 +36,7 @@ const USERSCRIPT_BANNER = `\
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
 // @connect      cashbacknorge.no
+// @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
 // @connect      www.pokepris.no
 // @connect      pokepris.no

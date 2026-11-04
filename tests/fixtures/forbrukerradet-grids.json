@@ -1,0 +1,27 @@
+[
+  {
+    "id": 5,
+    "name": "Oslo",
+    "areaCode": "NO1"
+  },
+  {
+    "id": 212,
+    "name": "Kristiansand",
+    "areaCode": "NO2"
+  },
+  {
+    "id": 249,
+    "name": "Trondheim - Tråante",
+    "areaCode": "NO3"
+  },
+  {
+    "id": 416,
+    "name": "Tromsø",
+    "areaCode": "NO4"
+  },
+  {
+    "id": 511,
+    "name": "Bergen",
+    "areaCode": "NO5"
+  }
+]

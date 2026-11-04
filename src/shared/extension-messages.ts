@@ -5,6 +5,7 @@ import {
   isProviderMeta,
   isRecord,
 } from "./cashback.js";
+import type { MobilePriceDetails } from "./mobile-price-match.js";
 import type { KiwiSortPrices } from "./flight-search.js";
 import { isElectricitySearch, type ElectricitySearch, type ElectricityPriceDetails } from "./electricity-price-match.js";
 import type {
@@ -34,6 +35,7 @@ export type GetOffersForUrlMessage = {
 export type GetPriceMatchForProductMessage = {
   type: "get-price-match-for-product";
   electricity?: ElectricitySearch;
+  mobile?: boolean;
   url: string;
   searchTerm: string;
   price?: number;
@@ -99,7 +101,9 @@ export type OffersForUrlResponse =
 
 export type PriceMatchOffer = {
   electricity?: ElectricityPriceDetails;
-  source?: "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
+  mobile?: MobilePriceDetails;
+  mobileBroadband?: PriceMatchAlternative;
+  source?: "tek" | "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -119,6 +123,7 @@ export type PriceMatchOffer = {
 
 export type PriceMatchAlternative = {
   electricity?: ElectricityPriceDetails;
+  mobile?: MobilePriceDetails;
   productName?: string;
   offerUrl?: string;
   matchedCurrentMerchant?: boolean;
@@ -224,6 +229,7 @@ export function isGetPriceMatchForProductMessage(
     value.type === "get-price-match-for-product" &&
     typeof value.url === "string" &&
     typeof value.searchTerm === "string" &&
+    (value.mobile === undefined || typeof value.mobile === "boolean") &&
     (value.price === undefined || typeof value.price === "number") &&
     (value.currency === undefined || typeof value.currency === "string") &&
     (value.productUrl === undefined || typeof value.productUrl === "string") &&
