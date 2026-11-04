@@ -142,3 +142,23 @@ test("sources without fallback enabled still propagate their errors", async (t) 
   );
   assert.deepEqual(warnings, []);
 });
+
+test("a rejected Awin token reuses only Awin's own cbn offers instead of failing the crawl", async (t) => {
+  const { isAwinOffer } = await import("../src/backend/providers/awin.js");
+  t.mock.method(Date, "now", () => Date.parse(NOW));
+  const awin = { ...offer(2, "cbn"), merchantName: "Awin shop", activationUrl: "https://www.awin1.com/cread.php?awinmid=1&awinaffid=2" };
+  const other = { ...offer(2, "cbn"), merchantName: "Partner-ads shop", activationUrl: "https://www.partner-ads.com/no/klikbanner.php?bannerid=1" };
+  const offers = await collectProviderOffers({
+    label: "Awin",
+    logger: { info() {}, error() {}, warn() {} },
+    maxPreviousOfferAgeDays: 14,
+    previousOfferFilter: isAwinOffer,
+    previousOffersByProvider: new Map([["cbn", [awin, other]]]),
+    provider: "cbn",
+    reusePreviousOnFailure: true,
+    run: async () => { throw new Error("Awin API returned 401 for /publishers/1/programmes"); },
+  });
+  assert.deepEqual(offers.map(o => o.merchantName), ["Awin shop"]);
+  assert.equal(offers[0]!.updatedAt, awin.updatedAt);
+  assert.equal(isAwinOffer({ activationUrl: "not a url" }), false);
+});

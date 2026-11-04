@@ -10,6 +10,19 @@ import {
 } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
 
+/**
+ * Awin offers share the cbn provider with other networks. Their tracking links
+ * go through awin1.com, so a failed Awin run can reuse only its own offers.
+ */
+export function isAwinOffer(offer: { activationUrl: string }): boolean {
+  try {
+    const host = new URL(offer.activationUrl).hostname;
+    return host === "awin1.com" || host.endsWith(".awin1.com");
+  } catch {
+    return false;
+  }
+}
+
 const API_URL = "https://api.awin.com";
 const DEFAULT_PUBLISHER_ID = "2934239";
 const CHARITY_SHARE_OF_COMMISSION = 0.1;

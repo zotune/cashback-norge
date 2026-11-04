@@ -32,7 +32,10 @@ export async function fetchInstabank(input: FetchInstabankInput): Promise<Cashba
       const status = response.statusCode ?? 0;
       if (status < 200 || status >= 300) {
         if ([401, 403, 404].includes(status)) request.noRetry = true;
-        throw new Error(`Instabank: HTTP ${status} for ${request.url}`);
+        // A redirect that is not followed names its target, so a block page
+        // or region redirect in GitHub Actions can be told apart.
+        const location = response.headers.location;
+        throw new Error(`Instabank: HTTP ${status} for ${request.url}${location ? ` (Location: ${String(location).slice(0, 200)})` : ""}`);
       }
       $("script, style, nav, header, footer").remove();
       if (request.userData.kind === "discounts") calendar = readCalendar($, input.generatedAt);

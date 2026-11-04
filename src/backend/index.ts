@@ -88,7 +88,7 @@ import { fetchYs } from "./providers/ys.js";
 import { fetchLofavor } from "./providers/lofavor.js";
 import { fetchPartnerAds } from "./providers/partnerads.js";
 import { fetchTradeTracker } from "./providers/tradetracker.js";
-import { fetchAwin } from "./providers/awin.js";
+import { fetchAwin, isAwinOffer } from "./providers/awin.js";
 import { fetchAddrevenue } from "./providers/addrevenue.js";
 import { fetchOrion } from "./providers/orion.js";
 import { fetchDaisycon } from "./providers/daisycon.js";
@@ -251,9 +251,14 @@ async function main(): Promise<void> {
   // provides exact locale-specific shop ids, so no Swedish, Danish or Finnish
   // variants are accepted by fuzzy search. --rabatta-shops can restrict local
   // test crawls.
+  // A rejected Awin token must not stop the other sources, so a failed run
+  // reuses Awin's own offers for up to 14 days, like the other providers.
   const awinOffersPromise = startEarly(config.skipAwin ? Promise.resolve([]) : collectOffers({
     label: "Awin",
+    maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+    previousOfferFilter: isAwinOffer,
     provider: "cbn",
+    reusePreviousOnFailure: true,
     run: () => fetchAwin({
       generatedAt, logger,
     }),
