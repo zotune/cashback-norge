@@ -10,6 +10,9 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import { ELECTRICITY_EXAMPLE, ELECTRICITY_MIN_GUARANTEE_MONTHS, ELECTRICITY_MAX_OFFERS, getElectricitySupplier, isElectricityPriceDetails, type ElectricityPriceDetails } from "../shared/electricity-price-match";
+import { createElectricityComparison } from "./electricity-comparison";
+import { ELECTRICITY_SUPPLIER_CACHE_KEY } from "../shared/electricity-suppliers";
 import { decodeHtmlEntities, readProductCodesFromUrl } from "../shared/product-match";
 import { findTypedLdJson, parseLdJson, readProductLanguage, readProductOfferLanguage, selectProductLdJson, readComparisonProductLdJson, readStructuredProductCodes } from "../shared/product-data";
 import { isPokeprisProductUrl } from "../shared/pokepris-price-match";
@@ -159,6 +162,7 @@ type UserscriptHttpRequestOptions = {
   headers?: Record<string, string>;
   data?: string;
   timeout?: number;
+  anonymous?: boolean;
   onload?: (response: UserscriptHttpResponse) => void;
   onerror?: () => void;
   ontimeout?: () => void;
@@ -353,7 +357,8 @@ type OffersForUrlResponse =
       reason: string;
     };
 type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
+  electricity?: ElectricityPriceDetails;
+  source?: "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -381,6 +386,10 @@ type PriceMatchOffer = {
   flightSortVariants?: Partial<Record<"cheapest" | "fastest", FlightSortVariant>>;
 };
 type PriceMatchAlternative = {
+  electricity?: ElectricityPriceDetails;
+  productName?: string;
+  offerUrl?: string;
+  matchedCurrentMerchant?: boolean;
   shopName: string;
   price: string;
   amount: number;
@@ -1405,6 +1414,21 @@ function hasBlockedHostname(blockedHosts: ReadonlySet<string>, hostname: string)
 
 let renderGeneration = 0;
 let runtimeCardOffers: CashbackOffer[] = [];
+const electricityComparison = createElectricityComparison({
+  getUrl: () => window.location.href,
+  requestJson: userscriptJsonRequest,
+  catalogCache: {
+    read: async () => (await chrome.storage.local.get(ELECTRICITY_SUPPLIER_CACHE_KEY))[ELECTRICITY_SUPPLIER_CACHE_KEY],
+    write: async (catalog) => { await chrome.storage.local.set({ [ELECTRICITY_SUPPLIER_CACHE_KEY]: catalog }); },
+  },
+  findOffers: async (message) => {
+    if (isUserscriptRuntime()) return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
+    const response = await sendRuntimeMessage<PriceMatchForProductResponse>(message);
+    if (response === undefined || !isPriceMatchForProductResponse(response)) throw new Error("Forbrukerrådet: fikk ikke svar fra extensionen");
+    if (!response.ok) throw new Error(response.reason);
+    return response.offers ?? (response.offer !== undefined ? [response.offer] : []);
+  },
+});
 
 async function renderCurrentContext(): Promise<void> {
   const generation = ++renderGeneration;
@@ -1424,7 +1448,7 @@ async function renderCurrentContext(): Promise<void> {
   ]);
   priceMatchesSettled = true;
   if (generation !== renderGeneration) return;
-  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
+  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || electricityComparison.isSupported()) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
     scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
     return;
@@ -1505,6 +1529,8 @@ async function readBundledOffersForCurrentUrl(): Promise<CashbackOffer[]> {
 }
 
 async function getPriceMatchesForCurrentPage(onFlightProgress?: (offers: PriceMatchOffer[]) => void): Promise<PriceMatchOffer[]> {
+  await electricityComparison.prepare();
+  if (electricityComparison.isSupported()) return electricityComparison.getOffers();
   const flightOffers = await findFlightPriceMatchOffers(onFlightProgress);
   if (flightOffers.length > 0) return flightOffers;
 
@@ -9766,6 +9792,28 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
   ].join("|");
 }
 
+function buildElectricityBasisChips(e: ElectricityPriceDetails, shadowRoot: ShadowRoot): HTMLElement {
+  const chips = buildPriceMatchInfoChips([
+    `${ELECTRICITY_EXAMPLE.municipality} · ${ELECTRICITY_EXAMPLE.areaCode}`,
+    `${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år`,
+    "Spotpris",
+    e.scheme === "norgespris" ? `Norgespris · ${formatKr(e.energyOrePerKwh)} øre/kWh` : "Strømstøtte",
+  ]);
+  chips.classList.add("electricity-basis-chips");
+  addHoverChipTooltip(chips, [
+    "Prisene gjelder et regneeksempel:",
+    `- Husholdning i ${ELECTRICITY_EXAMPLE.municipality}, prisområde ${ELECTRICITY_EXAMPLE.areaCode}, som i Forbrukerrådets standardeksempel.`,
+    `- ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år, som i Forbrukerrådets standardeksempel. Dette er ikke ditt målte forbruk.`,
+    `- Kildens forbruksprofil gir ${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh i ${e.period}.`,
+    `- Spotavtaler uten binding, medlemskrav eller kampanjevilkår, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti, som portalens standardfilter.`,
+    e.scheme === "norgespris"
+      ? `- Med Norgespris: ${formatKr(e.energyOrePerKwh)} øre/kWh inkl. mva., før leverandørens påslag og månedsgebyr. Eksemplet forutsetter Norgespris; vi vet ikke om du har valgt ordningen.`
+      : `- Spotpris etter strømstøtte i eksemplet: ${formatKr(e.energyOrePerKwh)} øre/kWh før påslag og månedsgebyr.`,
+    "- Nettleie kommer i tillegg. Prisene hentes live fra Forbrukerrådets strømprisportal.",
+  ].join("\n"), shadowRoot);
+  return chips;
+}
+
 async function getRegionPricesForCurrentPage(): Promise<PlayStationRegionPriceResult | undefined> {
   const currentUrl = window.location.href;
   const regionPriceLookupUrl = getRegionPriceLookupUrlForCurrentPage(currentUrl);
@@ -9875,6 +9923,7 @@ async function userscriptJsonRequest(
       };
       if (init?.headers !== undefined) requestOptions.headers = init.headers;
       if (init?.body !== undefined) requestOptions.data = init.body;
+      if (init?.credentials === "omit") requestOptions.anonymous = true;
 
       const maybePromise = gmRequest(requestOptions);
       if (isPromiseLike(maybePromise)) {
@@ -11670,6 +11719,14 @@ function renderNotice(
       background: ${PROVIDER_COLORS.pokepris!.bg};
       color: ${PROVIDER_COLORS.pokepris!.fg};
     }
+    .provider-forbrukerradet {
+      background: ${PROVIDER_COLORS.forbrukerradet!.bg};
+      color: ${PROVIDER_COLORS.forbrukerradet!.fg};
+    }
+    .provider-bytt {
+      background: ${PROVIDER_COLORS.bytt!.bg};
+      color: ${PROVIDER_COLORS.bytt!.fg};
+    }
     .provider-godpris {
       background: #21003f;
       color: #ffffff;
@@ -12147,7 +12204,7 @@ function renderNotice(
       width: auto;
     }
     /* Chipene har egen linje under «Prismatch», så radene får full bredde. */
-    .flight-filter-chips {
+    .flight-filter-chips, .electricity-basis-chips {
       display: inline-flex;
       flex-basis: 100%;
       flex-shrink: 0;
@@ -12155,7 +12212,7 @@ function renderNotice(
       gap: 4px;
       justify-content: flex-start;
     }
-    .flight-filter-chips .flight-filter-chip {
+    .flight-filter-chips .flight-filter-chip, .electricity-basis-chips .price-match-info-chip {
       align-items: center;
       display: inline-flex;
       font-size: 11px;
@@ -12175,6 +12232,7 @@ function renderNotice(
       transition: transform 0.15s;
     }
     .price-match-section.collapsed .price-match-card,
+    .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
       display: none;
     }
@@ -12197,6 +12255,18 @@ function renderNotice(
       padding: 6px 9px;
       text-decoration: none;
     }
+    .electricity-error { color: var(--cbn-muted); font-size: 11px; margin: 0; }
+    .electricity-comparison-tooltip { box-sizing: border-box; max-height: calc(100vh - 32px); max-width: calc(100vw - 16px); overflow-y: auto; }
+    .electricity-tooltip-heading { font-size: 12px; font-weight: 700; margin: 0 0 5px; }
+    .electricity-tooltip-basis { color: inherit; opacity: .82; font-size: 10px; line-height: 1.4; margin: 0 0 8px; }
+    .comparison-tooltip-option { color: var(--cbn-text); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 6px; padding: 7px; margin: 4px 0; }
+    .comparison-tooltip-option > :first-child { font-weight: 600; min-width: 0; }
+    .comparison-tooltip-option > strong { color: var(--cbn-accent); white-space: nowrap; }
+    .comparison-tooltip-option > .price-match-chip-line { grid-column: 1 / -1; }
+    .comparison-tooltip-option .price-match-info-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    .electricity-tooltip-plan > strong { color: var(--cbn-accent); white-space: nowrap; }
+    .electricity-tooltip-plan > .price-match-chip-line, .electricity-tooltip-terms { grid-column: 1 / -1; }
+    .electricity-tooltip-terms { color: var(--cbn-muted); font-size: 10px; line-height: 1.4; }
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
     }
@@ -12621,11 +12691,11 @@ function renderNotice(
   const cryptoSub = cryptoSubEntry?.[1];
   const codeOffers = offers.filter((o) => o.provider === "rabattkode" || (o.discountCode !== undefined && o.discountCode.length > 0));
   const offer = mainOffers[0];
-  if (offer === undefined && codeOffers.length === 0 && priceMatch === undefined && bestRegionPrice === undefined) {
+  if (offer === undefined && codeOffers.length === 0 && priceMatch === undefined && bestRegionPrice === undefined && !electricityComparison.isSupported()) {
     return;
   }
   const primaryOffer = offer ?? codeOffers[0];
-  if (primaryOffer === undefined && priceMatch === undefined && bestRegionPrice === undefined) {
+  if (primaryOffer === undefined && priceMatch === undefined && bestRegionPrice === undefined && !electricityComparison.isSupported()) {
     return;
   }
   const tooltipControls = createTooltipController(shadowRoot);
@@ -12637,7 +12707,7 @@ function renderNotice(
     (readRewardSortValueNok(offer) ?? 0) >= 250
   );
   if (hasFantasticOffer) notice.classList.add("has-fantastic-offer");
-  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : "region");
+  const sideTabProvider = offer?.provider ?? (primaryOffer !== undefined ? getCodeSourceProvider(primaryOffer) : undefined) ?? (priceMatch !== undefined ? getPriceMatchProviderClass(priceMatch) : electricityComparison.isSupported() ? "forbrukerradet" : "region");
   // Side tab (collapse/expand control on the left edge)
   const sideTab = document.createElement("button");
   sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
@@ -12673,6 +12743,11 @@ function renderNotice(
       chipSpan.textContent = formatProviderName(codeProvider);
       sideTabText.append(chipSpan);
     }
+  } else if (electricityComparison.isSupported()) {
+    const chipSpan = document.createElement("span");
+    chipSpan.className = "cbn-chip side-tab-chip provider-forbrukerradet";
+    chipSpan.textContent = PROVIDER_NAMES.forbrukerradet!;
+    sideTabText.append("Strøm", chipSpan);
   } else if (priceMatch !== undefined) {
     const rewardSpan = document.createElement("span");
     rewardSpan.className = "side-tab-reward";
@@ -12709,7 +12784,7 @@ function renderNotice(
     ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}`
       : primaryOffer !== undefined
         ? `Rabattkode hos ${primaryOffer.merchantName}`
-      : priceMatch !== undefined
+      : electricityComparison.isSupported() ? `Prismatch hos ${getElectricitySupplier(location.href)!.name}` : priceMatch !== undefined
         ? `Prismatch hos ${priceMatch.shopName}`
         : "Regionpriser";
   header.append(siteIcon, title);
@@ -12721,7 +12796,7 @@ function renderNotice(
   sumInput.addEventListener("keydown", (e) => {
     if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
   });
-  header.append(sumInput);
+  if (!electricityComparison.isSupported() || mainOffers.length > 0) header.append(sumInput);
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
   const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
   const offerList = document.createElement("div");
@@ -13520,7 +13595,7 @@ function renderNotice(
 
   const priceMatchSection = document.createElement("div");
   priceMatchSection.className = "price-match-section";
-  if (priceMatches.length > 0) {
+  if (priceMatches.length > 0 || electricityComparison.isSupported()) {
     if (initialPriceMatchCollapsed) {
       priceMatchSection.classList.add("collapsed");
     }
@@ -13548,16 +13623,24 @@ function renderNotice(
       : undefined;
     const flightFilterChips = flightMeta !== undefined ? buildFlightFilterChips(flightMeta, shadowRoot, flightSortMode) : undefined;
     if (flightFilterChips !== undefined) priceMatchHeader.append(flightFilterChips);
+    const electricity = priceMatches[0]?.electricity;
+    if (electricity !== undefined) priceMatchHeader.append(buildElectricityBasisChips(electricity, shadowRoot));
     priceMatchSection.append(
       priceMatchHeader,
       ...priceMatches.map((priceMatch, index) => buildPriceMatchCard(priceMatch, index === 0)),
     );
+    if (electricityComparison.isSupported() && priceMatches.length === 0) {
+      const status = document.createElement("p");
+      status.className = "electricity-error";
+      status.textContent = electricityComparison.getError() || "Ingen sammenlignbare strømavtaler akkurat nå.";
+      priceMatchSection.append(status);
+    }
   }
 
   body.append(header);
   if (mainOffers.length > 0) body.append(offerList);
   if (regionPrices !== undefined && regionPrices.prices.length > 0) body.append(regionPricesSection);
-  if (priceMatches.length > 0) body.append(priceMatchSection);
+  if (priceMatches.length > 0 || electricityComparison.isSupported()) body.append(priceMatchSection);
   body.append(chipsSection);
   if (offers.length > 0) body.append(codesSection);
 
@@ -13885,6 +13968,103 @@ function clearNotice(): void {
   document.getElementById(HOST_ID)?.remove();
 }
 
+function buildElectricityTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
+  tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
+  const heading = document.createElement("p");
+  heading.className = "electricity-tooltip-heading";
+  heading.textContent = "Billigste sammenlignbare avtaler";
+  const basis = document.createElement("p");
+  basis.className = "electricity-tooltip-basis";
+  const e = offer.electricity!;
+  basis.textContent = `Total strømpris for ${e.period}, inkl. ${e.scheme === "norgespris" ? `Norgespris (${formatKr(e.energyOrePerKwh)} øre/kWh)` : "spotpris og strømstøtte"}, påslag og månedsgebyr. Regneeksempel ${ELECTRICITY_EXAMPLE.municipality} · ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år (${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh denne måneden). Nettleie kommer i tillegg.`;
+  tooltip.append(heading, basis);
+  const alternatives = (offer.alternatives ?? []).filter((row) => row.electricity !== undefined);
+  const sorted = [...alternatives].sort((a, b) => a.amount - b.amount);
+  const addPlan = (plan: PriceMatchAlternative) => {
+    const row = document.createElement("div");
+    row.className = "cbn-row cbn-row--details comparison-tooltip-option electricity-tooltip-plan";
+    const title = document.createElement("span");
+    title.textContent = plan.shopName;
+    const amount = document.createElement("strong");
+    amount.textContent = plan.price;
+    const chips = buildElectricityPriceMatchChips({ electricity: plan.electricity!, productName: plan.productName ?? plan.shopName });
+    row.append(title, amount, chips);
+    const terms = document.createElement("span");
+    terms.className = "electricity-tooltip-terms";
+    const e = plan.electricity!;
+    terms.textContent = [e.guaranteeMonths !== undefined ? `${e.guaranteeMonths} mnd. påslagsgaranti` : undefined,
+      e.maximumYearlyKwh !== undefined ? `maks ${e.maximumYearlyKwh.toLocaleString("nb-NO")} kWh/år` : undefined].filter(Boolean).join(" · ");
+    if (terms.textContent) row.append(terms);
+    if (e.stromstotteMonthlyNok !== undefined) {
+      const subsidy = document.createElement("span");
+      subsidy.className = "electricity-tooltip-terms";
+      subsidy.textContent = `Med vanlig strømstøtte: ~${formatKr(e.stromstotteMonthlyNok)} kr/mnd`;
+      row.append(subsidy);
+    }
+    for (const text of [e.invoiceRequirement, e.conditionsText]) {
+      if (!text) continue;
+      const condition = document.createElement("span");
+      condition.className = "electricity-tooltip-terms";
+      condition.textContent = text;
+      row.append(condition);
+    }
+    tooltip.append(row);
+  };
+  if (sorted.length === 0) {
+    const none = document.createElement("p");
+    none.textContent = "Ingen sammenlignbare avtaler i dette utvalget.";
+    tooltip.append(none);
+  }
+  sorted.forEach(addPlan);
+  const terms = document.createElement("p");
+  terms.className = "electricity-tooltip-basis";
+  terms.textContent = `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen. Inkl. mva. ${e.scheme === "norgespris" ? "Eksemplet forutsetter at du har valgt Norgespris." : "Estimatet varierer med spotpris og forbruk."}`;
+  const source = document.createElement("p");
+  source.className = "electricity-tooltip-basis";
+  source.textContent = "Kilde: Forbrukerrådets strømprisportal og forbruksprofil. Eventuelt papirfakturagebyr kommer i tillegg.";
+  tooltip.append(terms, source);
+}
+
+function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
+  tooltip.classList.add("cbn-tooltip-details");
+  const parts = buildPriceMatchTooltip(offer).split(/\n{2,}/);
+  const listHeading = (part: string) => /^(Treffliste|Prisgrunnlag|Billigste datoer \([^\n]+\))\n/.test(part);
+  if (!parts.some(listHeading) || !offer.alternatives?.length) {
+    setTooltipContent(tooltip, [buildPriceMatchTooltip(offer)]);
+    return;
+  }
+  for (const part of parts) {
+    if (!listHeading(part)) {
+      const section = createTooltipSection(part);
+      if (section !== undefined) tooltip.append(section);
+      continue;
+    }
+    const section = document.createElement("div");
+    section.className = "offer-tooltip-section";
+    const heading = document.createElement("span");
+    heading.className = "offer-tooltip-title";
+    heading.textContent = part.split("\n")[0]!;
+    section.append(heading);
+    const limit = offer.dateFlex === undefined ? FLIGHT_TOOLTIP_MAX_ROWS : FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS;
+    for (const alternative of offer.alternatives.slice(0, limit)) {
+      const row = document.createElement("div");
+      row.className = "cbn-row cbn-row--details comparison-tooltip-option flight-tooltip-option";
+      const name = document.createElement("span");
+      name.textContent = alternative.shopName.replace(/:$/, "");
+      const price = document.createElement("strong");
+      price.textContent = alternative.price;
+      const chips = buildPriceMatchInfoChips([...new Set([
+        ...(alternative.durationText?.split(" · ") ?? []),
+        ...(alternative.platform?.split(/,\s*/) ?? []),
+      ])]);
+      row.append(name, price);
+      if (chips.childElementCount > 0) row.append(chips);
+      section.append(row);
+    }
+    tooltip.append(section);
+  }
+}
+
 function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMatchOffer[], tooltipControls: TooltipController): void {
   if (priceMatches.length === 0) return;
 
@@ -13896,37 +14076,43 @@ function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMat
 
     const tooltip = document.createElement("div");
     tooltip.className = "offer-tooltip";
-    setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+    if (priceMatch.electricity !== undefined) buildElectricityTooltip(tooltip, priceMatch);
+    else if (isFlightPanelRow(priceMatch)) buildFlightPriceMatchTooltip(tooltip, priceMatch);
+    else setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
     shadowRoot.append(tooltip);
     const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
     // Share the card's columns while keeping the details button outside its link.
     row.classList.add("price-match-tooltip-row");
     row.classList.toggle("price-match-tooltip-row--with-duration", card.classList.contains("price-match-card--with-duration"));
 
-    let hideTimer: number | undefined;
-    const clearHideTimer = () => {
-      if (hideTimer === undefined) return;
-      window.clearTimeout(hideTimer);
-      hideTimer = undefined;
-    };
-    const showTooltip = () => {
-      clearHideTimer();
-      positionTooltipRightOfPanel(tooltip, card, shadowRoot);
-    };
-    const scheduleHideTooltip = () => {
-      clearHideTimer();
-      hideTimer = window.setTimeout(() => {
-        if (!card.matches(":hover") && !tooltip.matches(":hover")) {
-          tooltip.classList.remove("visible");
-        }
-      }, 120);
-    };
-
-    card.addEventListener("mouseenter", showTooltip);
-    card.addEventListener("mouseleave", scheduleHideTooltip);
-    tooltip.addEventListener("mouseenter", showTooltip);
-    tooltip.addEventListener("mouseleave", scheduleHideTooltip);
+    bindPriceMatchTooltipHover(card, tooltip, shadowRoot);
   }
+}
+
+function bindPriceMatchTooltipHover(card: HTMLElement, tooltip: HTMLElement, shadowRoot: ShadowRoot): void {
+  let hideTimer: number | undefined;
+  const clearHideTimer = () => {
+    if (hideTimer === undefined) return;
+    window.clearTimeout(hideTimer);
+    hideTimer = undefined;
+  };
+  const showTooltip = () => {
+    clearHideTimer();
+    positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+  };
+  const scheduleHideTooltip = () => {
+    clearHideTimer();
+    hideTimer = window.setTimeout(() => {
+      if (!card.matches(":hover") && !tooltip.matches(":hover")) {
+        tooltip.classList.remove("visible");
+      }
+    }, 120);
+  };
+
+  card.addEventListener("mouseenter", showTooltip);
+  card.addEventListener("mouseleave", scheduleHideTooltip);
+  tooltip.addEventListener("mouseenter", showTooltip);
+  tooltip.addEventListener("mouseleave", scheduleHideTooltip);
 }
 
 function setTooltipContent(tooltip: HTMLElement, parts: string[]): void {
@@ -14150,7 +14336,8 @@ function isRegionPricePlanAlternative(value: unknown): boolean {
 function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
   return (
     isRecord(value) &&
-    (value.source === undefined || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
+    (value.electricity === undefined || isElectricityPriceDetails(value.electricity)) &&
+    (value.source === undefined || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.details === undefined || typeof value.details === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
@@ -14170,6 +14357,10 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
 function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative {
   return (
     isRecord(value) &&
+    (value.electricity === undefined || isElectricityPriceDetails(value.electricity)) &&
+    (value.productName === undefined || typeof value.productName === "string") &&
+    (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
+    (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
     typeof value.amount === "number" &&
@@ -14413,6 +14604,10 @@ function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
     priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : undefined,
     priceMatch.baggageExcluded === true ? "ekskl. bagasje" : undefined,
   ];
+  return buildPriceMatchInfoChips(texts);
+}
+
+function buildPriceMatchInfoChips(texts: (string | undefined)[]): HTMLElement {
   const chips = document.createElement("span");
   chips.className = "price-match-chip-line";
   for (const text of texts) {
@@ -14427,6 +14622,11 @@ function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
 
 // Velges én gang per side, ellers bytter annonsen hver gang panelet tegnes på nytt.
 const supportAdvertisementDraw = Math.random();
+
+function buildElectricityPriceMatchChips(priceMatch: Pick<PriceMatchOffer, "electricity" | "productName">): HTMLElement {
+  const e = priceMatch.electricity!;
+  return buildPriceMatchInfoChips([`${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
+}
 
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
@@ -14472,9 +14672,9 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
   priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
   priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
 
-  if (isFlightPanelRow(priceMatch)) {
+  if (isFlightPanelRow(priceMatch) || priceMatch.electricity !== undefined) {
     priceMatchCard.classList.add("price-match-card--chips");
-    const chips = buildFlightPriceMatchChips(priceMatch);
+    const chips = priceMatch.electricity !== undefined ? buildElectricityPriceMatchChips(priceMatch) : buildFlightPriceMatchChips(priceMatch);
     const side = document.createElement("span");
     side.className = "price-match-side";
     if (priceMatch.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) side.classList.add("price-match-side--inline");
@@ -14663,6 +14863,7 @@ function buildRegionPricesTooltip(regionPrices: PlayStationRegionPriceResult): s
   ].join("\n");
 }
 function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "forbrukerradet") return "forbrukerradet";
   if (priceMatch.source === "pokepris") return "pokepris";
   if (priceMatch.source === "godpris") return "godpris";
   if (priceMatch.source === "klarna") return "klarna";
@@ -14686,6 +14887,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   return "prisjakt";
 }
 function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "forbrukerradet") return PROVIDER_NAMES.forbrukerradet!;
   if (priceMatch.sourceName !== undefined) return priceMatch.sourceName;
   if (priceMatch.source === "pokepris") return PROVIDER_NAMES.pokepris!;
   if (priceMatch.source === "godpris") return "Godpris";
@@ -14711,6 +14913,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   return "Prisjakt";
 }
 function buildPriceMatchTooltip(priceMatch: PriceMatchOffer): string {
+  if (priceMatch.source === "forbrukerradet") return priceMatch.details ?? PROVIDER_NAMES.forbrukerradet!;
   if (priceMatch.travelKind === "hotel") {
     const alternatives = priceMatch.alternatives ?? [];
     const details = priceMatch.details ?? priceMatch.shopName;

@@ -5,6 +5,7 @@
   "version": "0.2.29",
   "permissions": ["storage", "unlimitedStorage", "tabs"],
   "host_permissions": [
+    "https://strom-api.forbrukerradet.no/*",
     "https://www.pokepris.no/*",
     "https://pokepris.no/*",
     "https://browser-extension-backend.cloud.pji.nu/*",

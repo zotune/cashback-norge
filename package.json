@@ -6,7 +6,7 @@
   "scripts": {
     "build": "pnpm run build:backend && pnpm run build:extension && pnpm run build:site && pnpm run build:userscript",
     "build:userscript": "vite build --config vite.userscript.config.ts",
-    "build:backend": "tsc --project tsconfig.backend.json",
+    "build:backend": "tsc --project tsconfig.backend.json && node scripts/build-backend-assets.mjs",
     "build:extension": "vite build --config vite.extension.config.ts",
     "build:extension:store": "pnpm run build:extension && node scripts/build-extension-store.mjs",
     "build:store": "pnpm run build:extension:store",

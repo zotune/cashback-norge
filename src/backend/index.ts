@@ -29,6 +29,7 @@ import { readManualOffers } from "./manual-offers.js";
 import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
 import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog.js";
+import { collectElectricitySupplierCatalog } from "./electricity-supplier-catalog.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
 import { fetchDealpass } from "./providers/dealpass.js";
@@ -194,6 +195,8 @@ type CliConfig = {
   skipPokeprisCatalog: boolean;
   pokeprisOrigin: string;
   pokeprisCatalogPath: string;
+  skipElectricityCatalog: boolean;
+  electricityCatalogPath: string;
   rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -267,6 +270,9 @@ async function main(): Promise<void> {
   // Not a cashback source: a merchant-URL catalog for Pokepris price matches.
   const pokeprisCatalogPromise = config.skipPokeprisCatalog ? undefined : startEarly(collectPokeprisCatalog({
     generatedAt, logger, origin: config.pokeprisOrigin, previousPath: config.pokeprisCatalogPath,
+  }));
+  const electricityCatalogPromise = config.skipElectricityCatalog ? undefined : startEarly(collectElectricitySupplierCatalog({
+    generatedAt, logger, previousPath: config.electricityCatalogPath,
   }));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
@@ -1129,6 +1135,12 @@ async function main(): Promise<void> {
     await copyFile(config.pokeprisCatalogPath, siteCatalogPath);
     logger.info(`Wrote Pokepris catalog (${pokeprisCatalog.generatedAt}) to ${config.pokeprisCatalogPath} and ${siteCatalogPath}`);
   }
+  const electricityCatalog = await electricityCatalogPromise;
+  if (electricityCatalog !== undefined) {
+    await writeJsonFile(config.electricityCatalogPath, electricityCatalog);
+    await copyFile(config.electricityCatalogPath, resolve("site/electricity-suppliers.json"));
+    logger.info(`Wrote Forbrukerrådet supplier catalogue (${electricityCatalog.suppliers.length} domains)`);
+  }
 }
 
 function readCliConfig(args: string[]): CliConfig {
@@ -1268,6 +1280,8 @@ function readCliConfig(args: string[]): CliConfig {
     skipPokeprisCatalog: args.includes("--skip-pokepris-catalog"),
     pokeprisOrigin: readArgumentValue(args, "--pokepris-origin") ?? "https://www.pokepris.no",
     pokeprisCatalogPath: resolve(readArgumentValue(args, "--pokepris-catalog-output") ?? "data/pokepris-catalog.json"),
+    skipElectricityCatalog: args.includes("--skip-electricity-catalog"),
+    electricityCatalogPath: resolve(readArgumentValue(args, "--electricity-catalog-output") ?? "data/electricity-suppliers.json"),
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??

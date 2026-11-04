@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793800609
+// @version      1793829840
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -16,6 +16,7 @@
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
 // @connect      cashbacknorge.no
+// @connect      strom-api.forbrukerradet.no
 // @connect      www.pokepris.no
 // @connect      pokepris.no
 // @connect      browser-extension-backend.cloud.pji.nu
@@ -145,6 +146,8 @@
   }
   const EB_PER_TRUMF_KR$1 = 13.5;
   const PROVIDER_NAMES = {
+    forbrukerradet: "Forbrukerrådet",
+    bytt: "Bytt.no",
     pokepris: "Pokepris",
     trumf: "Trumf",
     klarna: "Klarna",
@@ -206,6 +209,8 @@
     lofavor: "LOfavør"
   };
   const PROVIDER_TIPS = {
+    forbrukerradet: "Beregnet månedspris fra Forbrukerrådet, inkludert strøm, påslag og månedsgebyr. Grunnlagschipene viser område, forbruk og Norgespris/strømstøtte. Nettleie kommer i tillegg.",
+    bytt: "Sammenlign strømavtaler hos Bytt.no. Åpner kildens strømoversikt.",
     pokepris: "Varepriser fra Pokepris. Frakt er ukjent og kommer eventuelt i tillegg. Klikk for hele prislisten hos Pokepris.",
     trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
     klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
@@ -261,6 +266,8 @@
     lofavor: "LOfavør.\nKrever medlemskap i et LO-forbund.\nSe vilkår på lofavor.no."
   };
   const PROVIDER_COLORS = {
+    forbrukerradet: { bg: "#004a66", fg: "#ffffff", preserveInDark: true },
+    bytt: { bg: "#0075f5", fg: "#ffffff", preserveInDark: true },
     pokepris: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
     crypto: { bg: "#002d74", fg: "#ffffff" },
     remember: { bg: "#111111", fg: "#ff9900" },
@@ -504,6 +511,14 @@
     return value.offers.every(isCashbackOffer) && Object.values(value.domainIndex).every((offers) => {
       return Array.isArray(offers) && offers.every(isCashbackOffer);
     });
+  }
+  function normalizeHostname$1(hostname) {
+    const lowerCaseHostname = hostname.trim().toLowerCase();
+    const withoutTrailingDot = lowerCaseHostname.endsWith(".") ? lowerCaseHostname.slice(0, -1) : lowerCaseHostname;
+    if (withoutTrailingDot.startsWith("www.")) {
+      return withoutTrailingDot.slice(4);
+    }
+    return withoutTrailingDot;
   }
   function parseUrl$1(input) {
     try {
@@ -1002,9 +1017,9 @@
   }
   function selectSupportAdvertisement(draw, now = /* @__PURE__ */ new Date()) {
     const sample = Number.isFinite(draw) ? Math.min(1 - Number.EPSILON, Math.max(0, draw)) : 0;
-    const active = isInstabankAdActive(now);
-    if (active && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
-    const rest = active ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
+    const active2 = isInstabankAdActive(now);
+    if (active2 && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
+    const rest = active2 ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
     return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))];
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
@@ -2148,6 +2163,282 @@
       return void 0;
     }
   }
+  const version = 1;
+  const generatedAt = "2026-11-04T21:56:20.993Z";
+  const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
+  const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
+  const bundled = {
+    version,
+    generatedAt,
+    source,
+    suppliers
+  };
+  const ELECTRICITY_SUPPLIER_CATALOG_URL = "https://cashbacknorge.no/electricity-suppliers.json";
+  const ELECTRICITY_SUPPLIER_SOURCE = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
+  const MAX_AGE = 14 * 864e5;
+  const SOURCE_HOSTS = /* @__PURE__ */ new Set(["forbrukerradet.no", "strom-api.forbrukerradet.no", "strompris.no", "xn--strmpris-74a.no"]);
+  function pricelistUrl(value) {
+    const url = typeof value === "string" ? parseUrl$1(value.trim()) : void 0;
+    if (url === void 0 || !["http:", "https:"].includes(url.protocol) || url.username || url.password || url.port) return void 0;
+    const host = normalizeHostname$1(url.hostname);
+    if (!host.includes(".") || /^[\d.]+$/.test(host) || SOURCE_HOSTS.has(host)) return void 0;
+    url.search = "";
+    url.hash = "";
+    return url;
+  }
+  function isElectricitySupplierCatalog(value) {
+    if (!isRecord$6(value) || value.version !== 1 || value.source !== ELECTRICITY_SUPPLIER_SOURCE || typeof value.generatedAt !== "string" || !Number.isFinite(Date.parse(value.generatedAt)) || !Array.isArray(value.suppliers) || value.suppliers.length < 1 || value.suppliers.length > 500) return false;
+    const hosts = /* @__PURE__ */ new Set();
+    return value.suppliers.every((row) => {
+      if (!isRecord$6(row) || !Number.isSafeInteger(row.id) || row.id <= 0 || typeof row.name !== "string" || !row.name.trim()) return false;
+      const url = pricelistUrl(row.supplierUrl);
+      if (row.evidence !== "reported-pricelist" && row.evidence !== "verified-offer-page") return false;
+      if (url === void 0 || typeof row.hostname !== "string" || normalizeHostname$1(url.hostname) !== row.hostname || hosts.has(row.hostname)) return false;
+      hosts.add(row.hostname);
+      return true;
+    });
+  }
+  function isFreshElectricitySupplierCatalog(catalog, now = Date.now()) {
+    const age = now - Date.parse(catalog.generatedAt);
+    return age >= -864e5 && age <= MAX_AGE;
+  }
+  function findElectricitySupplier(value, catalog, now = Date.now()) {
+    if (catalog === void 0 || !isFreshElectricitySupplierCatalog(catalog, now)) return void 0;
+    const url = parseUrl$1(value);
+    if (url === void 0 || url.protocol !== "https:" || url.username || url.password || url.port || /(?:^|\/)(?:minside|min-side|logg-inn|login|konto|account|bedrift|business|checkout|bestilling|mobil|nettbutikk)(?:\/|$)/i.test(url.pathname)) return void 0;
+    const supplier = catalog.suppliers.find((row) => row.hostname === normalizeHostname$1(url.hostname));
+    if (supplier === void 0) return void 0;
+    const locale = new URL(supplier.supplierUrl).pathname.match(/^\/(no|nb|nb-no|no-no)(?:\/|$)/i)?.[1];
+    return locale === void 0 || url.pathname === "/" || url.pathname === `/${locale}` || url.pathname.startsWith(`/${locale}/`) ? supplier : void 0;
+  }
+  const ELECTRICITY_SUPPLIER_CACHE_KEY = "electricitySupplierCatalog";
+  let active = isElectricitySupplierCatalog(bundled) ? bundled : void 0;
+  let pending;
+  let loadedAt = 0;
+  function getElectricitySupplier(url) {
+    return findElectricitySupplier(url, active);
+  }
+  async function loadElectricitySuppliers(requestJson = fetchCatalog, cache) {
+    if (pending !== void 0) return pending;
+    if (Date.now() - loadedAt < 15 * 6e4) return;
+    const adopt = (value) => {
+      if (isElectricitySupplierCatalog(value) && isFreshElectricitySupplierCatalog(value) && (active === void 0 || Date.parse(value.generatedAt) > Date.parse(active.generatedAt))) active = value;
+    };
+    pending = (async () => {
+      if (cache !== void 0) {
+        try {
+          adopt(await cache.read());
+        } catch {
+        }
+      }
+      try {
+        adopt(await requestJson(ELECTRICITY_SUPPLIER_CATALOG_URL, { credentials: "omit" }));
+      } catch {
+      }
+      if (cache !== void 0 && active !== void 0 && isFreshElectricitySupplierCatalog(active)) {
+        try {
+          await cache.write(active);
+        } catch {
+        }
+      }
+      loadedAt = Date.now();
+    })();
+    try {
+      await pending;
+    } finally {
+      pending = void 0;
+    }
+  }
+  async function fetchCatalog(url) {
+    const response = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(1e4) });
+    if (!response.ok) throw new Error(`Forbrukerrådet leverandørkatalog: HTTP ${response.status}`);
+    return response.json();
+  }
+  const ELECTRICITY_EXAMPLE = { municipality: "Oslo", areaCode: "NO1", yearlyKwh: 14400, norgespris: true };
+  const API = "https://strom-api.forbrukerradet.no";
+  const PORTAL = "https://www.forbrukerradet.no/strompris/";
+  const REQUEST_TIMEOUT_MS = 15e3;
+  const ELECTRICITY_MIN_GUARANTEE_MONTHS = 6;
+  const ELECTRICITY_MAX_OFFERS = 10;
+  const INVOICE_REQUIREMENTS = { none: "", electronicInvoice: "Krever eFaktura", directDebit: "Krever AvtaleGiro", both: "Krever eFaktura og AvtaleGiro" };
+  function isElectricityPriceMatchUrl(value) {
+    return getElectricitySupplier(value) !== void 0;
+  }
+  function isElectricitySearch(value) {
+    return isRecord$6(value) && typeof value.norgespris === "boolean" && Number.isSafeInteger(value.localGridId) && value.localGridId > 0 && value.localGridId < 1e5 && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
+  }
+  function isElectricityPriceDetails(value) {
+    return isRecord$6(value) && nonNegative(value.monthlyFeeNok) && nonNegative(value.addonOrePerKwh) && (value.scheme === "norgespris" || value.scheme === "stromstotte") && nonNegative(value.energyOrePerKwh) && (value.stromstotteMonthlyNok === void 0 || positive(value.stromstotteMonthlyNok)) && (value.conditionsText === void 0 || typeof value.conditionsText === "string" && value.conditionsText.length <= 1e4) && (value.invoiceRequirement === void 0 || typeof value.invoiceRequirement === "string" && Object.values(INVOICE_REQUIREMENTS).includes(value.invoiceRequirement)) && positive(value.monthlyKwh) && typeof value.period === "string" && value.period.length > 0 && value.period.length <= 40 && (value.maximumYearlyKwh === void 0 || positive(value.maximumYearlyKwh)) && (value.guaranteeMonths === void 0 || nonNegative(value.guaranteeMonths)) && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
+  }
+  async function getElectricityLocalGrids(requestJson = fetchPublicJson) {
+    const value = await requestJson(`${API}/local_grids/`, { credentials: "omit" });
+    if (!Array.isArray(value)) throw new Error("Forbrukerrådet /local_grids/: ugyldig kommuneliste");
+    const grids = value.filter((item) => isRecord$6(item) && positive(item.id) && Number.isSafeInteger(item.id) && typeof item.name === "string" && item.name.length > 0 && typeof item.areaCode === "string" && /^NO[1-5]$/.test(item.areaCode)).map((item) => ({ id: item.id, name: item.name, areaCode: item.areaCode }));
+    if (grids.length === 0) throw new Error("Forbrukerrådet /local_grids/: tom eller endret kommuneliste");
+    return grids.sort((a, b) => a.name.localeCompare(b.name, "nb"));
+  }
+  async function findElectricityPriceMatches(message, requestJson = fetchPublicJson, now = /* @__PURE__ */ new Date()) {
+    if (!isElectricityPriceMatchUrl(message.url) || !isElectricitySearch(message.electricity)) return [];
+    const { localGridId, yearlyKwh, norgespris } = message.electricity;
+    const url = `${API}/products/grid/${localGridId}?yearlyKwhConsumption=${yearlyKwh}&norgespris=${norgespris}&consumptionCode=35`;
+    const [value, subsidyValue] = await Promise.all([
+      requestJson(url, { credentials: "omit" }),
+      norgespris ? requestJson(url.replace("norgespris=true", "norgespris=false"), { credentials: "omit" }).catch(() => void 0) : void 0
+    ]);
+    if (!Array.isArray(value) || value.length > 0 && !value.some((row) => isRecord$6(row) && typeof row.name === "string" && isRecord$6(row.currentPrice))) {
+      throw new Error(`Forbrukerrådet /products/grid/${localGridId}: ugyldig avtalesvar`);
+    }
+    const plans = value.flatMap((row) => {
+      const plan = readPlan(row, yearlyKwh, now);
+      return plan === void 0 ? [] : [plan];
+    });
+    const subsidyPlans = Array.isArray(subsidyValue) ? subsidyValue.flatMap((row) => {
+      const plan = readPlan(row, yearlyKwh, now);
+      return plan === void 0 ? [] : [plan];
+    }) : [];
+    const period = now.toLocaleDateString("nb-NO", { timeZone: "Europe/Oslo", month: "long", year: "numeric" });
+    const shortlist = plans.filter((plan) => plan.guaranteeMonths >= ELECTRICITY_MIN_GUARANTEE_MONTHS).sort((a, b) => a.amount - b.amount || a.id - b.id).filter((plan, index, list) => list.findIndex((other) => other.id === plan.id) === index).slice(0, ELECTRICITY_MAX_OFFERS);
+    return shortlist.map((plan) => ({
+      source: "forbrukerradet",
+      sourceName: "Forbrukerrådet",
+      productName: plan.supplier,
+      shopName: plan.name,
+      productUrl: PORTAL,
+      offerUrl: plan.orderUrl,
+      price: `~${formatKr(plan.amount)} kr/mnd`,
+      amount: plan.amount,
+      currency: "NOK",
+      electricity: {
+        monthlyFeeNok: plan.monthlyFee,
+        addonOrePerKwh: plan.addon,
+        yearlyKwh,
+        monthlyKwh: plan.monthlyKwh,
+        period,
+        guaranteeMonths: plan.guaranteeMonths,
+        scheme: norgespris ? "norgespris" : "stromstotte",
+        energyOrePerKwh: norgespris ? plan.norgesprisRate : plan.subsidizedSpotRate,
+        ...plan.conditionsText ? { conditionsText: plan.conditionsText } : {},
+        ...plan.invoiceRequirement ? { invoiceRequirement: plan.invoiceRequirement } : {},
+        ...(() => {
+          const other = subsidyPlans.find((p) => p.id === plan.id && p.name === plan.name && p.supplierId === plan.supplierId && p.monthlyFee === plan.monthlyFee && p.addon === plan.addon && p.monthlyKwh === plan.monthlyKwh);
+          return other === void 0 ? {} : { stromstotteMonthlyNok: other.amount };
+        })(),
+        ...plan.maximumYearlyKwh !== null ? { maximumYearlyKwh: plan.maximumYearlyKwh } : {}
+      },
+      details: [
+        `${plan.supplier}: ${plan.name}`,
+        `Regneeksempel for ${ELECTRICITY_EXAMPLE.municipality} fra Forbrukerrådets strømprisportal.`,
+        `${formatKr(plan.monthlyFee)} kr/mnd + ${formatKr(plan.addon)} øre/kWh. ${yearlyKwh.toLocaleString("nb-NO")} kWh/år.`,
+        `Beregnet total strømpris for ${period}: ${formatKr(plan.amount)} kr, inkl. ${norgespris ? "Norgespris" : "spotpris og strømstøtte"}, påslag og månedsgebyr. ${plan.vatExemption ? "Uten mva. i valgt område." : "Inkl. mva."}`,
+        `Timespot, etterskuddsvis, ingen bindingstid.${plan.guaranteeMonths > 0 ? ` Påslagsgaranti: ${plan.guaranteeMonths} mnd.` : ""}`,
+        "Nettleie og eventuelt papirfakturagebyr kommer i tillegg. Månedsprisen er et estimat, ikke en prisgaranti.",
+        `Innrapporterte avtaledata fra Forbrukerrådet. Sist endret hos kilden: ${plan.updatedAt.slice(0, 10)}.`,
+        plan.conditionsText,
+        plan.invoiceRequirement,
+        `Utvalget utelater kampanjer og medlemsavtaler. Minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} måneders påslagsgaranti, som portalens standardfilter.`
+      ].filter(Boolean).join("\n")
+    }));
+  }
+  function buildElectricityComparisonTooltip(offers, error = "") {
+    const example = offers[0]?.electricity;
+    return [
+      "Forbrukerrådet · strømavtaler",
+      `Regneeksempel: ${ELECTRICITY_EXAMPLE.municipality} · ${(example?.yearlyKwh ?? ELECTRICITY_EXAMPLE.yearlyKwh).toLocaleString("nb-NO")} kWh/år. Dette er ikke en beregning av din strømregning.`,
+      example ? `Beregnet total strømpris for ${example.period}, inkl. ${example.scheme === "norgespris" ? "Norgespris" : "spotpris og strømstøtte"}, påslag og månedsgebyr. Nettleie kommer i tillegg.` : "",
+      offers.length > 0 ? ["Billigste sammenlignbare strømavtaler", ...offers.map((offer) => {
+        const e = offer.electricity;
+        const conditions = [
+          e.maximumYearlyKwh !== void 0 ? `opptil ${e.maximumYearlyKwh.toLocaleString("nb-NO")} kWh/år` : "",
+          e.guaranteeMonths !== void 0 ? `${e.guaranteeMonths} mnd. påslagsgaranti` : ""
+        ].filter(Boolean).join(" · ");
+        return [
+          `- ${offer.productName}: ${offer.shopName} — ${offer.price}`,
+          `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr · ${formatKr(e.addonOrePerKwh)} øre/kWh påslag${conditions ? ` · ${conditions}` : ""}`,
+          e.stromstotteMonthlyNok !== void 0 ? `Med vanlig strømstøtte: ~${formatKr(e.stromstotteMonthlyNok)} kr/mnd` : void 0,
+          e.invoiceRequirement,
+          e.conditionsText
+        ].filter(Boolean).join("\n");
+      })].join("\n") : error || "Ingen sammenlignbare avtaler akkurat nå.",
+      `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen.`,
+      "Inkl. mva. Nettleie og eventuelt papirfakturagebyr kommer i tillegg. Månedsprisen er et estimat, ikke en prisgaranti.",
+      "Kilde: innrapporterte avtaledata fra Forbrukerrådet.",
+      "Standardavtaler med kort påslagsgaranti finnes under «Under 6 måneder» i portalens garantifilter."
+    ].filter(Boolean);
+  }
+  function summarizeElectricityComparison(offers) {
+    const best = offers[0];
+    if (best === void 0) return void 0;
+    return {
+      ...best,
+      details: buildElectricityComparisonTooltip(offers).join("\n\n"),
+      alternatives: offers.map((offer) => ({
+        shopName: offer.shopName,
+        productName: offer.productName,
+        ...offer.offerUrl !== void 0 ? { offerUrl: offer.offerUrl } : {},
+        ...offer.electricity !== void 0 ? { electricity: offer.electricity } : {},
+        amount: offer.amount,
+        price: offer.price,
+        currency: offer.currency
+      }))
+    };
+  }
+  function readPlan(value, yearlyKwh, now) {
+    if (!isRecord$6(value) || !positive(value.id) || !Number.isSafeInteger(value.id) || typeof value.name !== "string" || value.type !== "hourly_spot" || value.applicableToCustomerType !== "allCustomers" && value.applicableToCustomerType !== "newAndExisting" || value.expiredAt !== null || value.paymentType !== "after" || !validDate(value.publishedAt) || Date.parse(value.publishedAt) > now.getTime() || !validDate(value.updatedAt) || value.endDate !== null && (!validDate(value.endDate) || Date.parse(value.endDate) <= now.getTime())) return void 0;
+    const { conditions, fee, currentPrice: price, organization, addonPrice } = value;
+    if (!isRecord$6(conditions) || !isRecord$6(fee) || !isRecord$6(price) || !isRecord$6(organization) || !isRecord$6(price.tax) || typeof organization.name !== "string" || !positive(organization.id) || !Number.isSafeInteger(organization.id) || !Array.isArray(conditions.associations) || conditions.associations.length > 0 || conditions.cabinProduct !== false || conditions.promotionalAgreement !== false || conditions.linkedProduct !== null || typeof conditions.feeMandatoryType !== "string" || !Object.hasOwn(INVOICE_REQUIREMENTS, conditions.feeMandatoryType) || conditions.agreementTime !== null && conditions.agreementTime !== 0 || conditions.otherConditions !== null && (typeof conditions.otherConditions !== "string" || conditions.otherConditions.length > 1e4) || conditions.maxKwhPerYear !== null && (!positive(conditions.maxKwhPerYear) || yearlyKwh > conditions.maxKwhPerYear) || fee.contractBreachFee !== false || !nonNegative(fee.finalMonthlyFee) || !nonNegative(price.finalAddonPrice) || typeof price.tax.vatExemption !== "boolean" || !positive(price.finalPriceMonthly) || !positive(value.monthlyConsumption) || price.gridTariff !== null || !nonNegative(price.finalKwPrice) || typeof price.subsidyPrice !== "number" || !Number.isFinite(price.subsidyPrice) || price.subsidyPrice > 0 || !nonNegative(price.norgesprisPrice) || !nonNegative(price.spotPriceIncludingSubsidy) || !isRecord$6(value.billing) || value.billing.frequency !== 1 || value.billing.unit !== "month") return void 0;
+    const orderUrl = safeOrderUrl(value.orderUrl);
+    if (orderUrl === void 0) return void 0;
+    const guarantee = isRecord$6(addonPrice) && nonNegative(addonPrice.addonPriceMinimumFixedFor) ? addonPrice.addonPriceMinimumFixedFor : 0;
+    const guaranteeMonths = isRecord$6(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "year" ? guarantee * 12 : isRecord$6(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "month" ? guarantee : 0;
+    const amount = price.finalPriceMonthly;
+    if (!nonNegative(amount)) return void 0;
+    return {
+      id: value.id,
+      name: value.name,
+      supplier: organization.name,
+      supplierId: organization.id,
+      orderUrl,
+      monthlyFee: fee.finalMonthlyFee,
+      addon: price.finalAddonPrice,
+      amount,
+      monthlyKwh: value.monthlyConsumption,
+      guaranteeMonths,
+      norgesprisRate: price.norgesprisPrice,
+      subsidizedSpotRate: price.spotPriceIncludingSubsidy,
+      conditionsText: typeof conditions.otherConditions === "string" ? conditions.otherConditions.trim() : "",
+      invoiceRequirement: INVOICE_REQUIREMENTS[conditions.feeMandatoryType],
+      vatExemption: price.tax.vatExemption,
+      updatedAt: value.updatedAt,
+      maximumYearlyKwh: conditions.maxKwhPerYear
+    };
+  }
+  function safeOrderUrl(value) {
+    if (typeof value !== "string") return void 0;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password ? url.toString() : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function nonNegative(value) {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0;
+  }
+  function positive(value) {
+    return nonNegative(value) && value > 0;
+  }
+  function validDate(value) {
+    return typeof value === "string" && Number.isFinite(Date.parse(value));
+  }
+  async function fetchPublicJson(url) {
+    try {
+      const response = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      throw new Error(`Forbrukerrådet ${new URL(url).pathname}: ${error instanceof Error ? error.message : "nettverksfeil"}`);
+    }
+  }
   const GG_DEALS_ORIGIN = "https://gg.deals";
   const GG_DEALS_STEAM_APP_PRICE_URL = "https://api.gg.deals/v1/prices/by-steam-app-id/";
   const DEFAULT_GG_DEALS_API_KEY = "sqz5OjdsyxNW2e0i3aF5BA0p5rpd0fHU";
@@ -3042,13 +3333,13 @@
     return values;
   }
   function readNextProductData(html, productUrl) {
-    const pending = [...readNextFlightValues(html)];
-    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
-      const item = pending[visited];
-      if (Array.isArray(item)) pending.push(...item);
+    const pending2 = [...readNextFlightValues(html)];
+    for (let visited = 0; visited < pending2.length && visited < 5e4; visited += 1) {
+      const item = pending2[visited];
+      if (Array.isArray(item)) pending2.push(...item);
       else if (isRecord$6(item)) {
         if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
-        pending.push(...Object.values(item));
+        pending2.push(...Object.values(item));
       }
     }
     return void 0;
@@ -3079,13 +3370,13 @@
     };
   }
   function findStructuredProperty(value, name) {
-    const pending = [value];
-    for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
-      const item = pending.pop();
-      if (Array.isArray(item)) pending.push(...item);
+    const pending2 = [value];
+    for (let visited = 0; pending2.length > 0 && visited < 5e4; visited += 1) {
+      const item = pending2.pop();
+      if (Array.isArray(item)) pending2.push(...item);
       else if (isRecord$6(item)) {
         if (Object.hasOwn(item, name)) return item[name];
-        pending.push(...Object.values(item));
+        pending2.push(...Object.values(item));
       }
     }
     return void 0;
@@ -5206,14 +5497,14 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function readPriceRows(html, productUrl) {
     const id = new URL(productUrl).pathname.split("/")[2];
-    const pending = readNextFlightValues(html);
+    const pending2 = readNextFlightValues(html);
     const components = [];
-    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
-      const item = pending[visited];
-      if (Array.isArray(item)) pending.push(...item);
+    for (let visited = 0; visited < pending2.length && visited < 5e4; visited += 1) {
+      const item = pending2[visited];
+      if (Array.isArray(item)) pending2.push(...item);
       else if (isRecord$6(item)) {
         if (isRecord$6(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
-        pending.push(...Object.values(item));
+        pending2.push(...Object.values(item));
       }
     }
     const rowLists = components.map((item) => [item.lowestPrice, ...item.otherInStockPrices, ...item.outOfStockPrices]);
@@ -5502,8 +5793,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       const scripts = readPokeprisScriptUrls(html, ORIGIN);
       for (let offset = 0; offset < scripts.length; offset += 4) {
         const sources = await Promise.all(scripts.slice(offset, offset + 4).map((url) => requestText(url)));
-        for (const source of sources) {
-          const action = source === void 0 ? void 0 : readPokeprisSearchAction(source);
+        for (const source2 of sources) {
+          const action = source2 === void 0 ? void 0 : readPokeprisSearchAction(source2);
           if (action !== void 0) return action;
         }
       }
@@ -5522,8 +5813,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   function readPokeprisScriptUrls(html, origin) {
     return [...new Set([...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((match) => new URL(match[1], origin)).filter((url) => url.origin === origin && url.pathname.startsWith("/_next/static/chunks/")).map((url) => url.href))].reverse().slice(0, MAX_SCRIPT_REQUESTS);
   }
-  function readPokeprisSearchAction(source) {
-    return source.match(/createServerReference\)\(\s*["']([a-f0-9]{40,})["'][^;]{0,250}?["']getProducts["']/)?.[1];
+  function readPokeprisSearchAction(source2) {
+    return source2.match(/createServerReference\)\(\s*["']([a-f0-9]{40,})["'][^;]{0,250}?["']getProducts["']/)?.[1];
   }
   function readPokeprisSearchResult(text) {
     for (const line of text.split("\n")) {
@@ -6677,6 +6968,9 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   const MIN_ALLOWED_PRODUCT_TITLE_MATCH_SCORE = 0.45;
   async function findPriceMatches(message, requestJson, requestText, options = {}) {
+    if (isElectricityPriceMatchUrl(message.url)) {
+      return findElectricityPriceMatches(message, requestJson);
+    }
     if (isVinmonopoletProductUrl(message.url)) {
       const taxfreeOffer2 = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
       return taxfreeOffer2 !== void 0 ? [taxfreeOffer2] : [];
@@ -6896,6 +7190,41 @@ query SearchSuggestions($query: String!, $category: Int) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   const GENERIC_MERCHANT_KEYS = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
+  function createElectricityComparison(options) {
+    let error = "";
+    let result;
+    const isSupported = () => isElectricityPriceMatchUrl(options.getUrl());
+    const prepare = () => loadElectricitySuppliers(options.requestJson, options.catalogCache);
+    async function getOffers() {
+      await prepare();
+      if (!isSupported()) return [];
+      const url = options.getUrl();
+      if (result === void 0 || result.url !== url || result.expiresAt <= Date.now()) {
+        result = { url, expiresAt: Date.now() + 15 * 6e4, promise: (async () => {
+          const grids = await getElectricityLocalGrids(options.requestJson);
+          const grid = grids.find((grid2) => grid2.name === ELECTRICITY_EXAMPLE.municipality && grid2.areaCode === ELECTRICITY_EXAMPLE.areaCode);
+          if (grid === void 0) throw new Error("Forbrukerrådet: regneeksempelets prisområde mangler");
+          return options.findOffers({
+            type: "get-price-match-for-product",
+            url,
+            searchTerm: "Strømavtaler",
+            electricity: { localGridId: grid.id, yearlyKwh: ELECTRICITY_EXAMPLE.yearlyKwh, norgespris: ELECTRICITY_EXAMPLE.norgespris }
+          });
+        })() };
+      }
+      try {
+        const offers = await result.promise;
+        error = offers.length === 0 ? "Ingen sammenlignbare strømavtaler akkurat nå." : "";
+        const best = summarizeElectricityComparison(offers);
+        return best === void 0 ? [] : [best];
+      } catch (cause) {
+        result = void 0;
+        error = cause instanceof Error ? cause.message : "Forbrukerrådet: kunne ikke hente strømavtaler";
+        return [];
+      }
+    }
+    return { prepare, isSupported, getOffers, getError: () => error };
+  }
   const PLAYSTATION_REGIONS = [
     { region: "NO", countryName: "Norge", flag: "🇳🇴", locale: "no-no" },
     { region: "US", countryName: "USA", flag: "🇺🇸", locale: "en-us" },
@@ -8716,6 +9045,8 @@ query SearchSuggestions($query: String!, $category: Int) {
 .cbn-row { border: 0; border-radius: var(--cbn-control-radius); box-shadow: none; background: var(--cbn-soft); transition: background-color .12s; }
 .cbn-row:hover { background: var(--cbn-hover); }
 .cbn-row:active { background: var(--cbn-plate-down); }
+.cbn-row.cbn-row--details:hover { background: color-mix(in srgb, var(--cbn-soft) 80%, var(--cbn-text) 20%); }
+.cbn-row.cbn-row--details:hover .cbn-chip--muted { background: color-mix(in srgb, var(--cbn-plate-down) 85%, var(--cbn-text) 15%); }
 .cbn-chip { border: 0; border-radius: var(--cbn-chip-radius); box-shadow: none; }
 .cbn-chip[href], button.cbn-chip { transition: filter .12s; }
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
@@ -8839,6 +9170,10 @@ query SearchSuggestions($query: String!, $category: Int) {
   --cbn-glass-surface: rgba(23,23,23,.98);
 }
 ${darkProviderCss}
+.cbn-tooltip-details {
+  --cbn-text: #dedede; --cbn-muted: #b7b7b7; --cbn-soft: #282828;
+  --cbn-plate: #3b3b3b; --cbn-plate-down: #404040; --cbn-accent: #7ddc9f;
+}
 :root[data-cbn-theme="dark"] .cbn-chip--muted, :host([data-cbn-theme="dark"]) .cbn-chip--muted { background: #3b3b3b; color: #c8c8c8; }
 :root[data-cbn-theme="dark"] .app-chip, :host([data-cbn-theme="dark"]) .app-chip { background: #303d4b; color: #bfd0e5; }
 :root[data-cbn-theme="dark"] .ad-chip, :host([data-cbn-theme="dark"]) .ad-chip { background: #40372b; color: #e3c79d; }
@@ -8964,7 +9299,7 @@ ${darkProviderCss}
     const view = doc.defaultView;
     const targets = /* @__PURE__ */ new WeakMap();
     const hoverHosts = /* @__PURE__ */ new WeakMap();
-    let active;
+    let active2;
     const addMascot = (tooltip) => {
       if (tooltip.querySelector(".cbn-tooltip-mascot")) return;
       tooltip.classList.add("cbn-has-quokka");
@@ -8978,8 +9313,8 @@ ${darkProviderCss}
       tooltip.prepend(mascot);
     };
     const close = () => {
-      if (!active) return;
-      const { button, tooltip, style, topLayer } = active;
+      if (!active2) return;
+      const { button, tooltip, style, topLayer } = active2;
       button.setAttribute("aria-expanded", "false");
       tooltip.classList.remove("cbn-tooltip-open", "visible");
       if (topLayer) {
@@ -8991,14 +9326,14 @@ ${darkProviderCss}
       }
       if (style === null) tooltip.removeAttribute("style");
       else tooltip.setAttribute("style", style);
-      active = void 0;
+      active2 = void 0;
     };
     const onClick = (event) => {
       const button = event.target.closest(".cbn-tooltip-trigger");
       if (!button || !targets.has(button)) return;
       event.preventDefault();
       event.stopPropagation();
-      if (active?.button === button) {
+      if (active2?.button === button) {
         close();
         return;
       }
@@ -9039,25 +9374,25 @@ ${darkProviderCss}
           }
         }
       }
-      active = { button, tooltip, style, topLayer };
+      active2 = { button, tooltip, style, topLayer };
       const rect = tooltip.getBoundingClientRect();
       const position = tooltipPosition(button.getBoundingClientRect(), rect.width, rect.height, { width: doc.documentElement.clientWidth, height: view.innerHeight });
       tooltip.style.left = `${position.left}px`;
       tooltip.style.top = `${position.top}px`;
     };
     const outside = (event) => {
-      if (active && !event.composedPath().includes(active.button) && !event.composedPath().includes(active.tooltip)) close();
+      if (active2 && !event.composedPath().includes(active2.button) && !event.composedPath().includes(active2.tooltip)) close();
     };
     const onKey = (event) => {
-      if (event.key === "Escape" && active) {
-        const button = active.button;
+      if (event.key === "Escape" && active2) {
+        const button = active2.button;
         close();
         button.focus();
         event.stopPropagation();
       }
     };
     const onScroll = (event) => {
-      if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
+      if (active2 && !(event.target instanceof Node && active2.tooltip.contains(event.target))) close();
     };
     const onHover = (event) => {
       for (let element = event.target; element; element = element.parentElement) {
@@ -9413,11 +9748,11 @@ ${darkProviderCss}
     panflights: { best: "quality", cheapest: "price", fastest: "duration" },
     kiwi: { best: "quality", cheapest: "price", fastest: "duration" }
   };
-  function buildFlightSortUrlValue(source, mode) {
-    return FLIGHT_SORT_URL_VALUES[source]?.[mode] ?? "";
+  function buildFlightSortUrlValue(source2, mode) {
+    return FLIGHT_SORT_URL_VALUES[source2]?.[mode] ?? "";
   }
-  function readFlightSortUrlValue(source, value) {
-    const values = FLIGHT_SORT_URL_VALUES[source];
+  function readFlightSortUrlValue(source2, value) {
+    const values = FLIGHT_SORT_URL_VALUES[source2];
     if (value === null || values === void 0) return void 0;
     return ["best", "cheapest", "fastest"].find((mode) => values[mode] === value);
   }
@@ -10684,7 +11019,7 @@ ${darkProviderCss}
     if (parsedUrl === void 0 || !parsedUrl.hostname.endsWith("trip.com")) return;
     const filters = readFlightLinkFilters(parsedUrl);
     if (filters === void 0) return;
-    const pending = /* @__PURE__ */ new Set([
+    const pending2 = /* @__PURE__ */ new Set([
       ...filters.maxStops !== void 0 && filters.maxStops > 0 ? ["stops"] : [],
       ...filters.includeCabinBag === true ? ["cabin"] : [],
       ...filters.includeCheckedBag === true ? ["checked"] : [],
@@ -10694,7 +11029,7 @@ ${darkProviderCss}
     const checkOnce = (key, element) => {
       if (element === null || element === void 0) return;
       if (element.getAttribute("aria-checked") === "true") {
-        pending.delete(key);
+        pending2.delete(key);
         return;
       }
       if (clickedKeys.has(key)) return;
@@ -10705,7 +11040,7 @@ ${darkProviderCss}
     const timerId = window.setInterval(() => {
       attempts += 1;
       removeUnrequestedTripComFilters(filters, clickedKeys);
-      if (pending.has("stops")) {
+      if (pending2.has("stops")) {
         checkOnce("stops", document.querySelector(
           `[data-testid="filter_stops"] .filter-item[data-code="${filters.maxStops}"] [role="checkbox"]`
         ));
@@ -10713,19 +11048,19 @@ ${darkProviderCss}
       const baggageOptions = [...document.querySelectorAll(
         '[data-testid="filter_baggage"] [role="checkbox"], [data-testid="filter_others"] [role="checkbox"]'
       )];
-      if (pending.has("cabin")) {
+      if (pending2.has("cabin")) {
         checkOnce("cabin", baggageOptions.find((option) => /carry-on/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
       }
-      if (pending.has("checked")) {
+      if (pending2.has("checked")) {
         checkOnce("checked", baggageOptions.find((option) => /checked/i.test(option.getAttribute("aria-label") ?? option.textContent ?? "")));
       }
-      if (pending.size === 1 && pending.has("duration") && filters.maxDurationMinutes !== void 0 && attempts % 4 === 0 && applyTripComMaxDuration(filters.maxDurationMinutes)) {
-        pending.delete("duration");
+      if (pending2.size === 1 && pending2.has("duration") && filters.maxDurationMinutes !== void 0 && attempts % 4 === 0 && applyTripComMaxDuration(filters.maxDurationMinutes)) {
+        pending2.delete("duration");
       }
-      if (pending.size === 0 && attempts >= 8 || attempts >= 120) {
+      if (pending2.size === 0 && attempts >= 8 || attempts >= 120) {
         window.clearInterval(timerId);
-        if (pending.size > 0) {
-          console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending].join(", ")} på ${window.location.href}.`);
+        if (pending2.size > 0) {
+          console.warn(`[Cashback Norge] Fant ikke Trip.com-filtrene ${[...pending2].join(", ")} på ${window.location.href}.`);
         }
         const currentUrl = parseUrl(window.location.href);
         if (currentUrl !== void 0 && currentUrl.searchParams.has(FLIGHT_LINK_FILTERS_PARAM)) {
@@ -10900,6 +11235,23 @@ ${darkProviderCss}
   }
   let renderGeneration = 0;
   let runtimeCardOffers = [];
+  const electricityComparison = createElectricityComparison({
+    getUrl: () => window.location.href,
+    requestJson: userscriptJsonRequest,
+    catalogCache: {
+      read: async () => (await chrome.storage.local.get(ELECTRICITY_SUPPLIER_CACHE_KEY))[ELECTRICITY_SUPPLIER_CACHE_KEY],
+      write: async (catalog) => {
+        await chrome.storage.local.set({ [ELECTRICITY_SUPPLIER_CACHE_KEY]: catalog });
+      }
+    },
+    findOffers: async (message) => {
+      if (isUserscriptRuntime()) return findPriceMatches(message, userscriptJsonRequest, userscriptTextRequest);
+      const response = await sendRuntimeMessage(message);
+      if (response === void 0 || !isPriceMatchForProductResponse(response)) throw new Error("Forbrukerrådet: fikk ikke svar fra extensionen");
+      if (!response.ok) throw new Error(response.reason);
+      return response.offers ?? (response.offer !== void 0 ? [response.offer] : []);
+    }
+  });
   async function renderCurrentContext() {
     const generation = ++renderGeneration;
     const offersPromise = getCurrentOffers().catch(() => []);
@@ -10918,7 +11270,7 @@ ${darkProviderCss}
     ]);
     priceMatchesSettled = true;
     if (generation !== renderGeneration) return;
-    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0) {
+    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || electricityComparison.isSupported()) {
       renderNoticeWithStoredState(offers, priceMatches, regionPrices);
       scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
       return;
@@ -10984,6 +11336,8 @@ ${darkProviderCss}
     }
   }
   async function getPriceMatchesForCurrentPage(onFlightProgress) {
+    await electricityComparison.prepare();
+    if (electricityComparison.isSupported()) return electricityComparison.getOffers();
     const flightOffers = await findFlightPriceMatchOffers(onFlightProgress);
     if (flightOffers.length > 0) return flightOffers;
     const hotelOffers = await findHotelPriceMatchOffers();
@@ -11042,15 +11396,15 @@ ${darkProviderCss}
       }));
     };
     reportProgress();
-    await Promise.all(session.liveOfferFinders.map(async ({ source, sourceName, findOffer }) => {
+    await Promise.all(session.liveOfferFinders.map(async ({ source: source2, sourceName, findOffer }) => {
       const offer = await safelyFindFlightPriceMatchOffer(sourceName, () => findOffer());
       if (generation !== renderGeneration) return;
       if (offer !== void 0) liveOffers.push(offer);
-      pendingSources.delete(source);
+      pendingSources.delete(source2);
       reportProgress();
       if (offer?.searchIncomplete !== true) return;
       const replaceOffer = (nextOffer) => {
-        liveOffers[liveOffers.findIndex((liveOffer) => liveOffer.source === source)] = nextOffer;
+        liveOffers[liveOffers.findIndex((liveOffer) => liveOffer.source === source2)] = nextOffer;
         reportProgress();
       };
       let currentOffer = offer;
@@ -16829,6 +17183,25 @@ ${darkProviderCss}
       flightMeta.dateFlex !== void 0 ? formatFlightDateFlexDays(flightMeta.dateFlex, true) : ""
     ].join("|");
   }
+  function buildElectricityBasisChips(e, shadowRoot) {
+    const chips = buildPriceMatchInfoChips([
+      `${ELECTRICITY_EXAMPLE.municipality} · ${ELECTRICITY_EXAMPLE.areaCode}`,
+      `${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år`,
+      "Spotpris",
+      e.scheme === "norgespris" ? `Norgespris · ${formatKr(e.energyOrePerKwh)} øre/kWh` : "Strømstøtte"
+    ]);
+    chips.classList.add("electricity-basis-chips");
+    addHoverChipTooltip(chips, [
+      "Prisene gjelder et regneeksempel:",
+      `- Husholdning i ${ELECTRICITY_EXAMPLE.municipality}, prisområde ${ELECTRICITY_EXAMPLE.areaCode}, som i Forbrukerrådets standardeksempel.`,
+      `- ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år, som i Forbrukerrådets standardeksempel. Dette er ikke ditt målte forbruk.`,
+      `- Kildens forbruksprofil gir ${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh i ${e.period}.`,
+      `- Spotavtaler uten binding, medlemskrav eller kampanjevilkår, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti, som portalens standardfilter.`,
+      e.scheme === "norgespris" ? `- Med Norgespris: ${formatKr(e.energyOrePerKwh)} øre/kWh inkl. mva., før leverandørens påslag og månedsgebyr. Eksemplet forutsetter Norgespris; vi vet ikke om du har valgt ordningen.` : `- Spotpris etter strømstøtte i eksemplet: ${formatKr(e.energyOrePerKwh)} øre/kWh før påslag og månedsgebyr.`,
+      "- Nettleie kommer i tillegg. Prisene hentes live fra Forbrukerrådets strømprisportal."
+    ].join("\n"), shadowRoot);
+    return chips;
+  }
   async function getRegionPricesForCurrentPage() {
     const currentUrl = window.location.href;
     const regionPriceLookupUrl = getRegionPriceLookupUrlForCurrentPage(currentUrl);
@@ -16906,6 +17279,7 @@ ${darkProviderCss}
         };
         if (init?.headers !== void 0) requestOptions.headers = init.headers;
         if (init?.body !== void 0) requestOptions.data = init.body;
+        if (init?.credentials === "omit") requestOptions.anonymous = true;
         const maybePromise = gmRequest(requestOptions);
         if (isPromiseLike(maybePromise)) {
           maybePromise.then(
@@ -18285,6 +18659,14 @@ ${darkProviderCss}
       background: ${PROVIDER_COLORS.pokepris.bg};
       color: ${PROVIDER_COLORS.pokepris.fg};
     }
+    .provider-forbrukerradet {
+      background: ${PROVIDER_COLORS.forbrukerradet.bg};
+      color: ${PROVIDER_COLORS.forbrukerradet.fg};
+    }
+    .provider-bytt {
+      background: ${PROVIDER_COLORS.bytt.bg};
+      color: ${PROVIDER_COLORS.bytt.fg};
+    }
     .provider-godpris {
       background: #21003f;
       color: #ffffff;
@@ -18762,7 +19144,7 @@ ${darkProviderCss}
       width: auto;
     }
     /* Chipene har egen linje under «Prismatch», så radene får full bredde. */
-    .flight-filter-chips {
+    .flight-filter-chips, .electricity-basis-chips {
       display: inline-flex;
       flex-basis: 100%;
       flex-shrink: 0;
@@ -18770,7 +19152,7 @@ ${darkProviderCss}
       gap: 4px;
       justify-content: flex-start;
     }
-    .flight-filter-chips .flight-filter-chip {
+    .flight-filter-chips .flight-filter-chip, .electricity-basis-chips .price-match-info-chip {
       align-items: center;
       display: inline-flex;
       font-size: 11px;
@@ -18790,6 +19172,7 @@ ${darkProviderCss}
       transition: transform 0.15s;
     }
     .price-match-section.collapsed .price-match-card,
+    .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
       display: none;
     }
@@ -18812,6 +19195,18 @@ ${darkProviderCss}
       padding: 6px 9px;
       text-decoration: none;
     }
+    .electricity-error { color: var(--cbn-muted); font-size: 11px; margin: 0; }
+    .electricity-comparison-tooltip { box-sizing: border-box; max-height: calc(100vh - 32px); max-width: calc(100vw - 16px); overflow-y: auto; }
+    .electricity-tooltip-heading { font-size: 12px; font-weight: 700; margin: 0 0 5px; }
+    .electricity-tooltip-basis { color: inherit; opacity: .82; font-size: 10px; line-height: 1.4; margin: 0 0 8px; }
+    .comparison-tooltip-option { color: var(--cbn-text); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 6px; padding: 7px; margin: 4px 0; }
+    .comparison-tooltip-option > :first-child { font-weight: 600; min-width: 0; }
+    .comparison-tooltip-option > strong { color: var(--cbn-accent); white-space: nowrap; }
+    .comparison-tooltip-option > .price-match-chip-line { grid-column: 1 / -1; }
+    .comparison-tooltip-option .price-match-info-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    .electricity-tooltip-plan > strong { color: var(--cbn-accent); white-space: nowrap; }
+    .electricity-tooltip-plan > .price-match-chip-line, .electricity-tooltip-terms { grid-column: 1 / -1; }
+    .electricity-tooltip-terms { color: var(--cbn-muted); font-size: 10px; line-height: 1.4; }
     .price-match-card.price-match-card--with-duration {
       grid-template-columns: minmax(0, 1fr) auto auto auto;
     }
@@ -19236,11 +19631,11 @@ ${darkProviderCss}
     const cryptoSub = cryptoSubEntry?.[1];
     const codeOffers = offers.filter((o) => o.provider === "rabattkode" || o.discountCode !== void 0 && o.discountCode.length > 0);
     const offer = mainOffers[0];
-    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0 && bestRegionPrice === void 0) {
+    if (offer === void 0 && codeOffers.length === 0 && priceMatch === void 0 && bestRegionPrice === void 0 && !electricityComparison.isSupported()) {
       return;
     }
     const primaryOffer = offer ?? codeOffers[0];
-    if (primaryOffer === void 0 && priceMatch === void 0 && bestRegionPrice === void 0) {
+    if (primaryOffer === void 0 && priceMatch === void 0 && bestRegionPrice === void 0 && !electricityComparison.isSupported()) {
       return;
     }
     const tooltipControls = createTooltipController(shadowRoot);
@@ -19249,7 +19644,7 @@ ${darkProviderCss}
     const bestReward = offer !== void 0 ? parseRewardValue(offer) : void 0;
     const hasFantasticOffer = offer !== void 0 && (bestReward?.kind === "percentage" && bestReward.amount >= 10 || (readRewardSortValueNok(offer) ?? 0) >= 250);
     if (hasFantasticOffer) notice.classList.add("has-fantastic-offer");
-    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : "region");
+    const sideTabProvider = offer?.provider ?? (primaryOffer !== void 0 ? getCodeSourceProvider(primaryOffer) : void 0) ?? (priceMatch !== void 0 ? getPriceMatchProviderClass(priceMatch) : electricityComparison.isSupported() ? "forbrukerradet" : "region");
     const sideTab = document.createElement("button");
     sideTab.className = `cbn-button side-tab side-tab-${sideTabProvider}`;
     sideTab.type = "button";
@@ -19284,6 +19679,11 @@ ${darkProviderCss}
         chipSpan.textContent = formatProviderName(codeProvider);
         sideTabText.append(chipSpan);
       }
+    } else if (electricityComparison.isSupported()) {
+      const chipSpan = document.createElement("span");
+      chipSpan.className = "cbn-chip side-tab-chip provider-forbrukerradet";
+      chipSpan.textContent = PROVIDER_NAMES.forbrukerradet;
+      sideTabText.append("Strøm", chipSpan);
     } else if (priceMatch !== void 0) {
       const rewardSpan = document.createElement("span");
       rewardSpan.className = "side-tab-reward";
@@ -19315,7 +19715,7 @@ ${darkProviderCss}
     const siteIcon = createSiteIcon();
     const title = document.createElement("p");
     title.className = "title";
-    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Regionpriser";
+    title.textContent = offer !== void 0 ? `${formatOfferTitlePrefix(offer)} hos ${offer.merchantName}` : primaryOffer !== void 0 ? `Rabattkode hos ${primaryOffer.merchantName}` : electricityComparison.isSupported() ? `Prismatch hos ${getElectricitySupplier(location.href).name}` : priceMatch !== void 0 ? `Prismatch hos ${priceMatch.shopName}` : "Regionpriser";
     header.append(siteIcon, title);
     const sumInput = document.createElement("input");
     sumInput.className = "cbn-field sum-input";
@@ -19325,7 +19725,7 @@ ${darkProviderCss}
     sumInput.addEventListener("keydown", (e) => {
       if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
     });
-    header.append(sumInput);
+    if (!electricityComparison.isSupported() || mainOffers.length > 0) header.append(sumInput);
     const rewardLabels = [];
     const tooltipElements = [];
     const offerList = document.createElement("div");
@@ -20135,7 +20535,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     const priceMatchSection = document.createElement("div");
     priceMatchSection.className = "price-match-section";
-    if (priceMatches.length > 0) {
+    if (priceMatches.length > 0 || electricityComparison.isSupported()) {
       if (initialPriceMatchCollapsed) {
         priceMatchSection.classList.add("collapsed");
       }
@@ -20159,15 +20559,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const flightMeta = currentUrl !== void 0 && priceMatches.some((priceMatch2) => priceMatch2.travelKind !== "hotel" && isFlightSearchPriceMatch(priceMatch2)) ? extractFlightSearchMeta(currentUrl) : void 0;
       const flightFilterChips = flightMeta !== void 0 ? buildFlightFilterChips(flightMeta, shadowRoot, flightSortMode) : void 0;
       if (flightFilterChips !== void 0) priceMatchHeader.append(flightFilterChips);
+      const electricity = priceMatches[0]?.electricity;
+      if (electricity !== void 0) priceMatchHeader.append(buildElectricityBasisChips(electricity, shadowRoot));
       priceMatchSection.append(
         priceMatchHeader,
         ...priceMatches.map((priceMatch2, index) => buildPriceMatchCard(priceMatch2, index === 0))
       );
+      if (electricityComparison.isSupported() && priceMatches.length === 0) {
+        const status = document.createElement("p");
+        status.className = "electricity-error";
+        status.textContent = electricityComparison.getError() || "Ingen sammenlignbare strømavtaler akkurat nå.";
+        priceMatchSection.append(status);
+      }
     }
     body.append(header);
     if (mainOffers.length > 0) body.append(offerList);
     if (regionPrices !== void 0 && regionPrices.prices.length > 0) body.append(regionPricesSection);
-    if (priceMatches.length > 0) body.append(priceMatchSection);
+    if (priceMatches.length > 0 || electricityComparison.isSupported()) body.append(priceMatchSection);
     body.append(chipsSection);
     if (offers.length > 0) body.append(codesSection);
     let userHasVoted = false;
@@ -20450,6 +20858,103 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     disposeNoticeTheme = void 0;
     document.getElementById(HOST_ID)?.remove();
   }
+  function buildElectricityTooltip(tooltip, offer) {
+    tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
+    const heading = document.createElement("p");
+    heading.className = "electricity-tooltip-heading";
+    heading.textContent = "Billigste sammenlignbare avtaler";
+    const basis = document.createElement("p");
+    basis.className = "electricity-tooltip-basis";
+    const e = offer.electricity;
+    basis.textContent = `Total strømpris for ${e.period}, inkl. ${e.scheme === "norgespris" ? `Norgespris (${formatKr(e.energyOrePerKwh)} øre/kWh)` : "spotpris og strømstøtte"}, påslag og månedsgebyr. Regneeksempel ${ELECTRICITY_EXAMPLE.municipality} · ${e.yearlyKwh.toLocaleString("nb-NO")} kWh/år (${Math.round(e.monthlyKwh).toLocaleString("nb-NO")} kWh denne måneden). Nettleie kommer i tillegg.`;
+    tooltip.append(heading, basis);
+    const alternatives = (offer.alternatives ?? []).filter((row) => row.electricity !== void 0);
+    const sorted = [...alternatives].sort((a, b) => a.amount - b.amount);
+    const addPlan = (plan) => {
+      const row = document.createElement("div");
+      row.className = "cbn-row cbn-row--details comparison-tooltip-option electricity-tooltip-plan";
+      const title = document.createElement("span");
+      title.textContent = plan.shopName;
+      const amount = document.createElement("strong");
+      amount.textContent = plan.price;
+      const chips = buildElectricityPriceMatchChips({ electricity: plan.electricity, productName: plan.productName ?? plan.shopName });
+      row.append(title, amount, chips);
+      const terms2 = document.createElement("span");
+      terms2.className = "electricity-tooltip-terms";
+      const e2 = plan.electricity;
+      terms2.textContent = [
+        e2.guaranteeMonths !== void 0 ? `${e2.guaranteeMonths} mnd. påslagsgaranti` : void 0,
+        e2.maximumYearlyKwh !== void 0 ? `maks ${e2.maximumYearlyKwh.toLocaleString("nb-NO")} kWh/år` : void 0
+      ].filter(Boolean).join(" · ");
+      if (terms2.textContent) row.append(terms2);
+      if (e2.stromstotteMonthlyNok !== void 0) {
+        const subsidy = document.createElement("span");
+        subsidy.className = "electricity-tooltip-terms";
+        subsidy.textContent = `Med vanlig strømstøtte: ~${formatKr(e2.stromstotteMonthlyNok)} kr/mnd`;
+        row.append(subsidy);
+      }
+      for (const text of [e2.invoiceRequirement, e2.conditionsText]) {
+        if (!text) continue;
+        const condition = document.createElement("span");
+        condition.className = "electricity-tooltip-terms";
+        condition.textContent = text;
+        row.append(condition);
+      }
+      tooltip.append(row);
+    };
+    if (sorted.length === 0) {
+      const none = document.createElement("p");
+      none.textContent = "Ingen sammenlignbare avtaler i dette utvalget.";
+      tooltip.append(none);
+    }
+    sorted.forEach(addPlan);
+    const terms = document.createElement("p");
+    terms.className = "electricity-tooltip-basis";
+    terms.textContent = `Viser opptil ${ELECTRICITY_MAX_OFFERS} billigste spotavtaler uten binding eller medlemskrav, med minst ${ELECTRICITY_MIN_GUARANTEE_MONTHS} mnd. påslagsgaranti. Kampanjer er utelatt; øvrige vilkår står ved avtalen. Inkl. mva. ${e.scheme === "norgespris" ? "Eksemplet forutsetter at du har valgt Norgespris." : "Estimatet varierer med spotpris og forbruk."}`;
+    const source2 = document.createElement("p");
+    source2.className = "electricity-tooltip-basis";
+    source2.textContent = "Kilde: Forbrukerrådets strømprisportal og forbruksprofil. Eventuelt papirfakturagebyr kommer i tillegg.";
+    tooltip.append(terms, source2);
+  }
+  function buildFlightPriceMatchTooltip(tooltip, offer) {
+    tooltip.classList.add("cbn-tooltip-details");
+    const parts = buildPriceMatchTooltip(offer).split(/\n{2,}/);
+    const listHeading = (part) => /^(Treffliste|Prisgrunnlag|Billigste datoer \([^\n]+\))\n/.test(part);
+    if (!parts.some(listHeading) || !offer.alternatives?.length) {
+      setTooltipContent(tooltip, [buildPriceMatchTooltip(offer)]);
+      return;
+    }
+    for (const part of parts) {
+      if (!listHeading(part)) {
+        const section2 = createTooltipSection(part);
+        if (section2 !== void 0) tooltip.append(section2);
+        continue;
+      }
+      const section = document.createElement("div");
+      section.className = "offer-tooltip-section";
+      const heading = document.createElement("span");
+      heading.className = "offer-tooltip-title";
+      heading.textContent = part.split("\n")[0];
+      section.append(heading);
+      const limit = offer.dateFlex === void 0 ? FLIGHT_TOOLTIP_MAX_ROWS : FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS;
+      for (const alternative of offer.alternatives.slice(0, limit)) {
+        const row = document.createElement("div");
+        row.className = "cbn-row cbn-row--details comparison-tooltip-option flight-tooltip-option";
+        const name = document.createElement("span");
+        name.textContent = alternative.shopName.replace(/:$/, "");
+        const price = document.createElement("strong");
+        price.textContent = alternative.price;
+        const chips = buildPriceMatchInfoChips([.../* @__PURE__ */ new Set([
+          ...alternative.durationText?.split(" · ") ?? [],
+          ...alternative.platform?.split(/,\s*/) ?? []
+        ])]);
+        row.append(name, price);
+        if (chips.childElementCount > 0) row.append(chips);
+        section.append(row);
+      }
+      tooltip.append(section);
+    }
+  }
   function attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls) {
     if (priceMatches.length === 0) return;
     const cards = shadowRoot.querySelectorAll(".price-match-card");
@@ -20459,34 +20964,39 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       if (card === void 0 || priceMatch === void 0) continue;
       const tooltip = document.createElement("div");
       tooltip.className = "offer-tooltip";
-      setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
+      if (priceMatch.electricity !== void 0) buildElectricityTooltip(tooltip, priceMatch);
+      else if (isFlightPanelRow(priceMatch)) buildFlightPriceMatchTooltip(tooltip, priceMatch);
+      else setTooltipContent(tooltip, [buildPriceMatchTooltip(priceMatch)]);
       shadowRoot.append(tooltip);
       const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
       row.classList.add("price-match-tooltip-row");
       row.classList.toggle("price-match-tooltip-row--with-duration", card.classList.contains("price-match-card--with-duration"));
-      let hideTimer;
-      const clearHideTimer = () => {
-        if (hideTimer === void 0) return;
-        window.clearTimeout(hideTimer);
-        hideTimer = void 0;
-      };
-      const showTooltip = () => {
-        clearHideTimer();
-        positionTooltipRightOfPanel(tooltip, card, shadowRoot);
-      };
-      const scheduleHideTooltip = () => {
-        clearHideTimer();
-        hideTimer = window.setTimeout(() => {
-          if (!card.matches(":hover") && !tooltip.matches(":hover")) {
-            tooltip.classList.remove("visible");
-          }
-        }, 120);
-      };
-      card.addEventListener("mouseenter", showTooltip);
-      card.addEventListener("mouseleave", scheduleHideTooltip);
-      tooltip.addEventListener("mouseenter", showTooltip);
-      tooltip.addEventListener("mouseleave", scheduleHideTooltip);
+      bindPriceMatchTooltipHover(card, tooltip, shadowRoot);
     }
+  }
+  function bindPriceMatchTooltipHover(card, tooltip, shadowRoot) {
+    let hideTimer;
+    const clearHideTimer = () => {
+      if (hideTimer === void 0) return;
+      window.clearTimeout(hideTimer);
+      hideTimer = void 0;
+    };
+    const showTooltip = () => {
+      clearHideTimer();
+      positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+    };
+    const scheduleHideTooltip = () => {
+      clearHideTimer();
+      hideTimer = window.setTimeout(() => {
+        if (!card.matches(":hover") && !tooltip.matches(":hover")) {
+          tooltip.classList.remove("visible");
+        }
+      }, 120);
+    };
+    card.addEventListener("mouseenter", showTooltip);
+    card.addEventListener("mouseleave", scheduleHideTooltip);
+    tooltip.addEventListener("mouseenter", showTooltip);
+    tooltip.addEventListener("mouseleave", scheduleHideTooltip);
   }
   function setTooltipContent(tooltip, parts) {
     const sectionParts = parts.flatMap((part) => part.split(/\n{2,}/));
@@ -20643,10 +21153,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return isRecord(value) && typeof value.planName === "string" && (value.formattedPrice === void 0 || typeof value.formattedPrice === "string") && (value.formattedNok === void 0 || typeof value.formattedNok === "string") && (value.unavailableReason === void 0 || typeof value.unavailableReason === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.source === void 0 || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.source === void 0 || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
   }
   function isPriceMatchAlternative(value) {
-    return isRecord(value) && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.productName === void 0 || typeof value.productName === "string") && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -20834,6 +21344,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : void 0,
       priceMatch.baggageExcluded === true ? "ekskl. bagasje" : void 0
     ];
+    return buildPriceMatchInfoChips(texts);
+  }
+  function buildPriceMatchInfoChips(texts) {
     const chips = document.createElement("span");
     chips.className = "price-match-chip-line";
     for (const text of texts) {
@@ -20846,6 +21359,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return chips;
   }
   const supportAdvertisementDraw = Math.random();
+  function buildElectricityPriceMatchChips(priceMatch) {
+    const e = priceMatch.electricity;
+    return buildPriceMatchInfoChips([`${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
+  }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "cbn-row price-match-card";
@@ -20879,9 +21396,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const priceMatchBadge = document.createElement("span");
     priceMatchBadge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(priceMatch)}`;
     priceMatchBadge.textContent = getPriceMatchSourceName(priceMatch);
-    if (isFlightPanelRow(priceMatch)) {
+    if (isFlightPanelRow(priceMatch) || priceMatch.electricity !== void 0) {
       priceMatchCard.classList.add("price-match-card--chips");
-      const chips = buildFlightPriceMatchChips(priceMatch);
+      const chips = priceMatch.electricity !== void 0 ? buildElectricityPriceMatchChips(priceMatch) : buildFlightPriceMatchChips(priceMatch);
       const side = document.createElement("span");
       side.className = "price-match-side";
       if (priceMatch.amount >= FLIGHT_STATIC_PRICE_SORT_AMOUNT) side.classList.add("price-match-side--inline");
@@ -21040,6 +21557,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     ].join("\n");
   }
   function getPriceMatchProviderClass(priceMatch) {
+    if (priceMatch.source === "forbrukerradet") return "forbrukerradet";
     if (priceMatch.source === "pokepris") return "pokepris";
     if (priceMatch.source === "godpris") return "godpris";
     if (priceMatch.source === "klarna") return "klarna";
@@ -21063,6 +21581,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return "prisjakt";
   }
   function getPriceMatchSourceName(priceMatch) {
+    if (priceMatch.source === "forbrukerradet") return PROVIDER_NAMES.forbrukerradet;
     if (priceMatch.sourceName !== void 0) return priceMatch.sourceName;
     if (priceMatch.source === "pokepris") return PROVIDER_NAMES.pokepris;
     if (priceMatch.source === "godpris") return "Godpris";
@@ -21088,6 +21607,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return "Prisjakt";
   }
   function buildPriceMatchTooltip(priceMatch) {
+    if (priceMatch.source === "forbrukerradet") return priceMatch.details ?? PROVIDER_NAMES.forbrukerradet;
     if (priceMatch.travelKind === "hotel") {
       const alternatives2 = priceMatch.alternatives ?? [];
       const details = priceMatch.details ?? priceMatch.shopName;

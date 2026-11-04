@@ -1,0 +1,53 @@
+- generic [active] [ref=f15e1]:
+  - generic [ref=f15e2]:
+    - generic [ref=f15e3]:
+      - img "Chrome logo" [ref=f15e5]
+      - generic [ref=f15e6]: Google LLC
+      - generic [ref=f15e7]: Copyright 2026 Google LLC. All rights reserved.
+    - table [ref=f15e8]:
+      - rowgroup [ref=f15e9]:
+        - row [ref=f15e10]:
+          - cell "Google Chrome:" [ref=f15e11]
+          - cell [ref=f15e12]:
+            - generic [ref=f15e13]: 156.0.8078.48 (Official Build) (arm64)
+            - button "Copy version string" [ref=f15e14] [cursor=pointer]
+        - row [ref=f15e16]:
+          - cell "Revision:" [ref=f15e17]
+          - 'cell "d0c02bfad08ec92a6ffcf989e53cd995e6381a4c-refs/branch-heads/8078@{#1314}" [ref=f15e18]'
+        - row [ref=f15e19]:
+          - cell "OS:" [ref=f15e20]
+          - cell "macOS Version 27.2 (Build 26B123)" [ref=f15e21]
+        - row [ref=f15e23]:
+          - cell "JavaScript:" [ref=f15e24]
+          - cell "V8 15.6.75.19" [ref=f15e25]
+        - row [ref=f15e26]:
+          - cell "User Agent:" [ref=f15e27]
+          - cell "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36" [ref=f15e28]
+        - row [ref=f15e29]:
+          - cell "Command Line:" [ref=f15e30]
+          - cell [ref=f15e31]
+        - row [ref=f15e32]:
+          - cell "Executable Path:" [ref=f15e33]
+          - cell "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" [ref=f15e34]
+        - row [ref=f15e35]:
+          - cell "Profile Path:" [ref=f15e36]
+          - cell "/private/var/folders/yr/ds59_2ms4cj41tynqn26md240000gn/T/playwright_chromiumdev_profile-y2eVQM/Default" [ref=f15e37]
+        - row [ref=f15e38]:
+          - cell "Linker:" [ref=f15e39]
+          - cell "lld" [ref=f15e40]
+        - row [ref=f15e41]:
+          - cell "Variations Source:" [ref=f15e42]
+          - cell "command line or about flags" [ref=f15e43]
+        - text: ":"
+        - row [ref=f15e44]:
+          - cell "Command-line Variations:" [ref=f15e45]
+          - cell "eyJkaXNhYmxlLWZlYXR1cmVzIjoiQWltRW5hYmxlZCxBdXRvRGVFbGV2YXRl..." [ref=f15e46]
+          - cell [ref=f15e47]:
+            - button "Copy variations string" [ref=f15e48] [cursor=pointer]
+        - row [ref=f15e50]:
+          - cell "Active Variations:" [ref=f15e51]
+          - cell "b6f29041-9af5ba90 b357b792-dcf2ae30 f4f00e05-ca7d8d80 70678518-dee66fa8 be338734-dee66fa8 5f9907a9-dee66fa8 8eeccb9a-dee66fa8 2b465683-dee66fa8 52fc7926-ee3d6169 bc9b361d-dee66fa8 a41a7188-dee66fa8 ff71bfdc-dee66fa8 251fc742-dee66fa8 2159dd0c-dee66fa8 4330e9a4-dee66fa8 e7cc79d5-dee66fa8 4b935545-3d47f4f4 9a38bae3-6046c8a7 2d1e43a3-3d47f4f4 370ace14-3f4a17df 386dc267-3d47f4f4 d69d967d-9cce7190 3c8f75a1-dcfbe471 a983f698-4a95a5b1" [ref=f15e52]: b6f29041-9af5ba90b357b792-dcf2ae30f4f00e05-ca7d8d8070678518-dee66fa8be338734-dee66fa85f9907a9-dee66fa88eeccb9a-dee66fa82b465683-dee66fa852fc7926-ee3d6169bc9b361d-dee66fa8a41a7188-dee66fa8ff71bfdc-dee66fa8251fc742-dee66fa82159dd0c-dee66fa84330e9a4-dee66fa8e7cc79d5-dee66fa84b935545-3d47f4f49a38bae3-6046c8a72d1e43a3-3d47f4f4370ace14-3f4a17df386dc267-3d47f4f4d69d967d-9cce71903c8f75a1-dcfbe471a983f698-4a95a5b1
+          - cell [ref=f15e53]:
+            - button "Copy variations string" [ref=f15e54] [cursor=pointer]
+        - text: ":"
+  - alert [ref=f15e56]

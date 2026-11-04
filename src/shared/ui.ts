@@ -45,6 +45,8 @@ export const UI_CSS = `
 .cbn-row { border: 0; border-radius: var(--cbn-control-radius); box-shadow: none; background: var(--cbn-soft); transition: background-color .12s; }
 .cbn-row:hover { background: var(--cbn-hover); }
 .cbn-row:active { background: var(--cbn-plate-down); }
+.cbn-row.cbn-row--details:hover { background: color-mix(in srgb, var(--cbn-soft) 80%, var(--cbn-text) 20%); }
+.cbn-row.cbn-row--details:hover .cbn-chip--muted { background: color-mix(in srgb, var(--cbn-plate-down) 85%, var(--cbn-text) 15%); }
 .cbn-chip { border: 0; border-radius: var(--cbn-chip-radius); box-shadow: none; }
 .cbn-chip[href], button.cbn-chip { transition: filter .12s; }
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }

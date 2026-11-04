@@ -3,6 +3,7 @@ import type {
   PriceMatchOffer,
 } from "./extension-messages.js";
 import { findAllKeyShopPriceMatch } from "./allkeyshop-price-match.js";
+import { findElectricityPriceMatches, isElectricityPriceMatchUrl } from "./electricity-price-match.js";
 import {
   findGgDealsPriceMatch,
   type GgDealsPriceMatchOptions,
@@ -61,6 +62,9 @@ export async function findPriceMatches(
   requestText?: TextRequest,
   options: PriceMatchRuntimeOptions = {},
 ): Promise<PriceMatchOffer[]> {
+  if (isElectricityPriceMatchUrl(message.url)) {
+    return findElectricityPriceMatches(message, requestJson);
+  }
   if (isVinmonopoletProductUrl(message.url)) {
     const taxfreeOffer = await ignorePriceMatchFailure(findTaxfreePriceMatch(message, requestJson));
     return taxfreeOffer !== undefined ? [taxfreeOffer] : [];

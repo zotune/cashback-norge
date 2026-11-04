@@ -87,6 +87,10 @@ export const THEME_CSS = `
   --cbn-glass-surface: rgba(23,23,23,.98);
 }
 ${darkProviderCss}
+.cbn-tooltip-details {
+  --cbn-text: #dedede; --cbn-muted: #b7b7b7; --cbn-soft: #282828;
+  --cbn-plate: #3b3b3b; --cbn-plate-down: #404040; --cbn-accent: #7ddc9f;
+}
 :root[data-cbn-theme="dark"] .cbn-chip--muted, :host([data-cbn-theme="dark"]) .cbn-chip--muted { background: #3b3b3b; color: #c8c8c8; }
 :root[data-cbn-theme="dark"] .app-chip, :host([data-cbn-theme="dark"]) .app-chip { background: #303d4b; color: #bfd0e5; }
 :root[data-cbn-theme="dark"] .ad-chip, :host([data-cbn-theme="dark"]) .ad-chip { background: #40372b; color: #e3c79d; }

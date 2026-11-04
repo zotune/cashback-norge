@@ -9,6 +9,8 @@ export function getProviderPageUrl(provider: string): string {
 export const EB_PER_TRUMF_KR = 13.5;
 
 export const PROVIDER_NAMES: Record<string, string> = {
+  forbrukerradet: "Forbrukerrådet",
+  bytt: "Bytt.no",
   pokepris: "Pokepris",
   trumf: "Trumf",
   klarna: "Klarna",
@@ -71,6 +73,8 @@ export const PROVIDER_NAMES: Record<string, string> = {
 };
 
 export const PROVIDER_TIPS: Record<string, string> = {
+  forbrukerradet: "Beregnet månedspris fra Forbrukerrådet, inkludert strøm, påslag og månedsgebyr. Grunnlagschipene viser område, forbruk og Norgespris/strømstøtte. Nettleie kommer i tillegg.",
+  bytt: "Sammenlign strømavtaler hos Bytt.no. Åpner kildens strømoversikt.",
   pokepris: "Varepriser fra Pokepris. Frakt er ukjent og kommer eventuelt i tillegg. Klikk for hele prislisten hos Pokepris.",
   trumf: "Trumf-bonus. Aktiver i Trumf-appen.\n1 Trumf-kr ≈ 13,5 SAS EuroBonus-poeng.",
   klarna: "Klarna+ medlemskap.\nPlus: +0,5% (49 kr/mnd), Max: +1% (99 kr/mnd).",
@@ -127,6 +131,8 @@ export const PROVIDER_TIPS: Record<string, string> = {
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: string; preserveInDark?: boolean }> = {
+  forbrukerradet: { bg: "#004a66", fg: "#ffffff", preserveInDark: true },
+  bytt: { bg: "#0075f5", fg: "#ffffff", preserveInDark: true },
   pokepris: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
   crypto: { bg: "#002d74", fg: "#ffffff" },
   remember: { bg: "#111111", fg: "#ff9900" },

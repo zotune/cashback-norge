@@ -1,0 +1,312 @@
+[
+  {
+    "id": 11682,
+    "name": "Standard spotavtale privat",
+    "type": "hourly_spot",
+    "applicableToCustomerType": "allCustomers",
+    "orderUrl": "https://www.klarkraft.no",
+    "publishedAt": "2026-07-27T00:00:00.000Z",
+    "updatedAt": "2026-07-27T16:26:25.000Z",
+    "expiredAt": null,
+    "endDate": null,
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": 50000,
+      "cabinProduct": false,
+      "otherConditions": "",
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": true,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "paymentType": "after",
+    "fee": {
+      "monthlyFee": 31.2,
+      "finalMonthlyFee": 39,
+      "postalLetterFee": 0,
+      "finalPostalLetterFee": 0,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 1,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 0
+    },
+    "organization": {
+      "id": 10117,
+      "name": "Klarkraft AS",
+      "pricelistUrl": "https://klarkraft.no/nyheter/alle-strømavtaler"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 3.9,
+      "finalPriceMonthly": 1604,
+      "tax": {
+        "vatExemption": false,
+        "elCertificateExemption": false,
+        "vatRatio": 0.25,
+        "consumerElectricityTax": 0.1613,
+        "elCertificatePrice": 0
+      },
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  },
+  {
+    "id": 12650,
+    "name": "Agva Light",
+    "type": "hourly_spot",
+    "applicableToCustomerType": "allCustomers",
+    "orderUrl": "https://www.agva.no/stromavtale/agva-light/?utm_source=strompris.no",
+    "publishedAt": "2026-08-31T00:00:00.000Z",
+    "updatedAt": "2026-08-31T06:16:00.000Z",
+    "expiredAt": null,
+    "endDate": null,
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": 30000,
+      "cabinProduct": false,
+      "otherConditions": null,
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": false,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "paymentType": "after",
+    "fee": {
+      "monthlyFee": 12,
+      "finalMonthlyFee": 15,
+      "postalLetterFee": 7.92,
+      "finalPostalLetterFee": 9.9,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 12,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 0
+    },
+    "organization": {
+      "id": 10060,
+      "name": "Agva Kraft",
+      "pricelistUrl": "https://www.agva.no/prisliste/"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 0,
+      "finalPriceMonthly": 1525,
+      "tax": {
+        "vatExemption": false,
+        "elCertificateExemption": false,
+        "vatRatio": 0.25,
+        "consumerElectricityTax": 0.1613,
+        "elCertificatePrice": 0.03
+      },
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  },
+  {
+    "id": 11987,
+    "name": "Kun strøm",
+    "type": "hourly_spot",
+    "applicableToCustomerType": "allCustomers",
+    "orderUrl": "https://jaerkraft.no/kun-strom/",
+    "publishedAt": "2026-08-25T00:00:00.000Z",
+    "updatedAt": "2026-08-25T06:58:52.000Z",
+    "expiredAt": null,
+    "endDate": null,
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": 50000,
+      "cabinProduct": false,
+      "otherConditions": "",
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": true,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "paymentType": "after",
+    "fee": {
+      "monthlyFee": 15.2,
+      "finalMonthlyFee": 19,
+      "postalLetterFee": 9.36,
+      "finalPostalLetterFee": 11.7,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 12,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 0
+    },
+    "organization": {
+      "id": 10146,
+      "name": "Jærkraft AS",
+      "pricelistUrl": "https://jaerkraft.no/prisliste/"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 0,
+      "finalPriceMonthly": 1529,
+      "tax": {
+        "vatExemption": false,
+        "elCertificateExemption": false,
+        "vatRatio": 0.25,
+        "consumerElectricityTax": 0.1613,
+        "elCertificatePrice": 0
+      },
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  },
+  {
+    "id": 12467,
+    "name": "Vibb Spot",
+    "type": "hourly_spot",
+    "applicableToCustomerType": "allCustomers",
+    "orderUrl": "https://vibb.no/strom",
+    "publishedAt": "2026-07-28T00:00:00.000Z",
+    "updatedAt": "2026-07-28T09:18:56.000Z",
+    "expiredAt": null,
+    "endDate": null,
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": null,
+      "cabinProduct": false,
+      "otherConditions": null,
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": false,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "paymentType": "after",
+    "fee": {
+      "monthlyFee": 39.2,
+      "finalMonthlyFee": 49,
+      "postalLetterFee": 0,
+      "finalPostalLetterFee": 0,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 12,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 0
+    },
+    "organization": {
+      "id": 10115,
+      "name": "Vibb AS",
+      "pricelistUrl": "https://vibb.no/strom/"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 0,
+      "finalPriceMonthly": 1559,
+      "tax": {
+        "vatExemption": false,
+        "elCertificateExemption": false,
+        "vatRatio": 0.25,
+        "consumerElectricityTax": 0.1613,
+        "elCertificatePrice": 0
+      },
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  },
+  {
+    "id": 12668,
+    "name": "Cheap spot 12",
+    "type": "hourly_spot",
+    "applicableToCustomerType": "allCustomers",
+    "orderUrl": "https://cheapenergy.no/privat/cheap-spot-12/?utm_source=strompris.no",
+    "publishedAt": "2026-10-05T00:00:00.000Z",
+    "updatedAt": "2026-10-05T10:21:13.000Z",
+    "expiredAt": null,
+    "endDate": null,
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": 16000,
+      "cabinProduct": false,
+      "otherConditions": "Etter utløpt vilkårsgaranti løper avtalen videre på like vilkår hvis ikke andre endringer blir varslet.",
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": false,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "paymentType": "after",
+    "fee": {
+      "monthlyFee": 12,
+      "finalMonthlyFee": 15,
+      "postalLetterFee": 6.4,
+      "finalPostalLetterFee": 8,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 12,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 3.9
+    },
+    "organization": {
+      "id": 10148,
+      "name": "Cheap Energy Norge AS",
+      "pricelistUrl": "https://cheapenergy.no/prisliste/"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 0,
+      "finalPriceMonthly": 1525,
+      "tax": {
+        "vatExemption": false,
+        "elCertificateExemption": false,
+        "vatRatio": 0.25,
+        "consumerElectricityTax": 0.1613,
+        "elCertificatePrice": 0
+      },
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  }
+]

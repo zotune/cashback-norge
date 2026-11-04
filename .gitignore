@@ -7,6 +7,7 @@ data/cashback-index.json
 site/cashback-index.json
 data/pokepris-catalog.json
 site/pokepris-catalog.json
+site/electricity-suppliers.json
 *tmp*
 *.log*
 # Plan and roadmap: kept out of the public repository

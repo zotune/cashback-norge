@@ -8,6 +8,7 @@ import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import { createCashbackIndexCache, type CachedIndex } from "./cashback-index-cache.js";
 import { getCardBenefitOffers } from "../shared/card-benefits.js";
 import { findPriceMatches } from "../shared/price-match.js";
+import { ELECTRICITY_SUPPLIER_CACHE_KEY, getElectricitySupplierCatalog, loadElectricitySuppliers } from "../shared/electricity-suppliers.js";
 import {
   findPlayStationRegionPrices,
   isPlayStationProductUrl,
@@ -183,8 +184,16 @@ async function findOffersForUrl(
 async function findPriceMatchForProduct(
   message: GetPriceMatchForProductMessage,
 ): Promise<PriceMatchForProductResponse> {
-  const offers = await findPriceMatches(message);
-  return { ok: true, ...(offers[0] !== undefined ? { offer: offers[0], offers } : {}) };
+  try {
+    if (message.electricity !== undefined) await loadElectricitySuppliers(undefined, {
+      read: async () => (await chrome.storage.local.get(ELECTRICITY_SUPPLIER_CACHE_KEY))[ELECTRICITY_SUPPLIER_CACHE_KEY],
+      write: async (catalog) => { await chrome.storage.local.set({ [ELECTRICITY_SUPPLIER_CACHE_KEY]: catalog }); },
+    });
+    const offers = await findPriceMatches(message);
+    return { ok: true, ...(offers[0] !== undefined ? { offer: offers[0], offers } : {}) };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Prissammenligningen feilet" };
+  }
 }
 
 async function getPlayStationRegionPrices(
@@ -226,6 +235,8 @@ async function getPlayStationRegionPrices(
 async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpRequestResponse> {
   const parsedUrl = parseHttpUrl(message.url);
   const supportedHosts = new Set([
+    "cashbacknorge.no",
+    "strom-api.forbrukerradet.no",
     "open.er-api.com",
     "api.travelpayouts.com",
     "www.finn.no",
@@ -246,11 +257,38 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     return { ok: false, reason: "Unsupported host" };
   }
 
+  const isElectricityRequest = parsedUrl.hostname === "strom-api.forbrukerradet.no";
+  const isCatalogRequest = parsedUrl.hostname === "cashbacknorge.no";
+  if (isCatalogRequest && (parsedUrl.protocol !== "https:" || parsedUrl.port || parsedUrl.pathname !== "/electricity-suppliers.json" ||
+    parsedUrl.search || (message.method ?? "GET") !== "GET" || message.body !== undefined)) {
+    return { ok: false, reason: "Unsupported electricity catalogue request" };
+  }
+  if (isElectricityRequest && (parsedUrl.protocol !== "https:" || parsedUrl.pathname !== "/local_grids/" ||
+    (message.method ?? "GET") !== "GET" || message.body !== undefined)) {
+    return { ok: false, reason: "Unsupported electricity request" };
+  }
+  if (isCatalogRequest) {
+    // All open tabs share this background refresh and the persisted catalogue.
+    await loadElectricitySuppliers(undefined, {
+      read: async () => (await chrome.storage.local.get(ELECTRICITY_SUPPLIER_CACHE_KEY))[ELECTRICITY_SUPPLIER_CACHE_KEY],
+      write: async (catalog) => { await chrome.storage.local.set({ [ELECTRICITY_SUPPLIER_CACHE_KEY]: catalog }); },
+    });
+    const catalog = getElectricitySupplierCatalog();
+    return catalog === undefined ? { ok: false, reason: "Forbrukerrådet: ingen gyldig leverandørkatalog" }
+      : message.responseType === "text" ? { ok: true, responseType: "text", text: JSON.stringify(catalog) }
+      : { ok: true, responseType: "json", value: catalog };
+  }
+
   try {
     const init: RequestInit = { method: message.method ?? "GET" };
     if (message.headers !== undefined) init.headers = message.headers;
     if (message.body !== undefined) init.body = message.body;
     if (message.credentials !== undefined) init.credentials = message.credentials;
+    if (isElectricityRequest || isCatalogRequest) {
+      init.credentials = "omit";
+      init.headers = { Accept: "application/json" };
+      init.signal = AbortSignal.timeout(15_000);
+    }
 
     const response = await fetch(message.url, init);
     if (!response.ok) {

@@ -1,0 +1,118 @@
+[
+  {
+    "id": 12238,
+    "name": "Spotpris",
+    "type": "hourly_spot",
+    "orderUrl": "https://www.fortum.com/no/strom/stromavtale/spotpris",
+    "publishedAt": "2024-11-27T00:00:00.000Z",
+    "updatedAt": "2024-11-27T07:46:30.000Z",
+    "endDate": null,
+    "expiredAt": null,
+    "applicableToCustomerType": "allCustomers",
+    "paymentType": "after",
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": null,
+      "cabinProduct": false,
+      "otherConditions": null,
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": false,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "fee": {
+      "monthlyFee": 39.2,
+      "finalMonthlyFee": 49,
+      "postalLetterFee": 5.6,
+      "finalPostalLetterFee": 7,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 1,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 0
+    },
+    "organization": {
+      "id": 10030,
+      "name": "Fortum",
+      "pricelistUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 5.9,
+      "tax": {
+        "vatExemption": false
+      },
+      "finalPriceMonthly": 847,
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  },
+  {
+    "id": 11044,
+    "name": "Strøm til Spotpris",
+    "type": "hourly_spot",
+    "orderUrl": "https://www.fjordkraft.no/strom/stromavtale/strom-til-spotpris/",
+    "publishedAt": "2026-08-31T00:00:00.000Z",
+    "updatedAt": "2026-08-31T09:03:13.000Z",
+    "endDate": null,
+    "expiredAt": null,
+    "applicableToCustomerType": "allCustomers",
+    "paymentType": "after",
+    "conditions": {
+      "associations": [],
+      "agreementTime": null,
+      "agreementTimeUnit": "month",
+      "maxKwhPerYear": null,
+      "cabinProduct": false,
+      "otherConditions": "",
+      "feeMandatoryType": "none",
+      "feeMandatoryUpdated": true,
+      "linkedProduct": null,
+      "promotionalAgreement": false
+    },
+    "fee": {
+      "monthlyFee": 55.2,
+      "finalMonthlyFee": 69,
+      "postalLetterFee": 6.656000000000001,
+      "finalPostalLetterFee": 8.32,
+      "contractBreachFee": false
+    },
+    "addonPrice": {
+      "addonPriceMinimumFixedFor": 1,
+      "addonPriceMinimumFixedForUnit": "month",
+      "purchaseAddonPrice": 0
+    },
+    "organization": {
+      "id": 10049,
+      "name": "Fjordkraft AS",
+      "pricelistUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/"
+    },
+    "currentPrice": {
+      "finalAddonPrice": 5.9,
+      "tax": {
+        "vatExemption": false
+      },
+      "finalPriceMonthly": 867,
+      "finalKwPrice": 206.11,
+      "subsidyPrice": -100.3125,
+      "gridTariff": null,
+      "norgesprisPrice": 50,
+      "spotPriceIncludingSubsidy": 105.8
+    },
+    "monthlyConsumption": 1427.04,
+    "billing": {
+      "frequency": 1,
+      "unit": "month"
+    }
+  }
+]

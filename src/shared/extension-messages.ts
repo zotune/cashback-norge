@@ -6,6 +6,7 @@ import {
   isRecord,
 } from "./cashback.js";
 import type { KiwiSortPrices } from "./flight-search.js";
+import { isElectricitySearch, type ElectricitySearch, type ElectricityPriceDetails } from "./electricity-price-match.js";
 import type {
   PlayStationRegionPriceResult,
 } from "./playstation-region-prices.js";
@@ -32,6 +33,7 @@ export type GetOffersForUrlMessage = {
 
 export type GetPriceMatchForProductMessage = {
   type: "get-price-match-for-product";
+  electricity?: ElectricitySearch;
   url: string;
   searchTerm: string;
   price?: number;
@@ -96,7 +98,8 @@ export type OffersForUrlResponse =
     };
 
 export type PriceMatchOffer = {
-  source?: "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
+  electricity?: ElectricityPriceDetails;
+  source?: "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -115,6 +118,10 @@ export type PriceMatchOffer = {
 };
 
 export type PriceMatchAlternative = {
+  electricity?: ElectricityPriceDetails;
+  productName?: string;
+  offerUrl?: string;
+  matchedCurrentMerchant?: boolean;
   shopName: string;
   price: string;
   amount: number;
@@ -229,7 +236,8 @@ export function isGetPriceMatchForProductMessage(
     (value.packageAmount === undefined || typeof value.packageAmount === "number") &&
     (value.packageUnit === undefined || isProductPackageUnit(value.packageUnit)) &&
     (value.volumeMl === undefined || typeof value.volumeMl === "number") &&
-    (value.alcoholPercent === undefined || typeof value.alcoholPercent === "number")
+    (value.alcoholPercent === undefined || typeof value.alcoholPercent === "number") &&
+    (value.electricity === undefined || isElectricitySearch(value.electricity))
   );
 }
 
