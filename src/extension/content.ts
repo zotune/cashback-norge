@@ -5878,13 +5878,13 @@ function extractTripComListOfferCandidates(
       if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return undefined;
       if (exceedsFlightMaxDuration(flightMeta, journeys.map((journey) => readNumberValue(journey.duration)))) return undefined;
 
-      const candidate = toTripComOfferCandidate({
-        amount,
+      const priceInput = {
         currency,
         productUrl: resultUrl,
         rates,
         platformParts: [formatTripComItinerarySummary(itinerary, airlineNames)],
-      });
+      };
+      const candidate = toTripComOfferCandidate({ amount, ...priceInput });
       if (candidate === undefined) return undefined;
 
       const durationText = formatFlightLegDurationsWithStopsText(journeys.map((journey) => ({
@@ -5916,7 +5916,8 @@ function extractTripComListOfferCandidates(
           productId,
           outboundLeg: readTripComJourneyLeg(outbound, airlineNames),
           outboundKey: readStringValue(outbound.uniqueId) ?? policyId,
-          totalPrice: readTripComPolicyAmount(policy)!,
+          totalPrice: amount,
+          priceInput,
         });
       }
       return result;
@@ -5948,18 +5949,23 @@ function readTripComJourneyLeg(journey: Record<string, unknown>, airlineNames: R
 }
 
 // Tur/retur hos Trip.com velges i to steg som på nettsiden: FlightListSearch med journeyNo 2,
-// valgt policyId og søkets productId gir returene for én utreise (verifisert 2026-11-05).
-// Returen med priceDifference 0 er den som gir rundreiseprisen listen viser; uten en slik
-// retur, eller ved feil, får treffet ingen etappelinjer.
+// valgt policyId og søkets productId gir returene for én utreise, med rundreisepris per retur
+// (verifisert 2026-11-05). Listens pris gjelder billigste retur uten søkets stopp- og
+// reisetidsfilter (PVG⇄BGO: retur på 38 t mot filteret ≤22 t). Derfor velges billigste retur
+// som oppfyller filtrene, og prisen justeres til den. Finnes ingen slik retur, er rundreisen
+// ikke et gyldig treff. Ved feil eller tomt svar beholdes treffet uten etappelinjer.
 type TripComReturnLookup = {
   policyId: string;
   productId: string;
   outboundLeg: FlightLegDetails;
   outboundKey: string;
   totalPrice: number;
+  priceInput: { currency: string; productUrl: string; rates: NokBaseRates | undefined; platformParts: Array<string | undefined> };
 };
+// null: svaret har returer, men ingen som oppfyller søket.
+type TripComReturnSelection = { leg: FlightLegDetails; totalPrice: number } | null;
 const tripComReturnLookups = new WeakMap<TripComFlightOfferCandidate, TripComReturnLookup>();
-const tripComReturnLegCache = new Map<string, Promise<FlightLegDetails | undefined>>();
+const tripComReturnLegCache = new Map<string, Promise<TripComReturnSelection | undefined>>();
 const TRIP_COM_RETURN_LOOKUP_LIMIT = FLIGHT_TOOLTIP_MAX_ROWS;
 const TRIP_COM_RETURN_CACHE_LIMIT = 100;
 const TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearch`;
@@ -5970,21 +5976,32 @@ async function addTripComReturnLegs(
   session: TripComFlightSession,
 ): Promise<TripComFlightOfferCandidate[]> {
   if (flightMeta.inboundDate === undefined) return candidates;
-  const result = [...candidates];
+  const result: TripComFlightOfferCandidate[] = [];
   let lookups = 0;
-  for (const [index, candidate] of candidates.entries()) {
+  for (const candidate of candidates) {
     const lookup = tripComReturnLookups.get(candidate);
-    if (lookup === undefined) continue;
-    if (lookups++ >= TRIP_COM_RETURN_LOOKUP_LIMIT) break;
+    if (lookup === undefined || lookups >= TRIP_COM_RETURN_LOOKUP_LIMIT) {
+      result.push(candidate);
+      continue;
+    }
+    lookups++;
     // Sekvensielt for å holde antall kall mot Trip.com lavt.
-    const returnLeg = await fetchTripComReturnLeg(lookup, flightMeta, session);
-    if (returnLeg === undefined) continue;
-    const durationMinutes = sumFlightLegMinutes([lookup.outboundLeg.durationMinutes, returnLeg.durationMinutes]);
-    result[index] = {
+    const selection = await fetchTripComReturnLeg(lookup, flightMeta, session);
+    if (selection === null) continue;
+    if (selection === undefined) {
+      result.push(candidate);
+      continue;
+    }
+    const repriced = selection.totalPrice !== lookup.totalPrice
+      ? toTripComOfferCandidate({ amount: selection.totalPrice, ...lookup.priceInput })
+      : undefined;
+    const durationMinutes = sumFlightLegMinutes([lookup.outboundLeg.durationMinutes, selection.leg.durationMinutes]);
+    result.push({
       ...candidate,
-      flightLegs: [lookup.outboundLeg, returnLeg],
+      ...(repriced !== undefined ? repriced : {}),
+      flightLegs: [lookup.outboundLeg, selection.leg],
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
-    };
+    });
   }
   return result;
 }
@@ -5993,12 +6010,13 @@ function fetchTripComReturnLeg(
   lookup: TripComReturnLookup,
   flightMeta: FlightSearchMeta,
   session: TripComFlightSession,
-): Promise<FlightLegDetails | undefined> {
+): Promise<TripComReturnSelection | undefined> {
   const key = [buildFlightSearchMetaKey(flightMeta), lookup.outboundKey, lookup.totalPrice].join("|");
   const cached = tripComReturnLegCache.get(key);
   if (cached !== undefined) return cached;
   const promise = requestTripComReturnLeg(lookup, flightMeta, session).catch((error: unknown) => {
-    console.warn(`[Cashback Norge] Trip.com retur for ${flightMeta.origin}-${flightMeta.destination} feilet: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(`[Cashback Norge] Trip.com retur for ${flightMeta.origin}-${flightMeta.destination} ${flightMeta.inboundDate ?? ""} feilet: ${error instanceof Error ? error.message : String(error)}`);
+    tripComReturnLegCache.delete(key);
     return undefined;
   });
   if (tripComReturnLegCache.size >= TRIP_COM_RETURN_CACHE_LIMIT) tripComReturnLegCache.delete(tripComReturnLegCache.keys().next().value!);
@@ -6010,7 +6028,7 @@ async function requestTripComReturnLeg(
   lookup: TripComReturnLookup,
   flightMeta: FlightSearchMeta,
   session: TripComFlightSession,
-): Promise<FlightLegDetails | undefined> {
+): Promise<TripComReturnSelection | undefined> {
   const payload = buildTripComFlightListSearchPayload(flightMeta, "Score", 3, session);
   const searchCriteria = isRecord(payload.searchCriteria) ? payload.searchCriteria : {};
   const text = await userscriptTextRequest(TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT, {
@@ -6027,16 +6045,18 @@ async function requestTripComReturnLeg(
   const parsedText = text !== undefined ? parseJsonValue(text) : undefined;
   const resultData = isRecord(parsedText) ? parsedText : text !== undefined ? parseTripComSseResponse(text) : undefined;
   if (!isRecord(resultData)) return undefined;
-  return selectTripComReturnLeg(resultData, lookup, flightMeta);
+  return selectTripComReturnLeg(resultData, flightMeta);
 }
 
 function selectTripComReturnLeg(
   resultData: Record<string, unknown>,
-  lookup: TripComReturnLookup,
   flightMeta: FlightSearchMeta,
-): FlightLegDetails | undefined {
+): TripComReturnSelection | undefined {
+  const itineraries = readRecordArray(resultData.itineraryList);
+  if (itineraries.length === 0) return undefined;
   const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
-  for (const itinerary of readRecordArray(resultData.itineraryList)) {
+  let best: { leg: FlightLegDetails; totalPrice: number } | undefined;
+  for (const itinerary of itineraries) {
     const journeys = readRecordArray(itinerary.journeyList);
     const journey = journeys[0];
     if (journeys.length !== 1 || journey === undefined) continue;
@@ -6044,16 +6064,15 @@ function selectTripComReturnLeg(
     if (exceedsFlightMaxDuration(flightMeta, [readNumberValue(journey.duration)])) continue;
     const firstSection = readRecordArray(journey.transSectionList)[0];
     if (readStringValue(firstSection?.departDateTime)?.slice(0, 10) !== flightMeta.inboundDate) continue;
-    const samePrice = readRecordArray(itinerary.policies)
+    const totalPrice = readRecordArray(itinerary.policies)
       .filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta))
-      .some((policy) => {
-        const price = isRecord(policy.price) ? policy.price : undefined;
-        const morePrice = isRecord(price?.morePrice) ? price.morePrice : undefined;
-        return readNumberValue(morePrice?.priceDifference) === 0 && readTripComPolicyAmount(policy) === lookup.totalPrice;
-      });
-    if (samePrice) return readTripComJourneyLeg(journey, airlineNames);
+      .map(readTripComPolicyAmount)
+      .filter((amount): amount is number => amount !== undefined)
+      .sort((left, right) => left - right)[0];
+    if (totalPrice === undefined || (best !== undefined && totalPrice >= best.totalPrice)) continue;
+    best = { leg: readTripComJourneyLeg(journey, airlineNames), totalPrice };
   }
-  return undefined;
+  return best ?? null;
 }
 
 function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
@@ -15013,34 +15032,54 @@ function isFlightPanelRow(priceMatch: PriceMatchOffer): boolean {
     (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "kiwi" || priceMatch.source === "googleflights");
 }
 
-// Flyrader: reisetid og stopp per etappe, datoer, datovindu og butikk som chiper, med pris og
-// kilde til høyre. Passasjerer og filtre står allerede i chipene over radene. Søkets rute er
+// Flyrader: reisetid og stopp per etappe og eventuelt datoer og datovindu som chiper, med pris
+// og kilde til høyre. Passasjerer og filtre står allerede i chipene over radene. Søkets rute er
 // lik på alle radene; kjente mellomlandinger vises som «via FRA», og hele ruten står i
 // tooltipen. Tur/retur får én linje per etappe. Rader uten andre detaljer beholder ruten.
 function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
   const [route, dateWindow] = priceMatch.productName.split(" · ");
-  const shared = [
+  const dateChips = [
     priceMatch.dateFlex !== undefined
       ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)
       : undefined,
     dateWindow,
-    priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : undefined,
   ].filter((text): text is string => text !== undefined && text.length > 0);
+  // Selgeren (Bravofly, Gotogate …) står i tooltipen; raden viser bare reisen.
   const legChips = priceMatch.flightLegs?.map(flightLegPanelChipTexts);
   if (legChips !== undefined && legChips.length > 0 && legChips.every((chips) => chips.length > 0)) {
-    return buildFlightLegChipLines(legChips, shared);
+    // Med datovindu står hver etappes dato og vindu («25. nov», «±14 d») først på etappens linje.
+    const flex = priceMatch.dateFlex;
+    const legDates = flex === undefined ? undefined : [
+      { date: flex.outboundDate, before: flex.outboundBefore, after: flex.outboundAfter },
+      { date: flex.inboundDate, before: flex.inboundBefore, after: flex.inboundAfter },
+    ].slice(0, legChips.length);
+    if (legDates !== undefined && legDates.every((leg) => leg.date !== undefined)) {
+      const datedLegChips = legChips.map((chips, index) => {
+        const leg = legDates[index]!;
+        return [formatFlightCompactDateRange(leg.date!, undefined), `${formatFlightDateFlexWindow(leg.before, leg.after)} d`, ...chips];
+      });
+      return buildFlightLegChipLines(datedLegChips);
+    }
+    // Datovindu uten kjente datoer: egen linje under etappene, så Tur/Retur ikke brytes.
+    return buildFlightLegChipLines(legChips, dateChips);
   }
-  const details = [...(priceMatch.durationText?.split(" · ") ?? []), ...shared];
+  const details = [...(priceMatch.durationText?.split(" · ") ?? []), ...dateChips];
   return buildPriceMatchInfoChips(details.length > 0 ? details : [route]);
 }
 
-// Én chiplinje per etappe; felles chips (butikk, datoer) følger første linje.
-function buildFlightLegChipLines(legChips: string[][], sharedFirstLine: string[] = []): HTMLElement {
-  if (legChips.length === 1) return buildPriceMatchInfoChips([...legChips[0]!, ...sharedFirstLine]);
+// Én chiplinje per etappe. sharedLastLine står på egen linje under etappene, med samme
+// innrykk som etappenes chips.
+function buildFlightLegChipLines(legChips: string[][], sharedLastLine: string[] = []): HTMLElement {
+  if (legChips.length === 1 && sharedLastLine.length === 0) return buildPriceMatchInfoChips(legChips[0]!);
   const lines = document.createElement("span");
   lines.className = "price-match-leg-lines";
   for (const [index, chips] of legChips.entries()) {
-    lines.append(buildPriceMatchInfoChips(index === 0 ? [...chips, ...sharedFirstLine] : chips, flightLegLabel(index, legChips.length)));
+    lines.append(buildPriceMatchInfoChips(chips, flightLegLabel(index, legChips.length)));
+  }
+  if (sharedLastLine.length > 0) {
+    const sharedLine = buildPriceMatchInfoChips(sharedLastLine);
+    if (legChips.length > 1) sharedLine.classList.add("price-match-chip-line--leg");
+    lines.append(sharedLine);
   }
   return lines;
 }

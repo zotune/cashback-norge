@@ -420,14 +420,14 @@ export function flightLegPanelChipTexts(leg: FlightLegDetails): string[] {
     .filter((text): text is string => text !== undefined);
 }
 
-// Tooltipen: hele ruten (eller antall stopp), reisetid, flyselskap og klokkeslett.
+// Tooltipen: hele ruten (eller antall stopp), reisetid, klokkeslett og flyselskap.
 export function flightLegTooltipChipTexts(leg: FlightLegDetails): string[] {
   const carriers = leg.carriers !== undefined ? [...new Set(leg.carriers)].join("+") : undefined;
   return [
     leg.route ?? formatFlightLegStops(leg),
     formatCompactFlightDuration(leg.durationMinutes),
-    carriers,
     leg.timeRange,
+    carriers,
   ].filter((text): text is string => text !== undefined && text.length > 0);
 }
 

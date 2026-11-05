@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793839558
+// @version      1793841058
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10135,8 +10135,8 @@ ${darkProviderCss}
     return [
       leg.route ?? formatFlightLegStops(leg),
       formatCompactFlightDuration(leg.durationMinutes),
-      carriers,
-      leg.timeRange
+      leg.timeRange,
+      carriers
     ].filter((text) => text !== void 0 && text.length > 0);
   }
   function flightTooltipExtraTexts(platform, legs) {
@@ -14697,13 +14697,13 @@ ${darkProviderCss}
       const journeys = readRecordArray(itinerary.journeyList);
       if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return void 0;
       if (exceedsFlightMaxDuration(flightMeta, journeys.map((journey) => readNumberValue(journey.duration)))) return void 0;
-      const candidate = toTripComOfferCandidate({
-        amount,
+      const priceInput = {
         currency,
         productUrl: resultUrl,
         rates,
         platformParts: [formatTripComItinerarySummary(itinerary, airlineNames)]
-      });
+      };
+      const candidate = toTripComOfferCandidate({ amount, ...priceInput });
       if (candidate === void 0) return void 0;
       const durationText = formatFlightLegDurationsWithStopsText(journeys.map((journey) => ({
         durationMinutes: readNumberValue(journey.duration),
@@ -14729,7 +14729,8 @@ ${darkProviderCss}
           productId,
           outboundLeg: readTripComJourneyLeg(outbound, airlineNames),
           outboundKey: readStringValue(outbound.uniqueId) ?? policyId,
-          totalPrice: readTripComPolicyAmount(policy)
+          totalPrice: amount,
+          priceInput
         });
       }
       return result;
@@ -14760,20 +14761,29 @@ ${darkProviderCss}
   const TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearch`;
   async function addTripComReturnLegs(candidates, flightMeta, session) {
     if (flightMeta.inboundDate === void 0) return candidates;
-    const result = [...candidates];
+    const result = [];
     let lookups = 0;
-    for (const [index, candidate] of candidates.entries()) {
+    for (const candidate of candidates) {
       const lookup = tripComReturnLookups.get(candidate);
-      if (lookup === void 0) continue;
-      if (lookups++ >= TRIP_COM_RETURN_LOOKUP_LIMIT) break;
-      const returnLeg = await fetchTripComReturnLeg(lookup, flightMeta, session);
-      if (returnLeg === void 0) continue;
-      const durationMinutes = sumFlightLegMinutes([lookup.outboundLeg.durationMinutes, returnLeg.durationMinutes]);
-      result[index] = {
+      if (lookup === void 0 || lookups >= TRIP_COM_RETURN_LOOKUP_LIMIT) {
+        result.push(candidate);
+        continue;
+      }
+      lookups++;
+      const selection = await fetchTripComReturnLeg(lookup, flightMeta, session);
+      if (selection === null) continue;
+      if (selection === void 0) {
+        result.push(candidate);
+        continue;
+      }
+      const repriced = selection.totalPrice !== lookup.totalPrice ? toTripComOfferCandidate({ amount: selection.totalPrice, ...lookup.priceInput }) : void 0;
+      const durationMinutes = sumFlightLegMinutes([lookup.outboundLeg.durationMinutes, selection.leg.durationMinutes]);
+      result.push({
         ...candidate,
-        flightLegs: [lookup.outboundLeg, returnLeg],
+        ...repriced !== void 0 ? repriced : {},
+        flightLegs: [lookup.outboundLeg, selection.leg],
         ...durationMinutes !== void 0 ? { durationMinutes } : {}
-      };
+      });
     }
     return result;
   }
@@ -14782,7 +14792,8 @@ ${darkProviderCss}
     const cached = tripComReturnLegCache.get(key);
     if (cached !== void 0) return cached;
     const promise = requestTripComReturnLeg(lookup, flightMeta, session).catch((error) => {
-      console.warn(`[Cashback Norge] Trip.com retur for ${flightMeta.origin}-${flightMeta.destination} feilet: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(`[Cashback Norge] Trip.com retur for ${flightMeta.origin}-${flightMeta.destination} ${flightMeta.inboundDate ?? ""} feilet: ${error instanceof Error ? error.message : String(error)}`);
+      tripComReturnLegCache.delete(key);
       return void 0;
     });
     if (tripComReturnLegCache.size >= TRIP_COM_RETURN_CACHE_LIMIT) tripComReturnLegCache.delete(tripComReturnLegCache.keys().next().value);
@@ -14806,11 +14817,14 @@ ${darkProviderCss}
     const parsedText = text !== void 0 ? parseJsonValue(text) : void 0;
     const resultData = isRecord(parsedText) ? parsedText : text !== void 0 ? parseTripComSseResponse(text) : void 0;
     if (!isRecord(resultData)) return void 0;
-    return selectTripComReturnLeg(resultData, lookup, flightMeta);
+    return selectTripComReturnLeg(resultData, flightMeta);
   }
-  function selectTripComReturnLeg(resultData, lookup, flightMeta) {
+  function selectTripComReturnLeg(resultData, flightMeta) {
+    const itineraries = readRecordArray(resultData.itineraryList);
+    if (itineraries.length === 0) return void 0;
     const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
-    for (const itinerary of readRecordArray(resultData.itineraryList)) {
+    let best;
+    for (const itinerary of itineraries) {
       const journeys = readRecordArray(itinerary.journeyList);
       const journey = journeys[0];
       if (journeys.length !== 1 || journey === void 0) continue;
@@ -14818,14 +14832,11 @@ ${darkProviderCss}
       if (exceedsFlightMaxDuration(flightMeta, [readNumberValue(journey.duration)])) continue;
       const firstSection = readRecordArray(journey.transSectionList)[0];
       if (readStringValue(firstSection?.departDateTime)?.slice(0, 10) !== flightMeta.inboundDate) continue;
-      const samePrice = readRecordArray(itinerary.policies).filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta)).some((policy) => {
-        const price = isRecord(policy.price) ? policy.price : void 0;
-        const morePrice = isRecord(price?.morePrice) ? price.morePrice : void 0;
-        return readNumberValue(morePrice?.priceDifference) === 0 && readTripComPolicyAmount(policy) === lookup.totalPrice;
-      });
-      if (samePrice) return readTripComJourneyLeg(journey, airlineNames);
+      const totalPrice = readRecordArray(itinerary.policies).filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta)).map(readTripComPolicyAmount).filter((amount) => amount !== void 0).sort((left, right) => left - right)[0];
+      if (totalPrice === void 0 || best !== void 0 && totalPrice >= best.totalPrice) continue;
+      best = { leg: readTripComJourneyLeg(journey, airlineNames), totalPrice };
     }
-    return void 0;
+    return best ?? null;
   }
   function readTripComPolicyAmount(policy) {
     const price = isRecord(policy.price) ? policy.price : void 0;
@@ -22112,24 +22123,40 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   }
   function buildFlightPriceMatchChips(priceMatch) {
     const [route, dateWindow] = priceMatch.productName.split(" · ");
-    const shared = [
+    const dateChips = [
       priceMatch.dateFlex !== void 0 ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate) : void 0,
-      dateWindow,
-      priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : void 0
+      dateWindow
     ].filter((text) => text !== void 0 && text.length > 0);
     const legChips = priceMatch.flightLegs?.map(flightLegPanelChipTexts);
     if (legChips !== void 0 && legChips.length > 0 && legChips.every((chips) => chips.length > 0)) {
-      return buildFlightLegChipLines(legChips, shared);
+      const flex = priceMatch.dateFlex;
+      const legDates = flex === void 0 ? void 0 : [
+        { date: flex.outboundDate, before: flex.outboundBefore, after: flex.outboundAfter },
+        { date: flex.inboundDate, before: flex.inboundBefore, after: flex.inboundAfter }
+      ].slice(0, legChips.length);
+      if (legDates !== void 0 && legDates.every((leg) => leg.date !== void 0)) {
+        const datedLegChips = legChips.map((chips, index) => {
+          const leg = legDates[index];
+          return [formatFlightCompactDateRange(leg.date, void 0), `${formatFlightDateFlexWindow(leg.before, leg.after)} d`, ...chips];
+        });
+        return buildFlightLegChipLines(datedLegChips);
+      }
+      return buildFlightLegChipLines(legChips, dateChips);
     }
-    const details = [...priceMatch.durationText?.split(" · ") ?? [], ...shared];
+    const details = [...priceMatch.durationText?.split(" · ") ?? [], ...dateChips];
     return buildPriceMatchInfoChips(details.length > 0 ? details : [route]);
   }
-  function buildFlightLegChipLines(legChips, sharedFirstLine = []) {
-    if (legChips.length === 1) return buildPriceMatchInfoChips([...legChips[0], ...sharedFirstLine]);
+  function buildFlightLegChipLines(legChips, sharedLastLine = []) {
+    if (legChips.length === 1 && sharedLastLine.length === 0) return buildPriceMatchInfoChips(legChips[0]);
     const lines = document.createElement("span");
     lines.className = "price-match-leg-lines";
     for (const [index, chips] of legChips.entries()) {
-      lines.append(buildPriceMatchInfoChips(index === 0 ? [...chips, ...sharedFirstLine] : chips, flightLegLabel(index, legChips.length)));
+      lines.append(buildPriceMatchInfoChips(chips, flightLegLabel(index, legChips.length)));
+    }
+    if (sharedLastLine.length > 0) {
+      const sharedLine = buildPriceMatchInfoChips(sharedLastLine);
+      if (legChips.length > 1) sharedLine.classList.add("price-match-chip-line--leg");
+      lines.append(sharedLine);
     }
     return lines;
   }

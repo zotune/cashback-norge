@@ -828,7 +828,7 @@ test("flight legs give one labelled chip line per direction", () => {
   assert.deepEqual(flightLegPanelChipTexts({ durationMinutes: 55, route: "OSL → BGO" }), ["55m", "direkte"]);
   // Uten flyplasser (PanFlights, Kiwi) vises antall stopp.
   assert.deepEqual(flightLegPanelChipTexts({ durationMinutes: 1320, stopCount: 2 }), ["22t", "2 stopp"]);
-  assert.deepEqual(flightLegTooltipChipTexts(outbound), ["PVG → FRA → BGO", "18t 5m", "Lufthansa", "11:55-23:00"]);
+  assert.deepEqual(flightLegTooltipChipTexts(outbound), ["PVG → FRA → BGO", "18t 5m", "11:55-23:00", "Lufthansa"]);
   assert.deepEqual(flightLegTooltipChipTexts({ durationMinutes: 1320, stopCount: 2 }), ["2 stopp", "22t"]);
 
   // Platform-teksten gjentar etappefakta; bare selger og merknader står igjen.
