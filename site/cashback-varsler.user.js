@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793841286
+// @version      1793841824
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -9436,9 +9436,6 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
 .bonus-chip-brand-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
 .cbn-tooltip-open.cbn-tooltip-open { display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
 .cbn-tooltip-open::after { display: none; }
-.cbn-has-quokka { padding-left: 46px !important; }
-.cbn-tooltip-mascot { align-items: center; display: inline-flex; height: 38px; left: 5px; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); width: 38px; z-index: 2; }
-.cbn-tooltip-mascot img { height: 36px; object-fit: contain; width: 36px; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
   .cbn-tooltip-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -9448,7 +9445,7 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
 @media (prefers-reduced-motion: reduce) {
   .cbn-button, .cbn-field, .cbn-field-group, .cbn-row, .cbn-chip { transition: none; }
   .quokka-love-heart, .quokka-love--couple img, .side-tab-mascot,
-  .bonus-toggle-quokka img, .bonus-toggle-berries, .cbn-tooltip-mascot,
+  .bonus-toggle-quokka img, .bonus-toggle-berries,
   .quokka-runner, .cbn-quokka-tooltip-anchor::before, .cbn-quokka-tooltip-anchor::after { animation: none; }
 }
 `;
@@ -9674,19 +9671,6 @@ ${darkProviderCss}
     const targets = /* @__PURE__ */ new WeakMap();
     const hoverHosts = /* @__PURE__ */ new WeakMap();
     let active;
-    const addMascot = (tooltip) => {
-      if (tooltip.classList.contains("cbn-tooltip--no-mascot")) return;
-      if (tooltip.querySelector(".cbn-tooltip-mascot")) return;
-      tooltip.classList.add("cbn-has-quokka");
-      const mascot = doc.createElement("span");
-      mascot.className = "cbn-tooltip-mascot";
-      mascot.setAttribute("aria-hidden", "true");
-      const image = doc.createElement("img");
-      image.src = BRAND_QUOKKA_DATA_URL;
-      image.alt = "";
-      mascot.append(image);
-      tooltip.prepend(mascot);
-    };
     const close = () => {
       if (!active) return;
       const { button, tooltip, style, topLayer } = active;
@@ -9719,7 +9703,6 @@ ${darkProviderCss}
       const whiteSpace = view.getComputedStyle(tooltip).whiteSpace === "pre-line" ? "pre-line" : "normal";
       let topLayer = false;
       button.setAttribute("aria-expanded", "true");
-      addMascot(tooltip);
       tooltip.classList.add("cbn-tooltip-open");
       const availableWidth = Math.max(80, doc.documentElement.clientWidth - 16);
       Object.assign(tooltip.style, {
@@ -9773,7 +9756,6 @@ ${darkProviderCss}
       for (let element = event.target; element; element = element.parentElement) {
         const tooltip = hoverHosts.get(element);
         if (tooltip) {
-          addMascot(tooltip);
           const maxHeight = Math.max(80, view.innerHeight - 32);
           if (tooltip.getBoundingClientRect().height > maxHeight || element.classList.contains("cbn-tooltip-scrollable")) {
             element.classList.add("cbn-tooltip-scrollable");
@@ -21698,7 +21680,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     appendComparisonStatus(tooltip, offer);
   }
   function buildFlightPriceMatchTooltip(tooltip, offer) {
-    tooltip.classList.add("cbn-tooltip-details", "cbn-tooltip--no-mascot");
+    tooltip.classList.add("cbn-tooltip-details");
     const parts = buildPriceMatchTooltip(offer).split(/\n{2,}/);
     const listHeading = (part) => /^(Treffliste|Prisgrunnlag|Billigste datoer \([^\n]+\))\n/.test(part);
     if (!parts.some(listHeading) || !offer.alternatives?.length) {

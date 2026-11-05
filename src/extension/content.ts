@@ -14423,7 +14423,7 @@ function buildElectricityTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): 
 }
 
 function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
-  tooltip.classList.add("cbn-tooltip-details", "cbn-tooltip--no-mascot");
+  tooltip.classList.add("cbn-tooltip-details");
   const parts = buildPriceMatchTooltip(offer).split(/\n{2,}/);
   const listHeading = (part: string) => /^(Treffliste|Prisgrunnlag|Billigste datoer \([^\n]+\))\n/.test(part);
   if (!parts.some(listHeading) || !offer.alternatives?.length) {

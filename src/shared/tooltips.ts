@@ -1,6 +1,5 @@
 // Touch users get an explicit details button; links keep their normal one-tap action.
 // One delegated controller per page/panel, with no observer or per-button document listeners.
-import { BRAND_QUOKKA_DATA_URL } from "./brand.js";
 
 export const DETAILS_TOOLTIP_WIDTH = 340;
 
@@ -19,22 +18,6 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const targets = new WeakMap<HTMLButtonElement, HTMLElement>();
   const hoverHosts = new WeakMap<Element, HTMLElement>();
   let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean } | undefined;
-
-  // The mascot is a large data URL; create it on first hover or tap, not once per tooltip in long lists.
-  // Tette lister (f.eks. flyreisenes etappelinjer) trenger bredden mer enn maskoten.
-  const addMascot = (tooltip: HTMLElement) => {
-    if (tooltip.classList.contains("cbn-tooltip--no-mascot")) return;
-    if (tooltip.querySelector(".cbn-tooltip-mascot")) return;
-    tooltip.classList.add("cbn-has-quokka");
-    const mascot = doc.createElement("span");
-    mascot.className = "cbn-tooltip-mascot";
-    mascot.setAttribute("aria-hidden", "true");
-    const image = doc.createElement("img");
-    image.src = BRAND_QUOKKA_DATA_URL;
-    image.alt = "";
-    mascot.append(image);
-    tooltip.prepend(mascot);
-  };
 
   const close = () => {
     if (!active) return;
@@ -62,7 +45,6 @@ export function createTooltipController(root: Document | ShadowRoot) {
     const whiteSpace = view.getComputedStyle(tooltip).whiteSpace === "pre-line" ? "pre-line" : "normal";
     let topLayer = false;
     button.setAttribute("aria-expanded", "true");
-    addMascot(tooltip);
     tooltip.classList.add("cbn-tooltip-open");
     const availableWidth = Math.max(80, doc.documentElement.clientWidth - 16);
     Object.assign(tooltip.style, {
@@ -104,13 +86,11 @@ export function createTooltipController(root: Document | ShadowRoot) {
   const onScroll = (event: Event) => {
     if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
   };
-  // Desktop tooltips also open on CSS hover, so add the mascot before that first paint.
   const onHover = (event: Event) => {
     for (let element = event.target as Element | null; element; element = element.parentElement) {
       const tooltip = hoverHosts.get(element);
       if (tooltip) {
-        addMascot(tooltip);
-        const maxHeight = Math.max(80, view.innerHeight - 32);
+            const maxHeight = Math.max(80, view.innerHeight - 32);
         // Full partner terms can be taller than the screen even when their
         // logical line count is small. Fit hover tooltips as well as tap ones.
         if (tooltip.getBoundingClientRect().height > maxHeight || element.classList.contains("cbn-tooltip-scrollable")) {
