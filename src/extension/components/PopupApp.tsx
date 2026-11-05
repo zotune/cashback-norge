@@ -1,3 +1,4 @@
+import { formatTooltipHtml } from "../../shared/tooltip-content";
 import { ThemeControl } from "./ThemeControl";
 import React, { useEffect, useState, type ReactElement } from "react";
 import type { CashbackOffer } from "../../shared/cashback.js";
@@ -415,7 +416,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
         </span>
       </div>
       {tooltipContent !== null && (
-        <div className="offer-tooltip">{tooltipContent}</div>
+        <div className="offer-tooltip cbn-tooltip-rich" dangerouslySetInnerHTML={{ __html: formatTooltipHtml(tooltipContent) }} />
       )}
     </div>
   );

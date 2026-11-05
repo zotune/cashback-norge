@@ -1,3 +1,4 @@
+import { formatTooltipHtml } from "../shared/tooltip-content";
 import {
   FREE_CARDS,
   INSTABANK_AD,
@@ -21,7 +22,7 @@ import {
 import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters";
 import { getOfferCampaignLabel, getVisibleOfferKey } from "../shared/offer-context";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
-import { getSupportAdvertisementText, selectSupportAdvertisement } from "../shared/support-advertisements";
+import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement } from "../shared/support-advertisements";
 
 // Expose shared data as globals for the inline site script
 Object.assign(window, {
@@ -37,6 +38,8 @@ Object.assign(window, {
     INSTABANK_AD,
     selectSupportAdvertisement,
     getSupportAdvertisementText,
+    getSupportAdvertisementTooltipParts,
+    formatTooltipHtml,
     PREMIUM_CARDS,
     SUPPORT_LINKS,
     MERCHANT_ALIASES,

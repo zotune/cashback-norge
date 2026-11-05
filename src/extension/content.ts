@@ -1,8 +1,9 @@
+import { createTooltipSection, setTooltipContent } from "../shared/tooltip-content";
 import { createAutomaticComparison } from "./automatic-comparison";
 import { getMobileSupplier, loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers";
 import { isMobilePriceDetails, mobileTierLabel, type MobilePriceDetails } from "../shared/mobile-price-match";
 import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS } from "../shared/provider-data";
-import { getSupportAdvertisementText, selectSupportAdvertisement } from "../shared/support-advertisements";
+import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement } from "../shared/support-advertisements";
 import {
   calculateCashback,
   calculateCashbackMaxKr,
@@ -627,7 +628,6 @@ const FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS = 15 * 60 * 1000;
 const FLIGHT_DATE_FLEX_EXTRA_MATURATION_DELAYS_MS = Array.from({ length: 15 }, () => 8000);
 const FLIGHT_OFFER_CANDIDATE_LIMIT = 10;
 // Sikkerhetsgrense for alle høyre-tooltips, slik at ingen blir absurd høy.
-const TOOLTIP_MAX_LINES = 35;
 const ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE = true;
 const ENABLE_TRAVELLINK_FLIGHT_PRICE_SOURCE = false;
 const ENABLE_TRIP_COM_FLIGHT_PRICE_SOURCE = true;
@@ -12911,6 +12911,8 @@ function renderNotice(
       align-items: center;
       justify-content: space-between;
     }
+    .support-ad-anchor { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+    .support-ad-anchor > a { flex: 1; text-align: center; }
     .support a {
       color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
@@ -13801,19 +13803,7 @@ function renderNotice(
       setTooltipContent(termsTooltip, [codeOffer.terms]);
       shadowRoot.append(termsTooltip);
       tooltipControls.add(item, termsTooltip, "Vis vilkår for rabattkoden");
-      row.addEventListener("mouseenter", () => {
-        const panelEl = shadowRoot.querySelector(".panel");
-        const panelRect = panelEl?.getBoundingClientRect();
-        const rowRect = row.getBoundingClientRect();
-        termsTooltip.style.left = "-9999px";
-        termsTooltip.style.top = "-9999px";
-        termsTooltip.classList.add("visible");
-        const tooltipHeight = termsTooltip.offsetHeight;
-        const rightEdge = panelRect ? panelRect.right + 6 : rowRect.right + 6;
-        termsTooltip.style.left = `${rightEdge}px`;
-        termsTooltip.style.top = `${rowRect.top + rowRect.height / 2 - tooltipHeight / 2}px`;
-      });
-      row.addEventListener("mouseleave", () => { termsTooltip.classList.remove("visible"); });
+      bindPanelTooltipHover(row, termsTooltip, shadowRoot);
     }
 
     return row;
@@ -14123,9 +14113,17 @@ function renderNotice(
     logoImg.className = "support-logo";
     logoImg.alt = "CBN";
     logoLink.append(logoImg);
-    if (pick.affiliate) support.prepend(makeAdChip());
-    else supportLink.style.cssText = "flex:1;text-align:center;";
-    support.append(supportLink, logoLink);
+    const adAnchor = document.createElement("span");
+    adAnchor.className = "support-ad-anchor";
+    if (pick.affiliate) adAnchor.append(makeAdChip());
+    adAnchor.append(supportLink);
+    support.append(adAnchor, logoLink);
+    const adTooltip = document.createElement("div");
+    adTooltip.className = "offer-tooltip";
+    setTooltipContent(adTooltip, getSupportAdvertisementTooltipParts(pick, runtimeCardOffers));
+    shadowRoot.append(adTooltip);
+    tooltipControls.add(adAnchor, adTooltip, "Vis fordeler og vilkår for annonsen");
+    bindPanelTooltipHover(adAnchor, adTooltip, shadowRoot);
     const disclosure = document.createElement("p");
     disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
@@ -14172,7 +14170,7 @@ function renderNotice(
   void detectConflicts(shadowRoot, title);
   attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls);
   // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
-  const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
+  const wrappers = shadowRoot.querySelectorAll<HTMLElement>(".offer-link-wrapper");
   for (let idx = 0; idx < mainOffers.length; idx++) {
     const currentOffer = mainOffers[idx];
     if (currentOffer === undefined) continue;
@@ -14197,36 +14195,7 @@ function renderNotice(
     shadowRoot.append(tooltip);
     tooltipElements.push({ element: tooltip, offer: currentOffer });
     tooltipControls.add(wrapper.querySelector<HTMLElement>(".offer-link")!, tooltip, `Vis vilkår for ${formatProviderName(currentOffer.provider)}`);
-    wrapper.addEventListener("mouseenter", () => {
-      const panelEl = shadowRoot.querySelector(".panel");
-      const panelRect = panelEl?.getBoundingClientRect();
-      const wrapperRect = wrapper.getBoundingClientRect();
-      // Show off-screen to measure, then position to right of panel
-      tooltip.style.left = "-9999px";
-      tooltip.style.top = "-9999px";
-      tooltip.classList.add("visible");
-      const tooltipHeight = tooltip.offsetHeight;
-      const tooltipWidth = tooltip.offsetWidth;
-      const rightEdge = panelRect ? panelRect.right + 6 : wrapperRect.right + 6;
-      const preferredLeft = rightEdge;
-      const fallbackLeft = wrapperRect.left + wrapperRect.width / 2 - tooltipWidth / 2;
-      const left = preferredLeft + tooltipWidth > window.innerWidth - 8
-        ? Math.max(8, Math.min(fallbackLeft, window.innerWidth - tooltipWidth - 8))
-        : preferredLeft;
-      const top = Math.max(
-        8,
-        Math.min(wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2, window.innerHeight - tooltipHeight - 8),
-      );
-      tooltip.style.left = `${left}px`;
-      tooltip.style.top = `${top}px`;
-      // The hover tooltip cannot be scrolled, so terms taller than the window
-      // get the details button that opens them as a scrollable tooltip.
-      const capped = tooltip.offsetHeight >= Number.parseFloat(getComputedStyle(tooltip).maxHeight) - 1;
-      if (capped && tooltip.scrollHeight > tooltip.clientHeight) wrapper.classList.add("cbn-tooltip-scrollable");
-    });
-    wrapper.addEventListener("mouseleave", () => {
-      tooltip.classList.remove("visible");
-    });
+    bindPanelTooltipHover(wrapper, tooltip, shadowRoot);
   }
   // Re-enable transitions after layout settles (double rAF ensures reflow is done)
   if (initialCollapsed) {
@@ -14491,11 +14460,11 @@ function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMat
     row.classList.add("price-match-tooltip-row");
     row.classList.toggle("price-match-tooltip-row--with-duration", card.classList.contains("price-match-card--with-duration"));
 
-    bindPriceMatchTooltipHover(card, tooltip, shadowRoot);
+    bindPanelTooltipHover(card, tooltip, shadowRoot);
   }
 }
 
-function bindPriceMatchTooltipHover(card: HTMLElement, tooltip: HTMLElement, shadowRoot: ShadowRoot): void {
+function bindPanelTooltipHover(card: HTMLElement, tooltip: HTMLElement, shadowRoot: ShadowRoot): void {
   let hideTimer: number | undefined;
   const clearHideTimer = () => {
     if (hideTimer === undefined) return;
@@ -14504,7 +14473,11 @@ function bindPriceMatchTooltipHover(card: HTMLElement, tooltip: HTMLElement, sha
   };
   const showTooltip = () => {
     clearHideTimer();
+    // Tap-opened popovers keep their position while the pointer enters them.
+    if (tooltip.classList.contains("cbn-tooltip-open")) return;
     positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+    const capped = tooltip.offsetHeight >= Number.parseFloat(getComputedStyle(tooltip).maxHeight) - 1;
+    if (capped && tooltip.scrollHeight > tooltip.clientHeight) card.classList.add("cbn-tooltip-scrollable");
   };
   const scheduleHideTooltip = () => {
     clearHideTimer();
@@ -14521,82 +14494,6 @@ function bindPriceMatchTooltipHover(card: HTMLElement, tooltip: HTMLElement, sha
   tooltip.addEventListener("mouseleave", scheduleHideTooltip);
 }
 
-function setTooltipContent(tooltip: HTMLElement, parts: string[]): void {
-  const sectionParts = parts.flatMap((part) => part.split(/\n{2,}/));
-  const sections: HTMLDivElement[] = [];
-  let lineCount = 0;
-  let truncated = false;
-  for (const part of sectionParts) {
-    const partLines = part.split("\n").map((line) => line.trim()).filter(Boolean).length;
-    if (partLines === 0) continue;
-    if (lineCount + partLines > TOOLTIP_MAX_LINES && sections.length > 0) {
-      truncated = true;
-      break;
-    }
-    const section = createTooltipSection(part);
-    if (section === undefined) continue;
-    sections.push(section);
-    lineCount += partLines;
-  }
-  if (truncated) {
-    const moreSection = document.createElement("div");
-    moreSection.className = "offer-tooltip-section offer-tooltip-more";
-    moreSection.textContent = "… se resten hos kilden";
-    sections.push(moreSection);
-  }
-  tooltip.replaceChildren(...sections);
-}
-
-function createTooltipSection(part: string): HTMLDivElement | undefined {
-  const lines = part
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (lines.length === 0) return undefined;
-
-  const section = document.createElement("div");
-  section.className = "offer-tooltip-section";
-
-  if (lines.length === 1) {
-    const isRateLine = /^\d[\d.,]* (%|kr)/.test(lines[0] ?? "");
-    if (isRateLine) {
-      const list = document.createElement("ul");
-      list.className = "offer-tooltip-list";
-      const item = document.createElement("li");
-      item.textContent = lines[0] ?? "";
-      list.append(item);
-      section.append(list);
-    } else {
-      const text = document.createElement("span");
-      text.className = "offer-tooltip-text";
-      text.textContent = lines[0] ?? "";
-      section.append(text);
-    }
-    return section;
-  }
-
-  const firstLine = lines[0] ?? "";
-  const hasExplicitList = lines.slice(1).some((line) => /^[-•]\s+/.test(line));
-  const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) || hasExplicitList ? lines.slice(1) : lines;
-
-  if (listLines.length !== lines.length) {
-    const title = document.createElement("span");
-    title.className = "offer-tooltip-title";
-    title.textContent = firstLine;
-    section.append(title);
-  }
-
-  const list = document.createElement("ul");
-  list.className = "offer-tooltip-list";
-  for (const line of listLines) {
-    const item = document.createElement("li");
-    item.textContent = line.replace(/^-\s+/, "");
-    list.append(item);
-  }
-  section.append(list);
-  return section;
-}
 
 function applyHostOverlayStyle(host: HTMLElement): void {
   host.style.setProperty("background", "transparent", "important");
@@ -15660,7 +15557,8 @@ function positionTooltipRightOfPanel(
 ): void {
   const panelEl = shadowRoot.querySelector(".panel");
   const panelRect = panelEl?.getBoundingClientRect();
-  const anchorRect = anchor.getBoundingClientRect();
+  const measured = anchor.getClientRects().length > 0 ? anchor : anchor.querySelector<HTMLElement>("a") ?? anchor;
+  const anchorRect = measured.getBoundingClientRect();
 
   tooltip.style.left = "-9999px";
   tooltip.style.top = "-9999px";
@@ -15701,15 +15599,10 @@ function formatSideTabText(
 function addChipTooltip(chip: HTMLElement, text: string, shadowRoot: ShadowRoot, tooltipControls: TooltipController): void {
   const tooltip = document.createElement("div");
   tooltip.className = "bonus-chip-tooltip";
-  tooltip.textContent = text;
+  setTooltipContent(tooltip, [text]);
   shadowRoot.append(tooltip);
   const row = tooltipControls.addBeside(chip, tooltip);
-  row.addEventListener("mouseenter", () => {
-    showChipTooltipRightOfPanel(tooltip, row, shadowRoot);
-  });
-  row.addEventListener("mouseleave", () => {
-    tooltip.classList.remove("visible");
-  });
+  bindPanelTooltipHover(row, tooltip, shadowRoot);
 }
 
 // Samme tooltip som chipene, men bare ved hover (uten trykkknapp ved siden av).

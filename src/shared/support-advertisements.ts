@@ -1,5 +1,6 @@
 import { INSTABANK_AD, SUPPORT_LINKS } from "./provider-data.js";
-import { osloDate } from "./card-benefits.js";
+import type { CashbackOffer } from "./cashback.js";
+import { getFreeCards, osloDate } from "./card-benefits.js";
 
 export const INSTABANK_AD_SHARE = 0.8;
 export type SupportAdvertisement = typeof INSTABANK_AD | typeof SUPPORT_LINKS[number];
@@ -23,4 +24,12 @@ export function selectSupportAdvertisement(draw: number, now = new Date()): Supp
   if (active && sample < INSTABANK_AD_SHARE) return INSTABANK_AD;
   const rest = active ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
   return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))]!;
+}
+
+/** Reuse the dated card benefits and limits already shown in Extra cashback. */
+export function getSupportAdvertisementTooltipParts(ad: SupportAdvertisement, offers: CashbackOffer[], now = new Date()): string[] {
+  if (ad !== INSTABANK_AD) return [ad.text];
+  const card = getFreeCards(offers, now).find((card) => card.badge === "instabank");
+  const details = (card?.tip ?? getSupportAdvertisementText(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
+  return ["# Instabank kredittkort", details, INSTABANK_AD.example];
 }

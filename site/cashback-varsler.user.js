@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793842060
+// @version      1793870719
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -140,6 +140,41 @@
       }
     }
   };
+  const marker = /^[-•*]\s+/;
+  const clean = (line) => line.replace(marker, "");
+  function parseTooltipSections(parts) {
+    return (typeof parts === "string" ? [parts] : parts).flatMap((part) => part.split(/\n\s*\n/)).flatMap((part) => {
+      const lines = part.split("\n").map((line) => line.trim()).filter(Boolean);
+      if (!lines.length) return [];
+      const first = lines[0];
+      const markdownHeading = /^#{1,3}\s+/.test(first) || /^\*\*.+\*\*$/.test(first);
+      const hasHeading = markdownHeading || lines.length > 1 && (/^(medlemsfordel|medlemstilbud)$/i.test(first) || / tilbud$/i.test(first) || lines.slice(1).some((line) => marker.test(line)));
+      const title = hasHeading ? clean(first).replace(/^#{1,3}\s+|^\*\*|\*\*$/g, "") : void 0;
+      const items = (hasHeading ? lines.slice(1) : lines).map((line) => {
+        const text = clean(line);
+        const short = text.length <= 72 && text.split(/\s+/).length <= 12 && !/https?:\/\/|^⚠/.test(text);
+        return { kind: short ? "chip" : "text", text };
+      });
+      return [{ ...title ? { title } : {}, items }];
+    });
+  }
+  const escapes = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const escape = (text) => text.replace(/[&<>"']/g, (char) => escapes[char]);
+  function formatTooltipHtml(parts) {
+    return parseTooltipSections(parts).map((section) => `<span class="offer-tooltip-section cbn-tooltip-content">${section.title ? `<strong class="offer-tooltip-title">${escape(section.title)}</strong>` : ""}<span class="tooltip-content-items">${section.items.map((item) => `<span class="${item.kind === "chip" ? "cbn-chip cbn-chip--muted tooltip-content-chip" : "tooltip-content-note"}">${escape(item.text)}</span>`).join("")}</span></span>`).join("");
+  }
+  function setTooltipContent(tooltip, parts) {
+    tooltip.classList.add("cbn-tooltip-rich");
+    tooltip.innerHTML = formatTooltipHtml(parts);
+  }
+  function createTooltipSection(part) {
+    const html = formatTooltipHtml(part);
+    if (!html) return void 0;
+    const section = document.createElement("div");
+    section.className = "offer-tooltip-section";
+    section.innerHTML = html;
+    return section;
+  }
   function createAutomaticComparison(options) {
     let error = "";
     let result;
@@ -1403,6 +1438,12 @@
     const rest = active ? (sample - INSTABANK_AD_SHARE) / (1 - INSTABANK_AD_SHARE) : sample;
     return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))];
   }
+  function getSupportAdvertisementTooltipParts(ad, offers, now = /* @__PURE__ */ new Date()) {
+    if (ad !== INSTABANK_AD) return [ad.text];
+    const card = getFreeCards(offers, now).find((card2) => card2.badge === "instabank");
+    const details = (card?.tip ?? getSupportAdvertisementText(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
+    return ["# Instabank kredittkort", details, INSTABANK_AD.example];
+  }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
     /\s+\|\s+/,
     /\s+[-\u2013\u2014]\s+/,
@@ -2446,8 +2487,8 @@
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   }
   function readAssignedJsonObject(html, variableName) {
-    const marker = new RegExp(`\\bvar\\s+${escapeRegExp$4(variableName)}\\s*=\\s*`, "i");
-    const match = marker.exec(html);
+    const marker2 = new RegExp(`\\bvar\\s+${escapeRegExp$4(variableName)}\\s*=\\s*`, "i");
+    const match = marker2.exec(html);
     if (match === null) return void 0;
     const start = match.index + match[0].length;
     const jsonStart = html.indexOf("{", start);
@@ -9436,6 +9477,15 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
 .cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
+/* Structured terms share chips with the comparison tooltips. Noninteractive
+   prose keeps the original wording; no hover state suggests a clickable chip. */
+.offer-tooltip.cbn-tooltip-rich, .tooltip.cbn-tooltip-rich, .bonus-chip-tooltip.cbn-tooltip-rich { width: 340px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; white-space: normal; text-align: left; }
+.cbn-tooltip-content { display: block; }
+.cbn-tooltip-content + .cbn-tooltip-content { margin-top: 10px; }
+.cbn-tooltip-content .offer-tooltip-title { display: block; margin: 0 0 6px; font-size: inherit; font-weight: 700; }
+.tooltip-content-items { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
+.cbn-tooltip-content .tooltip-content-chip { background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; font-size: inherit; font-weight: 600; line-height: 1.4; padding: 3px 6px; white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.tooltip-content-note { display: block; flex-basis: 100%; margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
 .cbn-tooltip-scrollable .cbn-tooltip-trigger { display: inline-flex; }
 .cbn-tooltip-row { display: contents; }
@@ -9443,7 +9493,7 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
 .bonus-chip.cbn-tooltip-row { display: flex; }
 .bonus-chip-action { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
 .bonus-chip-brand-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
-.cbn-tooltip-open.cbn-tooltip-open { display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
+.cbn-tooltip-open.cbn-tooltip-open { border: 0; display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
 .cbn-tooltip-open::after { display: none; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
@@ -9708,7 +9758,7 @@ ${darkProviderCss}
       close();
       const tooltip = targets.get(button);
       const style = tooltip.getAttribute("style");
-      const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip");
+      const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip") && !tooltip.classList.contains("cbn-tooltip-rich");
       const whiteSpace = view.getComputedStyle(tooltip).whiteSpace === "pre-line" ? "pre-line" : "normal";
       let topLayer = false;
       button.setAttribute("aria-expanded", "true");
@@ -9759,12 +9809,13 @@ ${darkProviderCss}
       }
     };
     const onScroll = (event) => {
-      if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
+      if (active && !event.composedPath().includes(active.tooltip)) close();
     };
     const onHover = (event) => {
       for (let element = event.target; element; element = element.parentElement) {
         const tooltip = hoverHosts.get(element);
         if (tooltip) {
+          if (tooltip.classList.contains("cbn-tooltip-open")) return;
           const maxHeight = Math.max(80, view.innerHeight - 32);
           if (tooltip.getBoundingClientRect().height > maxHeight || element.classList.contains("cbn-tooltip-scrollable")) {
             element.classList.add("cbn-tooltip-scrollable");
@@ -11067,7 +11118,6 @@ ${darkProviderCss}
   const FINN_FLIGHT_DATE_FLEX_JOB_TTL_MS = 15 * 60 * 1e3;
   const FLIGHT_DATE_FLEX_EXTRA_MATURATION_DELAYS_MS = Array.from({ length: 15 }, () => 8e3);
   const FLIGHT_OFFER_CANDIDATE_LIMIT = 10;
-  const TOOLTIP_MAX_LINES = 35;
   const TRAVELPAYOUTS_AIRPORTS_URL = "https://api.travelpayouts.com/data/en/airports.json";
   const EXCHANGE_RATES_URL = "https://open.er-api.com/v6/latest/NOK";
   const FINN_FLIGHT_API_FALLBACK_URL = "https://www.finn.no/travel-api/flight";
@@ -20230,6 +20280,8 @@ ${darkProviderCss}
       align-items: center;
       justify-content: space-between;
     }
+    .support-ad-anchor { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+    .support-ad-anchor > a { flex: 1; text-align: center; }
     .support a {
       color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
@@ -21125,21 +21177,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         setTooltipContent(termsTooltip, [codeOffer.terms]);
         shadowRoot.append(termsTooltip);
         tooltipControls.add(item, termsTooltip, "Vis vilkår for rabattkoden");
-        row.addEventListener("mouseenter", () => {
-          const panelEl = shadowRoot.querySelector(".panel");
-          const panelRect = panelEl?.getBoundingClientRect();
-          const rowRect = row.getBoundingClientRect();
-          termsTooltip.style.left = "-9999px";
-          termsTooltip.style.top = "-9999px";
-          termsTooltip.classList.add("visible");
-          const tooltipHeight = termsTooltip.offsetHeight;
-          const rightEdge = panelRect ? panelRect.right + 6 : rowRect.right + 6;
-          termsTooltip.style.left = `${rightEdge}px`;
-          termsTooltip.style.top = `${rowRect.top + rowRect.height / 2 - tooltipHeight / 2}px`;
-        });
-        row.addEventListener("mouseleave", () => {
-          termsTooltip.classList.remove("visible");
-        });
+        bindPanelTooltipHover(row, termsTooltip, shadowRoot);
       }
       return row;
     };
@@ -21400,9 +21438,17 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       logoImg.className = "support-logo";
       logoImg.alt = "CBN";
       logoLink.append(logoImg);
-      if (pick.affiliate) support.prepend(makeAdChip());
-      else supportLink.style.cssText = "flex:1;text-align:center;";
-      support.append(supportLink, logoLink);
+      const adAnchor = document.createElement("span");
+      adAnchor.className = "support-ad-anchor";
+      if (pick.affiliate) adAnchor.append(makeAdChip());
+      adAnchor.append(supportLink);
+      support.append(adAnchor, logoLink);
+      const adTooltip = document.createElement("div");
+      adTooltip.className = "offer-tooltip";
+      setTooltipContent(adTooltip, getSupportAdvertisementTooltipParts(pick, runtimeCardOffers));
+      shadowRoot.append(adTooltip);
+      tooltipControls.add(adAnchor, adTooltip, "Vis fordeler og vilkår for annonsen");
+      bindPanelTooltipHover(adAnchor, adTooltip, shadowRoot);
       const disclosure = document.createElement("p");
       disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
       disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
@@ -21475,31 +21521,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       shadowRoot.append(tooltip);
       tooltipElements.push({ element: tooltip, offer: currentOffer });
       tooltipControls.add(wrapper.querySelector(".offer-link"), tooltip, `Vis vilkår for ${formatProviderName(currentOffer.provider)}`);
-      wrapper.addEventListener("mouseenter", () => {
-        const panelEl = shadowRoot.querySelector(".panel");
-        const panelRect = panelEl?.getBoundingClientRect();
-        const wrapperRect = wrapper.getBoundingClientRect();
-        tooltip.style.left = "-9999px";
-        tooltip.style.top = "-9999px";
-        tooltip.classList.add("visible");
-        const tooltipHeight = tooltip.offsetHeight;
-        const tooltipWidth = tooltip.offsetWidth;
-        const rightEdge = panelRect ? panelRect.right + 6 : wrapperRect.right + 6;
-        const preferredLeft = rightEdge;
-        const fallbackLeft = wrapperRect.left + wrapperRect.width / 2 - tooltipWidth / 2;
-        const left = preferredLeft + tooltipWidth > window.innerWidth - 8 ? Math.max(8, Math.min(fallbackLeft, window.innerWidth - tooltipWidth - 8)) : preferredLeft;
-        const top = Math.max(
-          8,
-          Math.min(wrapperRect.top + wrapperRect.height / 2 - tooltipHeight / 2, window.innerHeight - tooltipHeight - 8)
-        );
-        tooltip.style.left = `${left}px`;
-        tooltip.style.top = `${top}px`;
-        const capped = tooltip.offsetHeight >= Number.parseFloat(getComputedStyle(tooltip).maxHeight) - 1;
-        if (capped && tooltip.scrollHeight > tooltip.clientHeight) wrapper.classList.add("cbn-tooltip-scrollable");
-      });
-      wrapper.addEventListener("mouseleave", () => {
-        tooltip.classList.remove("visible");
-      });
+      bindPanelTooltipHover(wrapper, tooltip, shadowRoot);
     }
     if (initialCollapsed) {
       requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -21752,10 +21774,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const row = tooltipControls.addBeside(card, tooltip, "Vis detaljer om prissammenligningen");
       row.classList.add("price-match-tooltip-row");
       row.classList.toggle("price-match-tooltip-row--with-duration", card.classList.contains("price-match-card--with-duration"));
-      bindPriceMatchTooltipHover(card, tooltip, shadowRoot);
+      bindPanelTooltipHover(card, tooltip, shadowRoot);
     }
   }
-  function bindPriceMatchTooltipHover(card, tooltip, shadowRoot) {
+  function bindPanelTooltipHover(card, tooltip, shadowRoot) {
     let hideTimer;
     const clearHideTimer = () => {
       if (hideTimer === void 0) return;
@@ -21764,7 +21786,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     };
     const showTooltip = () => {
       clearHideTimer();
+      if (tooltip.classList.contains("cbn-tooltip-open")) return;
       positionTooltipRightOfPanel(tooltip, card, shadowRoot);
+      const capped = tooltip.offsetHeight >= Number.parseFloat(getComputedStyle(tooltip).maxHeight) - 1;
+      if (capped && tooltip.scrollHeight > tooltip.clientHeight) card.classList.add("cbn-tooltip-scrollable");
     };
     const scheduleHideTooltip = () => {
       clearHideTimer();
@@ -21778,72 +21803,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     card.addEventListener("mouseleave", scheduleHideTooltip);
     tooltip.addEventListener("mouseenter", showTooltip);
     tooltip.addEventListener("mouseleave", scheduleHideTooltip);
-  }
-  function setTooltipContent(tooltip, parts) {
-    const sectionParts = parts.flatMap((part) => part.split(/\n{2,}/));
-    const sections = [];
-    let lineCount = 0;
-    let truncated = false;
-    for (const part of sectionParts) {
-      const partLines = part.split("\n").map((line) => line.trim()).filter(Boolean).length;
-      if (partLines === 0) continue;
-      if (lineCount + partLines > TOOLTIP_MAX_LINES && sections.length > 0) {
-        truncated = true;
-        break;
-      }
-      const section = createTooltipSection(part);
-      if (section === void 0) continue;
-      sections.push(section);
-      lineCount += partLines;
-    }
-    if (truncated) {
-      const moreSection = document.createElement("div");
-      moreSection.className = "offer-tooltip-section offer-tooltip-more";
-      moreSection.textContent = "… se resten hos kilden";
-      sections.push(moreSection);
-    }
-    tooltip.replaceChildren(...sections);
-  }
-  function createTooltipSection(part) {
-    const lines = part.split("\n").map((line) => line.trim()).filter(Boolean);
-    if (lines.length === 0) return void 0;
-    const section = document.createElement("div");
-    section.className = "offer-tooltip-section";
-    if (lines.length === 1) {
-      const isRateLine = /^\d[\d.,]* (%|kr)/.test(lines[0] ?? "");
-      if (isRateLine) {
-        const list2 = document.createElement("ul");
-        list2.className = "offer-tooltip-list";
-        const item = document.createElement("li");
-        item.textContent = lines[0] ?? "";
-        list2.append(item);
-        section.append(list2);
-      } else {
-        const text = document.createElement("span");
-        text.className = "offer-tooltip-text";
-        text.textContent = lines[0] ?? "";
-        section.append(text);
-      }
-      return section;
-    }
-    const firstLine = lines[0] ?? "";
-    const hasExplicitList = lines.slice(1).some((line) => /^[-•]\s+/.test(line));
-    const listLines = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine) || / tilbud$/i.test(firstLine) || hasExplicitList ? lines.slice(1) : lines;
-    if (listLines.length !== lines.length) {
-      const title = document.createElement("span");
-      title.className = "offer-tooltip-title";
-      title.textContent = firstLine;
-      section.append(title);
-    }
-    const list = document.createElement("ul");
-    list.className = "offer-tooltip-list";
-    for (const line of listLines) {
-      const item = document.createElement("li");
-      item.textContent = line.replace(/^-\s+/, "");
-      list.append(item);
-    }
-    section.append(list);
-    return section;
   }
   function applyHostOverlayStyle(host) {
     host.style.setProperty("background", "transparent", "important");
@@ -22655,7 +22614,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   function positionTooltipRightOfPanel(tooltip, anchor, shadowRoot) {
     const panelEl = shadowRoot.querySelector(".panel");
     const panelRect = panelEl?.getBoundingClientRect();
-    const anchorRect = anchor.getBoundingClientRect();
+    const measured = anchor.getClientRects().length > 0 ? anchor : anchor.querySelector("a") ?? anchor;
+    const anchorRect = measured.getBoundingClientRect();
     tooltip.style.left = "-9999px";
     tooltip.style.top = "-9999px";
     tooltip.style.transform = "none";
@@ -22681,15 +22641,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   function addChipTooltip(chip, text, shadowRoot, tooltipControls) {
     const tooltip = document.createElement("div");
     tooltip.className = "bonus-chip-tooltip";
-    tooltip.textContent = text;
+    setTooltipContent(tooltip, [text]);
     shadowRoot.append(tooltip);
     const row = tooltipControls.addBeside(chip, tooltip);
-    row.addEventListener("mouseenter", () => {
-      showChipTooltipRightOfPanel(tooltip, row, shadowRoot);
-    });
-    row.addEventListener("mouseleave", () => {
-      tooltip.classList.remove("visible");
-    });
+    bindPanelTooltipHover(row, tooltip, shadowRoot);
   }
   function addHoverChipTooltip(anchor, text, shadowRoot) {
     const tooltip = document.createElement("div");

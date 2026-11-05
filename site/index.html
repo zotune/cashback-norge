@@ -457,6 +457,9 @@ a.code-reward { color: inherit; text-decoration: none; }
   max-width: 480px;
   overflow: hidden;
 }
+.support-ad-anchor { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+.fixed-footer:has(.support-ad-anchor:hover, .cbn-tooltip-open) { overflow: visible; }
+.fixed-footer .support-ad-anchor > .offer-tooltip { bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); }
 .fixed-footer .tip-line { gap: 4px; justify-content: center; margin-bottom: 0; }
 @media (max-width: 520px) { .fixed-footer { padding-left: 8px; } }
 .fixed-footer .tip-line .ad-chip { position: static !important; }
@@ -1023,7 +1026,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getOfferCampaignLabel, getVisibleOfferKey } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -1447,9 +1450,9 @@ async function init() {
   // One draw per page, so the top card and the bottom line agree.
   const adDraw = Math.random();
   setupSupportInvite(data.offers, adDraw);
+  cardBenefitOffers = getCardBenefitOffers(data.offers);
   const updateFooterAd = setupFooterAd(adDraw);
   applyProviderMeta(data.providers);
-  cardBenefitOffers = getCardBenefitOffers(data.offers);
   renderBonusChips();
   watchCardBenefitDate(() => { window.CashbackTooltips.close(); renderBonusChips(); updateFooterAd(); });
   allMerchants = groupByMerchant(data.offers.filter(offer => !offer.cardBenefit));
@@ -2228,37 +2231,6 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
-function formatTooltipHtml(text) {
-  return text
-    .split(/\n{2,}/)
-    .map(formatTooltipSectionHtml)
-    .filter(Boolean)
-    .join("");
-}
-
-function formatTooltipSectionHtml(part) {
-  const lines = part.split("\n").map(line => line.trim()).filter(Boolean);
-  if (lines.length === 0) return "";
-  if (lines.length === 1) {
-    const isRateLine = /^\d[\d.,]* (%|kr)/.test(lines[0] || "");
-    if (isRateLine) {
-      const item = `<span class="offer-tooltip-list-item"><span class="offer-tooltip-bullet">•</span><span>${esc(lines[0])}</span></span>`;
-      return `<span class="offer-tooltip-section"><span class="offer-tooltip-list">${item}</span></span>`;
-    }
-    return `<span class="offer-tooltip-section"><span class="offer-tooltip-text">${esc(lines[0])}</span></span>`;
-  }
-
-  const firstLine = lines[0] || "";
-  const hasHeading = /^(medlemsfordel|medlemstilbud)$/i.test(firstLine);
-  const listLines = hasHeading ? lines.slice(1) : lines;
-  const titleHtml = hasHeading
-    ? `<span class="offer-tooltip-title">${esc(firstLine)}</span>`
-    : "";
-  const listHtml = listLines
-    .map(line => `<span class="offer-tooltip-list-item"><span class="offer-tooltip-bullet">•</span><span>${esc(line.replace(/^-\s+/, ""))}</span></span>`)
-    .join("");
-  return `<span class="offer-tooltip-section">${titleHtml}<span class="offer-tooltip-list">${listHtml}</span></span>`;
-}
 
 const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
@@ -2426,11 +2398,17 @@ function setupFooterAd(draw) {
     const pick = selectSupportAdvertisement(draw);
     const line = footer.querySelector(".tip-line");
     line.replaceChildren();
+    const anchor = document.createElement("span");
+    anchor.className = "offer-wrap support-ad-anchor";
+    const tooltip = document.createElement("span");
+    tooltip.className = "offer-tooltip cbn-tooltip-rich";
+    tooltip.innerHTML = formatTooltipHtml(getSupportAdvertisementTooltipParts(pick, cardBenefitOffers));
+    anchor.append(tooltip);
     if (pick.affiliate) {
       const ad = document.createElement("span");
       ad.className = "cbn-chip cbn-chip--muted ad-chip";
       ad.textContent = "Ad";
-      line.append(ad);
+      anchor.append(ad);
     }
     const link = document.createElement("a");
     link.href = pick.url;
@@ -2445,7 +2423,9 @@ function setupFooterAd(draw) {
     image.src = "quokka-couple.png?v=quokka-1";
     image.alt = "";
     mascot.append(image);
-    line.append(link, mascot);
+    anchor.append(link);
+    line.append(anchor, mascot);
+    window.CashbackTooltips.attach(line);
   };
   update();
   return update;
@@ -2539,7 +2519,7 @@ function renderChipGroup(cards, container) {
       rewardText = (c.approx ? `+~${pctStr} %` : `+${pctStr} %`) + ebInfo;
     }
     return `<span class="tooltip-wrap">
-      <span class="tooltip">${esc(c.tip)}</span>
+      <span class="tooltip cbn-tooltip-rich">${formatTooltipHtml(c.tip)}</span>
       <a class="cbn-row bonus-chip" href="${esc(c.url)}" target="_blank" rel="${c.ad ? 'sponsored noopener noreferrer' : 'noreferrer'}">
         <span class="bonus-chip-label">${rewardText}</span> <span style="display:inline-flex;align-items:center;gap:6px;">${c.ad ? '<span aria-hidden="true">🥳</span>' : ''}${(c.ad || c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
       </a>

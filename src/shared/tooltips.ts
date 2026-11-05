@@ -40,7 +40,7 @@ export function createTooltipController(root: Document | ShadowRoot) {
     close();
     const tooltip = targets.get(button)!;
     const style = tooltip.getAttribute("style");
-    const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip");
+    const isBonusChipTooltip = tooltip.classList.contains("bonus-chip-tooltip") && !tooltip.classList.contains("cbn-tooltip-rich");
     // Plain-text tips keep their line breaks when tapped, as on hover.
     const whiteSpace = view.getComputedStyle(tooltip).whiteSpace === "pre-line" ? "pre-line" : "normal";
     let topLayer = false;
@@ -84,13 +84,14 @@ export function createTooltipController(root: Document | ShadowRoot) {
     }
   };
   const onScroll = (event: Event) => {
-    if (active && !(event.target instanceof Node && active.tooltip.contains(event.target))) close();
+    if (active && !event.composedPath().includes(active.tooltip)) close();
   };
   const onHover = (event: Event) => {
     for (let element = event.target as Element | null; element; element = element.parentElement) {
       const tooltip = hoverHosts.get(element);
       if (tooltip) {
-            const maxHeight = Math.max(80, view.innerHeight - 32);
+        if (tooltip.classList.contains("cbn-tooltip-open")) return;
+        const maxHeight = Math.max(80, view.innerHeight - 32);
         // Full partner terms can be taller than the screen even when their
         // logical line count is small. Fit hover tooltips as well as tap ones.
         if (tooltip.getBoundingClientRect().height > maxHeight || element.classList.contains("cbn-tooltip-scrollable")) {

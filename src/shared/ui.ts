@@ -54,6 +54,15 @@ export const UI_CSS = `
 .cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
+/* Structured terms share chips with the comparison tooltips. Noninteractive
+   prose keeps the original wording; no hover state suggests a clickable chip. */
+.offer-tooltip.cbn-tooltip-rich, .tooltip.cbn-tooltip-rich, .bonus-chip-tooltip.cbn-tooltip-rich { width: 340px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; white-space: normal; text-align: left; }
+.cbn-tooltip-content { display: block; }
+.cbn-tooltip-content + .cbn-tooltip-content { margin-top: 10px; }
+.cbn-tooltip-content .offer-tooltip-title { display: block; margin: 0 0 6px; font-size: inherit; font-weight: 700; }
+.tooltip-content-items { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
+.cbn-tooltip-content .tooltip-content-chip { background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; font-size: inherit; font-weight: 600; line-height: 1.4; padding: 3px 6px; white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.tooltip-content-note { display: block; flex-basis: 100%; margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .cbn-tooltip-trigger { display: none; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; font: 18px/1 system-ui, sans-serif; }
 .cbn-tooltip-scrollable .cbn-tooltip-trigger { display: inline-flex; }
 .cbn-tooltip-row { display: contents; }
@@ -61,7 +70,7 @@ export const UI_CSS = `
 .bonus-chip.cbn-tooltip-row { display: flex; }
 .bonus-chip-action { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
 .bonus-chip-brand-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
-.cbn-tooltip-open.cbn-tooltip-open { display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
+.cbn-tooltip-open.cbn-tooltip-open { border: 0; display: block; opacity: 1; pointer-events: auto; z-index: 2147483647; }
 .cbn-tooltip-open::after { display: none; }
 @media (hover: none), (pointer: coarse), (max-width: 520px) {
   .cbn-tooltip-trigger { display: inline-flex; }
