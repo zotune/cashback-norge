@@ -14973,7 +14973,7 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
 }
 function isFlightPanelRow(priceMatch: PriceMatchOffer): boolean {
   return priceMatch.travelKind !== "hotel" &&
-    (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "kiwi" || priceMatch.source === "googleflights");
+    (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "googleflights");
 }
 
 // Flyrader: reisetid og stopp per etappe og eventuelt datoer og datovindu som chiper, med pris
@@ -15478,7 +15478,8 @@ function isFlightSearchPriceMatch(priceMatch: PriceMatchOffer): boolean {
     priceMatch.source === "momondo" ||
     priceMatch.source === "skyscanner" ||
     priceMatch.source === "travellink" ||
-    priceMatch.source === "tripcom";
+    priceMatch.source === "tripcom" ||
+    priceMatch.source === "kiwi";
 }
 function formatPriceMatchTooltipOffer(offer: Pick<PriceMatchAlternative, "shopName" | "price" | "platform" | "durationText" | "shippingPrice" | "totalPrice">): string {
   const details = [

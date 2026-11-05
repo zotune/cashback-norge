@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793887846
+// @version      1793888040
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -22451,7 +22451,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return 0;
   }
   function isFlightPanelRow(priceMatch) {
-    return priceMatch.travelKind !== "hotel" && (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "kiwi" || priceMatch.source === "googleflights");
+    return priceMatch.travelKind !== "hotel" && (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "googleflights");
   }
   function buildFlightPriceMatchChips(priceMatch) {
     const [route, dateWindow] = priceMatch.productName.split(" · ");
@@ -22864,7 +22864,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     ].join("\n\n");
   }
   function isFlightSearchPriceMatch(priceMatch) {
-    return priceMatch.source === "finnreise" || priceMatch.source === "panflights" || priceMatch.source === "momondo" || priceMatch.source === "skyscanner" || priceMatch.source === "travellink" || priceMatch.source === "tripcom";
+    return priceMatch.source === "finnreise" || priceMatch.source === "panflights" || priceMatch.source === "momondo" || priceMatch.source === "skyscanner" || priceMatch.source === "travellink" || priceMatch.source === "tripcom" || priceMatch.source === "kiwi";
   }
   function formatPriceMatchTooltipOffer(offer) {
     const details = [
