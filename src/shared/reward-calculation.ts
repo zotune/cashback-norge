@@ -303,7 +303,9 @@ export function formatBreakdownWithAmounts(terms: string, amount: number): strin
       if (match !== null) {
         const pct = Number.parseFloat((match[1] ?? "0").replace(",", "."));
         const kr = amount * pct / 100;
-        return `${line} (${formatKr(kr)} kr)`;
+        // Keep the calculated amount beside its rate, rather than attaching
+        // it to the final category in a comma-separated commission list.
+        return `${match[0]} (${formatKr(kr)} kr)${line.slice(match[0].length)}`;
       }
       return line;
     })

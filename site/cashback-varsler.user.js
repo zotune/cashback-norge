@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793870719
+// @version      1793871345
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -142,10 +142,56 @@
   };
   const marker = /^[-•*]\s+/;
   const clean = (line) => line.replace(marker, "");
+  function categoryRateSection(line) {
+    const match = clean(line).match(/^((?:(?:opptil|fra)\s+)?\d[\d.,]*(?:\s*[-–]\s*\d[\d.,]*)?\s*(?:%|kr|NOK|SEK|DKK|EUR|USD|GBP)(?:\s+\([\d\s.,]+\s+kr\))?)\s+[–—-]\s+(?:i\s+)?(reward-rabatt|cashback|rabatt|bonus)\s+på\s+(.+)$/i);
+    if (!match) return void 0;
+    const categories = [];
+    let category = "";
+    let parentheses = 0;
+    for (const char of match[3]) {
+      if (char === "(") parentheses++;
+      if (char === ")") parentheses = Math.max(0, parentheses - 1);
+      if (char === "," && parentheses === 0) {
+        if (category.trim()) categories.push(category.trim());
+        category = "";
+      } else category += char;
+    }
+    if (category.trim()) categories.push(category.trim());
+    if (!categories.length) return void 0;
+    return {
+      title: `${match[1]} ${match[2]}`,
+      items: categories.map((text) => ({ kind: "chip", text }))
+    };
+  }
   function parseTooltipSections(parts) {
     return (typeof parts === "string" ? [parts] : parts).flatMap((part) => part.split(/\n\s*\n/)).flatMap((part) => {
       const lines = part.split("\n").map((line) => line.trim()).filter(Boolean);
       if (!lines.length) return [];
+      if (lines.some((line) => categoryRateSection(line) !== void 0)) {
+        const sections = [];
+        let prose = [];
+        const flushProse = () => {
+          if (prose.length) sections.push(...parseTooltipSections(prose.join("\n")));
+          prose = [];
+        };
+        let previousRate;
+        for (const line of lines) {
+          const rate = categoryRateSection(line);
+          if (!rate) {
+            prose.push(line);
+            previousRate = void 0;
+            continue;
+          }
+          flushProse();
+          if (previousRate !== void 0 && previousRate.title === rate.title) previousRate.items.push(...rate.items);
+          else {
+            sections.push(rate);
+            previousRate = rate;
+          }
+        }
+        flushProse();
+        return sections;
+      }
       const first = lines[0];
       const markdownHeading = /^#{1,3}\s+/.test(first) || /^\*\*.+\*\*$/.test(first);
       const hasHeading = markdownHeading || lines.length > 1 && (/^(medlemsfordel|medlemstilbud)$/i.test(first) || / tilbud$/i.test(first) || lines.slice(1).some((line) => marker.test(line)));
@@ -790,7 +836,7 @@
       if (match !== null) {
         const pct = Number.parseFloat((match[1] ?? "0").replace(",", "."));
         const kr = amount * pct / 100;
-        return `${line} (${formatKr(kr)} kr)`;
+        return `${match[0]} (${formatKr(kr)} kr)${line.slice(match[0].length)}`;
       }
       return line;
     }).join("\n");
@@ -20532,13 +20578,14 @@ ${darkProviderCss}
           element.textContent = formatCompactRewardLabel(offer2) ?? formatRewardLabel(offer2.reward, offer2.provider);
         }
       }
-      for (const { element, offer: offer2 } of tooltipElements) {
+      for (const { element, offer: offer2, extraParts } of tooltipElements) {
         const fullReward = formatRewardLabel(offer2.reward, offer2.provider);
         const compact = formatCompactRewardLabel(offer2);
         compact !== void 0 && fullReward !== compact && !fullReward.startsWith(compact);
         const breakdown = amount > 0 ? formatBreakdownWithAmounts(offer2.terms, amount) : offer2.terms;
         const parts = [];
         if (breakdown) parts.push(breakdown);
+        parts.push(...extraParts);
         setTooltipContent(element, parts);
       }
       for (const { element, pct, minPct, maxPct, ebPer100kr, approx, defaultText } of bonusChipLabels) {
@@ -21519,7 +21566,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       if (welcome !== void 0) tooltipParts.push(welcome.tip);
       setTooltipContent(tooltip, tooltipParts);
       shadowRoot.append(tooltip);
-      tooltipElements.push({ element: tooltip, offer: currentOffer });
+      tooltipElements.push({ element: tooltip, offer: currentOffer, extraParts: tooltipParts.slice(currentOffer.terms ? 1 : 0) });
       tooltipControls.add(wrapper.querySelector(".offer-link"), tooltip, `Vis vilkår for ${formatProviderName(currentOffer.provider)}`);
       bindPanelTooltipHover(wrapper, tooltip, shadowRoot);
     }

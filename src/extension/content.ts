@@ -13088,7 +13088,7 @@ function renderNotice(
   });
   if (!isAutomaticComparisonSupported() || mainOffers.length > 0) header.append(sumInput);
   const rewardLabels: { element: HTMLSpanElement; offer: CashbackOffer }[] = [];
-  const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer }[] = [];
+  const tooltipElements: { element: HTMLDivElement; offer: CashbackOffer; extraParts: string[] }[] = [];
   const offerList = document.createElement("div");
   offerList.className = "offer-list";
   for (const [offerIdx, currentOffer] of mainOffers.entries()) {
@@ -13178,13 +13178,14 @@ function renderNotice(
           formatRewardLabel(offer.reward, offer.provider);
       }
     }
-    for (const { element, offer } of tooltipElements) {
+    for (const { element, offer, extraParts } of tooltipElements) {
       const fullReward = formatRewardLabel(offer.reward, offer.provider);
       const compact = formatCompactRewardLabel(offer);
       const showRewardInTooltip = compact !== undefined && fullReward !== compact && !fullReward.startsWith(compact);
       const breakdown = amount > 0 ? formatBreakdownWithAmounts(offer.terms, amount) : offer.terms;
       const parts: string[] = [];
       if (breakdown) parts.push(breakdown);
+      parts.push(...extraParts);
       setTooltipContent(element, parts);
     }
     for (const { element, pct, minPct, maxPct, ebPer100kr, approx, defaultText } of bonusChipLabels) {
@@ -14193,7 +14194,7 @@ function renderNotice(
     if (welcome !== undefined) tooltipParts.push(welcome.tip);
     setTooltipContent(tooltip, tooltipParts);
     shadowRoot.append(tooltip);
-    tooltipElements.push({ element: tooltip, offer: currentOffer });
+    tooltipElements.push({ element: tooltip, offer: currentOffer, extraParts: tooltipParts.slice(currentOffer.terms ? 1 : 0) });
     tooltipControls.add(wrapper.querySelector<HTMLElement>(".offer-link")!, tooltip, `Vis vilkår for ${formatProviderName(currentOffer.provider)}`);
     bindPanelTooltipHover(wrapper, tooltip, shadowRoot);
   }

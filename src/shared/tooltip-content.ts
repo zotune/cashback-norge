@@ -6,10 +6,55 @@ export type TooltipItem = { kind: "chip" | "text"; text: string };
 export type TooltipSection = { title?: string; items: TooltipItem[] };
 const marker = /^[-•*]\s+/;
 const clean = (line: string) => line.replace(marker, "");
+
+// Presentation of the commission lines produced by the source adapters. Keep
+// the rate/qualifier/currency verbatim; no reward parsing or calculation here.
+function categoryRateSection(line: string): TooltipSection | undefined {
+  const match = clean(line).match(/^((?:(?:opptil|fra)\s+)?\d[\d.,]*(?:\s*[-–]\s*\d[\d.,]*)?\s*(?:%|kr|NOK|SEK|DKK|EUR|USD|GBP)(?:\s+\([\d\s.,]+\s+kr\))?)\s+[–—-]\s+(?:i\s+)?(reward-rabatt|cashback|rabatt|bonus)\s+på\s+(.+)$/i);
+  if (!match) return undefined;
+  const categories: string[] = [];
+  let category = "";
+  let parentheses = 0;
+  for (const char of match[3]!) {
+    if (char === "(") parentheses++;
+    if (char === ")") parentheses = Math.max(0, parentheses - 1);
+    if (char === "," && parentheses === 0) {
+      if (category.trim()) categories.push(category.trim());
+      category = "";
+    } else category += char;
+  }
+  if (category.trim()) categories.push(category.trim());
+  if (!categories.length) return undefined;
+  return {
+    title: `${match[1]} ${match[2]}`,
+    items: categories.map((text) => ({ kind: "chip", text })),
+  };
+}
+
 export function parseTooltipSections(parts: string | string[]): TooltipSection[] {
   return (typeof parts === "string" ? [parts] : parts).flatMap((part) => part.split(/\n\s*\n/)).flatMap((part) => {
     const lines = part.split("\n").map((line) => line.trim()).filter(Boolean);
     if (!lines.length) return [];
+    // Keep adjacent rates together, without moving a condition across groups.
+    // Unknown prose still follows the ordinary terms presentation below.
+    if (lines.some((line) => categoryRateSection(line) !== undefined)) {
+      const sections: TooltipSection[] = [];
+      let prose: string[] = [];
+      const flushProse = () => {
+        if (prose.length) sections.push(...parseTooltipSections(prose.join("\n")));
+        prose = [];
+      };
+      let previousRate: TooltipSection | undefined;
+      for (const line of lines) {
+        const rate = categoryRateSection(line);
+        if (!rate) { prose.push(line); previousRate = undefined; continue; }
+        flushProse();
+        if (previousRate !== undefined && previousRate.title === rate.title) previousRate.items.push(...rate.items);
+        else { sections.push(rate); previousRate = rate; }
+      }
+      flushProse();
+      return sections;
+    }
     const first = lines[0]!;
     const markdownHeading = /^#{1,3}\s+/.test(first) || /^\*\*.+\*\*$/.test(first);
     const hasHeading = markdownHeading || lines.length > 1 && (
