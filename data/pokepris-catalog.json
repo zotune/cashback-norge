@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-05T13:09:54.839Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-05T13:43:36.682Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -4652,6 +4652,7 @@
 "pokefriends.no/products/white-flare-booster-box":3759,
 "pokefriends.no/products/white-flare-booster-pack-japansk":3378,
 "pokelageret.no/products/30th-booster-pakke-eng":12614,
+"pokelageret.no/products/30th-celebration-booster-pack":13523,
 "pokelageret.no/products/30th-celebration-mini-tin-espeon":24949,
 "pokelageret.no/products/ancient-roar-booster-box":4179,
 "pokelageret.no/products/ascended-heroes-2-pack-blister":4591,
