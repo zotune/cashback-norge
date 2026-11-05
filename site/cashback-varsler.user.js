@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793888040
+// @version      1793888187
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -12235,7 +12235,7 @@ ${darkProviderCss}
         fullSearchDetails
       })],
       // Kiwi-raden får pris fra Kiwis GraphQL-API (findKiwiFlightPriceMatchOffer).
-      ...readKiwiSearchPath(parsedUrl) !== void 0 ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)],
+      buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
       // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
       // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
       ...isGoogleFlightsSearchPage(parsedUrl) ? [] : [withFlightSortLinks(buildFlightPriceMatchOffer({
@@ -12289,13 +12289,11 @@ ${darkProviderCss}
         }) : findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup)
       }]
     ];
-    if (readKiwiSearchPath(parsedUrl) === void 0) {
-      liveOfferFinders.push({
-        source: "kiwi",
-        sourceName: "KIWI",
-        findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup)
-      });
-    }
+    liveOfferFinders.push({
+      source: "kiwi",
+      sourceName: "KIWI",
+      findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup)
+    });
     return { staticOffers, liveOfferFinders };
   }
   async function runFlightLiveOfferFinders(finders, options) {

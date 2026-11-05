@@ -1742,7 +1742,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       })]
       : []),
     // Kiwi-raden får pris fra Kiwis GraphQL-API (findKiwiFlightPriceMatchOffer).
-    ...(readKiwiSearchPath(parsedUrl) !== undefined ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)]),
+    buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
     // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
     // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
     ...(isGoogleFlightsSearchPage(parsedUrl)
@@ -1813,14 +1813,12 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       }]
       : []),
   ];
-  // Ikke på Kiwi selv.
-  if (readKiwiSearchPath(parsedUrl) === undefined) {
-    liveOfferFinders.push({
-      source: "kiwi",
-      sourceName: "KIWI",
-      findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup),
-    });
-  }
+  // Som de andre kildene vises Kiwi også på kiwi.com, slik at prisene kan sammenlignes der.
+  liveOfferFinders.push({
+    source: "kiwi",
+    sourceName: "KIWI",
+    findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup),
+  });
   return { staticOffers, liveOfferFinders };
 }
 
