@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Cashback Norge",
   "description": "Shows cashback offers for supported stores.",
-  "version": "0.2.37",
+  "version": "0.2.38",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -50,6 +50,7 @@
     "https://workb.panflights.com/*",
     "https://typeb.panflights.com/*",
     "https://panflights.com/*",
+    "https://api.skypicker.com/*",
     "https://www.tek.no/*"
   ],
   "background": {

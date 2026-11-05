@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793885726
+// @version      1793887846
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -57,6 +57,7 @@
 // @connect      workb.panflights.com
 // @connect      typeb.panflights.com
 // @connect      panflights.com
+// @connect      api.skypicker.com
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
@@ -2637,7 +2638,7 @@
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-05T09:57:45.137Z";
+  const generatedAt = "2026-11-05T13:09:54.839Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -7653,6 +7654,1266 @@ query SearchSuggestions($query: String!, $category: Int) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   const GENERIC_MERCHANT_KEYS = /* @__PURE__ */ new Set(["butikk", "shop", "store", "nettbutikk", "online", "norge", "norway"]);
+  const FLIGHT_DEFAULT_CHILD_AGE = 7;
+  const FLIGHT_INFANT_AGE = 1;
+  const FLIGHT_LINK_FILTERS_PARAM = "cbvFilters";
+  const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"];
+  function normalizeFlightSearchMeta(meta) {
+    const origin = readIataCodeValue(meta.origin);
+    const destination = readIataCodeValue(meta.destination);
+    const outboundDate = readIsoDateValue(meta.outboundDate);
+    const inboundDate = meta.inboundDate !== void 0 ? readIsoDateValue(meta.inboundDate) : void 0;
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || origin === destination) {
+      return void 0;
+    }
+    const normalizedMeta = {
+      origin,
+      destination,
+      ...meta.originScope === "airport" || meta.originScope === "city" ? { originScope: meta.originScope } : {},
+      ...meta.destinationScope === "airport" || meta.destinationScope === "city" ? { destinationScope: meta.destinationScope } : {},
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
+      adults: Math.max(1, Math.trunc(meta.adults) + Math.max(0, Math.trunc(meta.youths))),
+      youths: 0,
+      children: Math.max(0, Math.trunc(meta.children)),
+      infants: Math.max(0, Math.trunc(meta.infants)),
+      ...meta.childAges !== void 0 && meta.childAges.length === Math.trunc(meta.children) && meta.childAges.every((age) => Number.isInteger(age) && age >= 2 && age <= 11) ? { childAges: meta.childAges } : {},
+      ...meta.cabinClass !== void 0 ? { cabinClass: meta.cabinClass } : {},
+      ...meta.maxStops !== void 0 ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {},
+      ...meta.includeCabinBag === true ? { includeCabinBag: true } : {},
+      ...meta.includeCheckedBag === true ? { includeCheckedBag: true } : {},
+      ...meta.maxDurationMinutes !== void 0 && meta.maxDurationMinutes > 0 ? { maxDurationMinutes: Math.round(meta.maxDurationMinutes) } : {},
+      ...meta.dateFlex !== void 0 ? { dateFlex: meta.dateFlex } : {}
+    };
+    return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : void 0;
+  }
+  function isFlightSearchPassengerMatchSupported(flightMeta) {
+    return flightMeta.adults > 0 && flightMeta.infants <= flightMeta.adults;
+  }
+  function readFlightChildAges(flightMeta) {
+    return flightMeta.childAges ?? Array.from({ length: flightMeta.children }, () => FLIGHT_DEFAULT_CHILD_AGE);
+  }
+  function countFlightSeatedPassengers(flightMeta) {
+    return flightMeta.adults + flightMeta.children;
+  }
+  function readFlightPassengerAges(ages) {
+    const childAges = ages.filter((age) => age >= 2 && age <= 11);
+    return { children: childAges.length, infants: ages.filter((age) => age < 2).length, childAges };
+  }
+  function readFlightCabinClassValue(value) {
+    if (typeof value !== "string") return void 0;
+    const normalized = value.trim().toLowerCase().replace(/[^a-zæøå]/g, "");
+    if (normalized.length === 0) return void 0;
+    if (/^(?:economy|okonomi|økonomi|ekonomi)$/.test(normalized)) return "economy";
+    if (normalized.includes("premium")) return "premium";
+    if (normalized.includes("business")) return "business";
+    if (/^first(?:class)?$|f[oø]rsteklasse/.test(normalized)) return "first";
+    return void 0;
+  }
+  function exceedsFlightMaxStops(flightMeta, stopCounts) {
+    if (flightMeta.maxStops === void 0) return false;
+    const maxStops = flightMeta.maxStops;
+    return stopCounts.some((stopCount) => stopCount !== void 0 && stopCount > maxStops);
+  }
+  function exceedsFlightMaxDuration(flightMeta, legDurationsMinutes) {
+    const { maxDurationMinutes } = flightMeta;
+    if (maxDurationMinutes === void 0) return false;
+    return legDurationsMinutes.some((durationMinutes) => durationMinutes !== void 0 && durationMinutes > maxDurationMinutes);
+  }
+  function isIsoDateWithinDays(date, centerDate, daysBefore, daysAfter) {
+    if (date === void 0) return false;
+    const time = (/* @__PURE__ */ new Date(`${date}T00:00:00Z`)).getTime();
+    const centerTime = (/* @__PURE__ */ new Date(`${centerDate}T00:00:00Z`)).getTime();
+    if (Number.isNaN(time) || Number.isNaN(centerTime)) return false;
+    const dayOffset = Math.round((time - centerTime) / (24 * 60 * 60 * 1e3));
+    return dayOffset >= -daysBefore && dayOffset <= daysAfter;
+  }
+  function formatFlightDateFlexWindow(before, after) {
+    return before === after ? `±${before}` : `-${before}/+${after}`;
+  }
+  function formatFlightDateFlexDays(dateFlex, roundTrip) {
+    const outbound = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
+    const inbound = formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter);
+    return !roundTrip || outbound === inbound ? `${outbound} d` : `${outbound}/${inbound} d`;
+  }
+  function shiftFlightDateNotBeforeToday(isoDate, days, now = /* @__PURE__ */ new Date()) {
+    if (days === 0) return isoDate;
+    const shiftedDate = addDaysToIsoDate(isoDate, days) ?? isoDate;
+    if (days > 0) return shiftedDate;
+    const today = [
+      String(now.getFullYear()),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0")
+    ].join("-");
+    const earliestDate = today < isoDate ? today : isoDate;
+    return shiftedDate < earliestDate ? earliestDate : shiftedDate;
+  }
+  function listFlightDateFlexCombinations(flightMeta, dateFlex, now = /* @__PURE__ */ new Date()) {
+    const listDates = (centerDate, before, after) => {
+      const firstDate = shiftFlightDateNotBeforeToday(centerDate, -before, now);
+      const dates = [];
+      for (let offset = -before; offset <= after; offset++) {
+        const date = addDaysToIsoDate(centerDate, offset);
+        if (date !== void 0 && date >= firstDate) dates.push({ date, offset });
+      }
+      return dates;
+    };
+    const outboundDates = listDates(flightMeta.outboundDate, dateFlex.outboundBefore, dateFlex.outboundAfter);
+    const { inboundDate } = flightMeta;
+    const combinations = inboundDate === void 0 ? outboundDates.map(({ date, offset }) => ({ outboundDate: date, distance: Math.abs(offset) })) : outboundDates.flatMap((outbound) => {
+      return listDates(inboundDate, dateFlex.inboundBefore, dateFlex.inboundAfter).filter((inbound) => inbound.date >= outbound.date).map((inbound) => ({
+        outboundDate: outbound.date,
+        inboundDate: inbound.date,
+        distance: Math.abs(outbound.offset) + Math.abs(inbound.offset)
+      }));
+    });
+    return combinations.sort((left, right) => left.distance - right.distance).map(({ distance: _distance, ...combination }) => combination);
+  }
+  function buildFlightDateCombinationKey(combination) {
+    return `${combination.outboundDate}|${combination.inboundDate ?? ""}`;
+  }
+  function readPanFlightsDateFlex(extraParts, outboundDate, inboundDate) {
+    const readValue = (key) => extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
+    const readWindow = (flexKey, endKey, startDate) => {
+      const value = readValue(flexKey);
+      if (value === "manual" && startDate !== void 0) {
+        const endDate = readIsoDateValue(readValue(endKey)?.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"));
+        const days = endDate === void 0 ? void 0 : Math.round((Date.parse(endDate) - Date.parse(startDate)) / 864e5);
+        return days !== void 0 && days >= 0 ? [0, days] : [0, 0];
+      }
+      const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
+      return before !== void 0 ? [before, after ?? before] : [0, 0];
+    };
+    const [outboundBefore, outboundAfter] = readWindow("ff", "td", outboundDate);
+    const [inboundBefore, inboundAfter] = inboundDate !== void 0 ? readWindow("tf", "ud", inboundDate) : [0, 0];
+    return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0 ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter } : void 0;
+  }
+  const FLIGHT_LINK_SORT_PARAM = "cbvSort";
+  const FLIGHT_FASTEST_MAX_PRICE_FACTOR = 4;
+  function sumFlightLegMinutes(legMinutes, expectedLegs = legMinutes.length) {
+    if (legMinutes.length === 0 || legMinutes.length !== expectedLegs) return void 0;
+    let total = 0;
+    for (const minutes of legMinutes) {
+      if (minutes === void 0 || !Number.isFinite(minutes) || minutes <= 0) return void 0;
+      total += minutes;
+    }
+    return total;
+  }
+  function selectFlightSortCandidate(candidates, mode) {
+    if (mode === "best") return candidates[0];
+    const amountOf = (candidate) => candidate.sortAmount ?? candidate.amount;
+    const fastestPriceLimit = Math.min(...candidates.map(amountOf)) * FLIGHT_FASTEST_MAX_PRICE_FACTOR;
+    let selected;
+    for (const candidate of candidates) {
+      if (mode === "cheapest") {
+        if (selected === void 0 || amountOf(candidate) < amountOf(selected)) selected = candidate;
+        continue;
+      }
+      if (candidate.durationMinutes === void 0 || amountOf(candidate) > fastestPriceLimit) continue;
+      if (selected === void 0 || candidate.durationMinutes < (selected.durationMinutes ?? Number.POSITIVE_INFINITY) || candidate.durationMinutes === selected.durationMinutes && amountOf(candidate) < amountOf(selected)) {
+        selected = candidate;
+      }
+    }
+    return selected;
+  }
+  function limitFlightCandidates(candidates, limit) {
+    const limited = candidates.slice(0, limit);
+    for (const mode of ["cheapest", "fastest"]) {
+      const winner = selectFlightSortCandidate(candidates, mode);
+      if (winner !== void 0 && !limited.includes(winner)) limited.push(winner);
+    }
+    return limited;
+  }
+  function formatFlightLegRoute(segments, stopCount) {
+    if (segments.length === 0) return void 0;
+    if (stopCount !== void 0 && stopCount !== segments.length - 1) return void 0;
+    const codes = segments.map((segment) => ({
+      origin: readIataCodeValue(segment.origin),
+      destination: readIataCodeValue(segment.destination)
+    }));
+    if (codes.some((segment) => segment.origin === void 0 || segment.destination === void 0)) return void 0;
+    const stops = codes.map((segment, index) => {
+      if (index === 0) return segment.origin;
+      const arrival = codes[index - 1].destination;
+      return arrival === segment.origin ? arrival : `${arrival}/${segment.origin}`;
+    });
+    return [...stops, codes[codes.length - 1].destination].join(" → ");
+  }
+  const FLIGHT_BAGGAGE_TEXT_PATTERN = /bagasje|innsjekk|baggage|carry.?on|cabin.?bag|checked.?bag/i;
+  function formatCompactFlightDuration(minutes) {
+    if (minutes === void 0 || !Number.isFinite(minutes) || minutes <= 0) return void 0;
+    const totalMinutes = Math.round(minutes);
+    const hours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    if (hours <= 0) return `${remainingMinutes}m`;
+    return remainingMinutes === 0 ? `${hours}t` : `${hours}t ${remainingMinutes}m`;
+  }
+  function formatFlightDurationLimit(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder === 0 ? `≤${hours}t` : `≤${hours}t ${remainder}m`;
+  }
+  function readFinnFlightPlace(legValue, requestedValue) {
+    const selectedAirports = (legValue ?? "").split(",").map(readIataCodeValue).filter(isString);
+    const requestedCode = readIataCodeValue(requestedValue?.split(".")[0]);
+    if (selectedAirports.length === 1) return { code: selectedAirports[0], scope: "airport" };
+    if (requestedCode === void 0) return void 0;
+    return { code: requestedCode, scope: requestedValue?.endsWith(".METROPOLITAN_AREA") === true ? "city" : "airport" };
+  }
+  function readSkyscannerFlightPlaceCode(value) {
+    const normalized = value?.toUpperCase();
+    if (normalized === void 0) return void 0;
+    if (/^[A-Z]{3}$/.test(normalized)) return { code: normalized, scope: "airport" };
+    if (/^C[A-Z]{3}$/.test(normalized)) return { code: normalized.slice(1), scope: "city" };
+    if (/^[A-Z]{3}A$/.test(normalized)) return { code: normalized.slice(0, 3), scope: "city" };
+    return void 0;
+  }
+  function selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces, scope, preferCity = false) {
+    const code = iataCode.toUpperCase();
+    const airport = airportPlaces.find((place) => place.flightPlaceType === "AIRPORT" && place.skyId === code);
+    const city = cityPlaces.find((place) => place.flightPlaceType === "CITY" && ([code, `${code}A`, `C${code}`].includes(place.skyId) || place.skyId.length === 4 && place.skyId.startsWith(code)));
+    if (scope === "city") return city;
+    if (scope === "airport") return airport;
+    return preferCity ? city ?? airport : airport ?? city;
+  }
+  function selectPanFlightsCityPlaceId(iataCode, places) {
+    const records = readRecordArray(places);
+    const airport = records.find((place) => place.type === 0 && place.sid === iataCode && place.stationtype === "air");
+    const name = readStringValue(airport?.shortname)?.trim().toLowerCase();
+    if (name === void 0) return void 0;
+    const cities = records.filter((place) => place.type === 4 && readStringValue(place.shortname)?.trim().toLowerCase() === name);
+    return cities.length === 1 ? readStringValue(cities[0]?.sid) : void 0;
+  }
+  function formatFlightClockRange(departure, arrival) {
+    const clock = (value) => value?.match(/[T ](\d{2}):(\d{2})/)?.slice(1, 3).join(":");
+    const departureClock = clock(departure);
+    const arrivalClock = clock(arrival);
+    return departureClock !== void 0 && arrivalClock !== void 0 ? `${departureClock}-${arrivalClock}` : void 0;
+  }
+  function buildFlightLegDetails(leg, carriers, timeRange = formatFlightClockRange(leg.departureTime, leg.arrivalTime)) {
+    const uniqueCarriers = [...new Set(carriers ?? [])];
+    return {
+      ...leg.durationMinutes !== void 0 && leg.durationMinutes > 0 ? { durationMinutes: leg.durationMinutes } : {},
+      ...leg.stopCount !== void 0 ? { stopCount: leg.stopCount } : {},
+      ...leg.route !== void 0 ? { route: leg.route } : {},
+      ...uniqueCarriers.length > 0 ? { carriers: uniqueCarriers } : {},
+      ...timeRange !== void 0 ? { timeRange } : {}
+    };
+  }
+  function readPanFlightsFlightLegs(item, legMinutes, legStopCounts) {
+    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+    const outboundRoute = routeList[0];
+    const returnFromBackdata = isRecord$6(outboundRoute?.backdata);
+    const legSources = [
+      { data: outboundRoute?.tripdata, departure: outboundRoute?.dTime, arrival: outboundRoute?.aTime },
+      returnFromBackdata ? { data: outboundRoute?.backdata, departure: outboundRoute?.drTime, arrival: outboundRoute?.arTime } : { data: routeList[1]?.tripdata, departure: routeList[1]?.dTime, arrival: routeList[1]?.aTime }
+    ];
+    const localClock = (epochSeconds) => {
+      const seconds = readPositiveNumberValue(epochSeconds);
+      return seconds !== void 0 ? new Date(seconds * 1e3).toISOString() : void 0;
+    };
+    const legs = legMinutes.map((durationMinutes, index) => {
+      const source2 = legSources[index];
+      const data = isRecord$6(source2?.data) ? source2.data : void 0;
+      const stopCount = legStopCounts[index];
+      const specs = Array.isArray(data?.spec) ? data.spec.filter(isString) : [];
+      const route = formatFlightLegRoute(specs.map((spec) => {
+        const [origin, destination] = spec.split(";");
+        return { origin, destination };
+      }), stopCount);
+      const carriers = (readStringValue(data?.airlines) ?? "").split(",").map((carrier) => carrier.trim()).filter((carrier) => carrier.length > 0);
+      return buildFlightLegDetails({
+        durationMinutes,
+        stopCount,
+        route,
+        departureTime: localClock(source2?.departure),
+        arrivalTime: localClock(source2?.arrival)
+      }, carriers);
+    });
+    return legs.some((leg) => Object.keys(leg).length > 0) ? legs : void 0;
+  }
+  function flightLegLabel(index, legCount) {
+    if (legCount < 2) return void 0;
+    if (legCount === 2) return index === 0 ? "Tur" : "Retur";
+    return `Etappe ${index + 1}`;
+  }
+  function formatFlightLegStops(leg) {
+    if (leg.route !== void 0) {
+      const stops = leg.route.split(" → ").slice(1, -1);
+      return stops.length === 0 ? "direkte" : `via ${stops.join(", ")}`;
+    }
+    if (leg.stopCount === void 0) return void 0;
+    return leg.stopCount === 0 ? "direkte" : `${leg.stopCount} stopp`;
+  }
+  function flightLegPanelChipTexts(leg) {
+    return [formatCompactFlightDuration(leg.durationMinutes), formatFlightLegStops(leg)].filter((text) => text !== void 0);
+  }
+  function flightLegTooltipChipTexts(leg) {
+    const carriers = leg.carriers !== void 0 ? [...new Set(leg.carriers)].join("+") : void 0;
+    return [
+      leg.route ?? formatFlightLegStops(leg),
+      formatCompactFlightDuration(leg.durationMinutes),
+      leg.timeRange,
+      carriers
+    ].filter((text) => text !== void 0 && text.length > 0);
+  }
+  function flightTooltipExtraTexts(platform, legs) {
+    const perLegCarriers = legs.map((leg) => [...new Set(leg.carriers ?? [])].join("+")).filter((text) => text.length > 0);
+    const allCarriers = [...new Set(legs.flatMap((leg) => leg.carriers ?? []))];
+    const carrierTexts = /* @__PURE__ */ new Set([
+      ...perLegCarriers,
+      perLegCarriers.join(" / "),
+      [...new Set(perLegCarriers)].join(" / "),
+      allCarriers.join("/"),
+      allCarriers.join("+")
+    ]);
+    const legFact = /^(?:(?:\d+ stopp|direkte)(?: \/ (?:\d+ stopp|direkte))*|\d{2}:\d{2}-\d{2}:\d{2}(?: \/ \d{2}:\d{2}-\d{2}:\d{2})*|(?:\d+ t(?: \d+ min)?|\d+ min)(?: \/ (?:\d+ t(?: \d+ min)?|\d+ min))*)$/;
+    return [...new Set(platform?.split(/,\s*/) ?? [])].filter((text) => text.length > 0 && !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text) && !legFact.test(text) && !carrierTexts.has(text));
+  }
+  function flightTooltipChipTexts(candidate) {
+    return [.../* @__PURE__ */ new Set([
+      ...candidate.durationText?.split(" · ") ?? [],
+      ...candidate.platform?.split(/,\s*/) ?? []
+    ])].filter((text) => !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text));
+  }
+  function applyFlightSortMode(offers, mode) {
+    if (mode === "best" || !offers.some((offer) => offer.flightSortVariants !== void 0)) return offers;
+    const amountOf = (candidate) => candidate.sortAmount ?? candidate.amount;
+    const durationOf = (candidate) => candidate.durationMinutes ?? Number.POSITIVE_INFINITY;
+    const compare = (left, right) => {
+      return mode === "fastest" ? durationOf(left) - durationOf(right) || amountOf(left) - amountOf(right) : amountOf(left) - amountOf(right);
+    };
+    return offers.map((offer) => {
+      const variant = offer.flightSortVariants?.[mode];
+      const { durationText: _durationText, flightLegs: _flightLegs, durationMinutes: _durationMinutes, ...base } = offer;
+      const selected = variant !== void 0 ? { ...base, ...variant } : offer;
+      return selected.alternatives !== void 0 ? { ...selected, alternatives: [...selected.alternatives].sort(compare) } : selected;
+    }).sort((left, right) => {
+      return compare(left, right);
+    });
+  }
+  const FLIGHT_SORT_URL_VALUES = {
+    finn: { best: "agony_asc", cheapest: "priceAmount_asc", fastest: "tripDuration_asc" },
+    momondo: { best: "bestflight_a", cheapest: "price_a", fastest: "duration_a" },
+    panflights: { best: "quality", cheapest: "price", fastest: "duration" },
+    kiwi: { best: "quality", cheapest: "price", fastest: "duration" }
+  };
+  function buildFlightSortUrlValue(source2, mode) {
+    return FLIGHT_SORT_URL_VALUES[source2]?.[mode] ?? "";
+  }
+  function readFlightSortUrlValue(source2, value) {
+    const values = FLIGHT_SORT_URL_VALUES[source2];
+    if (value === null || values === void 0) return void 0;
+    return ["best", "cheapest", "fastest"].find((mode) => values[mode] === value);
+  }
+  function readFlightSortLabel(text) {
+    const normalized = text?.toLowerCase() ?? "";
+    if (/rimeligste|cheapest/.test(normalized)) return "cheapest";
+    if (/raskeste|fastest/.test(normalized)) return "fastest";
+    if (/\bbeste\b|recommended/.test(normalized)) return "best";
+    return void 0;
+  }
+  function readPanFlightsLegMinutes(item, roundTrip) {
+    const packageRecord = isRecord$6(item.package) ? item.package : void 0;
+    const routes = readRecordArray(packageRecord?.routelist);
+    const route = routes[0];
+    const minutes = (seconds) => {
+      const value = readPositiveNumberValue(seconds);
+      return value !== void 0 ? Math.round(value / 60) : void 0;
+    };
+    const outbound = minutes(route?.fly_duration_secs);
+    if (!roundTrip) return [outbound];
+    return [outbound, minutes(route?.return_duration_secs) ?? minutes(routes[1]?.fly_duration_secs)];
+  }
+  function buildFlightLinkFiltersValue(flightMeta) {
+    const parts = [
+      flightMeta.maxStops !== void 0 ? `stops:${flightMeta.maxStops}` : void 0,
+      flightMeta.includeCabinBag === true ? "cabin" : void 0,
+      flightMeta.includeCheckedBag === true ? "checked" : void 0,
+      flightMeta.maxDurationMinutes !== void 0 ? `dur:${flightMeta.maxDurationMinutes}` : void 0
+    ].filter((part) => part !== void 0);
+    return parts.length > 0 ? parts.join(",") : void 0;
+  }
+  function readFlightLinkFilters(parsedUrl) {
+    const value = parsedUrl.searchParams.get(FLIGHT_LINK_FILTERS_PARAM);
+    if (value === null) return void 0;
+    const parts = value.split(",");
+    const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
+    const maxDurationMinutes = readPositiveIntegerValue(parts.find((part) => part.startsWith("dur:"))?.slice("dur:".length));
+    return {
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...parts.includes("cabin") ? { includeCabinBag: true } : {},
+      ...parts.includes("checked") ? { includeCheckedBag: true } : {},
+      ...maxDurationMinutes !== void 0 ? { maxDurationMinutes } : {}
+    };
+  }
+  function buildMomondoFlightFilterValue(flightMeta) {
+    const parts = [
+      flightMeta.maxStops !== void 0 && flightMeta.maxStops < 2 ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}` : void 0,
+      flightMeta.includeCabinBag === true ? "bfc=1" : void 0,
+      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0,
+      // legdur=-N = maks N minutter per etappe (verifisert 2026-11-01).
+      flightMeta.maxDurationMinutes !== void 0 ? `legdur=-${flightMeta.maxDurationMinutes}` : void 0
+    ].filter((part) => part !== void 0);
+    return parts.length > 0 ? parts.join(";") : void 0;
+  }
+  function readMomondoFlightFilters(parsedUrl) {
+    const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
+      const [key = "", value = ""] = part.split("=");
+      return [key, value];
+    }));
+    const stopValues = (filters.get("stops") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value));
+    const maxStops = filters.has("stops") && stopValues.every((value) => value !== void 0 && value < 2) ? Math.max(...stopValues.filter((value) => value !== void 0)) : void 0;
+    const maxDurationMinutes = readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, ""));
+    return {
+      ...maxStops !== void 0 ? { maxStops } : {},
+      ...(readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {},
+      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {},
+      ...maxDurationMinutes !== void 0 ? { maxDurationMinutes } : {}
+    };
+  }
+  function buildMomondoPassengerDetails(flightMeta) {
+    return [
+      ...Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
+      ...readFlightChildAges(flightMeta).map((age) => ({ ptc: "CHD", age })),
+      ...Array.from({ length: flightMeta.infants }, () => ({ ptc: "INL" }))
+    ];
+  }
+  function buildMomondoPassengerPathParts(flightMeta) {
+    const hasChildren = flightMeta.children > 0 || flightMeta.infants > 0;
+    return [
+      ...flightMeta.adults > 1 || hasChildren ? [`${flightMeta.adults}adults`] : [],
+      ...hasChildren ? [["children", ...readFlightChildAges(flightMeta).map(String), ...Array.from({ length: flightMeta.infants }, () => "1L")].join("-")] : []
+    ];
+  }
+  function readMomondoPassengerPathParts(parts) {
+    const adults = readPositiveIntegerValue(parts.map((part) => part.match(/^(\d+)adults?$/i)?.[1]).find((value) => value !== void 0));
+    const childPart = parts.find((part) => /^children(-\d+[LS]?)+$/i.test(part));
+    if (adults === void 0 && childPart === void 0) return void 0;
+    const childTokens = childPart?.split("-").slice(1) ?? [];
+    const childAges = childTokens.filter((token) => /^\d+$/.test(token)).map(Number).filter((age) => age >= 2 && age <= 11);
+    return {
+      adults: adults ?? 1,
+      children: childAges.length,
+      infants: childTokens.filter((token) => /^\d+[LS]$/i.test(token) || Number(token) < 2).length,
+      childAges
+    };
+  }
+  function readMomondoFlexibleDatePart(value) {
+    const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
+    if (match === null || match === void 0) return [value, 0];
+    return [match[1], match[2] !== void 0 ? Number(match[2]) : 0];
+  }
+  function readMomondoFlightFlexDays(before, after) {
+    return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
+  }
+  function readMomondoVisibleFlexibleDateOption(input, flightMeta, combinations) {
+    if (input.currency !== "NOK" || input.priceText === void 0 || !/\s(?:kr|NOK)$/i.test(input.priceText.trim())) return void 0;
+    const amount = readPriceAmount(input.priceText.replace(/\s*(?:kr|NOK)\s*$/i, ""));
+    if (amount === void 0 || amount <= 0 || input.legs.length !== (flightMeta.inboundDate === void 0 ? 1 : 2)) return void 0;
+    const dates = [];
+    const legs = [];
+    for (const [index, leg] of input.legs.entries()) {
+      if (leg.origin !== (index === 0 ? flightMeta.origin : flightMeta.destination) || leg.destination !== (index === 0 ? flightMeta.destination : flightMeta.origin)) return void 0;
+      const date = leg.dateText?.trim().match(/^(\d{1,2})\.(\d{1,2})\.$/);
+      const duration = leg.durationText?.trim().match(/^(?:(\d+)\s*[th]\s*)?(?:(\d+)\s*m)?$/i);
+      const durationMinutes = duration === void 0 || duration === null ? 0 : Number(duration[1] ?? 0) * 60 + Number(duration[2] ?? 0);
+      const stops = leg.stopsText?.trim().match(/^(\d+)\s*(?:stopp?|stops?)$/i);
+      const stopCount = /^(?:direkte|nonstop|direct)$/i.test(leg.stopsText?.trim() ?? "") ? 0 : stops?.[1] === void 0 ? void 0 : Number(stops[1]);
+      if (date === void 0 || date === null || durationMinutes <= 0 || stopCount === void 0) return void 0;
+      dates.push(`${Number(date[1])}.${Number(date[2])}`);
+      legs.push({ durationMinutes, stopCount });
+    }
+    if (exceedsFlightMaxStops(flightMeta, legs.map((leg) => leg.stopCount)) || exceedsFlightMaxDuration(flightMeta, legs.map((leg) => leg.durationMinutes))) return void 0;
+    const shortDate = (date) => `${Number(date.slice(8, 10))}.${Number(date.slice(5, 7))}`;
+    const combination = combinations.find((candidate) => shortDate(candidate.outboundDate) === dates[0] && (candidate.inboundDate === void 0 ? dates.length === 1 : shortDate(candidate.inboundDate) === dates[1]));
+    return combination === void 0 ? void 0 : { ...combination, amount, currency: "NOK", legs };
+  }
+  async function pollMomondoFlexibleDateOptions(state, input) {
+    for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
+      if (attempt > 0) await input.wait(input.intervalMs);
+      const value = await input.requestResults(state.searchId, state.filterState);
+      if (!isRecord$6(value) || !Array.isArray(value.results)) continue;
+      const searchId = readStringValue(value.searchId);
+      if (searchId !== void 0) state.searchId = searchId;
+      const nextFilterState = state.filterState ?? input.readFilterState(value);
+      if (state.filterState === void 0 && nextFilterState !== void 0) {
+        state.filterState = nextFilterState;
+        state.options = [];
+        continue;
+      }
+      const options = input.readOptions(value);
+      state.complete = readStringValue(value.status) === "complete";
+      const byDate = /* @__PURE__ */ new Map();
+      for (const option of state.complete ? options : [...state.options, ...options]) {
+        const key = buildFlightDateCombinationKey(option);
+        const previous = byDate.get(key);
+        if (previous === void 0 || (option.sortAmount ?? option.amount) < (previous.sortAmount ?? previous.amount)) {
+          byDate.set(key, option);
+        }
+      }
+      state.options = [...byDate.values()];
+    }
+  }
+  function formatMomondoLuggageValue(value) {
+    if (value === void 0) return void 0;
+    const cleaned = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (/^inkludert$/i.test(cleaned)) return "inkl.";
+    if (/^ukjent$/i.test(cleaned)) return "ukjent";
+    if (/ikke\s+inkludert|ikke\s+inkl/i.test(cleaned)) return "ikke inkl.";
+    return cleaned;
+  }
+  function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+    const fees = isRecord$6(bookingOption.fees) ? bookingOption.fees : void 0;
+    const isIncluded = (bagData, display) => {
+      const status = isRecord$6(bagData) ? readStringValue(bagData.status) : void 0;
+      return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
+    };
+    if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
+    if (flightMeta.includeCheckedBag === true && !isIncluded(fees?.checkedBagData, fees?.checkedBagDisplay)) return false;
+    return true;
+  }
+  function isTripComPolicyMatchingBaggage(policy, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+    const flags = new Set((Array.isArray(policy.policyFlags) ? policy.policyFlags : []).filter(isString));
+    if (flightMeta.includeCabinBag === true && !flags.has("FREE_CARRY_ON_BAGGAGE")) return false;
+    if (flightMeta.includeCheckedBag === true && !flags.has("FREE_CHECKED_BAGGAGE")) return false;
+    return true;
+  }
+  function readTripComJourneyStopCount(journey) {
+    const sections = readRecordArray(journey.transSectionList);
+    const intermediateStops = sections.reduce((count, section) => {
+      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
+      return count + readRecordArray(flightInfo?.stopList).length;
+    }, 0);
+    return Math.max(0, sections.length - 1) + intermediateStops;
+  }
+  function readTripComJourneyLeg(journey, airlineNames) {
+    const sections = readRecordArray(journey.transSectionList);
+    const stopCount = readTripComJourneyStopCount(journey);
+    const segments = sections.flatMap((section) => {
+      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
+      const airports = [
+        readStringValue(isRecord$6(section.departPoint) ? section.departPoint.airportCode : void 0),
+        ...readRecordArray(flightInfo?.stopList).map((stop) => readStringValue(stop.airportCode)),
+        readStringValue(isRecord$6(section.arrivePoint) ? section.arrivePoint.airportCode : void 0)
+      ];
+      return airports.slice(1).map((destination, index) => ({ origin: airports[index], destination }));
+    });
+    return buildFlightLegDetails({
+      durationMinutes: readNumberValue(journey.duration),
+      stopCount,
+      route: formatFlightLegRoute(segments, stopCount),
+      departureTime: readStringValue(sections[0]?.departDateTime),
+      arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime)
+    }, sections.map((section) => {
+      const code = readStringValue(isRecord$6(section.flightInfo) ? section.flightInfo.airlineCode : void 0)?.toUpperCase();
+      return code !== void 0 ? airlineNames[code] ?? code : void 0;
+    }).filter((carrier) => carrier !== void 0));
+  }
+  function buildTripComBaggageFilterFlags(flightMeta) {
+    return [
+      flightMeta.includeCabinBag === true ? "FreeCarryOnBaggage" : void 0,
+      flightMeta.includeCheckedBag === true ? "FreeCheckedBaggage" : void 0
+    ].filter((flag) => flag !== void 0).map((flag) => ({ flag, allow: true, journeyNoList: [1] }));
+  }
+  function readTripComTotalDurationRange(text) {
+    const match = text.match(/Total\s+(\d+)h(?:\s+(\d+)m)?\s*[–-]?\s*(\d+)h(?:\s+(\d+)m)?/i);
+    if (match === null) return void 0;
+    return {
+      minMinutes: Number(match[1]) * 60 + Number(match[2] ?? 0),
+      maxMinutes: Number(match[3]) * 60 + Number(match[4] ?? 0)
+    };
+  }
+  function readSkyscannerMaxStopsParam(value) {
+    const excluded = (value ?? "").split(",").map((part) => part.trim().replace(/^!/, "").toLowerCase());
+    if (!excluded.includes("twoplusstops")) return void 0;
+    return excluded.includes("onestop") ? 0 : 1;
+  }
+  function buildSkyscannerFareAttributesParam(flightMeta) {
+    const attributes = [
+      flightMeta.includeCabinBag === true ? "cabin-bag" : void 0,
+      flightMeta.includeCheckedBag === true ? "checked-bag" : void 0
+    ].filter((attribute) => attribute !== void 0);
+    return attributes.length > 0 ? attributes.join(",") : void 0;
+  }
+  function readSkyscannerFareAttributesParam(value) {
+    const attributes = (value ?? "").toLowerCase().split(",");
+    return {
+      ...attributes.includes("cabin-bag") ? { includeCabinBag: true } : {},
+      ...attributes.includes("checked-bag") ? { includeCheckedBag: true } : {}
+    };
+  }
+  function buildSkyscannerSearchOptions(flightMeta) {
+    const selectedFareAttributes = [
+      flightMeta.includeCabinBag === true ? "CABIN_BAG" : void 0,
+      flightMeta.includeCheckedBag === true ? "CHECKED_BAG" : void 0
+    ].filter((attribute) => attribute !== void 0);
+    return selectedFareAttributes.length > 0 ? { fareAttributes: { selectedFareAttributes } } : void 0;
+  }
+  function isSkyscannerPricingOptionMatchingBaggage(pricingOption, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
+    const fareAttributes = isRecord$6(pricingOption.fareAttributes) ? pricingOption.fareAttributes : void 0;
+    const isIncluded = (baggage) => isRecord$6(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
+    if (flightMeta.includeCabinBag === true && !isIncluded(fareAttributes?.cabinBaggage)) return false;
+    if (flightMeta.includeCheckedBag === true && !isIncluded(fareAttributes?.checkedBaggage)) return false;
+    return true;
+  }
+  function readPanFlightsPackageRecord(item) {
+    return isRecord$6(item.package) ? item.package : void 0;
+  }
+  function readPanFlightsRouteLegStopCount(route, dataKey) {
+    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
+    const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
+    return specs.length > 0 ? Math.max(0, specs.length - 1) : void 0;
+  }
+  function readPanFlightsLegStopCounts(item) {
+    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+    const outboundRoute = routeList[0];
+    if (outboundRoute === void 0) return [];
+    return [
+      readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
+      readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ?? (routeList[1] !== void 0 ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : void 0)
+    ];
+  }
+  function readPanFlightsLegDurationsMinutes(item, roundTrip) {
+    const packageRecord = readPanFlightsPackageRecord(item);
+    return [roundTrip ? readPositiveNumberValue(packageRecord?.legduration) : readPositiveNumberValue(packageRecord?.duration) ?? readPositiveNumberValue(item.duration)];
+  }
+  function readPanFlightsBaggageFee(baggage, flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
+    if (!isRecord$6(baggage)) return void 0;
+    let feePerPassenger = 0;
+    if (flightMeta.includeCabinBag === true) {
+      const cabinFee = readNumberValue(baggage.bin);
+      if (cabinFee === void 0 || cabinFee < 0) return void 0;
+      feePerPassenger += cabinFee;
+    }
+    if (flightMeta.includeCheckedBag === true) {
+      if (baggage.unit !== void 0) {
+        const includedPieces = baggage.unit === "pcs" ? readNumberValue(baggage.amount) ?? 0 : 1;
+        if (includedPieces < 1) return void 0;
+      } else {
+        const checkedFee = readNumberValue(baggage["1"]);
+        if (checkedFee === void 0 || checkedFee < 0) return void 0;
+        feePerPassenger += checkedFee;
+      }
+    }
+    return Math.round(feePerPassenger * countFlightSeatedPassengers(flightMeta));
+  }
+  function formatPanFlightsEpochDate(epochSeconds) {
+    if (epochSeconds === void 0) return void 0;
+    const date = new Date(epochSeconds * 1e3);
+    return Number.isNaN(date.getTime()) ? void 0 : date.toISOString().slice(0, 10);
+  }
+  function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
+    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
+    const matches = (code, expected) => code !== void 0 && (typeof expected === "string" ? code === expected : expected.has(code));
+    return matches(readStringValue(legData?.flyFrom)?.toUpperCase(), origin) && matches(readStringValue(legData?.flyTo)?.toUpperCase(), destination) ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
+  }
+  function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex, airports) {
+    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+    const outboundRoute = routeList[0];
+    if (outboundRoute === void 0) return void 0;
+    const origin = airports?.origin ?? flightMeta.origin;
+    const destination = airports?.destination ?? flightMeta.destination;
+    const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", origin, destination);
+    if (outboundDate === void 0 || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
+      return void 0;
+    }
+    const requestedInboundDate = flightMeta.inboundDate;
+    if (requestedInboundDate === void 0) return { outboundDate };
+    const inboundDate = [
+      readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", destination, origin),
+      ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", destination, origin))
+    ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
+    return inboundDate !== void 0 && inboundDate >= outboundDate ? { outboundDate, inboundDate } : void 0;
+  }
+  function extractWideroeFlightSearchMeta(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    if (hostname !== "wideroe.no" || !/^\/(?:[a-z]{2}\/)?(?:book-flight\/flight|bestill-flybillett\/flygning)\/?$/i.test(parsedUrl.pathname)) {
+      return void 0;
+    }
+    const tripType = parsedUrl.searchParams.get("triptype");
+    if (tripType !== "1" && tripType !== "2") return void 0;
+    const readDate = (dayKey, monthKey) => {
+      const month = parsedUrl.searchParams.get(monthKey)?.match(/^(\d{4})(\d{2})$/);
+      const day = readPositiveIntegerValue(parsedUrl.searchParams.get(dayKey));
+      return month !== null && month !== void 0 && day !== void 0 ? readIsoDateValue(`${month[1]}-${month[2]}-${String(day).padStart(2, "0")}`) : void 0;
+    };
+    const origin = readIataCodeValue(parsedUrl.searchParams.get("d_city")?.toUpperCase());
+    const destination = readIataCodeValue(parsedUrl.searchParams.get("a_city")?.toUpperCase());
+    const outboundDate = readDate("d_day", "d_month");
+    const inboundDate = tripType === "2" ? readDate("r_day", "r_month") : void 0;
+    const paxTokens = (parsedUrl.searchParams.get("pax") ?? "").toLowerCase().split(/[,;]/).filter(Boolean);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    if (tripType === "2" && (inboundDate === void 0 || inboundDate < outboundDate)) return void 0;
+    if (paxTokens.length === 0 || paxTokens.some((token) => token !== "adt")) return void 0;
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults: paxTokens.length,
+      youths: 0,
+      children: 0,
+      infants: 0
+    });
+  }
+  function readAirFranceKlmFlightSearchMeta(connectionsText, taggingText) {
+    const connections = readRecordArray(parseJsonValue(connectionsText ?? ""));
+    const outbound = connections[0];
+    const inbound = connections[1];
+    const readCode = (place) => readIataCodeValue(isRecord$6(place) ? place.code : void 0);
+    const origin = readCode(outbound?.origin);
+    const destination = readCode(outbound?.destination);
+    const outboundDate = readIsoDateValue(outbound?.departureDate);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || connections.length > 2) return void 0;
+    const inboundDate = inbound === void 0 ? void 0 : readIsoDateValue(inbound.departureDate);
+    if (inbound !== void 0 && (inboundDate === void 0 || readCode(inbound.origin) !== destination || readCode(inbound.destination) !== origin)) {
+      return void 0;
+    }
+    const tagging = parseJsonValue(taggingText ?? "");
+    const flow = isRecord$6(tagging) && isRecord$6(tagging.flow) ? tagging.flow : void 0;
+    if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
+    const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      // Seniorer og ungdom er voksne hos sammenligningskildene.
+      adults: (readNonNegativeIntegerValue(flow.z_nb_adults) ?? 0) + (readNonNegativeIntegerValue(flow.z_nb_seniors) ?? 0),
+      youths: readNonNegativeIntegerValue(flow.z_nb_youth) ?? 0,
+      children: readNonNegativeIntegerValue(flow.z_nb_children) ?? 0,
+      infants: readNonNegativeIntegerValue(flow.z_nb_infants) ?? 0,
+      ...cabinClass !== void 0 ? { cabinClass } : {}
+    });
+  }
+  function readAmadeusAirBoundsFlightSearchMeta(stateText) {
+    const state = parseJsonValue(stateText ?? "");
+    if (!isRecord$6(state) || !isRecord$6(state.entities)) return void 0;
+    const selectedId = readStringValue(state.selectedAirBoundsSearchId);
+    const search = selectedId !== void 0 && isRecord$6(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
+    if (search === void 0) return void 0;
+    const itineraries = readRecordArray(search.itineraries);
+    const outbound = itineraries[0];
+    const inbound = itineraries[1];
+    const origin = readIataCodeValue(outbound?.originLocationCode);
+    const destination = readIataCodeValue(outbound?.destinationLocationCode);
+    const readDate = (value) => readIsoDateValue(readStringValue(value)?.slice(0, 10));
+    const outboundDate = readDate(outbound?.departureDateTime);
+    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || itineraries.length > 2) return void 0;
+    const inboundDate = inbound === void 0 ? void 0 : readDate(inbound.departureDateTime);
+    if (inbound !== void 0 && (inboundDate === void 0 || readIataCodeValue(inbound.originLocationCode) !== destination || readIataCodeValue(inbound.destinationLocationCode) !== origin)) {
+      return void 0;
+    }
+    const passengerCodes = readRecordArray(search.travelers).map((traveler) => readStringValue(traveler.passengerTypeCode)?.toUpperCase());
+    const countCodes = (codes) => passengerCodes.filter((code) => code !== void 0 && codes.includes(code)).length;
+    const adults = countCodes(["ADT", "YTH", "YCD", "SRC"]);
+    const children = countCodes(["CHD"]);
+    const infants = countCodes(["INF"]);
+    if (passengerCodes.length === 0 || adults + children + infants !== passengerCodes.length) return void 0;
+    const cabinClass = readFlightCabinClassValue(search.cabin);
+    return normalizeFlightSearchMeta({
+      origin,
+      destination,
+      outboundDate,
+      ...inboundDate !== void 0 ? { inboundDate } : {},
+      adults,
+      youths: 0,
+      children,
+      infants,
+      ...cabinClass !== void 0 ? { cabinClass } : {},
+      ...outbound?.directFlights === true ? { maxStops: 0 } : {}
+    });
+  }
+  function capFlightDateFlexForSeparateSearches(dateFlex, roundTrip) {
+    const maxDays = roundTrip ? 1 : 3;
+    return {
+      outboundBefore: Math.min(dateFlex.outboundBefore, maxDays),
+      outboundAfter: Math.min(dateFlex.outboundAfter, maxDays),
+      inboundBefore: Math.min(dateFlex.inboundBefore, maxDays),
+      inboundAfter: Math.min(dateFlex.inboundAfter, maxDays)
+    };
+  }
+  const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
+  const TRIP_COM_DEFAULT_CURRENCY = "USD";
+  const TRIP_COM_BASE_URL = "https://us.trip.com";
+  function buildSkyscannerFlightSearchUrl(flightMeta, sortMode = "best", places) {
+    const pathParts = [
+      (places?.origin ?? flightMeta.origin).toLowerCase(),
+      (places?.destination ?? flightMeta.destination).toLowerCase(),
+      compactIsoDate(flightMeta.outboundDate).slice(2),
+      flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate).slice(2) : void 0
+    ].filter((part) => part !== void 0);
+    const params = new URLSearchParams({
+      adults: String(flightMeta.adults),
+      adultsv2: String(flightMeta.adults),
+      cabinclass: buildSkyscannerCabinClass(flightMeta).toLowerCase().replace(/_/g, ""),
+      childrenv2: [...readFlightChildAges(flightMeta), ...Array.from({ length: flightMeta.infants }, () => FLIGHT_INFANT_AGE)].join("|"),
+      inboundaltsenabled: "false",
+      outboundaltsenabled: "false",
+      preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
+      rtn: flightMeta.inboundDate !== void 0 ? "1" : "0"
+    });
+    if (flightMeta.maxStops === 0) params.set("stops", "!oneStop,!twoPlusStops");
+    else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
+    const fareAttributes = buildSkyscannerFareAttributesParam(flightMeta);
+    if (fareAttributes !== void 0) params.set("fare-attributes", fareAttributes);
+    if (flightMeta.maxDurationMinutes !== void 0) params.set("duration", String(flightMeta.maxDurationMinutes));
+    if (sortMode !== "best") params.set(FLIGHT_LINK_SORT_PARAM, sortMode);
+    return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
+  }
+  function buildSkyscannerCabinClass(flightMeta) {
+    switch (flightMeta.cabinClass) {
+      case "premium":
+        return "PREMIUM_ECONOMY";
+      case "business":
+        return "BUSINESS";
+      case "first":
+        return "FIRST";
+      default:
+        return "ECONOMY";
+    }
+  }
+  function buildPanFlightsFlightSearchUrl(flightMeta, sortMode = "best", places) {
+    const outboundDate = compactIsoDate(flightMeta.outboundDate);
+    const inboundDate = flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate) : void 0;
+    const path = inboundDate !== void 0 ? "roundtrip" : "oneway";
+    const route = `${places?.origin ?? flightMeta.origin}_${places?.destination ?? flightMeta.destination}`;
+    const v2 = inboundDate !== void 0 ? `${route}_${outboundDate}_${inboundDate}` : `${route}_${outboundDate}`;
+    const params = new URLSearchParams({
+      v2,
+      order: buildFlightSortUrlValue("panflights", sortMode),
+      pad: String(flightMeta.adults),
+      ...flightMeta.children > 0 ? { pch: String(flightMeta.children) } : {},
+      ...flightMeta.infants > 0 ? { pin: String(flightMeta.infants) } : {},
+      [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1"
+    });
+    const linkFilters = buildFlightLinkFiltersValue(flightMeta);
+    if (linkFilters !== void 0) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
+    return `https://panflights.no/nb/${path}/?${params.toString()}`;
+  }
+  const GOOGLE_FLIGHTS_SORT_PARAMS = {
+    cheapest: "EgoIARAAGAAgAigB",
+    fastest: "EgYIBRAAGAA"
+  };
+  function buildGoogleFlightsSearchUrl(flightMeta, sortMode = "best") {
+    const sortParam = GOOGLE_FLIGHTS_SORT_PARAMS[sortMode];
+    const params = new URLSearchParams({
+      tfs: buildGoogleFlightsTfsParam(flightMeta),
+      ...sortParam !== void 0 ? { tfu: sortParam } : {},
+      hl: "nb",
+      curr: "NOK"
+    });
+    return `https://www.google.com/travel/flights?${params.toString()}`;
+  }
+  function buildGoogleFlightsTfsParam(flightMeta) {
+    const bytes = [
+      ...encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.outboundDate, flightMeta.origin, flightMeta.destination, flightMeta.maxStops, flightMeta.maxDurationMinutes)),
+      ...flightMeta.inboundDate !== void 0 ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops, flightMeta.maxDurationMinutes)) : []
+    ];
+    for (let index = 0; index < flightMeta.adults; index++) {
+      bytes.push(...encodeProtoVarintField(8, 1));
+    }
+    for (let index = 0; index < flightMeta.children; index++) {
+      bytes.push(...encodeProtoVarintField(8, 2));
+    }
+    for (let index = 0; index < flightMeta.infants; index++) {
+      bytes.push(...encodeProtoVarintField(8, 4));
+    }
+    bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
+    const bagCount = flightMeta.adults + flightMeta.children;
+    if (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) {
+      bytes.push(...encodeProtoBytesField(13, [
+        ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? bagCount : 0),
+        ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? bagCount : 0)
+      ]));
+    }
+    bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== void 0 ? 1 : 2));
+    return encodeBase64Url(bytes);
+  }
+  function encodeGoogleFlightsLeg(date, origin, destination, maxStops, maxDurationMinutes) {
+    return [
+      ...encodeProtoStringField(2, date),
+      ...maxStops !== void 0 ? encodeProtoVarintField(5, maxStops) : [],
+      ...maxDurationMinutes !== void 0 ? encodeProtoVarintField(12, maxDurationMinutes) : [],
+      ...encodeProtoBytesField(13, encodeProtoStringField(2, origin.toUpperCase())),
+      ...encodeProtoBytesField(14, encodeProtoStringField(2, destination.toUpperCase()))
+    ];
+  }
+  function readGoogleFlightsSeatValue(flightMeta) {
+    switch (flightMeta.cabinClass) {
+      case "premium":
+        return 2;
+      case "business":
+        return 3;
+      case "first":
+        return 4;
+      default:
+        return 1;
+    }
+  }
+  function encodeProtoVarint(value) {
+    const bytes = [];
+    let remaining = Math.max(0, Math.trunc(value));
+    do {
+      const byte = remaining % 128;
+      remaining = Math.floor(remaining / 128);
+      bytes.push(remaining > 0 ? byte | 128 : byte);
+    } while (remaining > 0);
+    return bytes;
+  }
+  function encodeProtoVarintField(fieldNumber, value) {
+    return [...encodeProtoVarint(fieldNumber * 8), ...encodeProtoVarint(value)];
+  }
+  function encodeProtoStringField(fieldNumber, value) {
+    const encoded = [...new TextEncoder().encode(value)];
+    return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(encoded.length), ...encoded];
+  }
+  function encodeProtoBytesField(fieldNumber, bytes) {
+    return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(bytes.length), ...bytes];
+  }
+  function encodeBase64Url(bytes) {
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function buildTripComFlightSearchUrl(flightMeta, sortMode = "best") {
+    const params = new URLSearchParams({
+      dcity: flightMeta.origin.toLowerCase(),
+      acity: flightMeta.destination.toLowerCase(),
+      ddate: flightMeta.outboundDate,
+      triptype: flightMeta.inboundDate !== void 0 ? "rt" : "ow",
+      class: buildTripComCabinClassParam(flightMeta),
+      lowpricesource: "searchform",
+      quantity: String(flightMeta.adults),
+      // childqty/babyqty verifisert 2026-11-02; totalPrice gjelder da alle reisende.
+      ...flightMeta.children > 0 ? { childqty: String(flightMeta.children) } : {},
+      ...flightMeta.infants > 0 ? { babyqty: String(flightMeta.infants) } : {},
+      searchboxarg: "t",
+      nonstoponly: flightMeta.maxStops === 0 ? "on" : "off",
+      locale: "en-US",
+      curr: TRIP_COM_DEFAULT_CURRENCY
+    });
+    if (flightMeta.inboundDate !== void 0) params.set("rdate", flightMeta.inboundDate);
+    params.set(FLIGHT_LINK_FILTERS_PARAM, buildFlightLinkFiltersValue(flightMeta) ?? "none");
+    if (sortMode !== "best") params.set(FLIGHT_LINK_SORT_PARAM, sortMode);
+    return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
+  }
+  function buildTripComCabinClassParam(flightMeta) {
+    switch (flightMeta.cabinClass) {
+      case "premium":
+        return "s";
+      case "business":
+        return "c";
+      case "first":
+        return "f";
+      default:
+        return "y";
+    }
+  }
+  const KIWI_CABIN_CLASSES = {
+    economy: "ECONOMY",
+    premium: "PREMIUM_ECONOMY",
+    business: "BUSINESS",
+    first: "FIRST_CLASS"
+  };
+  function buildKiwiFlightSearchUrl(flightMeta, sortMode = "best") {
+    const { dateFlex } = flightMeta;
+    const formatDate = (date, before = 0, after = 0) => {
+      return before === 0 && after === 0 ? date : `${shiftFlightDateNotBeforeToday(date, -before)}_${shiftFlightDateNotBeforeToday(date, after)}`;
+    };
+    const pathParts = [
+      flightMeta.origin,
+      flightMeta.destination,
+      formatDate(flightMeta.outboundDate, dateFlex?.outboundBefore, dateFlex?.outboundAfter),
+      flightMeta.inboundDate !== void 0 ? formatDate(flightMeta.inboundDate, dateFlex?.inboundBefore, dateFlex?.inboundAfter) : "no-return"
+    ];
+    const params = new URLSearchParams({
+      adults: String(flightMeta.adults),
+      children: String(flightMeta.children),
+      infants: String(flightMeta.infants)
+    });
+    if (flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy") {
+      params.set("cabinClass", `${KIWI_CABIN_CLASSES[flightMeta.cabinClass]}-false`);
+    }
+    const bags = buildKiwiBagsParam(flightMeta);
+    if (bags !== void 0) params.set("bags", bags);
+    if (flightMeta.maxStops !== void 0 && flightMeta.maxStops <= 2) params.set("stopNumber", `${flightMeta.maxStops}~true`);
+    if (flightMeta.maxDurationMinutes !== void 0) {
+      params.set("flightDurationMax", String(Math.max(1, Math.floor(flightMeta.maxDurationMinutes / 60))));
+    }
+    if (sortMode !== "best") params.set("sortBy", buildFlightSortUrlValue("kiwi", sortMode));
+    return `https://www.kiwi.com/no/search/results/${pathParts.join("/")}?${params.toString()}`;
+  }
+  function buildKiwiBagsParam(flightMeta) {
+    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return void 0;
+    const bag = `${flightMeta.includeCabinBag === true ? 1 : 0}.${flightMeta.includeCheckedBag === true ? 1 : 0}`;
+    return [flightMeta.adults, flightMeta.children].filter((count) => count > 0).map((count) => Array.from({ length: count }, () => bag).join("_")).join("-");
+  }
+  function readKiwiBagsParam(value) {
+    const [cabinBags, checkedBags] = (value?.split(/[_-]/)[0] ?? "").split(".").map(Number);
+    return {
+      ...(cabinBags ?? 0) > 0 ? { includeCabinBag: true } : {},
+      ...(checkedBags ?? 0) > 0 ? { includeCheckedBag: true } : {}
+    };
+  }
+  function readKiwiSearchPath(parsedUrl) {
+    if (parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "kiwi.com") return void 0;
+    const match = parsedUrl.pathname.match(/^\/[a-z]{2}\/search\/results\/([^/]+)\/([^/]+)\/([^/]+)(?:\/([^/]+))?\/?$/);
+    if (match?.[1] === void 0 || match[2] === void 0 || match[3] === void 0) return void 0;
+    return {
+      origin: match[1],
+      destination: match[2],
+      outbound: match[3],
+      ...match[4] !== void 0 && match[4] !== "no-return" ? { inbound: match[4] } : {}
+    };
+  }
+  function readKiwiDatePart(value) {
+    const [start, end] = value.split("_");
+    if (start === void 0 || readIsoDateValue(start) === void 0) return void 0;
+    if (end === void 0) return { date: start, flexDays: 0 };
+    if (readIsoDateValue(end) === void 0) return void 0;
+    const flexDays = Math.floor((Date.parse(end) - Date.parse(start)) / 864e5 / 2);
+    const date = addDaysToIsoDate(start, flexDays);
+    return date !== void 0 && flexDays >= 0 ? { date, flexDays } : void 0;
+  }
+  function buildMomondoFlightSearchUrl(flightMeta, sortMode = "best") {
+    const { dateFlex } = flightMeta;
+    const formatDate = (date, flexDays) => {
+      if (flexDays === 0) return date;
+      return `${date}-flexible-${flexDays}${flexDays === 1 ? "day" : "days"}`;
+    };
+    const pathParts = [
+      `${flightMeta.origin}-${flightMeta.destination}`,
+      formatDate(flightMeta.outboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter) : 0),
+      flightMeta.inboundDate !== void 0 ? formatDate(flightMeta.inboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0) : void 0,
+      ...buildMomondoPassengerPathParts(flightMeta),
+      flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : void 0
+    ].filter((part) => part !== void 0);
+    const params = new URLSearchParams({ sort: dateFlex !== void 0 ? "price_a" : buildFlightSortUrlValue("momondo", sortMode) });
+    const momondoFilters = buildMomondoFlightFilterValue(flightMeta);
+    if (momondoFilters !== void 0) params.set("fs", momondoFilters);
+    return `https://www.momondo.no/flight-search/${pathParts.map(encodeURIComponent).join("/")}?${params.toString()}`;
+  }
+  function buildFinnFlightSearchUrl(flightMeta, scope = "exact") {
+    const params = new URLSearchParams({
+      adults: String(flightMeta.adults),
+      // FINN: barn 2–11 år og spedbarn 0–1 år som antall.
+      ...flightMeta.children > 0 ? { children: String(flightMeta.children) } : {},
+      ...flightMeta.infants > 0 ? { infants: String(flightMeta.infants) } : {},
+      // finn aksepterer economy|premium|business|first (verifisert mot søkeskjemaet).
+      cabinType: flightMeta.cabinClass ?? "economy",
+      requestedDepartureDate: flightMeta.outboundDate,
+      requestedDestination: `${flightMeta.destination}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
+      requestedOrigin: `${flightMeta.origin}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
+      tripType: flightMeta.inboundDate !== void 0 ? "roundtrip" : "oneway"
+    });
+    if (scope === "exact") {
+      const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
+      for (const [key, value] of exactAirportParams.entries()) {
+        params.set(key, value);
+      }
+    }
+    if (flightMeta.inboundDate !== void 0) {
+      params.set("requestedReturnDate", flightMeta.inboundDate);
+    }
+    if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
+    if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
+    if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
+    if (flightMeta.maxDurationMinutes !== void 0) params.set("durationTo", String(flightMeta.maxDurationMinutes));
+    return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
+  }
+  function buildFinnFlightExactAirportParams(flightMeta) {
+    const params = new URLSearchParams({
+      departureAirportLeg1: flightMeta.origin,
+      arrivalAirportLeg1: flightMeta.destination
+    });
+    if (flightMeta.inboundDate !== void 0) {
+      params.set("departureAirportLeg2", flightMeta.destination);
+      params.set("arrivalAirportLeg2", flightMeta.origin);
+    }
+    return params;
+  }
+  function compactIsoDate(value) {
+    return value.replace(/-/g, "");
+  }
+  const KIWI_GRAPHQL_URL = "https://api.skypicker.com/umbrella/v2/graphql";
+  const KIWI_PLACES_QUERY = "query KiwiPlace($search: PlacesSearchInput, $filter: PlacesFilterInput, $options: PlacesOptionsInput) { places(search: $search, filter: $filter, options: $options, first: 5) { ... on PlaceConnection { edges { node { __typename id legacyId slug ... on City { code } } } } } }";
+  const KIWI_SECTOR_FRAGMENT = "fragment KiwiSector on Sector { duration sectorSegments { segment { source { station { code } localTime } destination { station { code } localTime } carrier { name } followingTechnicalStop } } }";
+  const KIWI_ITINERARY_FRAGMENT = "fragment KiwiItinerary on Itinerary { __typename id duration price { amount } ... on ItineraryOneWay { sector { ...KiwiSector } } ... on ItineraryReturn { outbound { ...KiwiSector } inbound { ...KiwiSector } } }";
+  const KIWI_RESULT_SELECTION = "__typename ... on AppError { error: message } ... on Itineraries { metadata { hasMorePending topResults { best { ...KiwiItinerary } cheapest { ...KiwiItinerary } fastest { ...KiwiItinerary } } } itineraries { ...KiwiItinerary } }";
+  const KIWI_RETURN_QUERY = `query KiwiReturn($search: SearchReturnInput, $filter: ItinerariesFilterInput, $options: ItinerariesOptionsInput) { returnItineraries(search: $search, filter: $filter, options: $options) { ${KIWI_RESULT_SELECTION} } } ${KIWI_ITINERARY_FRAGMENT} ${KIWI_SECTOR_FRAGMENT}`;
+  const KIWI_ONE_WAY_QUERY = `query KiwiOneWay($search: SearchOnewayInput, $filter: ItinerariesFilterInput, $options: ItinerariesOptionsInput) { onewayItineraries(search: $search, filter: $filter, options: $options) { ${KIWI_RESULT_SELECTION} } } ${KIWI_ITINERARY_FRAGMENT} ${KIWI_SECTOR_FRAGMENT}`;
+  const KIWI_API_CABIN_CLASSES = {
+    economy: "ECONOMY",
+    premium: "PREMIUM_ECONOMY",
+    business: "BUSINESS",
+    first: "FIRST_CLASS"
+  };
+  const KIWI_API_SORT = { best: "QUALITY", cheapest: "PRICE", fastest: "DURATION" };
+  function buildKiwiPlacesUrl(term, placeType) {
+    const params = new URLSearchParams({
+      featureName: "UmbrellaPlacesQuery",
+      query: KIWI_PLACES_QUERY,
+      variables: JSON.stringify({ search: { term }, filter: { onlyTypes: [placeType] }, options: { locale: "no" } })
+    });
+    return `${KIWI_GRAPHQL_URL}?${params.toString()}`;
+  }
+  function readKiwiPlaces(value, placeType) {
+    const places = isRecord$6(value) && isRecord$6(value.data) && isRecord$6(value.data.places) ? value.data.places : void 0;
+    return readRecordArray(places?.edges).flatMap((edge) => {
+      const node = isRecord$6(edge.node) ? edge.node : void 0;
+      const id = readStringValue(node?.id);
+      const slug = readStringValue(node?.slug);
+      const code = readStringValue(placeType === "AIRPORT" ? node?.legacyId : node?.code);
+      return id !== void 0 && slug !== void 0 ? [{ id, slug, ...code !== void 0 ? { code } : {} }] : [];
+    });
+  }
+  function buildKiwiAirportId(code) {
+    return `Station:airport:${code.toUpperCase()}`;
+  }
+  function buildKiwiItinerariesRequest(flightMeta, places, sortMode) {
+    const { dateFlex } = flightMeta;
+    const dateRange = (date, before = 0, after = 0) => ({
+      start: `${shiftFlightDateNotBeforeToday(date, -before)}T00:00:00`,
+      end: `${shiftFlightDateNotBeforeToday(date, after)}T23:59:59`
+    });
+    const roundTrip = flightMeta.inboundDate !== void 0;
+    const handBags = flightMeta.includeCabinBag === true ? 1 : 0;
+    const holdBags = flightMeta.includeCheckedBag === true ? 1 : 0;
+    const bags = (count, value) => Array.from({ length: count }, () => value);
+    const variables = {
+      search: {
+        itinerary: {
+          source: { ids: [places.origin] },
+          destination: { ids: [places.destination] },
+          outboundDepartureDate: dateRange(flightMeta.outboundDate, dateFlex?.outboundBefore, dateFlex?.outboundAfter),
+          ...flightMeta.inboundDate !== void 0 ? { inboundDepartureDate: dateRange(flightMeta.inboundDate, dateFlex?.inboundBefore, dateFlex?.inboundAfter) } : {}
+        },
+        passengers: {
+          adults: flightMeta.adults,
+          children: flightMeta.children,
+          infants: flightMeta.infants,
+          adultsHoldBags: bags(flightMeta.adults, holdBags),
+          adultsHandBags: bags(flightMeta.adults, handBags),
+          childrenHoldBags: bags(flightMeta.children, holdBags),
+          childrenHandBags: bags(flightMeta.children, handBags)
+        },
+        cabinClass: { cabinClass: KIWI_API_CABIN_CLASSES[flightMeta.cabinClass ?? "economy"], applyMixedClasses: false }
+      },
+      filter: {
+        // Samme standardvalg som kiwi.com, så raden viser det Kiwi-lenken viser.
+        ...roundTrip ? { allowReturnFromDifferentCity: true } : {},
+        allowChangeInboundDestination: true,
+        allowChangeInboundSource: true,
+        allowDifferentStationConnection: true,
+        enableSelfTransfer: true,
+        enableThrowAwayTicketing: true,
+        enableTrueHiddenCity: true,
+        // Kiwi har bare hele timer; som lenken rundes det ned, og etappene kontrolleres etterpå.
+        ...flightMeta.maxDurationMinutes !== void 0 ? { maxDuration: Math.max(1, Math.floor(flightMeta.maxDurationMinutes / 60)) } : {},
+        ...flightMeta.maxStops !== void 0 ? { maxStopsCount: flightMeta.maxStops } : {},
+        transportTypes: ["FLIGHT"],
+        contentProviders: ["KIWI", "FRESH"],
+        flightsApiLimit: 25,
+        limit: 10
+      },
+      options: {
+        sortBy: KIWI_API_SORT[sortMode],
+        currency: "nok",
+        locale: "no",
+        market: "no",
+        partner: "skypicker",
+        partnerMarket: "no",
+        affilID: "skypicker",
+        storeSearch: false
+      }
+    };
+    const featureName = roundTrip ? "SearchReturnItinerariesQuery" : "SearchOneWayItinerariesQuery";
+    return {
+      url: `${KIWI_GRAPHQL_URL}?featureName=${featureName}`,
+      body: JSON.stringify({ query: roundTrip ? KIWI_RETURN_QUERY : KIWI_ONE_WAY_QUERY, variables })
+    };
+  }
+  function readKiwiItineraries(value, flightMeta, airports) {
+    const data = isRecord$6(value) && isRecord$6(value.data) ? value.data : void 0;
+    const result = isRecord$6(data?.returnItineraries) ? data.returnItineraries : isRecord$6(data?.onewayItineraries) ? data.onewayItineraries : void 0;
+    if (result === void 0) {
+      const errors = isRecord$6(value) && Array.isArray(value.errors) ? value.errors.map((error) => isRecord$6(error) ? readStringValue(error.message) : void 0).filter(Boolean).join("; ") : "";
+      throw new Error(`Kiwi: uventet svar${errors !== "" ? ` (${errors})` : ""}`);
+    }
+    if (result.__typename === "AppError") throw new Error(`Kiwi: ${readStringValue(result.error) ?? "AppError"}`);
+    const metadata = isRecord$6(result.metadata) ? result.metadata : void 0;
+    const topResults = isRecord$6(metadata?.topResults) ? metadata.topResults : void 0;
+    const read = (item) => isRecord$6(item) ? readKiwiItinerary(item, flightMeta, airports) : void 0;
+    const top = {};
+    for (const mode of ["best", "cheapest", "fastest"]) {
+      const itinerary = read(topResults?.[mode]);
+      if (itinerary !== void 0) top[mode] = itinerary;
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const itineraries = readRecordArray(result.itineraries).map(read).filter((itinerary) => itinerary !== void 0).filter((itinerary) => !seen.has(itinerary.id) && seen.add(itinerary.id) !== void 0);
+    return { itineraries, top, hasMorePending: metadata?.hasMorePending === true };
+  }
+  function readKiwiSector(sector) {
+    if (!isRecord$6(sector)) return void 0;
+    const segments = readRecordArray(sector.sectorSegments).map((item) => isRecord$6(item.segment) ? item.segment : void 0).filter((segment) => segment !== void 0);
+    if (segments.length === 0) return void 0;
+    const station = (end) => isRecord$6(end) && isRecord$6(end.station) ? readStringValue(end.station.code)?.toUpperCase() : void 0;
+    const localTime = (end) => isRecord$6(end) ? readStringValue(end.localTime) : void 0;
+    const airports = segments.map((segment) => ({ origin: station(segment.source), destination: station(segment.destination) }));
+    const technicalStops = segments.filter((segment) => segment.followingTechnicalStop === true).length;
+    const stopCount = segments.length - 1 + technicalStops;
+    const seconds = typeof sector.duration === "number" && Number.isFinite(sector.duration) ? sector.duration : void 0;
+    const minutes = seconds !== void 0 && seconds > 0 ? Math.round(seconds / 60) : void 0;
+    const carriers = segments.map((segment) => isRecord$6(segment.carrier) ? readStringValue(segment.carrier.name) : void 0).filter((carrier) => carrier !== void 0);
+    const departureTime = localTime(segments[0]?.source);
+    const leg = buildFlightLegDetails({
+      durationMinutes: minutes,
+      stopCount,
+      route: formatFlightLegRoute(airports, stopCount),
+      departureTime,
+      arrivalTime: localTime(segments[segments.length - 1]?.destination)
+    }, carriers);
+    return {
+      leg,
+      origin: airports[0]?.origin,
+      destination: airports[airports.length - 1]?.destination,
+      date: departureTime?.slice(0, 10),
+      minutes,
+      stopCount,
+      carriers
+    };
+  }
+  function readKiwiItinerary(item, flightMeta, airports) {
+    const id = readStringValue(item.id);
+    const price = isRecord$6(item.price) ? item.price : void 0;
+    const amount = Number(readStringValue(price?.amount));
+    if (id === void 0 || !Number.isFinite(amount) || amount <= 0) return void 0;
+    const roundTrip = flightMeta.inboundDate !== void 0;
+    const sectors = roundTrip ? [readKiwiSector(item.outbound), readKiwiSector(item.inbound)] : [readKiwiSector(item.sector)];
+    if (sectors.some((sector) => sector === void 0)) return void 0;
+    const [outbound, inbound] = sectors;
+    if (outbound === void 0 || outbound.date === void 0 || !airports.origin.has(outbound.origin ?? "") || !airports.destination.has(outbound.destination ?? "")) return void 0;
+    if (roundTrip && (inbound === void 0 || inbound.date === void 0 || !airports.destination.has(inbound.origin ?? "") || !airports.origin.has(inbound.destination ?? ""))) return void 0;
+    const legMinutes = sectors.map((sector) => sector.minutes);
+    if (exceedsFlightMaxStops(flightMeta, sectors.map((sector) => sector.stopCount))) return void 0;
+    if (exceedsFlightMaxDuration(flightMeta, legMinutes)) return void 0;
+    const durationMinutes = sumFlightLegMinutes(legMinutes);
+    return {
+      id,
+      amount: Math.round(amount),
+      legs: sectors.map((sector) => sector.leg),
+      legMinutes,
+      ...durationMinutes !== void 0 ? { durationMinutes } : {},
+      outboundDate: outbound.date,
+      ...inbound?.date !== void 0 ? { inboundDate: inbound.date } : {},
+      carriers: [...new Set(sectors.flatMap((sector) => sector.carriers))]
+    };
+  }
   function createElectricityComparison(options) {
     return createAutomaticComparison({
       getUrl: options.getUrl,
@@ -9966,1149 +11227,6 @@ ${darkProviderCss}
       }
     };
   }
-  const FLIGHT_DEFAULT_CHILD_AGE = 7;
-  const FLIGHT_INFANT_AGE = 1;
-  const FLIGHT_LINK_FILTERS_PARAM = "cbvFilters";
-  const MOMONDO_FLIGHT_FLEX_VALUES = ["exact", "plusminusone", "plusminustwo", "plusminusthree"];
-  function normalizeFlightSearchMeta(meta) {
-    const origin = readIataCodeValue(meta.origin);
-    const destination = readIataCodeValue(meta.destination);
-    const outboundDate = readIsoDateValue(meta.outboundDate);
-    const inboundDate = meta.inboundDate !== void 0 ? readIsoDateValue(meta.inboundDate) : void 0;
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || origin === destination) {
-      return void 0;
-    }
-    const normalizedMeta = {
-      origin,
-      destination,
-      ...meta.originScope === "airport" || meta.originScope === "city" ? { originScope: meta.originScope } : {},
-      ...meta.destinationScope === "airport" || meta.destinationScope === "city" ? { destinationScope: meta.destinationScope } : {},
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
-      adults: Math.max(1, Math.trunc(meta.adults) + Math.max(0, Math.trunc(meta.youths))),
-      youths: 0,
-      children: Math.max(0, Math.trunc(meta.children)),
-      infants: Math.max(0, Math.trunc(meta.infants)),
-      ...meta.childAges !== void 0 && meta.childAges.length === Math.trunc(meta.children) && meta.childAges.every((age) => Number.isInteger(age) && age >= 2 && age <= 11) ? { childAges: meta.childAges } : {},
-      ...meta.cabinClass !== void 0 ? { cabinClass: meta.cabinClass } : {},
-      ...meta.maxStops !== void 0 ? { maxStops: Math.max(0, Math.min(3, Math.trunc(meta.maxStops))) } : {},
-      ...meta.includeCabinBag === true ? { includeCabinBag: true } : {},
-      ...meta.includeCheckedBag === true ? { includeCheckedBag: true } : {},
-      ...meta.maxDurationMinutes !== void 0 && meta.maxDurationMinutes > 0 ? { maxDurationMinutes: Math.round(meta.maxDurationMinutes) } : {},
-      ...meta.dateFlex !== void 0 ? { dateFlex: meta.dateFlex } : {}
-    };
-    return isFlightSearchPassengerMatchSupported(normalizedMeta) ? normalizedMeta : void 0;
-  }
-  function isFlightSearchPassengerMatchSupported(flightMeta) {
-    return flightMeta.adults > 0 && flightMeta.infants <= flightMeta.adults;
-  }
-  function readFlightChildAges(flightMeta) {
-    return flightMeta.childAges ?? Array.from({ length: flightMeta.children }, () => FLIGHT_DEFAULT_CHILD_AGE);
-  }
-  function countFlightSeatedPassengers(flightMeta) {
-    return flightMeta.adults + flightMeta.children;
-  }
-  function readFlightPassengerAges(ages) {
-    const childAges = ages.filter((age) => age >= 2 && age <= 11);
-    return { children: childAges.length, infants: ages.filter((age) => age < 2).length, childAges };
-  }
-  function readFlightCabinClassValue(value) {
-    if (typeof value !== "string") return void 0;
-    const normalized = value.trim().toLowerCase().replace(/[^a-zæøå]/g, "");
-    if (normalized.length === 0) return void 0;
-    if (/^(?:economy|okonomi|økonomi|ekonomi)$/.test(normalized)) return "economy";
-    if (normalized.includes("premium")) return "premium";
-    if (normalized.includes("business")) return "business";
-    if (/^first(?:class)?$|f[oø]rsteklasse/.test(normalized)) return "first";
-    return void 0;
-  }
-  function exceedsFlightMaxStops(flightMeta, stopCounts) {
-    if (flightMeta.maxStops === void 0) return false;
-    const maxStops = flightMeta.maxStops;
-    return stopCounts.some((stopCount) => stopCount !== void 0 && stopCount > maxStops);
-  }
-  function exceedsFlightMaxDuration(flightMeta, legDurationsMinutes) {
-    const { maxDurationMinutes } = flightMeta;
-    if (maxDurationMinutes === void 0) return false;
-    return legDurationsMinutes.some((durationMinutes) => durationMinutes !== void 0 && durationMinutes > maxDurationMinutes);
-  }
-  function isIsoDateWithinDays(date, centerDate, daysBefore, daysAfter) {
-    if (date === void 0) return false;
-    const time = (/* @__PURE__ */ new Date(`${date}T00:00:00Z`)).getTime();
-    const centerTime = (/* @__PURE__ */ new Date(`${centerDate}T00:00:00Z`)).getTime();
-    if (Number.isNaN(time) || Number.isNaN(centerTime)) return false;
-    const dayOffset = Math.round((time - centerTime) / (24 * 60 * 60 * 1e3));
-    return dayOffset >= -daysBefore && dayOffset <= daysAfter;
-  }
-  function formatFlightDateFlexWindow(before, after) {
-    return before === after ? `±${before}` : `-${before}/+${after}`;
-  }
-  function formatFlightDateFlexDays(dateFlex, roundTrip) {
-    const outbound = formatFlightDateFlexWindow(dateFlex.outboundBefore, dateFlex.outboundAfter);
-    const inbound = formatFlightDateFlexWindow(dateFlex.inboundBefore, dateFlex.inboundAfter);
-    return !roundTrip || outbound === inbound ? `${outbound} d` : `${outbound}/${inbound} d`;
-  }
-  function shiftFlightDateNotBeforeToday(isoDate, days, now = /* @__PURE__ */ new Date()) {
-    if (days === 0) return isoDate;
-    const shiftedDate = addDaysToIsoDate(isoDate, days) ?? isoDate;
-    if (days > 0) return shiftedDate;
-    const today = [
-      String(now.getFullYear()),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0")
-    ].join("-");
-    const earliestDate = today < isoDate ? today : isoDate;
-    return shiftedDate < earliestDate ? earliestDate : shiftedDate;
-  }
-  function listFlightDateFlexCombinations(flightMeta, dateFlex, now = /* @__PURE__ */ new Date()) {
-    const listDates = (centerDate, before, after) => {
-      const firstDate = shiftFlightDateNotBeforeToday(centerDate, -before, now);
-      const dates = [];
-      for (let offset = -before; offset <= after; offset++) {
-        const date = addDaysToIsoDate(centerDate, offset);
-        if (date !== void 0 && date >= firstDate) dates.push({ date, offset });
-      }
-      return dates;
-    };
-    const outboundDates = listDates(flightMeta.outboundDate, dateFlex.outboundBefore, dateFlex.outboundAfter);
-    const { inboundDate } = flightMeta;
-    const combinations = inboundDate === void 0 ? outboundDates.map(({ date, offset }) => ({ outboundDate: date, distance: Math.abs(offset) })) : outboundDates.flatMap((outbound) => {
-      return listDates(inboundDate, dateFlex.inboundBefore, dateFlex.inboundAfter).filter((inbound) => inbound.date >= outbound.date).map((inbound) => ({
-        outboundDate: outbound.date,
-        inboundDate: inbound.date,
-        distance: Math.abs(outbound.offset) + Math.abs(inbound.offset)
-      }));
-    });
-    return combinations.sort((left, right) => left.distance - right.distance).map(({ distance: _distance, ...combination }) => combination);
-  }
-  function buildFlightDateCombinationKey(combination) {
-    return `${combination.outboundDate}|${combination.inboundDate ?? ""}`;
-  }
-  function readPanFlightsDateFlex(extraParts, outboundDate, inboundDate) {
-    const readValue = (key) => extraParts.find((part) => part.startsWith(`${key}:`))?.slice(key.length + 1);
-    const readWindow = (flexKey, endKey, startDate) => {
-      const value = readValue(flexKey);
-      if (value === "manual" && startDate !== void 0) {
-        const endDate = readIsoDateValue(readValue(endKey)?.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"));
-        const days = endDate === void 0 ? void 0 : Math.round((Date.parse(endDate) - Date.parse(startDate)) / 864e5);
-        return days !== void 0 && days >= 0 ? [0, days] : [0, 0];
-      }
-      const [before, after] = (value ?? "").split(",").map((day) => readNonNegativeIntegerValue(day));
-      return before !== void 0 ? [before, after ?? before] : [0, 0];
-    };
-    const [outboundBefore, outboundAfter] = readWindow("ff", "td", outboundDate);
-    const [inboundBefore, inboundAfter] = inboundDate !== void 0 ? readWindow("tf", "ud", inboundDate) : [0, 0];
-    return outboundBefore + outboundAfter + inboundBefore + inboundAfter > 0 ? { outboundBefore, outboundAfter, inboundBefore, inboundAfter } : void 0;
-  }
-  const FLIGHT_LINK_SORT_PARAM = "cbvSort";
-  const FLIGHT_FASTEST_MAX_PRICE_FACTOR = 4;
-  function sumFlightLegMinutes(legMinutes, expectedLegs = legMinutes.length) {
-    if (legMinutes.length === 0 || legMinutes.length !== expectedLegs) return void 0;
-    let total = 0;
-    for (const minutes of legMinutes) {
-      if (minutes === void 0 || !Number.isFinite(minutes) || minutes <= 0) return void 0;
-      total += minutes;
-    }
-    return total;
-  }
-  function selectFlightSortCandidate(candidates, mode) {
-    if (mode === "best") return candidates[0];
-    const amountOf = (candidate) => candidate.sortAmount ?? candidate.amount;
-    const fastestPriceLimit = Math.min(...candidates.map(amountOf)) * FLIGHT_FASTEST_MAX_PRICE_FACTOR;
-    let selected;
-    for (const candidate of candidates) {
-      if (mode === "cheapest") {
-        if (selected === void 0 || amountOf(candidate) < amountOf(selected)) selected = candidate;
-        continue;
-      }
-      if (candidate.durationMinutes === void 0 || amountOf(candidate) > fastestPriceLimit) continue;
-      if (selected === void 0 || candidate.durationMinutes < (selected.durationMinutes ?? Number.POSITIVE_INFINITY) || candidate.durationMinutes === selected.durationMinutes && amountOf(candidate) < amountOf(selected)) {
-        selected = candidate;
-      }
-    }
-    return selected;
-  }
-  function limitFlightCandidates(candidates, limit) {
-    const limited = candidates.slice(0, limit);
-    for (const mode of ["cheapest", "fastest"]) {
-      const winner = selectFlightSortCandidate(candidates, mode);
-      if (winner !== void 0 && !limited.includes(winner)) limited.push(winner);
-    }
-    return limited;
-  }
-  function formatFlightLegRoute(segments, stopCount) {
-    if (segments.length === 0) return void 0;
-    if (stopCount !== void 0 && stopCount !== segments.length - 1) return void 0;
-    const codes = segments.map((segment) => ({
-      origin: readIataCodeValue(segment.origin),
-      destination: readIataCodeValue(segment.destination)
-    }));
-    if (codes.some((segment) => segment.origin === void 0 || segment.destination === void 0)) return void 0;
-    const stops = codes.map((segment, index) => {
-      if (index === 0) return segment.origin;
-      const arrival = codes[index - 1].destination;
-      return arrival === segment.origin ? arrival : `${arrival}/${segment.origin}`;
-    });
-    return [...stops, codes[codes.length - 1].destination].join(" → ");
-  }
-  const FLIGHT_BAGGAGE_TEXT_PATTERN = /bagasje|innsjekk|baggage|carry.?on|cabin.?bag|checked.?bag/i;
-  function formatCompactFlightDuration(minutes) {
-    if (minutes === void 0 || !Number.isFinite(minutes) || minutes <= 0) return void 0;
-    const totalMinutes = Math.round(minutes);
-    const hours = Math.floor(totalMinutes / 60);
-    const remainingMinutes = totalMinutes % 60;
-    if (hours <= 0) return `${remainingMinutes}m`;
-    return remainingMinutes === 0 ? `${hours}t` : `${hours}t ${remainingMinutes}m`;
-  }
-  function formatFlightDurationLimit(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const remainder = minutes % 60;
-    return remainder === 0 ? `≤${hours}t` : `≤${hours}t ${remainder}m`;
-  }
-  function readFinnFlightPlace(legValue, requestedValue) {
-    const selectedAirports = (legValue ?? "").split(",").map(readIataCodeValue).filter(isString);
-    const requestedCode = readIataCodeValue(requestedValue?.split(".")[0]);
-    if (selectedAirports.length === 1) return { code: selectedAirports[0], scope: "airport" };
-    if (requestedCode === void 0) return void 0;
-    return { code: requestedCode, scope: requestedValue?.endsWith(".METROPOLITAN_AREA") === true ? "city" : "airport" };
-  }
-  function readSkyscannerFlightPlaceCode(value) {
-    const normalized = value?.toUpperCase();
-    if (normalized === void 0) return void 0;
-    if (/^[A-Z]{3}$/.test(normalized)) return { code: normalized, scope: "airport" };
-    if (/^C[A-Z]{3}$/.test(normalized)) return { code: normalized.slice(1), scope: "city" };
-    if (/^[A-Z]{3}A$/.test(normalized)) return { code: normalized.slice(0, 3), scope: "city" };
-    return void 0;
-  }
-  function selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces, scope, preferCity = false) {
-    const code = iataCode.toUpperCase();
-    const airport = airportPlaces.find((place) => place.flightPlaceType === "AIRPORT" && place.skyId === code);
-    const city = cityPlaces.find((place) => place.flightPlaceType === "CITY" && ([code, `${code}A`, `C${code}`].includes(place.skyId) || place.skyId.length === 4 && place.skyId.startsWith(code)));
-    if (scope === "city") return city;
-    if (scope === "airport") return airport;
-    return preferCity ? city ?? airport : airport ?? city;
-  }
-  function selectPanFlightsCityPlaceId(iataCode, places) {
-    const records = readRecordArray(places);
-    const airport = records.find((place) => place.type === 0 && place.sid === iataCode && place.stationtype === "air");
-    const name = readStringValue(airport?.shortname)?.trim().toLowerCase();
-    if (name === void 0) return void 0;
-    const cities = records.filter((place) => place.type === 4 && readStringValue(place.shortname)?.trim().toLowerCase() === name);
-    return cities.length === 1 ? readStringValue(cities[0]?.sid) : void 0;
-  }
-  function formatFlightClockRange(departure, arrival) {
-    const clock = (value) => value?.match(/[T ](\d{2}):(\d{2})/)?.slice(1, 3).join(":");
-    const departureClock = clock(departure);
-    const arrivalClock = clock(arrival);
-    return departureClock !== void 0 && arrivalClock !== void 0 ? `${departureClock}-${arrivalClock}` : void 0;
-  }
-  function buildFlightLegDetails(leg, carriers, timeRange = formatFlightClockRange(leg.departureTime, leg.arrivalTime)) {
-    const uniqueCarriers = [...new Set(carriers ?? [])];
-    return {
-      ...leg.durationMinutes !== void 0 && leg.durationMinutes > 0 ? { durationMinutes: leg.durationMinutes } : {},
-      ...leg.stopCount !== void 0 ? { stopCount: leg.stopCount } : {},
-      ...leg.route !== void 0 ? { route: leg.route } : {},
-      ...uniqueCarriers.length > 0 ? { carriers: uniqueCarriers } : {},
-      ...timeRange !== void 0 ? { timeRange } : {}
-    };
-  }
-  function readPanFlightsFlightLegs(item, legMinutes, legStopCounts) {
-    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
-    const outboundRoute = routeList[0];
-    const returnFromBackdata = isRecord$6(outboundRoute?.backdata);
-    const legSources = [
-      { data: outboundRoute?.tripdata, departure: outboundRoute?.dTime, arrival: outboundRoute?.aTime },
-      returnFromBackdata ? { data: outboundRoute?.backdata, departure: outboundRoute?.drTime, arrival: outboundRoute?.arTime } : { data: routeList[1]?.tripdata, departure: routeList[1]?.dTime, arrival: routeList[1]?.aTime }
-    ];
-    const localClock = (epochSeconds) => {
-      const seconds = readPositiveNumberValue(epochSeconds);
-      return seconds !== void 0 ? new Date(seconds * 1e3).toISOString() : void 0;
-    };
-    const legs = legMinutes.map((durationMinutes, index) => {
-      const source2 = legSources[index];
-      const data = isRecord$6(source2?.data) ? source2.data : void 0;
-      const stopCount = legStopCounts[index];
-      const specs = Array.isArray(data?.spec) ? data.spec.filter(isString) : [];
-      const route = formatFlightLegRoute(specs.map((spec) => {
-        const [origin, destination] = spec.split(";");
-        return { origin, destination };
-      }), stopCount);
-      const carriers = (readStringValue(data?.airlines) ?? "").split(",").map((carrier) => carrier.trim()).filter((carrier) => carrier.length > 0);
-      return buildFlightLegDetails({
-        durationMinutes,
-        stopCount,
-        route,
-        departureTime: localClock(source2?.departure),
-        arrivalTime: localClock(source2?.arrival)
-      }, carriers);
-    });
-    return legs.some((leg) => Object.keys(leg).length > 0) ? legs : void 0;
-  }
-  function flightLegLabel(index, legCount) {
-    if (legCount < 2) return void 0;
-    if (legCount === 2) return index === 0 ? "Tur" : "Retur";
-    return `Etappe ${index + 1}`;
-  }
-  function formatFlightLegStops(leg) {
-    if (leg.route !== void 0) {
-      const stops = leg.route.split(" → ").slice(1, -1);
-      return stops.length === 0 ? "direkte" : `via ${stops.join(", ")}`;
-    }
-    if (leg.stopCount === void 0) return void 0;
-    return leg.stopCount === 0 ? "direkte" : `${leg.stopCount} stopp`;
-  }
-  function flightLegPanelChipTexts(leg) {
-    return [formatCompactFlightDuration(leg.durationMinutes), formatFlightLegStops(leg)].filter((text) => text !== void 0);
-  }
-  function flightLegTooltipChipTexts(leg) {
-    const carriers = leg.carriers !== void 0 ? [...new Set(leg.carriers)].join("+") : void 0;
-    return [
-      leg.route ?? formatFlightLegStops(leg),
-      formatCompactFlightDuration(leg.durationMinutes),
-      leg.timeRange,
-      carriers
-    ].filter((text) => text !== void 0 && text.length > 0);
-  }
-  function flightTooltipExtraTexts(platform, legs) {
-    const perLegCarriers = legs.map((leg) => [...new Set(leg.carriers ?? [])].join("+")).filter((text) => text.length > 0);
-    const allCarriers = [...new Set(legs.flatMap((leg) => leg.carriers ?? []))];
-    const carrierTexts = /* @__PURE__ */ new Set([
-      ...perLegCarriers,
-      perLegCarriers.join(" / "),
-      [...new Set(perLegCarriers)].join(" / "),
-      allCarriers.join("/"),
-      allCarriers.join("+")
-    ]);
-    const legFact = /^(?:(?:\d+ stopp|direkte)(?: \/ (?:\d+ stopp|direkte))*|\d{2}:\d{2}-\d{2}:\d{2}(?: \/ \d{2}:\d{2}-\d{2}:\d{2})*|(?:\d+ t(?: \d+ min)?|\d+ min)(?: \/ (?:\d+ t(?: \d+ min)?|\d+ min))*)$/;
-    return [...new Set(platform?.split(/,\s*/) ?? [])].filter((text) => text.length > 0 && !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text) && !legFact.test(text) && !carrierTexts.has(text));
-  }
-  function flightTooltipChipTexts(candidate) {
-    return [.../* @__PURE__ */ new Set([
-      ...candidate.durationText?.split(" · ") ?? [],
-      ...candidate.platform?.split(/,\s*/) ?? []
-    ])].filter((text) => !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text));
-  }
-  function applyFlightSortMode(offers, mode) {
-    if (mode === "best" || !offers.some((offer) => offer.flightSortVariants !== void 0)) return offers;
-    const amountOf = (candidate) => candidate.sortAmount ?? candidate.amount;
-    const durationOf = (candidate) => candidate.durationMinutes ?? Number.POSITIVE_INFINITY;
-    const compare = (left, right) => {
-      return mode === "fastest" ? durationOf(left) - durationOf(right) || amountOf(left) - amountOf(right) : amountOf(left) - amountOf(right);
-    };
-    return offers.map((offer) => {
-      const variant = offer.flightSortVariants?.[mode];
-      const { durationText: _durationText, flightLegs: _flightLegs, durationMinutes: _durationMinutes, ...base } = offer;
-      const selected = variant !== void 0 ? { ...base, ...variant } : offer;
-      return selected.alternatives !== void 0 ? { ...selected, alternatives: [...selected.alternatives].sort(compare) } : selected;
-    }).sort((left, right) => {
-      return compare(left, right);
-    });
-  }
-  const FLIGHT_SORT_URL_VALUES = {
-    finn: { best: "agony_asc", cheapest: "priceAmount_asc", fastest: "tripDuration_asc" },
-    momondo: { best: "bestflight_a", cheapest: "price_a", fastest: "duration_a" },
-    panflights: { best: "quality", cheapest: "price", fastest: "duration" },
-    kiwi: { best: "quality", cheapest: "price", fastest: "duration" }
-  };
-  function buildFlightSortUrlValue(source2, mode) {
-    return FLIGHT_SORT_URL_VALUES[source2]?.[mode] ?? "";
-  }
-  function readFlightSortUrlValue(source2, value) {
-    const values = FLIGHT_SORT_URL_VALUES[source2];
-    if (value === null || values === void 0) return void 0;
-    return ["best", "cheapest", "fastest"].find((mode) => values[mode] === value);
-  }
-  function readFlightSortLabel(text) {
-    const normalized = text?.toLowerCase() ?? "";
-    if (/rimeligste|cheapest/.test(normalized)) return "cheapest";
-    if (/raskeste|fastest/.test(normalized)) return "fastest";
-    if (/\bbeste\b|recommended/.test(normalized)) return "best";
-    return void 0;
-  }
-  function readPanFlightsLegMinutes(item, roundTrip) {
-    const packageRecord = isRecord$6(item.package) ? item.package : void 0;
-    const routes = readRecordArray(packageRecord?.routelist);
-    const route = routes[0];
-    const minutes = (seconds) => {
-      const value = readPositiveNumberValue(seconds);
-      return value !== void 0 ? Math.round(value / 60) : void 0;
-    };
-    const outbound = minutes(route?.fly_duration_secs);
-    if (!roundTrip) return [outbound];
-    return [outbound, minutes(route?.return_duration_secs) ?? minutes(routes[1]?.fly_duration_secs)];
-  }
-  function buildFlightLinkFiltersValue(flightMeta) {
-    const parts = [
-      flightMeta.maxStops !== void 0 ? `stops:${flightMeta.maxStops}` : void 0,
-      flightMeta.includeCabinBag === true ? "cabin" : void 0,
-      flightMeta.includeCheckedBag === true ? "checked" : void 0,
-      flightMeta.maxDurationMinutes !== void 0 ? `dur:${flightMeta.maxDurationMinutes}` : void 0
-    ].filter((part) => part !== void 0);
-    return parts.length > 0 ? parts.join(",") : void 0;
-  }
-  function readFlightLinkFilters(parsedUrl) {
-    const value = parsedUrl.searchParams.get(FLIGHT_LINK_FILTERS_PARAM);
-    if (value === null) return void 0;
-    const parts = value.split(",");
-    const maxStops = readNonNegativeIntegerValue(parts.find((part) => part.startsWith("stops:"))?.slice("stops:".length));
-    const maxDurationMinutes = readPositiveIntegerValue(parts.find((part) => part.startsWith("dur:"))?.slice("dur:".length));
-    return {
-      ...maxStops !== void 0 ? { maxStops } : {},
-      ...parts.includes("cabin") ? { includeCabinBag: true } : {},
-      ...parts.includes("checked") ? { includeCheckedBag: true } : {},
-      ...maxDurationMinutes !== void 0 ? { maxDurationMinutes } : {}
-    };
-  }
-  function buildMomondoFlightFilterValue(flightMeta) {
-    const parts = [
-      flightMeta.maxStops !== void 0 && flightMeta.maxStops < 2 ? `stops=${Array.from({ length: flightMeta.maxStops + 1 }, (_, stops) => stops).join(",")}` : void 0,
-      flightMeta.includeCabinBag === true ? "bfc=1" : void 0,
-      flightMeta.includeCheckedBag === true ? "cfc=1" : void 0,
-      // legdur=-N = maks N minutter per etappe (verifisert 2026-11-01).
-      flightMeta.maxDurationMinutes !== void 0 ? `legdur=-${flightMeta.maxDurationMinutes}` : void 0
-    ].filter((part) => part !== void 0);
-    return parts.length > 0 ? parts.join(";") : void 0;
-  }
-  function readMomondoFlightFilters(parsedUrl) {
-    const filters = new Map((parsedUrl.searchParams.get("fs") ?? "").split(";").map((part) => {
-      const [key = "", value = ""] = part.split("=");
-      return [key, value];
-    }));
-    const stopValues = (filters.get("stops") ?? "").split(",").map((value) => readNonNegativeIntegerValue(value));
-    const maxStops = filters.has("stops") && stopValues.every((value) => value !== void 0 && value < 2) ? Math.max(...stopValues.filter((value) => value !== void 0)) : void 0;
-    const maxDurationMinutes = readPositiveIntegerValue(filters.get("legdur")?.replace(/^-/, ""));
-    return {
-      ...maxStops !== void 0 ? { maxStops } : {},
-      ...(readNonNegativeIntegerValue(filters.get("bfc")) ?? 0) > 0 ? { includeCabinBag: true } : {},
-      ...(readNonNegativeIntegerValue(filters.get("cfc")) ?? 0) > 0 ? { includeCheckedBag: true } : {},
-      ...maxDurationMinutes !== void 0 ? { maxDurationMinutes } : {}
-    };
-  }
-  function buildMomondoPassengerDetails(flightMeta) {
-    return [
-      ...Array.from({ length: flightMeta.adults }, () => ({ ptc: "ADT" })),
-      ...readFlightChildAges(flightMeta).map((age) => ({ ptc: "CHD", age })),
-      ...Array.from({ length: flightMeta.infants }, () => ({ ptc: "INL" }))
-    ];
-  }
-  function buildMomondoPassengerPathParts(flightMeta) {
-    const hasChildren = flightMeta.children > 0 || flightMeta.infants > 0;
-    return [
-      ...flightMeta.adults > 1 || hasChildren ? [`${flightMeta.adults}adults`] : [],
-      ...hasChildren ? [["children", ...readFlightChildAges(flightMeta).map(String), ...Array.from({ length: flightMeta.infants }, () => "1L")].join("-")] : []
-    ];
-  }
-  function readMomondoPassengerPathParts(parts) {
-    const adults = readPositiveIntegerValue(parts.map((part) => part.match(/^(\d+)adults?$/i)?.[1]).find((value) => value !== void 0));
-    const childPart = parts.find((part) => /^children(-\d+[LS]?)+$/i.test(part));
-    if (adults === void 0 && childPart === void 0) return void 0;
-    const childTokens = childPart?.split("-").slice(1) ?? [];
-    const childAges = childTokens.filter((token) => /^\d+$/.test(token)).map(Number).filter((age) => age >= 2 && age <= 11);
-    return {
-      adults: adults ?? 1,
-      children: childAges.length,
-      infants: childTokens.filter((token) => /^\d+[LS]$/i.test(token) || Number(token) < 2).length,
-      childAges
-    };
-  }
-  function readMomondoFlexibleDatePart(value) {
-    const match = value?.match(/^(\d{4}-\d{2}-\d{2})(?:-flexible-(\d+)days?)?$/i);
-    if (match === null || match === void 0) return [value, 0];
-    return [match[1], match[2] !== void 0 ? Number(match[2]) : 0];
-  }
-  function readMomondoFlightFlexDays(before, after) {
-    return Math.min(Math.max(before, after), MOMONDO_FLIGHT_FLEX_VALUES.length - 1);
-  }
-  function readMomondoVisibleFlexibleDateOption(input, flightMeta, combinations) {
-    if (input.currency !== "NOK" || input.priceText === void 0 || !/\s(?:kr|NOK)$/i.test(input.priceText.trim())) return void 0;
-    const amount = readPriceAmount(input.priceText.replace(/\s*(?:kr|NOK)\s*$/i, ""));
-    if (amount === void 0 || amount <= 0 || input.legs.length !== (flightMeta.inboundDate === void 0 ? 1 : 2)) return void 0;
-    const dates = [];
-    const legs = [];
-    for (const [index, leg] of input.legs.entries()) {
-      if (leg.origin !== (index === 0 ? flightMeta.origin : flightMeta.destination) || leg.destination !== (index === 0 ? flightMeta.destination : flightMeta.origin)) return void 0;
-      const date = leg.dateText?.trim().match(/^(\d{1,2})\.(\d{1,2})\.$/);
-      const duration = leg.durationText?.trim().match(/^(?:(\d+)\s*[th]\s*)?(?:(\d+)\s*m)?$/i);
-      const durationMinutes = duration === void 0 || duration === null ? 0 : Number(duration[1] ?? 0) * 60 + Number(duration[2] ?? 0);
-      const stops = leg.stopsText?.trim().match(/^(\d+)\s*(?:stopp?|stops?)$/i);
-      const stopCount = /^(?:direkte|nonstop|direct)$/i.test(leg.stopsText?.trim() ?? "") ? 0 : stops?.[1] === void 0 ? void 0 : Number(stops[1]);
-      if (date === void 0 || date === null || durationMinutes <= 0 || stopCount === void 0) return void 0;
-      dates.push(`${Number(date[1])}.${Number(date[2])}`);
-      legs.push({ durationMinutes, stopCount });
-    }
-    if (exceedsFlightMaxStops(flightMeta, legs.map((leg) => leg.stopCount)) || exceedsFlightMaxDuration(flightMeta, legs.map((leg) => leg.durationMinutes))) return void 0;
-    const shortDate = (date) => `${Number(date.slice(8, 10))}.${Number(date.slice(5, 7))}`;
-    const combination = combinations.find((candidate) => shortDate(candidate.outboundDate) === dates[0] && (candidate.inboundDate === void 0 ? dates.length === 1 : shortDate(candidate.inboundDate) === dates[1]));
-    return combination === void 0 ? void 0 : { ...combination, amount, currency: "NOK", legs };
-  }
-  async function pollMomondoFlexibleDateOptions(state, input) {
-    for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
-      if (attempt > 0) await input.wait(input.intervalMs);
-      const value = await input.requestResults(state.searchId, state.filterState);
-      if (!isRecord$6(value) || !Array.isArray(value.results)) continue;
-      const searchId = readStringValue(value.searchId);
-      if (searchId !== void 0) state.searchId = searchId;
-      const nextFilterState = state.filterState ?? input.readFilterState(value);
-      if (state.filterState === void 0 && nextFilterState !== void 0) {
-        state.filterState = nextFilterState;
-        state.options = [];
-        continue;
-      }
-      const options = input.readOptions(value);
-      state.complete = readStringValue(value.status) === "complete";
-      const byDate = /* @__PURE__ */ new Map();
-      for (const option of state.complete ? options : [...state.options, ...options]) {
-        const key = buildFlightDateCombinationKey(option);
-        const previous = byDate.get(key);
-        if (previous === void 0 || (option.sortAmount ?? option.amount) < (previous.sortAmount ?? previous.amount)) {
-          byDate.set(key, option);
-        }
-      }
-      state.options = [...byDate.values()];
-    }
-  }
-  function formatMomondoLuggageValue(value) {
-    if (value === void 0) return void 0;
-    const cleaned = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    if (/^inkludert$/i.test(cleaned)) return "inkl.";
-    if (/^ukjent$/i.test(cleaned)) return "ukjent";
-    if (/ikke\s+inkludert|ikke\s+inkl/i.test(cleaned)) return "ikke inkl.";
-    return cleaned;
-  }
-  function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fees = isRecord$6(bookingOption.fees) ? bookingOption.fees : void 0;
-    const isIncluded = (bagData, display) => {
-      const status = isRecord$6(bagData) ? readStringValue(bagData.status) : void 0;
-      return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
-    };
-    if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
-    if (flightMeta.includeCheckedBag === true && !isIncluded(fees?.checkedBagData, fees?.checkedBagDisplay)) return false;
-    return true;
-  }
-  function isTripComPolicyMatchingBaggage(policy, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const flags = new Set((Array.isArray(policy.policyFlags) ? policy.policyFlags : []).filter(isString));
-    if (flightMeta.includeCabinBag === true && !flags.has("FREE_CARRY_ON_BAGGAGE")) return false;
-    if (flightMeta.includeCheckedBag === true && !flags.has("FREE_CHECKED_BAGGAGE")) return false;
-    return true;
-  }
-  function readTripComJourneyStopCount(journey) {
-    const sections = readRecordArray(journey.transSectionList);
-    const intermediateStops = sections.reduce((count, section) => {
-      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
-      return count + readRecordArray(flightInfo?.stopList).length;
-    }, 0);
-    return Math.max(0, sections.length - 1) + intermediateStops;
-  }
-  function readTripComJourneyLeg(journey, airlineNames) {
-    const sections = readRecordArray(journey.transSectionList);
-    const stopCount = readTripComJourneyStopCount(journey);
-    const segments = sections.flatMap((section) => {
-      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
-      const airports = [
-        readStringValue(isRecord$6(section.departPoint) ? section.departPoint.airportCode : void 0),
-        ...readRecordArray(flightInfo?.stopList).map((stop) => readStringValue(stop.airportCode)),
-        readStringValue(isRecord$6(section.arrivePoint) ? section.arrivePoint.airportCode : void 0)
-      ];
-      return airports.slice(1).map((destination, index) => ({ origin: airports[index], destination }));
-    });
-    return buildFlightLegDetails({
-      durationMinutes: readNumberValue(journey.duration),
-      stopCount,
-      route: formatFlightLegRoute(segments, stopCount),
-      departureTime: readStringValue(sections[0]?.departDateTime),
-      arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime)
-    }, sections.map((section) => {
-      const code = readStringValue(isRecord$6(section.flightInfo) ? section.flightInfo.airlineCode : void 0)?.toUpperCase();
-      return code !== void 0 ? airlineNames[code] ?? code : void 0;
-    }).filter((carrier) => carrier !== void 0));
-  }
-  function buildTripComBaggageFilterFlags(flightMeta) {
-    return [
-      flightMeta.includeCabinBag === true ? "FreeCarryOnBaggage" : void 0,
-      flightMeta.includeCheckedBag === true ? "FreeCheckedBaggage" : void 0
-    ].filter((flag) => flag !== void 0).map((flag) => ({ flag, allow: true, journeyNoList: [1] }));
-  }
-  function readTripComTotalDurationRange(text) {
-    const match = text.match(/Total\s+(\d+)h(?:\s+(\d+)m)?\s*[–-]?\s*(\d+)h(?:\s+(\d+)m)?/i);
-    if (match === null) return void 0;
-    return {
-      minMinutes: Number(match[1]) * 60 + Number(match[2] ?? 0),
-      maxMinutes: Number(match[3]) * 60 + Number(match[4] ?? 0)
-    };
-  }
-  function readSkyscannerMaxStopsParam(value) {
-    const excluded = (value ?? "").split(",").map((part) => part.trim().replace(/^!/, "").toLowerCase());
-    if (!excluded.includes("twoplusstops")) return void 0;
-    return excluded.includes("onestop") ? 0 : 1;
-  }
-  function buildSkyscannerFareAttributesParam(flightMeta) {
-    const attributes = [
-      flightMeta.includeCabinBag === true ? "cabin-bag" : void 0,
-      flightMeta.includeCheckedBag === true ? "checked-bag" : void 0
-    ].filter((attribute) => attribute !== void 0);
-    return attributes.length > 0 ? attributes.join(",") : void 0;
-  }
-  function readSkyscannerFareAttributesParam(value) {
-    const attributes = (value ?? "").toLowerCase().split(",");
-    return {
-      ...attributes.includes("cabin-bag") ? { includeCabinBag: true } : {},
-      ...attributes.includes("checked-bag") ? { includeCheckedBag: true } : {}
-    };
-  }
-  function buildSkyscannerSearchOptions(flightMeta) {
-    const selectedFareAttributes = [
-      flightMeta.includeCabinBag === true ? "CABIN_BAG" : void 0,
-      flightMeta.includeCheckedBag === true ? "CHECKED_BAG" : void 0
-    ].filter((attribute) => attribute !== void 0);
-    return selectedFareAttributes.length > 0 ? { fareAttributes: { selectedFareAttributes } } : void 0;
-  }
-  function isSkyscannerPricingOptionMatchingBaggage(pricingOption, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fareAttributes = isRecord$6(pricingOption.fareAttributes) ? pricingOption.fareAttributes : void 0;
-    const isIncluded = (baggage) => isRecord$6(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
-    if (flightMeta.includeCabinBag === true && !isIncluded(fareAttributes?.cabinBaggage)) return false;
-    if (flightMeta.includeCheckedBag === true && !isIncluded(fareAttributes?.checkedBaggage)) return false;
-    return true;
-  }
-  function readPanFlightsPackageRecord(item) {
-    return isRecord$6(item.package) ? item.package : void 0;
-  }
-  function readPanFlightsRouteLegStopCount(route, dataKey) {
-    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
-    const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
-    return specs.length > 0 ? Math.max(0, specs.length - 1) : void 0;
-  }
-  function readPanFlightsLegStopCounts(item) {
-    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
-    const outboundRoute = routeList[0];
-    if (outboundRoute === void 0) return [];
-    return [
-      readPanFlightsRouteLegStopCount(outboundRoute, "tripdata"),
-      readPanFlightsRouteLegStopCount(outboundRoute, "backdata") ?? (routeList[1] !== void 0 ? readPanFlightsRouteLegStopCount(routeList[1], "tripdata") : void 0)
-    ];
-  }
-  function readPanFlightsLegDurationsMinutes(item, roundTrip) {
-    const packageRecord = readPanFlightsPackageRecord(item);
-    return [roundTrip ? readPositiveNumberValue(packageRecord?.legduration) : readPositiveNumberValue(packageRecord?.duration) ?? readPositiveNumberValue(item.duration)];
-  }
-  function readPanFlightsBaggageFee(baggage, flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
-    if (!isRecord$6(baggage)) return void 0;
-    let feePerPassenger = 0;
-    if (flightMeta.includeCabinBag === true) {
-      const cabinFee = readNumberValue(baggage.bin);
-      if (cabinFee === void 0 || cabinFee < 0) return void 0;
-      feePerPassenger += cabinFee;
-    }
-    if (flightMeta.includeCheckedBag === true) {
-      if (baggage.unit !== void 0) {
-        const includedPieces = baggage.unit === "pcs" ? readNumberValue(baggage.amount) ?? 0 : 1;
-        if (includedPieces < 1) return void 0;
-      } else {
-        const checkedFee = readNumberValue(baggage["1"]);
-        if (checkedFee === void 0 || checkedFee < 0) return void 0;
-        feePerPassenger += checkedFee;
-      }
-    }
-    return Math.round(feePerPassenger * countFlightSeatedPassengers(flightMeta));
-  }
-  function formatPanFlightsEpochDate(epochSeconds) {
-    if (epochSeconds === void 0) return void 0;
-    const date = new Date(epochSeconds * 1e3);
-    return Number.isNaN(date.getTime()) ? void 0 : date.toISOString().slice(0, 10);
-  }
-  function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
-    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
-    const matches = (code, expected) => code !== void 0 && (typeof expected === "string" ? code === expected : expected.has(code));
-    return matches(readStringValue(legData?.flyFrom)?.toUpperCase(), origin) && matches(readStringValue(legData?.flyTo)?.toUpperCase(), destination) ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
-  }
-  function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex, airports) {
-    const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
-    const outboundRoute = routeList[0];
-    if (outboundRoute === void 0) return void 0;
-    const origin = airports?.origin ?? flightMeta.origin;
-    const destination = airports?.destination ?? flightMeta.destination;
-    const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", origin, destination);
-    if (outboundDate === void 0 || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
-      return void 0;
-    }
-    const requestedInboundDate = flightMeta.inboundDate;
-    if (requestedInboundDate === void 0) return { outboundDate };
-    const inboundDate = [
-      readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", destination, origin),
-      ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", destination, origin))
-    ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
-    return inboundDate !== void 0 && inboundDate >= outboundDate ? { outboundDate, inboundDate } : void 0;
-  }
-  function extractWideroeFlightSearchMeta(parsedUrl) {
-    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    if (hostname !== "wideroe.no" || !/^\/(?:[a-z]{2}\/)?(?:book-flight\/flight|bestill-flybillett\/flygning)\/?$/i.test(parsedUrl.pathname)) {
-      return void 0;
-    }
-    const tripType = parsedUrl.searchParams.get("triptype");
-    if (tripType !== "1" && tripType !== "2") return void 0;
-    const readDate = (dayKey, monthKey) => {
-      const month = parsedUrl.searchParams.get(monthKey)?.match(/^(\d{4})(\d{2})$/);
-      const day = readPositiveIntegerValue(parsedUrl.searchParams.get(dayKey));
-      return month !== null && month !== void 0 && day !== void 0 ? readIsoDateValue(`${month[1]}-${month[2]}-${String(day).padStart(2, "0")}`) : void 0;
-    };
-    const origin = readIataCodeValue(parsedUrl.searchParams.get("d_city")?.toUpperCase());
-    const destination = readIataCodeValue(parsedUrl.searchParams.get("a_city")?.toUpperCase());
-    const outboundDate = readDate("d_day", "d_month");
-    const inboundDate = tripType === "2" ? readDate("r_day", "r_month") : void 0;
-    const paxTokens = (parsedUrl.searchParams.get("pax") ?? "").toLowerCase().split(/[,;]/).filter(Boolean);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
-    if (tripType === "2" && (inboundDate === void 0 || inboundDate < outboundDate)) return void 0;
-    if (paxTokens.length === 0 || paxTokens.some((token) => token !== "adt")) return void 0;
-    return normalizeFlightSearchMeta({
-      origin,
-      destination,
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      adults: paxTokens.length,
-      youths: 0,
-      children: 0,
-      infants: 0
-    });
-  }
-  function readAirFranceKlmFlightSearchMeta(connectionsText, taggingText) {
-    const connections = readRecordArray(parseJsonValue(connectionsText ?? ""));
-    const outbound = connections[0];
-    const inbound = connections[1];
-    const readCode = (place) => readIataCodeValue(isRecord$6(place) ? place.code : void 0);
-    const origin = readCode(outbound?.origin);
-    const destination = readCode(outbound?.destination);
-    const outboundDate = readIsoDateValue(outbound?.departureDate);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || connections.length > 2) return void 0;
-    const inboundDate = inbound === void 0 ? void 0 : readIsoDateValue(inbound.departureDate);
-    if (inbound !== void 0 && (inboundDate === void 0 || readCode(inbound.origin) !== destination || readCode(inbound.destination) !== origin)) {
-      return void 0;
-    }
-    const tagging = parseJsonValue(taggingText ?? "");
-    const flow = isRecord$6(tagging) && isRecord$6(tagging.flow) ? tagging.flow : void 0;
-    if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
-    const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
-    return normalizeFlightSearchMeta({
-      origin,
-      destination,
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      // Seniorer og ungdom er voksne hos sammenligningskildene.
-      adults: (readNonNegativeIntegerValue(flow.z_nb_adults) ?? 0) + (readNonNegativeIntegerValue(flow.z_nb_seniors) ?? 0),
-      youths: readNonNegativeIntegerValue(flow.z_nb_youth) ?? 0,
-      children: readNonNegativeIntegerValue(flow.z_nb_children) ?? 0,
-      infants: readNonNegativeIntegerValue(flow.z_nb_infants) ?? 0,
-      ...cabinClass !== void 0 ? { cabinClass } : {}
-    });
-  }
-  function readAmadeusAirBoundsFlightSearchMeta(stateText) {
-    const state = parseJsonValue(stateText ?? "");
-    if (!isRecord$6(state) || !isRecord$6(state.entities)) return void 0;
-    const selectedId = readStringValue(state.selectedAirBoundsSearchId);
-    const search = selectedId !== void 0 && isRecord$6(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
-    if (search === void 0) return void 0;
-    const itineraries = readRecordArray(search.itineraries);
-    const outbound = itineraries[0];
-    const inbound = itineraries[1];
-    const origin = readIataCodeValue(outbound?.originLocationCode);
-    const destination = readIataCodeValue(outbound?.destinationLocationCode);
-    const readDate = (value) => readIsoDateValue(readStringValue(value)?.slice(0, 10));
-    const outboundDate = readDate(outbound?.departureDateTime);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0 || itineraries.length > 2) return void 0;
-    const inboundDate = inbound === void 0 ? void 0 : readDate(inbound.departureDateTime);
-    if (inbound !== void 0 && (inboundDate === void 0 || readIataCodeValue(inbound.originLocationCode) !== destination || readIataCodeValue(inbound.destinationLocationCode) !== origin)) {
-      return void 0;
-    }
-    const passengerCodes = readRecordArray(search.travelers).map((traveler) => readStringValue(traveler.passengerTypeCode)?.toUpperCase());
-    const countCodes = (codes) => passengerCodes.filter((code) => code !== void 0 && codes.includes(code)).length;
-    const adults = countCodes(["ADT", "YTH", "YCD", "SRC"]);
-    const children = countCodes(["CHD"]);
-    const infants = countCodes(["INF"]);
-    if (passengerCodes.length === 0 || adults + children + infants !== passengerCodes.length) return void 0;
-    const cabinClass = readFlightCabinClassValue(search.cabin);
-    return normalizeFlightSearchMeta({
-      origin,
-      destination,
-      outboundDate,
-      ...inboundDate !== void 0 ? { inboundDate } : {},
-      adults,
-      youths: 0,
-      children,
-      infants,
-      ...cabinClass !== void 0 ? { cabinClass } : {},
-      ...outbound?.directFlights === true ? { maxStops: 0 } : {}
-    });
-  }
-  function capFlightDateFlexForSeparateSearches(dateFlex, roundTrip) {
-    const maxDays = roundTrip ? 1 : 3;
-    return {
-      outboundBefore: Math.min(dateFlex.outboundBefore, maxDays),
-      outboundAfter: Math.min(dateFlex.outboundAfter, maxDays),
-      inboundBefore: Math.min(dateFlex.inboundBefore, maxDays),
-      inboundAfter: Math.min(dateFlex.inboundAfter, maxDays)
-    };
-  }
-  const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
-  const TRIP_COM_DEFAULT_CURRENCY = "USD";
-  const TRIP_COM_BASE_URL = "https://us.trip.com";
-  function buildSkyscannerFlightSearchUrl(flightMeta, sortMode = "best", places) {
-    const pathParts = [
-      (places?.origin ?? flightMeta.origin).toLowerCase(),
-      (places?.destination ?? flightMeta.destination).toLowerCase(),
-      compactIsoDate(flightMeta.outboundDate).slice(2),
-      flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate).slice(2) : void 0
-    ].filter((part) => part !== void 0);
-    const params = new URLSearchParams({
-      adults: String(flightMeta.adults),
-      adultsv2: String(flightMeta.adults),
-      cabinclass: buildSkyscannerCabinClass(flightMeta).toLowerCase().replace(/_/g, ""),
-      childrenv2: [...readFlightChildAges(flightMeta), ...Array.from({ length: flightMeta.infants }, () => FLIGHT_INFANT_AGE)].join("|"),
-      inboundaltsenabled: "false",
-      outboundaltsenabled: "false",
-      preferdirects: flightMeta.maxStops === 0 ? "true" : "false",
-      rtn: flightMeta.inboundDate !== void 0 ? "1" : "0"
-    });
-    if (flightMeta.maxStops === 0) params.set("stops", "!oneStop,!twoPlusStops");
-    else if (flightMeta.maxStops === 1) params.set("stops", "!twoPlusStops");
-    const fareAttributes = buildSkyscannerFareAttributesParam(flightMeta);
-    if (fareAttributes !== void 0) params.set("fare-attributes", fareAttributes);
-    if (flightMeta.maxDurationMinutes !== void 0) params.set("duration", String(flightMeta.maxDurationMinutes));
-    if (sortMode !== "best") params.set(FLIGHT_LINK_SORT_PARAM, sortMode);
-    return `https://www.skyscanner.no/transport/flights/${pathParts.join("/")}/?${params.toString()}`;
-  }
-  function buildSkyscannerCabinClass(flightMeta) {
-    switch (flightMeta.cabinClass) {
-      case "premium":
-        return "PREMIUM_ECONOMY";
-      case "business":
-        return "BUSINESS";
-      case "first":
-        return "FIRST";
-      default:
-        return "ECONOMY";
-    }
-  }
-  function buildPanFlightsFlightSearchUrl(flightMeta, sortMode = "best", places) {
-    const outboundDate = compactIsoDate(flightMeta.outboundDate);
-    const inboundDate = flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate) : void 0;
-    const path = inboundDate !== void 0 ? "roundtrip" : "oneway";
-    const route = `${places?.origin ?? flightMeta.origin}_${places?.destination ?? flightMeta.destination}`;
-    const v2 = inboundDate !== void 0 ? `${route}_${outboundDate}_${inboundDate}` : `${route}_${outboundDate}`;
-    const params = new URLSearchParams({
-      v2,
-      order: buildFlightSortUrlValue("panflights", sortMode),
-      pad: String(flightMeta.adults),
-      ...flightMeta.children > 0 ? { pch: String(flightMeta.children) } : {},
-      ...flightMeta.infants > 0 ? { pin: String(flightMeta.infants) } : {},
-      [PANFLIGHTS_AUTO_SEARCH_PARAM]: "1"
-    });
-    const linkFilters = buildFlightLinkFiltersValue(flightMeta);
-    if (linkFilters !== void 0) params.set(FLIGHT_LINK_FILTERS_PARAM, linkFilters);
-    return `https://panflights.no/nb/${path}/?${params.toString()}`;
-  }
-  const GOOGLE_FLIGHTS_SORT_PARAMS = {
-    cheapest: "EgoIARAAGAAgAigB",
-    fastest: "EgYIBRAAGAA"
-  };
-  function buildGoogleFlightsSearchUrl(flightMeta, sortMode = "best") {
-    const sortParam = GOOGLE_FLIGHTS_SORT_PARAMS[sortMode];
-    const params = new URLSearchParams({
-      tfs: buildGoogleFlightsTfsParam(flightMeta),
-      ...sortParam !== void 0 ? { tfu: sortParam } : {},
-      hl: "nb",
-      curr: "NOK"
-    });
-    return `https://www.google.com/travel/flights?${params.toString()}`;
-  }
-  function buildGoogleFlightsTfsParam(flightMeta) {
-    const bytes = [
-      ...encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.outboundDate, flightMeta.origin, flightMeta.destination, flightMeta.maxStops, flightMeta.maxDurationMinutes)),
-      ...flightMeta.inboundDate !== void 0 ? encodeProtoBytesField(3, encodeGoogleFlightsLeg(flightMeta.inboundDate, flightMeta.destination, flightMeta.origin, flightMeta.maxStops, flightMeta.maxDurationMinutes)) : []
-    ];
-    for (let index = 0; index < flightMeta.adults; index++) {
-      bytes.push(...encodeProtoVarintField(8, 1));
-    }
-    for (let index = 0; index < flightMeta.children; index++) {
-      bytes.push(...encodeProtoVarintField(8, 2));
-    }
-    for (let index = 0; index < flightMeta.infants; index++) {
-      bytes.push(...encodeProtoVarintField(8, 4));
-    }
-    bytes.push(...encodeProtoVarintField(9, readGoogleFlightsSeatValue(flightMeta)));
-    const bagCount = flightMeta.adults + flightMeta.children;
-    if (flightMeta.includeCabinBag === true || flightMeta.includeCheckedBag === true) {
-      bytes.push(...encodeProtoBytesField(13, [
-        ...encodeProtoVarintField(2, flightMeta.includeCabinBag === true ? bagCount : 0),
-        ...encodeProtoVarintField(3, flightMeta.includeCheckedBag === true ? bagCount : 0)
-      ]));
-    }
-    bytes.push(...encodeProtoVarintField(19, flightMeta.inboundDate !== void 0 ? 1 : 2));
-    return encodeBase64Url(bytes);
-  }
-  function encodeGoogleFlightsLeg(date, origin, destination, maxStops, maxDurationMinutes) {
-    return [
-      ...encodeProtoStringField(2, date),
-      ...maxStops !== void 0 ? encodeProtoVarintField(5, maxStops) : [],
-      ...maxDurationMinutes !== void 0 ? encodeProtoVarintField(12, maxDurationMinutes) : [],
-      ...encodeProtoBytesField(13, encodeProtoStringField(2, origin.toUpperCase())),
-      ...encodeProtoBytesField(14, encodeProtoStringField(2, destination.toUpperCase()))
-    ];
-  }
-  function readGoogleFlightsSeatValue(flightMeta) {
-    switch (flightMeta.cabinClass) {
-      case "premium":
-        return 2;
-      case "business":
-        return 3;
-      case "first":
-        return 4;
-      default:
-        return 1;
-    }
-  }
-  function encodeProtoVarint(value) {
-    const bytes = [];
-    let remaining = Math.max(0, Math.trunc(value));
-    do {
-      const byte = remaining % 128;
-      remaining = Math.floor(remaining / 128);
-      bytes.push(remaining > 0 ? byte | 128 : byte);
-    } while (remaining > 0);
-    return bytes;
-  }
-  function encodeProtoVarintField(fieldNumber, value) {
-    return [...encodeProtoVarint(fieldNumber * 8), ...encodeProtoVarint(value)];
-  }
-  function encodeProtoStringField(fieldNumber, value) {
-    const encoded = [...new TextEncoder().encode(value)];
-    return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(encoded.length), ...encoded];
-  }
-  function encodeProtoBytesField(fieldNumber, bytes) {
-    return [...encodeProtoVarint(fieldNumber * 8 + 2), ...encodeProtoVarint(bytes.length), ...bytes];
-  }
-  function encodeBase64Url(bytes) {
-    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  function buildTripComFlightSearchUrl(flightMeta, sortMode = "best") {
-    const params = new URLSearchParams({
-      dcity: flightMeta.origin.toLowerCase(),
-      acity: flightMeta.destination.toLowerCase(),
-      ddate: flightMeta.outboundDate,
-      triptype: flightMeta.inboundDate !== void 0 ? "rt" : "ow",
-      class: buildTripComCabinClassParam(flightMeta),
-      lowpricesource: "searchform",
-      quantity: String(flightMeta.adults),
-      // childqty/babyqty verifisert 2026-11-02; totalPrice gjelder da alle reisende.
-      ...flightMeta.children > 0 ? { childqty: String(flightMeta.children) } : {},
-      ...flightMeta.infants > 0 ? { babyqty: String(flightMeta.infants) } : {},
-      searchboxarg: "t",
-      nonstoponly: flightMeta.maxStops === 0 ? "on" : "off",
-      locale: "en-US",
-      curr: TRIP_COM_DEFAULT_CURRENCY
-    });
-    if (flightMeta.inboundDate !== void 0) params.set("rdate", flightMeta.inboundDate);
-    params.set(FLIGHT_LINK_FILTERS_PARAM, buildFlightLinkFiltersValue(flightMeta) ?? "none");
-    if (sortMode !== "best") params.set(FLIGHT_LINK_SORT_PARAM, sortMode);
-    return `${TRIP_COM_BASE_URL}/flights/showfarefirst?${params.toString()}`;
-  }
-  function buildTripComCabinClassParam(flightMeta) {
-    switch (flightMeta.cabinClass) {
-      case "premium":
-        return "s";
-      case "business":
-        return "c";
-      case "first":
-        return "f";
-      default:
-        return "y";
-    }
-  }
-  const KIWI_CABIN_CLASSES = {
-    economy: "ECONOMY",
-    premium: "PREMIUM_ECONOMY",
-    business: "BUSINESS",
-    first: "FIRST_CLASS"
-  };
-  function buildKiwiFlightSearchUrl(flightMeta, sortMode = "best") {
-    const { dateFlex } = flightMeta;
-    const formatDate = (date, before = 0, after = 0) => {
-      return before === 0 && after === 0 ? date : `${shiftFlightDateNotBeforeToday(date, -before)}_${shiftFlightDateNotBeforeToday(date, after)}`;
-    };
-    const pathParts = [
-      flightMeta.origin,
-      flightMeta.destination,
-      formatDate(flightMeta.outboundDate, dateFlex?.outboundBefore, dateFlex?.outboundAfter),
-      flightMeta.inboundDate !== void 0 ? formatDate(flightMeta.inboundDate, dateFlex?.inboundBefore, dateFlex?.inboundAfter) : "no-return"
-    ];
-    const params = new URLSearchParams({
-      adults: String(flightMeta.adults),
-      children: String(flightMeta.children),
-      infants: String(flightMeta.infants)
-    });
-    if (flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy") {
-      params.set("cabinClass", `${KIWI_CABIN_CLASSES[flightMeta.cabinClass]}-false`);
-    }
-    const bags = buildKiwiBagsParam(flightMeta);
-    if (bags !== void 0) params.set("bags", bags);
-    if (flightMeta.maxStops !== void 0 && flightMeta.maxStops <= 2) params.set("stopNumber", `${flightMeta.maxStops}~true`);
-    if (flightMeta.maxDurationMinutes !== void 0) {
-      params.set("flightDurationMax", String(Math.max(1, Math.floor(flightMeta.maxDurationMinutes / 60))));
-    }
-    if (sortMode !== "best") params.set("sortBy", buildFlightSortUrlValue("kiwi", sortMode));
-    return `https://www.kiwi.com/no/search/results/${pathParts.join("/")}?${params.toString()}`;
-  }
-  function buildKiwiBagsParam(flightMeta) {
-    if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return void 0;
-    const bag = `${flightMeta.includeCabinBag === true ? 1 : 0}.${flightMeta.includeCheckedBag === true ? 1 : 0}`;
-    return [flightMeta.adults, flightMeta.children].filter((count) => count > 0).map((count) => Array.from({ length: count }, () => bag).join("_")).join("-");
-  }
-  function readKiwiBagsParam(value) {
-    const [cabinBags, checkedBags] = (value?.split(/[_-]/)[0] ?? "").split(".").map(Number);
-    return {
-      ...(cabinBags ?? 0) > 0 ? { includeCabinBag: true } : {},
-      ...(checkedBags ?? 0) > 0 ? { includeCheckedBag: true } : {}
-    };
-  }
-  const KIWI_PRICE_PROBE_PARAM = "cbvPriceProbe";
-  function readKiwiDetailLegRoutes(stopCodes, sectors) {
-    if (stopCodes.length === 0 || stopCodes.length % 2 !== 0) return [];
-    const legs = [];
-    let current = [];
-    for (let index = 0; index < stopCodes.length; index += 2) {
-      const segment = { origin: stopCodes[index], destination: stopCodes[index + 1] };
-      current.push(segment);
-      const sector = sectors[legs.length];
-      if (sector !== void 0 && segment.destination === sector.destination && (sector.stopCount === void 0 || current.length - 1 === sector.stopCount)) {
-        legs.push(current);
-        current = [];
-      }
-    }
-    if (current.length > 0 || legs.length !== sectors.length) return [];
-    return legs.map((segments, index) => formatFlightLegRoute(segments, sectors[index]?.stopCount) ?? "");
-  }
-  function readKiwiPrebookingLegRoutes(prebooking, sectors) {
-    let state;
-    try {
-      state = JSON.parse(atob(prebooking));
-    } catch {
-      return [];
-    }
-    if (!isRecord$6(state) || typeof state.r !== "string" || !Array.isArray(state.i)) return [];
-    const segments = state.r.split("|").map((segment) => {
-      const fields = segment.split(":");
-      return { origin: fields[2], destination: fields[4] };
-    });
-    const legSizes = state.i.map((leg) => typeof leg === "string" ? leg.split("|").length : 0);
-    if (legSizes.length !== sectors.length || legSizes.some((size) => size === 0) || legSizes.reduce((total, size) => total + size, 0) !== segments.length) return [];
-    let offset = 0;
-    return legSizes.map((size, index) => {
-      const legSegments = segments.slice(offset, offset + size);
-      offset += size;
-      const sector = sectors[index];
-      const last = legSegments[legSegments.length - 1];
-      if (sector?.destination !== void 0 && last?.destination !== sector.destination) return "";
-      return formatFlightLegRoute(legSegments, sector?.stopCount) ?? "";
-    });
-  }
-  function readKiwiSortTabText(text) {
-    const match = text?.replace(/\s+/g, " ").match(/\bkr (\d[\d ]*?) · (?:(\d+)h)? ?(?:(\d+)m)?\s*$/);
-    if (match?.[1] === void 0 || match[2] === void 0 && match[3] === void 0) return void 0;
-    const amount = Number(match[1].replace(/ /g, ""));
-    const durationMinutes = Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
-    return amount > 0 && durationMinutes > 0 ? { amount, durationMinutes } : void 0;
-  }
-  function readKiwiCardLeg(text) {
-    const normalized = text.replace(/\s+/g, " ");
-    const duration = normalized.match(/\b(\d+)h(?: (\d+)m)?\b|\b(\d+)m\b/);
-    const stops = normalized.match(/\b(\d+) stopp\b/);
-    return {
-      ...duration !== null ? { durationMinutes: Number(duration[1] ?? 0) * 60 + Number(duration[2] ?? duration[3] ?? 0) } : {},
-      ...stops?.[1] !== void 0 ? { stopCount: Number(stops[1]) } : /\bdirekte\b/i.test(normalized) ? { stopCount: 0 } : {}
-    };
-  }
-  function readKiwiSearchPath(parsedUrl) {
-    if (parsedUrl.hostname.replace(/^www\./, "").toLowerCase() !== "kiwi.com") return void 0;
-    const match = parsedUrl.pathname.match(/^\/[a-z]{2}\/search\/results\/([^/]+)\/([^/]+)\/([^/]+)(?:\/([^/]+))?\/?$/);
-    if (match?.[1] === void 0 || match[2] === void 0 || match[3] === void 0) return void 0;
-    return {
-      origin: match[1],
-      destination: match[2],
-      outbound: match[3],
-      ...match[4] !== void 0 && match[4] !== "no-return" ? { inbound: match[4] } : {}
-    };
-  }
-  function readKiwiDatePart(value) {
-    const [start, end] = value.split("_");
-    if (start === void 0 || readIsoDateValue(start) === void 0) return void 0;
-    if (end === void 0) return { date: start, flexDays: 0 };
-    if (readIsoDateValue(end) === void 0) return void 0;
-    const flexDays = Math.floor((Date.parse(end) - Date.parse(start)) / 864e5 / 2);
-    const date = addDaysToIsoDate(start, flexDays);
-    return date !== void 0 && flexDays >= 0 ? { date, flexDays } : void 0;
-  }
-  function buildMomondoFlightSearchUrl(flightMeta, sortMode = "best") {
-    const { dateFlex } = flightMeta;
-    const formatDate = (date, flexDays) => {
-      if (flexDays === 0) return date;
-      return `${date}-flexible-${flexDays}${flexDays === 1 ? "day" : "days"}`;
-    };
-    const pathParts = [
-      `${flightMeta.origin}-${flightMeta.destination}`,
-      formatDate(flightMeta.outboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter) : 0),
-      flightMeta.inboundDate !== void 0 ? formatDate(flightMeta.inboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0) : void 0,
-      ...buildMomondoPassengerPathParts(flightMeta),
-      flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : void 0
-    ].filter((part) => part !== void 0);
-    const params = new URLSearchParams({ sort: dateFlex !== void 0 ? "price_a" : buildFlightSortUrlValue("momondo", sortMode) });
-    const momondoFilters = buildMomondoFlightFilterValue(flightMeta);
-    if (momondoFilters !== void 0) params.set("fs", momondoFilters);
-    return `https://www.momondo.no/flight-search/${pathParts.map(encodeURIComponent).join("/")}?${params.toString()}`;
-  }
-  function buildFinnFlightSearchUrl(flightMeta, scope = "exact") {
-    const params = new URLSearchParams({
-      adults: String(flightMeta.adults),
-      // FINN: barn 2–11 år og spedbarn 0–1 år som antall.
-      ...flightMeta.children > 0 ? { children: String(flightMeta.children) } : {},
-      ...flightMeta.infants > 0 ? { infants: String(flightMeta.infants) } : {},
-      // finn aksepterer economy|premium|business|first (verifisert mot søkeskjemaet).
-      cabinType: flightMeta.cabinClass ?? "economy",
-      requestedDepartureDate: flightMeta.outboundDate,
-      requestedDestination: `${flightMeta.destination}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
-      requestedOrigin: `${flightMeta.origin}.${scope === "metropolitan" ? "METROPOLITAN_AREA" : "AIRPORT"}`,
-      tripType: flightMeta.inboundDate !== void 0 ? "roundtrip" : "oneway"
-    });
-    if (scope === "exact") {
-      const exactAirportParams = buildFinnFlightExactAirportParams(flightMeta);
-      for (const [key, value] of exactAirportParams.entries()) {
-        params.set(key, value);
-      }
-    }
-    if (flightMeta.inboundDate !== void 0) {
-      params.set("requestedReturnDate", flightMeta.inboundDate);
-    }
-    if (flightMeta.includeCabinBag === true) params.set("handLuggage", "true");
-    if (flightMeta.includeCheckedBag === true) params.set("checkedLuggage", "true");
-    if (flightMeta.maxStops !== void 0) params.set("maximumNumberOfStops", String(flightMeta.maxStops));
-    if (flightMeta.maxDurationMinutes !== void 0) params.set("durationTo", String(flightMeta.maxDurationMinutes));
-    return `https://www.finn.no/reise/flybilletter/resultat/?${params.toString()}`;
-  }
-  function buildFinnFlightExactAirportParams(flightMeta) {
-    const params = new URLSearchParams({
-      departureAirportLeg1: flightMeta.origin,
-      arrivalAirportLeg1: flightMeta.destination
-    });
-    if (flightMeta.inboundDate !== void 0) {
-      params.set("departureAirportLeg2", flightMeta.destination);
-      params.set("arrivalAirportLeg2", flightMeta.origin);
-    }
-    return params;
-  }
-  function compactIsoDate(value) {
-    return value.replace(/-/g, "");
-  }
   const PROFANITY_SET = new Set([...noWords, ...enWords].map((w) => w.toLowerCase()));
   const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
@@ -11419,7 +11537,6 @@ ${darkProviderCss}
   ]);
   function startContentScript() {
     if (isNoticeBlockedHost(CURRENT_HOST)) return;
-    if (installKiwiPriceProbe()) return;
     disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
     installOfferActivationClickTracker();
     chrome.runtime.onMessage.addListener((message) => {
@@ -12117,7 +12234,7 @@ ${darkProviderCss}
         cardSearchDetails,
         fullSearchDetails
       })],
-      // Kiwi gir bare riktige priser til sin egen side; raden får pris fra bakgrunnsfanen (kiwi-price-probe).
+      // Kiwi-raden får pris fra Kiwis GraphQL-API (findKiwiFlightPriceMatchOffer).
       ...readKiwiSearchPath(parsedUrl) !== void 0 ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)],
       // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
       // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
@@ -12172,6 +12289,13 @@ ${darkProviderCss}
         }) : findTripComFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup)
       }]
     ];
+    if (readKiwiSearchPath(parsedUrl) === void 0) {
+      liveOfferFinders.push({
+        source: "kiwi",
+        sourceName: "KIWI",
+        findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup)
+      });
+    }
     return { staticOffers, liveOfferFinders };
   }
   async function runFlightLiveOfferFinders(finders, options) {
@@ -14395,24 +14519,13 @@ ${darkProviderCss}
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
     return (hostname === "google.com" || hostname.startsWith("google.") || hostname.endsWith(".google.com")) && /^\/travel\/flights/i.test(parsedUrl.pathname);
   }
-  const KIWI_PLACE_LOOKUP_URL = "https://api.skypicker.com/umbrella/v2/graphql";
-  const KIWI_PLACE_LOOKUP_QUERY = "query KiwiPlace($search: PlacesSearchInput, $filter: PlacesFilterInput, $options: PlacesOptionsInput) { places(search: $search, filter: $filter, options: $options, first: 5) { ... on PlaceConnection { edges { node { __typename legacyId slug ... on City { code } } } } } }";
   const kiwiCityCodes = /* @__PURE__ */ new Map();
   async function fetchKiwiPlaces(term, placeType) {
-    const params = new URLSearchParams({
-      featureName: "UmbrellaPlacesQuery",
-      query: KIWI_PLACE_LOOKUP_QUERY,
-      variables: JSON.stringify({ search: { term }, filter: { onlyTypes: [placeType] }, options: { locale: "no" } })
-    });
-    const response = await fetch(`${KIWI_PLACE_LOOKUP_URL}?${params.toString()}`, { credentials: "omit" });
-    const value = await response.json();
-    const places = isRecord(value) && isRecord(value.data) && isRecord(value.data.places) ? value.data.places : void 0;
-    return readRecordArray(places?.edges).flatMap((edge) => {
-      const node = isRecord(edge.node) ? edge.node : void 0;
-      const slug = readStringValue(node?.slug);
-      const code = readStringValue(placeType === "AIRPORT" ? node?.legacyId : node?.code);
-      return slug !== void 0 ? [{ slug, ...code !== void 0 ? { code } : {} }] : [];
-    });
+    return readKiwiPlaces(await userscriptJsonRequest(buildKiwiPlacesUrl(term, placeType), {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      timeoutMs: KIWI_REQUEST_TIMEOUT_MS
+    }), placeType);
   }
   async function findKiwiPlaceSlug(code) {
     const city = (await fetchKiwiPlaces(code, "CITY")).find((place) => place.code === code);
@@ -14444,82 +14557,136 @@ ${darkProviderCss}
     })().catch(() => void 0);
     return void 0;
   }
-  const KIWI_PROBE_POLL_MS = 1e3;
-  const KIWI_PROBE_STABLE_POLLS = 3;
-  const KIWI_PROBE_LOADING_GRACE_MS = 15e3;
-  const KIWI_PROBE_DEADLINE_MS = 25e3;
-  const KIWI_PROBE_DETAILS_TIMEOUT_MS = 4e3;
-  const KIWI_SORT_TABS = { best: "quality", cheapest: "price", fastest: "duration" };
-  function readVisibleKiwiSortPrices() {
-    const prices = {};
-    for (const mode of ["best", "cheapest", "fastest"]) {
-      const text = document.querySelector(`[data-test="SortBy-${KIWI_SORT_TABS[mode]}"]`)?.innerText;
-      const price = readKiwiSortTabText(text);
-      if (price !== void 0) prices[mode] = price;
-    }
-    return prices;
+  const KIWI_REQUEST_TIMEOUT_MS = 2e4;
+  const KIWI_PENDING_POLL_ATTEMPTS = 3;
+  const KIWI_PENDING_POLL_INTERVAL_MS = 2e3;
+  const KIWI_RESULT_CACHE_TTL_MS = 5 * 60 * 1e3;
+  const KIWI_FAILURE_BACKOFF_MS = 10 * 60 * 1e3;
+  let kiwiBackoffUntil = 0;
+  const kiwiPlaceIds = /* @__PURE__ */ new Map();
+  const kiwiResultCache = /* @__PURE__ */ new Map();
+  function fetchKiwiPlaceId(code, scope) {
+    const normalizedCode = code.toUpperCase();
+    if (scope === "airport") return Promise.resolve(buildKiwiAirportId(normalizedCode));
+    const key = `${normalizedCode}:${scope ?? ""}`;
+    const cached = kiwiPlaceIds.get(key);
+    if (cached !== void 0) return cached;
+    const promise = fetchKiwiPlaces(normalizedCode, "CITY").then((cities) => cities.find((place) => place.code === normalizedCode)?.id ?? (scope === "city" ? void 0 : buildKiwiAirportId(normalizedCode)));
+    kiwiPlaceIds.set(key, promise);
+    void promise.then((id) => {
+      if (id === void 0) kiwiPlaceIds.delete(key);
+    }, () => kiwiPlaceIds.delete(key));
+    return promise;
   }
-  function installKiwiPriceProbe() {
-    const parsedUrl = parseUrl(window.location.href);
-    const path = parsedUrl !== void 0 ? readKiwiSearchPath(parsedUrl) : void 0;
-    if (parsedUrl?.searchParams.get(KIWI_PRICE_PROBE_PARAM) !== "1" || path === void 0) return false;
-    installKiwiLinkPlaces();
-    if (/^[A-Z]{3}$/.test(path.origin) && /^[A-Z]{3}$/.test(path.destination)) return true;
-    const startedAt = Date.now();
-    let lastKey = "";
-    let stablePolls = 0;
-    const timerId = window.setInterval(() => {
-      const prices = readVisibleKiwiSortPrices();
-      const key = JSON.stringify(prices);
-      stablePolls = key === lastKey && key !== "{}" ? stablePolls + 1 : 0;
-      lastKey = key;
-      const elapsedMs = Date.now() - startedAt;
-      const loading = document.querySelector('[data-test="LoadingLine"]') !== null && elapsedMs < KIWI_PROBE_LOADING_GRACE_MS;
-      if ((stablePolls < KIWI_PROBE_STABLE_POLLS || loading) && elapsedMs < KIWI_PROBE_DEADLINE_MS) return;
-      window.clearInterval(timerId);
-      void finishKiwiPriceProbeTab(prices, key);
-    }, KIWI_PROBE_POLL_MS);
-    return true;
-  }
-  async function finishKiwiPriceProbeTab(prices, key) {
-    const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
-    const card = document.querySelector('[data-test="ResultCardWrapper"]');
-    const sectors = card !== null ? [...card.querySelectorAll('[data-test="ResultCardSectorWrapper"]')] : [];
-    if (sectors.length > 0) {
-      prices.topCardSectors = sectors.map((sector) => sector.innerText);
-      prices.topCardCarriers = sectors.map((sector) => uniqueStrings(
-        [...sector.querySelectorAll('[data-test="ResultCardCarrierLogo"]')].map((logo) => {
-          return logo.getAttribute("title") ?? logo.querySelector("[title]")?.getAttribute("title") ?? logo.querySelector("img")?.getAttribute("alt") ?? void 0;
-        })
-      ));
-      if (isNok && key !== "{}" && card !== null) {
-        const routes = await readKiwiTopCardRoutes(card, sectors);
-        if (routes.length > 0) prices.topCardRoutes = routes;
+  async function fetchKiwiItineraries(flightMeta, places, sortMode, airports) {
+    const request = buildKiwiItinerariesRequest(flightMeta, places, sortMode);
+    const cacheKey = request.body;
+    const cached = kiwiResultCache.get(cacheKey);
+    if (cached !== void 0 && cached.expiresAt > Date.now()) return cached.result;
+    if (Date.now() < kiwiBackoffUntil) return void 0;
+    let result;
+    for (let attempt = 0; attempt < KIWI_PENDING_POLL_ATTEMPTS; attempt++) {
+      if (attempt > 0) await sleep(KIWI_PENDING_POLL_INTERVAL_MS);
+      const value = await userscriptJsonRequest(request.url, {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: request.body,
+        credentials: "omit",
+        timeoutMs: KIWI_REQUEST_TIMEOUT_MS
+      });
+      if (value === void 0) {
+        kiwiBackoffUntil = Date.now() + KIWI_FAILURE_BACKOFF_MS;
+        console.warn(`[Cashback Norge] Kiwi svarte ikke på ${request.url} (${flightMeta.origin}-${flightMeta.destination}); prøver igjen om ${KIWI_FAILURE_BACKOFF_MS / 6e4} min.`);
+        return result;
       }
+      result = readKiwiItineraries(value, flightMeta, airports);
+      if (!result.hasMorePending) break;
     }
-    void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...isNok && key !== "{}" ? { prices } : {} });
+    if (result !== void 0 && !result.hasMorePending) kiwiResultCache.set(cacheKey, { expiresAt: Date.now() + KIWI_RESULT_CACHE_TTL_MS, result });
+    return result;
   }
-  async function readKiwiTopCardRoutes(card, sectors) {
-    const sectorEnds = sectors.map((sector) => {
-      const stations = [...sector.querySelectorAll('[data-test="stationName"]')].map((station) => station.innerText.trim());
-      return { destination: stations[stations.length - 1], stopCount: readKiwiCardLeg(sector.innerText).stopCount };
-    });
-    card.click();
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
-      const prebooking = new URLSearchParams(window.location.search).get("prebooking");
-      if (prebooking !== null) {
-        const routes = readKiwiPrebookingLegRoutes(prebooking, sectorEnds);
-        if (routes.some((route) => route.length > 0)) return routes;
+  function toKiwiFlightOfferCandidate(itinerary, productUrl) {
+    return {
+      shopName: "Kiwi.com",
+      price: formatNokFlightPrice(itinerary.amount),
+      amount: itinerary.amount,
+      sortAmount: itinerary.amount,
+      currency: "NOK",
+      productUrl,
+      outboundDate: itinerary.outboundDate,
+      ...itinerary.inboundDate !== void 0 ? { inboundDate: itinerary.inboundDate } : {},
+      flightLegs: itinerary.legs,
+      ...formatFlightLegDurationsWithStopsText(itinerary.legs) !== void 0 ? { durationText: formatFlightLegDurationsWithStopsText(itinerary.legs) } : {},
+      ...itinerary.durationMinutes !== void 0 ? { durationMinutes: itinerary.durationMinutes } : {}
+    };
+  }
+  async function findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup) {
+    const { dateFlex } = flightMeta;
+    const [origin, destination] = await Promise.all([
+      fetchKiwiPlaceId(flightMeta.origin, flightMeta.originScope),
+      fetchKiwiPlaceId(flightMeta.destination, flightMeta.destinationScope)
+    ]);
+    if (origin === void 0 || destination === void 0) return void 0;
+    const airports = {
+      origin: collectEquivalentFlightAirportCodes(flightMeta.origin, airportLookup),
+      destination: collectEquivalentFlightAirportCodes(flightMeta.destination, airportLookup)
+    };
+    const sortMode = dateFlex !== void 0 ? "cheapest" : "best";
+    const result = await fetchKiwiItineraries(flightMeta, { origin, destination }, sortMode, airports);
+    if (result === void 0) return void 0;
+    const resultUrl = buildKiwiFlightSearchUrl(flightMeta, sortMode);
+    const listed = result.itineraries.map((itinerary) => toKiwiFlightOfferCandidate(itinerary, resultUrl));
+    const top = Object.fromEntries(Object.entries(result.top).map(([mode, itinerary]) => [mode, toKiwiFlightOfferCandidate(itinerary, buildKiwiFlightSearchUrl(flightMeta, mode))]));
+    if (dateFlex !== void 0) {
+      const byDates = /* @__PURE__ */ new Map();
+      for (const candidate of [...top.cheapest !== void 0 ? [top.cheapest] : [], ...listed]) {
+        const key = buildFlightDateCombinationKey(candidate);
+        const previous = byDates.get(key);
+        if (previous === void 0 || candidate.amount < previous.amount) byDates.set(key, candidate);
       }
-      const details = document.querySelector('[data-test="PrebookingTripDetails"]');
-      if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) {
-        const stopCodes = [...details.querySelectorAll('[data-test="SegmentStop"]')].filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText)).map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1]).filter((code) => code !== void 0);
-        return readKiwiDetailLegRoutes(stopCodes, sectorEnds);
-      }
-      await sleep(250);
+      const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
+      const totalCombinationCount = listFlightDateFlexCombinations(flightMeta, dateFlex).length;
+      return buildFlightDateFlexOffer({
+        source: "kiwi",
+        sourceName: "KIWI",
+        flightMeta,
+        dateFlex,
+        routeTitle,
+        searchDetails: fullSearchDetails,
+        options: [...byDates.values()].map(({ productUrl: _productUrl, ...option }) => {
+          const dates = { outboundDate: option.outboundDate, ...option.inboundDate !== void 0 ? { inboundDate: option.inboundDate } : {} };
+          return { ...option, productUrl: buildKiwiFlightSearchUrl({ ...exactFlightMeta, ...dates }) };
+        }),
+        // Kiwi søker hele vinduet i ett kall, sortert på pris.
+        checkedCombinationCount: totalCombinationCount,
+        totalCombinationCount,
+        ...result.hasMorePending ? { searchIncomplete: true } : {}
+      });
     }
-    return [];
+    const best = top.best ?? listed[0];
+    if (best === void 0) return void 0;
+    const pool = [best, ...listed, ...top.cheapest !== void 0 ? [top.cheapest] : [], ...top.fastest !== void 0 ? [top.fastest] : []];
+    const alternatives = [best, ...listed.filter((candidate) => candidate.amount !== best.amount || candidate.durationMinutes !== best.durationMinutes)];
+    return {
+      ...buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
+      shopName: best.shopName,
+      price: best.price,
+      amount: best.amount,
+      sortAmount: best.amount,
+      currency: best.currency,
+      productUrl: resultUrl,
+      offerUrl: resultUrl,
+      ...best.durationText !== void 0 ? { durationText: best.durationText } : {},
+      ...best.flightLegs !== void 0 ? { flightLegs: best.flightLegs } : {},
+      ...best.durationMinutes !== void 0 ? { durationMinutes: best.durationMinutes } : {},
+      ...result.hasMorePending ? { searchIncomplete: true } : {},
+      flightSortVariants: buildFlightSortVariants({
+        cheapestPool: pool,
+        fastestPool: pool,
+        buildUrl: (mode) => buildKiwiFlightSearchUrl(flightMeta, mode)
+      }),
+      alternatives: alternatives.slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT).map(({ productUrl: _productUrl, outboundDate: _outboundDate, inboundDate: _inboundDate, ...alternative }) => alternative)
+    };
   }
   function extractKiwiFlightSearchMeta(parsedUrl) {
     const path = readKiwiSearchPath(parsedUrl);
@@ -14724,10 +14891,18 @@ ${darkProviderCss}
   async function pollTripComFlightListSearch(flightMeta, session, sortOrder, grade) {
     let best;
     let previousKey;
+    if (Date.now() < tripComBackoffUntil) return { resultData: void 0, stable: true };
     for (let attempt = 0; attempt < TRIP_COM_LIST_POLL_ATTEMPTS; attempt++) {
       if (attempt > 0) await sleep(TRIP_COM_LIST_POLL_INTERVAL_MS);
       const value = await fetchTripComFlightListSearch(flightMeta, session, sortOrder, grade);
-      if (!isRecord(value)) continue;
+      if (!isRecord(value)) {
+        if (best === void 0 && attempt >= 1) {
+          tripComBackoffUntil = Date.now() + FLIGHT_SOURCE_FAILURE_BACKOFF_MS;
+          console.warn(`[Cashback Norge] Trip.com avviste søket ${flightMeta.origin}-${flightMeta.destination} (${TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT}); prøver igjen om ${FLIGHT_SOURCE_FAILURE_BACKOFF_MS / 6e4} min.`);
+          return { resultData: void 0, stable: true };
+        }
+        continue;
+      }
       if (best === void 0 || readTripComListItineraryCount(value) > readTripComListItineraryCount(best)) {
         best = value;
       }
@@ -16036,17 +16211,29 @@ ${darkProviderCss}
     );
     return isRecord(value) && Array.isArray(value.results) ? extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl) : [];
   }
+  const FLIGHT_SOURCE_FAILURE_BACKOFF_MS = 10 * 60 * 1e3;
+  let momondoBackoffUntil = 0;
+  let tripComBackoffUntil = 0;
   async function pollMomondoFlightResults(searchData, flightMeta, airportLookup) {
     let latestResult;
     let latestCandidateResult;
     let latestFilteredCandidateResult;
     let searchId;
     let filterState;
+    let failedPolls = 0;
+    if (Date.now() < momondoBackoffUntil) return void 0;
     for (let attempt = 0; attempt < MOMONDO_FLIGHT_POLL_ATTEMPTS; attempt++) {
       if (attempt > 0) await sleep(MOMONDO_FLIGHT_POLL_INTERVAL_MS);
       const requestFilterState = filterState;
       const value = await requestMomondoFlightPoll(searchData, flightMeta, airportLookup, searchId, requestFilterState);
-      if (!isRecord(value) || !Array.isArray(value.results)) continue;
+      if (!isRecord(value) || !Array.isArray(value.results)) {
+        if (++failedPolls >= 2 && latestResult === void 0) {
+          momondoBackoffUntil = Date.now() + FLIGHT_SOURCE_FAILURE_BACKOFF_MS;
+          console.warn(`[Cashback Norge] momondo avviste søket ${flightMeta.origin}-${flightMeta.destination} (${MOMONDO_FLIGHT_DYNAMIC_POLL_ENDPOINT}); prøver igjen om ${FLIGHT_SOURCE_FAILURE_BACKOFF_MS / 6e4} min.`);
+          return void 0;
+        }
+        continue;
+      }
       latestResult = value;
       searchId = readStringValue(value.searchId) ?? searchId;
       const candidates = extractMomondoFlightOfferCandidates(value, flightMeta, airportLookup, searchData.resultUrl);

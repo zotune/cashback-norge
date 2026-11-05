@@ -1,0 +1,602 @@
+{
+ "data": {
+  "returnItineraries": {
+   "__typename": "Itineraries",
+   "metadata": {
+    "hasMorePending": false,
+    "topResults": {
+     "best": {
+      "__typename": "ItineraryReturn",
+      "id": "ItineraryReturn:eyJwcm92aWRlcnMiOiJLSVdJIiwicm91dGVfZGF0YSI6IktMOjExNjQ6QkdPOjE3OTQzOTA2MDA6QU1TOjE3OTQzOTcyMDA6ZWNvbm9teTpGYWxzZTo6OktMfEtMOjg5NTpBTVM6MTc5NDQwMTQwMDpQVkc6MTc5NDQ0NTgwMDplY29ub215OkZhbHNlOjo6S0x8S0w6ODk2OlBWRzoxNzk3NDc3MDAwOkFNUzoxNzk3NTI4MzAwOmVjb25vbXk6RmFsc2U6OjpLTHxLTDoxMTcxOkFNUzoxNzk3NTQwMzAwOkJHTzoxNzk3NTQ2MzAwOmVjb25vbXk6RmFsc2U6OjpLTCIsInByaWNlIjoiOTk3MC4zNjcxMTQifQ==",
+      "duration": 124500,
+      "price": {
+       "amount": "9970.367114"
+      },
+      "outbound": {
+       "duration": 55200,
+       "sectorSegments": [
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "BGO"
+           },
+           "localTime": "2026-11-11T10:50:00"
+          },
+          "destination": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-11-11T12:40:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        },
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-11-11T13:50:00"
+          },
+          "destination": {
+           "station": {
+            "code": "PVG"
+           },
+           "localTime": "2026-11-12T09:10:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        }
+       ]
+      },
+      "inbound": {
+       "duration": 69300,
+       "sectorSegments": [
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "PVG"
+           },
+           "localTime": "2026-12-17T11:10:00"
+          },
+          "destination": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-12-17T18:25:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        },
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-12-17T21:45:00"
+          },
+          "destination": {
+           "station": {
+            "code": "BGO"
+           },
+           "localTime": "2026-12-17T23:25:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        }
+       ]
+      }
+     },
+     "cheapest": {
+      "__typename": "ItineraryReturn",
+      "id": "ItineraryReturn:eyJwcm92aWRlcnMiOiJLSVdJIiwicm91dGVfZGF0YSI6IktMOjExNjQ6QkdPOjE3OTQzOTA2MDA6QU1TOjE3OTQzOTcyMDA6ZWNvbm9teTpGYWxzZTo6OktMfEtMOjg5NTpBTVM6MTc5NDQwMTQwMDpQVkc6MTc5NDQ0NTgwMDplY29ub215OkZhbHNlOjo6S0x8S0w6ODk2OlBWRzoxNzk3NDc3MDAwOkFNUzoxNzk3NTI4MzAwOmVjb25vbXk6RmFsc2U6OjpLTHxLTDoxMTcxOkFNUzoxNzk3NTQwMzAwOkJHTzoxNzk3NTQ2MzAwOmVjb25vbXk6RmFsc2U6OjpLTCIsInByaWNlIjoiOTk3MC4zNjcxMTQifQ==",
+      "duration": 124500,
+      "price": {
+       "amount": "9970.367114"
+      },
+      "outbound": {
+       "duration": 55200,
+       "sectorSegments": [
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "BGO"
+           },
+           "localTime": "2026-11-11T10:50:00"
+          },
+          "destination": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-11-11T12:40:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        },
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-11-11T13:50:00"
+          },
+          "destination": {
+           "station": {
+            "code": "PVG"
+           },
+           "localTime": "2026-11-12T09:10:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        }
+       ]
+      },
+      "inbound": {
+       "duration": 69300,
+       "sectorSegments": [
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "PVG"
+           },
+           "localTime": "2026-12-17T11:10:00"
+          },
+          "destination": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-12-17T18:25:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        },
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-12-17T21:45:00"
+          },
+          "destination": {
+           "station": {
+            "code": "BGO"
+           },
+           "localTime": "2026-12-17T23:25:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        }
+       ]
+      }
+     },
+     "fastest": {
+      "__typename": "ItineraryReturn",
+      "id": "ItineraryReturn:eyJwcm92aWRlcnMiOiJLSVdJLUJBU0lDOktJV0kiLCJyb3V0ZV9kYXRhIjoiQVk6ODA2OkJHTzoxNzk0Mzg5MTAwOkhFTDoxNzk0NDAxNDAwOmVjb25vbXk6RmFsc2U6OjpBWXxITzoxNjA4OkhFTDoxNzk0NDA4MDAwOlBWRzoxNzk0NDQxMDAwOmVjb25vbXk6VHJ1ZTo6VHJ1ZTpIT3xNVTo3NzE6UFZHOjE3OTc0ODI0MDA6QU1TOjE3OTc1MjU5MDA6ZWNvbm9teTpGYWxzZTo6Ok1VfEtMOjExNzE6QU1TOjE3OTc1NDAzMDA6QkdPOjE3OTc1NDYzMDA6ZWNvbm9teTpUcnVlOjpUcnVlOktMIiwicHJpY2UiOiIyMDIxNC41NDEwMjIifQ==",
+      "duration": 115800,
+      "price": {
+       "amount": "20214.541022"
+      },
+      "outbound": {
+       "duration": 51900,
+       "sectorSegments": [
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "BGO"
+           },
+           "localTime": "2026-11-11T10:25:00"
+          },
+          "destination": {
+           "station": {
+            "code": "HEL"
+           },
+           "localTime": "2026-11-11T14:50:00"
+          },
+          "carrier": {
+           "name": "Finnair"
+          },
+          "followingTechnicalStop": false
+         }
+        },
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "HEL"
+           },
+           "localTime": "2026-11-11T16:40:00"
+          },
+          "destination": {
+           "station": {
+            "code": "PVG"
+           },
+           "localTime": "2026-11-12T07:50:00"
+          },
+          "carrier": {
+           "name": "Juneyao Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        }
+       ]
+      },
+      "inbound": {
+       "duration": 63900,
+       "sectorSegments": [
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "PVG"
+           },
+           "localTime": "2026-12-17T12:40:00"
+          },
+          "destination": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-12-17T17:45:00"
+          },
+          "carrier": {
+           "name": "China Eastern Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        },
+        {
+         "segment": {
+          "source": {
+           "station": {
+            "code": "AMS"
+           },
+           "localTime": "2026-12-17T21:45:00"
+          },
+          "destination": {
+           "station": {
+            "code": "BGO"
+           },
+           "localTime": "2026-12-17T23:25:00"
+          },
+          "carrier": {
+           "name": "KLM Royal Dutch Airlines"
+          },
+          "followingTechnicalStop": false
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "itineraries": [
+    {
+     "__typename": "ItineraryReturn",
+     "id": "ItineraryReturn:eyJwcm92aWRlcnMiOiJLSVdJIiwicm91dGVfZGF0YSI6IktMOjExNjQ6QkdPOjE3OTQzOTA2MDA6QU1TOjE3OTQzOTcyMDA6ZWNvbm9teTpGYWxzZTo6OktMfEtMOjg5NTpBTVM6MTc5NDQwMTQwMDpQVkc6MTc5NDQ0NTgwMDplY29ub215OkZhbHNlOjo6S0x8S0w6ODk2OlBWRzoxNzk3NDc3MDAwOkFNUzoxNzk3NTI4MzAwOmVjb25vbXk6RmFsc2U6OjpLTHxLTDoxMTcxOkFNUzoxNzk3NTQwMzAwOkJHTzoxNzk3NTQ2MzAwOmVjb25vbXk6RmFsc2U6OjpLTCIsInByaWNlIjoiOTk3MC4zNjcxMTQifQ==",
+     "duration": 124500,
+     "price": {
+      "amount": "9970.367114"
+     },
+     "outbound": {
+      "duration": 55200,
+      "sectorSegments": [
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "BGO"
+          },
+          "localTime": "2026-11-11T10:50:00"
+         },
+         "destination": {
+          "station": {
+           "code": "AMS"
+          },
+          "localTime": "2026-11-11T12:40:00"
+         },
+         "carrier": {
+          "name": "KLM Royal Dutch Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       },
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "AMS"
+          },
+          "localTime": "2026-11-11T13:50:00"
+         },
+         "destination": {
+          "station": {
+           "code": "PVG"
+          },
+          "localTime": "2026-11-12T09:10:00"
+         },
+         "carrier": {
+          "name": "KLM Royal Dutch Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       }
+      ]
+     },
+     "inbound": {
+      "duration": 69300,
+      "sectorSegments": [
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "PVG"
+          },
+          "localTime": "2026-12-17T11:10:00"
+         },
+         "destination": {
+          "station": {
+           "code": "AMS"
+          },
+          "localTime": "2026-12-17T18:25:00"
+         },
+         "carrier": {
+          "name": "KLM Royal Dutch Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       },
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "AMS"
+          },
+          "localTime": "2026-12-17T21:45:00"
+         },
+         "destination": {
+          "station": {
+           "code": "BGO"
+          },
+          "localTime": "2026-12-17T23:25:00"
+         },
+         "carrier": {
+          "name": "KLM Royal Dutch Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       }
+      ]
+     }
+    },
+    {
+     "__typename": "ItineraryReturn",
+     "id": "ItineraryReturn:eyJwcm92aWRlcnMiOiJLSVdJLUJBU0lDOktJV0kiLCJyb3V0ZV9kYXRhIjoiQVk6ODA2OkJHTzoxNzk0Mzg5MTAwOkhFTDoxNzk0NDAxNDAwOmVjb25vbXk6RmFsc2U6OjpBWXxITzoxNjA4OkhFTDoxNzk0NDA4MDAwOlBWRzoxNzk0NDQxMDAwOmVjb25vbXk6VHJ1ZTo6VHJ1ZTpIT3xDQTo4NDc6UFZHOjE3OTc0NDU1MDA6TEdXOjE3OTc0OTE0MDA6ZWNvbm9teTpGYWxzZTo6OkNBfERZOjEzMTU6TEdXOjE3OTc1MDUyMDA6QkdPOjE3OTc1MTIxMDA6ZWNvbm9teTpUcnVlOjpUcnVlOkRZIiwicHJpY2UiOiIxODA5NS45MDIwMSJ9",
+     "duration": 118500,
+     "price": {
+      "amount": "18095.90201"
+     },
+     "outbound": {
+      "duration": 51900,
+      "sectorSegments": [
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "BGO"
+          },
+          "localTime": "2026-11-11T10:25:00"
+         },
+         "destination": {
+          "station": {
+           "code": "HEL"
+          },
+          "localTime": "2026-11-11T14:50:00"
+         },
+         "carrier": {
+          "name": "Finnair"
+         },
+         "followingTechnicalStop": false
+        }
+       },
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "HEL"
+          },
+          "localTime": "2026-11-11T16:40:00"
+         },
+         "destination": {
+          "station": {
+           "code": "PVG"
+          },
+          "localTime": "2026-11-12T07:50:00"
+         },
+         "carrier": {
+          "name": "Juneyao Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       }
+      ]
+     },
+     "inbound": {
+      "duration": 66600,
+      "sectorSegments": [
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "PVG"
+          },
+          "localTime": "2026-12-17T02:25:00"
+         },
+         "destination": {
+          "station": {
+           "code": "LGW"
+          },
+          "localTime": "2026-12-17T07:10:00"
+         },
+         "carrier": {
+          "name": "Air China"
+         },
+         "followingTechnicalStop": false
+        }
+       },
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "LGW"
+          },
+          "localTime": "2026-12-17T11:00:00"
+         },
+         "destination": {
+          "station": {
+           "code": "BGO"
+          },
+          "localTime": "2026-12-17T13:55:00"
+         },
+         "carrier": {
+          "name": "Norwegian Air Shuttle"
+         },
+         "followingTechnicalStop": false
+        }
+       }
+      ]
+     }
+    },
+    {
+     "__typename": "ItineraryReturn",
+     "id": "ItineraryReturn:eyJwcm92aWRlcnMiOiJLSVdJLUJBU0lDOktJV0kiLCJyb3V0ZV9kYXRhIjoiQVk6ODA2OkJHTzoxNzk0Mzg5MTAwOkhFTDoxNzk0NDAxNDAwOmVjb25vbXk6RmFsc2U6OjpBWXxITzoxNjA4OkhFTDoxNzk0NDA4MDAwOlBWRzoxNzk0NDQxMDAwOmVjb25vbXk6VHJ1ZTo6VHJ1ZTpIT3xNVToyMTU6UFZHOjE3OTc0NDMxMDA6TEhSOjE3OTc0ODg3MDA6ZWNvbm9teTpGYWxzZTo6Ok1VfERZOjEzMTU6TEdXOjE3OTc1MDUyMDA6QkdPOjE3OTc1MTIxMDA6ZWNvbm9teTpUcnVlOjpUcnVlOkRZIiwicHJpY2UiOiIxODI3My4wNzMxMDEifQ==",
+     "duration": 120900,
+     "price": {
+      "amount": "18273.073101"
+     },
+     "outbound": {
+      "duration": 51900,
+      "sectorSegments": [
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "BGO"
+          },
+          "localTime": "2026-11-11T10:25:00"
+         },
+         "destination": {
+          "station": {
+           "code": "HEL"
+          },
+          "localTime": "2026-11-11T14:50:00"
+         },
+         "carrier": {
+          "name": "Finnair"
+         },
+         "followingTechnicalStop": false
+        }
+       },
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "HEL"
+          },
+          "localTime": "2026-11-11T16:40:00"
+         },
+         "destination": {
+          "station": {
+           "code": "PVG"
+          },
+          "localTime": "2026-11-12T07:50:00"
+         },
+         "carrier": {
+          "name": "Juneyao Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       }
+      ]
+     },
+     "inbound": {
+      "duration": 69000,
+      "sectorSegments": [
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "PVG"
+          },
+          "localTime": "2026-12-17T01:45:00"
+         },
+         "destination": {
+          "station": {
+           "code": "LHR"
+          },
+          "localTime": "2026-12-17T06:25:00"
+         },
+         "carrier": {
+          "name": "China Eastern Airlines"
+         },
+         "followingTechnicalStop": false
+        }
+       },
+       {
+        "segment": {
+         "source": {
+          "station": {
+           "code": "LGW"
+          },
+          "localTime": "2026-12-17T11:00:00"
+         },
+         "destination": {
+          "station": {
+           "code": "BGO"
+          },
+          "localTime": "2026-12-17T13:55:00"
+         },
+         "carrier": {
+          "name": "Norwegian Air Shuttle"
+         },
+         "followingTechnicalStop": false
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

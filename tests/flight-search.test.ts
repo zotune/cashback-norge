@@ -27,15 +27,9 @@ import {
   readPanFlightsLegStopCounts,
   readFlightSortLabel,
   readKiwiBagsParam,
-  readKiwiCardDate,
-  readKiwiCardLeg,
-  readKiwiCardLegTimeRange,
   readTripComJourneyLeg,
-  readKiwiDetailLegRoutes,
-  readKiwiPrebookingLegRoutes,
   readKiwiDatePart,
   readKiwiSearchPath,
-  readKiwiSortTabText,
   readFlightSortUrlValue,
   readPanFlightsLegMinutes,
   selectFlightSortCandidate,
@@ -833,36 +827,12 @@ test("Kiwi links keep cabin, date window and readable search paths", () => {
   assert.equal(readFlightSortUrlValue("kiwi", "duration"), "fastest");
 });
 
-test("Kiwi's sort tabs give price and duration", () => {
-  assert.deepEqual(readKiwiSortTabText("Beste\nkr 5750 · 27h 15m"), { amount: 5750, durationMinutes: 1635 });
-  assert.deepEqual(readKiwiSortTabText("Kortest kr 11\u00a0732 · 15h 35m"), { amount: 11732, durationMinutes: 935 });
-  assert.deepEqual(readKiwiSortTabText("Billigst kr 5073 · 54h"), { amount: 5073, durationMinutes: 3240 });
-  assert.equal(readKiwiSortTabText("Andre alternativer Tidligste avreise"), undefined);
-  assert.equal(readKiwiSortTabText("Beste"), undefined);
-  assert.equal(readKiwiSortTabText(undefined), undefined);
-});
-
-test("Kiwi's card dates get the year nearest the search", () => {
-  assert.equal(readKiwiCardDate("man. 18. jan. • Utgående", "2027-01-14"), "2027-01-18");
-  assert.equal(readKiwiCardDate("søn. 3. jan.", "2026-12-30"), "2027-01-03");
-  assert.equal(readKiwiCardDate("tir. 29. des.", "2027-01-02"), "2026-12-29");
-  assert.equal(readKiwiCardDate("Utgående", "2027-01-14"), undefined);
-  assert.equal(readKiwiCardDate(undefined, "2027-01-14"), undefined);
-});
-
 test("Google links keep the sort as Google's own tfu value", () => {
   const read = (mode?: FlightSortMode): string | null => new URL(buildGoogleFlightsSearchUrl(meta(), mode)).searchParams.get("tfu");
   assert.equal(read(), null);
   assert.equal(read("best"), null);
   assert.equal(read("cheapest"), "EgoIARAAGAAgAigB");
   assert.equal(read("fastest"), "EgYIBRAAGAA");
-});
-
-test("Kiwi's cards give duration and stops per leg", () => {
-  assert.deepEqual(readKiwiCardLeg("man. 18. jan. • Utgående 02:15 25h 55m 21:10 PVG 1 stopp · Manchester BGO"), { durationMinutes: 1555, stopCount: 1 });
-  assert.deepEqual(readKiwiCardLeg("07:00\n16h 05m\n06:05 +1 BGO 2 stopp · London, Paris PVG"), { durationMinutes: 965, stopCount: 2 });
-  assert.deepEqual(readKiwiCardLeg("07:00 3h 10:00 OSL Direkte BGO"), { durationMinutes: 180, stopCount: 0 });
-  assert.deepEqual(readKiwiCardLeg("ingen data"), {});
 });
 
 test("flight route lists connecting airports per leg for the tooltip chips", () => {
@@ -965,20 +935,6 @@ test("PanFlights legs read airports and local times from spec and route epochs",
   assert.equal(readPanFlightsFlightLegs(item, readPanFlightsLegMinutes(item, false), readPanFlightsLegStopCounts(item))?.length, 1);
 });
 
-test("Kiwi detail stops split into legs at the card's endpoints", () => {
-  // SegmentStop-kodene fra Kiwis detaljvisning PVG⇄BGO (hentet 2026-11-05), med flyplassbytte TRF/OSL.
-  const codes = ["PVG", "MAN", "MAN", "TRF", "OSL", "BGO", "BGO", "CPH", "CPH", "AMS", "AMS", "PVG"];
-  const sectors = [{ destination: "BGO", stopCount: 2 }, { destination: "PVG", stopCount: 2 }];
-  assert.deepEqual(readKiwiDetailLegRoutes(codes, sectors), ["PVG → MAN → TRF/OSL → BGO", "BGO → CPH → AMS → PVG"]);
-  // Feil antall stopp eller ufullstendige flyvninger gir ingen rute.
-  assert.deepEqual(readKiwiDetailLegRoutes(codes, [{ destination: "BGO", stopCount: 1 }, { destination: "PVG", stopCount: 2 }]), []);
-  assert.deepEqual(readKiwiDetailLegRoutes(codes.slice(0, 5), sectors), []);
-  assert.deepEqual(readKiwiDetailLegRoutes(codes.slice(0, 6), [{ destination: "BGO", stopCount: undefined }]), ["PVG → MAN → TRF/OSL → BGO"]);
-
-  assert.equal(readKiwiCardLegTimeRange("Utgående\n\n02:15\n22h\n17:15\nPVG\n\n2 stopp · flyplassbytte · Manchester, Oslo\n\nBGO"), "02:15-17:15");
-  assert.equal(readKiwiCardLegTimeRange("ingen tider"), undefined);
-});
-
 test("Trip.com legs include stops on the same flight number", () => {
   // Utdrag av FlightListSearchSSE BGO→SHA 11.11.2026 (hentet 2026-11-05): AY806 mellomlander i ARN.
   const section = (from: string, to: string, flightNo: string, airlineCode: string, departDateTime: string, arriveDateTime: string, stopList: unknown[] = []) => ({
@@ -999,17 +955,4 @@ test("Trip.com legs include stops on the same flight number", () => {
   const unknownStop = { ...journey, transSectionList: [section("BGO", "HEL", "AY806", "AY", "2026-11-11 10:25:00", "2026-11-11 15:05:00", [{ duration: 25 }])] };
   assert.equal(readTripComJourneyLeg(unknownStop, {}).route, undefined);
   assert.equal(readTripComJourneyLeg(unknownStop, {}).stopCount, 1);
-});
-
-test("Kiwi prebooking state gives the legs when the detail view has no stop rows", () => {
-  // `prebooking` fra Kiwi BGO⇄SHA 11.11.–17.12.2026 (hentet 2026-11-05), KLM via AMS begge veier.
-  const prebooking = Buffer.from(JSON.stringify({
-    r: "KL:1164:BGO:1794390600:AMS:1794397200:economy:False:::KL|KL:895:AMS:1794401400:PVG:1794445800:economy:False:::KL|KL:896:PVG:1797477000:AMS:1797528300:economy:False:::KL|KL:1171:AMS:1797540300:BGO:1797546300:economy:False:::KL",
-    i: ["1f84_0|1f84_1", "1f84_2|1f84_3"], thc: 0, tat: 0, vi: 0, t: "RT",
-  })).toString("base64");
-  const sectors = [{ destination: "PVG", stopCount: 1 }, { destination: "BGO", stopCount: 1 }];
-  assert.deepEqual(readKiwiPrebookingLegRoutes(prebooking, sectors), ["BGO → AMS → PVG", "PVG → AMS → BGO"]);
-  assert.deepEqual(readKiwiPrebookingLegRoutes(prebooking, [{ destination: "PVG", stopCount: 1 }]), []);
-  assert.deepEqual(readKiwiPrebookingLegRoutes(prebooking, [{ destination: "PVG", stopCount: 2 }, { destination: "BGO", stopCount: 1 }]), ["", "PVG → AMS → BGO"]);
-  assert.deepEqual(readKiwiPrebookingLegRoutes("not base64 json", sectors), []);
 });

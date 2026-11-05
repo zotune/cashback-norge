@@ -32,15 +32,11 @@ import {
   type OffersForUrlResponse,
   type PlayStationRegionPricesResponse,
   type PriceMatchForProductResponse,
-  type KiwiFlightPricesResponse,
-  isGetKiwiFlightPricesMessage,
   isHttpRequestMessage,
-  isKiwiFlightPricesResultMessage,
   isGetPlayStationRegionPricesMessage,
   isGetOffersForUrlMessage,
   isGetPriceMatchForProductMessage,
 } from "../shared/extension-messages.js";
-import { finishKiwiPriceProbe, getKiwiFlightPrices, installKiwiPriceProbeCleanup } from "./kiwi-price-probe.js";
 
 const STORAGE_KEY = "cashback-index";
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
@@ -109,26 +105,7 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-installKiwiPriceProbeCleanup();
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (isKiwiFlightPricesResultMessage(message)) {
-    finishKiwiPriceProbe(sender.tab?.id, message.prices);
-    sendResponse({ ok: true });
-    return false;
-  }
-  if (isGetKiwiFlightPricesMessage(message)) {
-    void getKiwiFlightPrices(message.url, {
-      ...(sender.tab?.id !== undefined ? { tabId: sender.tab.id } : {}),
-      ...(sender.tab?.windowId !== undefined ? { windowId: sender.tab.windowId } : {}),
-    })
-      .catch(() => undefined)
-      .then((prices) => {
-        const response: KiwiFlightPricesResponse = { ok: true, ...(prices !== undefined ? { prices } : {}) };
-        sendResponse(response);
-      });
-    return true;
-  }
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   void handleRuntimeMessage(message, sendResponse);
   return true;
 });
@@ -258,6 +235,7 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
     "workb.panflights.com",
     "typeb.panflights.com",
     "panflights.com",
+    "api.skypicker.com",
   ]);
   if (parsedUrl === undefined || !supportedHosts.has(parsedUrl.hostname)) {
     return { ok: false, reason: "Unsupported host" };
@@ -267,6 +245,10 @@ async function proxyHttpRequest(message: HttpRequestMessage): Promise<HttpReques
   if (isMobileRequest && (parsedUrl.protocol !== "https:" || parsedUrl.port || (message.method ?? "GET") !== "GET" || message.body !== undefined ||
     !/^\/mobilabonnement\/api\/(?:plans|mobile-broadband-plans)$/.test(parsedUrl.pathname))) {
     return { ok: false, reason: "Unsupported mobile comparison request" };
+  }
+  // Kiwi: bare GraphQL-endepunktet som kiwi.com selv bruker (søk og stedsoppslag).
+  if (parsedUrl.hostname === "api.skypicker.com" && (parsedUrl.protocol !== "https:" || parsedUrl.port || parsedUrl.pathname !== "/umbrella/v2/graphql")) {
+    return { ok: false, reason: "Unsupported Kiwi request" };
   }
   const isElectricityRequest = parsedUrl.hostname === "strom-api.forbrukerradet.no";
   const isCatalogRequest = parsedUrl.hostname === "cashbacknorge.no";

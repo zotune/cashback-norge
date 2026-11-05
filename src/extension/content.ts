@@ -14,6 +14,19 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import {
+  buildKiwiAirportId,
+  buildKiwiItinerariesRequest,
+  buildKiwiPlacesUrl,
+  readKiwiItineraries,
+  readKiwiPlaces,
+  type KiwiItinerariesResult,
+  type KiwiItinerary,
+  type KiwiPlace,
+  type KiwiPlaceType,
+  type KiwiSearchAirports,
+  type KiwiSearchPlaces,
+} from "../shared/kiwi-flight-search";
 import { ELECTRICITY_MAX_OFFERS, getElectricitySupplier, isElectricityPriceDetails, type ElectricityPriceDetails } from "../shared/electricity-price-match";
 import { createElectricityComparison } from "./electricity-comparison";
 import { ELECTRICITY_SUPPLIER_CACHE_KEY } from "../shared/electricity-suppliers";
@@ -49,7 +62,6 @@ import { bindThemeTarget, installThemeStyles, mountThemeControl } from "../share
 import { extensionTheme } from "./theme";
 import { createContentScriptContextGuard } from "./runtime-context";
 import { createMutedChip } from "../shared/ui";
-import type { KiwiFlightPricesResponse } from "../shared/extension-messages";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, DETAILS_TOOLTIP_WIDTH, type TooltipController } from "../shared/tooltips";
 import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
@@ -99,16 +111,7 @@ import {
   buildSkyscannerFlightSearchUrl,
   buildSkyscannerCabinClass,
   buildKiwiFlightSearchUrl,
-  KIWI_PRICE_PROBE_PARAM,
-  type KiwiSortPrice,
-  type KiwiSortPrices,
-  readKiwiCardDate,
-  readKiwiCardLeg,
-  readKiwiCardLegTimeRange,
   readTripComJourneyLeg,
-  readKiwiDetailLegRoutes,
-  readKiwiPrebookingLegRoutes,
-  readKiwiSortTabText,
   buildPanFlightsFlightSearchUrl,
   buildGoogleFlightsSearchUrl,
   buildTripComFlightSearchUrl,
@@ -867,7 +870,6 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
 ]);
 function startContentScript(): void {
   if (isNoticeBlockedHost(CURRENT_HOST)) return;
-  if (installKiwiPriceProbe()) return;
   disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
   installOfferActivationClickTracker();
   chrome.runtime.onMessage.addListener((message) => {
@@ -1739,7 +1741,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
         fullSearchDetails,
       })]
       : []),
-    // Kiwi gir bare riktige priser til sin egen side; raden får pris fra bakgrunnsfanen (kiwi-price-probe).
+    // Kiwi-raden får pris fra Kiwis GraphQL-API (findKiwiFlightPriceMatchOffer).
     ...(readKiwiSearchPath(parsedUrl) !== undefined ? [] : [buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails)]),
     // Ren deeplink — vi henter aldri priser fra Google. tfs-parameteren bærer
     // kabin/voksne/maks stopp, så søket er ferdig utfylt når brukeren klikker.
@@ -1811,12 +1813,12 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       }]
       : []),
   ];
-  // Ikke i userscriptet (ingen bakgrunnsfaner), og ikke på Kiwi selv.
-  if (!__USERSCRIPT_BUILD__ && readKiwiSearchPath(parsedUrl) === undefined) {
+  // Ikke på Kiwi selv.
+  if (readKiwiSearchPath(parsedUrl) === undefined) {
     liveOfferFinders.push({
       source: "kiwi",
       sourceName: "KIWI",
-      findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
+      findOffer: () => findKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails, airportLookup),
     });
   }
   return { staticOffers, liveOfferFinders };
@@ -4689,28 +4691,12 @@ function isGoogleFlightsSearchPage(parsedUrl: URL): boolean {
     /^\/travel\/flights/i.test(parsedUrl.pathname);
 }
 
-// Kiwis søke-API svarer uten siden sine sikkerhetstokener, men da med ett dyrt treff i stedet for
-// resultatlisten (92 468 mot 61 224 kr, 2026-11-02). Derfor brukes API-et bare til stedsoppslag.
-const KIWI_PLACE_LOOKUP_URL = "https://api.skypicker.com/umbrella/v2/graphql";
-const KIWI_PLACE_LOOKUP_QUERY = "query KiwiPlace($search: PlacesSearchInput, $filter: PlacesFilterInput, $options: PlacesOptionsInput) { places(search: $search, filter: $filter, options: $options, first: 5) { ... on PlaceConnection { edges { node { __typename legacyId slug ... on City { code } } } } } }";
-type KiwiPlace = { code?: string; slug: string };
 const kiwiCityCodes = new Map<string, string | undefined>();
 
-async function fetchKiwiPlaces(term: string, placeType: "AIRPORT" | "CITY"): Promise<KiwiPlace[]> {
-  const params = new URLSearchParams({
-    featureName: "UmbrellaPlacesQuery",
-    query: KIWI_PLACE_LOOKUP_QUERY,
-    variables: JSON.stringify({ search: { term }, filter: { onlyTypes: [placeType] }, options: { locale: "no" } }),
-  });
-  const response = await fetch(`${KIWI_PLACE_LOOKUP_URL}?${params.toString()}`, { credentials: "omit" });
-  const value: unknown = await response.json();
-  const places = isRecord(value) && isRecord(value.data) && isRecord(value.data.places) ? value.data.places : undefined;
-  return readRecordArray(places?.edges).flatMap((edge) => {
-    const node = isRecord(edge.node) ? edge.node : undefined;
-    const slug = readStringValue(node?.slug);
-    const code = readStringValue(placeType === "AIRPORT" ? node?.legacyId : node?.code);
-    return slug !== undefined ? [{ slug, ...(code !== undefined ? { code } : {}) }] : [];
-  });
+async function fetchKiwiPlaces(term: string, placeType: KiwiPlaceType): Promise<KiwiPlace[]> {
+  return readKiwiPlaces(await userscriptJsonRequest(buildKiwiPlacesUrl(term, placeType), {
+    headers: { Accept: "application/json" }, credentials: "omit", timeoutMs: KIWI_REQUEST_TIMEOUT_MS,
+  }), placeType);
 }
 
 async function findKiwiPlaceSlug(code: string): Promise<string | undefined> {
@@ -4752,99 +4738,82 @@ function readKiwiCityCode(slug: string): string | undefined {
   return undefined;
 }
 
-const KIWI_PROBE_POLL_MS = 1000;
-const KIWI_PROBE_STABLE_POLLS = 3;
-const KIWI_PROBE_LOADING_GRACE_MS = 15_000;
-const KIWI_PROBE_DEADLINE_MS = 25_000;
-const KIWI_PROBE_DETAILS_TIMEOUT_MS = 4_000;
-const KIWI_SORT_TABS: Record<FlightSortMode, string> = { best: "quality", cheapest: "price", fastest: "duration" };
+// Kiwi via GraphQL-API-et (se src/shared/kiwi-flight-search.ts). Kiwi melder hasMorePending
+// mens flere leverandører svarer; da spørres det på nytt et par ganger før raden vises som
+// et ufullstendig søk som modnes videre.
+const KIWI_REQUEST_TIMEOUT_MS = 20_000;
+const KIWI_PENDING_POLL_ATTEMPTS = 3;
+const KIWI_PENDING_POLL_INTERVAL_MS = 2_000;
+const KIWI_RESULT_CACHE_TTL_MS = 5 * 60 * 1000;
+// Etter avvist eller feilet kall hviler Kiwi i ti minutter i stedet for å prøve ved hver oppdatering.
+const KIWI_FAILURE_BACKOFF_MS = 10 * 60 * 1000;
+let kiwiBackoffUntil = 0;
+const kiwiPlaceIds = new Map<string, Promise<string | undefined>>();
+const kiwiResultCache = new Map<string, { expiresAt: number; result: KiwiItinerariesResult }>();
+type KiwiFlightOfferCandidate = PriceMatchAlternative & { productUrl: string; outboundDate: string; inboundDate?: string };
 
-function readVisibleKiwiSortPrices(): KiwiSortPrices {
-  const prices: KiwiSortPrices = {};
-  for (const mode of ["best", "cheapest", "fastest"] as const) {
-    const text = document.querySelector<HTMLElement>(`[data-test="SortBy-${KIWI_SORT_TABS[mode]}"]`)?.innerText;
-    const price = readKiwiSortTabText(text);
-    if (price !== undefined) prices[mode] = price;
-  }
-  return prices;
+// Bysøk (og koder uten flyplassvalg) bruker Kiwis by; et eksplisitt flyplassvalg bruker flyplassen.
+function fetchKiwiPlaceId(code: string, scope: FlightPlaceScope | undefined): Promise<string | undefined> {
+  const normalizedCode = code.toUpperCase();
+  if (scope === "airport") return Promise.resolve(buildKiwiAirportId(normalizedCode));
+  const key = `${normalizedCode}:${scope ?? ""}`;
+  const cached = kiwiPlaceIds.get(key);
+  if (cached !== undefined) return cached;
+  const promise = fetchKiwiPlaces(normalizedCode, "CITY")
+    .then((cities) => cities.find((place) => place.code === normalizedCode)?.id ??
+      (scope === "city" ? undefined : buildKiwiAirportId(normalizedCode)));
+  kiwiPlaceIds.set(key, promise);
+  void promise.then((id) => { if (id === undefined) kiwiPlaceIds.delete(key); }, () => kiwiPlaceIds.delete(key));
+  return promise;
 }
 
-// Bakgrunnsfanen fra kiwi-price-probe: viser ikke panelet og starter ingen egne søk,
-// den venter bare til fanene på siden har rolig pris og melder dem fra.
-function installKiwiPriceProbe(): boolean {
-  const parsedUrl = parseUrl(window.location.href);
-  const path = parsedUrl !== undefined ? readKiwiSearchPath(parsedUrl) : undefined;
-  if (parsedUrl?.searchParams.get(KIWI_PRICE_PROBE_PARAM) !== "1" || path === undefined) return false;
-  installKiwiLinkPlaces();
-  if (/^[A-Z]{3}$/.test(path.origin) && /^[A-Z]{3}$/.test(path.destination)) return true;
-
-  const startedAt = Date.now();
-  let lastKey = "";
-  let stablePolls = 0;
-  const timerId = window.setInterval(() => {
-    const prices = readVisibleKiwiSortPrices();
-    const key = JSON.stringify(prices);
-    stablePolls = key === lastKey && key !== "{}" ? stablePolls + 1 : 0;
-    lastKey = key;
-    const elapsedMs = Date.now() - startedAt;
-    const loading = document.querySelector('[data-test="LoadingLine"]') !== null && elapsedMs < KIWI_PROBE_LOADING_GRACE_MS;
-    if ((stablePolls < KIWI_PROBE_STABLE_POLLS || loading) && elapsedMs < KIWI_PROBE_DEADLINE_MS) return;
-    window.clearInterval(timerId);
-    void finishKiwiPriceProbeTab(prices, key);
-  }, KIWI_PROBE_POLL_MS);
-  return true;
+async function fetchKiwiItineraries(
+  flightMeta: FlightSearchMeta,
+  places: KiwiSearchPlaces,
+  sortMode: FlightSortMode,
+  airports: KiwiSearchAirports,
+): Promise<KiwiItinerariesResult | undefined> {
+  const request = buildKiwiItinerariesRequest(flightMeta, places, sortMode);
+  const cacheKey = request.body;
+  const cached = kiwiResultCache.get(cacheKey);
+  if (cached !== undefined && cached.expiresAt > Date.now()) return cached.result;
+  if (Date.now() < kiwiBackoffUntil) return undefined;
+  let result: KiwiItinerariesResult | undefined;
+  for (let attempt = 0; attempt < KIWI_PENDING_POLL_ATTEMPTS; attempt++) {
+    if (attempt > 0) await sleep(KIWI_PENDING_POLL_INTERVAL_MS);
+    const value = await userscriptJsonRequest(request.url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: request.body,
+      credentials: "omit",
+      timeoutMs: KIWI_REQUEST_TIMEOUT_MS,
+    });
+    if (value === undefined) {
+      kiwiBackoffUntil = Date.now() + KIWI_FAILURE_BACKOFF_MS;
+      console.warn(`[Cashback Norge] Kiwi svarte ikke på ${request.url} (${flightMeta.origin}-${flightMeta.destination}); prøver igjen om ${KIWI_FAILURE_BACKOFF_MS / 60000} min.`);
+      return result;
+    }
+    result = readKiwiItineraries(value, flightMeta, airports);
+    if (!result.hasMorePending) break;
+  }
+  if (result !== undefined && !result.hasMorePending) kiwiResultCache.set(cacheKey, { expiresAt: Date.now() + KIWI_RESULT_CACHE_TTL_MS, result });
+  return result;
 }
 
-async function finishKiwiPriceProbeTab(prices: KiwiSortPrices, key: string): Promise<void> {
-  // Andre valutaer og tomme svar gir ingen pris; raden beholder da «?».
-  const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
-  const card = document.querySelector<HTMLElement>('[data-test="ResultCardWrapper"]');
-  const sectors = card !== null ? [...card.querySelectorAll<HTMLElement>('[data-test="ResultCardSectorWrapper"]')] : [];
-  if (sectors.length > 0) {
-    prices.topCardSectors = sectors.map((sector) => sector.innerText);
-    prices.topCardCarriers = sectors.map((sector) => uniqueStrings(
-      [...sector.querySelectorAll<HTMLElement>('[data-test="ResultCardCarrierLogo"]')].map((logo) => {
-        return logo.getAttribute("title") ??
-          logo.querySelector("[title]")?.getAttribute("title") ??
-          logo.querySelector("img")?.getAttribute("alt") ??
-          undefined;
-      }),
-    ));
-    if (isNok && key !== "{}" && card !== null) {
-      const routes = await readKiwiTopCardRoutes(card, sectors);
-      if (routes.length > 0) prices.topCardRoutes = routes;
-    }
-  }
-  void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...(isNok && key !== "{}" ? { prices } : {}) });
-}
-
-// Kortet åpner Kiwis detaljvisning i probe-fanen (ingen bestilling). Flyvningene leses fra
-// `prebooking` i URL-en, ellers fra detaljvisningens SegmentStop-rader.
-async function readKiwiTopCardRoutes(card: HTMLElement, sectors: HTMLElement[]): Promise<string[]> {
-  const sectorEnds = sectors.map((sector) => {
-    const stations = [...sector.querySelectorAll<HTMLElement>('[data-test="stationName"]')].map((station) => station.innerText.trim());
-    return { destination: stations[stations.length - 1], stopCount: readKiwiCardLeg(sector.innerText).stopCount };
-  });
-  card.click();
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
-    const prebooking = new URLSearchParams(window.location.search).get("prebooking");
-    if (prebooking !== null) {
-      const routes = readKiwiPrebookingLegRoutes(prebooking, sectorEnds);
-      if (routes.some((route) => route.length > 0)) return routes;
-    }
-    const details = document.querySelector<HTMLElement>('[data-test="PrebookingTripDetails"]');
-    if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) {
-      const stopCodes = [...details.querySelectorAll<HTMLElement>('[data-test="SegmentStop"]')]
-        // «Skjult by»-reiser har en ekstra SegmentStop for billettens endedestinasjon uten klokkeslett.
-        .filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText))
-        .map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1])
-        .filter((code): code is string => code !== undefined);
-      return readKiwiDetailLegRoutes(stopCodes, sectorEnds);
-    }
-    await sleep(250);
-  }
-  return [];
+function toKiwiFlightOfferCandidate(itinerary: KiwiItinerary, productUrl: string): KiwiFlightOfferCandidate {
+  return {
+    shopName: "Kiwi.com",
+    price: formatNokFlightPrice(itinerary.amount),
+    amount: itinerary.amount,
+    sortAmount: itinerary.amount,
+    currency: "NOK",
+    productUrl,
+    outboundDate: itinerary.outboundDate,
+    ...(itinerary.inboundDate !== undefined ? { inboundDate: itinerary.inboundDate } : {}),
+    flightLegs: itinerary.legs,
+    ...(formatFlightLegDurationsWithStopsText(itinerary.legs) !== undefined ? { durationText: formatFlightLegDurationsWithStopsText(itinerary.legs)! } : {}),
+    ...(itinerary.durationMinutes !== undefined ? { durationMinutes: itinerary.durationMinutes } : {}),
+  };
 }
 
 async function findKiwiFlightPriceMatchOffer(
@@ -4852,57 +4821,34 @@ async function findKiwiFlightPriceMatchOffer(
   routeTitle: string,
   cardSearchDetails: string,
   fullSearchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
   const { dateFlex } = flightMeta;
-  const response = await sendRuntimeMessage<KiwiFlightPricesResponse>({
-    type: "get-kiwi-flight-prices",
-    // Med datovindu sorteres på pris, så det øverste kortet viser datoene for den billigste reisen.
-    url: buildKiwiFlightSearchUrl(flightMeta, dateFlex !== undefined ? "cheapest" : "best"),
-  });
-  const prices = response?.prices;
-  const bestPrice = prices?.best ?? prices?.cheapest;
-  if (bestPrice === undefined) return undefined;
-  // Det øverste kortet tilhører sorteringen søket ble åpnet med, og gir tid og stopp per etappe.
-  const topCardMode: FlightSortMode = dateFlex !== undefined ? "cheapest" : "best";
-  const topCardLegs = (prices?.topCardSectors ?? []).map((sector) => readKiwiCardLeg(sector));
-  const topCardText = formatFlightLegDurationsWithStopsText(topCardLegs);
-  const topCardFlightLegs = topCardLegs.length === (flightMeta.inboundDate !== undefined ? 2 : 1)
-    ? topCardLegs.map((leg, index) => {
-      const sectorText = prices?.topCardSectors?.[index] ?? "";
-      const route = prices?.topCardRoutes?.[index];
-      return buildFlightLegDetails(
-        { ...leg, ...(route !== undefined && route.length > 0 ? { route } : {}) },
-        prices?.topCardCarriers?.[index],
-        readKiwiCardLegTimeRange(sectorText),
-      );
-    })
-    : undefined;
-  const buildVariant = (price: KiwiSortPrice, mode: FlightSortMode): FlightSortVariant => {
-    const durationText = (mode === topCardMode ? topCardText : undefined) ?? formatFlightLegDurationsText([price.durationMinutes]);
-    const flightLegs = mode === topCardMode ? topCardFlightLegs : undefined;
-    return {
-      shopName: "Kiwi.com",
-      price: formatNokFlightPrice(price.amount),
-      amount: price.amount,
-      sortAmount: price.amount,
-      currency: "NOK",
-      productUrl: buildKiwiFlightSearchUrl(flightMeta, mode),
-      ...(durationText !== undefined ? { durationText } : {}),
-      ...(flightLegs !== undefined ? { flightLegs } : {}),
-      durationMinutes: price.durationMinutes,
-    };
+  const [origin, destination] = await Promise.all([
+    fetchKiwiPlaceId(flightMeta.origin, flightMeta.originScope),
+    fetchKiwiPlaceId(flightMeta.destination, flightMeta.destinationScope),
+  ]);
+  if (origin === undefined || destination === undefined) return undefined;
+  const airports = {
+    origin: collectEquivalentFlightAirportCodes(flightMeta.origin, airportLookup),
+    destination: collectEquivalentFlightAirportCodes(flightMeta.destination, airportLookup),
   };
+  // Med datovindu sorteres det på pris, som de andre kildene med datovindu.
+  const sortMode: FlightSortMode = dateFlex !== undefined ? "cheapest" : "best";
+  const result = await fetchKiwiItineraries(flightMeta, { origin, destination }, sortMode, airports);
+  if (result === undefined) return undefined;
+  const resultUrl = buildKiwiFlightSearchUrl(flightMeta, sortMode);
+  const listed = result.itineraries.map((itinerary) => toKiwiFlightOfferCandidate(itinerary, resultUrl));
+  const top = Object.fromEntries(Object.entries(result.top).map(([mode, itinerary]) => [mode, toKiwiFlightOfferCandidate(itinerary, buildKiwiFlightSearchUrl(flightMeta, mode as FlightSortMode))])) as Partial<Record<FlightSortMode, KiwiFlightOfferCandidate>>;
+
   if (dateFlex !== undefined) {
-    // Som de andre kildene med datovindu: billigste reise i vinduet, uansett valgt sortering.
-    const cheapest = buildVariant(prices?.cheapest ?? bestPrice, "cheapest");
-    const outboundDate = readKiwiCardDate(prices?.topCardSectors?.[0], flightMeta.outboundDate);
-    const inboundDate = flightMeta.inboundDate !== undefined ? readKiwiCardDate(prices?.topCardSectors?.[1], flightMeta.inboundDate) : undefined;
-    if (outboundDate === undefined || (flightMeta.inboundDate !== undefined && inboundDate === undefined)) {
-      const { flightSortVariants: _flightSortVariants, ...staticOffer } = buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails);
-      return { ...staticOffer, ...cheapest, productName: `${routeTitle} · ${formatFlightDateFlexDays(dateFlex, flightMeta.inboundDate !== undefined)}` };
+    const byDates = new Map<string, KiwiFlightOfferCandidate>();
+    for (const candidate of [...(top.cheapest !== undefined ? [top.cheapest] : []), ...listed]) {
+      const key = buildFlightDateCombinationKey(candidate);
+      const previous = byDates.get(key);
+      if (previous === undefined || candidate.amount < previous.amount) byDates.set(key, candidate);
     }
     const { dateFlex: _dateFlex, ...exactFlightMeta } = flightMeta;
-    const dates = { outboundDate, ...(inboundDate !== undefined ? { inboundDate } : {}) };
     const totalCombinationCount = listFlightDateFlexCombinations(flightMeta, dateFlex).length;
     return buildFlightDateFlexOffer({
       source: "kiwi",
@@ -4911,18 +4857,40 @@ async function findKiwiFlightPriceMatchOffer(
       dateFlex,
       routeTitle,
       searchDetails: fullSearchDetails,
-      options: [{ ...cheapest, ...dates, productUrl: buildKiwiFlightSearchUrl({ ...exactFlightMeta, ...dates }) }],
+      options: [...byDates.values()].map(({ productUrl: _productUrl, ...option }) => {
+        const dates = { outboundDate: option.outboundDate, ...(option.inboundDate !== undefined ? { inboundDate: option.inboundDate } : {}) };
+        return { ...option, productUrl: buildKiwiFlightSearchUrl({ ...exactFlightMeta, ...dates }) };
+      }),
+      // Kiwi søker hele vinduet i ett kall, sortert på pris.
       checkedCombinationCount: totalCombinationCount,
       totalCombinationCount,
+      ...(result.hasMorePending ? { searchIncomplete: true } : {}),
     });
   }
+
+  const best = top.best ?? listed[0];
+  if (best === undefined) return undefined;
+  const pool = [best, ...listed, ...(top.cheapest !== undefined ? [top.cheapest] : []), ...(top.fastest !== undefined ? [top.fastest] : [])];
+  const alternatives = [best, ...listed.filter((candidate) => candidate.amount !== best.amount || candidate.durationMinutes !== best.durationMinutes)];
   return {
     ...buildKiwiFlightPriceMatchOffer(flightMeta, routeTitle, cardSearchDetails, fullSearchDetails),
-    ...buildVariant(bestPrice, "best"),
-    flightSortVariants: {
-      ...(prices?.cheapest !== undefined ? { cheapest: buildVariant(prices.cheapest, "cheapest") } : {}),
-      ...(prices?.fastest !== undefined ? { fastest: buildVariant(prices.fastest, "fastest") } : {}),
-    },
+    shopName: best.shopName,
+    price: best.price,
+    amount: best.amount,
+    sortAmount: best.amount,
+    currency: best.currency,
+    productUrl: resultUrl,
+    offerUrl: resultUrl,
+    ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.flightLegs !== undefined ? { flightLegs: best.flightLegs } : {}),
+    ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
+    ...(result.hasMorePending ? { searchIncomplete: true } : {}),
+    flightSortVariants: buildFlightSortVariants({
+      cheapestPool: pool,
+      fastestPool: pool,
+      buildUrl: (mode) => buildKiwiFlightSearchUrl(flightMeta, mode),
+    }),
+    alternatives: alternatives.slice(0, FLIGHT_OFFER_CANDIDATE_LIMIT).map(({ productUrl: _productUrl, outboundDate: _outboundDate, inboundDate: _inboundDate, ...alternative }) => alternative),
   };
 }
 
@@ -5675,12 +5643,21 @@ async function pollTripComFlightListSearch(
 ): Promise<{ resultData: Record<string, unknown> | undefined; stable: boolean }> {
   let best: Record<string, unknown> | undefined;
   let previousKey: string | undefined;
+  if (Date.now() < tripComBackoffUntil) return { resultData: undefined, stable: true };
 
   for (let attempt = 0; attempt < TRIP_COM_LIST_POLL_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(TRIP_COM_LIST_POLL_INTERVAL_MS);
 
     const value = await fetchTripComFlightListSearch(flightMeta, session, sortOrder, grade);
-    if (!isRecord(value)) continue;
+    if (!isRecord(value)) {
+      // HTTP 430/403 (ratebegrensning/captcha) blir ikke bedre av nye forsøk med en gang.
+      if (best === undefined && attempt >= 1) {
+        tripComBackoffUntil = Date.now() + FLIGHT_SOURCE_FAILURE_BACKOFF_MS;
+        console.warn(`[Cashback Norge] Trip.com avviste søket ${flightMeta.origin}-${flightMeta.destination} (${TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT}); prøver igjen om ${FLIGHT_SOURCE_FAILURE_BACKOFF_MS / 60000} min.`);
+        return { resultData: undefined, stable: true };
+      }
+      continue;
+    }
 
     if (best === undefined || readTripComListItineraryCount(value) > readTripComListItineraryCount(best)) {
       best = value;
@@ -7432,6 +7409,11 @@ async function fetchMomondoFlightSortedCandidates(
     : [];
 }
 
+// Kilder som avviser kall (blokkering/ratebegrensning) hviler i ti minutter, som PanFlights.
+const FLIGHT_SOURCE_FAILURE_BACKOFF_MS = 10 * 60 * 1000;
+let momondoBackoffUntil = 0;
+let tripComBackoffUntil = 0;
+
 async function pollMomondoFlightResults(
   searchData: MomondoFlightSearchData,
   flightMeta: FlightSearchMeta,
@@ -7442,13 +7424,23 @@ async function pollMomondoFlightResults(
   let latestFilteredCandidateResult: Record<string, unknown> | undefined;
   let searchId: string | undefined;
   let filterState: string | undefined;
+  let failedPolls = 0;
+  if (Date.now() < momondoBackoffUntil) return undefined;
 
   for (let attempt = 0; attempt < MOMONDO_FLIGHT_POLL_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(MOMONDO_FLIGHT_POLL_INTERVAL_MS);
 
     const requestFilterState = filterState;
     const value = await requestMomondoFlightPoll(searchData, flightMeta, airportLookup, searchId, requestFilterState);
-    if (!isRecord(value) || !Array.isArray(value.results)) continue;
+    if (!isRecord(value) || !Array.isArray(value.results)) {
+      // Avvist økt (HTTP 401/403) endrer seg ikke ved nye forsøk; hvil i stedet for å spørre igjen.
+      if (++failedPolls >= 2 && latestResult === undefined) {
+        momondoBackoffUntil = Date.now() + FLIGHT_SOURCE_FAILURE_BACKOFF_MS;
+        console.warn(`[Cashback Norge] momondo avviste søket ${flightMeta.origin}-${flightMeta.destination} (${MOMONDO_FLIGHT_DYNAMIC_POLL_ENDPOINT}); prøver igjen om ${FLIGHT_SOURCE_FAILURE_BACKOFF_MS / 60000} min.`);
+        return undefined;
+      }
+      continue;
+    }
 
     latestResult = value;
     searchId = readStringValue(value.searchId) ?? searchId;
