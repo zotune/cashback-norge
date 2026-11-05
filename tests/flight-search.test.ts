@@ -30,6 +30,7 @@ import {
   readKiwiCardDate,
   readKiwiCardLeg,
   readKiwiCardLegTimeRange,
+  readTripComJourneyLeg,
   readKiwiDetailLegRoutes,
   readKiwiDatePart,
   readKiwiSearchPath,
@@ -908,4 +909,26 @@ test("Kiwi detail stops split into legs at the card's endpoints", () => {
 
   assert.equal(readKiwiCardLegTimeRange("Utgående\n\n02:15\n22h\n17:15\nPVG\n\n2 stopp · flyplassbytte · Manchester, Oslo\n\nBGO"), "02:15-17:15");
   assert.equal(readKiwiCardLegTimeRange("ingen tider"), undefined);
+});
+
+test("Trip.com legs include stops on the same flight number", () => {
+  // Utdrag av FlightListSearchSSE BGO→SHA 11.11.2026 (hentet 2026-11-05): AY806 mellomlander i ARN.
+  const section = (from: string, to: string, flightNo: string, airlineCode: string, departDateTime: string, arriveDateTime: string, stopList: unknown[] = []) => ({
+    departPoint: { airportCode: from }, arrivePoint: { airportCode: to }, departDateTime, arriveDateTime,
+    flightInfo: { flightNo, airlineCode, stopList },
+  });
+  const journey = {
+    duration: 865,
+    transSectionList: [
+      section("BGO", "HEL", "AY806", "AY", "2026-11-11 10:25:00", "2026-11-11 15:05:00", [{ cityCode: "STO", airportCode: "ARN", duration: 25 }]),
+      section("HEL", "PVG", "HO1608", "HO", "2026-11-11 17:25:00", "2026-11-12 07:50:00"),
+    ],
+  };
+  assert.deepEqual(readTripComJourneyLeg(journey, { AY: "Finnair", HO: "Juneyao Airlines" }), {
+    durationMinutes: 865, stopCount: 2, route: "BGO → ARN → HEL → PVG", carriers: ["Finnair", "Juneyao Airlines"], timeRange: "10:25-07:50",
+  });
+  // Mellomlanding uten flyplass gir antall stopp uten rute.
+  const unknownStop = { ...journey, transSectionList: [section("BGO", "HEL", "AY806", "AY", "2026-11-11 10:25:00", "2026-11-11 15:05:00", [{ duration: 25 }])] };
+  assert.equal(readTripComJourneyLeg(unknownStop, {}).route, undefined);
+  assert.equal(readTripComJourneyLeg(unknownStop, {}).stopCount, 1);
 });

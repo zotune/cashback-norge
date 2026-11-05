@@ -97,6 +97,7 @@ import {
   readKiwiCardDate,
   readKiwiCardLeg,
   readKiwiCardLegTimeRange,
+  readTripComJourneyLeg,
   readKiwiDetailLegRoutes,
   readKiwiSortTabText,
   buildPanFlightsFlightSearchUrl,
@@ -5924,28 +5925,6 @@ function extractTripComListOfferCandidates(
     })
     .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined);
   return limitFlightCandidates(dedupeTripComOfferCandidates(candidates), FLIGHT_OFFER_CANDIDATE_LIMIT);
-}
-
-function readTripComJourneyLeg(journey: Record<string, unknown>, airlineNames: Record<string, string>): FlightLegDetails {
-  // transSectionList[].departPoint/arrivePoint.airportCode (verifisert 2026-11-05). stopList
-  // mangler flyplass i kjente svar, så slike etapper får ingen rute.
-  const sections = readRecordArray(journey.transSectionList);
-  const stopCount = readTripComJourneyStopCount(journey);
-  return buildFlightLegDetails({
-    durationMinutes: readNumberValue(journey.duration),
-    stopCount,
-    route: formatFlightLegRoute(sections.map((section) => ({
-      origin: readStringValue(isRecord(section.departPoint) ? section.departPoint.airportCode : undefined),
-      destination: readStringValue(isRecord(section.arrivePoint) ? section.arrivePoint.airportCode : undefined),
-    })), stopCount),
-    departureTime: readStringValue(sections[0]?.departDateTime),
-    arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime),
-  }, sections
-    .map((section) => {
-      const code = readStringValue(isRecord(section.flightInfo) ? section.flightInfo.airlineCode : undefined)?.toUpperCase();
-      return code !== undefined ? (airlineNames[code] ?? code) : undefined;
-    })
-    .filter((carrier): carrier is string => carrier !== undefined));
 }
 
 // Tur/retur hos Trip.com velges i to steg som på nettsiden: FlightListSearch med journeyNo 2,

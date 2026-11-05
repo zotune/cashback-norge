@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793841058
+// @version      1793841286
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10371,6 +10371,29 @@ ${darkProviderCss}
     }, 0);
     return Math.max(0, sections.length - 1) + intermediateStops;
   }
+  function readTripComJourneyLeg(journey, airlineNames) {
+    const sections = readRecordArray(journey.transSectionList);
+    const stopCount = readTripComJourneyStopCount(journey);
+    const segments = sections.flatMap((section) => {
+      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
+      const airports = [
+        readStringValue(isRecord$6(section.departPoint) ? section.departPoint.airportCode : void 0),
+        ...readRecordArray(flightInfo?.stopList).map((stop) => readStringValue(stop.airportCode)),
+        readStringValue(isRecord$6(section.arrivePoint) ? section.arrivePoint.airportCode : void 0)
+      ];
+      return airports.slice(1).map((destination, index) => ({ origin: airports[index], destination }));
+    });
+    return buildFlightLegDetails({
+      durationMinutes: readNumberValue(journey.duration),
+      stopCount,
+      route: formatFlightLegRoute(segments, stopCount),
+      departureTime: readStringValue(sections[0]?.departDateTime),
+      arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime)
+    }, sections.map((section) => {
+      const code = readStringValue(isRecord$6(section.flightInfo) ? section.flightInfo.airlineCode : void 0)?.toUpperCase();
+      return code !== void 0 ? airlineNames[code] ?? code : void 0;
+    }).filter((carrier) => carrier !== void 0));
+  }
   function buildTripComBaggageFilterFlags(flightMeta) {
     return [
       flightMeta.includeCabinBag === true ? "FreeCarryOnBaggage" : void 0,
@@ -14736,23 +14759,6 @@ ${darkProviderCss}
       return result;
     }).filter((candidate) => candidate !== void 0);
     return limitFlightCandidates(dedupeTripComOfferCandidates(candidates), FLIGHT_OFFER_CANDIDATE_LIMIT);
-  }
-  function readTripComJourneyLeg(journey, airlineNames) {
-    const sections = readRecordArray(journey.transSectionList);
-    const stopCount = readTripComJourneyStopCount(journey);
-    return buildFlightLegDetails({
-      durationMinutes: readNumberValue(journey.duration),
-      stopCount,
-      route: formatFlightLegRoute(sections.map((section) => ({
-        origin: readStringValue(isRecord(section.departPoint) ? section.departPoint.airportCode : void 0),
-        destination: readStringValue(isRecord(section.arrivePoint) ? section.arrivePoint.airportCode : void 0)
-      })), stopCount),
-      departureTime: readStringValue(sections[0]?.departDateTime),
-      arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime)
-    }, sections.map((section) => {
-      const code = readStringValue(isRecord(section.flightInfo) ? section.flightInfo.airlineCode : void 0)?.toUpperCase();
-      return code !== void 0 ? airlineNames[code] ?? code : void 0;
-    }).filter((carrier) => carrier !== void 0));
   }
   const tripComReturnLookups = /* @__PURE__ */ new WeakMap();
   const tripComReturnLegCache = /* @__PURE__ */ new Map();

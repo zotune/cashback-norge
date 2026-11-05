@@ -791,6 +791,35 @@ export function readTripComJourneyStopCount(journey: Record<string, unknown>): n
   return Math.max(0, sections.length - 1) + intermediateStops;
 }
 
+export function readTripComJourneyLeg(journey: Record<string, unknown>, airlineNames: Record<string, string>): FlightLegDetails {
+  // transSectionList[].departPoint/arrivePoint.airportCode, og flightInfo.stopList[].airportCode for
+  // mellomlandinger på samme flynummer (AY806 BGO-ARN-HEL, verifisert 2026-11-05). Mangler en
+  // mellomlanding flyplass, stemmer ikke antall stopp, og etappen får ingen rute.
+  const sections = readRecordArray(journey.transSectionList);
+  const stopCount = readTripComJourneyStopCount(journey);
+  const segments = sections.flatMap((section) => {
+    const flightInfo = isRecord(section.flightInfo) ? section.flightInfo : undefined;
+    const airports = [
+      readStringValue(isRecord(section.departPoint) ? section.departPoint.airportCode : undefined),
+      ...readRecordArray(flightInfo?.stopList).map((stop) => readStringValue(stop.airportCode)),
+      readStringValue(isRecord(section.arrivePoint) ? section.arrivePoint.airportCode : undefined),
+    ];
+    return airports.slice(1).map((destination, index) => ({ origin: airports[index], destination }));
+  });
+  return buildFlightLegDetails({
+    durationMinutes: readNumberValue(journey.duration),
+    stopCount,
+    route: formatFlightLegRoute(segments, stopCount),
+    departureTime: readStringValue(sections[0]?.departDateTime),
+    arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime),
+  }, sections
+    .map((section) => {
+      const code = readStringValue(isRecord(section.flightInfo) ? section.flightInfo.airlineCode : undefined)?.toUpperCase();
+      return code !== undefined ? (airlineNames[code] ?? code) : undefined;
+    })
+    .filter((carrier): carrier is string => carrier !== undefined));
+}
+
 // Uten flaggene svarer Trip.com med billigste billett uten bagasje, og reiser med bagasje mot
 // høyere pris mangler. Siden selv sender journeyNoList [1], også for tur/retur (verifisert 2026-11-02).
 export function buildTripComBaggageFilterFlags(flightMeta: FlightSearchMeta): Array<Record<string, unknown>> {
