@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793871967
+// @version      1793885726
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1100,6 +1100,11 @@
     const url = new URL("https://cashbacknorge.no/");
     url.searchParams.set("provider", provider);
     return url.toString();
+  }
+  const SPENN_EXTENSION_URL = "https://spenn.refunder.com/no/extension";
+  const SPENN_EXTENSION_ELEMENT = "spenn-notification";
+  function requiresSpennExtension(offer) {
+    return offer.provider === "spenn" && offer.activationUrl === SPENN_EXTENSION_URL;
   }
   const EB_PER_TRUMF_KR = 13.5;
   const PROVIDER_NAMES = {
@@ -2632,7 +2637,7 @@
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-04T21:56:20.993Z";
+  const generatedAt = "2026-11-05T09:57:45.137Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -9976,6 +9981,8 @@ ${darkProviderCss}
     const normalizedMeta = {
       origin,
       destination,
+      ...meta.originScope === "airport" || meta.originScope === "city" ? { originScope: meta.originScope } : {},
+      ...meta.destinationScope === "airport" || meta.destinationScope === "city" ? { destinationScope: meta.destinationScope } : {},
       outboundDate,
       ...inboundDate !== void 0 ? { inboundDate } : {},
       // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
@@ -10153,6 +10160,42 @@ ${darkProviderCss}
     const remainingMinutes = totalMinutes % 60;
     if (hours <= 0) return `${remainingMinutes}m`;
     return remainingMinutes === 0 ? `${hours}t` : `${hours}t ${remainingMinutes}m`;
+  }
+  function formatFlightDurationLimit(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder === 0 ? `≤${hours}t` : `≤${hours}t ${remainder}m`;
+  }
+  function readFinnFlightPlace(legValue, requestedValue) {
+    const selectedAirports = (legValue ?? "").split(",").map(readIataCodeValue).filter(isString);
+    const requestedCode = readIataCodeValue(requestedValue?.split(".")[0]);
+    if (selectedAirports.length === 1) return { code: selectedAirports[0], scope: "airport" };
+    if (requestedCode === void 0) return void 0;
+    return { code: requestedCode, scope: requestedValue?.endsWith(".METROPOLITAN_AREA") === true ? "city" : "airport" };
+  }
+  function readSkyscannerFlightPlaceCode(value) {
+    const normalized = value?.toUpperCase();
+    if (normalized === void 0) return void 0;
+    if (/^[A-Z]{3}$/.test(normalized)) return { code: normalized, scope: "airport" };
+    if (/^C[A-Z]{3}$/.test(normalized)) return { code: normalized.slice(1), scope: "city" };
+    if (/^[A-Z]{3}A$/.test(normalized)) return { code: normalized.slice(0, 3), scope: "city" };
+    return void 0;
+  }
+  function selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces, scope, preferCity = false) {
+    const code = iataCode.toUpperCase();
+    const airport = airportPlaces.find((place) => place.flightPlaceType === "AIRPORT" && place.skyId === code);
+    const city = cityPlaces.find((place) => place.flightPlaceType === "CITY" && ([code, `${code}A`, `C${code}`].includes(place.skyId) || place.skyId.length === 4 && place.skyId.startsWith(code)));
+    if (scope === "city") return city;
+    if (scope === "airport") return airport;
+    return preferCity ? city ?? airport : airport ?? city;
+  }
+  function selectPanFlightsCityPlaceId(iataCode, places) {
+    const records = readRecordArray(places);
+    const airport = records.find((place) => place.type === 0 && place.sid === iataCode && place.stationtype === "air");
+    const name = readStringValue(airport?.shortname)?.trim().toLowerCase();
+    if (name === void 0) return void 0;
+    const cities = records.filter((place) => place.type === 4 && readStringValue(place.shortname)?.trim().toLowerCase() === name);
+    return cities.length === 1 ? readStringValue(cities[0]?.sid) : void 0;
   }
   function formatFlightClockRange(departure, arrival) {
     const clock = (value) => value?.match(/[T ](\d{2}):(\d{2})/)?.slice(1, 3).join(":");
@@ -10579,21 +10622,24 @@ ${darkProviderCss}
   }
   function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
     const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
-    return readStringValue(legData?.flyFrom)?.toUpperCase() === origin && readStringValue(legData?.flyTo)?.toUpperCase() === destination ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
+    const matches = (code, expected) => code !== void 0 && (typeof expected === "string" ? code === expected : expected.has(code));
+    return matches(readStringValue(legData?.flyFrom)?.toUpperCase(), origin) && matches(readStringValue(legData?.flyTo)?.toUpperCase(), destination) ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
   }
-  function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex) {
+  function matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex, airports) {
     const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
     const outboundRoute = routeList[0];
     if (outboundRoute === void 0) return void 0;
-    const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination);
+    const origin = airports?.origin ?? flightMeta.origin;
+    const destination = airports?.destination ?? flightMeta.destination;
+    const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", origin, destination);
     if (outboundDate === void 0 || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
       return void 0;
     }
     const requestedInboundDate = flightMeta.inboundDate;
     if (requestedInboundDate === void 0) return { outboundDate };
     const inboundDate = [
-      readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin),
-      ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin))
+      readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", destination, origin),
+      ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", destination, origin))
     ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
     return inboundDate !== void 0 && inboundDate >= outboundDate ? { outboundDate, inboundDate } : void 0;
   }
@@ -10708,10 +10754,10 @@ ${darkProviderCss}
   const PANFLIGHTS_AUTO_SEARCH_PARAM = "cbvAutoSearch";
   const TRIP_COM_DEFAULT_CURRENCY = "USD";
   const TRIP_COM_BASE_URL = "https://us.trip.com";
-  function buildSkyscannerFlightSearchUrl(flightMeta, sortMode = "best") {
+  function buildSkyscannerFlightSearchUrl(flightMeta, sortMode = "best", places) {
     const pathParts = [
-      flightMeta.origin.toLowerCase(),
-      flightMeta.destination.toLowerCase(),
+      (places?.origin ?? flightMeta.origin).toLowerCase(),
+      (places?.destination ?? flightMeta.destination).toLowerCase(),
       compactIsoDate(flightMeta.outboundDate).slice(2),
       flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate).slice(2) : void 0
     ].filter((part) => part !== void 0);
@@ -10745,11 +10791,12 @@ ${darkProviderCss}
         return "ECONOMY";
     }
   }
-  function buildPanFlightsFlightSearchUrl(flightMeta, sortMode = "best") {
+  function buildPanFlightsFlightSearchUrl(flightMeta, sortMode = "best", places) {
     const outboundDate = compactIsoDate(flightMeta.outboundDate);
     const inboundDate = flightMeta.inboundDate !== void 0 ? compactIsoDate(flightMeta.inboundDate) : void 0;
     const path = inboundDate !== void 0 ? "roundtrip" : "oneway";
-    const v2 = inboundDate !== void 0 ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}` : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
+    const route = `${places?.origin ?? flightMeta.origin}_${places?.destination ?? flightMeta.destination}`;
+    const v2 = inboundDate !== void 0 ? `${route}_${outboundDate}_${inboundDate}` : `${route}_${outboundDate}`;
     const params = new URLSearchParams({
       v2,
       order: buildFlightSortUrlValue("panflights", sortMode),
@@ -10941,6 +10988,30 @@ ${darkProviderCss}
     }
     if (current.length > 0 || legs.length !== sectors.length) return [];
     return legs.map((segments, index) => formatFlightLegRoute(segments, sectors[index]?.stopCount) ?? "");
+  }
+  function readKiwiPrebookingLegRoutes(prebooking, sectors) {
+    let state;
+    try {
+      state = JSON.parse(atob(prebooking));
+    } catch {
+      return [];
+    }
+    if (!isRecord$6(state) || typeof state.r !== "string" || !Array.isArray(state.i)) return [];
+    const segments = state.r.split("|").map((segment) => {
+      const fields = segment.split(":");
+      return { origin: fields[2], destination: fields[4] };
+    });
+    const legSizes = state.i.map((leg) => typeof leg === "string" ? leg.split("|").length : 0);
+    if (legSizes.length !== sectors.length || legSizes.some((size) => size === 0) || legSizes.reduce((total, size) => total + size, 0) !== segments.length) return [];
+    let offset = 0;
+    return legSizes.map((size, index) => {
+      const legSegments = segments.slice(offset, offset + size);
+      offset += size;
+      const sector = sectors[index];
+      const last = legSegments[legSegments.length - 1];
+      if (sector?.destination !== void 0 && last?.destination !== sector.destination) return "";
+      return formatFlightLegRoute(legSegments, sector?.stopCount) ?? "";
+    });
   }
   function readKiwiSortTabText(text) {
     const match = text?.replace(/\s+/g, " ").match(/\bkr (\d[\d ]*?) · (?:(\d+)h)? ?(?:(\d+)m)?\s*$/);
@@ -12065,7 +12136,7 @@ ${darkProviderCss}
         sourceName: "FINN",
         findOffer: (options) => dateFlex !== void 0 ? findFinnFlexibleDatesOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex, options) : findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, options)
       },
-      ...[{ source: "panflights", sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, dateFlex) }],
+      ...[{ source: "panflights", sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex) }],
       {
         source: "momondo",
         sourceName: "momondo",
@@ -12364,12 +12435,8 @@ ${darkProviderCss}
     if (hostname !== "finn.no" || !/^\/reise\/flybilletter\/resultat\/?$/i.test(parsedUrl.pathname)) {
       return void 0;
     }
-    const readFinnAirport = (legKey, requestedKey) => {
-      const legValue = parsedUrl.searchParams.get(legKey);
-      return readIataCodeFromValues([legValue?.includes(",") === true ? void 0 : legValue, parsedUrl.searchParams.get(requestedKey)]);
-    };
-    const origin = readFinnAirport("departureAirportLeg1", "requestedOrigin");
-    const destination = readFinnAirport("arrivalAirportLeg1", "requestedDestination");
+    const originPlace = readFinnFlightPlace(parsedUrl.searchParams.get("departureAirportLeg1"), parsedUrl.searchParams.get("requestedOrigin"));
+    const destinationPlace = readFinnFlightPlace(parsedUrl.searchParams.get("arrivalAirportLeg1"), parsedUrl.searchParams.get("requestedDestination"));
     const outboundDate = readIsoDateFromValues([
       parsedUrl.searchParams.get("requestedDepartureDate"),
       parsedUrl.searchParams.get("departureDate")
@@ -12378,13 +12445,15 @@ ${darkProviderCss}
       parsedUrl.searchParams.get("requestedReturnDate"),
       parsedUrl.searchParams.get("returnDate")
     ]);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    if (originPlace === void 0 || destinationPlace === void 0 || outboundDate === void 0) return void 0;
     const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
     const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("maximumNumberOfStops"));
     const maxDurationMinutes = readPositiveIntegerValue(parsedUrl.searchParams.get("durationTo"));
     return normalizeFlightSearchMeta({
-      origin,
-      destination,
+      origin: originPlace.code,
+      destination: destinationPlace.code,
+      originScope: originPlace.scope,
+      destinationScope: destinationPlace.scope,
       outboundDate,
       ...inboundDate !== void 0 ? { inboundDate } : {},
       adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
@@ -12442,6 +12511,30 @@ ${darkProviderCss}
   }
   const panFlightsPlaceCodeLookups = /* @__PURE__ */ new Map();
   const resolvedPanFlightsPlaceCodes = /* @__PURE__ */ new Map();
+  const panFlightsCityPlaceIds = /* @__PURE__ */ new Map();
+  async function fetchPanFlightsSearchPlaces(flightMeta) {
+    const resolve = (code, scope) => {
+      if (scope !== "city") return Promise.resolve(code);
+      const cached = panFlightsCityPlaceIds.get(code);
+      if (cached !== void 0) return cached;
+      const params = new URLSearchParams({ locale: "nb", query: code, ver: "9" });
+      const promise = userscriptJsonRequest(`${PANFLIGHTS_PLACE_SEARCH_ENDPOINT}?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+        credentials: "omit",
+        timeoutMs: 4e3
+      }).then((places) => selectPanFlightsCityPlaceId(code, places)).catch(() => void 0);
+      panFlightsCityPlaceIds.set(code, promise);
+      void promise.then((id) => {
+        if (id === void 0) panFlightsCityPlaceIds.delete(code);
+      });
+      return promise;
+    };
+    const [origin, destination] = await Promise.all([
+      resolve(flightMeta.origin, flightMeta.originScope),
+      resolve(flightMeta.destination, flightMeta.destinationScope)
+    ]);
+    return origin !== void 0 && destination !== void 0 ? { origin, destination } : void 0;
+  }
   async function fetchPanFlightsPlaceIataCode(sid) {
     const places = await userscriptJsonRequest(PANFLIGHTS_PLACE_LOOKUP_ENDPOINT, {
       method: "POST",
@@ -12523,19 +12616,21 @@ ${darkProviderCss}
   function extractSkyscannerFlightSearchMeta(parsedUrl) {
     if (!isSkyscannerFlightSearchPage(parsedUrl)) return void 0;
     const parts = parsedUrl.pathname.split("/").filter(Boolean);
-    const flightsIndex = parts.findIndex((part) => part.toLowerCase() === "flights");
-    const origin = readIataCodeValue(parts[flightsIndex + 1]);
-    const destination = readIataCodeValue(parts[flightsIndex + 2]);
+    const flightsIndex = parts.findIndex((part) => /^(?:flights|flyavganger)$/i.test(part));
+    const originPlace = readSkyscannerFlightPlaceCode(parts[flightsIndex + 1]);
+    const destinationPlace = readSkyscannerFlightPlaceCode(parts[flightsIndex + 2]);
     const outboundDate = readSkyscannerPathDate(parts[flightsIndex + 3]);
     const inboundDate = readSkyscannerPathDate(parts[flightsIndex + 4]);
-    if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
+    if (originPlace === void 0 || destinationPlace === void 0 || outboundDate === void 0) return void 0;
     const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinclass"));
     const prefersDirect = parsedUrl.searchParams.get("preferdirects") === "true";
     const skyscannerMaxStops = prefersDirect ? 0 : readSkyscannerMaxStopsParam(parsedUrl.searchParams.get("stops"));
     const skyscannerMaxDuration = readPositiveIntegerValue(parsedUrl.searchParams.get("duration"));
     return normalizeFlightSearchMeta({
-      origin,
-      destination,
+      origin: originPlace.code,
+      destination: destinationPlace.code,
+      originScope: originPlace.scope,
+      destinationScope: destinationPlace.scope,
       outboundDate,
       ...inboundDate !== void 0 ? { inboundDate } : {},
       adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? readPositiveIntegerValue(parsedUrl.searchParams.get("adultsv2")) ?? 1,
@@ -12624,7 +12719,7 @@ ${darkProviderCss}
   }
   function isSkyscannerFlightSearchPage(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return (hostname === "skyscanner.no" || hostname === "skyscanner.net") && /^\/transport\/flights\/[a-z]{3}\/[a-z]{3}\/\d{6}(?:\/\d{6})?\/?$/i.test(parsedUrl.pathname);
+    return (hostname === "skyscanner.no" || hostname === "skyscanner.net") && /^\/transport\/(?:flights|flyavganger)\/[a-z]{3,4}\/[a-z]{3,4}\/\d{6}(?:\/\d{6})?\/?$/i.test(parsedUrl.pathname);
   }
   function readSkyscannerPathDate(value) {
     if (value === void 0 || !/^\d{6}$/.test(value)) return void 0;
@@ -12881,6 +12976,8 @@ ${darkProviderCss}
     const lookup = /* @__PURE__ */ new Map();
     const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
     for (const requestedCode of requestedCodes) {
+      const scope = requestedCode === flightMeta.origin ? flightMeta.originScope : flightMeta.destinationScope;
+      if (scope === "airport") continue;
       const airports = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[requestedCode];
       if (airports !== void 0) lookup.set(requestedCode, airports);
     }
@@ -12888,8 +12985,10 @@ ${darkProviderCss}
     if (airportData === void 0) return lookup;
     const flightableAirports = airportData.filter((airport) => airport.iataType === "airport" && airport.flightable);
     for (const requestedCode of requestedCodes) {
+      const scope = requestedCode === flightMeta.origin ? flightMeta.originScope : flightMeta.destinationScope;
+      if (scope === "airport") continue;
       const hasExactAirport = flightableAirports.some((airport) => airport.code === requestedCode);
-      if (hasExactAirport) continue;
+      if (hasExactAirport && scope !== "city") continue;
       const cityAirports = uniqueStrings(
         flightableAirports.filter((airport) => airport.cityCode === requestedCode).map((airport) => airport.code)
       );
@@ -13490,18 +13589,24 @@ ${darkProviderCss}
     return isPanFlightsSearchPage(parsedUrl) || isSkyscannerFlightSearchPage(parsedUrl) || isGoogleFlightsSearchPage(parsedUrl) || hostname === "momondo.no" || hostname === "kiwi.com" || hostname === "travellink.no" || hostname.endsWith("trip.com") || // Flyselskapene søker ofte by (Norwegian: originLocationType "city", KLM: type "city").
     hostname === "booking.norwegian.com" || hostname === "shop.lufthansa.com" || isAirFranceKlmHostname(parsedUrl.hostname.toLowerCase());
   }
-  async function findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, dateFlex) {
+  async function findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup, dateFlex) {
+    const airports = {
+      origin: collectEquivalentFlightAirportCodes(flightMeta.origin, airportLookup),
+      destination: collectEquivalentFlightAirportCodes(flightMeta.destination, airportLookup)
+    };
     if (dateFlex !== void 0) {
-      return findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex);
+      return findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex, airports);
     }
-    const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
+    const places = await fetchPanFlightsSearchPlaces(flightMeta);
+    if (places === void 0) return void 0;
+    const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta, "best", places);
     const [pageCandidates, resultDataList] = await Promise.all([
       readCurrentPanFlightsPageOfferCandidates(flightMeta, resultUrl),
-      fetchPanFlightsFlightSearchResults(flightMeta)
+      fetchPanFlightsFlightSearchResults(flightMeta, void 0, places)
     ]);
     const apiCandidates = dedupePanFlightsOfferCandidates(
       resultDataList.flatMap((resultData) => {
-        return resultData === void 0 ? [] : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl);
+        return resultData === void 0 ? [] : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, airports);
       })
     );
     const rankedCandidates = pageCandidates.length > 0 ? mergePanFlightsVisibleCandidates(pageCandidates, apiCandidates) : rankPanFlightsOfferCandidates(apiCandidates);
@@ -13527,7 +13632,7 @@ ${darkProviderCss}
       flightSortVariants: buildFlightSortVariants({
         cheapestPool: rankedCandidates,
         fastestPool: rankedCandidates,
-        buildUrl: (mode) => buildPanFlightsFlightSearchUrl(flightMeta, mode)
+        buildUrl: (mode) => buildPanFlightsFlightSearchUrl(flightMeta, mode, places)
       }),
       alternatives: tooltipCandidates.map(({
         productUrl: _productUrl,
@@ -13540,12 +13645,14 @@ ${darkProviderCss}
       }) => candidate)
     };
   }
-  async function findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex) {
-    const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
-    const resultDataList = await fetchPanFlightsFlightSearchResults(flightMeta, dateFlex);
+  async function findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex, airports) {
+    const places = await fetchPanFlightsSearchPlaces(flightMeta);
+    if (places === void 0) return void 0;
+    const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta, "best", places);
+    const resultDataList = await fetchPanFlightsFlightSearchResults(flightMeta, dateFlex, places);
     const candidates = dedupePanFlightsOfferCandidates(
       resultDataList.flatMap((resultData) => {
-        return resultData === void 0 ? [] : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, dateFlex);
+        return resultData === void 0 ? [] : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, airports, dateFlex);
       })
     );
     const candidatesByDates = /* @__PURE__ */ new Map();
@@ -13574,7 +13681,7 @@ ${darkProviderCss}
           ...flightMeta,
           outboundDate: candidate.outboundDate,
           ...candidate.inboundDate !== void 0 ? { inboundDate: candidate.inboundDate } : {}
-        }),
+        }, "best", places),
         offerUrl: candidate.productUrl
       });
     }
@@ -13591,11 +13698,11 @@ ${darkProviderCss}
       totalCombinationCount
     });
   }
-  async function fetchPanFlightsFlightSearchResults(flightMeta, dateFlex) {
+  async function fetchPanFlightsFlightSearchResults(flightMeta, dateFlex, places) {
     const results = [];
     if (Date.now() < panFlightsBackoffUntil) return results;
     for (const variant of PANFLIGHTS_FLIGHT_SEARCH_VARIANTS) {
-      const result = await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex);
+      const result = await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex, places);
       results.push(result);
       if (result === void 0 && results.every((item) => item === void 0)) {
         panFlightsBackoffUntil = Date.now() + PANFLIGHTS_FAILURE_BACKOFF_MS;
@@ -13934,13 +14041,14 @@ ${darkProviderCss}
       candidate.platform?.toLowerCase() ?? ""
     ].join("|");
   }
-  async function fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex) {
+  async function fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex, places) {
     const body = new URLSearchParams({
       data: JSON.stringify(buildPanFlightsFlightSearchPayload(
         flightMeta,
         variant,
         variant.searchId,
-        dateFlex
+        dateFlex,
+        places
       ))
     }).toString();
     for (const endpoint of PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS) {
@@ -13959,7 +14067,7 @@ ${darkProviderCss}
     }
     return void 0;
   }
-  function buildPanFlightsFlightSearchPayload(flightMeta, variant, searchId, dateFlex) {
+  function buildPanFlightsFlightSearchPayload(flightMeta, variant, searchId, dateFlex, places) {
     const outboundFrom = splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.outboundDate, -(dateFlex?.outboundBefore ?? 0)));
     const outboundTo = splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.outboundDate, dateFlex?.outboundAfter ?? 0));
     const inboundFrom = flightMeta.inboundDate !== void 0 ? splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.inboundDate, -(dateFlex?.inboundBefore ?? 0))) : void 0;
@@ -13971,11 +14079,11 @@ ${darkProviderCss}
       dftm: outboundTo.month,
       dffy: outboundFrom.year,
       dfty: outboundTo.year,
-      fromlocsid: flightMeta.origin,
+      fromlocsid: places?.origin ?? flightMeta.origin,
       fromlocrad: "0",
       fromloclat: "0",
       fromloclng: "0",
-      tolocsid: flightMeta.destination,
+      tolocsid: places?.destination ?? flightMeta.destination,
       tolocrad: "0",
       toloclat: "0",
       toloclng: "0",
@@ -14043,11 +14151,11 @@ ${darkProviderCss}
         return "Y";
     }
   }
-  function extractPanFlightsOfferCandidates(resultData, variant, flightMeta, resultUrl, dateFlex) {
+  function extractPanFlightsOfferCandidates(resultData, variant, flightMeta, resultUrl, airports, dateFlex) {
     const currency = readStringValue(resultData.currency) ?? "NOK";
     const candidates = [];
     for (const [sourceRank2, item] of readRecordArray(resultData.flighttab).entries()) {
-      const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex);
+      const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex, airports);
       if (matchedDates === void 0) continue;
       if (exceedsFlightMaxStops(flightMeta, readPanFlightsLegStopCounts(item))) continue;
       if (exceedsFlightMaxDuration(flightMeta, readPanFlightsLegDurationsMinutes(item, flightMeta.inboundDate !== void 0))) continue;
@@ -14392,20 +14500,26 @@ ${darkProviderCss}
     void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...isNok && key !== "{}" ? { prices } : {} });
   }
   async function readKiwiTopCardRoutes(card, sectors) {
-    card.click();
-    const startedAt = Date.now();
-    let details = null;
-    while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
-      details = document.querySelector('[data-test="PrebookingTripDetails"]');
-      if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) break;
-      await sleep(250);
-    }
-    if (details === null) return [];
-    const stopCodes = [...details.querySelectorAll('[data-test="SegmentStop"]')].filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText)).map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1]).filter((code) => code !== void 0);
-    return readKiwiDetailLegRoutes(stopCodes, sectors.map((sector) => {
+    const sectorEnds = sectors.map((sector) => {
       const stations = [...sector.querySelectorAll('[data-test="stationName"]')].map((station) => station.innerText.trim());
       return { destination: stations[stations.length - 1], stopCount: readKiwiCardLeg(sector.innerText).stopCount };
-    }));
+    });
+    card.click();
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
+      const prebooking = new URLSearchParams(window.location.search).get("prebooking");
+      if (prebooking !== null) {
+        const routes = readKiwiPrebookingLegRoutes(prebooking, sectorEnds);
+        if (routes.some((route) => route.length > 0)) return routes;
+      }
+      const details = document.querySelector('[data-test="PrebookingTripDetails"]');
+      if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) {
+        const stopCodes = [...details.querySelectorAll('[data-test="SegmentStop"]')].filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText)).map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1]).filter((code) => code !== void 0);
+        return readKiwiDetailLegRoutes(stopCodes, sectorEnds);
+      }
+      await sleep(250);
+    }
+    return [];
   }
   function extractKiwiFlightSearchMeta(parsedUrl) {
     const path = readKiwiSearchPath(parsedUrl);
@@ -15111,7 +15225,13 @@ ${darkProviderCss}
     return void 0;
   }
   async function findSkyscannerFlightPriceMatchOffer(flightMeta, routeTitle, searchDetails, airportLookup) {
-    const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
+    const [originPlace, destinationPlace] = await Promise.all([
+      fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin", flightMeta.originScope),
+      fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination", flightMeta.destinationScope)
+    ]);
+    if (originPlace === void 0 || destinationPlace === void 0) return void 0;
+    const places = { origin: originPlace.skyId, destination: destinationPlace.skyId };
+    const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta, "best", places);
     const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
     const candidate = candidates[0];
     if (candidate === void 0) return void 0;
@@ -15135,7 +15255,7 @@ ${darkProviderCss}
       flightSortVariants: buildFlightSortVariants({
         cheapestPool: candidates,
         fastestPool: candidates,
-        buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode)
+        buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode, places)
       }),
       alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative)
     };
@@ -15178,8 +15298,8 @@ ${darkProviderCss}
   }
   async function fetchSkyscannerFlightSearchCandidates(flightMeta, resultUrl, airportLookup) {
     const [originPlace, destinationPlace] = await Promise.all([
-      fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
-      fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination")
+      fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin", flightMeta.originScope),
+      fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination", flightMeta.destinationScope)
     ]);
     if (originPlace === void 0 || destinationPlace === void 0) return { candidates: [], searchComplete: true };
     const headers = buildSkyscannerWebSearchHeaders(resultUrl);
@@ -15486,18 +15606,24 @@ ${darkProviderCss}
   }
   async function fetchSkyscannerFlightCalendarCandidate(flightMeta, resultUrl) {
     const [originPlace, destinationPlace] = await Promise.all([
-      fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
-      fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination")
+      fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin", flightMeta.originScope),
+      fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination", flightMeta.destinationScope)
     ]);
     if (originPlace === void 0 || destinationPlace === void 0) return void 0;
     return await fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originPlace.entityId, destinationPlace.entityId, true) ?? fetchSkyscannerCalendarCandidate(flightMeta, resultUrl, originPlace.entityId, destinationPlace.entityId, false);
   }
-  async function fetchSkyscannerFlightPlace(iataCode, endpoint) {
+  async function fetchSkyscannerFlightPlace(iataCode, endpoint, scope) {
     const [airportPlaces, cityPlaces] = await Promise.all([
       fetchSkyscannerFlightPlaces(iataCode, endpoint, "AIRPORT"),
       fetchSkyscannerFlightPlaces(iataCode, endpoint, "CITY")
     ]);
-    return selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces);
+    return selectSkyscannerFlightPlace(
+      iataCode,
+      airportPlaces,
+      cityPlaces,
+      scope,
+      STATIC_FLIGHT_METROPOLITAN_AIRPORTS[iataCode.toUpperCase()] !== void 0
+    );
   }
   async function fetchSkyscannerFlightPlaces(iataCode, endpoint, placeType) {
     const cacheKey = `${endpoint}|${placeType}|${iataCode.toUpperCase()}`;
@@ -15526,13 +15652,6 @@ ${darkProviderCss}
       credentials: "include"
     });
     return isRecord(value) ? readSkyscannerFlightPlaces(value) : [];
-  }
-  function selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces) {
-    const normalizedCode = iataCode.toUpperCase();
-    const isMetropolitanCode = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[normalizedCode] !== void 0;
-    const cityPlace = cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A`);
-    if (isMetropolitanCode && cityPlace !== void 0) return cityPlace;
-    return airportPlaces.find((place) => place.skyId === normalizedCode && place.flightPlaceType === "AIRPORT") ?? cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A` || place.skyId.startsWith(normalizedCode)) ?? airportPlaces[0] ?? cityPlaces[0];
   }
   function readSkyscannerFlightPlaces(value) {
     const places = [];
@@ -15611,7 +15730,7 @@ ${darkProviderCss}
     return currentMeta !== void 0 && isSameFlightSearchMeta(currentMeta, flightMeta) ? parsedUrl.toString() : void 0;
   }
   function isSameFlightSearchMeta(left, right) {
-    return left.origin === right.origin && left.destination === right.destination && left.outboundDate === right.outboundDate && left.inboundDate === right.inboundDate && left.adults === right.adults && left.youths === right.youths && left.children === right.children && left.infants === right.infants && (left.cabinClass ?? "economy") === (right.cabinClass ?? "economy");
+    return left.origin === right.origin && left.destination === right.destination && left.originScope === right.originScope && left.destinationScope === right.destinationScope && left.outboundDate === right.outboundDate && left.inboundDate === right.inboundDate && left.adults === right.adults && left.youths === right.youths && left.children === right.children && left.infants === right.infants && (left.cabinClass ?? "economy") === (right.cabinClass ?? "economy");
   }
   function readMomondoFlightSortMode(url) {
     const sortMode = parseUrl(url)?.searchParams.get("sort");
@@ -17880,7 +17999,7 @@ ${darkProviderCss}
       ...flightMeta.maxStops !== void 0 ? [{ iconSvg: FLIGHT_STOPS_ICON_SVG, text: flightMeta.maxStops === 0 ? "Direkte" : `≤${flightMeta.maxStops}`, tip: formatFlightStopsFilterText(flightMeta) ?? "" }] : [],
       ...flightMeta.maxDurationMinutes !== void 0 ? [{
         iconSvg: FLIGHT_DURATION_ICON_SVG,
-        text: `≤${formatFlightDurationHours(flightMeta.maxDurationMinutes).replace(" t", "t").replace(" min", "m")}`,
+        text: formatFlightDurationLimit(flightMeta.maxDurationMinutes),
         tip: formatFlightDurationFilterText(flightMeta) ?? ""
       }] : [],
       ...sortMode !== void 0 ? [{ text: FLIGHT_SORT_CHIP_TEXT[sortMode], tip: `sortert som på siden: ${FLIGHT_SORT_CHIP_TEXT[sortMode].toLowerCase()}` }] : []
@@ -17904,6 +18023,8 @@ ${darkProviderCss}
     return [
       flightMeta.origin,
       flightMeta.destination,
+      flightMeta.originScope ?? "",
+      flightMeta.destinationScope ?? "",
       flightMeta.outboundDate,
       flightMeta.inboundDate ?? "",
       flightMeta.adults,
@@ -18539,6 +18660,21 @@ ${darkProviderCss}
       return;
     }
     providerWrap.prepend(createActivationBadge(offer, shadowRoot));
+  }
+  function bindSpennExtensionClick(offerLink, chip) {
+    let resetTimer;
+    offerLink.addEventListener("click", (event) => {
+      if (document.querySelector(SPENN_EXTENSION_ELEMENT) === null) return;
+      event.preventDefault();
+      chip.textContent = "Bruk Spenn-boksen";
+      chip.classList.add("cbn-chip--highlight");
+      chip.title = "Spenn-utvidelsen er aktiv her: trykk «Tjen Spenn» i Spenn-boksen før du handler.";
+      window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => {
+        chip.textContent = "Utvidelse";
+        chip.classList.remove("cbn-chip--highlight");
+      }, 5e3);
+    });
   }
   function shouldMarkOfferClick(offer) {
     return offer.provider === "cbn";
@@ -20538,6 +20674,12 @@ ${darkProviderCss}
         warnIcon.className = "card-only-warn";
         warnIcon.textContent = "⚠";
         offerLink.append(offerLabel, warnIcon);
+      } else if (requiresSpennExtension(currentOffer)) {
+        const extensionChip = document.createElement("span");
+        extensionChip.className = "cbn-chip cbn-chip--muted app-chip";
+        extensionChip.textContent = "Utvidelse";
+        offerLink.append(offerLabel, extensionChip);
+        bindSpennExtensionClick(offerLink, extensionChip);
       } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
         const appChip = document.createElement("span");
         appChip.className = "cbn-chip cbn-chip--muted app-chip";
@@ -21551,7 +21693,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       const showRewardInTooltip = compact !== void 0 && fullReward !== compact;
       const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
-      const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider);
+      const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider) && !requiresSpennExtension(currentOffer);
       const hasTerms = currentOffer.terms.trim().length > 0;
       const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
       if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer && welcome === void 0) continue;

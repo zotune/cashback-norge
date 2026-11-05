@@ -84,6 +84,13 @@ import {
   type FlightDateFlex,
   type FlightLinkFilters,
   type FlightSearchMeta,
+  type FlightPlaceScope,
+  type SkyscannerFlightPlace,
+  readFinnFlightPlace,
+  readSkyscannerFlightPlaceCode,
+  selectSkyscannerFlightPlace,
+  selectPanFlightsCityPlaceId,
+  formatFlightDurationLimit,
   formatFlightDateFlexDays,
   formatFlightDateFlexWindow,
   buildSkyscannerFareAttributesParam,
@@ -100,6 +107,7 @@ import {
   readKiwiCardLegTimeRange,
   readTripComJourneyLeg,
   readKiwiDetailLegRoutes,
+  readKiwiPrebookingLegRoutes,
   readKiwiSortTabText,
   buildPanFlightsFlightSearchUrl,
   buildGoogleFlightsSearchUrl,
@@ -502,12 +510,6 @@ type SkyscannerFlightOfferCandidate = PriceMatchAlternative & {
 type SkyscannerFlightOfferSearchResult = {
   candidates: SkyscannerFlightOfferCandidate[];
   searchComplete: boolean;
-};
-type SkyscannerFlightPlace = {
-  entityId: string;
-  skyId: string;
-  flightPlaceType: "AIRPORT" | "CITY";
-  placeOfStayEntityId?: string;
 };
 type SkyscannerFlightLegSummary = {
   origin: string;
@@ -1762,7 +1764,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
         : findFinnFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, options),
     },
     ...(ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE
-      ? [{ source: "panflights" as const, sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, dateFlex) }]
+      ? [{ source: "panflights" as const, sourceName: "PanFlights", findOffer: () => findPanFlightsFlightPriceMatchOffer(flightMeta, routeTitle, fullSearchDetails, airportLookup, dateFlex) }]
       : []),
     {
       source: "momondo",
@@ -2189,12 +2191,8 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
 
   // Ved søk på by fyller FINN etappefeltet med alle flyplassene («TRF,OSL») etter at siden har lastet.
   // Da gjelder det opprinnelige valget, ellers ville de andre kildene søkt fra den første flyplassen.
-  const readFinnAirport = (legKey: string, requestedKey: string): string | undefined => {
-    const legValue = parsedUrl.searchParams.get(legKey);
-    return readIataCodeFromValues([legValue?.includes(",") === true ? undefined : legValue, parsedUrl.searchParams.get(requestedKey)]);
-  };
-  const origin = readFinnAirport("departureAirportLeg1", "requestedOrigin");
-  const destination = readFinnAirport("arrivalAirportLeg1", "requestedDestination");
+  const originPlace = readFinnFlightPlace(parsedUrl.searchParams.get("departureAirportLeg1"), parsedUrl.searchParams.get("requestedOrigin"));
+  const destinationPlace = readFinnFlightPlace(parsedUrl.searchParams.get("arrivalAirportLeg1"), parsedUrl.searchParams.get("requestedDestination"));
   const outboundDate = readIsoDateFromValues([
     parsedUrl.searchParams.get("requestedDepartureDate"),
     parsedUrl.searchParams.get("departureDate"),
@@ -2203,16 +2201,18 @@ function extractFinnFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | undefin
     parsedUrl.searchParams.get("requestedReturnDate"),
     parsedUrl.searchParams.get("returnDate"),
   ]);
-  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+  if (originPlace === undefined || destinationPlace === undefined || outboundDate === undefined) return undefined;
 
   const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinType"));
   // FINN speiler filtrene i URL-en (handLuggage/checkedLuggage=true, maximumNumberOfStops=N).
   const maxStops = readNonNegativeIntegerValue(parsedUrl.searchParams.get("maximumNumberOfStops"));
-  // durationTo er maks reisetid per etappe i minutter (FINNs glidebryter går i hele timer).
+  // durationTo/aria-valuenow er minutter. FINNs synlige timetall utelater minuttene.
   const maxDurationMinutes = readPositiveIntegerValue(parsedUrl.searchParams.get("durationTo"));
   return normalizeFlightSearchMeta({
-    origin,
-    destination,
+    origin: originPlace.code,
+    destination: destinationPlace.code,
+    originScope: originPlace.scope,
+    destinationScope: destinationPlace.scope,
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
     adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? 1,
@@ -2284,6 +2284,26 @@ function readPanFlightsPlaceIataCode(value: string | undefined): string | undefi
 
 const panFlightsPlaceCodeLookups = new Map<string, Promise<string | undefined>>();
 const resolvedPanFlightsPlaceCodes = new Map<string, string>();
+const panFlightsCityPlaceIds = new Map<string, Promise<string | undefined>>();
+
+async function fetchPanFlightsSearchPlaces(flightMeta: FlightSearchMeta): Promise<{ origin: string; destination: string } | undefined> {
+  const resolve = (code: string, scope: FlightPlaceScope | undefined): Promise<string | undefined> => {
+    if (scope !== "city") return Promise.resolve(code);
+    const cached = panFlightsCityPlaceIds.get(code);
+    if (cached !== undefined) return cached;
+    const params = new URLSearchParams({ locale: "nb", query: code, ver: "9" });
+    const promise = userscriptJsonRequest(`${PANFLIGHTS_PLACE_SEARCH_ENDPOINT}?${params.toString()}`, {
+      headers: { Accept: "application/json" }, credentials: "omit", timeoutMs: 4000,
+    }).then((places) => selectPanFlightsCityPlaceId(code, places)).catch(() => undefined);
+    panFlightsCityPlaceIds.set(code, promise);
+    void promise.then((id) => { if (id === undefined) panFlightsCityPlaceIds.delete(code); });
+    return promise;
+  };
+  const [origin, destination] = await Promise.all([
+    resolve(flightMeta.origin, flightMeta.originScope), resolve(flightMeta.destination, flightMeta.destinationScope),
+  ]);
+  return origin !== undefined && destination !== undefined ? { origin, destination } : undefined;
+}
 
 async function fetchPanFlightsPlaceIataCode(sid: string): Promise<string | undefined> {
   const places = await userscriptJsonRequest(PANFLIGHTS_PLACE_LOOKUP_ENDPOINT, {
@@ -2386,20 +2406,22 @@ function extractSkyscannerFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
   if (!isSkyscannerFlightSearchPage(parsedUrl)) return undefined;
 
   const parts = parsedUrl.pathname.split("/").filter(Boolean);
-  const flightsIndex = parts.findIndex((part) => part.toLowerCase() === "flights");
-  const origin = readIataCodeValue(parts[flightsIndex + 1]);
-  const destination = readIataCodeValue(parts[flightsIndex + 2]);
+  const flightsIndex = parts.findIndex((part) => /^(?:flights|flyavganger)$/i.test(part));
+  const originPlace = readSkyscannerFlightPlaceCode(parts[flightsIndex + 1]);
+  const destinationPlace = readSkyscannerFlightPlaceCode(parts[flightsIndex + 2]);
   const outboundDate = readSkyscannerPathDate(parts[flightsIndex + 3]);
   const inboundDate = readSkyscannerPathDate(parts[flightsIndex + 4]);
-  if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
+  if (originPlace === undefined || destinationPlace === undefined || outboundDate === undefined) return undefined;
 
   const cabinClass = readFlightCabinClassValue(parsedUrl.searchParams.get("cabinclass"));
   const prefersDirect = parsedUrl.searchParams.get("preferdirects") === "true";
   const skyscannerMaxStops = prefersDirect ? 0 : readSkyscannerMaxStopsParam(parsedUrl.searchParams.get("stops"));
   const skyscannerMaxDuration = readPositiveIntegerValue(parsedUrl.searchParams.get("duration"));
   return normalizeFlightSearchMeta({
-    origin,
-    destination,
+    origin: originPlace.code,
+    destination: destinationPlace.code,
+    originScope: originPlace.scope,
+    destinationScope: destinationPlace.scope,
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
     adults: readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ??
@@ -2504,7 +2526,7 @@ function readTripComCabinClassParam(value: string | null): FlightCabinClass | un
 function isSkyscannerFlightSearchPage(parsedUrl: URL): boolean {
   const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
   return (hostname === "skyscanner.no" || hostname === "skyscanner.net") &&
-    /^\/transport\/flights\/[a-z]{3}\/[a-z]{3}\/\d{6}(?:\/\d{6})?\/?$/i.test(parsedUrl.pathname);
+    /^\/transport\/(?:flights|flyavganger)\/[a-z]{3,4}\/[a-z]{3,4}\/\d{6}(?:\/\d{6})?\/?$/i.test(parsedUrl.pathname);
 }
 
 function readSkyscannerPathDate(value: string | undefined): string | undefined {
@@ -2793,6 +2815,8 @@ async function buildFlightAirportLookup(flightMeta: FlightSearchMeta): Promise<F
   const lookup: FlightAirportCodeLookup = new Map();
   const requestedCodes = uniqueStrings([flightMeta.origin, flightMeta.destination].map((code) => code.toUpperCase()));
   for (const requestedCode of requestedCodes) {
+    const scope = requestedCode === flightMeta.origin ? flightMeta.originScope : flightMeta.destinationScope;
+    if (scope === "airport") continue;
     const airports = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[requestedCode];
     if (airports !== undefined) lookup.set(requestedCode, airports);
   }
@@ -2802,8 +2826,10 @@ async function buildFlightAirportLookup(flightMeta: FlightSearchMeta): Promise<F
 
   const flightableAirports = airportData.filter((airport) => airport.iataType === "airport" && airport.flightable);
   for (const requestedCode of requestedCodes) {
+    const scope = requestedCode === flightMeta.origin ? flightMeta.originScope : flightMeta.destinationScope;
+    if (scope === "airport") continue;
     const hasExactAirport = flightableAirports.some((airport) => airport.code === requestedCode);
-    if (hasExactAirport) continue;
+    if (hasExactAirport && scope !== "city") continue;
 
     const cityAirports = uniqueStrings(
       flightableAirports
@@ -3639,22 +3665,29 @@ async function findPanFlightsFlightPriceMatchOffer(
   flightMeta: FlightSearchMeta,
   routeTitle: string,
   searchDetails: string,
+  airportLookup: FlightAirportCodeLookup,
   dateFlex?: FlightDateFlex,
 ): Promise<PriceMatchOffer | undefined> {
+  const airports = {
+    origin: collectEquivalentFlightAirportCodes(flightMeta.origin, airportLookup),
+    destination: collectEquivalentFlightAirportCodes(flightMeta.destination, airportLookup),
+  };
   if (dateFlex !== undefined) {
-    return findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex);
+    return findPanFlightsFlexibleDatesOffer(flightMeta, routeTitle, searchDetails, dateFlex, airports);
   }
 
-  const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
+  const places = await fetchPanFlightsSearchPlaces(flightMeta);
+  if (places === undefined) return undefined;
+  const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta, "best", places);
   const [pageCandidates, resultDataList] = await Promise.all([
     readCurrentPanFlightsPageOfferCandidates(flightMeta, resultUrl),
-    fetchPanFlightsFlightSearchResults(flightMeta),
+    fetchPanFlightsFlightSearchResults(flightMeta, undefined, places),
   ]);
   const apiCandidates = dedupePanFlightsOfferCandidates(
     resultDataList.flatMap((resultData) => {
       return resultData === undefined
         ? []
-        : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl);
+        : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, airports);
     }),
   );
   const rankedCandidates = pageCandidates.length > 0
@@ -3684,7 +3717,7 @@ async function findPanFlightsFlightPriceMatchOffer(
     flightSortVariants: buildFlightSortVariants({
       cheapestPool: rankedCandidates,
       fastestPool: rankedCandidates,
-      buildUrl: (mode) => buildPanFlightsFlightSearchUrl(flightMeta, mode),
+      buildUrl: (mode) => buildPanFlightsFlightSearchUrl(flightMeta, mode, places),
     }),
     alternatives: tooltipCandidates.map(({
       productUrl: _productUrl,
@@ -3706,14 +3739,17 @@ async function findPanFlightsFlexibleDatesOffer(
   routeTitle: string,
   searchDetails: string,
   dateFlex: FlightDateFlex,
+  airports: PanFlightsSearchAirports,
 ): Promise<PriceMatchOffer | undefined> {
-  const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta);
-  const resultDataList = await fetchPanFlightsFlightSearchResults(flightMeta, dateFlex);
+  const places = await fetchPanFlightsSearchPlaces(flightMeta);
+  if (places === undefined) return undefined;
+  const resultUrl = buildPanFlightsFlightSearchUrl(flightMeta, "best", places);
+  const resultDataList = await fetchPanFlightsFlightSearchResults(flightMeta, dateFlex, places);
   const candidates = dedupePanFlightsOfferCandidates(
     resultDataList.flatMap((resultData) => {
       return resultData === undefined
         ? []
-        : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, dateFlex);
+        : extractPanFlightsOfferCandidates(resultData.resultData, resultData.variant, flightMeta, resultUrl, airports, dateFlex);
     }),
   );
 
@@ -3743,7 +3779,7 @@ async function findPanFlightsFlexibleDatesOffer(
         ...flightMeta,
         outboundDate: candidate.outboundDate,
         ...(candidate.inboundDate !== undefined ? { inboundDate: candidate.inboundDate } : {}),
-      }),
+      }, "best", places),
       offerUrl: candidate.productUrl,
     });
   }
@@ -3766,11 +3802,12 @@ async function findPanFlightsFlexibleDatesOffer(
 async function fetchPanFlightsFlightSearchResults(
   flightMeta: FlightSearchMeta,
   dateFlex?: FlightDateFlex,
+  places?: { origin: string; destination: string },
 ): Promise<Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined>> {
   const results: Array<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> = [];
   if (Date.now() < panFlightsBackoffUntil) return results;
   for (const variant of PANFLIGHTS_FLIGHT_SEARCH_VARIANTS) {
-    const result = await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex);
+    const result = await fetchPanFlightsFlightSearchResult(flightMeta, variant, dateFlex, places);
     results.push(result);
     // Første variant uten svar betyr som regel at PanFlights avviser kall nå; ikke send flere.
     if (result === undefined && results.every((item) => item === undefined)) {
@@ -4182,6 +4219,7 @@ async function fetchPanFlightsFlightSearchResult(
   flightMeta: FlightSearchMeta,
   variant: PanFlightsSearchVariant,
   dateFlex?: FlightDateFlex,
+  places?: { origin: string; destination: string },
 ): Promise<{ resultData: Record<string, unknown>; variant: PanFlightsSearchVariant } | undefined> {
   const body = new URLSearchParams({
     data: JSON.stringify(buildPanFlightsFlightSearchPayload(
@@ -4189,6 +4227,7 @@ async function fetchPanFlightsFlightSearchResult(
       variant,
       variant.searchId,
       dateFlex,
+      places,
     )),
   }).toString();
 
@@ -4216,6 +4255,7 @@ function buildPanFlightsFlightSearchPayload(
   variant: PanFlightsSearchVariant,
   searchId: number,
   dateFlex?: FlightDateFlex,
+  places?: { origin: string; destination: string },
 ): Record<string, unknown> {
   // dff*/dft* og dtf*/dtt* er fra/til-dato for utreise og hjemreise.
   const outboundFrom = splitIsoDateParts(shiftFlightDateNotBeforeToday(flightMeta.outboundDate, -(dateFlex?.outboundBefore ?? 0)));
@@ -4233,11 +4273,11 @@ function buildPanFlightsFlightSearchPayload(
     dftm: outboundTo.month,
     dffy: outboundFrom.year,
     dfty: outboundTo.year,
-    fromlocsid: flightMeta.origin,
+    fromlocsid: places?.origin ?? flightMeta.origin,
     fromlocrad: "0",
     fromloclat: "0",
     fromloclng: "0",
-    tolocsid: flightMeta.destination,
+    tolocsid: places?.destination ?? flightMeta.destination,
     tolocrad: "0",
     toloclat: "0",
     toloclng: "0",
@@ -4307,18 +4347,22 @@ function buildPanFlightsCabinClass(flightMeta: FlightSearchMeta): string {
   }
 }
 
+// Flyplassene som godtas i hver ende; et bysøk (SHA) gir byens flyplasser (PVG, SHA).
+type PanFlightsSearchAirports = { origin: ReadonlySet<string>; destination: ReadonlySet<string> };
+
 function extractPanFlightsOfferCandidates(
   resultData: Record<string, unknown>,
   variant: PanFlightsSearchVariant,
   flightMeta: FlightSearchMeta,
   resultUrl: string,
+  airports: PanFlightsSearchAirports,
   dateFlex?: FlightDateFlex,
 ): PanFlightsOfferCandidate[] {
   const currency = readStringValue(resultData.currency) ?? "NOK";
   const candidates: PanFlightsOfferCandidate[] = [];
 
   for (const [sourceRank, item] of readRecordArray(resultData.flighttab).entries()) {
-    const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex);
+    const matchedDates = matchPanFlightsFlightSearchDates(item, flightMeta, dateFlex, airports);
     if (matchedDates === undefined) continue;
     // API-ets maxstops-felt holder ikke alltid; kontroller stopp per etappe som for de andre kildene.
     if (exceedsFlightMaxStops(flightMeta, readPanFlightsLegStopCounts(item))) continue;
@@ -4774,26 +4818,33 @@ async function finishKiwiPriceProbeTab(prices: KiwiSortPrices, key: string): Pro
   void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...(isNok && key !== "{}" ? { prices } : {}) });
 }
 
-// Kortet åpner Kiwis detaljvisning i probe-fanen (ingen bestilling), der flyplasskodene står.
+// Kortet åpner Kiwis detaljvisning i probe-fanen (ingen bestilling). Flyvningene leses fra
+// `prebooking` i URL-en, ellers fra detaljvisningens SegmentStop-rader.
 async function readKiwiTopCardRoutes(card: HTMLElement, sectors: HTMLElement[]): Promise<string[]> {
-  card.click();
-  const startedAt = Date.now();
-  let details: HTMLElement | null = null;
-  while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
-    details = document.querySelector<HTMLElement>('[data-test="PrebookingTripDetails"]');
-    if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) break;
-    await sleep(250);
-  }
-  if (details === null) return [];
-  const stopCodes = [...details.querySelectorAll<HTMLElement>('[data-test="SegmentStop"]')]
-    // «Skjult by»-reiser har en ekstra SegmentStop for billettens endedestinasjon uten klokkeslett.
-    .filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText))
-    .map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1])
-    .filter((code): code is string => code !== undefined);
-  return readKiwiDetailLegRoutes(stopCodes, sectors.map((sector) => {
+  const sectorEnds = sectors.map((sector) => {
     const stations = [...sector.querySelectorAll<HTMLElement>('[data-test="stationName"]')].map((station) => station.innerText.trim());
     return { destination: stations[stations.length - 1], stopCount: readKiwiCardLeg(sector.innerText).stopCount };
-  }));
+  });
+  card.click();
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
+    const prebooking = new URLSearchParams(window.location.search).get("prebooking");
+    if (prebooking !== null) {
+      const routes = readKiwiPrebookingLegRoutes(prebooking, sectorEnds);
+      if (routes.some((route) => route.length > 0)) return routes;
+    }
+    const details = document.querySelector<HTMLElement>('[data-test="PrebookingTripDetails"]');
+    if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) {
+      const stopCodes = [...details.querySelectorAll<HTMLElement>('[data-test="SegmentStop"]')]
+        // «Skjult by»-reiser har en ekstra SegmentStop for billettens endedestinasjon uten klokkeslett.
+        .filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText))
+        .map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1])
+        .filter((code): code is string => code !== undefined);
+      return readKiwiDetailLegRoutes(stopCodes, sectorEnds);
+    }
+    await sleep(250);
+  }
+  return [];
 }
 
 async function findKiwiFlightPriceMatchOffer(
@@ -6303,7 +6354,14 @@ async function findSkyscannerFlightPriceMatchOffer(
   searchDetails: string,
   airportLookup: FlightAirportCodeLookup,
 ): Promise<PriceMatchOffer | undefined> {
-  const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta);
+  const [originPlace, destinationPlace] = await Promise.all([
+    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin", flightMeta.originScope),
+    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination", flightMeta.destinationScope),
+  ]);
+  if (originPlace === undefined || destinationPlace === undefined) return undefined;
+  // Bruk kildens faktiske by-ID (f.eks. CSHA), aldri flyplasskoden for et bysøk.
+  const places = { origin: originPlace.skyId, destination: destinationPlace.skyId };
+  const resultUrl = buildSkyscannerFlightSearchUrl(flightMeta, "best", places);
   const { candidates, searchComplete } = await fetchCachedSkyscannerFlightOfferCandidates(flightMeta, resultUrl, airportLookup);
   const candidate = candidates[0];
   if (candidate === undefined) return undefined;
@@ -6328,7 +6386,7 @@ async function findSkyscannerFlightPriceMatchOffer(
     flightSortVariants: buildFlightSortVariants({
       cheapestPool: candidates,
       fastestPool: candidates,
-      buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode),
+      buildUrl: (mode) => buildSkyscannerFlightSearchUrl(flightMeta, mode, places),
     }),
     alternatives: candidates.map(({ productUrl: _productUrl, ...alternative }) => alternative),
   };
@@ -6395,8 +6453,8 @@ async function fetchSkyscannerFlightSearchCandidates(
   airportLookup: FlightAirportCodeLookup,
 ): Promise<SkyscannerFlightOfferSearchResult> {
   const [originPlace, destinationPlace] = await Promise.all([
-    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
-    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination"),
+    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin", flightMeta.originScope),
+    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination", flightMeta.destinationScope),
   ]);
   if (originPlace === undefined || destinationPlace === undefined) return { candidates: [], searchComplete: true };
 
@@ -6825,8 +6883,8 @@ async function fetchSkyscannerFlightCalendarCandidate(
   resultUrl: string,
 ): Promise<SkyscannerFlightOfferCandidate | undefined> {
   const [originPlace, destinationPlace] = await Promise.all([
-    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin"),
-    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination"),
+    fetchSkyscannerFlightPlace(flightMeta.origin, "inputorigin", flightMeta.originScope),
+    fetchSkyscannerFlightPlace(flightMeta.destination, "inputdestination", flightMeta.destinationScope),
   ]);
   if (originPlace === undefined || destinationPlace === undefined) return undefined;
 
@@ -6837,12 +6895,14 @@ async function fetchSkyscannerFlightCalendarCandidate(
 async function fetchSkyscannerFlightPlace(
   iataCode: string,
   endpoint: "inputorigin" | "inputdestination",
+  scope?: FlightPlaceScope,
 ): Promise<SkyscannerFlightPlace | undefined> {
   const [airportPlaces, cityPlaces] = await Promise.all([
     fetchSkyscannerFlightPlaces(iataCode, endpoint, "AIRPORT"),
     fetchSkyscannerFlightPlaces(iataCode, endpoint, "CITY"),
   ]);
-  return selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces);
+  return selectSkyscannerFlightPlace(iataCode, airportPlaces, cityPlaces, scope,
+    STATIC_FLIGHT_METROPOLITAN_AIRPORTS[iataCode.toUpperCase()] !== undefined);
 }
 
 async function fetchSkyscannerFlightPlaces(
@@ -6882,21 +6942,6 @@ async function fetchUncachedSkyscannerFlightPlaces(
     credentials: "include",
   });
   return isRecord(value) ? readSkyscannerFlightPlaces(value) : [];
-}
-
-function selectSkyscannerFlightPlace(
-  iataCode: string,
-  airportPlaces: SkyscannerFlightPlace[],
-  cityPlaces: SkyscannerFlightPlace[],
-): SkyscannerFlightPlace | undefined {
-  const normalizedCode = iataCode.toUpperCase();
-  const isMetropolitanCode = STATIC_FLIGHT_METROPOLITAN_AIRPORTS[normalizedCode] !== undefined;
-  const cityPlace = cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A`);
-  if (isMetropolitanCode && cityPlace !== undefined) return cityPlace;
-  return airportPlaces.find((place) => place.skyId === normalizedCode && place.flightPlaceType === "AIRPORT") ??
-    cityPlaces.find((place) => place.skyId === normalizedCode || place.skyId === `${normalizedCode}A` || place.skyId.startsWith(normalizedCode)) ??
-    airportPlaces[0] ??
-    cityPlaces[0];
 }
 
 function readSkyscannerFlightPlaces(value: Record<string, unknown>): SkyscannerFlightPlace[] {
@@ -7004,6 +7049,8 @@ function readCurrentMomondoFlightSearchUrl(flightMeta: FlightSearchMeta): string
 function isSameFlightSearchMeta(left: FlightSearchMeta, right: FlightSearchMeta): boolean {
   return left.origin === right.origin &&
     left.destination === right.destination &&
+    left.originScope === right.originScope &&
+    left.destinationScope === right.destinationScope &&
     left.outboundDate === right.outboundDate &&
     left.inboundDate === right.inboundDate &&
     left.adults === right.adults &&
@@ -10009,7 +10056,7 @@ function buildFlightFilterChips(flightMeta: FlightSearchMeta, shadowRoot: Shadow
     ...(flightMeta.maxDurationMinutes !== undefined
       ? [{
         iconSvg: FLIGHT_DURATION_ICON_SVG,
-        text: `≤${formatFlightDurationHours(flightMeta.maxDurationMinutes).replace(" t", "t").replace(" min", "m")}`,
+        text: formatFlightDurationLimit(flightMeta.maxDurationMinutes),
         tip: formatFlightDurationFilterText(flightMeta) ?? "",
       }]
       : []),
@@ -10037,6 +10084,8 @@ function buildFlightSearchMetaKey(flightMeta: FlightSearchMeta): string {
   return [
     flightMeta.origin,
     flightMeta.destination,
+    flightMeta.originScope ?? "",
+    flightMeta.destinationScope ?? "",
     flightMeta.outboundDate,
     flightMeta.inboundDate ?? "",
     flightMeta.adults,

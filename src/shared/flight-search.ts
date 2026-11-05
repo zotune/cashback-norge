@@ -17,10 +17,14 @@ import {
 } from "./values.js";
 
 export type FlightCabinClass = "economy" | "premium" | "business" | "first";
+export type FlightPlaceScope = "airport" | "city";
 
 export type FlightSearchMeta = {
   origin: string;
   destination: string;
+  // Noen IATA-koder betegner både en by og én av flyplassene (f.eks. SHA).
+  originScope?: FlightPlaceScope;
+  destinationScope?: FlightPlaceScope;
   outboundDate: string;
   inboundDate?: string;
   adults: number;
@@ -77,6 +81,8 @@ export function normalizeFlightSearchMeta(meta: FlightSearchMeta): FlightSearchM
   const normalizedMeta: FlightSearchMeta = {
     origin,
     destination,
+    ...(meta.originScope === "airport" || meta.originScope === "city" ? { originScope: meta.originScope } : {}),
+    ...(meta.destinationScope === "airport" || meta.destinationScope === "city" ? { destinationScope: meta.destinationScope } : {}),
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
     // Ungdom (12+) er voksne hos sammenligningskildene (FINN: «Barn over 12 år regnes som voksne»).
@@ -327,6 +333,64 @@ export function formatCompactFlightDuration(minutes: number | undefined): string
   const remainingMinutes = totalMinutes % 60;
   if (hours <= 0) return `${remainingMinutes}m`;
   return remainingMinutes === 0 ? `${hours}t` : `${hours}t ${remainingMinutes}m`;
+}
+
+export function formatFlightDurationLimit(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder === 0 ? `≤${hours}t` : `≤${hours}t ${remainder}m`;
+}
+
+export function readFinnFlightPlace(legValue: string | null, requestedValue: string | null): { code: string; scope: FlightPlaceScope } | undefined {
+  const selectedAirports = (legValue ?? "").split(",").map(readIataCodeValue).filter(isString);
+  const requestedCode = readIataCodeValue(requestedValue?.split(".")[0]);
+  if (selectedAirports.length === 1) return { code: selectedAirports[0]!, scope: "airport" };
+  if (requestedCode === undefined) return undefined;
+  return { code: requestedCode, scope: requestedValue?.endsWith(".METROPOLITAN_AREA") === true ? "city" : "airport" };
+}
+
+export function readSkyscannerFlightPlaceCode(value: string | undefined): { code: string; scope: FlightPlaceScope } | undefined {
+  const normalized = value?.toUpperCase();
+  if (normalized === undefined) return undefined;
+  if (/^[A-Z]{3}$/.test(normalized)) return { code: normalized, scope: "airport" };
+  // Offentlige søkeruter bruker bl.a. CSHA (Shanghai Alle) og OSLA (Oslo Alle).
+  if (/^C[A-Z]{3}$/.test(normalized)) return { code: normalized.slice(1), scope: "city" };
+  if (/^[A-Z]{3}A$/.test(normalized)) return { code: normalized.slice(0, 3), scope: "city" };
+  return undefined;
+}
+
+export type SkyscannerFlightPlace = {
+  skyId: string;
+  entityId: string;
+  flightPlaceType: "AIRPORT" | "CITY";
+  placeOfStayEntityId?: string;
+};
+
+export function selectSkyscannerFlightPlace<T extends SkyscannerFlightPlace>(
+  iataCode: string,
+  airportPlaces: T[],
+  cityPlaces: T[],
+  scope?: FlightPlaceScope,
+  preferCity = false,
+): T | undefined {
+  const code = iataCode.toUpperCase();
+  const airport = airportPlaces.find((place) => place.flightPlaceType === "AIRPORT" && place.skyId === code);
+  const city = cityPlaces.find((place) => place.flightPlaceType === "CITY" &&
+    ([code, `${code}A`, `C${code}`].includes(place.skyId) || (place.skyId.length === 4 && place.skyId.startsWith(code))));
+  // Ikke erstatt et eksplisitt bysøk med én flyplass når byoppslaget mangler.
+  if (scope === "city") return city;
+  if (scope === "airport") return airport;
+  return preferCity ? city ?? airport : airport ?? city;
+}
+
+export function selectPanFlightsCityPlaceId(iataCode: string, places: unknown): string | undefined {
+  const records = readRecordArray(places);
+  const airport = records.find((place) => place.type === 0 && place.sid === iataCode && place.stationtype === "air");
+  const name = readStringValue(airport?.shortname)?.trim().toLowerCase();
+  if (name === undefined) return undefined;
+  const cities = records.filter((place) => place.type === 4 && readStringValue(place.shortname)?.trim().toLowerCase() === name);
+  // Et tvetydig stedsoppslag skal ikke velge en annen by eller bare én flyplass.
+  return cities.length === 1 ? readStringValue(cities[0]?.sid) : undefined;
 }
 
 export function formatFlightClockRange(departure: string | undefined, arrival: string | undefined): string | undefined {
@@ -951,26 +1015,32 @@ export function readPanFlightsRouteLegDate(
   route: Record<string, unknown>,
   dataKey: "tripdata" | "backdata",
   timeKey: "dTime" | "drTime",
-  origin: string,
-  destination: string,
+  origin: string | ReadonlySet<string>,
+  destination: string | ReadonlySet<string>,
 ): string | undefined {
   const legData = isRecord(route[dataKey]) ? route[dataKey] : undefined;
-  return readStringValue(legData?.flyFrom)?.toUpperCase() === origin &&
-    readStringValue(legData?.flyTo)?.toUpperCase() === destination
+  const matches = (code: string | undefined, expected: string | ReadonlySet<string>) =>
+    code !== undefined && (typeof expected === "string" ? code === expected : expected.has(code));
+  return matches(readStringValue(legData?.flyFrom)?.toUpperCase(), origin) &&
+    matches(readStringValue(legData?.flyTo)?.toUpperCase(), destination)
     ? formatPanFlightsEpochDate(readNumberValue(route[timeKey]))
     : undefined;
 }
 
-// Returnerer reisens faktiske datoer når rute og datoer passer søket (±dateFlex).
+// Returnerer reisens faktiske datoer når rute og datoer passer søket (±dateFlex). Ved bysøk
+// (Shanghai) svarer PanFlights med flyplassene (flyTo PVG), så `airports` gir byens flyplasser.
 export function matchPanFlightsFlightSearchDates(
   item: Record<string, unknown>,
   flightMeta: FlightSearchMeta,
   dateFlex: FlightDateFlex | undefined,
+  airports?: { origin: ReadonlySet<string>; destination: ReadonlySet<string> },
 ): { outboundDate: string; inboundDate?: string } | undefined {
   const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
   const outboundRoute = routeList[0];
   if (outboundRoute === undefined) return undefined;
-  const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", flightMeta.origin, flightMeta.destination);
+  const origin = airports?.origin ?? flightMeta.origin;
+  const destination = airports?.destination ?? flightMeta.destination;
+  const outboundDate = readPanFlightsRouteLegDate(outboundRoute, "tripdata", "dTime", origin, destination);
   if (outboundDate === undefined || !isIsoDateWithinDays(outboundDate, flightMeta.outboundDate, dateFlex?.outboundBefore ?? 0, dateFlex?.outboundAfter ?? 0)) {
     return undefined;
   }
@@ -979,8 +1049,8 @@ export function matchPanFlightsFlightSearchDates(
   if (requestedInboundDate === undefined) return { outboundDate };
 
   const inboundDate = [
-    readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", flightMeta.destination, flightMeta.origin),
-    ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", flightMeta.destination, flightMeta.origin)),
+    readPanFlightsRouteLegDate(outboundRoute, "backdata", "drTime", destination, origin),
+    ...routeList.map((route) => readPanFlightsRouteLegDate(route, "tripdata", "dTime", destination, origin)),
   ].find((date) => isIsoDateWithinDays(date, requestedInboundDate, dateFlex?.inboundBefore ?? 0, dateFlex?.inboundAfter ?? 0));
   return inboundDate !== undefined && inboundDate >= outboundDate ? { outboundDate, inboundDate } : undefined;
 }
@@ -1138,10 +1208,14 @@ export const TRIP_COM_DEFAULT_CURRENCY = "USD";
 
 export const TRIP_COM_BASE_URL = "https://us.trip.com";
 
-export function buildSkyscannerFlightSearchUrl(flightMeta: FlightSearchMeta, sortMode: FlightSortMode = "best"): string {
+export function buildSkyscannerFlightSearchUrl(
+  flightMeta: FlightSearchMeta,
+  sortMode: FlightSortMode = "best",
+  places?: { origin: string; destination: string },
+): string {
   const pathParts = [
-    flightMeta.origin.toLowerCase(),
-    flightMeta.destination.toLowerCase(),
+    (places?.origin ?? flightMeta.origin).toLowerCase(),
+    (places?.destination ?? flightMeta.destination).toLowerCase(),
     compactIsoDate(flightMeta.outboundDate).slice(2),
     flightMeta.inboundDate !== undefined ? compactIsoDate(flightMeta.inboundDate).slice(2) : undefined,
   ].filter((part): part is string => part !== undefined);
@@ -1176,13 +1250,18 @@ export function buildSkyscannerCabinClass(flightMeta: FlightSearchMeta): string 
   }
 }
 
-export function buildPanFlightsFlightSearchUrl(flightMeta: FlightSearchMeta, sortMode: FlightSortMode = "best"): string {
+export function buildPanFlightsFlightSearchUrl(
+  flightMeta: FlightSearchMeta,
+  sortMode: FlightSortMode = "best",
+  places?: { origin: string; destination: string },
+): string {
   const outboundDate = compactIsoDate(flightMeta.outboundDate);
   const inboundDate = flightMeta.inboundDate !== undefined ? compactIsoDate(flightMeta.inboundDate) : undefined;
   const path = inboundDate !== undefined ? "roundtrip" : "oneway";
+  const route = `${places?.origin ?? flightMeta.origin}_${places?.destination ?? flightMeta.destination}`;
   const v2 = inboundDate !== undefined
-    ? `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}_${inboundDate}`
-    : `${flightMeta.origin}_${flightMeta.destination}_${outboundDate}`;
+    ? `${route}_${outboundDate}_${inboundDate}`
+    : `${route}_${outboundDate}`;
   // pad/pch/pin = voksne, barn og spedbarn; PanFlights fyller ut skjemaet fra dem (verifisert 2026-11-02).
   const params = new URLSearchParams({
     v2,
@@ -1435,6 +1514,39 @@ export function readKiwiDetailLegRoutes(
   }
   if (current.length > 0 || legs.length !== sectors.length) return [];
   return legs.map((segments, index) => formatFlightLegRoute(segments, sectors[index]?.stopCount) ?? "");
+}
+
+// Når kortet åpnes, legger Kiwi reisen i URL-en som `prebooking` (base64-JSON, verifisert
+// 2026-11-05): r = flyvningene «KL:1164:BGO:<avgang>:AMS:<ankomst>:…» skilt med «|», og
+// i = én oppføring per etappe med etappens flyvnings-ID-er skilt med «|». Dette gjelder også
+// reiser der detaljvisningen ikke har SegmentStop-radene (PrebookingModalNonVIItinerary).
+export function readKiwiPrebookingLegRoutes(
+  prebooking: string,
+  sectors: Array<{ destination: string | undefined; stopCount: number | undefined }>,
+): string[] {
+  let state: unknown;
+  try {
+    state = JSON.parse(atob(prebooking));
+  } catch {
+    return [];
+  }
+  if (!isRecord(state) || typeof state.r !== "string" || !Array.isArray(state.i)) return [];
+  const segments = state.r.split("|").map((segment) => {
+    const fields = segment.split(":");
+    return { origin: fields[2], destination: fields[4] };
+  });
+  const legSizes = state.i.map((leg) => typeof leg === "string" ? leg.split("|").length : 0);
+  if (legSizes.length !== sectors.length || legSizes.some((size) => size === 0) ||
+    legSizes.reduce((total, size) => total + size, 0) !== segments.length) return [];
+  let offset = 0;
+  return legSizes.map((size, index) => {
+    const legSegments = segments.slice(offset, offset + size);
+    offset += size;
+    const sector = sectors[index];
+    const last = legSegments[legSegments.length - 1];
+    if (sector?.destination !== undefined && last?.destination !== sector.destination) return "";
+    return formatFlightLegRoute(legSegments, sector?.stopCount) ?? "";
+  });
 }
 
 export function readKiwiCardLegTimeRange(text: string): string | undefined {

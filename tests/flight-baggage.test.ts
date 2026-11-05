@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import ts from "typescript";
-import { flightTooltipChipTexts, isMomondoBookingOptionMatchingBaggage, isSkyscannerPricingOptionMatchingBaggage, type FlightSearchMeta } from "../src/shared/flight-search.js";
+import * as flightSearch from "../src/shared/flight-search.js";
+import { buildSkyscannerFlightSearchUrl, flightTooltipChipTexts, isMomondoBookingOptionMatchingBaggage, isSkyscannerPricingOptionMatchingBaggage, type FlightSearchMeta } from "../src/shared/flight-search.js";
 
 // Run the content script's actual orchestration with captured fare shapes and
 // injected transport/extraction. This catches retries that silently drop bags,
@@ -71,6 +72,75 @@ test("Skyscanner: an empty baggage-filtered result stays empty instead of fallin
     assert.equal(result.searchComplete, true);
     assert.deepEqual(checked, [meta], "Ingen ny uthenting uten valgt bagasje");
   }
+});
+
+test("Skyscanner orchestration preserves city scope and uses the resolved place IDs in every link", async () => {
+  const meta: FlightSearchMeta = { ...searches[2]!, destination: "SHA", originScope: "airport", destinationScope: "city" };
+  const requests: unknown[][] = [];
+  const find = loadFunction("findSkyscannerFlightPriceMatchOffer", {
+    fetchSkyscannerFlightPlace: async (...args: unknown[]) => {
+      requests.push(args);
+      return { skyId: args[0] === "BGO" ? "BGO" : "CSHA" };
+    },
+    buildSkyscannerFlightSearchUrl,
+    fetchCachedSkyscannerFlightOfferCandidates: async (_meta: unknown, url: string) => {
+      assert.ok(new URL(url).pathname.includes("/bgo/csha/"));
+      return { candidates: [candidate(8014)], searchComplete: true };
+    },
+    buildFlightSortVariants: ({ buildUrl }: { buildUrl: (mode: string) => string }) => {
+      assert.ok(new URL(buildUrl("fastest")).pathname.includes("/bgo/csha/"));
+      return {};
+    },
+  });
+  const offer = await find(meta, "BGO → SHA", "", new Map());
+  assert.equal(offer?.amount, 8014);
+  assert.ok(new URL(offer.productUrl).pathname.includes("/bgo/csha/"));
+  assert.deepEqual(requests, [["BGO", "inputorigin", "airport"], ["SHA", "inputdestination", "city"]]);
+});
+
+test("city/airport scope separates caches and controls expansion of ambiguous airport codes", async () => {
+  const city: FlightSearchMeta = { ...searches[0]!, destination: "SHA", destinationScope: "city" };
+  const airport = { ...city, destinationScope: "airport" as const };
+  const key = loadFunction("buildFlightSearchMetaKey", {});
+  assert.notEqual(await key(city), await key(airport));
+  const lookup = loadFunction("buildFlightAirportLookup", {
+    uniqueStrings: (values: string[]) => [...new Set(values)],
+    STATIC_FLIGHT_METROPOLITAN_AIRPORTS: {},
+    fetchFlightAirportData: async () => [
+      { code: "SHA", cityCode: "SHA", iataType: "airport", flightable: true },
+      { code: "PVG", cityCode: "SHA", iataType: "airport", flightable: true },
+    ],
+  });
+  assert.deepEqual((await lookup(city)).get("SHA"), ["SHA", "PVG"]);
+  assert.equal((await lookup(airport)).has("SHA"), false);
+});
+
+test("PanFlights sends the resolved city ID to the search API while retaining IATA metadata", async () => {
+  const meta = { ...searches[0]!, destination: "SHA", destinationScope: "city" as const };
+  const payload = loadFunction("buildPanFlightsFlightSearchPayload", {
+    ...flightSearch,
+    splitIsoDateParts: loadFunction("splitIsoDateParts", {}),
+    buildPanFlightsCabinClass: loadFunction("buildPanFlightsCabinClass", {}),
+    PANFLIGHTS_FLIGHT_HITS_LIMIT: 500,
+    navigator: { userAgent: "fixture" },
+  });
+  let sent: Record<string, any> | undefined;
+  const request = loadFunction("fetchPanFlightsFlightSearchResult", {
+    buildPanFlightsFlightSearchPayload: payload,
+    PANFLIGHTS_FLIGHT_SEARCH_ENDPOINTS: ["https://example.test/flights"],
+    userscriptJsonRequest: async (_url: string, init: { body: string }) => {
+      sent = JSON.parse(new URLSearchParams(init.body).get("data")!);
+      return { flighttab: [] };
+    },
+    isRecord: (value: unknown) => typeof value === "object" && value !== null,
+  });
+  await request(meta, { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 }, undefined,
+    { origin: "BGO", destination: "2105" });
+  assert.ok(sent);
+  const serialized = JSON.stringify(sent);
+  assert.ok(serialized.includes('"tolocsid":"2105"'));
+  assert.ok(serialized.includes('"fromlocsid":"BGO"'));
+  assert.equal(meta.destination, "SHA");
 });
 
 test("momondo: an unqualified visible Best price cannot override a baggage-filtered fare", async () => {

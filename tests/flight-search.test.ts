@@ -32,6 +32,7 @@ import {
   readKiwiCardLegTimeRange,
   readTripComJourneyLeg,
   readKiwiDetailLegRoutes,
+  readKiwiPrebookingLegRoutes,
   readKiwiDatePart,
   readKiwiSearchPath,
   readKiwiSortTabText,
@@ -57,6 +58,11 @@ import {
   listFlightDateFlexCombinations,
   matchPanFlightsFlightSearchDates,
   normalizeFlightSearchMeta,
+  readFinnFlightPlace,
+  readSkyscannerFlightPlaceCode,
+  selectSkyscannerFlightPlace,
+  selectPanFlightsCityPlaceId,
+  formatFlightDurationLimit,
   readAirFranceKlmFlightSearchMeta,
   readAmadeusAirBoundsFlightSearchMeta,
   readFlightLinkFilters,
@@ -80,6 +86,61 @@ const NOW = new Date("2026-11-02T12:00:00Z");
 function meta(overrides: Partial<FlightSearchMeta> = {}): FlightSearchMeta {
   return { origin: "OSL", destination: "BGO", outboundDate: "2026-12-05", adults: 1, youths: 0, children: 0, infants: 0, ...overrides };
 }
+
+test("FINN preserves city selections and explicit airport filters without choosing the first airport", () => {
+  assert.deepEqual(readFinnFlightPlace("PVG,SHA", "SHA.METROPOLITAN_AREA"), { code: "SHA", scope: "city" });
+  assert.deepEqual(readFinnFlightPlace("TRF,OSL", "OSL.METROPOLITAN_AREA"), { code: "OSL", scope: "city" });
+  assert.deepEqual(readFinnFlightPlace("SHA", "SHA.METROPOLITAN_AREA"), { code: "SHA", scope: "airport" });
+  assert.deepEqual(readFinnFlightPlace("PVG", "SHA.METROPOLITAN_AREA"), { code: "PVG", scope: "airport" });
+  assert.deepEqual(readFinnFlightPlace(null, "BGO.AIRPORT"), { code: "BGO", scope: "airport" });
+  assert.equal(readFinnFlightPlace(null, null), undefined);
+  const normalized = normalizeFlightSearchMeta(meta({ originScope: "airport", destinationScope: "city" }));
+  assert.equal(normalized?.originScope, "airport");
+  assert.equal(normalized?.destinationScope, "city");
+});
+
+test("Skyscanner selects and links the requested city rather than the airport sharing its IATA code", () => {
+  const airport = { skyId: "SHA", entityId: "hongqiao", flightPlaceType: "AIRPORT" as const };
+  const city = { skyId: "CSHA", entityId: "shanghai", flightPlaceType: "CITY" as const };
+  assert.equal(selectSkyscannerFlightPlace("SHA", [airport], [city], "city"), city);
+  assert.equal(selectSkyscannerFlightPlace("SHA", [airport], [city], "airport"), airport);
+  assert.equal(selectSkyscannerFlightPlace("SHA", [airport], [], "city"), undefined);
+  assert.equal(selectSkyscannerFlightPlace("SHA", [], [city], "airport"), undefined);
+  assert.equal(selectSkyscannerFlightPlace("SHA", [airport], [city], undefined, true), city);
+  assert.equal(selectSkyscannerFlightPlace("SHA", [{ ...airport, skyId: "PVG" }], [], "airport"), undefined);
+  const flight = meta({ origin: "BGO", destination: "SHA", destinationScope: "city", maxDurationMinutes: 1245 });
+  const url = new URL(buildSkyscannerFlightSearchUrl(flight, "best", { origin: "BGO", destination: city.skyId }));
+  assert.equal(url.pathname, "/transport/flights/bgo/csha/261205/");
+  assert.equal(url.searchParams.get("duration"), "1245");
+  assert.deepEqual(readSkyscannerFlightPlaceCode("csha"), { code: "SHA", scope: "city" });
+  assert.deepEqual(readSkyscannerFlightPlaceCode("sha"), { code: "SHA", scope: "airport" });
+  assert.deepEqual(readSkyscannerFlightPlaceCode("osla"), { code: "OSL", scope: "city" });
+  assert.equal(readSkyscannerFlightPlaceCode("invalid"), undefined);
+});
+
+test("duration limits stay exact even when FINN displays only whole hours", () => {
+  assert.equal(formatFlightDurationLimit(1245), "≤20t 45m");
+  assert.equal(formatFlightDurationLimit(1200), "≤20t");
+  assert.equal(formatFlightDurationLimit(1305), "≤21t 45m");
+  const flight = meta({ maxDurationMinutes: 1245 });
+  assert.equal(exceedsFlightMaxDuration(flight, [1245, 900]), false);
+  assert.equal(exceedsFlightMaxDuration(flight, [1246, 900]), true);
+  assert.equal(new URL(buildFinnFlightSearchUrl(flight)).searchParams.get("durationTo"), "1245");
+});
+
+test("PanFlights resolves the public city ID without confusing a similarly named place or an airport", () => {
+  const places = [
+    { sid: "SHA", type: 0, stationtype: "air", shortname: "Shanghai" },
+    { sid: "2105", type: 4, shortname: "Shanghai" },
+    { sid: "PVG", type: 0, stationtype: "air", shortname: "Shanghai" },
+    { sid: "3558", type: 4, shortname: "Shantou" },
+  ];
+  assert.equal(selectPanFlightsCityPlaceId("SHA", places), "2105");
+  assert.equal(selectPanFlightsCityPlaceId("SHA", places.filter((place) => place.type === 0)), undefined);
+  assert.equal(selectPanFlightsCityPlaceId("SHA", [...places, { sid: "9999", type: 4, shortname: "Shanghai" }]), undefined);
+  const url = new URL(buildPanFlightsFlightSearchUrl(meta({ destination: "SHA", destinationScope: "city" }), "best", { origin: "OSL", destination: "2105" }));
+  assert.equal(url.searchParams.get("v2"), "OSL_2105_20261205");
+});
 
 // Utdrag av ekte svar fra skypickersearchsingle (PVG–BGO tur/retur, hentet 2026-11-01).
 function panFlightsItem(input: {
@@ -208,6 +269,13 @@ test("matches PanFlights trips inside the date window and reads stops and durati
   const item = panFlightsItem({ outbound: Date.UTC(2026, 10, 7, 11) / 1000, inbound: Date.UTC(2026, 10, 19, 9) / 1000, legduration: 1690 });
   assert.deepEqual(matchPanFlightsFlightSearchDates(item, roundTrip, window), { outboundDate: "2026-11-07", inboundDate: "2026-11-19" });
   assert.equal(matchPanFlightsFlightSearchDates(item, roundTrip, undefined), undefined);
+  // Bysøk: PanFlights svarer med flyplassen (PVG), ikke byens kode (SHA).
+  const citySearch = { ...roundTrip, origin: "SHA", originScope: "city" as const };
+  assert.equal(matchPanFlightsFlightSearchDates(item, citySearch, window), undefined);
+  assert.deepEqual(
+    matchPanFlightsFlightSearchDates(item, citySearch, window, { origin: new Set(["SHA", "PVG"]), destination: new Set(["BGO"]) }),
+    { outboundDate: "2026-11-07", inboundDate: "2026-11-19" },
+  );
 
   assert.deepEqual(readPanFlightsLegStopCounts(item), [2, 1]);
   assert.deepEqual(readPanFlightsLegDurationsMinutes(item, true), [1690]);
@@ -931,4 +999,17 @@ test("Trip.com legs include stops on the same flight number", () => {
   const unknownStop = { ...journey, transSectionList: [section("BGO", "HEL", "AY806", "AY", "2026-11-11 10:25:00", "2026-11-11 15:05:00", [{ duration: 25 }])] };
   assert.equal(readTripComJourneyLeg(unknownStop, {}).route, undefined);
   assert.equal(readTripComJourneyLeg(unknownStop, {}).stopCount, 1);
+});
+
+test("Kiwi prebooking state gives the legs when the detail view has no stop rows", () => {
+  // `prebooking` fra Kiwi BGO⇄SHA 11.11.–17.12.2026 (hentet 2026-11-05), KLM via AMS begge veier.
+  const prebooking = Buffer.from(JSON.stringify({
+    r: "KL:1164:BGO:1794390600:AMS:1794397200:economy:False:::KL|KL:895:AMS:1794401400:PVG:1794445800:economy:False:::KL|KL:896:PVG:1797477000:AMS:1797528300:economy:False:::KL|KL:1171:AMS:1797540300:BGO:1797546300:economy:False:::KL",
+    i: ["1f84_0|1f84_1", "1f84_2|1f84_3"], thc: 0, tat: 0, vi: 0, t: "RT",
+  })).toString("base64");
+  const sectors = [{ destination: "PVG", stopCount: 1 }, { destination: "BGO", stopCount: 1 }];
+  assert.deepEqual(readKiwiPrebookingLegRoutes(prebooking, sectors), ["BGO → AMS → PVG", "PVG → AMS → BGO"]);
+  assert.deepEqual(readKiwiPrebookingLegRoutes(prebooking, [{ destination: "PVG", stopCount: 1 }]), []);
+  assert.deepEqual(readKiwiPrebookingLegRoutes(prebooking, [{ destination: "PVG", stopCount: 2 }, { destination: "BGO", stopCount: 1 }]), ["", "PVG → AMS → BGO"]);
+  assert.deepEqual(readKiwiPrebookingLegRoutes("not base64 json", sectors), []);
 });
