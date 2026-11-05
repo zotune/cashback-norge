@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-05T09:57:45.137Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-05T13:09:54.839Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1444,6 +1444,7 @@
 "braspill.no/products/black-bolt-3-pack-blister":23036,
 "braspill.no/products/black-bolt-japansk-boosterpakke":3315,
 "braspill.no/products/clay-burst-japansk-boosterpakke":4793,
+"braspill.no/products/evolving-skies-sleeved-boosterpakke":4336,
 "braspill.no/products/forhandsbestilling-pokemon-blister-pack-mega-evolution-30th-celebration-2-pack-blister-collection-eevee-2-boosters-risk-of-allocation":12988,
 "braspill.no/products/forhandssalg-pokemon-paldean-fates-tin-charizard-ventes-inn-29-april":6091,
 "braspill.no/products/forhandssalg-pokemon-paldean-fates-tin-great-tusk-ventes-inn-29-april":5182,
@@ -1476,6 +1477,7 @@
 "braspill.no/products/pokemon-darkness-ablaze-booster-pack":5108,
 "braspill.no/products/pokemon-destined-rivals-boosterpakke":3321,
 "braspill.no/products/pokemon-destined-rivals-elite-trainer-box":3544,
+"braspill.no/products/pokemon-evolving-skies-3-pack-blister":4318,
 "braspill.no/products/pokemon-inferno-x-boosterpakke-jpn":3313,
 "braspill.no/products/pokemon-inferno-x-japansk-display-booster-box":3379,
 "braspill.no/products/pokemon-japansk-first-partner-illustration-collection-komplett-sett-alle-9-boksene":25734,
@@ -2410,6 +2412,8 @@
 "epicards.no/products/pokemon-151-blooming-waters-premium-collection":3419,
 "epicards.no/products/pokemon-151-booster-bundle":3351,
 "epicards.no/products/pokemon-151-japansk-booster-box":4463,
+"epicards.no/products/pokemon-30th-anniversary-japansk-booster-box":12613,
+"epicards.no/products/pokemon-30th-celebration-japansk-booster-pakke":13523,
 "epicards.no/products/pokemon-abyss-eye-japansk-booster-box":10489,
 "epicards.no/products/pokemon-abyss-eye-japansk-booster-pakke":11962,
 "epicards.no/products/pokemon-ascended-heroes-booster-bundle":4589,
