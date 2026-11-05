@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1793841824
+// @version      1793842060
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -918,7 +918,7 @@
           if (/HTTP (?:403|429)/.test(text)) blocked = true;
         }
       }));
-      const plans = eligible.sort((a, b) => a.amount - b.amount || a.productName.localeCompare(b.productName, "nb")).filter((plan, index, sorted) => sorted.findIndex((other) => other.mobile.networkId === plan.mobile.networkId) === index);
+      const plans = selectMobileComparisonPlans(eligible);
       for (const network of TEK_MOBILE_NETWORKS) {
         if (!plans.some((plan) => plan.mobile.networkId === network.id) && !warnings.some((text) => text.startsWith(`${network.name}:`))) {
           warnings.push(`${network.name}: ${blocked ? "oppslag stoppet etter blokkering/ratebegrensning" : "ingen sammenlignbare treff"}`);
@@ -966,6 +966,15 @@
         ].join("\n\n")
       };
     });
+  }
+  const MOBILE_CHEAPEST_OVERALL_COUNT = 3;
+  function selectMobileComparisonPlans(eligible) {
+    const sorted = [...eligible].sort((a, b) => a.amount - b.amount || a.productName.localeCompare(b.productName, "nb")).filter((plan, index, all) => all.findIndex((other) => other.shopName === plan.shopName && other.productName === plan.productName && other.amount === plan.amount && other.mobile.networkId === plan.mobile.networkId) === index);
+    const selected = sorted.slice(0, MOBILE_CHEAPEST_OVERALL_COUNT);
+    for (const plan of sorted) {
+      if (!selected.some((other) => other.mobile.networkId === plan.mobile.networkId)) selected.push(plan);
+    }
+    return selected.sort((a, b) => a.amount - b.amount || a.productName.localeCompare(b.productName, "nb"));
   }
   function mobileTierLabel(m) {
     return m.category === "broadband" ? `Mobilt bredbånd · ≥${m.requestedGb} GB` : m.category === "unlimited" ? "Fri data" : m.requestedGb === 0 ? "0 GB" : `≥${m.requestedGb} GB`;
@@ -21574,7 +21583,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
     const heading = document.createElement("p");
     heading.className = "electricity-tooltip-heading";
-    heading.textContent = `${mobileTierLabel(offer.mobile)} · billigste per nett`;
+    heading.textContent = `${mobileTierLabel(offer.mobile)} · billigste, og billigste per nett`;
     const basis = document.createElement("p");
     basis.className = "electricity-tooltip-basis";
     basis.textContent = offer.mobile.requestedGb === 0 ? "Beregnet uten databruk, med 5 000 ringeminutter og 5 000 meldinger i Norge. Bruksbasert data koster ekstra." : "Beregnet månedspris for datatrinnet, 5 000 ringeminutter og 5 000 meldinger i Norge. Eventuelle datapakker er inkludert i estimatet.";

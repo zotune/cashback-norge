@@ -60,8 +60,7 @@ export async function findMobilePriceMatches(message: GetPriceMatchForProductMes
         if (/HTTP (?:403|429)/.test(text)) blocked = true;
       }
     }));
-    const plans = eligible.sort((a, b) => a.amount - b.amount || a.productName!.localeCompare(b.productName!, "nb"))
-      .filter((plan, index, sorted) => sorted.findIndex((other) => other.mobile!.networkId === plan.mobile!.networkId) === index);
+    const plans = selectMobileComparisonPlans(eligible);
     for (const network of TEK_MOBILE_NETWORKS) {
       if (!plans.some((plan) => plan.mobile!.networkId === network.id) && !warnings.some((text) => text.startsWith(`${network.name}:`))) {
         warnings.push(`${network.name}: ${blocked ? "oppslag stoppet etter blokkering/ratebegrensning" : "ingen sammenlignbare treff"}`);
@@ -104,6 +103,21 @@ export async function findMobilePriceMatches(message: GetPriceMatchForProductMes
         "Kildens beregnede månedspris inkluderer eventuelle datapakker og brukskostnader. Se hastighetsgrenser og vilkår. Unge-/kontantkort, familiepakker og egne dagskvoter er utelatt.",
         ...(errors.length || warnings.length ? [`Ufullstendig oppslag: ${[...errors, ...warnings].join("; ")}`] : [])].join("\n\n") };
   });
+}
+
+// Tooltipen viser de billigste uansett nett, og i tillegg billigste på hvert nett som ikke
+// allerede er med. Samme abonnement fra nettoppslaget telles bare én gang.
+export const MOBILE_CHEAPEST_OVERALL_COUNT = 3;
+export function selectMobileComparisonPlans(eligible: PriceMatchAlternative[]): PriceMatchAlternative[] {
+  const sorted = [...eligible]
+    .sort((a, b) => a.amount - b.amount || a.productName!.localeCompare(b.productName!, "nb"))
+    .filter((plan, index, all) => all.findIndex((other) => other.shopName === plan.shopName && other.productName === plan.productName &&
+      other.amount === plan.amount && other.mobile!.networkId === plan.mobile!.networkId) === index);
+  const selected = sorted.slice(0, MOBILE_CHEAPEST_OVERALL_COUNT);
+  for (const plan of sorted) {
+    if (!selected.some((other) => other.mobile!.networkId === plan.mobile!.networkId)) selected.push(plan);
+  }
+  return selected.sort((a, b) => a.amount - b.amount || a.productName!.localeCompare(b.productName!, "nb"));
 }
 
 export function mobileTierLabel(m: MobilePriceDetails): string {

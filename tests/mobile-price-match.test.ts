@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { findMobilePriceMatches, isMobilePriceDetails, mobileTierLabel } from "../src/shared/mobile-price-match.js";
+import { findMobilePriceMatches, isMobilePriceDetails, mobileTierLabel, selectMobileComparisonPlans } from "../src/shared/mobile-price-match.js";
 import { buildMobileSupplierCatalog, findMobileSupplier, isMobileSupplierCatalog } from "../src/shared/mobile-suppliers.js";
 import { getTekCataloguePlans, tekPlansUrl } from "../src/shared/tek-mobile-api.js";
 import { findPriceMatches } from "../src/shared/price-match.js";
@@ -39,8 +39,10 @@ test("Tek: separate rows and correctly scoped alternatives for every data bracke
   assert.equal(new URL(five.productUrl).searchParams.get("data"), "5000");
   for (const offer of offers) {
     assert.ok(isMobilePriceDetails(offer.mobile));
-    assert.ok(offer.alternatives!.length > 0 && offer.alternatives!.length <= 3);
-    assert.deepEqual(offer.alternatives!.map((x) => x.mobile!.networkId).sort(), [1, 2, 3]);
+    assert.ok(offer.alternatives!.length >= 3);
+    assert.deepEqual([...new Set(offer.alternatives!.map((x) => x.mobile!.networkId))].sort(), [1, 2, 3]);
+    // Minst de tre billigste uansett nett, i prisrekkefølge.
+    assert.deepEqual(offer.alternatives!.map((x) => x.amount), [...offer.alternatives!.map((x) => x.amount)].sort((a, b) => a - b));
     assert.ok(offer.alternatives!.every((x) => x.mobile?.category === offer.mobile?.category && x.mobile?.requestedGb === offer.mobile?.requestedGb));
   }
   const unlimited = offers.find((x) => x.mobile?.category === "unlimited")!;
@@ -81,7 +83,7 @@ test("Tek: a missing-network failure leaves the other networks, and a wrongly fi
     return base(url, init);
   });
   const ten = offers.find((offer) => offer.mobile?.category === "mobile" && offer.mobile.requestedGb === 10)!;
-  assert.deepEqual(ten.alternatives!.map((plan) => plan.mobile!.networkId).sort(), [1, 2]);
+  assert.deepEqual([...new Set(ten.alternatives!.map((plan) => plan.mobile!.networkId))].sort(), [1, 2]);
   assert.match(ten.details!, /Ice: HTTP 503/);
   const invalid = await findMobilePriceMatches(message, async (url, init) => {
     if (new URL(url).searchParams.get("filter[network]") === "3") return fixture()[10];
@@ -167,4 +169,16 @@ test("shared catalogue store: offline restart preserves newer cache and original
   const store = createPublicCatalogStore(bundle, isMobileSupplierCatalog);
   await store.load(async () => { throw new Error("offline"); }, { read: async () => newer, write: async (value) => { saved = value; } });
   assert.equal(store.get()?.generatedAt, newer.generatedAt); assert.deepEqual(saved, newer);
+});
+
+test("Tek: tooltip lists the three cheapest plans and the cheapest on each remaining network", () => {
+  const plan = (productName: string, amount: number, networkId: number) => ({
+    shopName: productName, productName, amount, price: `${amount} kr/mnd`, currency: "NOK",
+    mobile: { category: "mobile" as const, requestedGb: 10, includedGb: 10, network: String(networkId), networkId, unlimitedData: false },
+  });
+  const selected = selectMobileComparisonPlans([
+    plan("Ice Max", 299, 3), plan("PlussMobil", 198, 1), plan("Happybytes", 205, 1), plan("Verimo", 210, 1),
+    plan("Chilimobil", 249, 2), plan("Verimo", 210, 1), plan("Talkmore", 260, 1),
+  ]);
+  assert.deepEqual(selected.map((x) => x.productName), ["PlussMobil", "Happybytes", "Verimo", "Chilimobil", "Ice Max"]);
 });

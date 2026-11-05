@@ -14315,7 +14315,7 @@ function buildMobileTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void 
   tooltip.classList.add("electricity-comparison-tooltip", "cbn-tooltip-details");
   const heading = document.createElement("p");
   heading.className = "electricity-tooltip-heading";
-  heading.textContent = `${mobileTierLabel(offer.mobile!)} · billigste per nett`;
+  heading.textContent = `${mobileTierLabel(offer.mobile!)} · billigste, og billigste per nett`;
   const basis = document.createElement("p");
   basis.className = "electricity-tooltip-basis";
   basis.textContent = offer.mobile!.requestedGb === 0
