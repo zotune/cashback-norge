@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Cashback Norge",
   "description": "Shows cashback offers for supported stores.",
-  "version": "0.2.29",
+  "version": "0.2.31",
   "permissions": [
     "storage",
     "unlimitedStorage",

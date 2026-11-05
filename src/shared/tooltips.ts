@@ -21,7 +21,9 @@ export function createTooltipController(root: Document | ShadowRoot) {
   let active: { button: HTMLButtonElement; tooltip: HTMLElement; style: string | null; topLayer: boolean } | undefined;
 
   // The mascot is a large data URL; create it on first hover or tap, not once per tooltip in long lists.
+  // Tette lister (f.eks. flyreisenes etappelinjer) trenger bredden mer enn maskoten.
   const addMascot = (tooltip: HTMLElement) => {
+    if (tooltip.classList.contains("cbn-tooltip--no-mascot")) return;
     if (tooltip.querySelector(".cbn-tooltip-mascot")) return;
     tooltip.classList.add("cbn-has-quokka");
     const mascot = doc.createElement("span");

@@ -287,13 +287,174 @@ export function limitFlightCandidates<T extends FlightSortableCandidate>(candida
   return limited;
 }
 
+export type FlightSegmentAirports = { origin?: string | undefined; destination?: string | undefined };
+
+// Etappens faktiske rute fra flyvningene: PVG→HEL + HEL→BGO gir «PVG → HEL → BGO».
+// Bytte av flyplass i overgangen vises som «TRF/OSL». Ukjent flyplass, eller flere stopp
+// enn flyvningene viser (mellomlanding på samme flynummer uten flyplass), gir ingen rute.
+export function formatFlightLegRoute(segments: FlightSegmentAirports[], stopCount?: number): string | undefined {
+  if (segments.length === 0) return undefined;
+  if (stopCount !== undefined && stopCount !== segments.length - 1) return undefined;
+  const codes = segments.map((segment) => ({
+    origin: readIataCodeValue(segment.origin),
+    destination: readIataCodeValue(segment.destination),
+  }));
+  if (codes.some((segment) => segment.origin === undefined || segment.destination === undefined)) return undefined;
+  const stops = codes.map((segment, index) => {
+    if (index === 0) return segment.origin!;
+    const arrival = codes[index - 1]!.destination!;
+    return arrival === segment.origin ? arrival : `${arrival}/${segment.origin}`;
+  });
+  return [...stops, codes[codes.length - 1]!.destination!].join(" → ");
+}
+
+// Detaljer per etappe (tur, retur) slik kilden oppgir dem. Panelet og tooltipen viser
+// én linje per etappe; ukjente felter utelates i stedet for å gjettes.
+export type FlightLegDetails = {
+  durationMinutes?: number;
+  stopCount?: number;
+  route?: string;
+  carriers?: string[];
+  timeRange?: string;
+};
+
+const FLIGHT_BAGGAGE_TEXT_PATTERN = /bagasje|innsjekk|baggage|carry.?on|cabin.?bag|checked.?bag/i;
+
+export function formatCompactFlightDuration(minutes: number | undefined): string | undefined {
+  if (minutes === undefined || !Number.isFinite(minutes) || minutes <= 0) return undefined;
+  const totalMinutes = Math.round(minutes);
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  if (hours <= 0) return `${remainingMinutes}m`;
+  return remainingMinutes === 0 ? `${hours}t` : `${hours}t ${remainingMinutes}m`;
+}
+
+export function formatFlightClockRange(departure: string | undefined, arrival: string | undefined): string | undefined {
+  const clock = (value: string | undefined) => value?.match(/[T ](\d{2}):(\d{2})/)?.slice(1, 3).join(":");
+  const departureClock = clock(departure);
+  const arrivalClock = clock(arrival);
+  return departureClock !== undefined && arrivalClock !== undefined ? `${departureClock}-${arrivalClock}` : undefined;
+}
+
+export function buildFlightLegDetails(
+  leg: { durationMinutes?: number | undefined; stopCount?: number | undefined; route?: string | undefined; departureTime?: string | undefined; arrivalTime?: string | undefined },
+  carriers?: string[],
+  timeRange = formatFlightClockRange(leg.departureTime, leg.arrivalTime),
+): FlightLegDetails {
+  const uniqueCarriers = [...new Set(carriers ?? [])];
+  return {
+    ...(leg.durationMinutes !== undefined && leg.durationMinutes > 0 ? { durationMinutes: leg.durationMinutes } : {}),
+    ...(leg.stopCount !== undefined ? { stopCount: leg.stopCount } : {}),
+    ...(leg.route !== undefined ? { route: leg.route } : {}),
+    ...(uniqueCarriers.length > 0 ? { carriers: uniqueCarriers } : {}),
+    ...(timeRange !== undefined ? { timeRange } : {}),
+  };
+}
+
+// PanFlights (Kiwi-data): tripdata er turen og backdata (eller neste routelist-rad) returen.
+// spec[] er flyvningene som «FRA;TIL;selskap;flynr;avgang;ankomst;…», og dTime/aTime
+// (drTime/arTime for backdata) er lokale klokkeslett lagret som UTC-epoker (verifisert
+// 2026-11-05 mot Trip.coms tider for samme flyvninger).
+export function readPanFlightsFlightLegs(
+  item: Record<string, unknown>,
+  legMinutes: Array<number | undefined>,
+  legStopCounts: Array<number | undefined>,
+): FlightLegDetails[] | undefined {
+  const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
+  const outboundRoute = routeList[0];
+  const returnFromBackdata = isRecord(outboundRoute?.backdata);
+  const legSources: Array<{ data: unknown; departure: unknown; arrival: unknown }> = [
+    { data: outboundRoute?.tripdata, departure: outboundRoute?.dTime, arrival: outboundRoute?.aTime },
+    returnFromBackdata
+      ? { data: outboundRoute?.backdata, departure: outboundRoute?.drTime, arrival: outboundRoute?.arTime }
+      : { data: routeList[1]?.tripdata, departure: routeList[1]?.dTime, arrival: routeList[1]?.aTime },
+  ];
+  const localClock = (epochSeconds: unknown): string | undefined => {
+    const seconds = readPositiveNumberValue(epochSeconds);
+    return seconds !== undefined ? new Date(seconds * 1000).toISOString() : undefined;
+  };
+  const legs = legMinutes.map((durationMinutes, index) => {
+    const source = legSources[index];
+    const data = isRecord(source?.data) ? source.data : undefined;
+    const stopCount = legStopCounts[index];
+    const specs = Array.isArray(data?.spec) ? data.spec.filter(isString) : [];
+    const route = formatFlightLegRoute(specs.map((spec) => {
+      const [origin, destination] = spec.split(";");
+      return { origin, destination };
+    }), stopCount);
+    const carriers = (readStringValue(data?.airlines) ?? "")
+      .split(",")
+      .map((carrier) => carrier.trim())
+      .filter((carrier) => carrier.length > 0);
+    return buildFlightLegDetails({
+      durationMinutes,
+      stopCount,
+      route,
+      departureTime: localClock(source?.departure),
+      arrivalTime: localClock(source?.arrival),
+    }, carriers);
+  });
+  return legs.some((leg) => Object.keys(leg).length > 0) ? legs : undefined;
+}
+
+// Bare tur/retur får etikett; én etappe står uten.
+export function flightLegLabel(index: number, legCount: number): string | undefined {
+  if (legCount < 2) return undefined;
+  if (legCount === 2) return index === 0 ? "Tur" : "Retur";
+  return `Etappe ${index + 1}`;
+}
+
+// Kjente mellomlandinger («via FRA», «via MAN, TRF/OSL»), ellers antall stopp.
+export function formatFlightLegStops(leg: FlightLegDetails): string | undefined {
+  if (leg.route !== undefined) {
+    const stops = leg.route.split(" → ").slice(1, -1);
+    return stops.length === 0 ? "direkte" : `via ${stops.join(", ")}`;
+  }
+  if (leg.stopCount === undefined) return undefined;
+  return leg.stopCount === 0 ? "direkte" : `${leg.stopCount} stopp`;
+}
+
+// Panelraden: reisetid og stopp. Søkets endepunkter er like på alle radene.
+export function flightLegPanelChipTexts(leg: FlightLegDetails): string[] {
+  return [formatCompactFlightDuration(leg.durationMinutes), formatFlightLegStops(leg)]
+    .filter((text): text is string => text !== undefined);
+}
+
+// Tooltipen: hele ruten (eller antall stopp), reisetid, flyselskap og klokkeslett.
+export function flightLegTooltipChipTexts(leg: FlightLegDetails): string[] {
+  const carriers = leg.carriers !== undefined ? [...new Set(leg.carriers)].join("+") : undefined;
+  return [
+    leg.route ?? formatFlightLegStops(leg),
+    formatCompactFlightDuration(leg.durationMinutes),
+    carriers,
+    leg.timeRange,
+  ].filter((text): text is string => text !== undefined && text.length > 0);
+}
+
+// Kildenes platform-tekst gjentar etappenes stopp, tider, varighet og flyselskap. Med
+// etappelinjer vises bare det som er igjen (f.eks. selger, «billigst», valutamerknad).
+export function flightTooltipExtraTexts(platform: string | undefined, legs: FlightLegDetails[]): string[] {
+  const perLegCarriers = legs.map((leg) => [...new Set(leg.carriers ?? [])].join("+")).filter((text) => text.length > 0);
+  const allCarriers = [...new Set(legs.flatMap((leg) => leg.carriers ?? []))];
+  const carrierTexts = new Set([
+    ...perLegCarriers,
+    perLegCarriers.join(" / "),
+    [...new Set(perLegCarriers)].join(" / "),
+    allCarriers.join("/"),
+    allCarriers.join("+"),
+  ]);
+  const legFact = /^(?:(?:\d+ stopp|direkte)(?: \/ (?:\d+ stopp|direkte))*|\d{2}:\d{2}-\d{2}:\d{2}(?: \/ \d{2}:\d{2}-\d{2}:\d{2})*|(?:\d+ t(?: \d+ min)?|\d+ min)(?: \/ (?:\d+ t(?: \d+ min)?|\d+ min))*)$/;
+  return [...new Set(platform?.split(/,\s*/) ?? [])]
+    .filter((text) => text.length > 0 && !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text) && !legFact.test(text) && !carrierTexts.has(text));
+}
+
 // Bagasjevalget står i søkets felles chips. Treffradene viser bare detaljene
 // som skiller avgangene; bagasjekrav kontrolleres før priser blir valgt.
 export function flightTooltipChipTexts(candidate: { durationText?: string; platform?: string }): string[] {
   return [...new Set([
     ...(candidate.durationText?.split(" · ") ?? []),
     ...(candidate.platform?.split(/,\s*/) ?? []),
-  ])].filter((text) => !/bagasje|innsjekk|baggage|carry.?on|cabin.?bag|checked.?bag/i.test(text));
+  ])].filter((text) => !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text));
 }
 
 export type FlightSortVariant = {
@@ -305,11 +466,13 @@ export type FlightSortVariant = {
   productUrl: string;
   offerUrl?: string;
   durationText?: string;
+  flightLegs?: FlightLegDetails[];
   durationMinutes?: number;
 };
 
 type FlightSortableOffer = FlightSortableCandidate & {
   durationText?: string;
+  flightLegs?: FlightLegDetails[];
   alternatives?: FlightSortableCandidate[];
   flightSortVariants?: Partial<Record<"cheapest" | "fastest", FlightSortVariant>>;
 };
@@ -328,7 +491,7 @@ export function applyFlightSortMode<T extends FlightSortableOffer>(offers: T[], 
   return offers
     .map((offer) => {
       const variant = offer.flightSortVariants?.[mode];
-      const { durationText: _durationText, durationMinutes: _durationMinutes, ...base } = offer;
+      const { durationText: _durationText, flightLegs: _flightLegs, durationMinutes: _durationMinutes, ...base } = offer;
       const selected = (variant !== undefined ? { ...base, ...variant } : offer) as T;
       return selected.alternatives !== undefined
         ? { ...selected, alternatives: [...selected.alternatives].sort(compare) }
@@ -1211,7 +1374,44 @@ export function readKiwiBagsParam(value: string | null): Pick<FlightSearchMeta, 
 export const KIWI_PRICE_PROBE_PARAM = "cbvPriceProbe";
 export type KiwiSortPrice = { amount: number; durationMinutes: number };
 // topCardSectors: teksten per etappe på det øverste kortet (datoer vises bare ved datovindu).
-export type KiwiSortPrices = Partial<Record<FlightSortMode, KiwiSortPrice>> & { topCardSectors?: string[] };
+// topCardRoutes: ruten per etappe fra kortets detaljvisning ("" når den ikke kunne leses).
+// topCardCarriers: flyselskapene per etappe fra kortets logoer.
+export type KiwiSortPrices = Partial<Record<FlightSortMode, KiwiSortPrice>> & {
+  topCardSectors?: string[];
+  topCardRoutes?: string[];
+  topCardCarriers?: string[][];
+};
+
+// Kiwi viser bare byene for mellomlandingene på kortet («2 stopp · Manchester, Oslo»).
+// Detaljvisningen (PrebookingTripDetails) har én SegmentStop med klokkeslett for avgang og
+// ankomst per flyvning, «Manchester ∙ MAN» (verifisert 2026-11-05). Ved «skjult by» står
+// billettens egentlige endedestinasjon som en ekstra rad uten klokkeslett; den utelates. Flyvningene deles i
+// etapper ved kortets endepunkter; stemmer ikke antall eller stopp, gis ingen rute.
+export function readKiwiDetailLegRoutes(
+  stopCodes: string[],
+  sectors: Array<{ destination: string | undefined; stopCount: number | undefined }>,
+): string[] {
+  if (stopCodes.length === 0 || stopCodes.length % 2 !== 0) return [];
+  const legs: FlightSegmentAirports[][] = [];
+  let current: FlightSegmentAirports[] = [];
+  for (let index = 0; index < stopCodes.length; index += 2) {
+    const segment = { origin: stopCodes[index], destination: stopCodes[index + 1] };
+    current.push(segment);
+    const sector = sectors[legs.length];
+    if (sector !== undefined && segment.destination === sector.destination &&
+      (sector.stopCount === undefined || current.length - 1 === sector.stopCount)) {
+      legs.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0 || legs.length !== sectors.length) return [];
+  return legs.map((segments, index) => formatFlightLegRoute(segments, sectors[index]?.stopCount) ?? "");
+}
+
+export function readKiwiCardLegTimeRange(text: string): string | undefined {
+  const times = text.match(/\b\d{2}:\d{2}\b/g);
+  return times !== null && times.length >= 2 ? `${times[0]}-${times[1]}` : undefined;
+}
 
 const KIWI_MONTHS = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
 

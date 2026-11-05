@@ -16,10 +16,21 @@ import {
   FLIGHT_LINK_SORT_PARAM,
   type FlightSortMode,
   limitFlightCandidates,
+  flightTooltipChipTexts,
+  formatFlightLegRoute,
+  flightLegLabel,
+  flightLegPanelChipTexts,
+  flightLegTooltipChipTexts,
+  flightTooltipExtraTexts,
+  formatFlightClockRange,
+  readPanFlightsFlightLegs,
+  readPanFlightsLegStopCounts,
   readFlightSortLabel,
   readKiwiBagsParam,
   readKiwiCardDate,
   readKiwiCardLeg,
+  readKiwiCardLegTimeRange,
+  readKiwiDetailLegRoutes,
   readKiwiDatePart,
   readKiwiSearchPath,
   readKiwiSortTabText,
@@ -57,7 +68,6 @@ import {
   readPanFlightsBaggageFee,
   readPanFlightsDateFlex,
   readPanFlightsLegDurationsMinutes,
-  readPanFlightsLegStopCounts,
   readSkyscannerFareAttributesParam,
   readSkyscannerMaxStopsParam,
   readTripComTotalDurationRange,
@@ -784,4 +794,118 @@ test("Kiwi's cards give duration and stops per leg", () => {
   assert.deepEqual(readKiwiCardLeg("07:00\n16h 05m\n06:05 +1 BGO 2 stopp · London, Paris PVG"), { durationMinutes: 965, stopCount: 2 });
   assert.deepEqual(readKiwiCardLeg("07:00 3h 10:00 OSL Direkte BGO"), { durationMinutes: 180, stopCount: 0 });
   assert.deepEqual(readKiwiCardLeg("ingen data"), {});
+});
+
+test("flight route lists connecting airports per leg for the tooltip chips", () => {
+  const outbound = formatFlightLegRoute([
+    { origin: "PVG", destination: "HEL" },
+    { origin: "hel", destination: "BGO" },
+  ], 1);
+  assert.equal(outbound, "PVG → HEL → BGO");
+  assert.equal(formatFlightLegRoute([{ origin: "OSL", destination: "BGO" }], 0), "OSL → BGO");
+  // FINN-reise med flyplassbytte (Torp → Gardermoen) mellom selvbetjente flyvninger.
+  assert.equal(formatFlightLegRoute([
+    { origin: "PVG", destination: "MAN" },
+    { origin: "MAN", destination: "TRF" },
+    { origin: "OSL", destination: "BGO" },
+  ], 2), "PVG → MAN → TRF/OSL → BGO");
+  // Mellomlanding på samme flynummer uten kjent flyplass gir ingen gjettet rute.
+  assert.equal(formatFlightLegRoute([{ origin: "HEL", destination: "BGO" }], 1), undefined);
+  assert.equal(formatFlightLegRoute([{ origin: "PVG" }, { origin: "HEL", destination: "BGO" }]), undefined);
+  assert.equal(formatFlightLegRoute([]), undefined);
+
+});
+
+test("flight legs give one labelled chip line per direction", () => {
+  assert.equal(flightLegLabel(0, 1), undefined);
+  assert.equal(flightLegLabel(0, 2), "Tur");
+  assert.equal(flightLegLabel(1, 2), "Retur");
+
+  const outbound = { durationMinutes: 1085, stopCount: 1, route: "PVG → FRA → BGO", carriers: ["Lufthansa", "Lufthansa"], timeRange: "11:55-23:00" };
+  const inbound = { durationMinutes: 1205, stopCount: 2, route: "BGO → OSL → FRA → PVG", carriers: ["SAS", "Lufthansa"], timeRange: "07:00-10:05" };
+  assert.deepEqual(flightLegPanelChipTexts(outbound), ["18t 5m", "via FRA"]);
+  assert.deepEqual(flightLegPanelChipTexts(inbound), ["20t 5m", "via OSL, FRA"]);
+  assert.deepEqual(flightLegPanelChipTexts({ durationMinutes: 55, route: "OSL → BGO" }), ["55m", "direkte"]);
+  // Uten flyplasser (PanFlights, Kiwi) vises antall stopp.
+  assert.deepEqual(flightLegPanelChipTexts({ durationMinutes: 1320, stopCount: 2 }), ["22t", "2 stopp"]);
+  assert.deepEqual(flightLegTooltipChipTexts(outbound), ["PVG → FRA → BGO", "18t 5m", "Lufthansa", "11:55-23:00"]);
+  assert.deepEqual(flightLegTooltipChipTexts({ durationMinutes: 1320, stopCount: 2 }), ["2 stopp", "22t"]);
+
+  // Platform-teksten gjentar etappefakta; bare selger og merknader står igjen.
+  assert.deepEqual(
+    flightTooltipExtraTexts("Gotogate, Lufthansa / SAS+Lufthansa, 1 stopp / 2 stopp, 11:55-23:00 / 07:00-10:05, 1 innsjekket bagasje, billigst", [outbound, inbound]),
+    ["Gotogate", "billigst"],
+  );
+  assert.deepEqual(
+    flightTooltipExtraTexts("Lufthansa/SAS, 1 stopp / 2 stopp, 18 t 5 min / 20 t 5 min, Trip.com viser 1 179 USD", [outbound, inbound]),
+    ["Trip.com viser 1 179 USD"],
+  );
+  assert.equal(formatFlightClockRange("2026-11-25T11:55:00", "2026-11-25 23:00:00"), "11:55-23:00");
+  assert.equal(formatFlightClockRange("2026-11-25", "2026-11-25T23:00:00"), undefined);
+});
+
+test("flight sort variants replace the best row's route", () => {
+  const offer = {
+    shopName: "FINN", price: "6 016 kr", amount: 6016, currency: "NOK", productUrl: "https://example.test/best",
+    durationText: "18t 55m · 1 stopp", flightLegs: [{ durationMinutes: 1135, stopCount: 1, route: "PVG → FRA → BGO" }], durationMinutes: 1135,
+    flightSortVariants: {
+      cheapest: { shopName: "FINN", price: "5 155 kr", amount: 5155, currency: "NOK", productUrl: "https://example.test/cheap", durationText: "32t 15m · 1 stopp", durationMinutes: 1935 },
+    },
+  };
+  const [cheapest] = applyFlightSortMode([offer], "cheapest");
+  assert.equal(cheapest?.flightLegs, undefined);
+  assert.equal(cheapest?.durationText, "32t 15m · 1 stopp");
+});
+
+test("PanFlights legs read airports and local times from spec and route epochs", () => {
+  // Utdrag av skypickersearchsingle PVG⇄BGO 25.11.–05.12.2026 (hentet 2026-11-05).
+  const item = {
+    package: {
+      routelist: [{
+        dTime: 1795635000,
+        aTime: 1795702500,
+        drTime: 1796479800,
+        arTime: 1796597400,
+        fly_duration_secs: 92700,
+        return_duration_secs: 92400,
+        tripdata: {
+          flyFrom: "PVG", flyTo: "BGO", airlines: "Hainan Airlines, Norwegian",
+          spec: [
+            "PVG;PEK;HU;7612;1795635000;1795643700;HU;Y;145;102547",
+            "PEK;BER;HU;489;1795663200;1795675200;HU;Y;620;488719",
+            "BER;BGO;DY;1161;1795695900;1795702500;DY;Y;110;96000",
+          ],
+        },
+        backdata: {
+          flyFrom: "BGO", flyTo: "PVG", airlines: "KLM, China Southern Airlines",
+          spec: [
+            "BGO;AMS;KL;1168;1796479800;1796486400;KL;Y;110;88117",
+            "AMS;PKX;CZ;346;1796502900;1796563200;CZ;Y;585;548735",
+            "PKX;PVG;CZ;8889;1796589000;1796597400;CZ;Y;140;124282",
+          ],
+        },
+      }],
+    },
+  };
+  const legs = readPanFlightsFlightLegs(item, readPanFlightsLegMinutes(item, true), readPanFlightsLegStopCounts(item));
+  assert.deepEqual(legs, [
+    { durationMinutes: 1545, stopCount: 2, route: "PVG → PEK → BER → BGO", carriers: ["Hainan Airlines", "Norwegian"], timeRange: "19:30-14:15" },
+    { durationMinutes: 1540, stopCount: 2, route: "BGO → AMS → PKX → PVG", carriers: ["KLM", "China Southern Airlines"], timeRange: "14:10-22:50" },
+  ]);
+  // Én vei: bare turen.
+  assert.equal(readPanFlightsFlightLegs(item, readPanFlightsLegMinutes(item, false), readPanFlightsLegStopCounts(item))?.length, 1);
+});
+
+test("Kiwi detail stops split into legs at the card's endpoints", () => {
+  // SegmentStop-kodene fra Kiwis detaljvisning PVG⇄BGO (hentet 2026-11-05), med flyplassbytte TRF/OSL.
+  const codes = ["PVG", "MAN", "MAN", "TRF", "OSL", "BGO", "BGO", "CPH", "CPH", "AMS", "AMS", "PVG"];
+  const sectors = [{ destination: "BGO", stopCount: 2 }, { destination: "PVG", stopCount: 2 }];
+  assert.deepEqual(readKiwiDetailLegRoutes(codes, sectors), ["PVG → MAN → TRF/OSL → BGO", "BGO → CPH → AMS → PVG"]);
+  // Feil antall stopp eller ufullstendige flyvninger gir ingen rute.
+  assert.deepEqual(readKiwiDetailLegRoutes(codes, [{ destination: "BGO", stopCount: 1 }, { destination: "PVG", stopCount: 2 }]), []);
+  assert.deepEqual(readKiwiDetailLegRoutes(codes.slice(0, 5), sectors), []);
+  assert.deepEqual(readKiwiDetailLegRoutes(codes.slice(0, 6), [{ destination: "BGO", stopCount: undefined }]), ["PVG → MAN → TRF/OSL → BGO"]);
+
+  assert.equal(readKiwiCardLegTimeRange("Utgående\n\n02:15\n22h\n17:15\nPVG\n\n2 stopp · flyplassbytte · Manchester, Oslo\n\nBGO"), "02:15-17:15");
+  assert.equal(readKiwiCardLegTimeRange("ingen tider"), undefined);
 });

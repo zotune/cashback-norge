@@ -96,6 +96,8 @@ import {
   type KiwiSortPrices,
   readKiwiCardDate,
   readKiwiCardLeg,
+  readKiwiCardLegTimeRange,
+  readKiwiDetailLegRoutes,
   readKiwiSortTabText,
   buildPanFlightsFlightSearchUrl,
   buildGoogleFlightsSearchUrl,
@@ -115,6 +117,16 @@ import {
   type FlightSortVariant,
   limitFlightCandidates,
   flightTooltipChipTexts,
+  formatFlightLegRoute,
+  type FlightLegDetails,
+  buildFlightLegDetails,
+  readPanFlightsFlightLegs,
+  flightLegLabel,
+  flightLegPanelChipTexts,
+  flightLegTooltipChipTexts,
+  flightTooltipExtraTexts,
+  formatCompactFlightDuration,
+  formatFlightClockRange,
   readFlightSortLabel,
   readFlightSortUrlValue,
   readKiwiBagsParam,
@@ -378,6 +390,8 @@ type PriceMatchOffer = {
   productUrl: string;
   offerUrl?: string;
   durationText?: string;
+  // Én oppføring per etappe (tur, retur) med reisetid, stopp, rute, flyselskap og tider.
+  flightLegs?: FlightLegDetails[];
   alternatives?: PriceMatchAlternative[];
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
@@ -402,6 +416,7 @@ type PriceMatchAlternative = {
   currency: string;
   platform?: string;
   durationText?: string;
+  flightLegs?: FlightLegDetails[];
   durationMinutes?: number;
   shippingPrice?: string;
   totalPrice?: string;
@@ -501,6 +516,7 @@ type SkyscannerFlightLegSummary = {
   durationMinutes?: number;
   stopCount: number;
   carrierNames: string[];
+  route?: string;
 };
 type TimedPromiseCacheEntry<T> = {
   expiresAt: number;
@@ -533,6 +549,7 @@ type MomondoFlightLegSummary = {
   durationMinutes?: number;
   stopCount: number;
   carrierCodes: string[];
+  route?: string;
 };
 type TravellinkFlightLegSummary = {
   origin: string;
@@ -543,6 +560,7 @@ type TravellinkFlightLegSummary = {
   durationMinutes?: number;
   stopCount: number;
   carrierNames: string[];
+  route?: string;
 };
 type TravellinkLocation = {
   iata: string;
@@ -1926,6 +1944,7 @@ function buildFlightDateFlexOffer(input: {
     // Datoene vises sammen med butikken på raden, og reisetiden som på vanlige søk.
     shopName: best.shopName,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.flightLegs !== undefined ? { flightLegs: best.flightLegs } : {}),
     ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     price: best.price,
     amount: best.amount,
@@ -2871,6 +2890,7 @@ function buildFlightSortVariants(input: {
       productUrl: input.buildUrl(mode),
       offerUrl: candidate.productUrl,
       ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+      ...(candidate.flightLegs !== undefined ? { flightLegs: candidate.flightLegs } : {}),
       ...(candidate.durationMinutes !== undefined ? { durationMinutes: candidate.durationMinutes } : {}),
     };
   };
@@ -2978,6 +2998,7 @@ async function findFinnFlightPriceMatchOffer(
     productUrl: wantsSortVariants ? buildFinnFlightSortUrl(searchData.resultUrl, "best") : searchData.resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.flightLegs !== undefined ? { flightLegs: best.flightLegs } : {}),
     ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     ...(progress !== undefined && progress < 100 ? { searchIncomplete: true } : {}),
     alternatives: candidates.map(({ productUrl: _productUrl, ...candidate }) => candidate),
@@ -3046,6 +3067,7 @@ async function findFinnFlexibleDatesOffer(
       productUrl: offer.productUrl,
       ...(offer.offerUrl !== undefined ? { offerUrl: offer.offerUrl } : {}),
       ...(offer.durationText !== undefined ? { durationText: offer.durationText } : {}),
+      ...(offer.flightLegs !== undefined ? { flightLegs: offer.flightLegs } : {}),
     });
   }
   return buildFlightDateFlexOffer({
@@ -3096,6 +3118,7 @@ async function findSeparateSearchFlexibleDatesOffer(input: {
       productUrl: offer.productUrl,
       ...(offer.offerUrl !== undefined ? { offerUrl: offer.offerUrl } : {}),
       ...(offer.durationText !== undefined ? { durationText: offer.durationText } : {}),
+      ...(offer.flightLegs !== undefined ? { flightLegs: offer.flightLegs } : {}),
     });
   }
   if (dateOptions.length === 0) {
@@ -3416,6 +3439,17 @@ function extractFinnFlightOfferCandidates(
     if (exceedsFlightMaxDuration(flightMeta, legs.map((leg) => readNumberValue(leg.duration)))) continue;
 
     const tripSummary = formatFinnFlightTripSummary(trip);
+    const flightLegs = legs.map((leg) => {
+      const stopCount = readFinnFlightLegStopCount(leg);
+      return buildFlightLegDetails({
+        durationMinutes: readNumberValue(leg.duration),
+        stopCount,
+        route: formatFlightLegRoute(
+          readRecordArray(leg.segments).map((segment) => ({ origin: readStringValue(segment.origin), destination: readStringValue(segment.destination) })),
+          stopCount,
+        ),
+      }, collectFinnFlightLegCarrierNames(leg), formatFinnFlightLegTimeRange(leg));
+    });
     const durationText = formatFlightLegDurationsWithStopsText(
       legs.map((leg) => ({
         durationMinutes: readNumberValue(leg.duration),
@@ -3446,6 +3480,7 @@ function extractFinnFlightOfferCandidates(
       currency: "NOK",
       productUrl: buildFinnFlightOfferUrl(searchData.searchId, offerId),
       ...(durationText !== undefined ? { durationText } : {}),
+      ...(flightLegs.length > 0 ? { flightLegs } : {}),
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(platform.length > 0 ? { platform } : {}),
     });
@@ -3643,6 +3678,7 @@ async function findPanFlightsFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.flightLegs !== undefined ? { flightLegs: best.flightLegs } : {}),
     ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     flightSortVariants: buildFlightSortVariants({
       cheapestPool: rankedCandidates,
@@ -3700,6 +3736,7 @@ async function findPanFlightsFlexibleDatesOffer(
       currency: candidate.currency,
       ...(candidate.platform !== undefined ? { platform: candidate.platform } : {}),
       ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+      ...(candidate.flightLegs !== undefined ? { flightLegs: candidate.flightLegs } : {}),
       ...(candidate.durationMinutes !== undefined ? { durationMinutes: candidate.durationMinutes } : {}),
       productUrl: buildPanFlightsFlightSearchUrl({
         ...flightMeta,
@@ -4312,6 +4349,7 @@ function extractPanFlightsOfferCandidates(
       const stopCount = legStopCounts[index];
       return { durationMinutes: minutes, ...(stopCount !== undefined ? { stopCount } : {}) };
     }));
+    const flightLegs = readPanFlightsFlightLegs(item, legMinutes, legStopCounts);
     const qualityScore = readNumberValue(item.quality) ?? readNumberValue(packageRecord?.quality);
     const routeFingerprint = readStringValue(packageRecord?.routefingerprint) ??
       readStringValue(item.routefingerprint);
@@ -4330,6 +4368,7 @@ function extractPanFlightsOfferCandidates(
       ...matchedDates,
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(durationText !== undefined ? { durationText } : {}),
+      ...(flightLegs !== undefined ? { flightLegs } : {}),
       ...(qualityScore !== undefined ? { qualityScore } : {}),
       ...(routeFingerprint !== undefined ? { routeFingerprint } : {}),
       ...(platform !== undefined ? { platform } : {}),
@@ -4672,6 +4711,7 @@ const KIWI_PROBE_POLL_MS = 1000;
 const KIWI_PROBE_STABLE_POLLS = 3;
 const KIWI_PROBE_LOADING_GRACE_MS = 15_000;
 const KIWI_PROBE_DEADLINE_MS = 25_000;
+const KIWI_PROBE_DETAILS_TIMEOUT_MS = 4_000;
 const KIWI_SORT_TABS: Record<FlightSortMode, string> = { best: "quality", cheapest: "price", fastest: "duration" };
 
 function readVisibleKiwiSortPrices(): KiwiSortPrices {
@@ -4705,13 +4745,54 @@ function installKiwiPriceProbe(): boolean {
     const loading = document.querySelector('[data-test="LoadingLine"]') !== null && elapsedMs < KIWI_PROBE_LOADING_GRACE_MS;
     if ((stablePolls < KIWI_PROBE_STABLE_POLLS || loading) && elapsedMs < KIWI_PROBE_DEADLINE_MS) return;
     window.clearInterval(timerId);
-    // Andre valutaer og tomme svar gir ingen pris; raden beholder da «?».
-    const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
-    const sectors = document.querySelector('[data-test="ResultCardWrapper"]')?.querySelectorAll<HTMLElement>('[data-test="ResultCardSectorWrapper"]');
-    if (sectors !== undefined && sectors.length > 0) prices.topCardSectors = [...sectors].map((sector) => sector.innerText);
-    void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...(isNok && key !== "{}" ? { prices } : {}) });
+    void finishKiwiPriceProbeTab(prices, key);
   }, KIWI_PROBE_POLL_MS);
   return true;
+}
+
+async function finishKiwiPriceProbeTab(prices: KiwiSortPrices, key: string): Promise<void> {
+  // Andre valutaer og tomme svar gir ingen pris; raden beholder da «?».
+  const isNok = [...document.querySelectorAll("button, a")].some((element) => element.textContent?.trim() === "NOK");
+  const card = document.querySelector<HTMLElement>('[data-test="ResultCardWrapper"]');
+  const sectors = card !== null ? [...card.querySelectorAll<HTMLElement>('[data-test="ResultCardSectorWrapper"]')] : [];
+  if (sectors.length > 0) {
+    prices.topCardSectors = sectors.map((sector) => sector.innerText);
+    prices.topCardCarriers = sectors.map((sector) => uniqueStrings(
+      [...sector.querySelectorAll<HTMLElement>('[data-test="ResultCardCarrierLogo"]')].map((logo) => {
+        return logo.getAttribute("title") ??
+          logo.querySelector("[title]")?.getAttribute("title") ??
+          logo.querySelector("img")?.getAttribute("alt") ??
+          undefined;
+      }),
+    ));
+    if (isNok && key !== "{}" && card !== null) {
+      const routes = await readKiwiTopCardRoutes(card, sectors);
+      if (routes.length > 0) prices.topCardRoutes = routes;
+    }
+  }
+  void sendRuntimeMessage({ type: "kiwi-flight-prices-result", ...(isNok && key !== "{}" ? { prices } : {}) });
+}
+
+// Kortet åpner Kiwis detaljvisning i probe-fanen (ingen bestilling), der flyplasskodene står.
+async function readKiwiTopCardRoutes(card: HTMLElement, sectors: HTMLElement[]): Promise<string[]> {
+  card.click();
+  const startedAt = Date.now();
+  let details: HTMLElement | null = null;
+  while (Date.now() - startedAt < KIWI_PROBE_DETAILS_TIMEOUT_MS) {
+    details = document.querySelector<HTMLElement>('[data-test="PrebookingTripDetails"]');
+    if (details !== null && details.querySelector('[data-test="SegmentStop"]') !== null) break;
+    await sleep(250);
+  }
+  if (details === null) return [];
+  const stopCodes = [...details.querySelectorAll<HTMLElement>('[data-test="SegmentStop"]')]
+    // «Skjult by»-reiser har en ekstra SegmentStop for billettens endedestinasjon uten klokkeslett.
+    .filter((stop) => /\b\d{2}:\d{2}\b/.test(stop.innerText))
+    .map((stop) => stop.innerText.match(/∙\s*([A-Z]{3})\b/)?.[1])
+    .filter((code): code is string => code !== undefined);
+  return readKiwiDetailLegRoutes(stopCodes, sectors.map((sector) => {
+    const stations = [...sector.querySelectorAll<HTMLElement>('[data-test="stationName"]')].map((station) => station.innerText.trim());
+    return { destination: stations[stations.length - 1], stopCount: readKiwiCardLeg(sector.innerText).stopCount };
+  }));
 }
 
 async function findKiwiFlightPriceMatchOffer(
@@ -4731,9 +4812,22 @@ async function findKiwiFlightPriceMatchOffer(
   if (bestPrice === undefined) return undefined;
   // Det øverste kortet tilhører sorteringen søket ble åpnet med, og gir tid og stopp per etappe.
   const topCardMode: FlightSortMode = dateFlex !== undefined ? "cheapest" : "best";
-  const topCardText = formatFlightLegDurationsWithStopsText((prices?.topCardSectors ?? []).map((sector) => readKiwiCardLeg(sector)));
+  const topCardLegs = (prices?.topCardSectors ?? []).map((sector) => readKiwiCardLeg(sector));
+  const topCardText = formatFlightLegDurationsWithStopsText(topCardLegs);
+  const topCardFlightLegs = topCardLegs.length === (flightMeta.inboundDate !== undefined ? 2 : 1)
+    ? topCardLegs.map((leg, index) => {
+      const sectorText = prices?.topCardSectors?.[index] ?? "";
+      const route = prices?.topCardRoutes?.[index];
+      return buildFlightLegDetails(
+        { ...leg, ...(route !== undefined && route.length > 0 ? { route } : {}) },
+        prices?.topCardCarriers?.[index],
+        readKiwiCardLegTimeRange(sectorText),
+      );
+    })
+    : undefined;
   const buildVariant = (price: KiwiSortPrice, mode: FlightSortMode): FlightSortVariant => {
     const durationText = (mode === topCardMode ? topCardText : undefined) ?? formatFlightLegDurationsText([price.durationMinutes]);
+    const flightLegs = mode === topCardMode ? topCardFlightLegs : undefined;
     return {
       shopName: "Kiwi.com",
       price: formatNokFlightPrice(price.amount),
@@ -4742,6 +4836,7 @@ async function findKiwiFlightPriceMatchOffer(
       currency: "NOK",
       productUrl: buildKiwiFlightSearchUrl(flightMeta, mode),
       ...(durationText !== undefined ? { durationText } : {}),
+      ...(flightLegs !== undefined ? { flightLegs } : {}),
       durationMinutes: price.durationMinutes,
     };
   };
@@ -5197,6 +5292,7 @@ function extractTravellinkOfferCandidates(
     if (fee === undefined) continue;
 
     const platform = formatTravellinkFlightTripSummary(legs);
+    const flightLegs = legs.map((leg) => buildFlightLegDetails(leg, leg.carrierNames));
     const durationMinutes = legs.reduce((total, leg) => total + (leg.durationMinutes ?? 0), 0);
     const meRating = readNumberValue(itinerary.meRating);
     candidates.push({
@@ -5206,6 +5302,7 @@ function extractTravellinkOfferCandidates(
       sortAmount: fee.amount,
       currency: fee.currency,
       productUrl: resultUrl,
+      ...(flightLegs.length > 0 ? { flightLegs } : {}),
       ...(durationMinutes > 0 ? { durationMinutes } : {}),
       ...(meRating !== undefined ? { meRating } : {}),
       ...(platform !== undefined ? { platform } : {}),
@@ -5261,6 +5358,10 @@ function readTravellinkFlightLegSummaries(
         ...(arrivalTime !== undefined ? { arrivalTime } : {}),
         ...(durationMinutes !== undefined ? { durationMinutes } : {}),
         stopCount: Math.max(0, sections.length - 1),
+        ...optionalRoute(formatFlightLegRoute(sections.map((section) => ({
+          origin: readStringValue(readTravellinkRecordFromMap(locationsById, section.departureId)?.iata),
+          destination: readStringValue(readTravellinkRecordFromMap(locationsById, section.destinationId)?.iata),
+        })))),
         carrierNames,
       };
     })
@@ -5475,6 +5576,7 @@ async function findTripComFlightPriceMatchOffer(
   if (candidates.length === 0 && calendarCandidate !== undefined) {
     candidates = [calendarCandidate];
   }
+  candidates = await addTripComReturnLegs(candidates, flightMeta, session);
   const best = candidates[0];
   if (best === undefined) return undefined;
 
@@ -5492,6 +5594,7 @@ async function findTripComFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: best.productUrl,
     ...(best.durationText !== undefined ? { durationText: best.durationText } : {}),
+    ...(best.flightLegs !== undefined ? { flightLegs: best.flightLegs } : {}),
     ...(best.durationMinutes !== undefined ? { durationMinutes: best.durationMinutes } : {}),
     ...(listResult.stable ? {} : { searchIncomplete: true }),
     flightSortVariants: buildFlightSortVariants({
@@ -5765,11 +5868,11 @@ function extractTripComListOfferCandidates(
   // Én rad per itinerær i Trip.coms egen rekkefølge; policies[0] er prisen listen viser.
   const candidates = readRecordArray(resultData.itineraryList)
     .map((itinerary): TripComFlightOfferCandidate | undefined => {
-      const amount = readRecordArray(itinerary.policies)
-        .filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta))
-        .map(readTripComPolicyAmount)
-        .find((policyAmount): policyAmount is number => policyAmount !== undefined);
-      if (amount === undefined) return undefined;
+      const policy = readRecordArray(itinerary.policies)
+        .filter((option) => isTripComPolicyMatchingBaggage(option, flightMeta))
+        .find((option) => readTripComPolicyAmount(option) !== undefined);
+      const amount = policy !== undefined ? readTripComPolicyAmount(policy) : undefined;
+      if (policy === undefined || amount === undefined) return undefined;
 
       const journeys = readRecordArray(itinerary.journeyList);
       if (exceedsFlightMaxStops(flightMeta, journeys.map(readTripComJourneyStopCount))) return undefined;
@@ -5788,19 +5891,169 @@ function extractTripComListOfferCandidates(
         durationMinutes: readNumberValue(journey.duration),
         stopCount: readTripComJourneyStopCount(journey),
       })));
+      // Listen for tur/retur har bare utreisen; returen hentes for de øverste treffene etterpå
+      // (addTripComReturnLegs). Uten den vises ikke etappelinjer som om reisen var én vei.
+      const flightLegs = journeys.length === (flightMeta.inboundDate !== undefined ? 2 : 1)
+        ? journeys.map((journey) => readTripComJourneyLeg(journey, airlineNames))
+        : [];
       // Listen for tur/retur viser bare utreisen, så den kan ikke sammenlignes på samlet reisetid.
       const durationMinutes = sumFlightLegMinutes(
         journeys.map((journey) => readNumberValue(journey.duration)),
         flightMeta.inboundDate !== undefined ? 2 : 1,
       );
-      return {
+      const result: TripComFlightOfferCandidate = {
         ...candidate,
         ...(durationText !== undefined ? { durationText } : {}),
+        ...(flightLegs.length > 0 ? { flightLegs } : {}),
         ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       };
+      const policyId = readStringValue(policy.policyId);
+      const productId = readStringValue(basicInfo.productId);
+      const outbound = journeys[0];
+      if (flightMeta.inboundDate !== undefined && journeys.length === 1 && outbound !== undefined && policyId !== undefined && productId !== undefined) {
+        tripComReturnLookups.set(result, {
+          policyId,
+          productId,
+          outboundLeg: readTripComJourneyLeg(outbound, airlineNames),
+          outboundKey: readStringValue(outbound.uniqueId) ?? policyId,
+          totalPrice: readTripComPolicyAmount(policy)!,
+        });
+      }
+      return result;
     })
     .filter((candidate): candidate is TripComFlightOfferCandidate => candidate !== undefined);
   return limitFlightCandidates(dedupeTripComOfferCandidates(candidates), FLIGHT_OFFER_CANDIDATE_LIMIT);
+}
+
+function readTripComJourneyLeg(journey: Record<string, unknown>, airlineNames: Record<string, string>): FlightLegDetails {
+  // transSectionList[].departPoint/arrivePoint.airportCode (verifisert 2026-11-05). stopList
+  // mangler flyplass i kjente svar, så slike etapper får ingen rute.
+  const sections = readRecordArray(journey.transSectionList);
+  const stopCount = readTripComJourneyStopCount(journey);
+  return buildFlightLegDetails({
+    durationMinutes: readNumberValue(journey.duration),
+    stopCount,
+    route: formatFlightLegRoute(sections.map((section) => ({
+      origin: readStringValue(isRecord(section.departPoint) ? section.departPoint.airportCode : undefined),
+      destination: readStringValue(isRecord(section.arrivePoint) ? section.arrivePoint.airportCode : undefined),
+    })), stopCount),
+    departureTime: readStringValue(sections[0]?.departDateTime),
+    arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime),
+  }, sections
+    .map((section) => {
+      const code = readStringValue(isRecord(section.flightInfo) ? section.flightInfo.airlineCode : undefined)?.toUpperCase();
+      return code !== undefined ? (airlineNames[code] ?? code) : undefined;
+    })
+    .filter((carrier): carrier is string => carrier !== undefined));
+}
+
+// Tur/retur hos Trip.com velges i to steg som på nettsiden: FlightListSearch med journeyNo 2,
+// valgt policyId og søkets productId gir returene for én utreise (verifisert 2026-11-05).
+// Returen med priceDifference 0 er den som gir rundreiseprisen listen viser; uten en slik
+// retur, eller ved feil, får treffet ingen etappelinjer.
+type TripComReturnLookup = {
+  policyId: string;
+  productId: string;
+  outboundLeg: FlightLegDetails;
+  outboundKey: string;
+  totalPrice: number;
+};
+const tripComReturnLookups = new WeakMap<TripComFlightOfferCandidate, TripComReturnLookup>();
+const tripComReturnLegCache = new Map<string, Promise<FlightLegDetails | undefined>>();
+const TRIP_COM_RETURN_LOOKUP_LIMIT = FLIGHT_TOOLTIP_MAX_ROWS;
+const TRIP_COM_RETURN_CACHE_LIMIT = 100;
+const TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT = `${TRIP_COM_BASE_URL}/restapi/soa2/27015/FlightListSearch`;
+
+async function addTripComReturnLegs(
+  candidates: TripComFlightOfferCandidate[],
+  flightMeta: FlightSearchMeta,
+  session: TripComFlightSession,
+): Promise<TripComFlightOfferCandidate[]> {
+  if (flightMeta.inboundDate === undefined) return candidates;
+  const result = [...candidates];
+  let lookups = 0;
+  for (const [index, candidate] of candidates.entries()) {
+    const lookup = tripComReturnLookups.get(candidate);
+    if (lookup === undefined) continue;
+    if (lookups++ >= TRIP_COM_RETURN_LOOKUP_LIMIT) break;
+    // Sekvensielt for å holde antall kall mot Trip.com lavt.
+    const returnLeg = await fetchTripComReturnLeg(lookup, flightMeta, session);
+    if (returnLeg === undefined) continue;
+    const durationMinutes = sumFlightLegMinutes([lookup.outboundLeg.durationMinutes, returnLeg.durationMinutes]);
+    result[index] = {
+      ...candidate,
+      flightLegs: [lookup.outboundLeg, returnLeg],
+      ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+    };
+  }
+  return result;
+}
+
+function fetchTripComReturnLeg(
+  lookup: TripComReturnLookup,
+  flightMeta: FlightSearchMeta,
+  session: TripComFlightSession,
+): Promise<FlightLegDetails | undefined> {
+  const key = [buildFlightSearchMetaKey(flightMeta), lookup.outboundKey, lookup.totalPrice].join("|");
+  const cached = tripComReturnLegCache.get(key);
+  if (cached !== undefined) return cached;
+  const promise = requestTripComReturnLeg(lookup, flightMeta, session).catch((error: unknown) => {
+    console.warn(`[Cashback Norge] Trip.com retur for ${flightMeta.origin}-${flightMeta.destination} feilet: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  });
+  if (tripComReturnLegCache.size >= TRIP_COM_RETURN_CACHE_LIMIT) tripComReturnLegCache.delete(tripComReturnLegCache.keys().next().value!);
+  tripComReturnLegCache.set(key, promise);
+  return promise;
+}
+
+async function requestTripComReturnLeg(
+  lookup: TripComReturnLookup,
+  flightMeta: FlightSearchMeta,
+  session: TripComFlightSession,
+): Promise<FlightLegDetails | undefined> {
+  const payload = buildTripComFlightListSearchPayload(flightMeta, "Score", 3, session);
+  const searchCriteria = isRecord(payload.searchCriteria) ? payload.searchCriteria : {};
+  const text = await userscriptTextRequest(TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT, {
+    method: "POST",
+    headers: TRIP_COM_COMMON_HEADERS,
+    body: JSON.stringify({
+      ...payload,
+      searchCriteria: { ...searchCriteria, journeyNo: 2, policyId: lookup.policyId, productId: lookup.productId },
+      flagList: ["FullDataCache"],
+    }),
+    credentials: "omit",
+    timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS,
+  });
+  const parsedText = text !== undefined ? parseJsonValue(text) : undefined;
+  const resultData = isRecord(parsedText) ? parsedText : text !== undefined ? parseTripComSseResponse(text) : undefined;
+  if (!isRecord(resultData)) return undefined;
+  return selectTripComReturnLeg(resultData, lookup, flightMeta);
+}
+
+function selectTripComReturnLeg(
+  resultData: Record<string, unknown>,
+  lookup: TripComReturnLookup,
+  flightMeta: FlightSearchMeta,
+): FlightLegDetails | undefined {
+  const airlineNames = buildTripComAirlineNameMap(resultData.airlineList);
+  for (const itinerary of readRecordArray(resultData.itineraryList)) {
+    const journeys = readRecordArray(itinerary.journeyList);
+    const journey = journeys[0];
+    if (journeys.length !== 1 || journey === undefined) continue;
+    if (exceedsFlightMaxStops(flightMeta, [readTripComJourneyStopCount(journey)])) continue;
+    if (exceedsFlightMaxDuration(flightMeta, [readNumberValue(journey.duration)])) continue;
+    const firstSection = readRecordArray(journey.transSectionList)[0];
+    if (readStringValue(firstSection?.departDateTime)?.slice(0, 10) !== flightMeta.inboundDate) continue;
+    const samePrice = readRecordArray(itinerary.policies)
+      .filter((policy) => isTripComPolicyMatchingBaggage(policy, flightMeta))
+      .some((policy) => {
+        const price = isRecord(policy.price) ? policy.price : undefined;
+        const morePrice = isRecord(price?.morePrice) ? price.morePrice : undefined;
+        return readNumberValue(morePrice?.priceDifference) === 0 && readTripComPolicyAmount(policy) === lookup.totalPrice;
+      });
+    if (samePrice) return readTripComJourneyLeg(journey, airlineNames);
+  }
+  return undefined;
 }
 
 function readTripComPolicyAmount(policy: Record<string, unknown>): number | undefined {
@@ -6071,6 +6324,7 @@ async function findSkyscannerFlightPriceMatchOffer(
     productUrl: resultUrl,
     offerUrl: resultUrl,
     ...(candidate.durationText !== undefined ? { durationText: candidate.durationText } : {}),
+    ...(candidate.flightLegs !== undefined ? { flightLegs: candidate.flightLegs } : {}),
     ...(candidate.durationMinutes !== undefined ? { durationMinutes: candidate.durationMinutes } : {}),
     ...(searchComplete ? {} : { searchIncomplete: true }),
     flightSortVariants: buildFlightSortVariants({
@@ -6280,6 +6534,7 @@ function extractSkyscannerFlightSearchCandidates(
     const tags = readSkyscannerResultTags(result);
     const tagSummary = tags.includes("cheapest") ? "billigst" : undefined;
     const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
+    const flightLegs = legSummaries.map((leg) => buildFlightLegDetails(leg, leg.carrierNames));
     const platform = [tripSummary, tagSummary]
       .filter((part): part is string => part !== undefined && part.length > 0)
       .join(", ");
@@ -6308,6 +6563,7 @@ function extractSkyscannerFlightSearchCandidates(
       productUrl: readSkyscannerPricingOptionUrl(bestPricingOption, fallbackUrl),
       ...(score !== undefined ? { score } : {}),
       ...(durationText !== undefined ? { durationText } : {}),
+      ...(flightLegs.length > 0 ? { flightLegs } : {}),
       ...(durationMinutes !== undefined ? { durationMinutes } : {}),
       ...(platform.length > 0 ? { platform } : {}),
     });
@@ -6437,6 +6693,13 @@ function readSkyscannerFlightLegSummaries(result: Record<string, unknown>): Skys
         ...(arrivalTime !== undefined ? { arrivalTime } : {}),
         ...(durationMinutes !== undefined ? { durationMinutes } : {}),
         stopCount: readNonNegativeIntegerValue(leg.stopCount) ?? 0,
+        ...optionalRoute(formatFlightLegRoute(
+          readRecordArray(leg.segments).map((segment) => ({
+            origin: readSkyscannerLegPlaceCode(isRecord(segment.origin) ? segment.origin : undefined),
+            destination: readSkyscannerLegPlaceCode(isRecord(segment.destination) ? segment.destination : undefined),
+          })),
+          readNonNegativeIntegerValue(leg.stopCount),
+        )),
         carrierNames: readRecordArray(carriers?.marketing)
           .map((carrier) => readStringValue(carrier.name))
           .filter((carrierName): carrierName is string => carrierName !== undefined),
@@ -6877,6 +7140,7 @@ async function findMomondoFlightPriceMatchOffer(
     productUrl: buildMomondoFlightSortUrl(searchData.resultUrl, "best"),
     offerUrl: displayedBest.productUrl,
     ...(displayedBest.durationText !== undefined ? { durationText: displayedBest.durationText } : {}),
+    ...(displayedBest.flightLegs !== undefined ? { flightLegs: displayedBest.flightLegs } : {}),
     ...(displayedBest.durationMinutes !== undefined ? { durationMinutes: displayedBest.durationMinutes } : {}),
     ...(searchIncomplete ? { searchIncomplete: true } : {}),
     flightSortVariants: buildFlightSortVariants({
@@ -7027,6 +7291,7 @@ function readCurrentMomondoFlexibleDateOptions(
       sortAmount: option.amount, productUrl,
       durationMinutes: sumFlightLegMinutes(summaries.map((leg) => leg.durationMinutes))!,
       durationText: formatFlightLegDurationsWithStopsText(summaries)!,
+      flightLegs: summaries.map((leg) => buildFlightLegDetails(leg)),
       platform: [
         card.querySelector<HTMLElement>(".J0g6-operator-text")?.innerText,
         /selvbetjent transfer|self.transfer/i.test(card.innerText) ? "Selvbetjent transfer" : undefined,
@@ -7423,6 +7688,7 @@ function collectMomondoFlightOfferCandidates(
 
     const tripSummary = formatMomondoFlightTripSummary(result, resultData);
     const durationText = formatFlightLegDurationsWithStopsText(legSummaries);
+    const flightLegs = legSummaries.map((leg) => buildFlightLegDetails(leg, collectMomondoFlightLegCarrierNames(leg, resultData)));
     const durationMinutes = sumFlightLegMinutes(legSummaries.map((leg) => leg.durationMinutes));
     const productUrl = readMomondoResultUrl(result.shareableUrl, fallbackUrl);
     const bookingOptions = readRecordArray(result.bookingOptions)
@@ -7457,6 +7723,7 @@ function collectMomondoFlightOfferCandidates(
         currency,
         productUrl,
         ...(durationText !== undefined ? { durationText } : {}),
+        ...(flightLegs.length > 0 ? { flightLegs } : {}),
         ...(durationMinutes !== undefined ? { durationMinutes } : {}),
         ...(platform.length > 0 ? { platform } : {}),
       });
@@ -7680,6 +7947,10 @@ function readMomondoFlightLegSummaries(
         ...(arrivalTime !== undefined ? { arrivalTime } : {}),
         ...(durationMinutes > 0 ? { durationMinutes } : {}),
         stopCount: Math.max(0, segments.length - 1),
+        ...optionalRoute(formatFlightLegRoute(segments.map((segment) => ({
+          origin: readStringValue(segment.origin),
+          destination: readStringValue(segment.destination),
+        })))),
         carrierCodes: segments
           .map((segment) => readStringValue(segment.airline)?.toUpperCase())
           .filter((carrier): carrier is string => carrier !== undefined),
@@ -9480,15 +9751,6 @@ function formatApproxNokFlightPrice(amount: number): string {
   return `~${formatNokFlightPrice(amount)}`;
 }
 
-function formatCompactFlightDuration(minutes: number | undefined): string | undefined {
-  if (minutes === undefined || !Number.isFinite(minutes) || minutes <= 0) return undefined;
-  const totalMinutes = Math.round(minutes);
-  const hours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
-  if (hours <= 0) return `${remainingMinutes}m`;
-  return remainingMinutes === 0 ? `${hours}t` : `${hours}t ${remainingMinutes}m`;
-}
-
 function formatFlightLegDurationsText(durationsMinutes: Array<number | undefined>): string | undefined {
   if (durationsMinutes.length === 0) return undefined;
   const parts = durationsMinutes.map(formatCompactFlightDuration);
@@ -9523,6 +9785,10 @@ function hasFlightSearchResultFilters(flightMeta: FlightSearchMeta): boolean {
     flightMeta.includeCabinBag === true ||
     flightMeta.includeCheckedBag === true ||
     (flightMeta.cabinClass !== undefined && flightMeta.cabinClass !== "economy");
+}
+
+function optionalRoute(route: string | undefined): { route?: string } {
+  return route !== undefined ? { route } : {};
 }
 
 function formatFlightCarriersByLeg(carriersPerLeg: string[][]): string | undefined {
@@ -12287,6 +12553,27 @@ function renderNotice(
       gap: 4px;
       min-width: 0;
     }
+    .price-match-leg-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    /* Etiketten står i egen kolonne, så chips som brytes til ny linje holder innrykket. */
+    .price-match-chip-line--leg {
+      padding-left: 3.6em;
+      position: relative;
+    }
+    .flight-tooltip-option > .price-match-chip-line--leg + .price-match-chip-line--leg { margin-top: 3px; }
+    .price-match-leg-label {
+      color: var(--cbn-muted);
+      font-size: 10px;
+      font-weight: 700;
+      left: 0;
+      line-height: 18px;
+      position: absolute;
+      top: 0;
+    }
     .price-match-section .price-match-info-chip {
       display: inline-block;
       font-size: 10px;
@@ -14138,7 +14425,7 @@ function buildElectricityTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): 
 }
 
 function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOffer): void {
-  tooltip.classList.add("cbn-tooltip-details");
+  tooltip.classList.add("cbn-tooltip-details", "cbn-tooltip--no-mascot");
   const parts = buildPriceMatchTooltip(offer).split(/\n{2,}/);
   const listHeading = (part: string) => /^(Treffliste|Prisgrunnlag|Billigste datoer \([^\n]+\))\n/.test(part);
   if (!parts.some(listHeading) || !offer.alternatives?.length) {
@@ -14166,9 +14453,18 @@ function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOff
       name.textContent = alternative.shopName.replace(/:$/, "");
       const price = document.createElement("strong");
       price.textContent = alternative.price;
-      const chips = buildPriceMatchInfoChips(flightTooltipChipTexts(alternative));
       row.append(name, price);
-      if (chips.childElementCount > 0) row.append(chips);
+      const legs = alternative.flightLegs;
+      if (legs !== undefined && legs.length > 0) {
+        for (const [legIndex, leg] of legs.entries()) {
+          row.append(buildPriceMatchInfoChips(flightLegTooltipChipTexts(leg), flightLegLabel(legIndex, legs.length)));
+        }
+        const extras = flightTooltipExtraTexts(alternative.platform, legs);
+        if (extras.length > 0) row.append(buildPriceMatchInfoChips(extras));
+      } else {
+        const chips = buildPriceMatchInfoChips(flightTooltipChipTexts(alternative));
+        if (chips.childElementCount > 0) row.append(chips);
+      }
       section.append(row);
     }
     tooltip.append(section);
@@ -14465,7 +14761,18 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     typeof value.productUrl === "string" &&
     (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
     (value.durationText === undefined || typeof value.durationText === "string") &&
+    (value.flightLegs === undefined || (Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails))) &&
     (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)))
+  );
+}
+function isFlightLegDetails(value: unknown): value is FlightLegDetails {
+  return (
+    isRecord(value) &&
+    (value.durationMinutes === undefined || typeof value.durationMinutes === "number") &&
+    (value.stopCount === undefined || typeof value.stopCount === "number") &&
+    (value.route === undefined || typeof value.route === "string") &&
+    (value.carriers === undefined || (Array.isArray(value.carriers) && value.carriers.every((carrier) => typeof carrier === "string"))) &&
+    (value.timeRange === undefined || typeof value.timeRange === "string")
   );
 }
 function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative {
@@ -14483,6 +14790,7 @@ function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative
     typeof value.currency === "string" &&
     (value.platform === undefined || typeof value.platform === "string") &&
     (value.durationText === undefined || typeof value.durationText === "string") &&
+    (value.flightLegs === undefined || (Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails))) &&
     (value.shippingPrice === undefined || typeof value.shippingPrice === "string") &&
     (value.totalPrice === undefined || typeof value.totalPrice === "string")
   );
@@ -14705,25 +15013,48 @@ function isFlightPanelRow(priceMatch: PriceMatchOffer): boolean {
     (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "kiwi" || priceMatch.source === "googleflights");
 }
 
-// Flyrader: rute, datoer, datovindu, reisetid, stopp og butikk som chiper, med pris og kilde til høyre.
-// Passasjerer og filtre står allerede i chipene over radene.
+// Flyrader: reisetid og stopp per etappe, datoer, datovindu og butikk som chiper, med pris og
+// kilde til høyre. Passasjerer og filtre står allerede i chipene over radene. Søkets rute er
+// lik på alle radene; kjente mellomlandinger vises som «via FRA», og hele ruten står i
+// tooltipen. Tur/retur får én linje per etappe. Rader uten andre detaljer beholder ruten.
 function buildFlightPriceMatchChips(priceMatch: PriceMatchOffer): HTMLElement {
   const [route, dateWindow] = priceMatch.productName.split(" · ");
-  const texts = [
-    route,
+  const shared = [
     priceMatch.dateFlex !== undefined
       ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate)
       : undefined,
     dateWindow,
-    ...(priceMatch.durationText?.split(" · ") ?? []),
     priceMatch.amount < FLIGHT_STATIC_PRICE_SORT_AMOUNT ? priceMatch.shopName : undefined,
-  ];
-  return buildPriceMatchInfoChips(texts);
+  ].filter((text): text is string => text !== undefined && text.length > 0);
+  const legChips = priceMatch.flightLegs?.map(flightLegPanelChipTexts);
+  if (legChips !== undefined && legChips.length > 0 && legChips.every((chips) => chips.length > 0)) {
+    return buildFlightLegChipLines(legChips, shared);
+  }
+  const details = [...(priceMatch.durationText?.split(" · ") ?? []), ...shared];
+  return buildPriceMatchInfoChips(details.length > 0 ? details : [route]);
 }
 
-function buildPriceMatchInfoChips(texts: (string | undefined)[]): HTMLElement {
+// Én chiplinje per etappe; felles chips (butikk, datoer) følger første linje.
+function buildFlightLegChipLines(legChips: string[][], sharedFirstLine: string[] = []): HTMLElement {
+  if (legChips.length === 1) return buildPriceMatchInfoChips([...legChips[0]!, ...sharedFirstLine]);
+  const lines = document.createElement("span");
+  lines.className = "price-match-leg-lines";
+  for (const [index, chips] of legChips.entries()) {
+    lines.append(buildPriceMatchInfoChips(index === 0 ? [...chips, ...sharedFirstLine] : chips, flightLegLabel(index, legChips.length)));
+  }
+  return lines;
+}
+
+function buildPriceMatchInfoChips(texts: (string | undefined)[], label?: string): HTMLElement {
   const chips = document.createElement("span");
   chips.className = "price-match-chip-line";
+  if (label !== undefined) {
+    const labelElement = document.createElement("span");
+    labelElement.className = "price-match-leg-label";
+    labelElement.textContent = label;
+    chips.classList.add("price-match-chip-line--leg");
+    chips.append(labelElement);
+  }
   for (const text of texts) {
     if (text === undefined || text.length === 0) continue;
     const chip = document.createElement("span");
