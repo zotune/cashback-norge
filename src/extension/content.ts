@@ -2,7 +2,7 @@ import { createTooltipSection, setTooltipContent } from "../shared/tooltip-conte
 import { createAutomaticComparison } from "./automatic-comparison";
 import { getMobileSupplier, loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers";
 import { isMobilePriceDetails, mobileTierLabel, type MobilePriceDetails } from "../shared/mobile-price-match";
-import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, REVOLUT_SUBSCRIPTIONS } from "../shared/provider-data";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, requiresSpennExtension, REVOLUT_SUBSCRIPTIONS, SPENN_EXTENSION_ELEMENT } from "../shared/provider-data";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement } from "../shared/support-advertisements";
 import {
   calculateCashback,
@@ -10938,6 +10938,25 @@ function showOfferActivated(
   providerWrap.prepend(createActivationBadge(offer, shadowRoot));
 }
 
+// Spenn tjenes bare via Spenns egen utvidelse. Er den aktiv på siden (elementet den legger
+// inn når butikken gir Spenn), peker raden til Spenn-boksen i stedet for å åpne
+// installasjonssiden; ellers åpnes Spenns offisielle side for utvidelsen.
+function bindSpennExtensionClick(offerLink: HTMLAnchorElement, chip: HTMLElement): void {
+  let resetTimer: number | undefined;
+  offerLink.addEventListener("click", (event) => {
+    if (document.querySelector(SPENN_EXTENSION_ELEMENT) === null) return;
+    event.preventDefault();
+    chip.textContent = "Bruk Spenn-boksen";
+    chip.classList.add("cbn-chip--highlight");
+    chip.title = "Spenn-utvidelsen er aktiv her: trykk «Tjen Spenn» i Spenn-boksen før du handler.";
+    window.clearTimeout(resetTimer);
+    resetTimer = window.setTimeout(() => {
+      chip.textContent = "Utvidelse";
+      chip.classList.remove("cbn-chip--highlight");
+    }, 5000);
+  });
+}
+
 function shouldMarkOfferClick(offer: CashbackOffer): boolean {
   return offer.provider === "cbn";
 }
@@ -13135,6 +13154,12 @@ function renderNotice(
       warnIcon.className = "card-only-warn";
       warnIcon.textContent = "⚠";
       offerLink.append(offerLabel, warnIcon);
+    } else if (requiresSpennExtension(currentOffer)) {
+      const extensionChip = document.createElement("span");
+      extensionChip.className = "cbn-chip cbn-chip--muted app-chip";
+      extensionChip.textContent = "Utvidelse";
+      offerLink.append(offerLabel, extensionChip);
+      bindSpennExtensionClick(offerLink, extensionChip);
     } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
       const appChip = document.createElement("span");
       appChip.className = "cbn-chip cbn-chip--muted app-chip";
@@ -14179,7 +14204,8 @@ function renderNotice(
     const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
     const showRewardInTooltip = compact !== undefined && fullReward !== compact;
     const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
-    const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider);
+    // Spenn's extension offers explain the extension in their terms instead of the app.
+    const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider) && !requiresSpennExtension(currentOffer);
     const hasTerms = currentOffer.terms.trim().length > 0;
     const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
     if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer && welcome === undefined) continue;

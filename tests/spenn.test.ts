@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createServer, type IncomingMessage } from "node:http";
 import { test } from "node:test";
 import { buildSpennOffers, fetchSpennSource } from "../src/backend/providers/spenn.js";
+import { requiresSpennExtension, SPENN_EXTENSION_URL } from "../src/shared/provider-data.js";
 
 const NORWAY_SITE_ID = "4aefb3fa-6549-11ef-be75-0aaed722973b";
 const STORES = { rate: "a1", dropped: "b2", hanging: "c3" };
@@ -142,8 +143,11 @@ test("Spenn uses the extension catalogue: fixed bonuses, verified hosts, up-to b
     const nordnet = byName.get("Nordnet")!;
     assert.equal(nordnet.reward, "192 kr");
     assert.deepEqual(nordnet.domains, ["nordnet.no"]);
-    assert.match(nordnet.activationUrl!, new RegExp(`/refunder\\.com/click\\?site=${NORWAY_SITE_ID}&store=nordnet$`));
-    assert.match(nordnet.terms!, /1 920 Spenn \(1 Spenn = 10 øre\)\.\nGjelder: Nytt depot\./);
+    // The click link needs the shopper's SpennID, so the offer points to Spenn's own extension.
+    assert.equal(nordnet.activationUrl, SPENN_EXTENSION_URL);
+    assert.ok(requiresSpennExtension(nordnet));
+    assert.match(nordnet.terms!, /^1 920 Spenn \(1 Spenn = 10 øre\)\.\nGjelder: Nytt depot\.\nKrever Spenns egen nettleserutvidelse/);
+    assert.ok(offers.every((offer) => !/spennId|refunder\.com\/click/i.test(offer.activationUrl ?? "")));
     // Breakdown from the refunder page when its maximum matches the catalogue; "Up To"'s page
     // disagrees (3 %), so the catalogue maximum stays with its qualifier.
     assert.equal(byName.get("Rate Store")!.reward, "6,5 %");
@@ -152,6 +156,8 @@ test("Spenn uses the extension catalogue: fixed bonuses, verified hosts, up-to b
     assert.equal(byName.get("Farmasiet.no")!.reward, "3,4 %");
     // Contentful keeps direct offers, but its refunder stores and renamed duplicates do not reappear.
     assert.equal(byName.get("Direct Brand")!.reward, "5 %");
+    assert.equal(byName.get("Direct Brand")!.activationUrl, "https://www.directbrand.no/spenn");
+    assert.ok(!requiresSpennExtension(byName.get("Direct Brand")!));
     assert.ok(!byName.has("Old Refunder Store") && !byName.has("Farmasiet"));
     assert.ok(warnings.some((message) => /skipping Implausible/.test(message)));
   }, {

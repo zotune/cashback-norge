@@ -4,6 +4,7 @@ import { Configuration, HttpCrawler, MemoryStorage, Request } from "crawlee";
 import { normalizeDomainInput, parseUrl, type CashbackOffer } from "../../shared/cashback.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
+import { SPENN_EXTENSION_URL } from "../../shared/provider-data.js";
 
 /**
  * Primary source: the public store catalogue that Spenn's own browser extension
@@ -15,6 +16,17 @@ import type { Logger } from "../logger.js";
  */
 const CATALOG_BASE_URL = "https://spenn-cdn.refunder.com/extension/v1/no";
 const CATALOG_LOCALE = "nb";
+
+/**
+ * Refunder store purchases only count with the shopper's personal SpennID. The
+ * click link without it shows "Vi finner ingen SpennID" (verified 2026-11-05),
+ * and the ID is only passed on by Spenn's own extension or app. These offers
+ * therefore link to Spenn's official extension page (Chrome, Firefox, Edge),
+ * the catalogue's links.plugin, without any user ID or campaign parameters.
+ */
+const SPENN_EXTENSION_TERMS =
+  "Krever Spenns egen nettleserutvidelse «Tjen Spenn på nett», innlogget med SpennID fra profilen i Spenn-appen. " +
+  "Trykk «Tjen Spenn» i utvidelsen før du handler, og godta alle cookies i butikken.";
 
 const CONTENTFUL_URL =
   "https://graphql.eu.contentful.com/content/v1/spaces/eu01y9qnrf4v/environments/master";
@@ -415,8 +427,9 @@ export function buildSpennOffers(options: {
       domains,
       reward: rate,
       sourceUrl: "https://app.spenngroup.com",
-      activationUrl: link,
-      terms,
+      // The refunder click link (kept as `link` for the rate pages) needs the shopper's SpennID.
+      activationUrl: link.includes("refunder.com/click") ? SPENN_EXTENSION_URL : link,
+      terms: link.includes("refunder.com/click") ? [terms, SPENN_EXTENSION_TERMS].filter((part) => part !== "").join("\n") : terms,
       updatedAt: generatedAt,
     });
   }

@@ -6,6 +6,20 @@ export function getProviderPageUrl(provider: string): string {
   return url.toString();
 }
 
+/**
+ * Spenn's refunder stores only credit purchases that carry the shopper's
+ * SpennID, which only Spenn's own browser extension ("Tjen Spenn på nett") or
+ * app adds. These offers link to the extension's official page instead of a
+ * click link that would not register the purchase.
+ */
+export const SPENN_EXTENSION_URL = "https://spenn.refunder.com/no/extension";
+/** Custom element Spenn's extension adds to a store page when it offers Spenn there. */
+export const SPENN_EXTENSION_ELEMENT = "spenn-notification";
+
+export function requiresSpennExtension(offer: { provider: string; activationUrl?: string }): boolean {
+  return offer.provider === "spenn" && offer.activationUrl === SPENN_EXTENSION_URL;
+}
+
 export const EB_PER_TRUMF_KR = 13.5;
 
 export const PROVIDER_NAMES: Record<string, string> = {
