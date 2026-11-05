@@ -17,8 +17,8 @@ async function readBody(request: IncomingMessage): Promise<string> {
 }
 
 async function withSource(
-  run: (contentfulUrl: string, requests: string[]) => Promise<void>,
-  options: { contentfulStatus?: number; failingStores?: number } = {},
+  run: (contentfulUrl: string, requests: string[], catalogBaseUrl: string) => Promise<void>,
+  options: { contentfulStatus?: number; failingStores?: number; catalog?: (link: (store: string) => string) => Record<string, unknown>; statusHash?: string; contentfulItems?: (link: (store: string) => string) => unknown[] } = {},
 ) {
   const requests: string[] = [];
   let base = "";
@@ -26,6 +26,17 @@ async function withSource(
   const failing = Array.from({ length: options.failingStores ?? 0 }, (_value, index) => `f${index}`);
   const server = createServer(async (request, response) => {
     const url = new URL(request.url!, base);
+    if (url.pathname.startsWith("/catalog/")) {
+      requests.push(`catalog:${url.pathname.slice("/catalog/".length)}`);
+      if (options.catalog === undefined) { response.writeHead(404).end("missing"); return; }
+      const catalog = { ...options.catalog(link), content_hash: "a".repeat(64) };
+      const body = url.pathname.endsWith("status.json")
+        ? { version: 1, market: "NO", files: { nb: { catalog: options.statusHash ?? catalog.content_hash, strings: "b".repeat(64) } } }
+        : url.pathname.endsWith("catalog.nb.json") ? catalog : undefined;
+      if (body === undefined) { response.writeHead(404).end("missing"); return; }
+      response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(body));
+      return;
+    }
     if (url.pathname === "/contentful") {
       const { variables } = JSON.parse(await readBody(request)) as { variables: { skip: number; limit: number } };
       requests.push(`contentful:${variables.skip}`);
@@ -34,7 +45,7 @@ async function withSource(
         return;
       }
       // A full first page must lead to a second page request.
-      const items = variables.skip === 0
+      const items = options.contentfulItems !== undefined ? options.contentfulItems(link) : variables.skip === 0
         ? Array.from({ length: variables.limit }, () => ({ title: "Annet", longDescription: null, merchant: null, externalTarget: null }))
         : [
           { title: "Rate", longDescription: "**1 Spenn per 10 kr**", merchant: { name: "Rate Store" }, externalTarget: { link: link(STORES.rate) } },
@@ -58,7 +69,7 @@ async function withSource(
   assert.ok(address && typeof address === "object");
   base = `http://127.0.0.1:${address.port}`;
   try {
-    await run(`${base}/contentful`, requests);
+    await run(`${base}/contentful`, requests, `${base}/catalog`);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
@@ -66,10 +77,13 @@ async function withSource(
 }
 
 test("Spenn pages through Contentful, retries a dropped refunder connection and falls back to Contentful after a timeout", async () => {
-  await withSource(async (contentfulUrl, requests) => {
+  await withSource(async (contentfulUrl, requests, catalogBaseUrl) => {
     const warnings: string[] = [];
     const logger = { info() {}, warn: (message: string) => { warnings.push(message); }, error() {} };
-    const source = await fetchSpennSource({ logger, contentfulUrl, navigationTimeoutSecs: 1 });
+    const source = await fetchSpennSource({ logger, catalogBaseUrl, contentfulUrl, navigationTimeoutSecs: 1 });
+    // Without the extension catalogue the Contentful store list is the backup.
+    assert.equal(source.catalog, undefined);
+    assert.ok(warnings.some((message) => /extension catalogue .*status\.json failed \(HTTP 404/.test(message)));
     assert.deepEqual(requests.filter((entry) => entry.startsWith("contentful")), ["contentful:0", "contentful:100"]);
     assert.equal(requests.filter((entry) => entry === `refunder:${STORES.dropped}`).length, 2);
     assert.equal(requests.filter((entry) => entry === `refunder:${STORES.hanging}`).length, 3);
@@ -85,20 +99,94 @@ test("Spenn pages through Contentful, retries a dropped refunder connection and 
 });
 
 test("Spenn stops refunder pages after repeated failures and reports Contentful errors with the request", async () => {
-  await withSource(async (contentfulUrl, requests) => {
+  await withSource(async (contentfulUrl, requests, catalogBaseUrl) => {
     const warnings: string[] = [];
     const logger = { info() {}, warn: (message: string) => { warnings.push(message); }, error() {} };
-    const source = await fetchSpennSource({ logger, contentfulUrl, navigationTimeoutSecs: 1, maxRefunderFailures: 2 });
+    const source = await fetchSpennSource({ logger, catalogBaseUrl, contentfulUrl, navigationTimeoutSecs: 1, maxRefunderFailures: 2 });
     assert.ok(warnings.some((message) => /stopping refunder pages after 2 failures/.test(message)));
     assert.ok(requests.filter((entry) => entry.startsWith("refunder:f")).length < 20);
     assert.ok(source.items.length > 100);
   }, { failingStores: 20 });
 
-  await withSource(async (contentfulUrl) => {
+  await withSource(async (contentfulUrl, _requests, catalogBaseUrl) => {
     const logger = { info() {}, warn() {}, error() {} };
     await assert.rejects(
-      fetchSpennSource({ logger, contentfulUrl, navigationTimeoutSecs: 1 }),
-      /Spenn: Contentful offers request \(skip 0\) to http:\/\/127\.0\.0\.1:\d+\/contentful failed after retries \(503/,
+      fetchSpennSource({ logger, catalogBaseUrl, contentfulUrl, navigationTimeoutSecs: 1 }),
+      /Spenn: extension catalogue .*status\.json failed \(HTTP 404\); Contentful offers request \(skip 0\) to http:\/\/127\.0\.0\.1:\d+\/contentful failed after retries \(503/,
     );
   }, { contentfulStatus: 503 });
+});
+
+// Shape of spenn-cdn.refunder.com/extension/v1/no/catalog.nb.json (fetched 2026-11-05).
+function catalogStore(link: (store: string) => string, id: string, name: string, rate: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+  return {
+    id, name, logo: "", description: "", terms: "", spenn: "", category: "", extension: { popup: true },
+    rate: { unit: rate.fixed === true ? null : "per 10 kr", fixed: false, up_to: false, condition: null, ...rate },
+    match_rules: [{ host: `${id}.no`, include_subdomains: true, path: "", query: {} }],
+    activation_url: `${link(id)}&source=browser-extension&spennId={spennId}`,
+    ...extra,
+  };
+}
+
+test("Spenn uses the extension catalogue: fixed bonuses, verified hosts, up-to breakdowns and Contentful direct offers", async () => {
+  await withSource(async (contentfulUrl, requests, catalogBaseUrl) => {
+    const warnings: string[] = [];
+    const logger = { info() {}, warn: (message: string) => { warnings.push(message); }, error() {} };
+    const source = await fetchSpennSource({ logger, catalogBaseUrl, contentfulUrl, navigationTimeoutSecs: 1 });
+    assert.ok(source.catalog);
+    // Only the "opp til" store needs its refunder page for the category breakdown.
+    assert.deepEqual(requests.filter((entry) => entry.startsWith("refunder:")).sort(), ["refunder:a1", "refunder:upto"]);
+    const offers = buildSpennOffers({ source, domainLookup: new Map(), generatedAt: "2026-11-05T12:00:00.000Z", logger });
+    const byName = new Map(offers.map((offer) => [offer.merchantName, offer]));
+    assert.deepEqual([...byName.keys()].sort(), ["Direct Brand", "Farmasiet.no", "Lindex", "Nordnet", "Rate Store", "Up To"]);
+    const nordnet = byName.get("Nordnet")!;
+    assert.equal(nordnet.reward, "192 kr");
+    assert.deepEqual(nordnet.domains, ["nordnet.no"]);
+    assert.match(nordnet.activationUrl!, new RegExp(`/refunder\\.com/click\\?site=${NORWAY_SITE_ID}&store=nordnet$`));
+    assert.match(nordnet.terms!, /1 920 Spenn \(1 Spenn = 10 øre\)\.\nGjelder: Nytt depot\./);
+    // Breakdown from the refunder page when its maximum matches the catalogue; "Up To"'s page
+    // disagrees (3 %), so the catalogue maximum stays with its qualifier.
+    assert.equal(byName.get("Rate Store")!.reward, "6,5 %");
+    assert.equal(byName.get("Up To")!.reward, "opptil 4,8 %");
+    assert.deepEqual(byName.get("Lindex")!.domains, ["lindex.no"]);
+    assert.equal(byName.get("Farmasiet.no")!.reward, "3,4 %");
+    // Contentful keeps direct offers, but its refunder stores and renamed duplicates do not reappear.
+    assert.equal(byName.get("Direct Brand")!.reward, "5 %");
+    assert.ok(!byName.has("Old Refunder Store") && !byName.has("Farmasiet"));
+    assert.ok(warnings.some((message) => /skipping Implausible/.test(message)));
+  }, {
+    catalog: (link) => ({
+      version: 1, generated_at: "2026-11-05T10:45:04+01:00", market: "NO", locale: "nb", currency: "NOK", campaigns: [], direct_brands: [], links: {}, stand_down: {},
+      stores: [
+        catalogStore(link, "nordnet", "Nordnet", { value: 1920, fixed: true, condition: "Nytt depot" }, { spenn: "1 920 Spenn" }),
+        catalogStore(link, "a1", "Rate Store ", { value: 6.5, up_to: true }),
+        catalogStore(link, "upto", "Up To", { value: 4.8, up_to: true }),
+        catalogStore(link, "lindex", "Lindex", { value: 2.4 }, { match_rules: [
+          { host: "lindex.no", include_subdomains: true, path: "", query: {} },
+          { host: "lindex.com", include_subdomains: true, path: "/no", query: {} },
+        ] }),
+        catalogStore(link, "farmasiet", "Farmasiet.no", { value: 3.4 }),
+        catalogStore(link, "implausible", "Implausible", { value: 37.9 }),
+      ],
+    }),
+    contentfulItems: (link) => [
+      { title: "Old", longDescription: "**2 Spenn per 10 kr**", merchant: { name: "Old Refunder Store" }, externalTarget: { link: link("old") } },
+      { title: "Farmasiet", longDescription: "**3,4 Spenn per 10 kr**", merchant: { name: "Farmasiet" }, externalTarget: { link: "https://www.farmasiet.no/spenn" } },
+      { title: "Direct", longDescription: "Tjen **5 Spenn per 10 kr**", merchant: { name: "Direct Brand" }, externalTarget: { link: "https://www.directbrand.no/spenn" } },
+    ],
+  });
+});
+
+test("Spenn rejects a catalogue whose content_hash does not match status.json", async () => {
+  await withSource(async (contentfulUrl, _requests, catalogBaseUrl) => {
+    const warnings: string[] = [];
+    const logger = { info() {}, warn: (message: string) => { warnings.push(message); }, error() {} };
+    const source = await fetchSpennSource({ logger, catalogBaseUrl, contentfulUrl, navigationTimeoutSecs: 1 });
+    assert.equal(source.catalog, undefined);
+    assert.ok(warnings.some((message) => /content_hash a{64} does not match status\.json \(c{64}\)/.test(message)));
+  }, {
+    statusHash: "c".repeat(64),
+    catalog: () => ({ generated_at: "2026-11-05T10:45:04+01:00", market: "NO", locale: "nb", stores: [] }),
+    contentfulItems: () => [],
+  });
 });

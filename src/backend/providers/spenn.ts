@@ -5,6 +5,17 @@ import { normalizeDomainInput, parseUrl, type CashbackOffer } from "../../shared
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 
+/**
+ * Primary source: the public store catalogue that Spenn's own browser extension
+ * ("Tjen Spenn på nett") downloads. status.json names the current catalogue and
+ * its SHA-256; catalog.nb.json holds every Norwegian refunder store with a
+ * structured rate, terms, activation link and the hosts the extension matches
+ * The catalogue's content_hash must match status.json, as the extension checks
+ * (verified 2026-11-05: 191 stores, Nordnet among them, which Contentful lacks).
+ */
+const CATALOG_BASE_URL = "https://spenn-cdn.refunder.com/extension/v1/no";
+const CATALOG_LOCALE = "nb";
+
 const CONTENTFUL_URL =
   "https://graphql.eu.contentful.com/content/v1/spaces/eu01y9qnrf4v/environments/master";
 const CONTENTFUL_TOKEN = "7M6TKX9Vk0uQzCh16pbokiOlJztMRtJ_EvQPOrPVu4I";
@@ -66,7 +77,29 @@ type ContentfulResponse = {
 
 type RefunderStore = { merchantName: string; link: string; desc: string };
 
+type SpennCatalogRate = {
+  value: number;
+  unit: string | null;
+  fixed: boolean;
+  up_to: boolean;
+  condition: string | null;
+};
+type SpennCatalogMatchRule = { host: string; include_subdomains: boolean; path: string; query: Record<string, unknown> };
+export type SpennCatalogStore = {
+  id: string;
+  name: string;
+  terms: string;
+  spenn: string;
+  rate: SpennCatalogRate;
+  match_rules: SpennCatalogMatchRule[];
+  activation_url: string;
+};
+export type SpennCatalog = { market: string; locale: string; generated_at: string; stores: SpennCatalogStore[] };
+
 export type SpennSource = {
+  /** The extension catalogue; undefined when it could not be fetched or validated. */
+  catalog?: SpennCatalog;
+  /** Contentful offers: direct (non-refunder) offers, and the refunder stores when the catalogue is missing. */
   items: SpennOfferItem[];
   /** Rates from refunder landing pages, keyed by link. */
   refunderRates: Map<string, ParsedRate>;
@@ -74,29 +107,53 @@ export type SpennSource = {
 
 export type FetchSpennSourceInput = {
   logger: Logger;
+  catalogBaseUrl?: string;
   contentfulUrl?: string;
   navigationTimeoutSecs?: number;
   maxRefunderFailures?: number;
 };
 
 /**
- * Fetches the Contentful offers and the refunder rates. No domain lookup is
- * needed here, so the crawl runs this alongside the other providers and maps
+ * Fetches the extension catalogue, the Contentful offers and refunder landing
+ * pages. The catalogue is the store list; Contentful adds direct (non-refunder)
+ * offers and is the backup for the store list. Refunder pages give the
+ * category breakdown behind an "opp til" rate (the catalogue only has the
+ * maximum), or every rate when the catalogue is unavailable. No domain lookup
+ * is needed here, so the crawl runs this alongside the other providers and maps
  * the result with {@link buildSpennOffers} once the full lookup exists.
  */
 export async function fetchSpennSource(input: FetchSpennSourceInput): Promise<SpennSource> {
   const { logger } = input;
+  const catalogBaseUrl = (input.catalogBaseUrl ?? CATALOG_BASE_URL).replace(/\/$/, "");
   const contentfulUrl = input.contentfulUrl ?? CONTENTFUL_URL;
   const maxRefunderFailures = input.maxRefunderFailures ?? MAX_REFUNDER_FAILURES;
   const now = new Date().toISOString();
   const items: SpennOfferItem[] = [];
   const refunderRates = new Map<string, ParsedRate>();
-  let refunderLinks: string[] | undefined;
+  let catalog: SpennCatalog | undefined;
+  let catalogFailure: string | undefined;
+  let catalogDone = false;
+  let contentfulDone = false;
   let contentfulFailure: string | undefined;
+  let refunderLinks: string[] = [];
   let refunderFailures = 0;
 
   const config = new Configuration();
   config.useStorageClient(new MemoryStorage({ persistStorage: false }));
+  // Refunder pages are requested once both the catalogue and Contentful are
+  // settled, since either may supply the store list.
+  const queueRefunderPages = async () => {
+    if (!catalogDone || !contentfulDone) return;
+    refunderLinks = catalog !== undefined
+      ? catalog.stores.filter((store) => !store.rate.fixed && store.rate.up_to).map(refunderLinkForStore).filter((link): link is string => link !== undefined)
+      : [...groupRefunderStores(items).values()].map((store) => store.link);
+    await crawler.addRequests(refunderLinks.map((link) => new Request({
+      url: link,
+      label: "refunder",
+      userData: { link },
+      headers: { "Accept-Language": "nb-NO,nb" },
+    })));
+  };
   const crawler = new HttpCrawler({
     maxConcurrency: 5,
     maxRequestRetries: 2,
@@ -104,6 +161,7 @@ export async function fetchSpennSource(input: FetchSpennSourceInput): Promise<Sp
     requestHandlerTimeoutSecs: 30,
     useSessionPool: false,
     ignoreSslErrors: false,
+    additionalMimeTypes: ["application/json"],
     preNavigationHooks: [(_context, gotOptions) => {
       gotOptions.followRedirect = false;
     }],
@@ -120,6 +178,29 @@ export async function fetchSpennSource(input: FetchSpennSourceInput): Promise<Sp
         if (parsed) refunderRates.set(String(request.userData.link), parsed);
         return;
       }
+      if (request.label === "catalog-status") {
+        const hash = readCatalogHash(JSON.parse(text));
+        await crawler.addRequests([new Request({
+          url: `${catalogBaseUrl}/catalog.${CATALOG_LOCALE}.json`,
+          label: "catalog",
+          userData: { hash },
+          headers: { Accept: "application/json" },
+        })]);
+        return;
+      }
+      if (request.label === "catalog") {
+        // Like the extension: the catalogue's content_hash must be the one status.json names.
+        const value: unknown = JSON.parse(text);
+        const contentHash = isObject(value) ? value.content_hash : undefined;
+        if (contentHash !== request.userData.hash) {
+          request.noRetry = true;
+          throw new Error(`content_hash ${String(contentHash)} does not match status.json (${String(request.userData.hash)})`);
+        }
+        catalog = parseSpennCatalog(value);
+        catalogDone = true;
+        await queueRefunderPages();
+        return;
+      }
 
       const json = JSON.parse(text) as ContentfulResponse;
       const pageItems = json.data?.offerCollection?.items;
@@ -132,38 +213,95 @@ export async function fetchSpennSource(input: FetchSpennSourceInput): Promise<Sp
         await crawler.addRequests([contentfulRequest(contentfulUrl, Number(request.userData.skip) + CONTENTFUL_PAGE_SIZE, now)]);
         return;
       }
-      // Rates from the refunder landing pages are more reliable than the
-      // Contentful descriptions.
-      refunderLinks = [...groupRefunderStores(items).values()].map((store) => store.link);
-      await crawler.addRequests(refunderLinks.map((link) => new Request({
-        url: link,
-        label: "refunder",
-        userData: { link },
-        headers: { "Accept-Language": "nb-NO,nb" },
-      })));
+      contentfulDone = true;
+      await queueRefunderPages();
     },
     failedRequestHandler: async ({ request }, error) => {
       const reason = error.message.slice(0, 300);
+      if (request.label === "catalog-status" || request.label === "catalog") {
+        catalogFailure = `extension catalogue ${request.url} failed (${reason})`;
+        logger.warn(`Spenn: ${catalogFailure}; using Contentful and refunder pages for the store list`);
+        catalogDone = true;
+        await queueRefunderPages();
+        return;
+      }
       if (request.label !== "refunder") {
         contentfulFailure = `Contentful offers request (skip ${String(request.userData.skip)}) to ${request.url} failed after retries (${reason})`;
+        logger.warn(`Spenn: ${contentfulFailure}`);
+        contentfulDone = true;
+        await queueRefunderPages();
         return;
       }
       refunderFailures++;
       logger.warn(`Spenn: refunder page ${request.url} failed after retries (${reason})`);
       if (refunderFailures === maxRefunderFailures) {
-        logger.warn(`Spenn: stopping refunder pages after ${refunderFailures} failures; using Contentful descriptions for the remaining stores`);
+        logger.warn(`Spenn: stopping refunder pages after ${refunderFailures} failures; using the catalogue/Contentful rates for the remaining stores`);
         crawler.stop();
       }
     },
   }, config);
 
-  await crawler.run([contentfulRequest(contentfulUrl, 0, now)]);
-  if (refunderLinks === undefined) {
-    throw new Error(`Spenn: ${contentfulFailure ?? "Contentful offers did not complete"}`);
+  await crawler.run([
+    new Request({ url: `${catalogBaseUrl}/status.json`, label: "catalog-status", headers: { Accept: "application/json" } }),
+    contentfulRequest(contentfulUrl, 0, now),
+  ]);
+  if (catalog === undefined && contentfulFailure !== undefined) {
+    throw new Error(`Spenn: ${catalogFailure ?? "extension catalogue did not complete"}; ${contentfulFailure}`);
   }
+  if (catalog === undefined && !contentfulDone) {
+    throw new Error(`Spenn: ${catalogFailure ?? "extension catalogue did not complete"}; Contentful offers did not complete`);
+  }
+  if (catalog !== undefined) logger.info(`Spenn: ${catalog.stores.length} stores in the extension catalogue (${catalog.generated_at})`);
   logger.info(`Spenn: fetched ${items.length} active offers from Contentful`);
   logger.info(`Spenn: fetched rates from ${refunderRates.size}/${refunderLinks.length} refunder pages`);
-  return { items, refunderRates };
+  return { ...(catalog !== undefined ? { catalog } : {}), items, refunderRates };
+}
+
+function readCatalogHash(value: unknown): string {
+  const files = isObject(value) && value.market === "NO" && isObject(value.files) ? value.files : undefined;
+  const locale = files !== undefined && isObject(files[CATALOG_LOCALE]) ? files[CATALOG_LOCALE] : undefined;
+  const hash = locale?.catalog;
+  if (typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash)) {
+    throw new Error(`status.json has no ${CATALOG_LOCALE} catalogue hash for market NO`);
+  }
+  return hash;
+}
+
+/** Validates the catalogue shape; a changed format must fail loudly rather than drop stores silently. */
+export function parseSpennCatalog(value: unknown): SpennCatalog {
+  if (!isObject(value) || value.market !== "NO" || value.locale !== CATALOG_LOCALE || typeof value.generated_at !== "string" || !Array.isArray(value.stores)) {
+    throw new Error("unexpected catalogue format (market/locale/generated_at/stores)");
+  }
+  const stores = value.stores.filter(isCatalogStore);
+  if (stores.length !== value.stores.length) {
+    throw new Error(`unexpected catalogue format: ${value.stores.length - stores.length} of ${value.stores.length} stores lack name, rate, match rules or activation link`);
+  }
+  return { market: value.market, locale: value.locale, generated_at: value.generated_at, stores };
+}
+
+function isCatalogStore(value: unknown): value is SpennCatalogStore {
+  if (!isObject(value) || typeof value.id !== "string" || typeof value.name !== "string" || value.name.trim() === "" ||
+    typeof value.activation_url !== "string" || !Array.isArray(value.match_rules) || !isObject(value.rate)) return false;
+  const rate = value.rate;
+  return typeof rate.value === "number" && Number.isFinite(rate.value) && rate.value > 0 &&
+    typeof rate.fixed === "boolean" && typeof rate.up_to === "boolean" &&
+    (rate.fixed || rate.unit === "per 10 kr") &&
+    (rate.condition === null || typeof rate.condition === "string") &&
+    (value.terms === undefined || value.terms === null || typeof value.terms === "string") &&
+    value.match_rules.every((rule) => isObject(rule) && typeof rule.host === "string" && typeof rule.path === "string");
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The plain click link (as in Contentful), without the extension's source/spennId parameters. */
+function refunderLinkForStore(store: SpennCatalogStore): string | undefined {
+  const parsed = parseUrl(store.activation_url);
+  const site = parsed?.searchParams.get("site");
+  const storeId = parsed?.searchParams.get("store");
+  if (parsed === undefined || site !== NORWAY_SITE_ID || storeId === null || storeId === undefined) return undefined;
+  return `${parsed.origin}${parsed.pathname}?site=${site}&store=${storeId}`;
 }
 
 function contentfulRequest(url: string, skip: number, now: string): Request {
@@ -217,11 +355,34 @@ export function buildSpennOffers(options: {
 }): CashbackOffer[] {
   const { source, generatedAt, logger, domainLookup } = options;
   const allItems = source.items;
-  const storeMap = groupRefunderStores(allItems);
+  const storeMap = source.catalog === undefined ? groupRefunderStores(allItems) : new Map<string, RefunderStore>();
   const refunderRates = source.refunderRates;
 
   // Pick best rate per merchant (highest max)
-  const best = new Map<string, { rate: string; maxVal: number; link: string; terms: string }>();
+  const best = new Map<string, { rate: string; maxVal: number; link: string; terms: string; domains?: string[] }>();
+
+  for (const store of source.catalog?.stores ?? []) {
+    const merchantName = store.name.trim();
+    const link = refunderLinkForStore(store) ?? cleanTemplateLink(store.activation_url);
+    const parsed = parseCatalogRate(store, refunderRates.get(link));
+    if (isImplausiblePercent(parsed)) {
+      logger.warn(
+        `Spenn: skipping ${merchantName}, implausible rate ${parsed.rate}` +
+          " (likely a fixed fee expressed per 10 kr)",
+      );
+      continue;
+    }
+    // Path-limited rules (lindex.com/no) would match the whole host; the
+    // extension's host-wide rules are the verified domains.
+    const domains = [...new Set(store.match_rules
+      .filter((rule) => rule.path === "" && Object.keys(rule.query ?? {}).length === 0)
+      .map((rule) => normalizeDomainInput(rule.host))
+      .filter((domain) => domain !== ""))];
+    const existing = best.get(merchantName);
+    if (!existing || parsed.maxVal > existing.maxVal) {
+      best.set(merchantName, { rate: parsed.rate, maxVal: parsed.maxVal, link, terms: parsed.terms, domains });
+    }
+  }
 
   for (const [, { merchantName, link, desc }] of storeMap) {
     // Prefer refunder page rate; fall back to Contentful description
@@ -243,8 +404,10 @@ export function buildSpennOffers(options: {
 
   const offers: CashbackOffer[] = [];
 
-  for (const [merchantName, { rate, link, terms }] of best) {
-    const domains = lookupDomains(domainLookup, merchantName);
+  for (const [merchantName, { rate, link, terms, domains: catalogDomains }] of best) {
+    const domains = catalogDomains !== undefined && catalogDomains.length > 0
+      ? catalogDomains
+      : lookupDomains(domainLookup, merchantName);
 
     offers.push({
       provider: "spenn",
@@ -266,9 +429,10 @@ export function buildSpennOffers(options: {
   type DirectOffer = { parsed: ParsedRate; isPercent: boolean; link: string };
   const directBest = new Map<string, DirectOffer>();
 
+  const catalogNames = new Set([...best.keys()].map(normalizeMerchantName));
   for (const item of allItems) {
-    const merchantName = item.merchant?.name;
-    if (!merchantName || merchantName === "Spenn" || best.has(merchantName)) continue;
+    const merchantName = item.merchant?.name?.trim();
+    if (!merchantName || merchantName === "Spenn" || catalogNames.has(normalizeMerchantName(merchantName))) continue;
 
     const link = item.externalTarget?.link ?? "";
     if (link.includes("refunder.com") || !isNorwegianMarketLink(link)) continue;
@@ -317,6 +481,38 @@ export function buildSpennOffers(options: {
 
   logger.info(`Spenn: ${offers.length} Norwegian cashback offers`);
   return offers;
+}
+
+/**
+ * Catalogue rate → reward. "X Spenn per 10 kr" is X % (1 Spenn = 10 øre); a
+ * fixed value is Spenn, so 1920 Spenn = 192 kr. For "opp til" the catalogue
+ * only has the maximum; the refunder page's category breakdown is used when its
+ * maximum agrees, otherwise the reward keeps the "opptil" qualifier.
+ */
+export function parseCatalogRate(store: SpennCatalogStore, breakdown?: ParsedRate): ParsedRate {
+  const { value, fixed, up_to: upTo, condition } = store.rate;
+  const storeTerms = (store.terms ?? "").trim();
+  const join = (...parts: Array<string | undefined>) => parts.filter((part): part is string => part !== undefined && part !== "").join("\n");
+  if (fixed) {
+    const kr = Math.round(value / 10);
+    return {
+      rate: upTo ? `opptil ${kr} kr` : `${kr} kr`,
+      maxVal: kr,
+      terms: join(`${store.spenn.replace(/\s+/g, " ").trim()} (1 Spenn = 10 øre).`, condition ? `Gjelder: ${condition}.` : undefined, storeTerms),
+    };
+  }
+  if (upTo && breakdown !== undefined && breakdown.maxVal === value) {
+    return { rate: breakdown.rate, maxVal: value, terms: join(breakdown.terms, storeTerms) };
+  }
+  return {
+    rate: `${upTo ? "opptil " : ""}${fmt(value)} %`,
+    maxVal: value,
+    terms: join(condition ? `Gjelder: ${condition}.` : undefined, storeTerms),
+  };
+}
+
+function normalizeMerchantName(name: string): string {
+  return name.trim().toLowerCase().replace(/\.no$/, "");
 }
 
 /** Fixed bonuses are in kroner, so the ceiling only applies to percentages. */
