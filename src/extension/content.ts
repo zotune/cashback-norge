@@ -1711,7 +1711,10 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
   const flightMeta = extractFlightSearchMeta(parsedUrl);
   if (flightMeta === undefined || !isFlightSearchPassengerMatchSupported(flightMeta)) return undefined;
 
-  const airportLookup = await buildFlightAirportLookup(flightMeta);
+  const [airportLookup, panFlightsPlaces] = await Promise.all([
+    buildFlightAirportLookup(flightMeta),
+    ENABLE_PANFLIGHTS_FLIGHT_PRICE_SOURCE ? fetchPanFlightsSearchPlaces(flightMeta) : undefined,
+  ]);
   const dateFlex = flightMeta.dateFlex;
   const routeTitle = `${flightMeta.origin} → ${flightMeta.destination}`;
   const fullSearchDetails = [
@@ -1735,7 +1738,7 @@ async function buildFlightPriceMatchSession(): Promise<FlightPriceMatchSession |
       ? [buildFlightPriceMatchOffer({
         source: "panflights",
         sourceName: "PanFlights",
-        productUrl: buildPanFlightsFlightSearchUrl(flightMeta),
+        productUrl: buildPanFlightsFlightSearchUrl(flightMeta, "best", panFlightsPlaces),
         routeTitle,
         cardSearchDetails,
         fullSearchDetails,
