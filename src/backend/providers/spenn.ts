@@ -106,7 +106,20 @@ export type SpennCatalogStore = {
   match_rules: SpennCatalogMatchRule[];
   activation_url: string;
 };
-export type SpennCatalog = { market: string; locale: string; generated_at: string; stores: SpennCatalogStore[] };
+/**
+ * Brands where Spenn is not earned through the extension: "app" brands
+ * (OneCall, BookBeat, Fortum …) must be started from the Spenn app, "card"
+ * brands (Norwegian, Strawberry, Widerøe) through a linked loyalty programme.
+ * Same wording as Spenn's own extension (directAppText/directCardText).
+ */
+export type SpennDirectBrand = {
+  name: string;
+  kind: "app" | "card";
+  programme: string | null;
+  app_url: string | null;
+  match_rules: SpennCatalogMatchRule[];
+};
+export type SpennCatalog = { market: string; locale: string; generated_at: string; stores: SpennCatalogStore[]; direct_brands: SpennDirectBrand[] };
 
 export type SpennSource = {
   /** The extension catalogue; undefined when it could not be fetched or validated. */
@@ -288,7 +301,30 @@ export function parseSpennCatalog(value: unknown): SpennCatalog {
   if (stores.length !== value.stores.length) {
     throw new Error(`unexpected catalogue format: ${value.stores.length - stores.length} of ${value.stores.length} stores lack name, rate, match rules or activation link`);
   }
-  return { market: value.market, locale: value.locale, generated_at: value.generated_at, stores };
+  // Direct brands only add instructions and hosts; a changed entry is skipped, not fatal.
+  const directBrands = Array.isArray(value.direct_brands) ? value.direct_brands.filter(isDirectBrand) : [];
+  return { market: value.market, locale: value.locale, generated_at: value.generated_at, stores, direct_brands: directBrands };
+}
+
+function isDirectBrand(value: unknown): value is SpennDirectBrand {
+  return isObject(value) && typeof value.name === "string" && value.name.trim() !== "" &&
+    (value.kind === "app" || value.kind === "card") &&
+    (value.programme === null || value.programme === undefined || typeof value.programme === "string") &&
+    (value.app_url === null || value.app_url === undefined || typeof value.app_url === "string") &&
+    Array.isArray(value.match_rules) && value.match_rules.every((rule) => isObject(rule) && typeof rule.host === "string" && typeof rule.path === "string");
+}
+
+function hostWideDomains(rules: SpennCatalogMatchRule[]): string[] {
+  return [...new Set(rules
+    .filter((rule) => rule.path === "" && Object.keys(rule.query ?? {}).length === 0)
+    .map((rule) => normalizeDomainInput(rule.host))
+    .filter((domain) => domain !== ""))];
+}
+
+function directBrandTerms(brand: SpennDirectBrand): string {
+  return brand.kind === "app"
+    ? "Opptjeningen skjer ikke gjennom nettleserutvidelsen. Start kjøpet fra Spenn-appen."
+    : `Her tjener du ikke Spenn via nettleserutvidelsen. Logg inn som ${brand.programme ?? brand.name}-medlem for å tjene Spenn.`;
 }
 
 function isCatalogStore(value: unknown): value is SpennCatalogStore {
@@ -386,10 +422,7 @@ export function buildSpennOffers(options: {
     }
     // Path-limited rules (lindex.com/no) would match the whole host; the
     // extension's host-wide rules are the verified domains.
-    const domains = [...new Set(store.match_rules
-      .filter((rule) => rule.path === "" && Object.keys(rule.query ?? {}).length === 0)
-      .map((rule) => normalizeDomainInput(rule.host))
-      .filter((domain) => domain !== ""))];
+    const domains = hostWideDomains(store.match_rules);
     const existing = best.get(merchantName);
     if (!existing || parsed.maxVal > existing.maxVal) {
       best.set(merchantName, { rate: parsed.rate, maxVal: parsed.maxVal, link, terms: parsed.terms, domains });
@@ -474,11 +507,21 @@ export function buildSpennOffers(options: {
     if (isBetter) directBest.set(merchantName, candidate);
   }
 
+  const directBrands = new Map((source.catalog?.direct_brands ?? []).map((brand) => [normalizeMerchantName(brand.name), brand]));
   for (const [merchantName, { parsed, link }] of directBest) {
+    const brand = directBrands.get(normalizeMerchantName(merchantName));
+    const brandDomains = brand !== undefined ? hostWideDomains(brand.match_rules) : [];
     const linkDomain = extractLinkDomain(link);
-    const domains = linkDomain !== undefined && linkDomain !== "app.spenngroup.com"
-      ? [linkDomain]
+    // The extension's hosts (norwegian.com) plus the offer's own site (norwegian.no).
+    const ownDomains = linkDomain !== undefined && linkDomain !== "app.spenngroup.com" ? [linkDomain] : [];
+    const domains = brandDomains.length > 0 || ownDomains.length > 0
+      ? [...new Set([...brandDomains, ...ownDomains])]
       : lookupDomains(domainLookup, merchantName);
+    // Spenn's app brands must be started in the app; their web landing pages
+    // (onecall.no/mobilabonnement/get-spenn) fail without it.
+    const activationUrl = brand?.kind === "app" && brand.app_url !== null
+      ? brand.app_url
+      : link !== "" ? link : "https://app.spenngroup.com";
 
     offers.push({
       provider: "spenn",
@@ -486,8 +529,8 @@ export function buildSpennOffers(options: {
       domains,
       reward: parsed.rate,
       sourceUrl: "https://app.spenngroup.com",
-      activationUrl: link !== "" ? link : "https://app.spenngroup.com",
-      terms: parsed.terms,
+      activationUrl,
+      terms: [parsed.terms, brand !== undefined ? directBrandTerms(brand) : ""].filter((part) => part !== "").join("\n"),
       updatedAt: generatedAt,
     });
   }

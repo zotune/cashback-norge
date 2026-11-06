@@ -139,7 +139,7 @@ test("Spenn uses the extension catalogue: fixed bonuses, verified hosts, up-to b
     assert.deepEqual(requests.filter((entry) => entry.startsWith("refunder:")).sort(), ["refunder:a1", "refunder:upto"]);
     const offers = buildSpennOffers({ source, domainLookup: new Map(), generatedAt: "2026-11-05T12:00:00.000Z", logger });
     const byName = new Map(offers.map((offer) => [offer.merchantName, offer]));
-    assert.deepEqual([...byName.keys()].sort(), ["Direct Brand", "Farmasiet.no", "Lindex", "Nordnet", "Rate Store", "Up To"]);
+    assert.deepEqual([...byName.keys()].sort(), ["Card Brand", "Direct Brand", "Farmasiet.no", "Lindex", "Nordnet", "Rate Store", "Up To"]);
     const nordnet = byName.get("Nordnet")!;
     assert.equal(nordnet.reward, "192 kr");
     assert.deepEqual(nordnet.domains, ["nordnet.no"]);
@@ -156,13 +156,25 @@ test("Spenn uses the extension catalogue: fixed bonuses, verified hosts, up-to b
     assert.equal(byName.get("Farmasiet.no")!.reward, "3,4 %");
     // Contentful keeps direct offers, but its refunder stores and renamed duplicates do not reappear.
     assert.equal(byName.get("Direct Brand")!.reward, "5 %");
-    assert.equal(byName.get("Direct Brand")!.activationUrl, "https://www.directbrand.no/spenn");
+    // App brands start in the Spenn app (their web page fails without it), as Spenn's extension says.
+    assert.equal(byName.get("Direct Brand")!.activationUrl, "https://app.spenngroup.com/home");
+    assert.match(byName.get("Direct Brand")!.terms!, /Opptjeningen skjer ikke gjennom nettleserutvidelsen\. Start kjøpet fra Spenn-appen\./);
+    assert.deepEqual(byName.get("Direct Brand")!.domains, ["directbrand.no"]);
+    assert.deepEqual(byName.get("Card Brand")!.domains, ["cardbrand.com", "cardbrand.no"]);
+    // Card brands keep their link and say which loyalty login is needed.
+    assert.equal(byName.get("Card Brand")!.activationUrl, "https://www.cardbrand.no/spenn");
+    assert.match(byName.get("Card Brand")!.terms!, /Logg inn som Card Reward-medlem for å tjene Spenn\./);
     assert.ok(!requiresSpennExtension(byName.get("Direct Brand")!));
     assert.ok(!byName.has("Old Refunder Store") && !byName.has("Farmasiet"));
     assert.ok(warnings.some((message) => /skipping Implausible/.test(message)));
   }, {
     catalog: (link) => ({
-      version: 1, generated_at: "2026-11-05T10:45:04+01:00", market: "NO", locale: "nb", currency: "NOK", campaigns: [], direct_brands: [], links: {}, stand_down: {},
+      version: 1, generated_at: "2026-11-05T10:45:04+01:00", market: "NO", locale: "nb", currency: "NOK", campaigns: [], links: {}, stand_down: {},
+      // Shape of the catalogue's direct_brands (OneCall: kind "app", Norwegian: kind "card").
+      direct_brands: [
+        { id: "d1", name: "Direct Brand", logo: "", kind: "app", programme: null, app_url: "https://app.spenngroup.com/home", match_rules: [{ host: "directbrand.no", include_subdomains: true, path: "", query: {} }] },
+        { id: "d2", name: "Card Brand", logo: "", kind: "card", programme: "Card Reward", app_url: null, match_rules: [{ host: "cardbrand.com", include_subdomains: true, path: "", query: {} }] },
+      ],
       stores: [
         catalogStore(link, "nordnet", "Nordnet", { value: 1920, fixed: true, condition: "Nytt depot" }, { spenn: "1 920 Spenn" }),
         catalogStore(link, "a1", "Rate Store ", { value: 6.5, up_to: true }),
@@ -179,6 +191,7 @@ test("Spenn uses the extension catalogue: fixed bonuses, verified hosts, up-to b
       { title: "Old", longDescription: "**2 Spenn per 10 kr**", merchant: { name: "Old Refunder Store" }, externalTarget: { link: link("old") } },
       { title: "Farmasiet", longDescription: "**3,4 Spenn per 10 kr**", merchant: { name: "Farmasiet" }, externalTarget: { link: "https://www.farmasiet.no/spenn" } },
       { title: "Direct", longDescription: "Tjen **5 Spenn per 10 kr**", merchant: { name: "Direct Brand" }, externalTarget: { link: "https://www.directbrand.no/spenn" } },
+      { title: "Card", longDescription: "Tjen **1 Spenn per 10 kr**", merchant: { name: "Card Brand" }, externalTarget: { link: "https://www.cardbrand.no/spenn" } },
     ],
   });
 });
