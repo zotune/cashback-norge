@@ -3,7 +3,7 @@
 //
 // Colours were checked one by one against each chain's logo (Tjek dealer logo and colour,
 // November 2026): REMA 1000 blue, KIWI green with black lettering, MENY and SPAR red,
-// Joker green with yellow, Extra's yellow with red, Coop Prix yellow with blue, Coop Mega
+// Joker green with white text for legibility, Extra's yellow with red, Coop Prix yellow with blue, Coop Mega
 // dark green, Obs blue, Coop Marked and Matkroken red, Bunnpris yellow with black,
 // Nærbutikken silver with the red heart, Europris green and Oda orange.
 // `search` is the chain's own product search ({q} = the product), checked November 2026.
@@ -16,7 +16,7 @@ export const GROCERY_CHAIN_LIST: GroceryChain[] = [
   { name: "KIWI", label: "KIWI", slug: "kiwi", bg: "#50b848", fg: "#111111" },
   { name: "MENY", label: "MENY", slug: "meny", bg: "#da1f3d", fg: "#ffffff", search: "https://meny.no/sok?query={q}&expanded=products" },
   { name: "SPAR", label: "SPAR", slug: "spar", bg: "#dc1e21", fg: "#ffffff", search: "https://spar.no/sok?query={q}&expanded=products" },
-  { name: "Joker", label: "Joker", slug: "joker", bg: "#008c58", fg: "#ffe600", search: "https://joker.no/sok?query={q}&expanded=products" },
+  { name: "Joker", label: "Joker", slug: "joker", bg: "#008c58", fg: "#ffffff", search: "https://joker.no/sok?query={q}&expanded=products" },
   { name: "Extra", label: "Extra", slug: "extra", bg: "#ffd400", fg: "#c8102e" },
   { name: "Coop Mega", label: "Coop Mega", slug: "coop-mega", bg: "#2f5d2a", fg: "#ffffff" },
   { name: "Coop Prix", label: "Coop Prix", slug: "coop-prix", bg: "#ffcc00", fg: "#00468c" },

@@ -23,6 +23,7 @@ import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters
 import { getOfferCampaignLabel, getVisibleOfferKey } from "../shared/offer-context";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 import * as SITE_UI from "./site-ui";
+import { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS } from "../shared/prisjakt-deals";
 import { GROCERY_CHAIN_LIST, getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery, getGroceryUnitPrice, getGroceryCardBonus, GROCERY_CARD_BONUSES } from "../shared/grocery-chains";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement } from "../shared/support-advertisements";
 
@@ -63,6 +64,8 @@ Object.assign(window, {
     getGroceryUnitPrice,
     getGroceryCardBonus,
     GROCERY_CARD_BONUSES,
+    getPrisjaktDealGroup,
+    PRISJAKT_DEAL_GROUPS,
     ...SITE_UI,
   },
 });

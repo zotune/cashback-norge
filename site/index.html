@@ -497,71 +497,6 @@ a.code-reward { color: inherit; text-decoration: none; }
   right: 0;
   z-index: 200;
 }
-.chip-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.chip-group-label {
-  color: var(--cbn-subtle, #8a9a92);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.chip-group-items {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.tooltip-wrap {
-  position: relative;
-}
-.tooltip {
-  background: var(--cbn-tooltip, #172026);
-  border-radius: 8px;
-  bottom: calc(100% + 6px);
-  color: #fff;
-  font-size: 12px;
-  left: 50%;
-  line-height: 1.45;
-  opacity: 0;
-  padding: 8px 12px;
-  pointer-events: none;
-  position: absolute;
-  transform: translateX(-50%);
-  transition: opacity 0.15s;
-  white-space: pre-line;
-  width: max-content;
-  max-width: 260px;
-  z-index: 200;
-}
-.tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.tooltip-wrap:hover .tooltip,
-.tooltip-wrap.active .tooltip {
-  opacity: 1;
-  pointer-events: auto;
-}
-.bonus-chip {
-  align-items: center;
-  color: var(--cbn-text, #172026);
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
-  gap: 4px;
-  line-height: 1;
-  padding: 5px 10px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.bonus-chip .badge { font-size: 9px; min-height: 16px; padding: 0 5px; }
 .app-chip {
   display: inline-block;
   font-size: 9px;
@@ -605,7 +540,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 </head>
 <body>
 <div class="container">
-  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/" aria-current="page">Cashback</a><a href="/dagligvarer/">Dagligvarer</a></nav>
+  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/" aria-current="page">Cashback</a><a href="/dagligvarer/">Dagligvarer</a><a href="/dagens-tilbud/">Tilbud</a></nav>
   <img src="logo.png?v=quokka-1" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker.</p>
@@ -689,7 +624,7 @@ a.code-reward { color: inherit; text-decoration: none; }
   <div class="az-bar" id="az-bar"></div>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
-      <a href="/dagligvarer/">Dagligvarer</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a> · <a class="js-email" data-u="c" data-d="adoretunes.com" data-keep-text href="#">Kontakt</a>
+      <a href="/dagligvarer/">Dagligvarer</a> · <a href="/dagens-tilbud/">Tilbud</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a> · <a class="js-email" data-u="c" data-d="adoretunes.com" data-keep-text href="#">Kontakt</a>
     </nav>
     <div>© 2026 Cashback Norge · Uavhengig cashback-oversikt for norske nettbutikker</div>
   </footer>
@@ -2097,38 +2032,7 @@ function installQuokkaRunner() {
 installQuokkaRunner();
 
 function renderChipGroup(cards, container) {
-  container.innerHTML = cards.map(c => {
-    // A conditional card's rate does not apply to the whole sum.
-    const amt = currentAmount > 0 && !c.conditional ? currentAmount : 0;
-    let rewardText;
-    if (amt > 0 && c.minPct != null && c.maxPct != null) {
-      const minKr = Math.round(amt * c.minPct);
-      const maxKr = Math.round(amt * c.maxPct);
-      rewardText = `+${minKr}-${maxKr} kr`;
-    } else if (amt > 0) {
-      const kr = Math.round(amt * c.pct);
-      if (c.ebPer100kr) {
-        const eb = Math.round(amt * c.ebPer100kr / 100);
-        rewardText = `+~${kr} kr (~${eb} EB)`;
-      } else {
-        rewardText = c.approx ? `+~${kr} kr` : `+${kr} kr`;
-      }
-    } else if (c.minPct != null && c.maxPct != null) {
-      const minStr = (c.minPct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
-      const maxStr = (c.maxPct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
-      rewardText = `+${minStr}-${maxStr} %`;
-    } else {
-      const pctStr = (c.pct * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
-      const ebInfo = c.ebPer100kr ? ` (~${c.ebPer100kr} EB/100kr)` : "";
-      rewardText = (c.approx ? `+~${pctStr} %` : `+${pctStr} %`) + ebInfo;
-    }
-    return `<span class="tooltip-wrap">
-      <span class="tooltip cbn-tooltip-rich">${formatTooltipHtml(c.tip)}</span>
-      <a class="cbn-row bonus-chip" href="${esc(c.url)}" target="_blank" rel="${c.ad ? 'sponsored noopener noreferrer' : 'noreferrer'}">
-        <span class="bonus-chip-label">${rewardText}</span> <span style="display:inline-flex;align-items:center;gap:6px;">${c.ad ? '<span aria-hidden="true">🥳</span>' : ''}${(c.ad || c.label === 'Crypto' || c.label === 'Curve') ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ''}<span class="cbn-chip badge badge-${c.badge}">${esc(c.label)}</span></span>
-      </a>
-    </span>`;
-  }).join("");
+  window.SHARED.renderBonusCardGroup(cards, container, currentAmount);
 }
 
 function setupAzBar() {

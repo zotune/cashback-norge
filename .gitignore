@@ -10,6 +10,8 @@ site/pokepris-catalog.json
 site/electricity-suppliers.json
 data/grocery-offers.json
 site/grocery-offers.json
+data/prisjakt-deals.json
+site/prisjakt-deals.json
 *tmp*
 *.log*
 # Plan and roadmap: kept out of the public repository

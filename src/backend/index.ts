@@ -30,6 +30,7 @@ import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
 import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog.js";
 import { collectGroceryOffers } from "./grocery-offers.js";
+import { collectPrisjaktDeals } from "./prisjakt-deals.js";
 import { collectElectricitySupplierCatalog } from "./electricity-supplier-catalog.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
@@ -200,6 +201,8 @@ type CliConfig = {
   electricityCatalogPath: string;
   skipGroceryOffers: boolean;
   groceryOffersPath: string;
+  skipPrisjaktDeals: boolean;
+  prisjaktDealsPath: string;
   rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -279,6 +282,8 @@ async function main(): Promise<void> {
   }));
   // Not a cashback source: this week's supermarket flyer offers for cashbacknorge.no/dagligvarer.
   const groceryOffersPromise = config.skipGroceryOffers ? undefined : startEarly(collectGroceryOffers({ generatedAt, logger }));
+  // Not a cashback source either: Prisjakt's "Dagens tilbud" for cashbacknorge.no/dagens-tilbud.
+  const prisjaktDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(collectPrisjaktDeals({ generatedAt, logger }));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
     maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
@@ -1152,6 +1157,12 @@ async function main(): Promise<void> {
     await copyFile(config.groceryOffersPath, resolve("site/grocery-offers.json"));
     logger.info(`Wrote grocery offers (${groceryOffers.offers.length} offers, ${groceryOffers.chains.length} chains) to ${config.groceryOffersPath}`);
   }
+  const prisjaktDeals = await prisjaktDealsPromise;
+  if (prisjaktDeals !== undefined) {
+    await writeJsonFile(config.prisjaktDealsPath, prisjaktDeals);
+    await copyFile(config.prisjaktDealsPath, resolve("site/prisjakt-deals.json"));
+    logger.info(`Wrote Prisjakt deals (${prisjaktDeals.deals.length} deals) to ${config.prisjaktDealsPath}`);
+  }
 }
 
 function readCliConfig(args: string[]): CliConfig {
@@ -1295,6 +1306,8 @@ function readCliConfig(args: string[]): CliConfig {
     electricityCatalogPath: resolve(readArgumentValue(args, "--electricity-catalog-output") ?? "data/electricity-suppliers.json"),
     skipGroceryOffers: args.includes("--skip-grocery-offers"),
     groceryOffersPath: resolve(readArgumentValue(args, "--grocery-offers-output") ?? "data/grocery-offers.json"),
+    skipPrisjaktDeals: args.includes("--skip-prisjakt-deals"),
+    prisjaktDealsPath: resolve(readArgumentValue(args, "--prisjakt-deals-output") ?? "data/prisjakt-deals.json"),
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??

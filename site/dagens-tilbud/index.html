@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tilbud · Cashback Norge</title>
+<script src="/theme.js?v=3"></script>
+<link rel="stylesheet" href="/site.css?v=1">
+<link rel="stylesheet" href="/offer-list.css?v=1">
+<meta name="description" content="Gode tilbud på elektronikk, hjem, sport og mer – sorter på prisfall, pris og butikk, med lenke til prishistorikken.">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
+<link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
+<style>
+.intro-logo { width: 72px; height: 72px; display: block; margin: 0 auto 6px; }
+</style>
+<script data-goatcounter="https://cashbacknorge.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<div class="container">
+  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/">Cashback</a><a href="/dagligvarer/">Dagligvarer</a><a href="/dagens-tilbud/" aria-current="page">Tilbud</a></nav>
+  <img class="intro-logo" src="/logo.png?v=quokka-1" alt="">
+  <h1>Tilbud</h1>
+  <p class="subtitle">Varer som er billigere enn vanlig akkurat nå – elektronikk, hjem, sport og mer.</p>
+  <div class="update-row"><span id="updated">Oppdatert daglig</span><span data-theme-control></span></div>
+  <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
+    <div class="invite-card-header">
+      <span class="cbn-chip cbn-chip--muted">Annonse</span>
+      <span data-invite-provider></span>
+      <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul annonsen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <h2 id="support-invite-title" data-invite-title></h2>
+    <p data-invite-description></p>
+    <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+    <p class="invite-card-fine-print" data-invite-fine-print hidden></p>
+  </aside>
+  <div id="offer-list"></div>
+  <p class="note" id="note"></p>
+  <footer class="footer" style="margin-bottom:56px;">
+    <nav style="margin-bottom:6px;">
+      <a href="/">Cashback</a> · <a href="/dagligvarer/">Dagligvarer</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
+    </nav>
+    <div>© 2026 Cashback Norge · Uavhengig oversikt, ikke tilknyttet butikkene</div>
+  </footer>
+</div>
+<div class="fixed-footer">
+  <div class="tip-line"></div>
+</div>
+<script src="/shared-data.js"></script>
+<script src="/offer-list.js?v=1"></script>
+<script>
+// Data: /prisjakt-deals.json, built by the daily crawl from Prisjakt's "Dagens tilbud".
+// The discount column is Prisjakt's price drop against the usual price; the pre-price is the
+// shop's own. Only new products the shop reports in stock are included.
+const { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS } = window.SHARED;
+
+function read(catalog) {
+  const deals = Array.isArray(catalog.deals) ? catalog.deals : [];
+  return {
+    items: deals.filter((deal) => typeof deal.price === "number" && deal.currency === "NOK").map((deal) => ({
+      id: `pj${deal.id}`,
+      title: deal.name,
+      description: [deal.brand, deal.storeCount > 1 ? `${deal.storeCount} butikker` : "", "Frakt ukjent"].filter(Boolean).join(" · "),
+      category: deal.category || "",
+      group: getPrisjaktDealGroup(deal.category),
+      store: { label: deal.store, className: "cbn-chip--muted", ...(deal.offerUrl ? { url: deal.offerUrl } : {}) },
+      amount: deal.price,
+      ...(deal.originalPrice > deal.price ? { prePrice: deal.originalPrice } : {}),
+      ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `Prisjakt: ${deal.priceDrop} % under vanlig pris` } : {}),
+      ...(deal.imageUrl ? { imageUrl: deal.imageUrl } : {}),
+      link: { url: deal.productUrl, label: "Se alle butikker og prishistorikk på Prisjakt" },
+      rank: deal.rank,
+      ...(deal.validTo ? { validTo: deal.validTo } : {}),
+    })),
+    updated: catalog.generatedAt,
+    note: "Tilbud Prisjakt vurderer som ekstra gode akkurat nå, oppdatert daglig. Prisfall er målt mot varens vanlige pris; førpris er butikkens egen. Bare nye varer på lager er med. Prisen kan ha endret seg siden – sjekk hos butikken. Stemmene er brukernes egne vurderinger.",
+  };
+}
+
+createOfferList({
+  mount: document.getElementById("offer-list"),
+  dataUrl: "/prisjakt-deals.json",
+  storageKey: "cbn-dagens-tilbud-v1",
+  voteKey: "dagens-tilbud",
+  groupLabel: "Kategorier",
+  noGroupsText: "Velg minst én kategori.",
+  savingLabel: "Prisfall",
+  searchPlaceholder: "Søk etter vare, merke eller butikk...",
+  features: { category: true },
+  categoryOf: (item) => item.category,
+  groupOrder: PRISJAKT_DEAL_GROUPS,
+  read,
+});
+</script>
+</body>
+</html>

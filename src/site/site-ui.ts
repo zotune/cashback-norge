@@ -1,13 +1,16 @@
 // Shared website pieces for cashbacknorge.no and /dagligvarer: the support ad line at the
 // bottom, the ad card, the sort menu, lazy batches and the Supabase votes.
 // Styles live in site/site.css; the pages own their layout.
-import { INSTABANK_AD } from "../shared/provider-data";
+import { INSTABANK_AD, type BonusCard } from "../shared/provider-data";
 import type { CashbackOffer } from "../shared/cashback";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement, type SupportAdvertisement } from "../shared/support-advertisements";
 import { formatTooltipHtml } from "../shared/tooltip-content";
 import { getBrandChipCss } from "../shared/theme";
 import { createCountBadge } from "../shared/ui";
 import { GROCERY_CHAIN_LIST } from "../shared/grocery-chains";
+import { formatKr } from "../shared/reward-calculation";
+
+export { copyOffer } from "./offer-copy";
 
 type Attach = (parent: ParentNode) => void;
 
@@ -204,6 +207,33 @@ export function installGroceryChainStyles(): void {
   const style = document.createElement("style");
   style.textContent = GROCERY_CHAIN_LIST.map((chain) => getBrandChipCss(`.badge-chain-${chain.slug}`, chain)).join("\n");
   document.head.append(style);
+}
+
+/** Identical extra-cashback rows on the home and grocery pages. */
+export function renderBonusCardGroup(cards: Array<BonusCard & { rewardLabel?: string }>, container: HTMLElement, amount = 0): void {
+  const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+  container.innerHTML = cards.map((card) => {
+    const sum = amount > 0 && !card.conditional ? amount : 0;
+    let reward: string;
+    if (card.rewardLabel !== undefined) {
+      reward = card.rewardLabel;
+    } else if (sum > 0 && card.minPct != null && card.maxPct != null) {
+      reward = `+${formatKr(Math.round(sum * card.minPct))}–${formatKr(Math.round(sum * card.maxPct))} kr`;
+    } else if (sum > 0) {
+      reward = `+${card.approx ? "~" : ""}${formatKr(Math.round(sum * card.pct))} kr`;
+      if (card.ebPer100kr) reward += ` (~${formatKr(Math.round(sum * card.ebPer100kr / 100))} EB)`;
+    } else if (card.minPct != null && card.maxPct != null) {
+      reward = `+${formatKr(card.minPct * 100)}–${formatKr(card.maxPct * 100)} %`;
+    } else {
+      reward = `+${card.approx ? "~" : ""}${formatKr(card.pct * 100)} %`;
+      if (card.ebPer100kr) reward += ` (~${card.ebPer100kr} EB/100kr)`;
+    }
+    const ad = card.ad || card.badge === "crypto" || card.badge === "curve";
+    return `<span class="tooltip-wrap"><span class="tooltip cbn-tooltip-rich">${formatTooltipHtml(card.tip)}</span>
+      <a class="cbn-row bonus-chip" href="${esc(card.url)}" target="_blank" rel="${ad ? "sponsored " : ""}noopener noreferrer">
+        <span class="bonus-chip-label">${esc(reward)}</span><span class="bonus-chip-brand">${card.ad ? '<span aria-hidden="true">🥳</span>' : ""}${ad ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ""}<span class="cbn-chip badge badge-${esc(card.badge)}">${esc(card.label)}</span></span>
+      </a></span>`;
+  }).join("");
 }
 
 export { createCountBadge };

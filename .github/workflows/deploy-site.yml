@@ -40,6 +40,7 @@ jobs:
           cp data/cashback-index.json _site/cashback-index.json
           # Built by the daily crawl and not committed; keep the published copy for /dagligvarer.
           curl -fsSL --retry 2 https://cashbacknorge.no/grocery-offers.json -o _site/grocery-offers.json || echo "::warning::grocery-offers.json could not be fetched; /dagligvarer shows an error until the next Daily crawl"
+          curl -fsSL --retry 2 https://cashbacknorge.no/prisjakt-deals.json -o _site/prisjakt-deals.json || echo "::warning::prisjakt-deals.json could not be fetched; /dagens-tilbud shows an error until the next Daily crawl"
 
       - uses: actions/upload-pages-artifact@v3
         with:
