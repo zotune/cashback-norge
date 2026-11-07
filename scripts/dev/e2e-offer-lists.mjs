@@ -8,14 +8,22 @@ const { chromium } = require('playwright');
 const output = new URL('../../dist/preview/offer-lists/', import.meta.url).pathname;
 await mkdir(output, { recursive: true });
 const catalog = JSON.parse(await readFile(new URL('../../site/grocery-offers.json', import.meta.url), 'utf8'));
+const deals = JSON.parse(await readFile(new URL('../../site/prisjakt-deals.json', import.meta.url), 'utf8')).deals;
 const active = catalog.offers.filter(o => Date.parse(o.validTo) >= Date.now() && Date.parse(o.validFrom) <= Date.now());
 const [a, b] = active;
 assert.ok(a && b);
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'], locale: 'nb-NO' });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'], locale: 'nb-NO', reducedMotion: 'reduce' });
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
+const externalSourceRequests = [];
+page.on('request', request => { if (/(?:prisjakt\.no|etilbudsavis\.no|pji\.nu|tjek\.com)$/.test(new URL(request.url()).hostname)) externalSourceRequests.push(request.url()); });
+const rgb = async (locator, property = 'backgroundColor') => locator.evaluate((el, property) => {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+  const context = canvas.getContext('2d'); context.fillStyle = getComputedStyle(el)[property]; context.fillRect(0, 0, 1, 1);
+  return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+}, property);
 let rateLimited = false;
 let capped = false;
 let writes = 0;
@@ -102,6 +110,11 @@ try {
   await page.locator('#card-bonus-toggle').click();
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });
+    const shop = page.locator('[data-group="Nærbutikken"]');
+    await shop.hover();
+    const hoverBackground = await rgb(shop);
+    assert.ok(colorScheme === 'dark' ? hoverBackground.every(value => value < 150) : hoverBackground.every(value => value > 200), 'pale brand hover must follow the selected theme');
+    await page.mouse.move(10, 10);
     await page.locator('[data-view="table"]').click();
     await noOverflow();
     await page.screenshot({ path: `${output}/grocery-desktop-${colorScheme}.png` });
@@ -161,6 +174,14 @@ try {
   assert.equal(await page.locator('.active-offer-filter-label').first().innerText(), 'Kategorier:');
   assert.deepEqual(await page.locator('footer nav a').allTextContents(), ['Om oss', 'Informasjonskapsler']);
   assert.ok(!(await page.locator('#note').innerText()).includes('Prisjakt'));
+  const aboveLow = deals.find(deal => deal.lowestPriceEver > 0 && deal.price > deal.lowestPriceEver);
+  assert.ok(aboveLow);
+  await page.locator('[data-ol="search"]').fill(aboveLow.name);
+  const aboveLowRow = page.locator(`[data-id="pj${aboveLow.id}"]`);
+  const warning = aboveLowRow.locator('.deal-history .cbn-chip--warning');
+  await warning.waitFor();
+  const warningColor = await rgb(warning, 'color');
+  assert.ok(warningColor[0] > warningColor[1], 'a price above the historical low uses an amber warning');
   await page.locator('[data-ol="search"]').fill('Starlink Mini');
   await page.waitForFunction(() => document.querySelectorAll('.deal-row').length === 1 && document.querySelector('.deal-title')?.textContent.includes('Starlink Mini'));
   assert.equal(await page.locator('.deal-thumb').getAttribute('href'), await page.locator('.deal-title a').getAttribute('href'));
@@ -199,6 +220,16 @@ try {
   assert.equal(await page.locator('.deal-store-benefits').count(), 0);
   assert.ok((await page.locator('.deal-thumb img, .deal-store-icon').evaluateAll(images => images.map(img => new URL(img.src).origin))).every(origin => origin === 'http://localhost:8765'));
   assert.equal(await page.locator('.deal-title a svg').count(), 0);
+  const shopBadge = page.locator('.deal-store-badge--logo').first();
+  assert.ok(await shopBadge.evaluate(badge => badge.querySelector('img').getBoundingClientRect().bottom <= badge.querySelector('.deal-store-name').getBoundingClientRect().top), 'retailer logo sits above its name inside the chip');
+  const hoveredRow = page.locator('.deal-row').first();
+  await hoveredRow.hover();
+  const rowColor = await rgb(hoveredRow.locator('td').first());
+  const chipColor = await rgb(hoveredRow.locator('.deal-fact').first());
+  assert.ok(Math.hypot(...rowColor.map((value, index) => value - chipColor[index])) > 30, 'hovered rows and muted chips remain distinct');
+  await hoveredRow.evaluate(row => scrollTo(0, row.getBoundingClientRect().top + scrollY - document.querySelector('.sticky-header').offsetHeight - document.querySelector('thead').offsetHeight - 12));
+  await hoveredRow.hover();
+  await hoveredRow.screenshot({ path: `${output}/deals-shop-hover-dark.png`, animations: 'disabled' });
   await page.locator('[data-ol="filter-reset"]').click();
   await page.locator('[data-toplist="saving"]').click();
   assert.equal(await page.locator('th[data-sort="saving"]').getAttribute('aria-sort'), 'descending');
@@ -222,5 +253,6 @@ try {
   await page.waitForFunction(() => document.querySelector('.count')?.textContent.includes(' av '));
   assert.match(await page.locator('.merchant').first().innerText(), /kiwi/i);
   assert.deepEqual(errors, []);
+  assert.deepEqual(externalSourceRequests, [], 'offer pages make no direct requests to the price or flyer sources');
   console.log(`PASS: desktop/mobile, filters, persistence, net votes, limits, bonus/affiliate rows, PNG clipboard, both offer lists and home. ${writes} mocked vote writes. Screenshots: ${output}`);
 } finally { await browser.close(); }

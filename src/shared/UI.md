@@ -5,7 +5,9 @@ installation guides, React popup, shadow DOM panel and generated userscript.
 - `cbn-button--filter`: neutral filter toggles with a solid accent when pressed.
 - `cbn-field`, `cbn-field-group`: inputs and grouped inputs.
 - `cbn-card`, `cbn-row`: content surfaces and interactive offer rows.
+- `cbn-row--offer`: offer rows with a tinted hover surface and distinct muted chips.
 - `cbn-chip`, `cbn-chip--muted`: provider brands and small status labels.
+- `cbn-chip--warning`: amber status, including prices above a historical low.
 - `cbn-count` (`createCountBadge`): the number of offers or stores inside a chip or
   filter, a round white plate with dark figures (`cbn-count--dark` on pale chips).
 - `cbn-popover`: floating menus.

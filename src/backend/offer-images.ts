@@ -36,13 +36,14 @@ export async function cacheOfferImages(inputs: OfferImageInput[], options: Offer
     let url: URL;
     try { url = new URL(input.url, "https://cashbacknorge.no"); } catch { continue; }
     if (url.protocol !== "https:" || !(hosts.has(url.hostname) || (url.hostname === "cashbacknorge.no" && localPath.test(url.pathname)))) continue;
-    const path = url.hostname === "cashbacknorge.no" && url.pathname.startsWith("/offer-images/")
+    const snapshot = url.hostname === "cashbacknorge.no" && url.pathname.startsWith("/offer-images/");
+    const path = snapshot
       ? url.pathname : `/offer-images/${createHash("sha256").update(key).digest("hex").slice(0, 32)}.webp`;
     try {
       const info = await stat(resolve(directory, basename(path)));
       if (info.size > 0 && info.size <= MAX_IMAGE_BYTES && bytes + info.size <= MAX_BATCH_BYTES) { bytes += info.size; result.set(key, path); continue; }
     } catch { /* Download the current snapshot below. */ }
-    requests.push(new Request({ url: options.requestUrl?.(url.href) ?? url.href, uniqueKey: key, userData: { key, path, size: Math.min(320, input.size ?? 320) } }));
+    requests.push(new Request({ url: options.requestUrl?.(url.href) ?? url.href, uniqueKey: key, userData: { key, path, snapshot, size: Math.min(320, input.size ?? 320) } }));
   }
   const configuration = new Configuration();
   configuration.useStorageClient(new MemoryStorage({ persistStorage: false }));
@@ -57,7 +58,11 @@ export async function cacheOfferImages(inputs: OfferImageInput[], options: Offer
       }
       let output: Buffer;
       try {
-        output = await sharp(buffer, { limitInputPixels: 20_000_000 }).rotate().resize({ width: request.userData.size, height: request.userData.size, fit: "inside", withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
+        if (request.userData.snapshot) {
+          const metadata = await sharp(buffer, { limitInputPixels: 20_000_000 }).metadata();
+          if (metadata.format !== "webp" || !metadata.width || !metadata.height || metadata.width > 320 || metadata.height > 320) throw new Error("invalid snapshot");
+          output = buffer;
+        } else output = await sharp(buffer, { limitInputPixels: 20_000_000 }).rotate().resize({ width: request.userData.size, height: request.userData.size, fit: "inside", withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
       } catch { request.noRetry = true; throw new Error("image could not be decoded"); }
       if (output.length > MAX_IMAGE_BYTES || bytes + output.length > MAX_BATCH_BYTES) { request.noRetry = true; throw new Error("image storage budget exceeded"); }
       bytes += output.length;

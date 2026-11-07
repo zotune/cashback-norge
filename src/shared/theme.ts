@@ -58,11 +58,22 @@ const darkProviderColors = { ...PROVIDER_COLORS,
   sesum: { bg: "#f3f4f6", fg: "#111827" },
 };
 /** Brand chips keep their hue in dark mode; pale fills turn charcoal and white lettering softens. */
-export function getDarkChipDeclarations(colors: { bg: string; fg: string; preserveInDark?: boolean }): string {
-  if (colors.preserveInDark === true) return "";
+function getDarkChipColors(colors: { bg: string; fg: string; preserveInDark?: boolean }): { bg?: string; fg?: string } {
+  if (colors.preserveInDark === true) return {};
   const pale = ["#ffffff", "#fff7f0", "#f3f4f6", "#e9e9ed"].includes(colors.bg.toLowerCase());
-  return pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);`
-    : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
+  return pale ? { bg: "#34373d", fg: `color-mix(in srgb, ${colors.fg} 30%, #ededed 70%)` }
+    : colors.fg.toLowerCase() === "#ffffff" ? { fg: "#e5e5e5" } : {};
+}
+export function getDarkChipDeclarations(colors: { bg: string; fg: string; preserveInDark?: boolean }): string {
+  const dark = getDarkChipColors(colors);
+  return `${dark.bg ? `background:${dark.bg};` : ""}${dark.fg ? `color:${dark.fg};` : ""}`;
+}
+
+/** Button interaction states use the same resolved brand colours as the chip. */
+export function getBrandButtonCss(selector: string, colors: { bg: string; fg: string; preserveInDark?: boolean }): string {
+  const dark = getDarkChipColors(colors);
+  return `${selector} { --group-brand-bg: ${colors.bg}; --group-brand-fg: ${colors.fg}; }` +
+    `\n:root[data-cbn-theme="dark"] ${selector} { --group-brand-bg: ${dark.bg ?? colors.bg}; --group-brand-fg: ${dark.fg ?? colors.fg}; }`;
 }
 
 /** Light and dark rules for a brand chip class, for chips outside the provider metadata. */

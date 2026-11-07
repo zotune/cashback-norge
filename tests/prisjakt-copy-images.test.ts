@@ -11,11 +11,13 @@ import { cachePrisjaktCopyImages, type PrisjaktDealsCatalog } from "../src/backe
 const png = await sharp({ create: { width: 600, height: 400, channels: 3, background: "#50b848" } }).png().toBuffer();
 test("daily image assets are resized, deduplicated, reused and pruned, with invalid responses omitted", async () => {
   const directory = await mkdtemp(join(tmpdir(), "prisjakt-copy-images-"));
+  const deployDirectory = await mkdtemp(join(tmpdir(), "prisjakt-copy-deploy-"));
+  let snapshot: Buffer | undefined;
   const requests: string[] = [];
   const warnings: string[] = [];
   const server = createServer((request, response) => {
     requests.push(request.url!);
-    response.writeHead(200, { "Content-Type": request.url === "/good" ? "image/png" : "text/html" }).end(request.url === "/good" ? png : "<html>unavailable</html>");
+    response.writeHead(200, { "Content-Type": request.url === "/good" ? "image/png" : request.url === "/published" ? "image/webp" : "text/html" }).end(request.url === "/good" ? png : request.url === "/published" ? snapshot : "<html>unavailable</html>");
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); assert.ok(address && typeof address === "object");
@@ -38,11 +40,14 @@ test("daily image assets are resized, deduplicated, reused and pruned, with inva
     requests.length = 0;
     await cachePrisjaktCopyImages(result, input);
     assert.deepEqual(requests, []);
+    snapshot = await readFile(file);
+    const redeployed = await cachePrisjaktCopyImages(result, { ...input, copyImageDirectory: deployDirectory, imageRequestUrl: () => `http://127.0.0.1:${address.port}/published` });
+    assert.deepEqual(await readFile(join(deployDirectory, basename(redeployed.deals[0]!.imageUrl!))), snapshot, "manual deploys preserve published WebP bytes without another lossy conversion");
     await pruneOfferImages([result.deals[0]!.imageUrl], directory);
     assert.ok(await readFile(file));
     await pruneOfferImages([], directory);
     await assert.rejects(readFile(file));
   } finally {
-    server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(directory, { recursive: true, force: true });
+    server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(directory, { recursive: true, force: true }); await rm(deployDirectory, { recursive: true, force: true });
   }
 });

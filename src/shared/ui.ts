@@ -7,10 +7,12 @@ export const UI_CSS = `
   --cbn-control-radius: 7px; --cbn-card-radius: 10px; --cbn-chip-radius: 4px;
   --cbn-plate: #eaf0ec; --cbn-plate-hover: #dfe8e2; --cbn-plate-down: #d2ded6;
   --cbn-field: #eaf0ec; --cbn-on-accent: #fff;
+  --cbn-warning-bg: #fff1dc; --cbn-warning-fg: #a35a00;
 }
 :root[data-cbn-theme="dark"], :host([data-cbn-theme="dark"]) {
   --cbn-plate: #262626; --cbn-plate-hover: #333; --cbn-plate-down: #404040;
   --cbn-field: #202020; --cbn-on-accent: #102016;
+  --cbn-warning-bg: #3d2c14; --cbn-warning-fg: #f2b366;
 }
 .cbn-button {
   border: 0; border-radius: var(--cbn-control-radius); box-shadow: none;
@@ -50,11 +52,15 @@ export const UI_CSS = `
 .cbn-row:active { background: var(--cbn-plate-down); }
 .cbn-row.cbn-row--details:hover { background: color-mix(in srgb, var(--cbn-soft) 80%, var(--cbn-text) 20%); }
 .cbn-row.cbn-row--details:hover .cbn-chip--muted { background: color-mix(in srgb, var(--cbn-plate-down) 85%, var(--cbn-text) 15%); }
+.cbn-row--offer { --cbn-offer-hover: color-mix(in srgb, var(--cbn-surface) 90%, var(--cbn-accent) 10%); background: var(--cbn-surface); }
+.cbn-row.cbn-row--offer:hover { background: var(--cbn-offer-hover); }
+.cbn-row.cbn-row--offer:hover .cbn-chip--muted { background: var(--cbn-plate-down); }
 .cbn-chip { border: 0; border-radius: var(--cbn-chip-radius); box-shadow: none; }
 .cbn-chip[href], button.cbn-chip { transition: filter .12s; }
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
 .cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
+.cbn-chip--warning { background: var(--cbn-warning-bg); color: var(--cbn-warning-fg); }
 /* Counts inside a chip or filter: a round white plate with dark figures. */
 .cbn-count { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 18px; height: 16px; padding: 0 5px; border-radius: 999px; background: #fff; color: #111; font-size: 10px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .cbn-count--dark { background: #172026; color: #fff; }

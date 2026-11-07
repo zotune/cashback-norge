@@ -335,7 +335,7 @@
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
     const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
-      const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(item.store.label)}</span>`;
+      const chip = `<span class="cbn-chip badge${item.store.iconUrl ? " deal-store-badge--logo" : ""} ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<span class="deal-store-name">${esc(item.store.label)}</span></span>`;
       if (!features.category) return `<button class="cbn-button cbn-button--quiet deal-store-filter" type="button" data-store-group="${esc(item.group)}" title="Vis bare ${esc(item.store.label)}" aria-label="Vis bare ${esc(item.store.label)}">${chip}</button>`;
       const store = item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
       return store;
@@ -343,8 +343,10 @@
     const historyHtml = (item) => {
       const low = getDealLowPrice(item.amount, item.lowestPriceEver);
       if (!low) return `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
+      const aboveLow = item.amount > low.lowestPrice;
+      const difference = low.abovePercent ? `${new Intl.NumberFormat("nb-NO").format(low.abovePercent)} %` : "0,1 %";
       const tip = `Laveste registrerte varepris gjennom hele historikken, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`;
-      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight card-chip" title="${low.abovePercent ? `Dagens pris er ${low.abovePercent} % over laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${low.abovePercent ? `+${new Intl.NumberFormat("nb-NO").format(low.abovePercent)} %` : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
+      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight${aboveLow ? " cbn-chip--warning" : ""} card-chip" title="${aboveLow ? `Dagens pris er ${low.abovePercent ? "" : "mindre enn "}${difference} over laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${aboveLow ? low.abovePercent ? `+${difference}` : "&lt;0,1 % over" : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
     };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
@@ -368,7 +370,7 @@
       </span>`;
     }
     function tableRowHtml(item) {
-      return `<tr class="deal-row" data-id="${esc(item.id)}">
+      return `<tr class="cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}">
         <td>${thumbHtml(item)}</td>
         <td>${titleHtml(item)}${factsHtml(item)}</td>
         <td>${storeHtml(item)}</td>
@@ -388,7 +390,7 @@
       const before = item.prePrice > item.amount || saving(item) > 0
         ? `<span class="deal-before">${item.prePrice > item.amount ? `<s aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""} ${savingChipHtml(item)}</span>`
         : "";
-      return `<article class="cbn-card deal-row" data-id="${esc(item.id)}">
+      return `<article class="cbn-card cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}">
         ${thumbHtml(item)}
         <div class="deal-main">
           ${titleHtml(item)}

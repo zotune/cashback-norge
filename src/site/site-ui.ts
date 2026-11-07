@@ -5,7 +5,7 @@ import { INSTABANK_AD, PROVIDER_COLORS, type BonusCard } from "../shared/provide
 import type { CashbackOffer } from "../shared/cashback";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement, type SupportAdvertisement } from "../shared/support-advertisements";
 import { formatTooltipHtml } from "../shared/tooltip-content";
-import { getBrandChipCss } from "../shared/theme";
+import { getBrandChipCss, getBrandButtonCss } from "../shared/theme";
 import { createCountBadge } from "../shared/ui";
 import { GROCERY_CHAIN_LIST } from "../shared/grocery-chains";
 import { createSelectionMenu } from "./selection-menu";
@@ -109,7 +109,7 @@ export function createChoiceMenu(button: HTMLButtonElement, options: ChoiceOptio
 /** Chip colours for the grocery chains, light and dark, as one style element. */
 export function installGroceryChainStyles(): void {
   const style = document.createElement("style");
-  style.textContent = GROCERY_CHAIN_LIST.map((chain) => getBrandChipCss(`.badge-chain-${chain.slug}`, chain) + `\n.badge-chain-${chain.slug} { --group-brand-bg: ${chain.bg}; --group-brand-fg: ${chain.fg}; }`).join("\n");
+  style.textContent = GROCERY_CHAIN_LIST.map((chain) => getBrandChipCss(`.badge-chain-${chain.slug}`, chain) + getBrandButtonCss(`.badge-chain-${chain.slug}`, chain)).join("\n");
   document.head.append(style);
 }
 
