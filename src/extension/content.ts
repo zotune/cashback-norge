@@ -869,6 +869,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "kassal.app",
 ]);
 function startContentScript(): void {
+  installSpennActivationReceiptListener();
   if (isNoticeBlockedHost(CURRENT_HOST)) return;
   disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
   installOfferActivationClickTracker();
@@ -11084,23 +11085,70 @@ function installOfferActivationClickTracker(): void {
   }, true);
 }
 
+// Spenn-tilbudene via Spenns extension deler samme lenke (extension-siden), så aktiveringen
+// lagres for butikkens domene fra Spenns klikkside (se installSpennActivationReceiptListener).
+const SPENN_REFUNDER_ORIGIN = "https://spenn.refunder.com";
+
+function buildSpennActivationUrl(domain: string): string {
+  return `${SPENN_REFUNDER_ORIGIN}/click?domain=${encodeURIComponent(domain)}`;
+}
+
+function getOfferActivationUrl(offer: Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl" | "domains">): string {
+  if (!requiresSpennExtension(offer)) return offer.activationUrl || offer.sourceUrl;
+  const domain = offer.domains.find((candidate) => CURRENT_HOST === candidate || CURRENT_HOST.endsWith(`.${candidate}`)) ?? offer.domains[0];
+  return domain !== undefined ? buildSpennActivationUrl(domain) : offer.activationUrl;
+}
+
+// Spenns klikkside (spenn.refunder.com/click?…&spennId=…&deeplink=…) videresender kjøpet til butikken
+// via «Fortsett til …» (samme lenke med redirect=1), verifisert 2026-11-07 med CDON. Det er dette
+// klikket som knytter kjøpet til brukerens SpennID. Uten SpennID registreres ingenting.
+function readSpennClickActivationDomain(rawUrl: string): string | undefined {
+  const url = parseUrl(rawUrl);
+  if (url === undefined || url.origin !== SPENN_REFUNDER_ORIGIN || url.pathname !== "/click") return undefined;
+  if ((url.searchParams.get("spennId") ?? "") === "" || (url.searchParams.get("store") ?? "") === "") return undefined;
+  const domain = parseUrl(url.searchParams.get("deeplink") ?? "")?.hostname.replace(/^www\./, "").toLowerCase();
+  return domain !== undefined && domain !== "" ? domain : undefined;
+}
+
+function installSpennActivationReceiptListener(): void {
+  const pageDomain = readSpennClickActivationDomain(window.location.href);
+  if (pageDomain === undefined) return;
+  const markActivated = () => { void markOfferActivated("spenn", buildSpennActivationUrl(pageDomain)); };
+  // Videresendingssiden selv (redirect=1), hvis innholdsskriptet rekker å kjøre før den går videre.
+  if (new URLSearchParams(window.location.search).get("redirect") === "1") markActivated();
+  document.addEventListener("click", (event) => {
+    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+    if (link === null) return;
+    const target = parseUrl(link.href);
+    if (target?.searchParams.get("redirect") === "1" && readSpennClickActivationDomain(link.href) === pageDomain) markActivated();
+  }, true);
+  // Samme kvittering som Spenns extension lytter etter, hvis siden sender den.
+  window.addEventListener("message", (event) => {
+    if (event.source !== window || event.origin !== SPENN_REFUNDER_ORIGIN) return;
+    const data: unknown = event.data;
+    if (!isRecord(data) || data.type !== "spenn:activated" || data.market !== "NO" ||
+      data.store_id !== new URLSearchParams(window.location.search).get("store")) return;
+    markActivated();
+  });
+}
+
 function isOfferActivated(
-  offer: Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl">,
+  offer: Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl" | "domains">,
   activeOfferKey: string | undefined,
 ): boolean {
-  const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
+  const activationKey = getProviderActivationKey(offer.provider, getOfferActivationUrl(offer));
   return activationKey !== undefined && activationKey === activeOfferKey;
 }
 
 function getLastActivatedOfferKey(
-  offers: readonly Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl">[],
+  offers: readonly Pick<CashbackOffer, "provider" | "activationUrl" | "sourceUrl" | "domains">[],
   activatedOffers: Readonly<Record<string, number>>,
 ): string | undefined {
   let latestKey: string | undefined;
   let latestActivatedAt = -1;
 
   for (const offer of offers) {
-    const activationKey = getProviderActivationKey(offer.provider, offer.activationUrl || offer.sourceUrl);
+    const activationKey = getProviderActivationKey(offer.provider, getOfferActivationUrl(offer));
     if (activationKey === undefined) {
       continue;
     }
