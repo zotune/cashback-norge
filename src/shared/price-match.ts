@@ -21,6 +21,7 @@ import {
 } from "./isthereanydeal-price-match.js";
 import { findEnhverPriceMatch } from "./enhver-price-match.js";
 import { findKassalPriceMatch } from "./kassal-price-match.js";
+import { findEtilbudsavisPriceMatch } from "./etilbudsavis-price-match.js";
 import { findKlarnaPriceMatch } from "./klarna-price-match.js";
 import {
   isLikelySameProductTitle,
@@ -88,7 +89,7 @@ export async function findPriceMatches(
   }
 
   const verifiedAvailability: VerifiedPriceMatchAvailability[] = [];
-  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer, pokeprisOffer] = await Promise.all([
+  const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer, pokeprisOffer, etilbudsavisOffer] = await Promise.all([
     ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
     ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText)),
     ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson)),
@@ -99,6 +100,7 @@ export async function findPriceMatches(
     ignorePriceMatchFailure(findEnhverPriceMatch(message, requestJson, requestText)),
     ignorePriceMatchFailure(findKassalPriceMatch(message, requestText)),
     ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, useCatalog: true, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) })),
+    ignorePriceMatchFailure(findEtilbudsavisPriceMatch(message, requestJson)),
   ]);
 
   const anchorOffers = [prisjaktOffer, klarnaOffer]
@@ -136,6 +138,7 @@ export async function findPriceMatches(
     enhverOffer,
     kassalOffer,
     pokeprisOffer,
+    etilbudsavisOffer,
   ]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined)
     .map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability))
@@ -258,6 +261,7 @@ function sourceRank(offer: PriceMatchOffer): number {
   if (offer.source === "sesum") return 4;
   if (offer.source === "enhver") return 5;
   if (offer.source === "kassal") return 6;
+  if (offer.source === "etilbudsavis") return 6;
   if (offer.source === "pokepris") return 6;
   if (offer.source === "isthereanydeal") return 7;
   if (offer.source === "ggdeals") return 8;

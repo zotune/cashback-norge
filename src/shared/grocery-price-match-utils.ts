@@ -1,3 +1,5 @@
+import { isLikelySameProductTitle } from "./product-title-match.js";
+
 export type ProductPackageUnit = "g" | "ml" | "pcs";
 
 export type ProductPackageQuantity = {
@@ -199,4 +201,54 @@ function uniqueStrings(values: string[]): string[] {
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The product fields a grocery price match reads from the page (subset of GetPriceMatchForProductMessage). */
+export type GroceryProductClues = {
+  searchTerm: string;
+  productTitleCandidates?: string[] | undefined;
+  productBrand?: string | undefined;
+  packageAmount?: number | undefined;
+  packageUnit?: ProductPackageUnit | undefined;
+};
+
+export function getGroceryPackageQuantity(message: GroceryProductClues): ProductPackageQuantity | undefined {
+  return message.packageAmount !== undefined && message.packageUnit !== undefined
+    ? { amount: message.packageAmount, unit: message.packageUnit }
+    : undefined;
+}
+
+// Store page titles carry buy verbs, chain names and prices ("Kjøp Mills Kaviar - MENY", "fra 39 kr").
+export function cleanGroceryTitleCandidate(value: string): string {
+  return value
+    .replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "")
+    .replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "")
+    .replace(/\s+[-|]\s+(?:Oda|MENY|SPAR|KIWI|REMA\s*1000|Coop(?:\s+Extra)?|Joker|Bunnpris)\s*$/i, "")
+    .replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "")
+    .replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "")
+    .replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "")
+    .replace(/[.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function isLikelySameGroceryTitle(message: GroceryProductClues, title: string, minimumScore = 0.4): boolean {
+  return uniqueStrings([message.searchTerm, ...(message.productTitleCandidates ?? [])])
+    .some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate(candidate), title, minimumScore));
+}
+
+export function normalizeGroceryBrandText(value: string): string {
+  return transliterateNorwegianCharacters(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^A-Za-z0-9]+/g, "")
+    .toLowerCase();
+}
+
+/** True when the page names no brand (or a very short one), or the text contains it. */
+export function hasGroceryBrandSignal(message: GroceryProductClues, text: string): boolean {
+  if (message.productBrand === undefined) return true;
+  const brand = normalizeGroceryBrandText(message.productBrand);
+  if (brand.length < 3) return true;
+  return normalizeGroceryBrandText(text).includes(brand);
 }

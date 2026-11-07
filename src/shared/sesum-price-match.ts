@@ -3,13 +3,16 @@ import type {
   PriceMatchOffer,
 } from "./extension-messages.js";
 import {
+  cleanGroceryTitleCandidate,
+  type ProductPackageQuantity,
   buildPackageQuantityLabels,
+  getGroceryPackageQuantity,
+  hasGroceryBrandSignal,
   isLikelyGroceryPriceMatchContext,
+  isLikelySameGroceryTitle,
   isSamePackageQuantity,
   readPackageQuantityFromText,
-  type ProductPackageQuantity,
 } from "./grocery-price-match-utils.js";
-import { isLikelySameProductTitle } from "./product-title-match.js";
 
 type TextRequest = (
   url: string,
@@ -75,8 +78,8 @@ function readSesumProductPage(
   const matchedByCode = pageGtin !== undefined && getLikelyGtins(message.codes).includes(pageGtin);
   const matchedByQuantity =
     pageQuantity !== undefined &&
-    isSamePackageQuantity(getMessagePackageQuantity(message), pageQuantity) &&
-    hasRequestedBrandSignal(message, productName) &&
+    isSamePackageQuantity(getGroceryPackageQuantity(message), pageQuantity) &&
+    hasGroceryBrandSignal(message, productName) &&
     isLikelySameGroceryTitle(message, productName);
 
   if (!matchedByCode && !matchedByQuantity) return undefined;
@@ -110,11 +113,11 @@ function isSesumNotFoundPage(html: string): boolean {
 }
 
 function hasGroceryIdentitySignal(message: GetPriceMatchForProductMessage): boolean {
-  return getLikelyGtins(message.codes).length > 0 || getMessagePackageQuantity(message) !== undefined;
+  return getLikelyGtins(message.codes).length > 0 || getGroceryPackageQuantity(message) !== undefined;
 }
 
 function buildSesumProductUrlCandidates(message: GetPriceMatchForProductMessage): string[] {
-  const quantityLabels = buildPackageQuantityLabels(getMessagePackageQuantity(message));
+  const quantityLabels = buildPackageQuantityLabels(getGroceryPackageQuantity(message));
   const brand = message.productBrand;
   const titles = uniqueStrings([
     message.searchTerm,
@@ -143,18 +146,6 @@ function buildSesumProductUrlCandidates(message: GetPriceMatchForProductMessage)
     .map((slug) => `${SESUM_PRODUCT_URL}${encodeURIComponent(slug)}`);
 }
 
-function cleanGroceryTitleCandidate(value: string): string {
-  return value
-    .replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "")
-    .replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "")
-    .replace(/\s+[-|]\s+(?:Oda|MENY|KIWI|SPAR|REMA\s*1000|Coop(?:\s+Extra)?)\s*$/i, "")
-    .replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "")
-    .replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "")
-    .replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "")
-    .replace(/[.]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function removePackageLabels(value: string, quantityLabels: string[]): string {
   let cleaned = value;
@@ -331,23 +322,8 @@ function readMetaContent(html: string, nameOrProperty: string): string | undefin
   return raw !== undefined ? decodeHtml(raw).trim() : undefined;
 }
 
-function isLikelySameGroceryTitle(message: GetPriceMatchForProductMessage, title: string): boolean {
-  return uniqueStrings([message.searchTerm, ...(message.productTitleCandidates ?? [])])
-    .some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate(candidate), title, 0.4));
-}
 
-function hasRequestedBrandSignal(message: GetPriceMatchForProductMessage, title: string): boolean {
-  if (message.productBrand === undefined) return true;
-  const brand = normalizeBrandText(message.productBrand);
-  if (brand.length < 3) return true;
-  return normalizeBrandText(title).includes(brand);
-}
 
-function getMessagePackageQuantity(message: GetPriceMatchForProductMessage): ProductPackageQuantity | undefined {
-  return message.packageAmount !== undefined && message.packageUnit !== undefined
-    ? { amount: message.packageAmount, unit: message.packageUnit }
-    : undefined;
-}
 
 async function fetchText(url: string, init?: Parameters<TextRequest>[1]): Promise<string | undefined> {
   const response = await fetch(url, {
@@ -428,13 +404,6 @@ function transliterateNorwegianCharacters(value: string): string {
     .replace(/[\u00C5\u00E5]/g, "a");
 }
 
-function normalizeBrandText(value: string): string {
-  return transliterateNorwegianCharacters(value)
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^A-Za-z0-9]+/g, "")
-    .toLowerCase();
-}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

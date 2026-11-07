@@ -51,6 +51,7 @@
     "https://typeb.panflights.com/*",
     "https://panflights.com/*",
     "https://api.skypicker.com/*",
+    "https://squid-api.tjek.com/*",
     "https://www.tek.no/*"
   ],
   "background": {

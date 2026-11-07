@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794054169
+// @version      1794055169
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -58,6 +58,7 @@
 // @connect      typeb.panflights.com
 // @connect      panflights.com
 // @connect      api.skypicker.com
+// @connect      squid-api.tjek.com
 // @run-at       document-idle
 // @updateURL    https://cashbacknorge.no/cashback-varsler.user.js
 // @downloadURL  https://cashbacknorge.no/cashback-varsler.user.js
@@ -298,38 +299,38 @@
     };
     return [...offers.filter(relevant), ...offers.filter((offer) => !relevant(offer))];
   }
-  function isRecord$6(value) {
+  function isRecord$7(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   function isCashbackProvider(value) {
     return typeof value === "string" && value.length > 0;
   }
   function isProviderMeta(value) {
-    if (!isRecord$6(value)) {
+    if (!isRecord$7(value)) {
       return false;
     }
     return typeof value.name === "string" && (value.tip === void 0 || typeof value.tip === "string") && (value.bg === void 0 || typeof value.bg === "string") && (value.fg === void 0 || typeof value.fg === "string") && (value.border === void 0 || typeof value.border === "string");
   }
   function isCashbackOffer(value) {
-    if (!isRecord$6(value)) {
+    if (!isRecord$7(value)) {
       return false;
     }
     return isCashbackProvider(value.provider) && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every((domain) => typeof domain === "string") && typeof value.reward === "string" && (value.rewardSortValueNok === void 0 || typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok)) && (value.rewardCalculation === void 0 || isRewardCalculationRules(value.rewardCalculation)) && (value.cardBenefit === void 0 || isCardBenefit(value.cardBenefit)) && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
   }
   function isCardBenefit(value) {
-    if (!isRecord$6(value) || typeof value.category !== "string" || !value.category.trim()) return false;
+    if (!isRecord$7(value) || typeof value.category !== "string" || !value.category.trim()) return false;
     if (value.kind === "ongoing") return value.validFrom === void 0 && value.validUntil === void 0;
     const isDate = (date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
     return value.kind === "monthly" && isDate(value.validFrom) && isDate(value.validUntil) && value.validFrom <= value.validUntil;
   }
   function isRewardCalculationRules(value) {
-    return isRecord$6(value) && (value.minimumPurchaseNok === void 0 || typeof value.minimumPurchaseNok === "number" && Number.isFinite(value.minimumPurchaseNok) && value.minimumPurchaseNok >= 0) && (value.minimumPurchaseExclusive === void 0 || typeof value.minimumPurchaseExclusive === "boolean") && (value.singleItemOnly === void 0 || typeof value.singleItemOnly === "boolean");
+    return isRecord$7(value) && (value.minimumPurchaseNok === void 0 || typeof value.minimumPurchaseNok === "number" && Number.isFinite(value.minimumPurchaseNok) && value.minimumPurchaseNok >= 0) && (value.minimumPurchaseExclusive === void 0 || typeof value.minimumPurchaseExclusive === "boolean") && (value.singleItemOnly === void 0 || typeof value.singleItemOnly === "boolean");
   }
   function isCashbackIndex(value) {
-    if (!isRecord$6(value)) {
+    if (!isRecord$7(value)) {
       return false;
     }
-    if (typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord$6(value.domainIndex) || value.providers !== void 0 && !(isRecord$6(value.providers) && Object.values(value.providers).every(isProviderMeta))) {
+    if (typeof value.version !== "number" || typeof value.generatedAt !== "string" || !Array.isArray(value.offers) || !isRecord$7(value.domainIndex) || value.providers !== void 0 && !(isRecord$7(value.providers) && Object.values(value.providers).every(isProviderMeta))) {
       return false;
     }
     return value.offers.every(isCashbackOffer) && Object.values(value.domainIndex).every((offers) => {
@@ -520,7 +521,7 @@
     return url.href;
   }
   function readTekPage(value) {
-    if (!isRecord$6(value) || !Array.isArray(value.data) || !value.data.every(isRecord$6) || !isRecord$6(value.meta) || !Number.isSafeInteger(value.meta.last_page) || value.meta.last_page < 1 || value.data.length > 100) throw new Error("Tek mobilabonnement: endret eller ugyldig plansvar");
+    if (!isRecord$7(value) || !Array.isArray(value.data) || !value.data.every(isRecord$7) || !isRecord$7(value.meta) || !Number.isSafeInteger(value.meta.last_page) || value.meta.last_page < 1 || value.data.length > 100) throw new Error("Tek mobilabonnement: endret eller ugyldig plansvar");
     return { rows: value.data, pages: value.meta.last_page };
   }
   async function requestTekJson(url) {
@@ -549,7 +550,7 @@
   function buildMobileSupplierCatalog(rows, generatedAt2, verified = []) {
     const entries = /* @__PURE__ */ new Map();
     for (const row of rows) {
-      if (row.type !== "mobile-plan" || !isRecord$6(row.operator) || !Number.isSafeInteger(row.operator.id) || typeof row.operator.name !== "string" || typeof row.operator.slug !== "string") continue;
+      if (row.type !== "mobile-plan" || !isRecord$7(row.operator) || !Number.isSafeInteger(row.operator.id) || typeof row.operator.name !== "string" || typeof row.operator.slug !== "string") continue;
       const operator = row.operator;
       let site = safeSite(row.affiliateSignupUrl);
       if (site?.hostname === "linkfusion.no") site = safeSite(site.searchParams.get("url"));
@@ -585,7 +586,7 @@
     return catalog;
   }
   function isMobileSupplierCatalog(value) {
-    return isRecord$6(value) && value.version === 1 && value.source === TEK_MOBILE_API && typeof value.generatedAt === "string" && Number.isFinite(Date.parse(value.generatedAt)) && Array.isArray(value.suppliers) && value.suppliers.length > 0 && value.suppliers.length <= 100 && value.suppliers.every((row) => isRecord$6(row) && Number.isSafeInteger(row.id) && row.id > 0 && typeof row.name === "string" && row.name.length > 0 && typeof row.hostname === "string" && normalizeHostname$1(row.hostname) === row.hostname && safeSite(row.supplierUrl)?.hostname === row.hostname && typeof row.path === "string" && /^\/(?:mobil)?$/.test(row.path) && (row.evidence === "tek-destination" || row.evidence === "verified-site"));
+    return isRecord$7(value) && value.version === 1 && value.source === TEK_MOBILE_API && typeof value.generatedAt === "string" && Number.isFinite(Date.parse(value.generatedAt)) && Array.isArray(value.suppliers) && value.suppliers.length > 0 && value.suppliers.length <= 100 && value.suppliers.every((row) => isRecord$7(row) && Number.isSafeInteger(row.id) && row.id > 0 && typeof row.name === "string" && row.name.length > 0 && typeof row.hostname === "string" && normalizeHostname$1(row.hostname) === row.hostname && safeSite(row.supplierUrl)?.hostname === row.hostname && typeof row.path === "string" && /^\/(?:mobil)?$/.test(row.path) && (row.evidence === "tek-destination" || row.evidence === "verified-site"));
   }
   function findMobileSupplier(value, catalog) {
     if (!catalog || !isFreshPublicCatalog(catalog)) return void 0;
@@ -623,7 +624,7 @@
     const value = await requestJson(EXCHANGE_RATES_URL$1, {
       headers: { "Accept": "application/json" }
     });
-    if (!isRecord$5(value) || value.result !== "success" || !isRecord$5(value.rates)) return void 0;
+    if (!isRecord$6(value) || value.result !== "success" || !isRecord$6(value.rates)) return void 0;
     const rates = {};
     for (const [currency, rate] of Object.entries(value.rates)) {
       if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
@@ -649,7 +650,7 @@
     if (!response.ok) return void 0;
     return response.json();
   }
-  function isRecord$5(value) {
+  function isRecord$6(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const EB_PER_TRUMF_KR$1 = 13.5;
@@ -957,13 +958,13 @@
     }
   }
   function readRecordArray(value) {
-    return Array.isArray(value) ? value.filter(isRecord$6) : [];
+    return Array.isArray(value) ? value.filter(isRecord$7) : [];
   }
   function isString(value) {
     return typeof value === "string";
   }
   function isMobilePriceDetails(value) {
-    return isRecord$6(value) && ["mobile", "unlimited", "broadband"].includes(String(value.category)) && finite(value.requestedGb) && value.requestedGb >= 0 && finite(value.includedGb) && value.includedGb >= 0 && typeof value.network === "string" && value.network.length <= 80 && typeof value.unlimitedData === "boolean" && TEK_MOBILE_NETWORKS.some((network) => network.id === value.networkId) && (value.meteredData === void 0 || typeof value.meteredData === "boolean") && (value.speedMbps === void 0 || finite(value.speedMbps) && value.speedMbps > 0) && (value.afterQuotaMbps === void 0 || finite(value.afterQuotaMbps) && value.afterQuotaMbps > 0) && (value.terms === void 0 || typeof value.terms === "string" && value.terms.length <= 1e4);
+    return isRecord$7(value) && ["mobile", "unlimited", "broadband"].includes(String(value.category)) && finite(value.requestedGb) && value.requestedGb >= 0 && finite(value.includedGb) && value.includedGb >= 0 && typeof value.network === "string" && value.network.length <= 80 && typeof value.unlimitedData === "boolean" && TEK_MOBILE_NETWORKS.some((network) => network.id === value.networkId) && (value.meteredData === void 0 || typeof value.meteredData === "boolean") && (value.speedMbps === void 0 || finite(value.speedMbps) && value.speedMbps > 0) && (value.afterQuotaMbps === void 0 || finite(value.afterQuotaMbps) && value.afterQuotaMbps > 0) && (value.terms === void 0 || typeof value.terms === "string" && value.terms.length <= 1e4);
   }
   async function findMobilePriceMatches(message, requestJson = requestTekJson) {
     if (message.mobile !== true || getMobileSupplier(message.url) === void 0) return [];
@@ -990,7 +991,7 @@
       if (!blocked) await Promise.all(missing.map(async (network) => {
         try {
           const page = readTekPage(await requestJson(tekPlansUrl(gb, 1, category === "broadband", network.id), { credentials: "omit" }));
-          if (page.rows.some((row) => !isRecord$6(row.operator) || !isRecord$6(row.operator.network) || row.operator.network.id !== network.id)) {
+          if (page.rows.some((row) => !isRecord$7(row.operator) || !isRecord$7(row.operator.network) || row.operator.network.id !== network.id)) {
             throw new Error("nettfilteret returnerte feil mobilnett");
           }
           eligible.push(...selectPlans(page.rows, gb, category));
@@ -1063,11 +1064,11 @@
   }
   function selectPlans(rows, gb, category) {
     const plans = rows.flatMap((row) => {
-      const networkId = isRecord$6(row.operator) && isRecord$6(row.operator.network) ? row.operator.network.id : void 0;
-      if (row.type !== (category === "broadband" ? "mobile-broadband-plan" : "mobile-plan") || typeof row.name !== "string" || !isRecord$6(row.operator) || typeof row.operator.name !== "string" || !isRecord$6(row.operator.network) || typeof row.operator.network.name !== "string" || !TEK_MOBILE_NETWORKS.some((network) => network.id === networkId) || !Array.isArray(row.features) || !row.features.every(isRecord$6) || row.features.some((feature) => ["for-unge", "kontantkort", "familie"].includes(String(feature.slug))) || !isRecord$6(row.pricingModel) || !["regular", "incremental_data", "data_only"].includes(String(row.pricingModel.type)) || !isRecord$6(row.pricingModel.attributes) || !isRecord$6(row.estimatedInvoice) || row.estimatedInvoice.meetsUsageRequirements !== true || !finite(row.estimatedInvoice.total) || row.estimatedInvoice.total <= 0) return [];
+      const networkId = isRecord$7(row.operator) && isRecord$7(row.operator.network) ? row.operator.network.id : void 0;
+      if (row.type !== (category === "broadband" ? "mobile-broadband-plan" : "mobile-plan") || typeof row.name !== "string" || !isRecord$7(row.operator) || typeof row.operator.name !== "string" || !isRecord$7(row.operator.network) || typeof row.operator.network.name !== "string" || !TEK_MOBILE_NETWORKS.some((network) => network.id === networkId) || !Array.isArray(row.features) || !row.features.every(isRecord$7) || row.features.some((feature) => ["for-unge", "kontantkort", "familie"].includes(String(feature.slug))) || !isRecord$7(row.pricingModel) || !["regular", "incremental_data", "data_only"].includes(String(row.pricingModel.type)) || !isRecord$7(row.pricingModel.attributes) || !isRecord$7(row.estimatedInvoice) || row.estimatedInvoice.meetsUsageRequirements !== true || !finite(row.estimatedInvoice.total) || row.estimatedInvoice.total <= 0) return [];
       const a = row.pricingModel.attributes;
       if (typeof row.comment === "string" && /\b(?:MB|GB)\s+(?:data\s+)?(?:hver|per)\s+dag\b/i.test(stripHtml$2(row.comment))) return [];
-      const meteredData = row.pricingModel.type === "incremental_data" && Array.isArray(a.dataSteps) && isRecord$6(a.dataSteps[0]) && (numericField(a.dataSteps[0].length) ?? 0) > 0 && (readNumberValue(a.dataSteps[0].per_megabyte) ?? 0) > 0;
+      const meteredData = row.pricingModel.type === "incremental_data" && Array.isArray(a.dataSteps) && isRecord$7(a.dataSteps[0]) && (numericField(a.dataSteps[0].length) ?? 0) > 0 && (readNumberValue(a.dataSteps[0].per_megabyte) ?? 0) > 0;
       const included = meteredData ? 0 : numericField(a.dataIncluded);
       if (included === void 0 || included < 0) return [];
       const after = numericField(a.dataExhaustedSpeedLimit);
@@ -1879,11 +1880,11 @@
     });
   }
   function readAugmentedSteamAppInfo(value, targets) {
-    if (!isRecord$4(value) || !isRecord$4(value.prices)) return void 0;
+    if (!isRecord$5(value) || !isRecord$5(value.prices)) return void 0;
     for (const target of targets) {
       const targetPrices = value.prices[`${target.type}/${target.id}`];
-      if (!isRecord$4(targetPrices)) continue;
-      const urls = isRecord$4(targetPrices.urls) ? targetPrices.urls : void 0;
+      if (!isRecord$5(targetPrices)) continue;
+      const urls = isRecord$5(targetPrices.urls) ? targetPrices.urls : void 0;
       const infoUrl = typeof urls?.info === "string" && urls.info.length > 0 ? urls.info : void 0;
       if (infoUrl !== void 0) return { infoUrl };
     }
@@ -1939,9 +1940,9 @@
     }));
   }
   function readItadSearchGames(value) {
-    const results = Array.isArray(value) ? value : isRecord$4(value) && Array.isArray(value.games) ? value.games : [];
+    const results = Array.isArray(value) ? value : isRecord$5(value) && Array.isArray(value.games) ? value.games : [];
     return results.map((game) => {
-      if (!isRecord$4(game)) return void 0;
+      if (!isRecord$5(game)) return void 0;
       const slug = typeof game.slug === "string" && game.slug.length > 0 ? game.slug : void 0;
       const title = typeof game.title === "string" && game.title.length > 0 ? game.title : void 0;
       const type = readNumber$1(game.type);
@@ -2010,13 +2011,13 @@
     if (html === void 0) return void 0;
     const globalState = parseScriptJson(html, /var g = (\{[\s\S]*?\});\s*var page = /);
     const pageState = parseScriptJson(html, /var page = (\[[\s\S]*?\]);\s*var /);
-    if (!isRecord$4(globalState) || !Array.isArray(pageState)) return void 0;
-    const user = isRecord$4(globalState.user) ? globalState.user : void 0;
+    if (!isRecord$5(globalState) || !Array.isArray(pageState)) return void 0;
+    const user = isRecord$5(globalState.user) ? globalState.user : void 0;
     const token = typeof user?.token === "string" && user.token.length > 0 ? user.token : void 0;
     const visitorId = typeof user?.id === "string" && user.id.length > 0 ? user.id : void 0;
     const shops = readItadShops(globalState.shops);
-    const pageProps = isRecord$4(pageState[1]) ? pageState[1] : void 0;
-    const game = isRecord$4(pageProps?.game) ? pageProps.game : void 0;
+    const pageProps = isRecord$5(pageState[1]) ? pageState[1] : void 0;
+    const game = isRecord$5(pageProps?.game) ? pageProps.game : void 0;
     const gameId = typeof game?.id === "string" && game.id.length > 0 ? game.id : void 0;
     if (token === void 0 || gameId === void 0 || shops.size === 0) return void 0;
     const slug = typeof game?.slug === "string" && game.slug.length > 0 ? game.slug : void 0;
@@ -2076,7 +2077,7 @@
   }
   function readItadShops(value) {
     const shops = /* @__PURE__ */ new Map();
-    if (!isRecord$4(value)) return shops;
+    if (!isRecord$5(value)) return shops;
     for (const [rawId, rawShop] of Object.entries(value)) {
       const id = Number.parseInt(rawId, 10);
       const name = Array.isArray(rawShop) && typeof rawShop[0] === "string" ? rawShop[0] : void 0;
@@ -2087,7 +2088,7 @@
     return shops;
   }
   function readItadDeals(value, shops) {
-    if (!isRecord$4(value) || !Array.isArray(value.deals)) return [];
+    if (!isRecord$5(value) || !Array.isArray(value.deals)) return [];
     return value.deals.map((deal) => readItadDeal(deal, shops)).filter((deal) => deal !== void 0);
   }
   function isItadDealInScope(deal, scope) {
@@ -2113,15 +2114,15 @@
     return typeof message.price === "number" && Number.isFinite(message.price) && message.price > 0 ? message.price : void 0;
   }
   function hasNokDeal(value) {
-    if (!isRecord$4(value) || !Array.isArray(value.deals)) return false;
+    if (!isRecord$5(value) || !Array.isArray(value.deals)) return false;
     return value.deals.some((deal) => {
-      if (!isRecord$4(deal)) return false;
+      if (!isRecord$5(deal)) return false;
       const price = readItadPrice(deal.priceNew);
       return price?.currency === "NOK";
     });
   }
   function readItadDeal(value, shops) {
-    if (!isRecord$4(value)) return void 0;
+    if (!isRecord$5(value)) return void 0;
     const shopId = readNumber$1(value.shop);
     const price = readItadPrice(value.priceNew);
     if (shopId === void 0 || price === void 0 || price.amount <= 0) return void 0;
@@ -2238,7 +2239,7 @@
     if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
     return value;
   }
-  function isRecord$4(value) {
+  function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   function uniqueStrings$d(values) {
@@ -2320,7 +2321,7 @@
   }
   function readAllKeyShopData(html) {
     const gamePageTrans = readAssignedJsonObject(html, "gamePageTrans");
-    if (!isRecord$6(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
+    if (!isRecord$7(gamePageTrans) || !Array.isArray(gamePageTrans.prices)) return void 0;
     const prices = gamePageTrans.prices.map(readAllKeyShopRawPrice).filter((price) => price !== void 0);
     if (prices.length === 0) return void 0;
     return {
@@ -2332,7 +2333,7 @@
     };
   }
   function readAllKeyShopRawPrice(value) {
-    if (!isRecord$6(value)) return void 0;
+    if (!isRecord$7(value)) return void 0;
     const merchantName = readString$1(value.merchantName);
     const amount = readAmount$1(value.price);
     if (merchantName === void 0 || amount === void 0 || amount <= 0) return void 0;
@@ -2366,9 +2367,9 @@
   }
   function readAllKeyShopEditions(value) {
     const editions = /* @__PURE__ */ new Map();
-    if (!isRecord$6(value)) return editions;
+    if (!isRecord$7(value)) return editions;
     for (const [id, edition] of Object.entries(value)) {
-      if (!isRecord$6(edition)) continue;
+      if (!isRecord$7(edition)) continue;
       const name = readString$1(edition.name);
       if (name !== void 0) editions.set(id, name);
     }
@@ -2376,9 +2377,9 @@
   }
   function readAllKeyShopRegions(value) {
     const regions = /* @__PURE__ */ new Map();
-    if (!isRecord$6(value)) return regions;
+    if (!isRecord$7(value)) return regions;
     for (const [id, region] of Object.entries(value)) {
-      if (!isRecord$6(region)) continue;
+      if (!isRecord$7(region)) continue;
       const name = readString$1(region.region_name) ?? readString$1(region.filter_name);
       if (name !== void 0) regions.set(id, name);
     }
@@ -2645,7 +2646,7 @@
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-06T21:28:54.021Z";
+  const generatedAt = "2026-11-07T12:06:25.741Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -2668,10 +2669,10 @@
     return url;
   }
   function isElectricitySupplierCatalog(value) {
-    if (!isRecord$6(value) || value.version !== 1 || value.source !== ELECTRICITY_SUPPLIER_SOURCE || typeof value.generatedAt !== "string" || !Number.isFinite(Date.parse(value.generatedAt)) || !Array.isArray(value.suppliers) || value.suppliers.length < 1 || value.suppliers.length > 500) return false;
+    if (!isRecord$7(value) || value.version !== 1 || value.source !== ELECTRICITY_SUPPLIER_SOURCE || typeof value.generatedAt !== "string" || !Number.isFinite(Date.parse(value.generatedAt)) || !Array.isArray(value.suppliers) || value.suppliers.length < 1 || value.suppliers.length > 500) return false;
     const hosts = /* @__PURE__ */ new Set();
     return value.suppliers.every((row) => {
-      if (!isRecord$6(row) || !Number.isSafeInteger(row.id) || row.id <= 0 || typeof row.name !== "string" || !row.name.trim()) return false;
+      if (!isRecord$7(row) || !Number.isSafeInteger(row.id) || row.id <= 0 || typeof row.name !== "string" || !row.name.trim()) return false;
       const url = pricelistUrl(row.supplierUrl);
       if (row.evidence !== "reported-pricelist" && row.evidence !== "verified-offer-page") return false;
       if (url === void 0 || typeof row.hostname !== "string" || normalizeHostname$1(url.hostname) !== row.hostname || hosts.has(row.hostname)) return false;
@@ -2722,15 +2723,15 @@
     return getElectricitySupplier(value) !== void 0;
   }
   function isElectricitySearch(value) {
-    return isRecord$6(value) && typeof value.norgespris === "boolean" && Number.isSafeInteger(value.localGridId) && value.localGridId > 0 && value.localGridId < 1e5 && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5 && (value.municipality === void 0 || typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100) && (value.areaCode === void 0 || typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode));
+    return isRecord$7(value) && typeof value.norgespris === "boolean" && Number.isSafeInteger(value.localGridId) && value.localGridId > 0 && value.localGridId < 1e5 && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5 && (value.municipality === void 0 || typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100) && (value.areaCode === void 0 || typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode));
   }
   function isElectricityPriceDetails(value) {
-    return isRecord$6(value) && nonNegative(value.monthlyFeeNok) && nonNegative(value.addonOrePerKwh) && typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100 && typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode) && typeof value.vatExempt === "boolean" && (value.scheme === "norgespris" || value.scheme === "stromstotte") && nonNegative(value.energyOrePerKwh) && (value.stromstotteMonthlyNok === void 0 || positive(value.stromstotteMonthlyNok)) && (value.conditionsText === void 0 || typeof value.conditionsText === "string" && value.conditionsText.length <= 1e4) && (value.invoiceRequirement === void 0 || typeof value.invoiceRequirement === "string" && Object.values(INVOICE_REQUIREMENTS).includes(value.invoiceRequirement)) && (value.comparisonOnly === void 0 || typeof value.comparisonOnly === "boolean") && positive(value.monthlyKwh) && typeof value.period === "string" && value.period.length > 0 && value.period.length <= 40 && (value.maximumYearlyKwh === void 0 || positive(value.maximumYearlyKwh)) && (value.guaranteeMonths === void 0 || nonNegative(value.guaranteeMonths)) && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
+    return isRecord$7(value) && nonNegative(value.monthlyFeeNok) && nonNegative(value.addonOrePerKwh) && typeof value.municipality === "string" && value.municipality.length > 0 && value.municipality.length < 100 && typeof value.areaCode === "string" && /^NO[1-5]$/.test(value.areaCode) && typeof value.vatExempt === "boolean" && (value.scheme === "norgespris" || value.scheme === "stromstotte") && nonNegative(value.energyOrePerKwh) && (value.stromstotteMonthlyNok === void 0 || positive(value.stromstotteMonthlyNok)) && (value.conditionsText === void 0 || typeof value.conditionsText === "string" && value.conditionsText.length <= 1e4) && (value.invoiceRequirement === void 0 || typeof value.invoiceRequirement === "string" && Object.values(INVOICE_REQUIREMENTS).includes(value.invoiceRequirement)) && (value.comparisonOnly === void 0 || typeof value.comparisonOnly === "boolean") && positive(value.monthlyKwh) && typeof value.period === "string" && value.period.length > 0 && value.period.length <= 40 && (value.maximumYearlyKwh === void 0 || positive(value.maximumYearlyKwh)) && (value.guaranteeMonths === void 0 || nonNegative(value.guaranteeMonths)) && Number.isSafeInteger(value.yearlyKwh) && value.yearlyKwh >= 100 && value.yearlyKwh <= 1e5;
   }
   async function getElectricityLocalGrids(requestJson = fetchPublicJson) {
     const value = await requestJson(`${API}/local_grids/`, { credentials: "omit" });
     if (!Array.isArray(value)) throw new Error("Forbrukerrådet /local_grids/: ugyldig kommuneliste");
-    const grids = value.filter((item) => isRecord$6(item) && positive(item.id) && Number.isSafeInteger(item.id) && typeof item.name === "string" && item.name.length > 0 && typeof item.areaCode === "string" && /^NO[1-5]$/.test(item.areaCode)).map((item) => ({ id: item.id, name: item.name, areaCode: item.areaCode }));
+    const grids = value.filter((item) => isRecord$7(item) && positive(item.id) && Number.isSafeInteger(item.id) && typeof item.name === "string" && item.name.length > 0 && typeof item.areaCode === "string" && /^NO[1-5]$/.test(item.areaCode)).map((item) => ({ id: item.id, name: item.name, areaCode: item.areaCode }));
     if (grids.length === 0) throw new Error("Forbrukerrådet /local_grids/: tom eller endret kommuneliste");
     return grids.sort((a, b) => a.name.localeCompare(b.name, "nb"));
   }
@@ -2744,7 +2745,7 @@
       requestJson(url, { credentials: "omit" }),
       norgespris ? requestJson(url.replace("norgespris=true", "norgespris=false"), { credentials: "omit" }).catch(() => void 0) : void 0
     ]);
-    if (!Array.isArray(value) || value.length > 0 && !value.some((row) => isRecord$6(row) && typeof row.name === "string" && isRecord$6(row.currentPrice))) {
+    if (!Array.isArray(value) || value.length > 0 && !value.some((row) => isRecord$7(row) && typeof row.name === "string" && isRecord$7(row.currentPrice))) {
       throw new Error(`Forbrukerrådet /products/grid/${localGridId}: ugyldig avtalesvar`);
     }
     const plans = value.flatMap((row) => {
@@ -2852,14 +2853,14 @@
     };
   }
   function readPlan(value, yearlyKwh, now) {
-    if (!isRecord$6(value) || !positive(value.id) || !Number.isSafeInteger(value.id) || typeof value.name !== "string" || value.type !== "hourly_spot" || value.applicableToCustomerType !== "allCustomers" && value.applicableToCustomerType !== "newAndExisting" || value.expiredAt !== null || value.paymentType !== "after" || !validDate(value.publishedAt) || Date.parse(value.publishedAt) > now.getTime() || !validDate(value.updatedAt) || value.endDate !== null && (!validDate(value.endDate) || Date.parse(value.endDate) <= now.getTime())) return void 0;
+    if (!isRecord$7(value) || !positive(value.id) || !Number.isSafeInteger(value.id) || typeof value.name !== "string" || value.type !== "hourly_spot" || value.applicableToCustomerType !== "allCustomers" && value.applicableToCustomerType !== "newAndExisting" || value.expiredAt !== null || value.paymentType !== "after" || !validDate(value.publishedAt) || Date.parse(value.publishedAt) > now.getTime() || !validDate(value.updatedAt) || value.endDate !== null && (!validDate(value.endDate) || Date.parse(value.endDate) <= now.getTime())) return void 0;
     const { conditions, fee, currentPrice: price, organization, addonPrice } = value;
-    if (!isRecord$6(conditions) || !isRecord$6(fee) || !isRecord$6(price) || !isRecord$6(organization) || !isRecord$6(price.tax) || typeof organization.name !== "string" || !positive(organization.id) || !Number.isSafeInteger(organization.id) || !Array.isArray(conditions.associations) || conditions.associations.length > 0 || conditions.cabinProduct !== false || conditions.promotionalAgreement !== false || conditions.linkedProduct !== null || typeof conditions.feeMandatoryType !== "string" || !Object.hasOwn(INVOICE_REQUIREMENTS, conditions.feeMandatoryType) || conditions.agreementTime !== null && conditions.agreementTime !== 0 || conditions.otherConditions !== null && (typeof conditions.otherConditions !== "string" || conditions.otherConditions.length > 1e4) || conditions.maxKwhPerYear !== null && (!positive(conditions.maxKwhPerYear) || yearlyKwh > conditions.maxKwhPerYear) || fee.contractBreachFee !== false || !nonNegative(fee.finalMonthlyFee) || !nonNegative(price.finalAddonPrice) || typeof price.tax.vatExemption !== "boolean" || !positive(price.finalPriceMonthly) || !positive(value.monthlyConsumption) || price.gridTariff !== null || !nonNegative(price.finalKwPrice) || typeof price.subsidyPrice !== "number" || !Number.isFinite(price.subsidyPrice) || price.subsidyPrice > 0 || !nonNegative(price.norgesprisPrice) || !nonNegative(price.spotPriceIncludingSubsidy) || !isRecord$6(value.billing) || value.billing.frequency !== 1 || value.billing.unit !== "month") return void 0;
+    if (!isRecord$7(conditions) || !isRecord$7(fee) || !isRecord$7(price) || !isRecord$7(organization) || !isRecord$7(price.tax) || typeof organization.name !== "string" || !positive(organization.id) || !Number.isSafeInteger(organization.id) || !Array.isArray(conditions.associations) || conditions.associations.length > 0 || conditions.cabinProduct !== false || conditions.promotionalAgreement !== false || conditions.linkedProduct !== null || typeof conditions.feeMandatoryType !== "string" || !Object.hasOwn(INVOICE_REQUIREMENTS, conditions.feeMandatoryType) || conditions.agreementTime !== null && conditions.agreementTime !== 0 || conditions.otherConditions !== null && (typeof conditions.otherConditions !== "string" || conditions.otherConditions.length > 1e4) || conditions.maxKwhPerYear !== null && (!positive(conditions.maxKwhPerYear) || yearlyKwh > conditions.maxKwhPerYear) || fee.contractBreachFee !== false || !nonNegative(fee.finalMonthlyFee) || !nonNegative(price.finalAddonPrice) || typeof price.tax.vatExemption !== "boolean" || !positive(price.finalPriceMonthly) || !positive(value.monthlyConsumption) || price.gridTariff !== null || !nonNegative(price.finalKwPrice) || typeof price.subsidyPrice !== "number" || !Number.isFinite(price.subsidyPrice) || price.subsidyPrice > 0 || !nonNegative(price.norgesprisPrice) || !nonNegative(price.spotPriceIncludingSubsidy) || !isRecord$7(value.billing) || value.billing.frequency !== 1 || value.billing.unit !== "month") return void 0;
     const orderUrl = safeOrderUrl(value.orderUrl);
     if (orderUrl === void 0) return void 0;
     if (typeof conditions.otherConditions === "string" && /(?:betinger|forutsetter|krever)[^.]{0,200}\bkjøp(?:er)?\b/i.test(conditions.otherConditions)) return void 0;
-    const guarantee = isRecord$6(addonPrice) && nonNegative(addonPrice.addonPriceMinimumFixedFor) ? addonPrice.addonPriceMinimumFixedFor : 0;
-    const guaranteeMonths = isRecord$6(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "year" ? guarantee * 12 : isRecord$6(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "month" ? guarantee : 0;
+    const guarantee = isRecord$7(addonPrice) && nonNegative(addonPrice.addonPriceMinimumFixedFor) ? addonPrice.addonPriceMinimumFixedFor : 0;
+    const guaranteeMonths = isRecord$7(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "year" ? guarantee * 12 : isRecord$7(addonPrice) && addonPrice.addonPriceMinimumFixedForUnit === "month" ? guarantee : 0;
     const amount = price.finalPriceMonthly;
     if (!nonNegative(amount)) return void 0;
     return {
@@ -3006,13 +3007,13 @@
     return shopName;
   }
   function readGgDealsApiPriceData(value, id) {
-    if (!isRecord$6(value) || value.success !== true || !isRecord$6(value.data)) return void 0;
+    if (!isRecord$7(value) || value.success !== true || !isRecord$7(value.data)) return void 0;
     const rawData = value.data[id];
-    if (!isRecord$6(rawData)) return void 0;
+    if (!isRecord$7(rawData)) return void 0;
     return readGgDealsPriceData(rawData);
   }
   function readGgDealsPriceData(value) {
-    const prices = isRecord$6(value.prices) ? value.prices : void 0;
+    const prices = isRecord$7(value.prices) ? value.prices : void 0;
     if (prices === void 0) return void 0;
     const currency = typeof prices.currency === "string" && prices.currency.length > 0 ? prices.currency.toUpperCase() : "NOK";
     return {
@@ -3429,6 +3430,24 @@
   function isPlainRecord$7(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
+  function getGroceryPackageQuantity(message) {
+    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
+  }
+  function cleanGroceryTitleCandidate(value) {
+    return value.replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "").replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "").replace(/\s+[-|]\s+(?:Oda|MENY|SPAR|KIWI|REMA\s*1000|Coop(?:\s+Extra)?|Joker|Bunnpris)\s*$/i, "").replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "").replace(/[.]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function isLikelySameGroceryTitle$1(message, title, minimumScore = 0.4) {
+    return uniqueStrings$a([message.searchTerm, ...message.productTitleCandidates ?? []]).some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate(candidate), title, minimumScore));
+  }
+  function normalizeGroceryBrandText(value) {
+    return transliterateNorwegianCharacters$4(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
+  }
+  function hasGroceryBrandSignal(message, text) {
+    if (message.productBrand === void 0) return true;
+    const brand = normalizeGroceryBrandText(message.productBrand);
+    if (brand.length < 3) return true;
+    return normalizeGroceryBrandText(text).includes(brand);
+  }
   const MIN_PRODUCT_MATCH_SCORE = 0.45;
   function isSameProductUrl(first, second) {
     const a = first === void 0 ? void 0 : normalizeProductUrlKey(first);
@@ -3807,7 +3826,7 @@
     for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
       const item = pending[visited];
       if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$6(item)) {
+      else if (isRecord$7(item)) {
         if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
         pending.push(...Object.values(item));
       }
@@ -3828,8 +3847,8 @@
     if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return void 0;
     const product = readNextProductData(html, rawUrl);
     if (product === void 0) return void 0;
-    const brand = isRecord$6(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
-    const attributes = isRecord$6(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$6).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$6) : []) : [];
+    const brand = isRecord$7(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
+    const attributes = isRecord$7(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$7).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$7) : []) : [];
     return {
       "@type": "Product",
       name: product.title,
@@ -3844,7 +3863,7 @@
     for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
       const item = pending.pop();
       if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$6(item)) {
+      else if (isRecord$7(item)) {
         if (Object.hasOwn(item, name)) return item[name];
         pending.push(...Object.values(item));
       }
@@ -3852,7 +3871,7 @@
     return void 0;
   }
   function readProductLanguage(product, titles) {
-    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$6) : [];
+    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$7) : [];
     const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
     const languages = new Set(values.filter((value) => typeof value === "string").flatMap((value) => readTcgLanguages(value).map((language) => language.code)));
     return languages.size === 1 ? [...languages][0] : void 0;
@@ -3860,7 +3879,7 @@
   function readProductOfferLanguage(html, productId) {
     const rows = findStructuredProperty(readNextFlightValues(html), "offerRows");
     if (!Array.isArray(rows)) return void 0;
-    const names = rows.filter(isRecord$6).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
+    const names = rows.filter(isRecord$7).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
     return readProductLanguage(void 0, names);
   }
   function findTypedLdJson(value, type) {
@@ -3871,7 +3890,7 @@
       }
       return void 0;
     }
-    if (!isRecord$6(value)) return void 0;
+    if (!isRecord$7(value)) return void 0;
     const found = Array.isArray(value["@graph"]) ? findTypedLdJson(value["@graph"], type) : void 0;
     if (found !== void 0) return found;
     const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
@@ -3885,7 +3904,7 @@
       }
       return void 0;
     }
-    if (!isRecord$6(value)) return void 0;
+    if (!isRecord$7(value)) return void 0;
     const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
     if (types.includes("Product") && typeof value.name === "string" && value.name.trim().length > 0) return value;
     return Array.isArray(value["@graph"]) ? selectProductLdJson(value["@graph"]) : void 0;
@@ -3893,7 +3912,7 @@
   function decodeLdJsonStrings(value) {
     if (typeof value === "string") return decodeHtmlEntities(value);
     if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
-    if (isRecord$6(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
+    if (isRecord$7(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
     return value;
   }
   function isExplicitPreorder(...values) {
@@ -4007,15 +4026,15 @@
     if (structured !== void 0) {
       const productName2 = withLeadingBrand$1(
         readStringLike$5(structured.name),
-        readStringLike$5(isRecord$6(structured.brand) ? structured.brand.name : structured.brand)
+        readStringLike$5(isRecord$7(structured.brand) ? structured.brand.name : structured.brand)
       );
       if (productName2 === void 0 || hasProductVariantConflict(anchor, productName2) || scoreProductCandidateMatch(anchor, { title: productName2 }) < MIN_PRODUCT_MATCH_SCORE) return void 0;
-      const aggregate = isRecord$6(structured.offers) ? structured.offers : void 0;
+      const aggregate = isRecord$7(structured.offers) ? structured.offers : void 0;
       const rawOffers = Array.isArray(structured.offers) ? structured.offers : Array.isArray(aggregate?.offers) ? aggregate.offers : [];
-      const offers2 = rawOffers.filter(isRecord$6).flatMap((item) => {
+      const offers2 = rawOffers.filter(isRecord$7).flatMap((item) => {
         const stock = readStringLike$5(item.availability)?.replace(/^https?:\/\/schema\.org\//, "");
         const amount = readPriceAmount(item.price);
-        const shopName = readStringLike$5(isRecord$6(item.seller) ? item.seller.name : void 0);
+        const shopName = readStringLike$5(isRecord$7(item.seller) ? item.seller.name : void 0);
         const currency = readStringLike$5(item.priceCurrency);
         if (stock !== "InStock" || isExplicitPreorder(item.isPreorder, item.is_preorder) || item.itemCondition === "https://schema.org/UsedCondition" || amount === void 0 || amount <= 0 || shopName === void 0 || currency !== "NOK") return [];
         const url = parseUrl$1(readStringLike$5(item.url) ?? "");
@@ -4217,28 +4236,28 @@
       });
       if (exact !== void 0) return exact;
     }
-    const messageQuantity = getMessagePackageQuantity$2(message);
+    const messageQuantity = getMessagePackageQuantity(message);
     if (messageQuantity === void 0) return void 0;
     return groceries.find((grocery) => {
       const groceryQuantity = readEnhverPackageQuantity(grocery);
       if (!isSamePackageQuantity(messageQuantity, groceryQuantity)) return false;
-      return isLikelySameGroceryTitle$2(message, grocery);
+      return isLikelySameGroceryTitle(message, grocery);
     });
   }
   function readEnhverPackageQuantity(grocery) {
     const directQuantity = grocery.amount !== void 0 && grocery.unit !== void 0 ? readPackageQuantityFromText(`${grocery.amount} ${grocery.unit}`) : void 0;
     return directQuantity ?? readPackageQuantityFromText(grocery.desc);
   }
-  function isLikelySameGroceryTitle$2(message, grocery) {
+  function isLikelySameGroceryTitle(message, grocery) {
     const title = [grocery.name, grocery.desc].filter((value) => value !== void 0).join(" ");
-    if (!hasRequestedBrandSignal$2(message, title)) return false;
+    if (!hasRequestedBrandSignal$1(message, title)) return false;
     return uniqueStrings$7([message.searchTerm, ...message.productTitleCandidates ?? []]).some((candidate) => isLikelySameProductTitle(candidate, title, 0.45));
   }
-  function hasRequestedBrandSignal$2(message, title) {
+  function hasRequestedBrandSignal$1(message, title) {
     if (message.productBrand === void 0) return true;
-    const brand = normalizeBrandText$2(message.productBrand);
+    const brand = normalizeBrandText(message.productBrand);
     if (brand.length < 3) return true;
-    return normalizeBrandText$2(title).includes(brand);
+    return normalizeBrandText(title).includes(brand);
   }
   function readEnhverProductTitle(html, grocery) {
     const escapedName = escapeRegExp$2(String(grocery.groceryId));
@@ -4267,9 +4286,9 @@
     return prices;
   }
   function hasGroceryIdentitySignal$2(message) {
-    return getLikelyGtins$2(message.codes).length > 0 || getMessagePackageQuantity$2(message) !== void 0;
+    return getLikelyGtins$2(message.codes).length > 0 || getMessagePackageQuantity(message) !== void 0;
   }
-  function getMessagePackageQuantity$2(message) {
+  function getMessagePackageQuantity(message) {
     return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
   }
   async function fetchJson$4(url, init) {
@@ -4334,7 +4353,7 @@
   function escapeRegExp$2(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  function normalizeBrandText$2(value) {
+  function normalizeBrandText(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
   function uniqueStrings$7(values) {
@@ -4376,7 +4395,7 @@
     const pageGtin = readLikelyGtin(readStringLike$3(product.gtin) ?? readStringLike$3(product.gtin13));
     const pageQuantity = readKassalPackageQuantity(product, productName);
     const matchedByCode = pageGtin !== void 0 && getLikelyGtins$1(message.codes).includes(pageGtin);
-    const matchedByQuantity = pageQuantity !== void 0 && isSamePackageQuantity(getMessagePackageQuantity$1(message), pageQuantity) && hasRequestedBrandSignal$1(message, productName, product) && isLikelySameGroceryTitle$1(message, productName);
+    const matchedByQuantity = pageQuantity !== void 0 && isSamePackageQuantity(getGroceryPackageQuantity(message), pageQuantity) && hasRequestedBrandSignal(message, productName, product) && isLikelySameGroceryTitle$1(message, productName);
     if (!matchedByCode && !matchedByQuantity) return void 0;
     const sortedPrices = [...prices].sort((first, second) => first.amount - second.amount);
     const best = sortedPrices[0];
@@ -4469,12 +4488,12 @@
     return urls;
   }
   function buildKassalSlugCandidates(message) {
-    const quantityLabels = buildPackageQuantityLabels(getMessagePackageQuantity$1(message));
+    const quantityLabels = buildPackageQuantityLabels(getGroceryPackageQuantity(message));
     const brand = message.productBrand;
     const titles = uniqueStrings$6([
       message.searchTerm,
       ...message.productTitleCandidates ?? []
-    ]).map(cleanGroceryTitleCandidate$1);
+    ]).map(cleanGroceryTitleCandidate);
     const slugs = [];
     for (const title of titles) {
       if (title.length < 3) continue;
@@ -4589,23 +4608,14 @@
     return /<title>\s*404/i.test(html) || /<h1[^>]*>\s*404/i.test(html);
   }
   function hasGroceryIdentitySignal$1(message) {
-    return getLikelyGtins$1(message.codes).length > 0 || getMessagePackageQuantity$1(message) !== void 0;
+    return getLikelyGtins$1(message.codes).length > 0 || getGroceryPackageQuantity(message) !== void 0;
   }
-  function isLikelySameGroceryTitle$1(message, title) {
-    return uniqueStrings$6([message.searchTerm, ...message.productTitleCandidates ?? []]).some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate$1(candidate), title, 0.4));
-  }
-  function hasRequestedBrandSignal$1(message, productName, product) {
+  function hasRequestedBrandSignal(message, productName, product) {
     if (message.productBrand === void 0) return true;
-    const brand = normalizeBrandText$1(message.productBrand);
+    const brand = normalizeGroceryBrandText(message.productBrand);
     if (brand.length < 3) return true;
     const productBrand = isPlainRecord$4(product.brand) ? readStringLike$3(product.brand.name) : readStringLike$3(product.brand);
-    return normalizeBrandText$1(`${productBrand ?? ""} ${productName}`).includes(brand);
-  }
-  function getMessagePackageQuantity$1(message) {
-    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
-  }
-  function cleanGroceryTitleCandidate$1(value) {
-    return value.replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "").replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "").replace(/\s+[-|]\s+(?:Oda|MENY|SPAR|KIWI|REMA\s*1000|Coop(?:\s+Extra)?)\s*$/i, "").replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "").replace(/[.]+/g, " ").replace(/\s+/g, " ").trim();
+    return normalizeGroceryBrandText(`${productBrand ?? ""} ${productName}`).includes(brand);
   }
   function removePackageLabels$1(value, quantityLabels) {
     let cleaned = value;
@@ -4680,9 +4690,6 @@
   function transliterateNorwegianCharacters$3(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
   }
-  function normalizeBrandText$1(value) {
-    return transliterateNorwegianCharacters$3(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
-  }
   function escapeRegExp$1(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
@@ -4690,6 +4697,157 @@
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function isPlainRecord$4(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const ETILBUDSAVIS_SEARCH_URL = "https://squid-api.tjek.com/v2/offers/search";
+  const ETILBUDSAVIS_SEARCH_LIMIT = 24;
+  const ETILBUDSAVIS_MAX_ALTERNATIVES = 8;
+  function buildEtilbudsavisSearchUrl(query) {
+    const params = new URLSearchParams({ query, limit: String(ETILBUDSAVIS_SEARCH_LIMIT) });
+    return `${ETILBUDSAVIS_SEARCH_URL}?${params.toString()}`;
+  }
+  function buildEtilbudsavisQueries(message) {
+    const title = cleanGroceryTitleCandidate(message.searchTerm).replace(/\b\d+(?:[.,]\d+)?\s*(?:x\s*\d+(?:[.,]\d+)?\s*)?(?:kg|g|gr|gram|l|ltr|liter|dl|cl|ml|stk|pk|pakning)\b/gi, " ").replace(/[()[\],/|-]+/g, " ").replace(/\s+/g, " ").trim();
+    const brand = message.productBrand?.trim();
+    const brandWords = brand !== void 0 ? brand.toLowerCase().split(/\s+/) : [];
+    const words = title.split(" ").filter((word) => /\p{L}/u.test(word) && word.length >= 3);
+    const productWords = words.filter((word) => !brandWords.includes(word.toLowerCase()));
+    const queries = brand !== void 0 && brand.length >= 2 ? [[brand, productWords[0]].filter(Boolean).join(" "), brand] : [words.slice(0, 2).join(" ")];
+    return [...new Set(queries.filter((query) => query.length >= 3))];
+  }
+  function readEtilbudsavisOffers(value) {
+    if (!Array.isArray(value)) throw new Error("eTilbudsavis: uventet svar (forventet en liste med tilbud)");
+    return readRecordArray(value).flatMap((item) => {
+      const heading = readStringValue(item.heading)?.trim();
+      const pricing = isRecord$4(item.pricing) ? item.pricing : void 0;
+      const amount = typeof pricing?.price === "number" && Number.isFinite(pricing.price) && pricing.price > 0 ? pricing.price : void 0;
+      const dealer = isRecord$4(item.dealer) ? readStringValue(item.dealer.name) : isRecord$4(item.branding) ? readStringValue(item.branding.name) : void 0;
+      const validFrom = readStringValue(item.run_from);
+      const validTo = readStringValue(item.run_till);
+      if (heading === void 0 || amount === void 0 || pricing?.currency !== "NOK" || dealer === void 0 || validFrom === void 0 || validTo === void 0) return [];
+      const prePrice = typeof pricing.pre_price === "number" && Number.isFinite(pricing.pre_price) && pricing.pre_price > amount ? pricing.pre_price : void 0;
+      const quantity = readEtilbudsavisQuantity(item.quantity);
+      const images = isRecord$4(item.images) ? item.images : void 0;
+      const imageUrl = readStringValue(images?.view) ?? readStringValue(images?.zoom) ?? readStringValue(images?.thumb);
+      return [{
+        heading,
+        description: readStringValue(item.description)?.trim() ?? "",
+        dealer: dealer.trim(),
+        amount,
+        ...prePrice !== void 0 ? { prePrice } : {},
+        ...quantity !== void 0 ? { quantity } : {},
+        validFrom,
+        validTo,
+        ...imageUrl !== void 0 && imageUrl.startsWith("https://") ? { imageUrl } : {}
+      }];
+    });
+  }
+  function readEtilbudsavisQuantity(value) {
+    if (!isRecord$4(value) || !isRecord$4(value.unit) || !isRecord$4(value.size)) return void 0;
+    const symbol = readStringValue(value.unit.symbol)?.toLowerCase();
+    const factors = {
+      g: ["g", 1],
+      kg: ["g", 1e3],
+      ml: ["ml", 1],
+      cl: ["ml", 10],
+      dl: ["ml", 100],
+      l: ["ml", 1e3],
+      pcs: ["pcs", 1]
+    };
+    const unit = symbol !== void 0 ? factors[symbol] : void 0;
+    const from = typeof value.size.from === "number" ? value.size.from : void 0;
+    const to = typeof value.size.to === "number" ? value.size.to : void 0;
+    if (unit === void 0 || from === void 0 || to === void 0 || !(from > 0) || to < from) return void 0;
+    return { unit: unit[0], from: from * unit[1], to: to * unit[1] };
+  }
+  function isActive(offer, now) {
+    const from = Date.parse(offer.validFrom);
+    const to = Date.parse(offer.validTo);
+    return Number.isFinite(from) && Number.isFinite(to) && from <= now && now <= to;
+  }
+  function matchesQuantity(offer, quantity) {
+    if (quantity === void 0) return true;
+    if (offer.quantity === void 0 || offer.quantity.unit !== quantity.unit) return false;
+    return quantity.amount >= offer.quantity.from - 0.5 && quantity.amount <= offer.quantity.to + 0.5;
+  }
+  const ASSORTMENT_PATTERN = /\b(?:et\s+utvalg|utvalgte|flere\s+(?:varianter|sorter|typer)|ass(?:\.|ortert)|diverse\s+varianter)\b/i;
+  function isEtilbudsavisAssortment(offer) {
+    return ASSORTMENT_PATTERN.test(`${offer.heading} ${offer.description}`);
+  }
+  function selectEtilbudsavisMatches(offers, message, now = Date.now()) {
+    const quantity = getGroceryPackageQuantity(message);
+    return offers.filter((offer) => isActive(offer, now)).filter((offer) => hasGroceryBrandSignal(message, `${offer.heading} ${offer.description}`)).filter((offer) => isLikelySameGroceryTitle$1(message, offer.heading, 0.45) || isEtilbudsavisAssortment(offer) && message.productBrand !== void 0 && quantity !== void 0).filter((offer) => matchesQuantity(offer, quantity)).sort((left, right) => left.amount - right.amount);
+  }
+  async function findEtilbudsavisPriceMatch(message, requestJson = fetchEtilbudsavisJson, now = Date.now()) {
+    if (!isLikelyGroceryPriceMatchContext(message.url, message.productUrl)) return void 0;
+    if (message.productBrand === void 0 && getGroceryPackageQuantity(message) === void 0) return void 0;
+    let matches = [];
+    let query;
+    for (const candidate of buildEtilbudsavisQueries(message)) {
+      const value = await requestJson(buildEtilbudsavisSearchUrl(candidate), { headers: { Accept: "application/json" }, credentials: "omit" });
+      if (value === void 0) throw new Error(`eTilbudsavis: ingen svar fra ${ETILBUDSAVIS_SEARCH_URL} for «${candidate}»`);
+      matches = selectEtilbudsavisMatches(readEtilbudsavisOffers(value), message, now);
+      query = candidate;
+      if (matches.length > 0) break;
+    }
+    const best = matches[0];
+    if (best === void 0 || query === void 0) return void 0;
+    const alternatives = matches.slice(0, ETILBUDSAVIS_MAX_ALTERNATIVES).map(toAlternative);
+    return {
+      source: "etilbudsavis",
+      sourceName: "eTilbudsavis",
+      // Et utvalg eller ukjent mengde er ikke bekreftet som nøyaktig samme vare.
+      matchedExactProduct: getGroceryPackageQuantity(message) !== void 0 && !isEtilbudsavisAssortment(best),
+      shopName: best.dealer,
+      price: formatNok(best.amount),
+      amount: best.amount,
+      currency: "NOK",
+      productName: formatHeading(best.heading),
+      productUrl: `https://etilbudsavis.no/soek/${encodeURIComponent(query)}`,
+      ...best.imageUrl !== void 0 ? { imageUrl: best.imageUrl } : {},
+      details: [
+        `Kundeavistilbud hos ${best.dealer}, gyldig ${formatValidity(best)}.`,
+        best.description !== "" ? best.description.replace(/\n+/g, " · ") : void 0,
+        "Tilbud og priser i kundeavisen kan variere mellom regioner og butikker, og gjelder så langt lageret rekker."
+      ].filter((line) => line !== void 0).join("\n\n"),
+      alternatives
+    };
+  }
+  const ETILBUDSAVIS_TIMEOUT_MS = 1e4;
+  async function fetchEtilbudsavisJson(url, init) {
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(ETILBUDSAVIS_TIMEOUT_MS) });
+    if (!response.ok) throw new Error(`eTilbudsavis: HTTP ${response.status} fra ${url}`);
+    return response.json();
+  }
+  function toAlternative(offer) {
+    return {
+      shopName: offer.dealer,
+      productName: formatHeading(offer.heading),
+      price: formatNok(offer.amount),
+      amount: offer.amount,
+      currency: "NOK",
+      platform: [
+        isEtilbudsavisAssortment(offer) ? "Gjelder et utvalg" : void 0,
+        offer.prePrice !== void 0 ? `Førpris ${formatNok(offer.prePrice)}` : void 0,
+        `t.o.m. ${formatDate(offer.validTo)}`
+      ].filter((part) => part !== void 0).join(", "),
+      ...offer.imageUrl !== void 0 ? { imageUrl: offer.imageUrl } : {}
+    };
+  }
+  function formatHeading(heading) {
+    return heading === heading.toUpperCase() ? heading.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_match, space, letter) => space + letter.toUpperCase()) : heading;
+  }
+  function formatValidity(offer) {
+    return `${formatDate(offer.validFrom)}–${formatDate(offer.validTo)}`;
+  }
+  function formatDate(iso) {
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? iso : new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", timeZone: "Europe/Oslo" }).format(date).replace(/\.$/, "");
+  }
+  function formatNok(amount) {
+    return `${formatKr(amount)} kr`;
+  }
+  function isRecord$4(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
@@ -5972,15 +6130,15 @@ query SearchSuggestions($query: String!, $category: Int) {
     for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
       const item = pending[visited];
       if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$6(item)) {
-        if (isRecord$6(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
+      else if (isRecord$7(item)) {
+        if (isRecord$7(item.product) && String(item.product.id) === id && Object.hasOwn(item, "lowestPrice") && Array.isArray(item.otherInStockPrices) && Array.isArray(item.outOfStockPrices)) components.push(item);
         pending.push(...Object.values(item));
       }
     }
     const rowLists = components.map((item) => [item.lowestPrice, ...item.otherInStockPrices, ...item.outOfStockPrices]);
     if (rowLists.length === 0) return { issue: "missing-product-price-data" };
     if (new Set(rowLists.map((rows) => JSON.stringify(rows))).size !== 1) return { issue: "ambiguous-product-price-data" };
-    return { rows: rowLists[0].filter(isRecord$6) };
+    return { rows: rowLists[0].filter(isRecord$7) };
   }
   function readPokeprisOffers(html, rawOffers, productUrl, productName, language, onDiagnostic) {
     const scoped = readPriceRows(html, productUrl);
@@ -5988,8 +6146,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       onDiagnostic({ reason: scoped.issue });
       return void 0;
     }
-    const verified = rawOffers.filter(isRecord$6).flatMap((offer) => {
-      const shopName = isRecord$6(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
+    const verified = rawOffers.filter(isRecord$7).flatMap((offer) => {
+      const shopName = isRecord$7(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
       const url = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
       const diagnostic = { reason: "", ...url !== void 0 ? { offerUrl: url.href } : {}, ...shopName ? { shopName } : {} };
       const reject = (reason) => {
@@ -6027,7 +6185,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         preorder
       }];
     });
-    const judgedUrls = rawOffers.filter(isRecord$6).map((offer) => typeof offer.url === "string" ? offer.url : "");
+    const judgedUrls = rawOffers.filter(isRecord$7).map((offer) => typeof offer.url === "string" ? offer.url : "");
     const rowIdentity = /* @__PURE__ */ new Map();
     for (const row of scoped.rows) {
       const url = typeof row.product_url === "string" ? parseUrl$1(row.product_url) : void 0;
@@ -6048,12 +6206,12 @@ query SearchSuggestions($query: String!, $category: Int) {
   const POKEPRIS_CATALOG_URL = "https://cashbacknorge.no/pokepris-catalog.json";
   const POKEPRIS_CATALOG_MAX_AGE_MS = 14 * 864e5;
   function isPokeprisCatalog(value) {
-    if (!isRecord$6(value) || value.version !== 1 || typeof value.source !== "string") return false;
+    if (!isRecord$7(value) || value.version !== 1 || typeof value.source !== "string") return false;
     if (typeof value.generatedAt !== "string" || !Number.isFinite(Date.parse(value.generatedAt))) return false;
-    if (!Array.isArray(value.products) || !isRecord$6(value.urls)) return false;
+    if (!Array.isArray(value.products) || !isRecord$7(value.urls)) return false;
     const ids = /* @__PURE__ */ new Set();
     for (const product of value.products) {
-      if (!isRecord$6(product) || !Number.isSafeInteger(product.id) || product.id <= 0) return false;
+      if (!isRecord$7(product) || !Number.isSafeInteger(product.id) || product.id <= 0) return false;
       if (typeof product.canonicalId !== "string" || typeof product.name !== "string" || typeof product.category !== "string") return false;
       if (product.setName !== void 0 && typeof product.setName !== "string") return false;
       if (product.language !== void 0 && typeof product.language !== "string") return false;
@@ -6135,7 +6293,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (products.length === 0 && apiFailure !== void 0) throw apiFailure;
     }
     const anchor = buildProductMatchAnchor(message);
-    const candidates = products.filter(isRecord$6).filter((product) => /^[1-9]\d*$/.test(String(product.id ?? "")) && typeof product.name === "string").filter((product) => readTcgProductKind(String(product.name)) === kind).map((product) => ({ product, score: scoreProductCandidateMatch(anchor, { title: `Pokémon ${product.name}` }) })).filter(({ score }) => score >= MIN_PRODUCT_MATCH_SCORE).sort((a, b) => b.score - a.score).slice(0, MAX_PRODUCT_REQUESTS);
+    const candidates = products.filter(isRecord$7).filter((product) => /^[1-9]\d*$/.test(String(product.id ?? "")) && typeof product.name === "string").filter((product) => readTcgProductKind(String(product.name)) === kind).map((product) => ({ product, score: scoreProductCandidateMatch(anchor, { title: `Pokémon ${product.name}` }) })).filter(({ score }) => score >= MIN_PRODUCT_MATCH_SCORE).sort((a, b) => b.score - a.score).slice(0, MAX_PRODUCT_REQUESTS);
     if (candidates.length === 0) options.onDiagnostic?.({ reason: "no-matching-catalog-product" });
     for (const { product } of candidates) {
       const productUrl = `${ORIGIN}/produkt/${encodeURIComponent(String(product.id))}`;
@@ -6204,7 +6362,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       throw new Error("Pokepris: empty getProducts response");
     }
     const data = readPokeprisSearchResult(result);
-    if (!isRecord$6(data) || !Array.isArray(data.products)) {
+    if (!isRecord$7(data) || !Array.isArray(data.products)) {
       actionCache.delete(requestText);
       throw new Error("Pokepris: invalid getProducts response");
     }
@@ -6217,7 +6375,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (featured.length > 0) return featured;
     const taxonomy = findStructuredProperty(readNextFlightValues(home), "seriesWithSets");
     const query = normalizeTcgProductTitle(message.searchTerm);
-    const knownSetNames = Array.isArray(taxonomy) ? taxonomy.filter(isRecord$6).flatMap((series) => Array.isArray(series.sets) ? series.sets.filter(isRecord$6).map((set) => set.name).filter((name) => typeof name === "string") : []) : [];
+    const knownSetNames = Array.isArray(taxonomy) ? taxonomy.filter(isRecord$7).flatMap((series) => Array.isArray(series.sets) ? series.sets.filter(isRecord$7).map((set) => set.name).filter((name) => typeof name === "string") : []) : [];
     const setNames = knownSetNames.filter((name) => query.includes(normalizeTcgProductTitle(name))).sort((a, b) => query.lastIndexOf(normalizeTcgProductTitle(b)) - query.lastIndexOf(normalizeTcgProductTitle(a)) || b.length - a.length);
     for (const setName of setNames.slice(0, 2)) {
       const path = normalizeTcgText(setName).replace(/ /g, "-");
@@ -6247,8 +6405,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     return readLdJsonScripts(html).flatMap((entry) => {
       const list = findTypedLdJson(entry, "ItemList");
       return Array.isArray(list?.itemListElement) ? list.itemListElement : [];
-    }).filter(isRecord$6).flatMap((entry) => {
-      const item = isRecord$6(entry.item) ? entry.item : void 0;
+    }).filter(isRecord$7).flatMap((entry) => {
+      const item = isRecord$7(entry.item) ? entry.item : void 0;
       if (typeof item?.name !== "string" || typeof item.url !== "string" || !isPokeprisProductUrl(item.url)) return [];
       if (readTcgProductKind(item.name) !== kind || !isNameWithinSearchTerm(item.name, message.searchTerm)) return [];
       return [{ id: new URL(item.url).pathname.split("/")[2], name: item.name }];
@@ -6292,7 +6450,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (separator < 0) continue;
       try {
         const value = JSON.parse(line.slice(separator + 1));
-        if (isRecord$6(value) && Array.isArray(value.products)) return value;
+        if (isRecord$7(value) && Array.isArray(value.products)) return value;
       } catch {
       }
     }
@@ -6301,7 +6459,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   async function readProductPage(html, productUrl, message, mode, options) {
     const product = selectProductLdJson(readLdJsonScripts(html));
     if (product === void 0 || typeof product.name !== "string") return void 0;
-    const brand = isRecord$6(product.brand) ? product.brand.name : product.brand;
+    const brand = isRecord$7(product.brand) ? product.brand.name : product.brand;
     if (typeof brand !== "string" || !/pok[eé]mon/i.test(brand)) return void 0;
     const name = `Pokémon ${product.name.replace(/^pok[eé]mon\s+/i, "")}`;
     const reject = (reason) => {
@@ -6311,7 +6469,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const kind = readTcgProductKind(name);
     if (kind === void 0 || mode === "search" && readTcgProductKind(message.searchTerm) !== kind) return void 0;
     if (mode === "merchant-url" && hasTcgProductVariantConflict(message.searchTerm, name)) return reject("product-variant-mismatch");
-    const properties = Array.isArray(product.additionalProperty) ? product.additionalProperty.filter(isRecord$6) : [];
+    const properties = Array.isArray(product.additionalProperty) ? product.additionalProperty.filter(isRecord$7) : [];
     const setName = properties.find((item) => item.name === "Kortsett")?.value;
     const languageName = properties.find((item) => item.name === "Språk")?.value;
     const language = typeof languageName === "string" ? readTcgLanguage(languageName) : void 0;
@@ -6325,7 +6483,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (scoreProductCandidateMatch(buildProductMatchAnchor(message), { title: name }) < MIN_PRODUCT_MATCH_SCORE) return reject("product-variant-mismatch");
     }
     const aggregate = product.offers;
-    const rawOffers = isRecord$6(aggregate) && Array.isArray(aggregate.offers) ? aggregate.offers : Array.isArray(aggregate) ? aggregate : [];
+    const rawOffers = isRecord$7(aggregate) && Array.isArray(aggregate.offers) ? aggregate.offers : Array.isArray(aggregate) ? aggregate : [];
     const validated = readPokeprisOffers(
       html,
       rawOffers,
@@ -6407,7 +6565,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const pageGtin = readSesumGtin(html);
     const pageQuantity = readSesumPackageQuantity(html);
     const matchedByCode = pageGtin !== void 0 && getLikelyGtins(message.codes).includes(pageGtin);
-    const matchedByQuantity = pageQuantity !== void 0 && isSamePackageQuantity(getMessagePackageQuantity(message), pageQuantity) && hasRequestedBrandSignal(message, productName) && isLikelySameGroceryTitle(message, productName);
+    const matchedByQuantity = pageQuantity !== void 0 && isSamePackageQuantity(getGroceryPackageQuantity(message), pageQuantity) && hasGroceryBrandSignal(message, productName) && isLikelySameGroceryTitle$1(message, productName);
     if (!matchedByCode && !matchedByQuantity) return void 0;
     const sortedPrices = [...prices].sort((first, second) => first.amount - second.amount);
     const best = sortedPrices[0];
@@ -6434,10 +6592,10 @@ query SearchSuggestions($query: String!, $category: Int) {
     return /<title>\s*(?:Produkt ikke funnet|404\b|404: This page could not be found)/i.test(html) || /<h1[^>]*>\s*(?:Produkt ikke funnet|404\b)/i.test(html);
   }
   function hasGroceryIdentitySignal(message) {
-    return getLikelyGtins(message.codes).length > 0 || getMessagePackageQuantity(message) !== void 0;
+    return getLikelyGtins(message.codes).length > 0 || getGroceryPackageQuantity(message) !== void 0;
   }
   function buildSesumProductUrlCandidates(message) {
-    const quantityLabels = buildPackageQuantityLabels(getMessagePackageQuantity(message));
+    const quantityLabels = buildPackageQuantityLabels(getGroceryPackageQuantity(message));
     const brand = message.productBrand;
     const titles = uniqueStrings$2([
       message.searchTerm,
@@ -6458,9 +6616,6 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
     }
     return uniqueStrings$2(slugs).filter((slug) => slug.length >= 4).slice(0, MAX_SESUM_CANDIDATES).map((slug) => `${SESUM_PRODUCT_URL}${encodeURIComponent(slug)}`);
-  }
-  function cleanGroceryTitleCandidate(value) {
-    return value.replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "").replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "").replace(/\s+[-|]\s+(?:Oda|MENY|KIWI|SPAR|REMA\s*1000|Coop(?:\s+Extra)?)\s*$/i, "").replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "").replace(/[.]+/g, " ").replace(/\s+/g, " ").trim();
   }
   function removePackageLabels(value, quantityLabels) {
     let cleaned = value;
@@ -6602,18 +6757,6 @@ query SearchSuggestions($query: String!, $category: Int) {
     const raw = html.match(pattern)?.[1] ?? html.match(alternatePattern)?.[1];
     return raw !== void 0 ? decodeHtml(raw).trim() : void 0;
   }
-  function isLikelySameGroceryTitle(message, title) {
-    return uniqueStrings$2([message.searchTerm, ...message.productTitleCandidates ?? []]).some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate(candidate), title, 0.4));
-  }
-  function hasRequestedBrandSignal(message, title) {
-    if (message.productBrand === void 0) return true;
-    const brand = normalizeBrandText(message.productBrand);
-    if (brand.length < 3) return true;
-    return normalizeBrandText(title).includes(brand);
-  }
-  function getMessagePackageQuantity(message) {
-    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
-  }
   async function fetchText(url, init) {
     const response = await fetch(url, {
       ...init,
@@ -6666,9 +6809,6 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function transliterateNorwegianCharacters$1(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
-  }
-  function normalizeBrandText(value) {
-    return transliterateNorwegianCharacters$1(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
   function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -7459,7 +7599,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return sortPriceMatchOffers([isthereanydealOffer2, ggDealsOffer, allKeyShopOffer].filter((offer) => offer !== void 0));
     }
     const verifiedAvailability = [];
-    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer, pokeprisOffer] = await Promise.all([
+    const [prisjaktOffer, godprisOffer, klarnaOffer, prisradarOffer, isthereanydealOffer, taxfreeOffer, sesumOffer, enhverOffer, kassalOffer, pokeprisOffer, etilbudsavisOffer] = await Promise.all([
       ignorePriceMatchFailure(findPrisjaktPriceMatch(message, requestJson)),
       ignorePriceMatchFailure(findGodprisPriceMatch(message, requestJson, requestText)),
       ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson)),
@@ -7469,7 +7609,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       ignorePriceMatchFailure(findSesumPriceMatch(message, requestText)),
       ignorePriceMatchFailure(findEnhverPriceMatch(message, requestJson, requestText)),
       ignorePriceMatchFailure(findKassalPriceMatch(message, requestText)),
-      ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, useCatalog: true, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) }))
+      ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, useCatalog: true, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) })),
+      ignorePriceMatchFailure(findEtilbudsavisPriceMatch(message, requestJson))
     ]);
     const anchorOffers = [prisjaktOffer, klarnaOffer].filter((offer) => offer !== void 0).map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability)).filter((offer) => offer !== void 0);
     const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
@@ -7495,7 +7636,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       sesumOffer,
       enhverOffer,
       kassalOffer,
-      pokeprisOffer
+      pokeprisOffer,
+      etilbudsavisOffer
     ].filter((offer) => offer !== void 0).map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability)).filter((offer) => offer !== void 0);
     const productAnchorTerms = uniqueStrings$1([
       message.searchTerm,
@@ -7566,6 +7708,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (offer.source === "sesum") return 4;
     if (offer.source === "enhver") return 5;
     if (offer.source === "kassal") return 6;
+    if (offer.source === "etilbudsavis") return 6;
     if (offer.source === "pokepris") return 6;
     if (offer.source === "isthereanydeal") return 7;
     if (offer.source === "ggdeals") return 8;
@@ -7911,7 +8054,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function readPanFlightsFlightLegs(item, legMinutes, legStopCounts) {
     const routeList = readRecordArray(readPanFlightsPackageRecord(item)?.routelist);
     const outboundRoute = routeList[0];
-    const returnFromBackdata = isRecord$6(outboundRoute?.backdata);
+    const returnFromBackdata = isRecord$7(outboundRoute?.backdata);
     const legSources = [
       { data: outboundRoute?.tripdata, departure: outboundRoute?.dTime, arrival: outboundRoute?.aTime },
       returnFromBackdata ? { data: outboundRoute?.backdata, departure: outboundRoute?.drTime, arrival: outboundRoute?.arTime } : { data: routeList[1]?.tripdata, departure: routeList[1]?.dTime, arrival: routeList[1]?.aTime }
@@ -7922,7 +8065,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     };
     const legs = legMinutes.map((durationMinutes, index) => {
       const source2 = legSources[index];
-      const data = isRecord$6(source2?.data) ? source2.data : void 0;
+      const data = isRecord$7(source2?.data) ? source2.data : void 0;
       const stopCount = legStopCounts[index];
       const specs = Array.isArray(data?.spec) ? data.spec.filter(isString) : [];
       const route = formatFlightLegRoute(specs.map((spec) => {
@@ -8022,7 +8165,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return void 0;
   }
   function readPanFlightsLegMinutes(item, roundTrip) {
-    const packageRecord = isRecord$6(item.package) ? item.package : void 0;
+    const packageRecord = isRecord$7(item.package) ? item.package : void 0;
     const routes = readRecordArray(packageRecord?.routelist);
     const route = routes[0];
     const minutes = (seconds) => {
@@ -8141,7 +8284,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     for (let attempt = 0; attempt < input.attempts && !state.complete; attempt++) {
       if (attempt > 0) await input.wait(input.intervalMs);
       const value = await input.requestResults(state.searchId, state.filterState);
-      if (!isRecord$6(value) || !Array.isArray(value.results)) continue;
+      if (!isRecord$7(value) || !Array.isArray(value.results)) continue;
       const searchId = readStringValue(value.searchId);
       if (searchId !== void 0) state.searchId = searchId;
       const nextFilterState = state.filterState ?? input.readFilterState(value);
@@ -8173,9 +8316,9 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isMomondoBookingOptionMatchingBaggage(bookingOption, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fees = isRecord$6(bookingOption.fees) ? bookingOption.fees : void 0;
+    const fees = isRecord$7(bookingOption.fees) ? bookingOption.fees : void 0;
     const isIncluded = (bagData, display) => {
-      const status = isRecord$6(bagData) ? readStringValue(bagData.status) : void 0;
+      const status = isRecord$7(bagData) ? readStringValue(bagData.status) : void 0;
       return status !== void 0 ? status === "INCLUDED" : formatMomondoLuggageValue(readStringValue(display)) === "inkl.";
     };
     if (flightMeta.includeCabinBag === true && !isIncluded(fees?.carryOnBagData, fees?.carryOnDisplay)) return false;
@@ -8192,7 +8335,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function readTripComJourneyStopCount(journey) {
     const sections = readRecordArray(journey.transSectionList);
     const intermediateStops = sections.reduce((count, section) => {
-      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
+      const flightInfo = isRecord$7(section.flightInfo) ? section.flightInfo : void 0;
       return count + readRecordArray(flightInfo?.stopList).length;
     }, 0);
     return Math.max(0, sections.length - 1) + intermediateStops;
@@ -8201,11 +8344,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     const sections = readRecordArray(journey.transSectionList);
     const stopCount = readTripComJourneyStopCount(journey);
     const segments = sections.flatMap((section) => {
-      const flightInfo = isRecord$6(section.flightInfo) ? section.flightInfo : void 0;
+      const flightInfo = isRecord$7(section.flightInfo) ? section.flightInfo : void 0;
       const airports = [
-        readStringValue(isRecord$6(section.departPoint) ? section.departPoint.airportCode : void 0),
+        readStringValue(isRecord$7(section.departPoint) ? section.departPoint.airportCode : void 0),
         ...readRecordArray(flightInfo?.stopList).map((stop) => readStringValue(stop.airportCode)),
-        readStringValue(isRecord$6(section.arrivePoint) ? section.arrivePoint.airportCode : void 0)
+        readStringValue(isRecord$7(section.arrivePoint) ? section.arrivePoint.airportCode : void 0)
       ];
       return airports.slice(1).map((destination, index) => ({ origin: airports[index], destination }));
     });
@@ -8216,7 +8359,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       departureTime: readStringValue(sections[0]?.departDateTime),
       arrivalTime: readStringValue(sections[sections.length - 1]?.arriveDateTime)
     }, sections.map((section) => {
-      const code = readStringValue(isRecord$6(section.flightInfo) ? section.flightInfo.airlineCode : void 0)?.toUpperCase();
+      const code = readStringValue(isRecord$7(section.flightInfo) ? section.flightInfo.airlineCode : void 0)?.toUpperCase();
       return code !== void 0 ? airlineNames[code] ?? code : void 0;
     }).filter((carrier) => carrier !== void 0));
   }
@@ -8262,17 +8405,17 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isSkyscannerPricingOptionMatchingBaggage(pricingOption, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return true;
-    const fareAttributes = isRecord$6(pricingOption.fareAttributes) ? pricingOption.fareAttributes : void 0;
-    const isIncluded = (baggage) => isRecord$6(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
+    const fareAttributes = isRecord$7(pricingOption.fareAttributes) ? pricingOption.fareAttributes : void 0;
+    const isIncluded = (baggage) => isRecord$7(baggage) && readStringValue(baggage.assessment) === "INCLUDED";
     if (flightMeta.includeCabinBag === true && !isIncluded(fareAttributes?.cabinBaggage)) return false;
     if (flightMeta.includeCheckedBag === true && !isIncluded(fareAttributes?.checkedBaggage)) return false;
     return true;
   }
   function readPanFlightsPackageRecord(item) {
-    return isRecord$6(item.package) ? item.package : void 0;
+    return isRecord$7(item.package) ? item.package : void 0;
   }
   function readPanFlightsRouteLegStopCount(route, dataKey) {
-    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
+    const legData = isRecord$7(route[dataKey]) ? route[dataKey] : void 0;
     const specs = Array.isArray(legData?.spec) ? legData.spec.filter(isString) : [];
     return specs.length > 0 ? Math.max(0, specs.length - 1) : void 0;
   }
@@ -8291,7 +8434,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function readPanFlightsBaggageFee(baggage, flightMeta) {
     if (flightMeta.includeCabinBag !== true && flightMeta.includeCheckedBag !== true) return 0;
-    if (!isRecord$6(baggage)) return void 0;
+    if (!isRecord$7(baggage)) return void 0;
     let feePerPassenger = 0;
     if (flightMeta.includeCabinBag === true) {
       const cabinFee = readNumberValue(baggage.bin);
@@ -8316,7 +8459,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return Number.isNaN(date.getTime()) ? void 0 : date.toISOString().slice(0, 10);
   }
   function readPanFlightsRouteLegDate(route, dataKey, timeKey, origin, destination) {
-    const legData = isRecord$6(route[dataKey]) ? route[dataKey] : void 0;
+    const legData = isRecord$7(route[dataKey]) ? route[dataKey] : void 0;
     const matches = (code, expected) => code !== void 0 && (typeof expected === "string" ? code === expected : expected.has(code));
     return matches(readStringValue(legData?.flyFrom)?.toUpperCase(), origin) && matches(readStringValue(legData?.flyTo)?.toUpperCase(), destination) ? formatPanFlightsEpochDate(readNumberValue(route[timeKey])) : void 0;
   }
@@ -8373,7 +8516,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const connections = readRecordArray(parseJsonValue(connectionsText ?? ""));
     const outbound = connections[0];
     const inbound = connections[1];
-    const readCode = (place) => readIataCodeValue(isRecord$6(place) ? place.code : void 0);
+    const readCode = (place) => readIataCodeValue(isRecord$7(place) ? place.code : void 0);
     const origin = readCode(outbound?.origin);
     const destination = readCode(outbound?.destination);
     const outboundDate = readIsoDateValue(outbound?.departureDate);
@@ -8383,7 +8526,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       return void 0;
     }
     const tagging = parseJsonValue(taggingText ?? "");
-    const flow = isRecord$6(tagging) && isRecord$6(tagging.flow) ? tagging.flow : void 0;
+    const flow = isRecord$7(tagging) && isRecord$7(tagging.flow) ? tagging.flow : void 0;
     if (flow === void 0 || readStringValue(flow.z_origin) !== origin || readStringValue(flow.z_destination) !== destination) return void 0;
     const cabinClass = readFlightCabinClassValue(flow.z_search_cabin_code ?? flow.z_cabin_code);
     return normalizeFlightSearchMeta({
@@ -8401,9 +8544,9 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function readAmadeusAirBoundsFlightSearchMeta(stateText) {
     const state = parseJsonValue(stateText ?? "");
-    if (!isRecord$6(state) || !isRecord$6(state.entities)) return void 0;
+    if (!isRecord$7(state) || !isRecord$7(state.entities)) return void 0;
     const selectedId = readStringValue(state.selectedAirBoundsSearchId);
-    const search = selectedId !== void 0 && isRecord$6(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
+    const search = selectedId !== void 0 && isRecord$7(state.entities[selectedId]) ? state.entities[selectedId] : void 0;
     if (search === void 0) return void 0;
     const itineraries = readRecordArray(search.itineraries);
     const outbound = itineraries[0];
@@ -8629,14 +8772,14 @@ query SearchSuggestions($query: String!, $category: Int) {
   };
   function buildKiwiFlightSearchUrl(flightMeta, sortMode = "best") {
     const { dateFlex } = flightMeta;
-    const formatDate = (date, before = 0, after = 0) => {
+    const formatDate2 = (date, before = 0, after = 0) => {
       return before === 0 && after === 0 ? date : `${shiftFlightDateNotBeforeToday(date, -before)}_${shiftFlightDateNotBeforeToday(date, after)}`;
     };
     const pathParts = [
       flightMeta.origin,
       flightMeta.destination,
-      formatDate(flightMeta.outboundDate, dateFlex?.outboundBefore, dateFlex?.outboundAfter),
-      flightMeta.inboundDate !== void 0 ? formatDate(flightMeta.inboundDate, dateFlex?.inboundBefore, dateFlex?.inboundAfter) : "no-return"
+      formatDate2(flightMeta.outboundDate, dateFlex?.outboundBefore, dateFlex?.outboundAfter),
+      flightMeta.inboundDate !== void 0 ? formatDate2(flightMeta.inboundDate, dateFlex?.inboundBefore, dateFlex?.inboundAfter) : "no-return"
     ];
     const params = new URLSearchParams({
       adults: String(flightMeta.adults),
@@ -8689,14 +8832,14 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function buildMomondoFlightSearchUrl(flightMeta, sortMode = "best") {
     const { dateFlex } = flightMeta;
-    const formatDate = (date, flexDays) => {
+    const formatDate2 = (date, flexDays) => {
       if (flexDays === 0) return date;
       return `${date}-flexible-${flexDays}${flexDays === 1 ? "day" : "days"}`;
     };
     const pathParts = [
       `${flightMeta.origin}-${flightMeta.destination}`,
-      formatDate(flightMeta.outboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter) : 0),
-      flightMeta.inboundDate !== void 0 ? formatDate(flightMeta.inboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0) : void 0,
+      formatDate2(flightMeta.outboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.outboundBefore, dateFlex.outboundAfter) : 0),
+      flightMeta.inboundDate !== void 0 ? formatDate2(flightMeta.inboundDate, dateFlex !== void 0 ? readMomondoFlightFlexDays(dateFlex.inboundBefore, dateFlex.inboundAfter) : 0) : void 0,
       ...buildMomondoPassengerPathParts(flightMeta),
       flightMeta.cabinClass !== void 0 && flightMeta.cabinClass !== "economy" ? flightMeta.cabinClass : void 0
     ].filter((part) => part !== void 0);
@@ -8770,9 +8913,9 @@ query SearchSuggestions($query: String!, $category: Int) {
     return `${KIWI_GRAPHQL_URL}?${params.toString()}`;
   }
   function readKiwiPlaces(value, placeType) {
-    const places = isRecord$6(value) && isRecord$6(value.data) && isRecord$6(value.data.places) ? value.data.places : void 0;
+    const places = isRecord$7(value) && isRecord$7(value.data) && isRecord$7(value.data.places) ? value.data.places : void 0;
     return readRecordArray(places?.edges).flatMap((edge) => {
-      const node = isRecord$6(edge.node) ? edge.node : void 0;
+      const node = isRecord$7(edge.node) ? edge.node : void 0;
       const id = readStringValue(node?.id);
       const slug = readStringValue(node?.slug);
       const code = readStringValue(placeType === "AIRPORT" ? node?.legacyId : node?.code);
@@ -8846,16 +8989,16 @@ query SearchSuggestions($query: String!, $category: Int) {
     };
   }
   function readKiwiItineraries(value, flightMeta, airports) {
-    const data = isRecord$6(value) && isRecord$6(value.data) ? value.data : void 0;
-    const result = isRecord$6(data?.returnItineraries) ? data.returnItineraries : isRecord$6(data?.onewayItineraries) ? data.onewayItineraries : void 0;
+    const data = isRecord$7(value) && isRecord$7(value.data) ? value.data : void 0;
+    const result = isRecord$7(data?.returnItineraries) ? data.returnItineraries : isRecord$7(data?.onewayItineraries) ? data.onewayItineraries : void 0;
     if (result === void 0) {
-      const errors = isRecord$6(value) && Array.isArray(value.errors) ? value.errors.map((error) => isRecord$6(error) ? readStringValue(error.message) : void 0).filter(Boolean).join("; ") : "";
+      const errors = isRecord$7(value) && Array.isArray(value.errors) ? value.errors.map((error) => isRecord$7(error) ? readStringValue(error.message) : void 0).filter(Boolean).join("; ") : "";
       throw new Error(`Kiwi: uventet svar${errors !== "" ? ` (${errors})` : ""}`);
     }
     if (result.__typename === "AppError") throw new Error(`Kiwi: ${readStringValue(result.error) ?? "AppError"}`);
-    const metadata = isRecord$6(result.metadata) ? result.metadata : void 0;
-    const topResults = isRecord$6(metadata?.topResults) ? metadata.topResults : void 0;
-    const read = (item) => isRecord$6(item) ? readKiwiItinerary(item, flightMeta, airports) : void 0;
+    const metadata = isRecord$7(result.metadata) ? result.metadata : void 0;
+    const topResults = isRecord$7(metadata?.topResults) ? metadata.topResults : void 0;
+    const read = (item) => isRecord$7(item) ? readKiwiItinerary(item, flightMeta, airports) : void 0;
     const top = {};
     for (const mode of ["best", "cheapest", "fastest"]) {
       const itinerary = read(topResults?.[mode]);
@@ -8866,17 +9009,17 @@ query SearchSuggestions($query: String!, $category: Int) {
     return { itineraries, top, hasMorePending: metadata?.hasMorePending === true };
   }
   function readKiwiSector(sector) {
-    if (!isRecord$6(sector)) return void 0;
-    const segments = readRecordArray(sector.sectorSegments).map((item) => isRecord$6(item.segment) ? item.segment : void 0).filter((segment) => segment !== void 0);
+    if (!isRecord$7(sector)) return void 0;
+    const segments = readRecordArray(sector.sectorSegments).map((item) => isRecord$7(item.segment) ? item.segment : void 0).filter((segment) => segment !== void 0);
     if (segments.length === 0) return void 0;
-    const station = (end) => isRecord$6(end) && isRecord$6(end.station) ? readStringValue(end.station.code)?.toUpperCase() : void 0;
-    const localTime = (end) => isRecord$6(end) ? readStringValue(end.localTime) : void 0;
+    const station = (end) => isRecord$7(end) && isRecord$7(end.station) ? readStringValue(end.station.code)?.toUpperCase() : void 0;
+    const localTime = (end) => isRecord$7(end) ? readStringValue(end.localTime) : void 0;
     const airports = segments.map((segment) => ({ origin: station(segment.source), destination: station(segment.destination) }));
     const technicalStops = segments.filter((segment) => segment.followingTechnicalStop === true).length;
     const stopCount = segments.length - 1 + technicalStops;
     const seconds = typeof sector.duration === "number" && Number.isFinite(sector.duration) ? sector.duration : void 0;
     const minutes = seconds !== void 0 && seconds > 0 ? Math.round(seconds / 60) : void 0;
-    const carriers = segments.map((segment) => isRecord$6(segment.carrier) ? readStringValue(segment.carrier.name) : void 0).filter((carrier) => carrier !== void 0);
+    const carriers = segments.map((segment) => isRecord$7(segment.carrier) ? readStringValue(segment.carrier.name) : void 0).filter((carrier) => carrier !== void 0);
     const departureTime = localTime(segments[0]?.source);
     const leg = buildFlightLegDetails({
       durationMinutes: minutes,
@@ -8897,7 +9040,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function readKiwiItinerary(item, flightMeta, airports) {
     const id = readStringValue(item.id);
-    const price = isRecord$6(item.price) ? item.price : void 0;
+    const price = isRecord$7(item.price) ? item.price : void 0;
     const amount = Number(readStringValue(price?.amount));
     if (id === void 0 || !Number.isFinite(amount) || amount <= 0) return void 0;
     const roundTrip = flightMeta.inboundDate !== void 0;
@@ -19823,6 +19966,10 @@ ${darkProviderCss}
       background: #ffffff;
       color: #162333;
     }
+    .provider-etilbudsavis {
+      background: #ffffff;
+      color: #1f2937;
+    }
     .provider-kassal {
       background: #c8103a;
       color: #ffffff;
@@ -20344,6 +20491,7 @@ ${darkProviderCss}
     .comparison-tooltip-option > strong { color: var(--cbn-text); white-space: nowrap; }
     .comparison-tooltip-option--best > strong { color: var(--cbn-accent); }
     .comparison-tooltip-option > .price-match-chip-line { grid-column: 1 / -1; }
+    .comparison-tooltip-option > .price-match-offer-image { grid-column: 1 / -1; max-width: 100%; max-height: 140px; object-fit: contain; border-radius: 6px; background: #fff; justify-self: start; }
     .comparison-tooltip-option .price-match-info-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
     .electricity-tooltip-plan > .price-match-chip-line, .electricity-tooltip-terms { grid-column: 1 / -1; }
     .price-match-subheading { color: var(--cbn-muted); font-size: 11px; font-weight: 700; margin: 14px 0 4px; }
@@ -22034,12 +22182,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const chips = buildProductPriceMatchChips({ ...alternative, shopName: "" });
       row.append(name, price);
       if (chips.childElementCount) row.append(chips);
+      if (alternative.imageUrl !== void 0) row.append(buildPriceMatchOfferImage(alternative.imageUrl, alternative.productName ?? offer.productName));
       tooltip.append(row);
     });
     if (offer.details) {
       const details = createTooltipSection(offer.details);
       if (details) tooltip.append(details);
     }
+  }
+  function buildPriceMatchOfferImage(imageUrl, alt) {
+    const image = document.createElement("img");
+    image.className = "price-match-offer-image";
+    image.src = imageUrl;
+    image.alt = alt;
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => image.remove(), { once: true });
+    return image;
   }
   function buildMobilePriceMatchChips(m, supplier, actualAllowance = false) {
     return buildPriceMatchInfoChips([
@@ -22350,13 +22509,16 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return isRecord(value) && typeof value.planName === "string" && (value.formattedPrice === void 0 || typeof value.formattedPrice === "string") && (value.formattedNok === void 0 || typeof value.formattedNok === "string") && (value.unavailableReason === void 0 || typeof value.unavailableReason === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "etilbudsavis" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && isOptionalHttpsImageUrl(value.imageUrl) && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+  }
+  function isOptionalHttpsImageUrl(value) {
+    return value === void 0 || typeof value === "string" && value.startsWith("https://") && value.length <= 2048;
   }
   function isFlightLegDetails(value) {
     return isRecord(value) && (value.durationMinutes === void 0 || typeof value.durationMinutes === "number") && (value.stopCount === void 0 || typeof value.stopCount === "number") && (value.route === void 0 || typeof value.route === "string") && (value.carriers === void 0 || Array.isArray(value.carriers) && value.carriers.every((carrier) => typeof carrier === "string")) && (value.timeRange === void 0 || typeof value.timeRange === "string");
   }
   function isPriceMatchAlternative(value) {
-    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.productName === void 0 || typeof value.productName === "string") && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.productName === void 0 || typeof value.productName === "string") && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && isOptionalHttpsImageUrl(value.imageUrl) && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && (value.platform === void 0 || typeof value.platform === "string") && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.shippingPrice === void 0 || typeof value.shippingPrice === "string") && (value.totalPrice === void 0 || typeof value.totalPrice === "string");
   }
   function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -22811,6 +22973,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (priceMatch.source === "sesum") return "sesum";
     if (priceMatch.source === "enhver") return "enhver";
     if (priceMatch.source === "kassal") return "kassal";
+    if (priceMatch.source === "etilbudsavis") return "etilbudsavis";
     if (priceMatch.source === "finnreise") return "finnreise";
     if (priceMatch.source === "panflights") return "panflights";
     if (priceMatch.source === "momondo") return "momondo";
@@ -22837,6 +23000,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (priceMatch.source === "sesum") return "SeSum";
     if (priceMatch.source === "enhver") return "enhver";
     if (priceMatch.source === "kassal") return "Kassalapp";
+    if (priceMatch.source === "etilbudsavis") return "eTilbudsavis";
     if (priceMatch.source === "finnreise") return "FINN";
     if (priceMatch.source === "panflights") return "PanFlights";
     if (priceMatch.source === "momondo") return "momondo";

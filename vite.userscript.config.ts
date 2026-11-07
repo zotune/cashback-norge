@@ -78,6 +78,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      typeb.panflights.com
 // @connect      panflights.com
 // @connect      api.skypicker.com
+// @connect      squid-api.tjek.com
 // @run-at       document-idle
 // @updateURL    ${PAGES_URL}/cashback-varsler.user.js
 // @downloadURL  ${PAGES_URL}/cashback-varsler.user.js

@@ -1,0 +1,598 @@
+{
+ "Mills kaviar": [
+  {
+   "id": "x88aJmIeKMBzU6YbGp42i",
+   "heading": "MILLS KAVIAR TUBE",
+   "description": "185 g. Pr stk. Pr kg 162,16\nFørpris 37,90",
+   "pricing": {
+    "price": 30,
+    "pre_price": 37.9,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 185,
+     "to": 185
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-10-25T23:00:00+0000",
+   "run_till": "2026-11-08T22:59:59+0000",
+   "dealer": {
+    "name": "Coop Prix"
+   },
+   "branding": {
+    "name": "Coop Prix"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FoCD0FSvr%2Fp-replacement-dY02OgpT-7.webp&w=300&x1r=0.02&x2r=0.52&y1r=0.48&y2r=0.73&s=8b9aa1d51600b8b23f2e20e395c36e38",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FoCD0FSvr%2Fp-replacement-dY02OgpT-7.webp&w=600&x1r=0.02&x2r=0.52&y1r=0.48&y2r=0.73&s=618ac6b05c8e50b7fd48951098ebb691",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FoCD0FSvr%2Fp-replacement-dY02OgpT-7.webp&w=1000&x1r=0.02&x2r=0.52&y1r=0.48&y2r=0.73&s=9c6478677968b21b7260e15da7d97f7b"
+   }
+  },
+  {
+   "id": "7IEpQ0dgPphFfwqHAEfWB",
+   "heading": "Kronemarked",
+   "description": "",
+   "pricing": {
+    "price": 30,
+    "pre_price": null,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "pcs",
+     "si": {
+      "symbol": "pcs",
+      "factor": 1
+     }
+    },
+    "size": {
+     "from": 1,
+     "to": 1
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-10-25T23:00:00+0000",
+   "run_till": "2026-11-08T22:59:59+0000",
+   "dealer": {
+    "name": "Coop Prix"
+   },
+   "branding": {
+    "name": "Coop Prix"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FoCD0FSvr%2Fp-replacement-dY02OgpT-2.webp&w=300&x1r=0.03&x2r=0.978&y1r=0.72&y2r=0.978&s=74162148da0d2ae89e0bc427e38d7375",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FoCD0FSvr%2Fp-replacement-dY02OgpT-2.webp&w=600&x1r=0.03&x2r=0.978&y1r=0.72&y2r=0.978&s=fa596186bd57ae96c75af1934229342f",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FoCD0FSvr%2Fp-replacement-dY02OgpT-2.webp&w=1000&x1r=0.03&x2r=0.978&y1r=0.72&y2r=0.978&s=14d96b68dd99276c135ec3308a132fde"
+   }
+  }
+ ],
+ "Grandiosa": [
+  {
+   "id": "vf4a9uixTQcfe3gFUBIBk",
+   "heading": "Grandiosa pizza",
+   "description": "et utvalg, 430–575 g\nEnh.pris 104,17–139,30 pr. kg Førpris 79,90–93,90",
+   "pricing": {
+    "price": 59.9,
+    "pre_price": null,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 430,
+     "to": 575
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-10-31T23:00:00+0000",
+   "run_till": "2026-11-30T22:59:59+0000",
+   "dealer": {
+    "name": "Nærbutikken"
+   },
+   "branding": {
+    "name": "Nærbutikken"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F6nMME2k5%2Fp-1.webp&w=300&x1r=0.74&x2r=0.97&y1r=0.702&y2r=0.958&s=db0753b96ce35f9d6bf2c54a8b4239bd",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F6nMME2k5%2Fp-1.webp&w=600&x1r=0.74&x2r=0.97&y1r=0.702&y2r=0.958&s=097f2dbb950f1a58fd74a03ec56f9008",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F6nMME2k5%2Fp-1.webp&w=1000&x1r=0.74&x2r=0.97&y1r=0.702&y2r=0.958&s=d6004d8509c6c9abf0a2473f71d4db69"
+   }
+  },
+  {
+   "id": "Jj-1_bWCU7rndWJozBMnO",
+   "heading": "PAN PIZZA",
+   "description": "Grandiosa. 490-575 g. Fryst. Flera olika sorter. Jfr pris 68:70-80:61/kg.",
+   "pricing": {
+    "price": 79,
+    "pre_price": null,
+    "currency": "SEK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 490,
+     "to": 575
+    },
+    "pieces": {
+     "from": 2,
+     "to": 2,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-01T23:00:00+0000",
+   "run_till": "2026-11-08T22:59:59+0000",
+   "dealer": {
+    "name": "ICA Maxi Stormarknad"
+   },
+   "branding": {
+    "name": "ICA Maxi Stormarknad"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F97RsaPLr%2Fp-8.webp&w=300&x1r=0.67&x2r=0.96&y1r=0.03&y2r=0.34&s=23cce392c43b0714aac0cd4a24c59f75",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F97RsaPLr%2Fp-8.webp&w=600&x1r=0.67&x2r=0.96&y1r=0.03&y2r=0.34&s=a78d961c3c924e634fc7f3e2d1305daa",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F97RsaPLr%2Fp-8.webp&w=1000&x1r=0.67&x2r=0.96&y1r=0.03&y2r=0.34&s=7c44ae66600247219a7f573a80cdc941"
+   }
+  },
+  {
+   "id": "JKwpCXvsGw2J-2XQxGYVg",
+   "heading": "GRANDIOSA Pizza",
+   "description": "Lägsta 30-dgrs pris: 36.90 Välj mellan olika sorter 350 g Jfr 88,29 kr/kg",
+   "pricing": {
+    "price": 30.9,
+    "pre_price": 36.9,
+    "currency": "SEK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 350,
+     "to": 350
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-11T23:00:00+0000",
+   "run_till": "2026-11-15T22:59:59+0000",
+   "dealer": {
+    "name": "Lidl"
+   },
+   "branding": {
+    "name": "Lidl"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FvFlSR_sI%2Fp-replacement-RrseBdbG-28.webp&w=300&x1r=0.08&x2r=0.65&y1r=0.05&y2r=0.485&s=e59fba2407866be144d0fdbffab48f15",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FvFlSR_sI%2Fp-replacement-RrseBdbG-28.webp&w=600&x1r=0.08&x2r=0.65&y1r=0.05&y2r=0.485&s=440293874a6a571b9424e0200a86e76a",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FvFlSR_sI%2Fp-replacement-RrseBdbG-28.webp&w=1000&x1r=0.08&x2r=0.65&y1r=0.05&y2r=0.485&s=143d03d83d3bad1b7d6feb133e213a2f"
+   }
+  },
+  {
+   "id": "RAr_OYbLZOKHSmEGvPT2F",
+   "heading": "Grandiosa kiviuunipizzat 310-350 g ",
+   "description": "8,54-9,65/kg   Ilman Plussa-korttia 3,59/pkt (10,26-11,58/kg)",
+   "pricing": {
+    "price": 2.99,
+    "pre_price": null,
+    "currency": "EUR"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 310,
+     "to": 350
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-01T22:00:00+0000",
+   "run_till": "2026-11-29T21:59:59+0000",
+   "dealer": {
+    "name": "K-Market"
+   },
+   "branding": {
+    "name": "K-Market"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2Fbusiness_images%2F9c56Y8%2Fec697ae5d3779bb222a83fdf2c0147c4&w=300&s=839e0db8ff4fdc6377fbd6195adb4cbb",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2Fbusiness_images%2F9c56Y8%2Fec697ae5d3779bb222a83fdf2c0147c4&w=600&s=f5b596eae9e5561917859bfcc514fdd2",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2Fbusiness_images%2F9c56Y8%2Fec697ae5d3779bb222a83fdf2c0147c4&w=1000&s=c01e478db001448748a4d3e830cb0dce"
+   }
+  },
+  {
+   "id": "kWAO-IOj7tKm6Yip0UnAm",
+   "heading": "Grandiosa BigOne pakastepitsat",
+   "description": "MARRASKUUN S-MOBIILIETU\n565-590 g\n(5,07-5,29/kg)\n(norm. 6,09-6,65)\nVoimassa 1.–30.11.2026 PKO:n S-marketeissa, Saloissa ja Prismoissa 1 etu/kk/S-mobiilikäyttäjä. Valikoima vaihtelee myymälöittäin. Ei voi vaihtaa rahaksi.",
+   "pricing": {
+    "price": 2.99,
+    "pre_price": null,
+    "currency": "EUR"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 565,
+     "to": 590
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-10-31T22:00:00+0000",
+   "run_till": "2026-11-30T21:59:59+0000",
+   "dealer": {
+    "name": "S-market"
+   },
+   "branding": {
+    "name": "S-market"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F6ceolwXv%2Fp-1.webp&w=300&x1r=0.254&x2r=0.546&y1r=0.849&y2r=0.992&s=74a17694e7e49fba4f81973740cf0c7a",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F6ceolwXv%2Fp-1.webp&w=600&x1r=0.254&x2r=0.546&y1r=0.849&y2r=0.992&s=9d0e9c0bde5f0f8e7c69d5dd14bae22d",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2F6ceolwXv%2Fp-1.webp&w=1000&x1r=0.254&x2r=0.546&y1r=0.849&y2r=0.992&s=b51f7f55c6e8d0a6dda08c1b918c3c42"
+   }
+  },
+  {
+   "id": "tEzvRqMNK8BsIMAgUqa8-",
+   "heading": "Grandiosa KIVIUUNIPIZZAT",
+   "description": "310-350 g (8,54-9,65/kg)\nStenugnspizzor\nIlman Plussa-korttia/Utan Plussa-kort 3,59 pkt (10,26-11,58/kg)\nVoimassa/Gäller 2.–29.11.2026\nVoita pidennetty Grandiosa Pizzaperjantai\nVinn en förlängd Grandiosa Pizzafredag\nOSTA GRANDIOSA-KIVIUUNIPIZZA JA VOITA PITKÄ VIIKONLOPPU LUKSUSMÖKISSÄ LEVILLÄ, HIMOKSELLA TAI VIERUMÄELLÄ! PALKINNON ARVO 3500 €.\nKun ostat Grandiosa-kiviuunipizzan 2.–29.11.2026 K-ruokakaupoista ja käytät Plussa-korttia oston yhteydessä, olet mukana unelmien mökkiviikonlopun arvonnassa. Palkintoja arvotaan yksi. Lisätiedot ja säännöt / Tilläggsuppgifter och regler: k-ruoka.fi/grandiosa",
+   "pricing": {
+    "price": 3.59,
+    "pre_price": null,
+    "currency": "EUR"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 310,
+     "to": 350
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-01T22:00:00+0000",
+   "run_till": "2026-11-29T21:59:59+0000",
+   "dealer": {
+    "name": "K-Supermarket"
+   },
+   "branding": {
+    "name": "K-Supermarket"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FXbI858i9%2Fp-4.webp&w=300&x1r=0.04&x2r=0.96&y1r=0.44&y2r=0.62&s=c77b9aaf3f7c7536f188ad0f6dd71dc9",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FXbI858i9%2Fp-4.webp&w=600&x1r=0.04&x2r=0.96&y1r=0.44&y2r=0.62&s=2ceccb0d08660327f73c649871307cba",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FXbI858i9%2Fp-4.webp&w=1000&x1r=0.04&x2r=0.96&y1r=0.44&y2r=0.62&s=a8ff961f21894e8fbb32887213687870"
+   }
+  },
+  {
+   "id": "KJZgCPG7Foea1WrMu-GbZ",
+   "heading": "FULL PAKKE",
+   "description": "Orkla foods norge, 555 g, 71,89 pr. kg",
+   "pricing": {
+    "price": 39.9,
+    "pre_price": null,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 555,
+     "to": 555
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-04T23:00:00+0000",
+   "run_till": "2026-11-07T22:59:59+0000",
+   "dealer": {
+    "name": "REMA 1000"
+   },
+   "branding": {
+    "name": "REMA 1000"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-20.webp&w=300&x1r=0.232&x2r=0.768&y1r=0.49&y2r=0.93&s=9bc6fd96bd6d6a0cdaea496dd66b47a9",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-20.webp&w=600&x1r=0.232&x2r=0.768&y1r=0.49&y2r=0.93&s=514890ac2e31a558066c9eaa880ab981",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-20.webp&w=1000&x1r=0.232&x2r=0.768&y1r=0.49&y2r=0.93&s=b8ef4b8d6ad5241a56e1b7f001a2b4ec"
+   }
+  },
+  {
+   "id": "OMnehgLY19J1DTsQ_S8D-",
+   "heading": "Pizza",
+   "description": "Grandiosa. Fryst. Välj mellan olika sorter. 310-350 g.",
+   "pricing": {
+    "price": 99,
+    "pre_price": null,
+    "currency": "SEK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 310,
+     "to": 350
+    },
+    "pieces": {
+     "from": 3,
+     "to": 3,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-01T23:00:00+0000",
+   "run_till": "2026-11-08T22:59:59+0000",
+   "dealer": {
+    "name": "Coop"
+   },
+   "branding": {
+    "name": "Coop"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FOmB8DB5j%2Fp-1.webp&w=300&x1r=0.65&x2r=0.95&y1r=0.38&y2r=0.725&s=6cd9185e6eadb1c7994d5b7076ec9377",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FOmB8DB5j%2Fp-1.webp&w=600&x1r=0.65&x2r=0.95&y1r=0.38&y2r=0.725&s=69f976048968a2228c7b9c18978dc2ab",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FOmB8DB5j%2Fp-1.webp&w=1000&x1r=0.65&x2r=0.95&y1r=0.38&y2r=0.725&s=4be50e9ca94da02bf45b093560b050bc"
+   }
+  }
+ ],
+ "Friele": [
+  {
+   "id": "ww4hq5LScBtDRj1NGbDPo",
+   "heading": "FRIELE MØRKBRENT/BRYGGEN",
+   "description": "Jacob Douwe Egberts, 500 g, 199,80 pr. kg",
+   "pricing": {
+    "price": 99.9,
+    "pre_price": null,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 500,
+     "to": 500
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-04T23:00:00+0000",
+   "run_till": "2026-11-07T22:59:59+0000",
+   "dealer": {
+    "name": "REMA 1000"
+   },
+   "branding": {
+    "name": "REMA 1000"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=300&x1r=0.42&x2r=0.83&y1r=0.74&y2r=0.93&s=8d0390dacf69df7a5bc9af605b3cedfd",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=600&x1r=0.42&x2r=0.83&y1r=0.74&y2r=0.93&s=a685c1ad810e90466a1c283080ff8875",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=1000&x1r=0.42&x2r=0.83&y1r=0.74&y2r=0.93&s=3ad342cc6317229aa57ad4b5fc1b9cf5"
+   }
+  },
+  {
+   "id": "CB408EfpW8eebzWHP0HA2",
+   "heading": "FRIELE INSTANT",
+   "description": "Jacobs douwe egberts norge, 200 g, 399,50 pr. kg",
+   "pricing": {
+    "price": 79.9,
+    "pre_price": 119.9,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 200,
+     "to": 200
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-04T23:00:00+0000",
+   "run_till": "2026-11-07T22:59:59+0000",
+   "dealer": {
+    "name": "REMA 1000"
+   },
+   "branding": {
+    "name": "REMA 1000"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=300&x1r=0.69&x2r=0.98&y1r=0.49&y2r=0.74&s=9b19fc532910051e9898a87d799312fe",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=600&x1r=0.69&x2r=0.98&y1r=0.49&y2r=0.74&s=6d9750ff55512c124cfff3e3545e747d",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=1000&x1r=0.69&x2r=0.98&y1r=0.49&y2r=0.74&s=99f0f8257e4a5c8b94e45cbcd443eb45"
+   }
+  },
+  {
+   "id": "ZaXLaqTrSsBObXylufLF0",
+   "heading": "FRIELE INSTANT REFIL",
+   "description": "Jacob Douwe Egbertsl, 150 g, 399,33 pr. kg",
+   "pricing": {
+    "price": 59.9,
+    "pre_price": 87.4,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "g",
+     "si": {
+      "symbol": "kg",
+      "factor": 0.001
+     }
+    },
+    "size": {
+     "from": 150,
+     "to": 150
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-04T23:00:00+0000",
+   "run_till": "2026-11-07T22:59:59+0000",
+   "dealer": {
+    "name": "REMA 1000"
+   },
+   "branding": {
+    "name": "REMA 1000"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=300&x1r=0.37&x2r=0.66&y1r=0.49&y2r=0.74&s=8e58c94218867784dc4d8d4e5af105db",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=600&x1r=0.37&x2r=0.66&y1r=0.49&y2r=0.74&s=e79dad6e687b57ba54ee61e7b46891a5",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-19.webp&w=1000&x1r=0.37&x2r=0.66&y1r=0.49&y2r=0.74&s=d0d37ac9c95146f7b149f9b38e341b02"
+   }
+  }
+ ],
+ "Tine Lettmelk": [
+  {
+   "id": "4HoBE8vGD4xbg_joZrYh7",
+   "heading": "TINE LETTMELK 1%",
+   "description": "Tine, 1,75 l, 18,23 pr. l",
+   "pricing": {
+    "price": 31.9,
+    "pre_price": null,
+    "currency": "NOK"
+   },
+   "quantity": {
+    "unit": {
+     "symbol": "l",
+     "si": {
+      "symbol": "l",
+      "factor": 1
+     }
+    },
+    "size": {
+     "from": 1.75,
+     "to": 1.75
+    },
+    "pieces": {
+     "from": 1,
+     "to": 1,
+     "min": null,
+     "max": null
+    }
+   },
+   "run_from": "2026-11-04T23:00:00+0000",
+   "run_till": "2026-11-07T22:59:59+0000",
+   "dealer": {
+    "name": "REMA 1000"
+   },
+   "branding": {
+    "name": "REMA 1000"
+   },
+   "images": {
+    "thumb": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-14.webp&w=300&x1r=0.4&x2r=0.68&y1r=0.74&y2r=0.93&s=7038c0934c3220940549c08ab0aaca59",
+    "view": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-14.webp&w=600&x1r=0.4&x2r=0.68&y1r=0.74&y2r=0.93&s=4e8b047ebca977fea12c2d488e68f39b",
+    "zoom": "https://image-transformer-api.tjek.com/?u=s3%3A%2F%2Fsgn-prd-assets%2Fuploads%2FnYSzFXW9%2Fp-14.webp&w=1000&x1r=0.4&x2r=0.68&y1r=0.74&y2r=0.93&s=533b6ac9962d65b0a7aa13efdb279070"
+   }
+  }
+ ]
+}

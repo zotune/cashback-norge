@@ -389,7 +389,7 @@ type PriceMatchOffer = {
   mobileBroadband?: PriceMatchAlternative;
   electricity?: ElectricityPriceDetails;
   mobile?: MobilePriceDetails;
-  source?: "tek" | "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
+  source?: "tek" | "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "etilbudsavis" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -402,6 +402,7 @@ type PriceMatchOffer = {
   productName: string;
   productUrl: string;
   offerUrl?: string;
+  imageUrl?: string;
   durationText?: string;
   // Én oppføring per etappe (tur, retur) med reisetid, stopp, rute, flyselskap og tider.
   flightLegs?: FlightLegDetails[];
@@ -421,6 +422,7 @@ type PriceMatchAlternative = {
   mobile?: MobilePriceDetails;
   productName?: string;
   offerUrl?: string;
+  imageUrl?: string;
   matchedCurrentMerchant?: boolean;
   shopName: string;
   price: string;
@@ -12161,6 +12163,10 @@ function renderNotice(
       background: #ffffff;
       color: #162333;
     }
+    .provider-etilbudsavis {
+      background: #ffffff;
+      color: #1f2937;
+    }
     .provider-kassal {
       background: #c8103a;
       color: #ffffff;
@@ -12682,6 +12688,7 @@ function renderNotice(
     .comparison-tooltip-option > strong { color: var(--cbn-text); white-space: nowrap; }
     .comparison-tooltip-option--best > strong { color: var(--cbn-accent); }
     .comparison-tooltip-option > .price-match-chip-line { grid-column: 1 / -1; }
+    .comparison-tooltip-option > .price-match-offer-image { grid-column: 1 / -1; max-width: 100%; max-height: 140px; object-fit: contain; border-radius: 6px; background: #fff; justify-self: start; }
     .comparison-tooltip-option .price-match-info-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
     .electricity-tooltip-plan > .price-match-chip-line, .electricity-tooltip-terms { grid-column: 1 / -1; }
     .price-match-subheading { color: var(--cbn-muted); font-size: 11px; font-weight: 700; margin: 14px 0 4px; }
@@ -14423,12 +14430,25 @@ function buildProductPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOf
     const chips = buildProductPriceMatchChips({ ...alternative, shopName: "" });
     row.append(name, price);
     if (chips.childElementCount) row.append(chips);
+    if (alternative.imageUrl !== undefined) row.append(buildPriceMatchOfferImage(alternative.imageUrl, alternative.productName ?? offer.productName));
     tooltip.append(row);
   });
   if (offer.details) {
     const details = createTooltipSection(offer.details);
     if (details) tooltip.append(details);
   }
+}
+
+// Utklipp av tilbudet (kundeaviser). Blokkerer siden bildet (CSP), skjules det i stedet for et brutt bilde.
+function buildPriceMatchOfferImage(imageUrl: string, alt: string): HTMLImageElement {
+  const image = document.createElement("img");
+  image.className = "price-match-offer-image";
+  image.src = imageUrl;
+  image.alt = alt;
+  image.loading = "lazy";
+  image.referrerPolicy = "no-referrer";
+  image.addEventListener("error", () => image.remove(), { once: true });
+  return image;
 }
 
 function buildMobilePriceMatchChips(m: MobilePriceDetails, supplier: string, actualAllowance = false): HTMLElement {
@@ -14807,7 +14827,7 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     (value.electricity === undefined || isElectricityPriceDetails(value.electricity)) &&
     (value.mobile === undefined || isMobilePriceDetails(value.mobile)) &&
     (value.mobileBroadband === undefined || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") &&
-    (value.source === undefined || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
+    (value.source === undefined || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "etilbudsavis" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") &&
     (value.sourceName === undefined || typeof value.sourceName === "string") &&
     (value.details === undefined || typeof value.details === "string") &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
@@ -14820,10 +14840,14 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     typeof value.productName === "string" &&
     typeof value.productUrl === "string" &&
     (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
+    isOptionalHttpsImageUrl(value.imageUrl) &&
     (value.durationText === undefined || typeof value.durationText === "string") &&
     (value.flightLegs === undefined || (Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails))) &&
     (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)))
   );
+}
+function isOptionalHttpsImageUrl(value: unknown): boolean {
+  return value === undefined || (typeof value === "string" && value.startsWith("https://") && value.length <= 2048);
 }
 function isFlightLegDetails(value: unknown): value is FlightLegDetails {
   return (
@@ -14842,6 +14866,7 @@ function isPriceMatchAlternative(value: unknown): value is PriceMatchAlternative
     (value.mobile === undefined || isMobilePriceDetails(value.mobile)) &&
     (value.productName === undefined || typeof value.productName === "string") &&
     (value.offerUrl === undefined || typeof value.offerUrl === "string") &&
+    isOptionalHttpsImageUrl(value.imageUrl) &&
     (value.matchedCurrentMerchant === undefined || typeof value.matchedCurrentMerchant === "boolean") &&
     typeof value.shopName === "string" &&
     typeof value.price === "string" &&
@@ -15409,6 +15434,7 @@ function getPriceMatchProviderClass(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "sesum") return "sesum";
   if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "kassal") return "kassal";
+  if (priceMatch.source === "etilbudsavis") return "etilbudsavis";
   if (priceMatch.source === "finnreise") return "finnreise";
   if (priceMatch.source === "panflights") return "panflights";
   if (priceMatch.source === "momondo") return "momondo";
@@ -15435,6 +15461,7 @@ function getPriceMatchSourceName(priceMatch: PriceMatchOffer): string {
   if (priceMatch.source === "sesum") return "SeSum";
   if (priceMatch.source === "enhver") return "enhver";
   if (priceMatch.source === "kassal") return "Kassalapp";
+  if (priceMatch.source === "etilbudsavis") return "eTilbudsavis";
   if (priceMatch.source === "finnreise") return "FINN";
   if (priceMatch.source === "panflights") return "PanFlights";
   if (priceMatch.source === "momondo") return "momondo";

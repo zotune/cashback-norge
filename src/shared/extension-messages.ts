@@ -87,7 +87,7 @@ export type PriceMatchOffer = {
   electricity?: ElectricityPriceDetails;
   mobile?: MobilePriceDetails;
   mobileBroadband?: PriceMatchAlternative;
-  source?: "tek" | "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
+  source?: "tek" | "forbrukerradet" | "prisjakt" | "godpris" | "pokepris" | "klarna" | "prisradar" | "isthereanydeal" | "ggdeals" | "allkeyshop" | "taxfree" | "vinmonopolet" | "sesum" | "enhver" | "kassal" | "etilbudsavis" | "finnreise" | "panflights" | "momondo" | "skyscanner" | "travellink" | "tripcom" | "kiwi" | "googleflights" | "googleshopping";
   sourceName?: string;
   details?: string;
   matchedCurrentMerchant?: boolean;
@@ -100,6 +100,8 @@ export type PriceMatchOffer = {
   productName: string;
   productUrl: string;
   offerUrl?: string;
+  // Bilde av tilbudet (f.eks. utklipp fra kundeavisen), bare https.
+  imageUrl?: string;
   alternatives?: PriceMatchAlternative[];
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
@@ -110,6 +112,7 @@ export type PriceMatchAlternative = {
   mobile?: MobilePriceDetails;
   productName?: string;
   offerUrl?: string;
+  imageUrl?: string;
   matchedCurrentMerchant?: boolean;
   shopName: string;
   price: string;
