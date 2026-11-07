@@ -2,7 +2,7 @@ import type {
   GetPriceMatchForProductMessage,
   PriceMatchOffer,
 } from "./extension-messages.js";
-import { hasModelNumberConflict, hasNumericModelConflict, isSameProductUrl, isValidGtin, readProductCodesFromUrl } from "./product-match.js";
+import { hasModelNumberConflict, hasNumericModelConflict, hasProductVariantConflict, isSameProductUrl, isValidGtin, readProductCodesFromUrl } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { readNextProductData } from "./product-data.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
@@ -710,7 +710,8 @@ export function readPrisradarProductPage(html: string, fallbackProductUrl: strin
   const productUrl = readStringLike(product.url) ?? fallbackProductUrl;
   const rawOffers = Array.isArray(product.offers) ? product.offers : [];
   const offers = dedupePrisradarOffersByShop(rawOffers
-    .filter(value => !requireInStock || isPlainRecord(value) && value.availability === "in_stock" && value.isInactive !== true)
+    .filter(value => !requireInStock || isPlainRecord(value) && value.availability === "in_stock" && value.isInactive !== true &&
+      typeof value.title === "string" && !hasProductVariantConflict({ searchTerm: productName }, value.title))
     .map(readPrisradarOffer)
     .filter((offer): offer is PrisradarOffer => offer !== undefined)
     .sort(comparePrisradarOffersByPrice));

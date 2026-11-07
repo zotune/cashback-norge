@@ -26,6 +26,10 @@
 .toplists button { font: inherit; min-height: 32px; padding: 4px 10px; }
 .toplists small { color: var(--cbn-muted); flex-basis: 100%; font-size: 11px; line-height: 1.4; }
 .deal-rank { color: var(--cbn-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.deal-main > .deal-rank { align-self: flex-start; font-size: 10px; margin-bottom: 2px; padding: 1px 5px; }
+.deal-sources { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.deal-source { font-size: 10px; text-decoration: none; }
+.deal-source:hover { filter: brightness(1.15); }
 .list-bar { align-items: center; display: flex; gap: 4px; margin-bottom: 6px; }
 .list-bar .count { flex: 1; margin: 0; padding: 0; }
 .list-reset { font: inherit; font-size: 12px; min-height: 30px; padding: 0 8px; }
@@ -120,6 +124,7 @@ a.card-chip { text-decoration: none; }
 .deal-table td { background: var(--cbn-surface); border-top: 1px solid var(--cbn-bg); padding: 6px 8px; vertical-align: middle; }
 .deal-table tr:hover td { background: var(--cbn-offer-hover); }
 .deal-table td:first-child { border-radius: 8px 0 0 8px; width: 52px; }
+.deal-table td.deal-rank-cell { width: 28px; padding-right: 2px; }
 .deal-table td:last-child { border-radius: 0 8px 8px 0; }
 .deal-table .deal-thumb { height: 40px; width: 40px; }
 .deal-table .deal-title { font-size: 13px; }

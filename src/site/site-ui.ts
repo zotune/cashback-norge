@@ -189,12 +189,16 @@ export function installGroceryChainStyles(): void {
 }
 
 /** Identical extra-cashback rows on the home and grocery pages. */
-export function renderBonusCardGroup(cards: Array<BonusCard & { rewardLabel?: string }>, container: HTMLElement, amount = 0): void {
+export function installProviderChipStyles(): void {
   if (!document.getElementById("bonus-card-brand-styles")) {
     const style = document.createElement("style"); style.id = "bonus-card-brand-styles";
     style.textContent = Object.entries(PROVIDER_COLORS).map(([id, colors]) => getBrandChipCss(`.badge-${id}`, colors)).join("\n");
     document.head.append(style);
   }
+}
+
+export function renderBonusCardGroup(cards: Array<BonusCard & { rewardLabel?: string }>, container: HTMLElement, amount = 0): void {
+  installProviderChipStyles();
   const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
   container.innerHTML = cards.map((card) => {
     const sum = amount > 0 && !card.conditional ? amount : 0;

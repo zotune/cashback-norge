@@ -126,6 +126,9 @@ function buildProductTitleBaseCandidates(searchTerm: string): string[] {
   ]).filter((candidate) => candidate.length >= 4);
 }
 
+/** Canonical tokens shared by live matching and conservative catalogue deduping. */
+export function getProductTitleMatchTokens(value: string): string[] { return tokenizeMatchText(value); }
+
 function tokenizeMatchText(value: string): string[] {
   const normalizedValue = transliterateNorwegianCharacters(value)
     .normalize("NFD")

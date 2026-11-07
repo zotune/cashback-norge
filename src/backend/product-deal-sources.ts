@@ -1,0 +1,128 @@
+// Structured APIs first. Godpris' current list has no verified list API, so
+// only its own product-card links/discounts use Cheerio; prices always come
+// from named Product JSON-LD and concrete in-stock offers. Prisradar list links
+// are a bounded DOM fallback; the detail uses its product-bound Next component.
+import { CheerioCrawler, Configuration, MemoryStorage, Request, type CheerioCrawlingContext } from "crawlee";
+import { isRecord } from "../shared/cashback.js";
+import { readKlarnaDealCandidates, readKlarnaDeal, klarnaOffersUrl, KLARNA_DEALS_API, type KlarnaDealCandidate } from "../shared/klarna-deals.js";
+import { readGodprisProductPage } from "../shared/godpris-price-match.js";
+import { readPrisradarProductPage } from "../shared/prisradar-price-match.js";
+import { readComparisonProductLdJson, readLdJsonScripts, readNextProductData, readStructuredProductCodes, findTypedLdJson } from "../shared/product-data.js";
+import { readPriceAmount } from "../shared/price.js";
+import { isValidGtin } from "../shared/product-match.js";
+import type { DealSource, ProductDeal } from "../shared/product-deals.js";
+import type { Logger } from "./logger.js";
+
+export const SOURCE_LIST_URLS = { klarna: KLARNA_DEALS_API, godpris: "https://godpris.no/tilbud", prisradar: "https://prisradar.no/beste-tilbud" };
+type Source = Exclude<DealSource, "prisjakt">;
+type Candidate = { id: string; name: string; productUrl: string; sourceRank: number; advertisedPrice?: number; priceDrop?: number };
+export type SourceInput = { source: Source; generatedAt: string; logger: Logger; maxProducts?: number; maxPages?: number; requestUrl?: (url: string) => string; timeoutSecs?: number };
+
+export async function fetchProductDealSource(input: SourceInput): Promise<ProductDeal[]> {
+  const maxProducts = Math.max(1, Math.min(input.source === "klarna" ? 150 : 48, input.maxProducts ?? (input.source === "klarna" ? 150 : 24)));
+  const pages = Math.max(1, Math.min(3, input.maxPages ?? 3));
+  const candidates = new Set<string>();
+  const deals: ProductDeal[] = [];
+  let listed = 0, failures = 0, listingFailed = false;
+  const configuration = new Configuration();
+  configuration.useStorageClient(new MemoryStorage({ persistStorage: false }));
+  const crawler = new CheerioCrawler({
+    maxConcurrency: 1, maxRequestRetries: 2, maxRequestsPerCrawl: maxProducts + pages,
+    navigationTimeoutSecs: input.timeoutSecs ?? 30, requestHandlerTimeoutSecs: 30,
+    useSessionPool: false, ignoreSslErrors: false, additionalMimeTypes: ["application/json"],
+    async requestHandler({ request, body, response, $ }) {
+      const html = String(body);
+      const status = response.statusCode ?? 0;
+      if (status !== 200) { if (status < 500 && status !== 429) request.noRetry = true; throw new Error(`HTTP ${status}`); }
+      if (request.userData.kind === "detail") {
+        const candidate = request.userData.candidate as Candidate;
+        const deal = input.source === "klarna" ? readKlarnaDeal(candidate as KlarnaDealCandidate, JSON.parse(html), input.generatedAt)
+          : readOtherDealPage(input.source, html, candidate, input.generatedAt);
+        if (deal) deals.push(deal);
+        return;
+      }
+      listed++;
+      const offset = Number(request.userData.offset ?? 0);
+      const rows = input.source === "klarna" ? readKlarnaDealCandidates(JSON.parse(html), offset) : readListCandidates(input.source, $);
+      if (!rows.length) { request.noRetry = true; throw new Error(`${input.source}: no deal candidates (format changed?)`); }
+      for (const candidate of rows) {
+        if (candidates.size >= maxProducts) break;
+        if (candidates.has(candidate.id)) continue;
+        candidates.add(candidate.id);
+        const url = input.source === "klarna" ? klarnaOffersUrl(candidate.id) : candidate.productUrl;
+        await crawler.addRequests([new Request({ url: input.requestUrl?.(url) ?? url, uniqueKey: `${input.source}:${candidate.id}`, userData: { kind: "detail", candidate } })]);
+      }
+      if (input.source === "klarna" && offset / 50 + 1 < pages && candidates.size < maxProducts) await crawler.addRequests([listingRequest(offset + 50)]);
+    },
+    async failedRequestHandler({ request }, error) {
+      failures++;
+      if (request.userData.kind !== "detail") listingFailed = true;
+      input.logger.warn(`${input.source} deals: ${request.url} (${error.message.slice(0, 250)})`);
+    },
+  }, configuration);
+  function listingRequest(offset = 0): Request {
+    const url = new URL(SOURCE_LIST_URLS[input.source]);
+    if (input.source === "klarna") { url.searchParams.set("sorting", "GLOBALRANK_ASC"); url.searchParams.set("af_PRICE_DROP", "-90_-10"); url.searchParams.set("size", "50"); url.searchParams.set("offset", String(offset)); }
+    return new Request({ url: input.requestUrl?.(url.href) ?? url.href, userData: { kind: "list", offset }, uniqueKey: `list:${input.source}:${offset}` });
+  }
+  await crawler.run([listingRequest()]);
+  if (!listed || listingFailed || !deals.length) throw new Error(`${input.source} deals: ${listed} listing pages, ${candidates.size} candidates, ${deals.length} verified deals, ${failures} failed requests`);
+  input.logger.info(`${input.source} deals: ${deals.length}/${candidates.size} verified in-stock offers (${failures} failed requests)`);
+  return deals.sort((a, b) => a.sourceRank - b.sourceRank);
+}
+
+function readListCandidates(source: "godpris" | "prisradar", $: CheerioCrawlingContext["$"]): Candidate[] {
+  const result = new Map<string, Candidate>();
+  const selector = source === "godpris" ? ".search-item-wrapper" : "a[href^='/produkter/']";
+  $(selector).each((_index, element) => {
+    const item = $(element);
+    const anchor = source === "godpris" ? item.find("h3 a[href]").first() : item;
+    const href = anchor.attr("href");
+    if (!href) return;
+    const url = new URL(href, SOURCE_LIST_URLS[source]);
+    if (url.origin !== new URL(SOURCE_LIST_URLS[source]).origin) return;
+    const id = url.pathname.split("/")[2];
+    if (!id || result.has(id)) return;
+    const name = (source === "godpris" ? anchor.attr("title") : anchor.text())?.trim();
+    if (!name) return;
+    const advertisedPrice = source === "godpris" ? readPriceAmount(item.find("[data-price]").attr("data-price")) : undefined;
+    const priceDrop = source === "godpris" ? readPriceAmount(item.find(".app-offer-badge [aria-hidden]").text().replace("%", "")) : undefined;
+    result.set(id, { id, name, productUrl: url.href, sourceRank: result.size + 1,
+      ...(advertisedPrice !== undefined ? { advertisedPrice } : {}), ...(priceDrop !== undefined ? { priceDrop } : {}) });
+  });
+  return [...result.values()];
+}
+
+export function readOtherDealPage(source: "godpris" | "prisradar", html: string, candidate: Candidate, updatedAt: string): ProductDeal | undefined {
+  const structured = readComparisonProductLdJson(html, candidate.productUrl);
+  if (!structured) return undefined;
+  const codes = readStructuredProductCodes(structured).filter(isValidGtin);
+  const brand = isRecord(structured.brand) ? structured.brand.name : structured.brand;
+  const shared = { id: candidate.id, source, sourceRank: candidate.sourceRank, updatedAt, productUrl: candidate.productUrl, currency: "NOK" as const,
+    ...(typeof brand === "string" ? { brand } : {}), ...(codes.length ? { codes } : {}) };
+  if (source === "godpris") {
+    const offer = readGodprisProductPage(html, candidate.id, { searchTerm: candidate.name }, true);
+    // Its advertised discount only applies when that exact price is buyable.
+    if (!offer || offer.amount !== candidate.advertisedPrice || !(candidate.priceDrop! > 0 && candidate.priceDrop! < 100)) return undefined;
+    const breadcrumb = findTypedLdJson(readLdJsonScripts(html), "BreadcrumbList");
+    const categories = Array.isArray(breadcrumb?.itemListElement) ? breadcrumb.itemListElement.filter(isRecord).map(item => item.name).filter((name): name is string => typeof name === "string") : [];
+    const image = Array.isArray(structured.image) ? structured.image[0] : structured.image;
+    return { ...shared, name: offer.productName, store: offer.shopName, price: offer.amount, priceDrop: candidate.priceDrop!, referenceLabel: "Godpris' oppgitte prisfall", storeCount: offer.alternatives?.length ?? 1,
+      ...(categories.length ? { category: categories.at(-1)! } : {}), ...(typeof image === "string" ? { imageUrl: image } : {}), ...(offer.offerUrl ? { offerUrl: offer.offerUrl } : {}) };
+  }
+  const product = readNextProductData(html, candidate.productUrl);
+  const schemaOffer = isRecord(structured.offers) ? structured.offers : undefined;
+  if (!product || schemaOffer?.priceCurrency !== "NOK" || !/NewCondition$/.test(String(schemaOffer.itemCondition))) return undefined;
+  const offer = readPrisradarProductPage(html, candidate.productUrl, true);
+  const referencePrice = isRecord(product.discount) ? readPriceAmount(product.discount.oldPrice) : undefined;
+  if (!offer || !referencePrice || offer.amount >= referencePrice) return undefined;
+  const images = Array.isArray(product.images) ? product.images.filter(isRecord) : [];
+  const image = images.find(image => image.isMain === true) ?? images[0];
+  const imageUrl = image && isRecord(image.medium) ? image.medium.path : undefined;
+  const category = isRecord(product.category) ? product.category.title : undefined;
+  const alternative = offer.alternatives?.find(item => item.shopName === offer.shopName && item.amount === offer.amount);
+  return { ...shared, name: offer.productName, store: offer.shopName, price: offer.amount, referencePrice, referenceLabel: "Prisradars sammenligningspris før prisfallet",
+    priceDrop: Math.round((referencePrice - offer.amount) / referencePrice * 100), storeCount: offer.alternatives?.length ?? 1,
+    ...(alternative?.sortAmount !== undefined ? { shippingAmount: alternative.sortAmount - offer.amount } : {}),
+    ...(typeof imageUrl === "string" ? { imageUrl } : {}), ...(typeof category === "string" ? { category } : {}) };
+}

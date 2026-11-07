@@ -18,7 +18,7 @@
 <body>
 <div class="container">
   <nav class="site-tabs" aria-label="Velg seksjon"><a href="/">Cashback</a><a href="/dagens-tilbud/" aria-current="page">Tilbud</a><a href="/dagligvarer/">Dagligvarer</a></nav>
-  <img class="intro-logo" src="/quokka-tilbud-v2.webp" alt="">
+  <img class="intro-logo" src="/quokka-tilbud-v4.webp" alt="">
   <h1>Tilbud</h1>
   <p class="subtitle">Varer som er billigere enn vanlig akkurat nå – elektronikk, hjem, sport og mer.</p>
   <div class="update-row"><span id="updated">Oppdatert daglig</span><span data-theme-control></span></div>
@@ -48,53 +48,56 @@
 <script src="/shared-data.js?v=8"></script>
 <script src="/offer-list.js?v=8"></script>
 <script>
-// Data: /prisjakt-deals.json, built by the daily crawl from Prisjakt's "Dagens tilbud".
-// The discount column is Prisjakt's price drop against the usual price; the pre-price is the
-// shop's own. Only new products the shop reports in stock are included.
-const { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS } = window.SHARED;
-
-
+// Only our daily snapshot is read here. Product/source links open on explicit click.
+const { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS, PROVIDER_NAMES, formatKr } = window.SHARED;
+function productItem(deal) {
+  const source = deal.source || "prisjakt";
+  const label = PROVIDER_NAMES[source] || source;
+  const shipping = deal.shippingAmount === undefined ? "Frakt ukjent" : deal.shippingAmount === 0 ? "Gratis frakt" : `Frakt ${formatKr(deal.shippingAmount)} kr`;
+  const storeUrl = source === "prisjakt" && deal.storeId ? `https://www.prisjakt.no/shop.php?f=${encodeURIComponent(deal.storeId)}` : deal.storeUrl;
+  return {
+    id: `${source === "prisjakt" ? "pj" : source}${deal.id}`, source, updatedAt: deal.updatedAt,
+    title: deal.name,
+    description: [deal.brand, deal.storeCount > 1 ? `${deal.storeCount} butikker` : "", shipping].filter(Boolean).join(" · "),
+    category: deal.category || "", group: getPrisjaktDealGroup(deal.category),
+    store: { label: deal.store, className: "cbn-chip--muted",
+      ...(storeUrl && new URL(storeUrl).hostname.endsWith(source === "prisjakt" ? "prisjakt.no" : `${source}.no`) ? { url: storeUrl } : source === "klarna" && storeUrl?.startsWith("https://www.klarna.com/no/shopping/") ? { url: storeUrl } : {}),
+      ...(deal.storeIconUrl?.startsWith("/offer-images/") ? { iconUrl: deal.storeIconUrl } : {}),
+    },
+    amount: deal.price, rank: deal.rank,
+    lowestPriceEver: deal.lowestPriceEver, historyScope: deal.historyScope, historyUpdatedAt: deal.historyUpdatedAt, historyStartedAt: deal.historyStartedAt,
+    ...(deal.originalPrice > deal.price ? { prePrice: deal.originalPrice } : {}),
+    ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `${label}: ${deal.priceDrop} % prisfall. ${deal.referenceLabel || "Mot vanlig pris hos Prisjakt"}${deal.referencePrice ? ` (${formatKr(deal.referencePrice)} kr)` : ""}. Frakt er ikke med.` } : {}),
+    ...(deal.imageUrl?.startsWith("/offer-images/") ? { imageUrl: deal.imageUrl, copyImageUrl: deal.imageUrl } : {}),
+    link: { url: deal.productUrl, label: `Se butikker og prishistorikk hos ${label}` },
+    ...(deal.validTo ? { validTo: deal.validTo } : {}),
+  };
+}
 function read(catalog) {
   const deals = Array.isArray(catalog.deals) ? catalog.deals : [];
   return {
     items: deals.filter((deal) => typeof deal.price === "number" && deal.currency === "NOK").map((deal) => ({
-      id: `pj${deal.id}`,
-      title: deal.name,
-      description: [deal.brand, deal.storeCount > 1 ? `${deal.storeCount} butikker` : "", "Frakt ukjent"].filter(Boolean).join(" · "),
-      category: deal.category || "",
-      group: getPrisjaktDealGroup(deal.category),
-      store: {
-        label: deal.store, className: "cbn-chip--muted",
-        ...(deal.storeId ? { url: `https://www.prisjakt.no/shop.php?f=${encodeURIComponent(deal.storeId)}` } : {}),
-        ...(deal.storeIconUrl?.startsWith("/offer-images/") ? { iconUrl: deal.storeIconUrl } : {}),
-      },
-      amount: deal.price,
-      lowestPriceEver: deal.lowestPriceEver, historyScope: deal.historyScope, historyUpdatedAt: deal.historyUpdatedAt, historyStartedAt: deal.historyStartedAt,
-      ...(deal.originalPrice > deal.price ? { prePrice: deal.originalPrice } : {}),
-      ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `Prisjakt: ${deal.priceDrop} % under vanlig pris` } : {}),
-      ...(deal.imageUrl?.startsWith("/offer-images/") ? { imageUrl: deal.imageUrl } : {}),
-      ...(deal.copyImageUrl ? { copyImageUrl: deal.copyImageUrl } : {}),
-      link: { url: deal.productUrl, label: "Se alle butikker og prishistorikk på Prisjakt" },
-      rank: deal.rank,
-      ...(deal.validTo ? { validTo: deal.validTo } : {}),
+      ...productItem(deal),
+      sources: (deal.sources || [{ ...deal, source: "prisjakt", updatedAt: catalog.generatedAt }]).map(productItem),
     })),
     updated: catalog.generatedAt,
-    note: "Oppdatert daglig. Prisfall er målt mot varens vanlige pris; førpris er butikkens egen. Bare nye varer på lager er med. Prisen kan ha endret seg siden – sjekk hos butikken. Stemmene er brukernes egne vurderinger.",
+    note: "Oppdatert daglig. Like varer samles når produkt og variant stemmer. Prisfall bruker kildens sammenligningspris; hold over prosenten for detaljer. Førpris er butikkens egen. Bare nye varer på lager er med. Frakt vises separat. Pris og lager kan ha endret seg siden. Stemmene er brukernes egne vurderinger.",
   };
 }
 
 async function start() {
   createOfferList({
   mount: document.getElementById("offer-list"),
-  dataUrl: "/prisjakt-deals.json",
+  dataUrl: "/product-deals.json",
+  fallbackDataUrl: "/prisjakt-deals.json",
   storageKey: "cbn-dagens-tilbud-v1",
   voteKey: "dagens-tilbud",
   groupLabel: "Kategorier",
   noGroupsText: "Velg minst én kategori.",
-  savingLabel: "Mot normalpris",
+  savingLabel: "Prisfall",
   searchPlaceholder: "Søk etter vare, merke eller butikk...",
-  features: { category: true, validity: true, history: true },
-  toplists: [{ sort: "relevance", label: "Populært nå" }, { sort: "saving", label: "Størst prisfall" }, { sort: "votes", label: "Brukernes favoritter" }],
+  features: { category: true, validity: true, history: true, sources: true },
+  toplists: [{ sort: "relevance", label: "Topplisten" }, { sort: "saving", label: "Størst prisfall" }, { sort: "votes", label: "Brukernes favoritter" }],
   groupOrder: PRISJAKT_DEAL_GROUPS,
   read,
   });

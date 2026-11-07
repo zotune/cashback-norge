@@ -37,6 +37,9 @@ export function isMobileBrowser(nav: { userAgent: string; maxTouchPoints?: numbe
 export const EB_PER_TRUMF_KR = 13.5;
 
 export const PROVIDER_NAMES: Record<string, string> = {
+  prisjakt: "Prisjakt",
+  prisradar: "Prisradar",
+  godpris: "Godpris",
   tek: "Tek.no",
   forbrukerradet: "Forbrukerrådet",
   bytt: "Bytt.no",

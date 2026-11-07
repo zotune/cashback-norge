@@ -12,6 +12,8 @@ data/grocery-offers.json
 site/grocery-offers.json
 data/prisjakt-deals.json
 site/prisjakt-deals.json
+data/product-deals.json
+site/product-deals.json
 site/deal-images/
 site/offer-images/
 *tmp*

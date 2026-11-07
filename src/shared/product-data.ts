@@ -11,6 +11,15 @@ export function readLdJsonScripts(html: string): unknown[] {
   for (const match of html.matchAll(/<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
     try { entries.push(parseLdJson(match[1] ?? "")); } catch { /* Ignore malformed metadata. */ }
   }
+  // Next beforeInteractive Script: its wrapper is JSON data, not something to
+  // execute. Current Prisradar publishes the concrete Product schema here.
+  for (const match of html.matchAll(/<script\b[^>]*>\s*\(self\.__next_s=self\.__next_s\|\|\[\]\)\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
+    try {
+      const row: unknown = JSON.parse(match[1]!);
+      const props = Array.isArray(row) && isRecord(row[1]) ? row[1] : undefined;
+      if (props?.type === "application/ld+json" && typeof props.children === "string") entries.push(parseLdJson(props.children));
+    } catch { /* Other executable script content is never evaluated. */ }
+  }
   return entries;
 }
 

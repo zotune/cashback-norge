@@ -31,6 +31,7 @@ import { crawlKlarna } from "./providers/klarna.js";
 import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog.js";
 import { collectGroceryOffers } from "./grocery-offers.js";
 import { collectPrisjaktDeals } from "./prisjakt-deals.js";
+import { collectProductDeals } from "./product-deals.js";
 import { pruneOfferImages } from "./offer-images.js";
 import { createDealMerchantLookup } from "../shared/deal-merchants.js";
 import { collectElectricitySupplierCatalog } from "./electricity-supplier-catalog.js";
@@ -288,6 +289,9 @@ async function main(): Promise<void> {
   const prisjaktDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(collectPrisjaktDeals({ generatedAt, logger,
     merchantDomain: createDealMerchantLookup({ offers: [...previousOffersByProvider.values()].flat() }),
   }));
+  const productDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(prisjaktDealsPromise!.then(prisjakt => collectProductDeals({ generatedAt, logger,
+    ...(prisjakt ? { prisjakt } : {}), merchantDomain: createDealMerchantLookup({ offers: [...previousOffersByProvider.values()].flat() }),
+  })));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
     maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
@@ -1169,9 +1173,15 @@ async function main(): Promise<void> {
     await copyFile(config.prisjaktDealsPath, resolve("site/prisjakt-deals.json"));
     logger.info(`Wrote Prisjakt deals (${prisjaktDeals.deals.length} deals) to ${config.prisjaktDealsPath}`);
   }
+  const productDeals = await productDealsPromise;
+  if (productDeals) {
+    await writeJsonFile(resolve("data/product-deals.json"), productDeals);
+    await copyFile(resolve("data/product-deals.json"), resolve("site/product-deals.json"));
+  }
   await pruneOfferImages([
     ...(groceryOffers?.offers.map(offer => offer.imageUrl) ?? []),
     ...(prisjaktDeals?.deals.flatMap(deal => [deal.imageUrl, deal.storeIconUrl]) ?? []),
+    ...(productDeals?.deals.flatMap(deal => deal.sources.flatMap(source => [source.imageUrl, source.storeIconUrl])) ?? []),
   ]);
 }
 

@@ -124,6 +124,7 @@ jobs:
           if [ -f data/electricity-suppliers.json ]; then cp data/electricity-suppliers.json _site/electricity-suppliers.json; fi
           if [ -f data/grocery-offers.json ]; then cp data/grocery-offers.json _site/grocery-offers.json; fi
           if [ -f data/prisjakt-deals.json ]; then cp data/prisjakt-deals.json _site/prisjakt-deals.json; fi
+          if [ -f data/product-deals.json ]; then cp data/product-deals.json _site/product-deals.json; fi
 
       - uses: actions/upload-pages-artifact@v3
         with:

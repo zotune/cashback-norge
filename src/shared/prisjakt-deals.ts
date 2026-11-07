@@ -168,13 +168,13 @@ function amount(value: unknown): number | undefined {
 // for its chips. The specific category stays visible on each row. First match wins.
 const DEAL_GROUPS: Array<[string, RegExp]> = [
   ["Jul", /julekalender|julelys/i],
-  ["Data og gaming", /tastatur|^pc-|skjermkort|hovedkort|\(cpu\)|ram-minne|\bssd\b|\bmus\b|musematt|gaming|ratt & pedal|joystick|håndkontroll|playstation|nintendo|xbox|router|skriver|3d-printer|nettbrett/i],
+  ["Data og gaming", /tastatur|^pc-|^data$|datamus|grafikkort|skjermkort|bærbar|stasjonær|hovedkort|\(cpu\)|ram-minne|\bssd\b|\bmus\b|musematt|gaming|ratt & pedal|joystick|håndkontroll|playstation|nintendo|xbox|router|skriver|3d-printer|nettbrett/i],
   ["Lyd, bilde og mobil", /^tv$|hodetelefon|høyttaler|lydplanke|radio|projektor|forsterker|mikrofon|mobiltelefon|smartklokke|aktivitetsmåler|kamera|objektiv|drone|portable batteri/i],
   ["Hvitevarer", /vaskemaskin|tørketromle|oppvaskmaskin|innbyggingsovn|platetopp|kombiskap|kjøleskap|komfyr|mikrobølge|fryser/i],
   ["Sport og friluft", /\bski\b|ski |alpinski|langrenn|sykkel|hodelykt|vannflask|stormkjøkken/i],
   ["Kjøkken", /espresso|kaffe|foodprosessor|kjøkken|mikser|blender|vaffel|airfryer|frityr|iskrem|smørbrød|kniv|gryte|stekepanne|bestikk|^glass$|skål|krus|kanne|karaf|termos|kvern/i],
-  ["Klær og sko", /jakke|sko\b|sko |støvle|bukse|boxer|undertøy|^vester$|parkdress|jeans|votter|hansker|tøfler|sneakers|ryggsekk|koffert|solbriller|^klokker|armbåndsur/i],
-  ["Skjønnhet og helse", /parfyme|deodorant|bodylotion|ansikt|hår|barbermaskin|trimmer|solkrem|øyne|diabetes/i],
+  ["Klær og sko", /klær|jakke|sko\b|sko |støvle|bukse|boxer|undertøy|^vester$|parkdress|jeans|votter|hansker|tøfler|sneakers|ryggsekk|koffert|solbriller|^klokker|armbåndsur/i],
+  ["Skjønnhet og helse", /hudpleie|helse|parfyme|deodorant|bodylotion|ansikt|hår|barbermaskin|trimmer|solkrem|øyne|diabetes/i],
   ["Barn og leker", /lego|dukke|leke|brettspill|barnevogn|vognpose|bilstol/i],
   ["Verktøy", /verktøy|sag\b|sager|boremaskin|skrumaskin|slipemaskin|nøkkel|laser|kompressor|motorsag/i],
   ["Hjem og hage", /støvsuger|gressklipper|luftfukter|avfukter|luftrenser|vifte|varmeovn|peis|vedovn|lys|lampe|dørklokke|smarte låser|dampvask|ladestasjon|platemateriale/i],

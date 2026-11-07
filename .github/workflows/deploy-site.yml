@@ -41,6 +41,7 @@ jobs:
           # Built by the daily crawl and not committed; keep the published copy for /dagligvarer.
           curl -fsSL --retry 2 https://cashbacknorge.no/grocery-offers.json -o _site/grocery-offers.json || echo "::warning::grocery-offers.json could not be fetched; /dagligvarer shows an error until the next Daily crawl"
           curl -fsSL --retry 2 https://cashbacknorge.no/prisjakt-deals.json -o _site/prisjakt-deals.json || echo "::warning::prisjakt-deals.json could not be fetched; /dagens-tilbud shows an error until the next Daily crawl"
+          curl -fsSL --retry 2 https://cashbacknorge.no/product-deals.json -o _site/product-deals.json || echo "::notice::Combined deals not published yet; using Prisjakt until the next Daily crawl"
           if [ -s _site/prisjakt-deals.json ]; then pnpm exec tsx src/scripts/prepare-deal-images.ts; fi
 
       - uses: actions/upload-pages-artifact@v3

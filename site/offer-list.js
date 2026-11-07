@@ -72,7 +72,8 @@
     const features = config.features ?? {};
     const SORTS = ALL_SORTS.filter((sort) => !sort.feature || features[sort.feature]).map((sort) => sort.value === "saving" && config.savingLabel ? { ...sort, label: `Størst ${config.savingLabel.toLowerCase()}` } : sort);
     const wideScreen = window.matchMedia("(min-width: 1100px)");
-    const state = { items: [], counts: new Map(), off: new Set(), offCategories: new Set(), offStores: new Set(), category: "", query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], ranks: new Map(), shown: 0 };
+    const state = { items: [], counts: new Map(), off: new Set(), offCategories: new Set(), offStores: new Set(), offSources: new Set(), category: "", query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], ranks: new Map(), shown: 0 };
+    if (features.sources) window.SHARED.installProviderChipStyles();
     const tallies = new Map();
     let myVotes = {};
     let previewFor = null;
@@ -135,6 +136,7 @@
         if (Array.isArray(saved.offCategories)) state.offCategories = new Set(saved.offCategories.filter((value) => typeof value === "string"));
         else if (typeof saved.category === "string") state.category = saved.category;
         if (Array.isArray(saved.offStores)) state.offStores = new Set(saved.offStores.filter((value) => typeof value === "string"));
+        if (Array.isArray(saved.offSources)) state.offSources = new Set(saved.offSources.filter((value) => typeof value === "string"));
         if (saved.filters && typeof saved.filters === "object") {
           for (const key of Object.keys(FILTER_DEFAULTS)) {
             if (typeof saved.filters[key] === typeof FILTER_DEFAULTS[key]) state.filters[key] = saved.filters[key];
@@ -143,7 +145,7 @@
       } catch { /* Defaults: every group, most relevant, table on wide screens. */ }
     }
     function savePreferences() {
-      try { localStorage.setItem(config.storageKey, JSON.stringify({ off: [...state.off], offCategories: [...state.offCategories], offStores: [...state.offStores], sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
+      try { localStorage.setItem(config.storageKey, JSON.stringify({ off: [...state.off], offCategories: [...state.offCategories], offStores: [...state.offStores], offSources: [...state.offSources], sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
     }
 
     // The spreadsheet needs the width; phones get the list instead.
@@ -160,16 +162,25 @@
       if (features.category) {
         for (const [kind, field, section] of [["category", "category", "Underkategorier"], ["store", "store", "Butikker"]]) {
           const counts = new Map();
-          for (const item of state.items) { const value = kind === "store" ? item.store.label : item.category; if (value) counts.set(value, (counts.get(value) || 0) + 1); }
+          for (const item of state.items) {
+            const values = kind === "store" ? [...new Set((item.sources ?? [item]).map(source => source.store.label))] : [item.category];
+            for (const value of values) if (value) counts.set(value, (counts.get(value) || 0) + 1);
+          }
           options.push({ value: `${kind}:*`, label: `Alle ${section.toLowerCase()}`, section });
           for (const value of [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb"))) options.push({ value: `${kind}:${value}`, label: value, count: counts.get(value), section });
         }
       }
+      if (features.sources) {
+        const counts = new Map();
+        for (const item of state.items) for (const source of item.sources ?? []) counts.set(source.source, (counts.get(source.source) || 0) + 1);
+        options.push({ value: "source:*", label: "Alle prissammenligninger", section: "Prissammenligning" });
+        for (const [source, count] of counts) options.push({ value: `source:${source}`, label: window.SHARED.PROVIDER_NAMES[source] || source, section: "Prissammenligning", count, className: `badge-${source}` });
+      }
       return options;
     }
-    const filterSet = (value) => value.startsWith("category:") ? state.offCategories : value.startsWith("store:") ? state.offStores : state.off;
+    const filterSet = (value) => value.startsWith("category:") ? state.offCategories : value.startsWith("store:") ? state.offStores : value.startsWith("source:") ? state.offSources : state.off;
     const filterValue = (value) => value.slice(value.indexOf(":") + 1);
-    const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0;
+    const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0 || state.offSources.size > 0;
     function renderGroups() {
       const options = filterOptions().filter((option) => !option.value.endsWith(":*"));
       const selected = options.filter((option) => !filterSet(option.value).has(filterValue(option.value)));
@@ -196,7 +207,7 @@
         el("none").disabled = options.every((option) => state.off.has(filterValue(option.value)));
         return;
       }
-      const filtered = selected.filter((option) => option.value.startsWith("group:") || filterSet(option.value).size > 0);
+      const filtered = selected.filter((option) => option.value.startsWith("group:") || option.value.startsWith("source:") || filterSet(option.value).size > 0);
       active.hidden = filtered.length === 0;
       active.replaceChildren();
       const sections = new Map();
@@ -239,7 +250,13 @@
       const now = Date.now();
       const words = fold(state.query).split(/\s+/).filter(Boolean);
       const { minSaving, maxPrice, maxUnit, onlyPrePrice, endingSoon } = state.filters;
-      const visible = state.items.filter((item) => isRunning(item, now) && !state.off.has(item.group) &&
+      const choices = features.sources ? state.items.flatMap((item) => {
+        const available = (item.sources ?? []).filter((source) => !state.offSources.has(source.source) && isRunning(source, now) && !state.offStores.has(source.store.label));
+        const best = [...available].sort((a, b) => a.amount - b.amount)[0];
+        return best ? [{ ...item, ...best, id: item.id, rank: item.rank, group: item.group, category: item.category, sources: available,
+          lowestPriceEver: item.lowestPriceEver, historyScope: item.historyScope, historyStartedAt: item.historyStartedAt, historyUpdatedAt: item.historyUpdatedAt }] : [];
+      }) : state.items;
+      const visible = choices.filter((item) => isRunning(item, now) && !state.off.has(item.group) &&
         !state.offCategories.has(item.category) && !state.offStores.has(item.store.label) &&
         (!minSaving || saving(item) >= minSaving) &&
         (!maxPrice || item.amount <= maxPrice) &&
@@ -271,7 +288,7 @@
       el("count").textContent = words.length ? `${list.length} av ${visible.length} tilbud` : `${visible.length} tilbud`;
       state.list = list;
       config.mount.querySelectorAll("[data-toplist]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.toplist === state.sort && state.sortDir === 1)));
-      if (config.toplists) el("toplist-note").textContent = state.sort === "votes" ? "Tommel opp minus tommel ned. Tilbud uten stemmer har ingen brukerrangering." : state.sort === "saving" ? "Prisfall mot normalpris hos Prisjakt, basert på de siste tre månedene." : state.sort === "relevance" ? "Prisjakts popularitetsrekkefølge innen valgte filtre." : "";
+      if (config.toplists) el("toplist-note").textContent = state.sort === "votes" ? "Tommel opp minus tommel ned. # viser fortsatt plasseringen i topplisten." : state.sort === "saving" ? "Prisfall mot kildens sammenligningspris. Hold over prosenten for prisgrunnlaget." : state.sort === "relevance" ? "Kildenes rekkefølge vektes sammen, med mest vekt på Prisjakt og Klarna. Ingen klikkdata. # beholdes ved søk og filtrering." : "";
       state.shown = 0;
       hidePreview();
       const results = el("results");
@@ -316,6 +333,7 @@
       { label: "", sort: "" },
       { label: "Vare", sort: "name" },
       { label: "Butikk", sort: "store" },
+      ...(features.sources ? [{ label: "Prissammenligning", sort: "" }] : []),
       ...(features.category ? [{ label: "Kategori", sort: "group" }] : []),
       { label: "Pris", sort: "price", num: true },
       { label: config.savingLabel ?? "Rabatt", sort: "saving", num: true },
@@ -338,6 +356,7 @@
       ? `<a class="deal-thumb" href="${esc(item.link.url)}" target="_blank" rel="noopener" data-preview="${esc(item.imageUrl)}" aria-label="Åpne ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></a>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
     const rankHtml = (item) => config.toplists && state.ranks.has(item.id) ? `<span class="cbn-chip cbn-chip--muted deal-rank" title="Plassering i den samlede topplisten før søk og filtrering">#${state.ranks.get(item.id)}</span>` : "";
+    const sourcesHtml = (item) => `<span class="deal-sources">${(item.sources ?? []).map((source) => `<a class="cbn-chip badge-${esc(source.source)} deal-source" href="${esc(source.link.url)}" target="_blank" rel="noopener" title="${esc(`${window.SHARED.PROVIDER_NAMES[source.source] || source.source}: ${kr(source.amount)} · ${source.store.label}${source.updatedAt ? ` · Hentet ${formatDate(source.updatedAt)}` : ""}`)}">${esc(window.SHARED.PROVIDER_NAMES[source.source] || source.source)}</a>`).join(" ")}</span>`;
     const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
       const initial = features.category ? `<span class="deal-store-initial" aria-hidden="true"${item.store.iconUrl ? ' style="display:none"' : ""}>${esc(item.store.label.charAt(0))}</span>` : "";
@@ -382,6 +401,7 @@
         <td>${thumbHtml(item)}</td>
         <td>${titleHtml(item)}${factsHtml(item)}</td>
         <td>${storeHtml(item)}</td>
+        ${features.sources ? `<td>${sourcesHtml(item)}</td>` : ""}
         ${features.category ? `<td>${categoryHtml(item)}</td>` : ""}
         <td class="num"><span class="deal-price-stack"><strong class="deal-price">${esc(kr(item.amount))}</strong> ${item.prePrice > item.amount ? `<s class="deal-before" aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""}</span></td>
         <td class="num">${savingChipHtml(item)}</td>
@@ -412,7 +432,7 @@
           ${actionsHtml(item)}
         </div>
         <div class="deal-details">
-          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? categoryHtml(item) : ""}</div>
+          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? categoryHtml(item) : ""}${features.sources ? sourcesHtml(item) : ""}</div>
           ${features.validity ? `<div class="deal-meta deal-meta--validity">${validityHtml(item)}</div>` : ""}
         </div>
       </article>`;
@@ -448,7 +468,7 @@
       previewFor = null;
       el("preview").hidden = true;
     }
-    const itemOf = (element) => state.items.find((item) => item.id === element.closest(".deal-row")?.dataset.id);
+    const itemOf = (element) => state.list.find((item) => item.id === element.closest(".deal-row")?.dataset.id);
 
     // A real PNG attachment also pastes into native Notes; remote HTML images do not.
     async function copyItem(button) {
@@ -604,7 +624,7 @@
         },
         onBulk: (selected, section) => { for (const option of filterOptions().filter((option) => option.section === section && !option.value.endsWith(":*"))) { const set = filterSet(option.value), name = filterValue(option.value); if (selected) set.delete(name); else set.add(name); } updateSelectionFilters(); },
       });
-      el("filter-reset").addEventListener("click", () => { state.off.clear(); state.offCategories.clear(); state.offStores.clear(); updateSelectionFilters(); });
+      el("filter-reset").addEventListener("click", () => { state.off.clear(); state.offCategories.clear(); state.offStores.clear(); state.offSources.clear(); updateSelectionFilters(); });
       el("active-filters").addEventListener("click", (event) => {
         const value = event.target.closest("[data-remove-filter]")?.dataset.removeFilter;
         if (!value) return;
@@ -713,7 +733,8 @@
 
     return (async () => {
       try {
-        const response = await fetch(config.dataUrl, { cache: "no-cache" });
+        let response = await fetch(config.dataUrl, { cache: "no-cache" });
+        if (!response.ok && config.fallbackDataUrl) response = await fetch(config.fallbackDataUrl, { cache: "no-cache" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const { items, updated, note } = config.read(await response.json());
         state.items = items.filter((item) => typeof item.id === "string" && Number.isFinite(item.amount) && item.amount > 0);
