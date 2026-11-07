@@ -109,6 +109,7 @@ jobs:
           cp data/cashback-index.json _site/cashback-index.json
           if [ -f data/pokepris-catalog.json ]; then cp data/pokepris-catalog.json _site/pokepris-catalog.json; fi
           if [ -f data/electricity-suppliers.json ]; then cp data/electricity-suppliers.json _site/electricity-suppliers.json; fi
+          if [ -f data/grocery-offers.json ]; then cp data/grocery-offers.json _site/grocery-offers.json; fi
 
       - uses: actions/upload-pages-artifact@v3
         with:

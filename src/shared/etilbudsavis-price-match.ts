@@ -24,6 +24,7 @@ const ETILBUDSAVIS_SEARCH_LIMIT = 24;
 const ETILBUDSAVIS_MAX_ALTERNATIVES = 8;
 
 export type EtilbudsavisOffer = {
+  id?: string;
   heading: string;
   description: string;
   dealer: string;
@@ -73,7 +74,9 @@ export function readEtilbudsavisOffers(value: unknown): EtilbudsavisOffer[] {
     const quantity = readEtilbudsavisQuantity(item.quantity);
     const images = isRecord(item.images) ? item.images : undefined;
     const imageUrl = readStringValue(images?.view) ?? readStringValue(images?.zoom) ?? readStringValue(images?.thumb);
+    const id = readStringValue(item.id);
     return [{
+      ...(id !== undefined ? { id } : {}),
       heading,
       description: readStringValue(item.description)?.trim() ?? "",
       dealer: dealer.trim(),

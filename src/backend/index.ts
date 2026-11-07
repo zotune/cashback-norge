@@ -29,6 +29,7 @@ import { readManualOffers } from "./manual-offers.js";
 import { readProviderOverrides } from "./provider-overrides.js";
 import { crawlKlarna } from "./providers/klarna.js";
 import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog.js";
+import { collectGroceryOffers } from "./grocery-offers.js";
 import { collectElectricitySupplierCatalog } from "./electricity-supplier-catalog.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
@@ -197,6 +198,8 @@ type CliConfig = {
   pokeprisCatalogPath: string;
   skipElectricityCatalog: boolean;
   electricityCatalogPath: string;
+  skipGroceryOffers: boolean;
+  groceryOffersPath: string;
   rabattaShopSlugs: string[];
   dnbPageDataUrl: string;
   dnbSupertilbudPageDataUrl: string;
@@ -274,6 +277,8 @@ async function main(): Promise<void> {
   const electricityCatalogPromise = config.skipElectricityCatalog ? undefined : startEarly(collectElectricitySupplierCatalog({
     generatedAt, logger, previousPath: config.electricityCatalogPath,
   }));
+  // Not a cashback source: this week's supermarket flyer offers for cashbacknorge.no/mattilbud.
+  const groceryOffersPromise = config.skipGroceryOffers ? undefined : startEarly(collectGroceryOffers({ generatedAt, logger }));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
     maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
@@ -1141,6 +1146,12 @@ async function main(): Promise<void> {
     await copyFile(config.electricityCatalogPath, resolve("site/electricity-suppliers.json"));
     logger.info(`Wrote Forbrukerrådet supplier catalogue (${electricityCatalog.suppliers.length} domains)`);
   }
+  const groceryOffers = await groceryOffersPromise;
+  if (groceryOffers !== undefined) {
+    await writeJsonFile(config.groceryOffersPath, groceryOffers);
+    await copyFile(config.groceryOffersPath, resolve("site/grocery-offers.json"));
+    logger.info(`Wrote grocery offers (${groceryOffers.offers.length} offers, ${groceryOffers.chains.length} chains) to ${config.groceryOffersPath}`);
+  }
 }
 
 function readCliConfig(args: string[]): CliConfig {
@@ -1282,6 +1293,8 @@ function readCliConfig(args: string[]): CliConfig {
     pokeprisCatalogPath: resolve(readArgumentValue(args, "--pokepris-catalog-output") ?? "data/pokepris-catalog.json"),
     skipElectricityCatalog: args.includes("--skip-electricity-catalog"),
     electricityCatalogPath: resolve(readArgumentValue(args, "--electricity-catalog-output") ?? "data/electricity-suppliers.json"),
+    skipGroceryOffers: args.includes("--skip-grocery-offers"),
+    groceryOffersPath: resolve(readArgumentValue(args, "--grocery-offers-output") ?? "data/grocery-offers.json"),
     rabattaShopSlugs: readCommaSeparatedArgument(args, "--rabatta-shops"),
     dnbPageDataUrl:
       readArgumentValue(args, "--dnb-page-data-url") ??
