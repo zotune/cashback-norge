@@ -16,6 +16,7 @@ export type PrisjaktDeal = {
   brand?: string;
   category?: string;
   imageUrl?: string;
+  copyImageUrl?: string;
   productUrl: string;
   offerUrl?: string;
   store: string;
@@ -32,6 +33,9 @@ export type PrisjaktDeal = {
   storeCount?: number;
   validTo?: string;
   lowestPrice90Days?: number;
+  lowestPriceEver?: number;
+  historyStartedAt?: string;
+  historyVariantIds?: number[];
   historyScope?: "product" | "variant";
   historyUpdatedAt?: string;
 };

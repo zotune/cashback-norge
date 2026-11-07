@@ -419,3 +419,38 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 
 .bonus-chip-brand { align-items: center; display: inline-flex; flex-shrink: 0; gap: 6px; }
 .bonus-chip-label { line-height: 1.35; }
+
+/* Shared searchable single/multiple selection popover. */
+.selection-menu { gap: 8px; max-height: min(480px, calc(100dvh - 24px)); padding: 10px; }
+.selection-search { flex: 0 0 42px; font: inherit; font-size: 15px; min-height: 42px; padding: 0 12px; width: 100%; }
+.selection-options { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.selection-options .provider-option { min-height: 40px; }
+.selection-options .badge { align-items: center; display: inline-flex; font-size: 12px; gap: 6px; line-height: 1.4; padding: 4px 8px; white-space: normal; width: fit-content; }
+.selection-options .badge .cbn-count { flex-shrink: 0; }
+.selection-sections, .selection-actions { display: flex; flex-shrink: 0; gap: 4px; }
+.selection-sections button, .selection-actions button, .selection-done { font: inherit; font-size: 12px; min-height: 34px; padding: 4px 9px; }
+.selection-actions { justify-content: flex-end; }
+.selection-done { align-self: flex-end; }
+.selection-menu [hidden] { display: none; }
+.selection-empty { color: var(--cbn-muted); font-size: 13px; padding: 12px; }
+.selection-options .provider-option:hover .badge { filter: brightness(1.12); }
+
+/* Selected filter chips shared by Cashback, Tilbud and Dagligvarer. */
+.active-provider {
+  align-items: center;
+  background: var(--cbn-soft, #f7faf8);
+  border-radius: 16px;
+  color: var(--cbn-text, #172026);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+}
+
+.active-provider:hover { filter: brightness(1.12); }
+.active-provider.cbn-chip--highlight { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.active-provider:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 3px; }

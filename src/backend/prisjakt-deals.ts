@@ -8,7 +8,10 @@
 import { Configuration, HttpCrawler, type HttpCrawlingContext, MemoryStorage, Request } from "crawlee";
 import { readPrisjaktDeals, type PrisjaktDeal } from "../shared/prisjakt-deals.js";
 import type { Logger } from "./logger.js";
-import { readPrisjaktDealDetails } from "../shared/prisjakt-deal-details.js";
+import { readPrisjaktDealDetails, readPrisjaktAllTimeHistory } from "../shared/prisjakt-deal-details.js";
+import { createHash } from "node:crypto";
+import { mkdir, writeFile, access } from "node:fs/promises";
+import { resolve, basename } from "node:path";
 
 export const PRISJAKT_DEALS_URL = "https://www.prisjakt.no/tema/dagens-tilbud";
 export const PRISJAKT_DEALS_PUBLISHED_URL = "https://cashbacknorge.no/prisjakt-deals.json";
@@ -31,11 +34,14 @@ export type CollectPrisjaktDealsInput = {
   navigationTimeoutSecs?: number;
   maxDetailProducts?: number;
   productPageUrl?: (deal: PrisjaktDeal) => string;
+  historyUrl?: string;
+  copyImageDirectory?: string;
+  imageRequestUrl?: (url: string) => string;
 };
 
 export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog | undefined> {
   try {
-    return await enrichPrisjaktDeals(await fetchPrisjaktDeals(input), input);
+    return await cachePrisjaktCopyImages(await enrichPrisjaktDeals(await fetchPrisjaktDeals(input), input), input);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const previous = await fetchPreviousCatalog(input).catch((previousError: unknown) => {
@@ -45,11 +51,49 @@ export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Pr
     const age = previous === undefined ? NaN : Date.parse(input.generatedAt) - Date.parse(previous.generatedAt);
     if (previous !== undefined && age >= 0 && age <= MAX_CATALOG_AGE_DAYS * 86_400_000) {
       input.logger.warn(`${message}; reusing ${previous.deals.length} deals from the catalogue generated ${previous.generatedAt}`);
-      return previous;
+      return await cachePrisjaktCopyImages(previous, input);
     }
     input.logger.error(`${message}; no usable previous Prisjakt deals catalogue`);
     return undefined;
   }
+}
+
+/** Legacy cdn.pji.nu images omit CORS headers. Store those exact public images
+ * with the published site so the browser can include them in a clipboard PNG.
+ * The normal thumbnail retains its source URL. No third-party image proxy.
+ */
+export async function cachePrisjaktCopyImages(catalog: PrisjaktDealsCatalog, input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog> {
+  const directory = input.copyImageDirectory ?? resolve("site/deal-images");
+  const deals = catalog.deals.map((deal) => ({ ...deal }));
+  const requests: Request[] = [];
+  const pendingPaths = new Map<number, string>();
+  const availablePaths = new Set<string>();
+  for (const [index, deal] of deals.entries()) {
+    if (index >= 400) break;
+    let url: URL;
+    try { url = new URL(deal.imageUrl ?? ""); } catch { continue; }
+    const previous = deal.copyImageUrl && /^\/deal-images\/[a-f0-9]{32}\.(?:png|jpe?g|webp)$/.test(deal.copyImageUrl) ? deal.copyImageUrl : undefined;
+    const extension = url.pathname.match(/\.(png|jpe?g|webp)$/i)?.[1]?.toLowerCase();
+    if (!previous && (url.hostname !== "cdn.pji.nu" || !url.pathname.startsWith("/product/") || !extension)) continue;
+    const path = previous ?? `/deal-images/${createHash("sha256").update(url.href).digest("hex").slice(0, 32)}.${extension}`;
+    try { await access(resolve(directory, basename(path))); deal.copyImageUrl = path; continue; } catch { /* Download below. */ }
+    delete deal.copyImageUrl;
+    pendingPaths.set(index, path);
+    const sourceUrl = previous ? `https://cashbacknorge.no${previous}` : url.href;
+    requests.push(new Request({ url: input.imageRequestUrl?.(sourceUrl) ?? sourceUrl, userData: { index, path } }));
+  }
+  if (!requests.length) return { ...catalog, deals };
+  await mkdir(directory, { recursive: true });
+  const crawler = createCrawler(input, async ({ request, buffer, contentType }) => {
+    if (!/^image\/(?:jpeg|png|webp)(?:;|$)/i.test(contentType) || buffer.length < 8 || buffer.length > 5 * 1024 * 1024) throw new NoRetryError(`Prisjakt copy image: unexpected image format/size (${contentType}, ${buffer.length} bytes)`);
+    await writeFile(resolve(directory, basename(request.userData.path as string)), buffer);
+    deals[request.userData.index as number]!.copyImageUrl = request.userData.path as string;
+    availablePaths.add(request.userData.path as string);
+  }, (request, reason) => input.logger.warn(`Prisjakt copy image: ${request.url} (${reason})`), ["image/jpeg", "image/png", "image/webp"]);
+  await crawler.run(requests);
+  for (const [index, path] of pendingPaths) if (availablePaths.has(path)) deals[index]!.copyImageUrl = path;
+  input.logger.info(`Prisjakt copy images: ${deals.filter((deal) => deal.copyImageUrl).length} available`);
+  return { ...catalog, deals };
 }
 
 /** Bounded sequential reads; detail failures leave the verified listing usable. */
@@ -59,10 +103,24 @@ export async function enrichPrisjaktDeals(catalog: PrisjaktDealsCatalog, input: 
   let failed = 0;
   const crawler = createCrawler(input, async ({ request, body }) => {
     const index = request.userData.index as number;
+    if (request.userData.kind === "history") {
+      let json: unknown;
+      try { json = JSON.parse(body); } catch { throw new NoRetryError("Prisjakt history: invalid JSON"); }
+      Object.assign(deals[index]!, readPrisjaktAllTimeHistory(json, deals[index]!.historyVariantIds!, catalog.generatedAt));
+      return;
+    }
     Object.assign(deals[index]!, readPrisjaktDealDetails(body, deals[index]!, catalog.generatedAt));
+    const variantIds = deals[index]!.historyVariantIds;
+    if (variantIds) await crawler.addRequests([new Request({
+      url: input.historyUrl ?? "https://www.prisjakt.no/api/price-history", method: "POST",
+      uniqueKey: `history:${deals[index]!.id}:${variantIds.join(",")}`,
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      payload: JSON.stringify({ productId: Number(deals[index]!.id), timeRange: "ALL", shopIds: [], variantIds }),
+      userData: { index, kind: "history" },
+    })]);
   }, (request, reason) => { failed += 1; input.logger.warn(`Prisjakt details: ${request.url} (${reason})`); });
   await crawler.run(deals.slice(0, limit).map((deal, index) => new Request({ url: input.productPageUrl?.(deal) ?? deal.productUrl, userData: { index } })));
-  input.logger.info(`Prisjakt details: ${Math.min(limit, deals.length)} products, ${deals.filter((deal) => deal.lowestPrice90Days !== undefined).length} verified 90-day histories, ${failed} failed`);
+  input.logger.info(`Prisjakt details: ${Math.min(limit, deals.length)} products, ${deals.filter((deal) => deal.lowestPriceEver !== undefined).length} verified all-time histories, ${failed} failed`);
   return { ...catalog, deals };
 }
 
@@ -133,7 +191,7 @@ class NoRetryError extends Error {}
 
 function createCrawler(
   input: CollectPrisjaktDealsInput,
-  handle: (context: { request: Request; body: string }) => Promise<void>,
+  handle: (context: { request: Request; body: string; buffer: Buffer; contentType: string }) => Promise<void>,
   onFailure: (request: Request, reason: string) => void,
   additionalMimeTypes: string[] = [],
 ): HttpCrawler<HttpCrawlingContext> {
@@ -154,7 +212,8 @@ function createCrawler(
         throw new Error(`HTTP ${status}`);
       }
       try {
-        await handle({ request, body: Buffer.isBuffer(body) ? body.toString("utf8") : String(body) });
+        const buffer = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+        await handle({ request, body: buffer.toString("utf8"), buffer, contentType: String(response.headers["content-type"] ?? "") });
       } catch (error) {
         if (error instanceof NoRetryError) request.noRetry = true;
         throw error;

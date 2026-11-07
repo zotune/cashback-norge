@@ -45,6 +45,10 @@ export function readPrisjaktDealDetails(html: string, deal: PrisjaktDeal, now: s
     const history = chart.initialData.priceHistory;
     if (!isRecord(history) || !Array.isArray(history.historyItems) || !Array.isArray(chart.variantIds)) continue;
     const specificVariant = [...new URL(deal.productUrl).searchParams.keys()].some((key) => key.startsWith("a-"));
+    // The public history API accepts the concrete offer's variant ID. This
+    // avoids treating the initial, product-wide chart as selected-variant data.
+    if (specificVariant && variantId !== undefined) result.historyVariantIds = [variantId];
+    else if (!specificVariant && chart.variantIds.every((id) => typeof id === "number")) result.historyVariantIds = chart.variantIds as number[];
     if (specificVariant && (variantId === undefined || !chart.variantIds.includes(variantId))) continue;
     if (chart.variantIds.length > 0 && (variantId === undefined || !chart.variantIds.includes(variantId))) continue;
     const updated = typeof history.newestHistoryItem === "string" ? Date.parse(history.newestHistoryItem) : NaN;
@@ -65,4 +69,23 @@ export function readPrisjaktDealDetails(html: string, deal: PrisjaktDeal, now: s
     break;
   }
   return result;
+}
+
+/** Response to the page's public POST /api/price-history with timeRange: ALL.
+ * The caller binds the response to the queued product and variant IDs. A
+ * three-month chart is deliberately never passed here as an all-time result.
+ */
+export function readPrisjaktAllTimeHistory(value: unknown, variantIds: number[], now: string): Partial<PrisjaktDeal> {
+  if (!isRecord(value) || !isRecord(value.priceHistory) || !Array.isArray(value.priceHistory.historyItems)) throw new Error("Prisjakt history: missing priceHistory.historyItems");
+  const history = value.priceHistory;
+  const oldest = typeof history.oldestHistoryItem === "string" ? Date.parse(history.oldestHistoryItem) : NaN;
+  const updated = typeof history.newestHistoryItem === "string" ? Date.parse(history.newestHistoryItem) : NaN;
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(oldest) || !Number.isFinite(updated) || updated < nowMs - 2 * 86400000 || updated > nowMs + 5 * 60000) return {};
+  const events = (history.historyItems as unknown[]).filter(isRecord).filter((item) => typeof item.date === "string" && Date.parse(item.date) <= nowMs + 5 * 60000);
+  const first = Math.min(...events.map((item) => Date.parse(String(item.date))).filter(Number.isFinite));
+  if (!Number.isFinite(first) || first > oldest + 86400000) return {};
+  const prices = events.filter((item) => item.active === true && item.isMembershipPrice === false && item.isPaidMembership === false && typeof item.price === "number" && Number.isFinite(item.price) && item.price > 0).map((item) => (item.price as number) / 100);
+  if (!prices.length) return {};
+  return { lowestPriceEver: Math.min(...prices), historyStartedAt: new Date(oldest).toISOString(), historyUpdatedAt: new Date(updated).toISOString(), historyScope: variantIds.length ? "variant" : "product" };
 }

@@ -12,7 +12,7 @@
   const {
     createCountBadge, fitCountToChip, createChoiceMenu, createLazyBatches,
     renderSupportFooter, getInstabankInvite, renderSupportInvite, selectSupportAdvertisement,
-    fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer,
+    fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer, createSelectionMenu,
   } = window.SHARED;
 
   const BATCH = 40;
@@ -73,26 +73,27 @@
     const features = config.features ?? {};
     const SORTS = ALL_SORTS.filter((sort) => !sort.feature || features[sort.feature]).map((sort) => sort.value === "saving" && config.savingLabel ? { ...sort, label: `Størst ${config.savingLabel.toLowerCase()}` } : sort);
     const wideScreen = window.matchMedia("(min-width: 1100px)");
-    const state = { items: [], counts: new Map(), off: new Set(), category: "", query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], ranks: new Map(), shown: 0 };
+    const state = { items: [], counts: new Map(), off: new Set(), offCategories: new Set(), offStores: new Set(), category: "", query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], ranks: new Map(), shown: 0 };
     const tallies = new Map();
     let myVotes = {};
     let previewFor = null;
     let rearmBatches = () => {};
     let sortMenu = { refresh() {} };
+    let filterMenu = { refresh() {} };
     let searchTimer;
 
     // ---------- markup ----------
     config.mount.innerHTML = `
       <div class="sticky-header" data-ol="sticky">
-        <div class="group-heading"><span>${esc(config.groupLabel)} <small>Velg én eller flere</small></span><span class="group-actions">
-          <button class="cbn-button cbn-button--quiet list-reset" data-ol="all" type="button">Velg alle</button>
-          <button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button>
-        </span></div>
-        <div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="${esc(config.groupLabel)}"></div>
-        ${features.category ? `<div class="category-picker"><label for="offer-category">Underkategori</label><select class="cbn-field" id="offer-category" data-ol="category"><option value="">Alle underkategorier</option></select><button class="cbn-button cbn-button--quiet" data-ol="category-clear" type="button" hidden>Vis alle</button></div>` : ""}
+        ${!features.category ? `<div class="group-heading"><span>Butikker</span><span class="group-actions"><button class="cbn-button cbn-button--quiet list-reset" data-ol="all" type="button">Velg alle</button><button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button></span></div><div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="Butikker"></div>` : ""}
+        <div class="offer-filter-bar"${!features.category ? " hidden" : ""}>
+          <button class="cbn-button cbn-button--quiet offer-filter-picker" data-ol="filter-picker" type="button" aria-label="Filtrer butikker og kategorier">${FILTER_SVG} Filtre</button>
+          <span data-ol="filter-summary"></span><button class="cbn-button cbn-button--quiet list-reset" data-ol="filter-reset" type="button" hidden>Nullstill valg</button>
+        </div>
+        <div class="active-offer-filters" data-ol="active-filters" hidden></div>
         <div class="list-bar">
           <div class="count" data-ol="count" aria-live="polite"></div>
-          <button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Flere filtre">${FILTER_SVG}</button>
+          <button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Pris og rabatt">Pris/rabatt</button>
           <button class="cbn-button cbn-button--quiet sort-button" data-ol="sort" type="button" aria-label="Sorter tilbud">${SORT_SVG}<span data-choice-label></span></button>
           <div class="view-toggle" role="group" aria-label="Visning">
             <button class="cbn-button cbn-button--quiet view-table" type="button" data-view="table" aria-label="Tabell" title="Tabell">${VIEW_ICONS.table}</button>
@@ -130,7 +131,9 @@
         if (SORTS.some((sort) => sort.value === saved.sort)) state.sort = saved.sort;
         if (["grid", "list", "table"].includes(saved.view)) state.view = saved.view;
         if (saved.sortDir === -1) state.sortDir = -1;
-        if (typeof saved.category === "string") state.category = saved.category;
+        if (Array.isArray(saved.offCategories)) state.offCategories = new Set(saved.offCategories.filter((value) => typeof value === "string"));
+        else if (typeof saved.category === "string") state.category = saved.category;
+        if (Array.isArray(saved.offStores)) state.offStores = new Set(saved.offStores.filter((value) => typeof value === "string"));
         if (saved.filters && typeof saved.filters === "object") {
           for (const key of Object.keys(FILTER_DEFAULTS)) {
             if (typeof saved.filters[key] === typeof FILTER_DEFAULTS[key]) state.filters[key] = saved.filters[key];
@@ -139,7 +142,7 @@
       } catch { /* Defaults: every group, most relevant, table on wide screens. */ }
     }
     function savePreferences() {
-      try { localStorage.setItem(config.storageKey, JSON.stringify({ off: [...state.off], category: state.category, sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
+      try { localStorage.setItem(config.storageKey, JSON.stringify({ off: [...state.off], offCategories: [...state.offCategories], offStores: [...state.offStores], sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
     }
 
     // The spreadsheet needs the width; phones get the list instead.
@@ -150,37 +153,81 @@
     const netVotes = (item) => { const t = tallies.get(item.id.toUpperCase()); return t ? t.upvotes - t.downvotes : 0; };
 
     // ---------- group filters ----------
-    function renderGroups() {
-      const nav = el("groups");
-      nav.replaceChildren();
-      const names = config.groupOrder?.filter((name) => state.counts.has(name)) ?? [...state.counts.keys()].sort((a, b) => (config.groupName?.(a) ?? a).localeCompare(config.groupName?.(b) ?? b, "nb"));
-      for (const name of names) {
-        const button = document.createElement("button");
-        const on = !state.off.has(name);
-        button.type = "button";
-        const brand = config.groupClass?.(name);
-        button.className = `cbn-button ${brand && on ? `group-toggle--brand ${brand}` : "cbn-button--filter"} group-toggle`;
-        button.dataset.group = name;
-        button.setAttribute("aria-pressed", String(on));
-        button.title = on ? `Skjul ${name}` : `Vis ${name}`;
-        const check = document.createElement("span");
-        check.className = "group-check";
-        check.setAttribute("aria-hidden", "true");
-        check.textContent = on ? "✓" : "+";
-        const label = document.createElement("span");
-        label.textContent = config.groupName?.(name) ?? name;
-        button.append(check, label, createCountBadge(state.counts.get(name), `${state.counts.get(name)} tilbud`));
-        nav.append(button);
-        if (on) fitCountToChip(button);
-      }
-      el("all").disabled = ![...state.counts.keys()].some((name) => state.off.has(name));
-      el("none").disabled = ![...state.counts.keys()].some((name) => !state.off.has(name));
+    function filterOptions() {
+      const names = config.groupOrder?.filter((name) => state.counts.has(name)) ?? [...state.counts.keys()].sort((a, b) => a.localeCompare(b, "nb"));
+      const options = [{ value: "group:*", label: `Alle ${config.groupLabel.toLowerCase()}`, section: config.groupLabel }, ...names.map((name) => ({ value: `group:${name}`, label: config.groupName?.(name) ?? name, count: state.counts.get(name), section: config.groupLabel, className: config.groupClass?.(name) }))];
       if (features.category) {
-        const categories = [...new Set(state.items.filter((item) => !state.off.has(item.group)).map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "nb"));
-        if (!categories.includes(state.category)) state.category = "";
-        el("category").innerHTML = `<option value="">Alle underkategorier</option>${categories.map((name) => `<option value="${esc(name)}"${name === state.category ? " selected" : ""}>${esc(name)}</option>`).join("")}`;
+        for (const [kind, field, section] of [["category", "category", "Underkategorier"], ["store", "store", "Butikker"]]) {
+          const counts = new Map();
+          for (const item of state.items) { const value = kind === "store" ? item.store.label : item.category; if (value) counts.set(value, (counts.get(value) || 0) + 1); }
+          options.push({ value: `${kind}:*`, label: `Alle ${section.toLowerCase()}`, section });
+          for (const value of [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb"))) options.push({ value: `${kind}:${value}`, label: value, count: counts.get(value), section });
+        }
       }
+      return options;
     }
+    const filterSet = (value) => value.startsWith("category:") ? state.offCategories : value.startsWith("store:") ? state.offStores : state.off;
+    const filterValue = (value) => value.slice(value.indexOf(":") + 1);
+    const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0;
+    function renderGroups() {
+      const options = filterOptions().filter((option) => !option.value.endsWith(":*"));
+      const selected = options.filter((option) => !filterSet(option.value).has(filterValue(option.value)));
+      el("filter-summary").textContent = hasSelectionFilters() ? `${selected.length} av ${options.length} filtervalg` : features.category ? "Alle kategorier og butikker" : "Alle butikker";
+      el("filter-reset").hidden = !hasSelectionFilters();
+      el("filter-picker").classList.toggle("is-active", hasSelectionFilters());
+      const active = el("active-filters");
+      if (!features.category) {
+        active.hidden = true;
+        const nav = el("groups"); nav.replaceChildren();
+        for (const option of options) {
+          const name = filterValue(option.value), on = !state.off.has(name);
+          const chip = document.createElement("button");
+          chip.type = "button"; chip.dataset.group = name;
+          chip.className = `cbn-button group-toggle ${on && option.className ? `cbn-button--brand ${option.className}` : "cbn-button--filter"}`;
+          chip.setAttribute("aria-pressed", String(on));
+          chip.title = on ? `Skjul ${option.label}` : `Vis ${option.label}`;
+          const check = document.createElement("span"); check.className = "group-check"; check.textContent = on ? "✓" : "+"; check.setAttribute("aria-hidden", "true");
+          const label = document.createElement("span"); label.textContent = option.label;
+          chip.append(check, label, createCountBadge(option.count || 0, `${option.count || 0} tilbud`));
+          nav.append(chip); fitCountToChip(chip);
+        }
+        el("all").disabled = state.off.size === 0;
+        el("none").disabled = options.every((option) => state.off.has(filterValue(option.value)));
+        return;
+      }
+      const filtered = selected.filter((option) => option.value.startsWith("group:") || filterSet(option.value).size > 0);
+      active.hidden = filtered.length === 0;
+      active.replaceChildren();
+      const sections = new Map();
+      for (const option of filtered) {
+        if (!sections.has(option.section)) {
+          const section = document.createElement("div");
+          section.className = "active-offer-filter-group";
+          section.setAttribute("role", "group");
+          section.setAttribute("aria-label", option.section);
+          const heading = document.createElement("span");
+          heading.className = "active-offer-filter-label";
+          heading.textContent = `${option.section}:`;
+          const chips = document.createElement("div");
+          chips.className = "active-offer-filter-chips";
+          section.append(heading, chips);
+          active.append(section);
+          sections.set(option.section, chips);
+        }
+        const chip = document.createElement("button");
+        chip.className = `cbn-chip active-provider ${option.className || "cbn-chip--highlight"}`;
+        chip.type = "button";
+        chip.dataset.removeFilter = option.value;
+        chip.setAttribute("aria-label", `Fjern ${option.label}-filter`);
+        const label = document.createElement("span"); label.textContent = option.label;
+        const remove = document.createElement("span"); remove.textContent = "×"; remove.setAttribute("aria-hidden", "true");
+        chip.append(label, createCountBadge(option.count || 0, `${option.count || 0} tilbud`), remove);
+        sections.get(option.section).append(chip);
+        fitCountToChip(chip);
+      }
+      filterMenu.refresh();
+    }
+    function updateSelectionFilters() { savePreferences(); renderGroups(); render(); }
 
     // ---------- list ----------
     function relevance(item, words) {
@@ -192,7 +239,7 @@
       const words = fold(state.query).split(/\s+/).filter(Boolean);
       const { minSaving, maxPrice, maxUnit, onlyPrePrice, endingSoon } = state.filters;
       const visible = state.items.filter((item) => isRunning(item, now) && !state.off.has(item.group) &&
-        (!state.category || item.category === state.category) &&
+        !state.offCategories.has(item.category) && !state.offStores.has(item.store.label) &&
         (!minSaving || saving(item) >= minSaving) &&
         (!maxPrice || item.amount <= maxPrice) &&
         (!features.unit || !maxUnit || (item.unit && item.unit.amount <= maxUnit)) &&
@@ -223,7 +270,6 @@
       el("count").textContent = words.length ? `${list.length} av ${visible.length} tilbud` : `${visible.length} tilbud`;
       state.list = list;
       state.ranks = new Map((state.sort === "votes" ? list.filter((item) => { const tally = tallies.get(item.id.toUpperCase()); return tally && tally.upvotes + tally.downvotes > 0; }) : list).map((item, index) => [item.id, index + 1]));
-      if (features.category) el("category-clear").hidden = !state.category;
       config.mount.querySelectorAll("[data-toplist]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.toplist === state.sort && state.sortDir === 1)));
       if (config.toplists) el("toplist-note").textContent = state.sort === "votes" ? "Tommel opp minus tommel ned. Tilbud uten stemmer har ingen brukerrangering." : state.sort === "saving" ? "Prisfall mot normalpris hos Prisjakt, basert på de siste tre månedene." : state.sort === "relevance" ? "Prisjakts popularitetsrekkefølge innen valgte filtre." : "";
       state.shown = 0;
@@ -269,10 +315,9 @@
       { label: "Butikk", sort: "store" },
       ...(features.category ? [{ label: "Kategori", sort: "group" }] : []),
       { label: "Pris", sort: "price", num: true },
-      { label: "Førpris", sort: "", num: true },
       { label: config.savingLabel ?? "Rabatt", sort: "saving", num: true },
       ...(!features.history ? [{ label: "Spart", sort: "savingKr", num: true }] : []),
-      ...(features.history ? [{ label: "Lavest 90 dager", sort: "", num: true }] : []),
+      ...(features.history ? [{ label: "Lavest", sort: "", num: true }] : []),
       ...(features.unit ? [{ label: "Kilo-/literpris", sort: "unit", num: true }] : []),
       ...(features.validity ? [{ label: "Gyldig", sort: "ending" }] : []),
       ...(features.bonus ? [{ label: "Kortbonus", sort: "" }] : []),
@@ -287,16 +332,19 @@
       }).join("")}</tr></thead><tbody></tbody></table>`;
     }
     const thumbHtml = (item) => item.imageUrl
-      ? `<button class="deal-thumb" type="button" data-preview="${esc(item.imageUrl)}" aria-label="Vis større bilde av ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></button>`
+      ? `<a class="deal-thumb" href="${esc(item.link.url)}" target="_blank" rel="noopener" data-preview="${esc(item.imageUrl)}" aria-label="Åpne ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></a>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
     const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}${EXTERNAL_SVG}</a></span>`;
     const storeHtml = (item) => {
       const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(item.store.label)}</span>`;
-      return item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
+      if (!features.category) return `<button class="cbn-button cbn-button--quiet deal-store-filter" type="button" data-store-group="${esc(item.group)}" title="Vis bare ${esc(item.store.label)}" aria-label="Vis bare ${esc(item.store.label)}">${chip}</button>`;
+      const store = item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
+      return store;
     };
-    const historyHtml = (item) => Number.isFinite(item.lowestPrice90Days) ? `<span class="deal-history" title="${esc(`Laveste registrerte varepris siste 90 dager hos Prisjakt. ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`)}">${esc(kr(item.lowestPrice90Days))}${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>` : `<span class="deal-valid" title="Historikk for riktig produkt/variant og hele perioden er ikke tilgjengelig">—</span>`;
+    const historyHtml = (item) => Number.isFinite(item.lowestPriceEver) ? `<span class="deal-history" title="${esc(`Laveste registrerte varepris gjennom hele historikken hos Prisjakt.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`)}">${esc(kr(item.lowestPriceEver))}${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>` : `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
-    const bonusHtml = (item) => item.bonus ? `<span class="cbn-chip cbn-chip--highlight card-chip" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</span>` : "";
+    const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
+    const factsHtml = (item) => `<span class="deal-facts">${(item.details ?? (item.description ? item.description.split(/\s*·\s*/) : [])).map((part) => `<span class="cbn-chip cbn-chip--muted deal-fact">${esc(part)}</span>`).join(" ")}</span>`;
     function daysLeftHtml(item) {
       if (!item.validTo) return "";
       const days = daysLeft(item);
@@ -318,11 +366,10 @@
     function tableRowHtml(item) {
       return `<tr class="deal-row" data-id="${esc(item.id)}">
         <td>${thumbHtml(item)}</td>
-        <td>${titleHtml(item)}${item.description ? `<br><span class="deal-desc">${esc(item.description)}</span>` : ""}</td>
+        <td>${titleHtml(item)}${factsHtml(item)}</td>
         <td>${storeHtml(item)}</td>
         ${features.category ? `<td><button class="cbn-button cbn-button--quiet category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button></td>` : ""}
-        <td class="num"><strong class="deal-price">${esc(kr(item.amount))}</strong></td>
-        <td class="num">${item.prePrice > item.amount ? `<s class="deal-before">${esc(kr(item.prePrice))}</s>` : ""}</td>
+        <td class="num"><span class="deal-price-stack"><strong class="deal-price">${esc(kr(item.amount))}</strong> ${item.prePrice > item.amount ? `<s class="deal-before" aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""}</span></td>
         <td class="num">${savingChipHtml(item)}</td>
         ${!features.history ? `<td class="num">${savingKr(item) > 0 ? esc(kr(savingKr(item))) : ""}</td>` : ""}
         ${features.history ? `<td class="num">${historyHtml(item)}</td>` : ""}
@@ -335,22 +382,22 @@
     }
     function cardHtml(item) {
       const before = item.prePrice > item.amount || saving(item) > 0
-        ? `<span class="deal-before">${item.prePrice > item.amount ? `<s aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""}${savingChipHtml(item)}</span>`
+        ? `<span class="deal-before">${item.prePrice > item.amount ? `<s aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""} ${savingChipHtml(item)}</span>`
         : "";
       return `<article class="cbn-card deal-row" data-id="${esc(item.id)}">
         ${thumbHtml(item)}
         <div class="deal-main">
           ${titleHtml(item)}
-          ${item.description ? `<span class="deal-desc">${esc(item.description)}</span>` : ""}
+          ${factsHtml(item)}
         </div>
         <div class="deal-side">
           <strong class="deal-price">${esc(kr(item.amount))}</strong>
           ${before}
-          ${features.history ? `<span class="deal-history-summary">Lavest 90 d: ${historyHtml(item)}</span>` : ""}
+          ${features.history ? `<span class="deal-history-summary">Lavest: ${historyHtml(item)}</span>` : ""}
           ${actionsHtml(item)}
         </div>
         <div class="deal-details">
-          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? `<span class="deal-valid deal-category">${esc(item.category || item.group)}</span>` : ""}</div>
+          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? `<button class="cbn-button cbn-chip cbn-chip--muted category-link" type="button" data-category="${esc(item.category || item.group)}">${esc(item.category || item.group)}</button>` : ""}</div>
           ${features.validity ? `<div class="deal-meta deal-meta--validity">${validityHtml(item)}</div>` : ""}
         </div>
       </article>`;
@@ -358,7 +405,7 @@
 
     // ---------- preview, copy, votes ----------
     function validityHtml(item) {
-      return item.validTo ? `<span class="deal-validity"><span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span>${daysLeftHtml(item)}</span>` : `<span class="deal-valid">Sluttdato ukjent</span>`;
+      return item.validTo ? `<span class="deal-validity"><span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span> ${daysLeftHtml(item)}</span>` : `<span class="deal-valid">Sluttdato ukjent</span>`;
     }
     function showPreview(thumb) {
       const preview = el("preview");
@@ -399,7 +446,7 @@
       button.classList.add("copied");
       tooltip.textContent = "Lager bilde …";
       try {
-        tooltip.textContent = await copyOffer({ title: item.title, description: item.description, price, where, url: item.link.url, imageUrl: item.imageUrl });
+        tooltip.textContent = await copyOffer({ title: item.title, description: item.description, price, where, url: item.link.url, imageUrl: item.copyImageUrl || item.imageUrl });
       } catch {
         tooltip.textContent = "Kunne ikke kopiere";
       }
@@ -519,25 +566,44 @@
       if (url.href !== location.href) history.replaceState(null, "", url);
     }
     function setupControls() {
-      if (features.category) {
-        el("category").addEventListener("change", () => { state.category = el("category").value; savePreferences(); render(); });
-        el("category-clear").addEventListener("click", () => { state.category = ""; el("category").value = ""; savePreferences(); render(); });
+      if (!features.category) {
+        el("groups").addEventListener("click", (event) => { const name = event.target.closest("[data-group]")?.dataset.group; if (name) { if (state.off.has(name)) state.off.delete(name); else state.off.add(name); updateSelectionFilters(); } });
+        el("all").addEventListener("click", () => { state.off.clear(); updateSelectionFilters(); });
+        el("none").addEventListener("click", () => { state.off = new Set(state.counts.keys()); updateSelectionFilters(); });
       }
+      if (features.category)
+      filterMenu = createSelectionMenu(el("filter-picker"), {
+        id: `${config.voteKey}-filters`, multiple: true, placeholder: "Søk i filtervalgene …", getOptions: filterOptions,
+        isSelected: (value) => filterValue(value) === "*" ? filterSet(value).size === 0 : value.startsWith("group:") ? !state.off.has(filterValue(value)) : filterSet(value).size > 0 && !filterSet(value).has(filterValue(value)),
+        onSelect: (value) => {
+          const set = filterSet(value), name = filterValue(value);
+          if (name === "*") set.clear();
+          else if (value.startsWith("group:")) { if (set.has(name)) set.delete(name); else set.add(name); }
+          else if (set.size === 0) {
+            const prefix = value.slice(0, value.indexOf(":") + 1);
+            for (const option of filterOptions()) if (option.value.startsWith(prefix) && !option.value.endsWith(":*") && option.value !== value) set.add(filterValue(option.value));
+          } else if (set.has(name)) { set.delete(name); if (value.startsWith("category:")) { const item = state.items.find((item) => item.category === name); if (item) state.off.delete(item.group); } }
+          else set.add(name);
+          updateSelectionFilters();
+        },
+        onBulk: (selected, section) => { for (const option of filterOptions().filter((option) => option.section === section && !option.value.endsWith(":*"))) { const set = filterSet(option.value), name = filterValue(option.value); if (selected) set.delete(name); else set.add(name); } updateSelectionFilters(); },
+      });
+      el("filter-reset").addEventListener("click", () => { state.off.clear(); state.offCategories.clear(); state.offStores.clear(); updateSelectionFilters(); });
+      el("active-filters").addEventListener("click", (event) => {
+        const value = event.target.closest("[data-remove-filter]")?.dataset.removeFilter;
+        if (!value) return;
+        const set = filterSet(value);
+        set.add(filterValue(value));
+        // Removing the last narrow filter restores the implicit "all" selection.
+        if (!value.startsWith("group:")) {
+          const prefix = value.slice(0, value.indexOf(":") + 1);
+          if (filterOptions().filter((option) => option.value.startsWith(prefix) && !option.value.endsWith(":*")).every((option) => set.has(filterValue(option.value)))) set.clear();
+        }
+        updateSelectionFilters();
+      });
       config.mount.querySelectorAll("[data-toplist]").forEach((button) => button.addEventListener("click", () => {
         state.sort = button.dataset.toplist; state.sortDir = 1; savePreferences(); sortMenu.refresh(); render();
       }));
-      el("groups").addEventListener("click", (event) => {
-        const button = event.target.closest(".group-toggle");
-        if (!button) return;
-        const name = button.dataset.group;
-        if (state.off.has(name)) state.off.delete(name);
-        else state.off.add(name);
-        savePreferences();
-        renderGroups();
-        render();
-      });
-      el("all").addEventListener("click", () => { state.off.clear(); savePreferences(); renderGroups(); render(); });
-      el("none").addEventListener("click", () => { state.off = new Set(state.counts.keys()); savePreferences(); renderGroups(); render(); });
       setupFilters();
       const search = el("search");
       const wrap = search.closest(".input-wrap");
@@ -587,14 +653,14 @@
         if (thumb && hoverCapable.matches && !thumb.contains(event.relatedTarget)) hidePreview();
       });
       results.addEventListener("click", (event) => {
+        const store = event.target.closest("[data-store-group]");
+        if (store) { state.off = new Set([...state.counts.keys()].filter((name) => name !== store.dataset.storeGroup)); updateSelectionFilters(); return; }
         const category = event.target.closest("[data-category]");
-        if (category) { state.category = category.dataset.category; el("category").value = state.category; savePreferences(); render(); return; }
+        if (category) { state.off.clear(); state.offCategories = new Set(state.items.map((item) => item.category).filter((name) => name !== category.dataset.category)); updateSelectionFilters(); return; }
         const vote = event.target.closest(".vote-btn");
         if (vote) return void castVote(vote);
         const copy = event.target.closest(".copy-btn");
         if (copy) return void copyItem(copy);
-        const thumb = event.target.closest(".deal-thumb[data-preview]");
-        if (thumb && effectiveView() !== "grid") return void (previewFor === thumb ? hidePreview() : showPreview(thumb));
         const header = event.target.closest("th[data-sort]");
         if (header) {
           // Same column again flips the direction.
@@ -633,6 +699,7 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const { items, updated, note } = config.read(await response.json());
         state.items = items.filter((item) => typeof item.id === "string" && Number.isFinite(item.amount) && item.amount > 0);
+        if (state.category) { state.offCategories = new Set(state.items.map((item) => item.category).filter((name) => name !== state.category)); state.category = ""; }
         const now = Date.now();
         for (const item of state.items) if (isRunning(item, now)) state.counts.set(item.group, (state.counts.get(item.group) || 0) + 1);
         const only = config.onlyGroupsFromUrl?.(params, [...state.counts.keys()]);

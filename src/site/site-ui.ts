@@ -8,6 +8,8 @@ import { formatTooltipHtml } from "../shared/tooltip-content";
 import { getBrandChipCss } from "../shared/theme";
 import { createCountBadge } from "../shared/ui";
 import { GROCERY_CHAIN_LIST } from "../shared/grocery-chains";
+import { createSelectionMenu } from "./selection-menu";
+export { createSelectionMenu } from "./selection-menu";
 import { formatKr } from "../shared/reward-calculation";
 
 export { copyOffer } from "./offer-copy";
@@ -101,105 +103,7 @@ export type ChoiceOption = { value: string; label: string };
 
 /** A single-choice popover menu in the same style as the filter menu (sorting and similar). */
 export function createChoiceMenu(button: HTMLButtonElement, options: ChoiceOption[], getValue: () => string, onSelect: (value: string) => void): { refresh: () => void } {
-  const menu = document.createElement("div");
-  menu.className = "provider-menu choice-menu cbn-card";
-  menu.setAttribute("role", "listbox");
-  menu.setAttribute("aria-label", button.getAttribute("aria-label") ?? "");
-  menu.hidden = true;
-  menu.tabIndex = -1;
-  document.body.append(menu);
-  const label = button.querySelector<HTMLElement>("[data-choice-label]");
-  let active = 0;
-
-  const render = () => {
-    menu.replaceChildren(...options.map((option, index) => {
-      const row = document.createElement("div");
-      const selected = option.value === getValue();
-      row.className = `provider-option${index === active ? " is-active" : ""}`;
-      row.setAttribute("role", "option");
-      row.setAttribute("aria-selected", String(selected));
-      row.dataset.value = option.value;
-      const text = document.createElement("span");
-      text.className = "provider-option-all";
-      text.textContent = option.label;
-      const check = document.createElement("span");
-      check.className = "provider-option-check";
-      check.setAttribute("aria-hidden", "true");
-      check.textContent = selected ? "✓" : "";
-      row.append(text, check);
-      return row;
-    }));
-  };
-  const refresh = () => {
-    if (label) label.textContent = options.find((option) => option.value === getValue())?.label ?? "";
-    if (!menu.hidden) render();
-  };
-  const position = () => {
-    if (menu.hidden) return;
-    const anchor = button.getBoundingClientRect();
-    const width = Math.min(260, window.innerWidth - 24);
-    menu.style.width = `${width}px`;
-    menu.style.left = `${Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12))}px`;
-    const height = menu.getBoundingClientRect().height;
-    const below = window.innerHeight - anchor.bottom - 12;
-    menu.style.top = `${below >= height ? anchor.bottom + 6 : Math.max(12, anchor.top - height - 6)}px`;
-  };
-  const close = (restoreFocus = false) => {
-    if (menu.hidden) return;
-    menu.hidden = true;
-    button.setAttribute("aria-expanded", "false");
-    button.classList.remove("is-open");
-    if (restoreFocus) button.focus({ preventScroll: true });
-  };
-  const open = () => {
-    active = Math.max(0, options.findIndex((option) => option.value === getValue()));
-    menu.hidden = false;
-    button.setAttribute("aria-expanded", "true");
-    button.classList.add("is-open");
-    render();
-    position();
-    menu.focus({ preventScroll: true });
-  };
-  const choose = (value: string) => {
-    onSelect(value);
-    refresh();
-    close(true);
-  };
-  button.setAttribute("aria-haspopup", "listbox");
-  button.setAttribute("aria-expanded", "false");
-  button.addEventListener("click", () => (menu.hidden ? open() : close(true)));
-  menu.addEventListener("click", (event) => {
-    const row = (event.target as Element).closest<HTMLElement>(".provider-option");
-    if (row?.dataset.value !== undefined) choose(row.dataset.value);
-  });
-  menu.addEventListener("pointerover", (event) => {
-    const row = (event.target as Element).closest<HTMLElement>(".provider-option");
-    if (!row) return;
-    active = options.findIndex((option) => option.value === row.dataset.value);
-    menu.querySelectorAll(".provider-option").forEach((item, index) => item.classList.toggle("is-active", index === active));
-  });
-  menu.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      active = (active + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
-      render();
-    } else if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      choose(options[active]!.value);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      close(true);
-    } else if (event.key === "Tab") {
-      close();
-    }
-  });
-  document.addEventListener("pointerdown", (event) => {
-    if (!menu.hidden && !menu.contains(event.target as Node) && !button.contains(event.target as Node)) close();
-  });
-  window.addEventListener("resize", position, { passive: true });
-  window.addEventListener("scroll", position, { passive: true, capture: true });
-  refresh();
-  return { refresh };
+  return createSelectionMenu(button, { className: "choice-menu", getOptions: () => options, isSelected: (value) => value === getValue(), onSelect, updateLabel: true });
 }
 
 /** Chip colours for the grocery chains, light and dark, as one style element. */

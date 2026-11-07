@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cashback Norge</title>
-<script src="/theme.js?v=3"></script>
-<link rel="stylesheet" href="/site.css?v=1">
+<script src="/theme.js?v=4"></script>
+<link rel="stylesheet" href="/site.css?v=5">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="favicon.png?v=quokka-1">
 <script>
@@ -60,20 +60,6 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
 .provider-option-empty { color: var(--cbn-muted); font-size: 13px; padding: 14px 8px; text-align: center; }
 .provider-filter-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .provider-filter-status[hidden] { display: none; }
-.active-provider {
-  align-items: center;
-  background: var(--cbn-soft, #f7faf8);
-  border-radius: 16px;
-  color: var(--cbn-text, #172026);
-  cursor: pointer;
-  display: inline-flex;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  gap: 8px;
-  min-height: 32px;
-  padding: 4px 10px;
-}
 .active-provider:focus-visible, .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
 .filter-bar { align-items: center; display: flex; gap: 4px; margin-bottom: 8px; }
 .filter-bar .provider-picker { align-self: stretch; min-height: 36px; width: 36px; }
@@ -633,7 +619,7 @@ a.code-reward { color: inherit; text-decoration: none; }
   <div class="tip-line"></div>
 </div>
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
-<script src="shared-data.js"></script>
+<script src="shared-data.js?v=5"></script>
 <script>
 const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey, renderSupportFooter, getInstabankInvite, createCountBadge, fitCountToChip, renderSupportInvite, createLazyBatches, SUPABASE_URL, SUPABASE_ANON_KEY, fetchMyVotes, apiVote } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
@@ -698,173 +684,24 @@ function getProviderOptions() {
   return options;
 }
 
-function normalizeProviderSearch(value) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("nb");
-}
-
-function setActiveProviderOption(index) {
-  const options = document.querySelectorAll(".provider-option");
-  activeProviderOption = Math.max(-1, Math.min(visibleProviderOptions.length - 1, index));
-  options.forEach((option, optionIndex) => option.classList.toggle("is-active", optionIndex === activeProviderOption));
-  const search = document.getElementById("provider-menu-search");
-  if (activeProviderOption >= 0) search.setAttribute("aria-activedescendant", `provider-option-${activeProviderOption}`);
-  else search.removeAttribute("aria-activedescendant");
-}
-
-function renderProviderOptions(query = "") {
-  const list = document.getElementById("provider-options");
-  if (!list) return;
-  const normalizedQuery = normalizeProviderSearch(query.trim());
-  visibleProviderOptions = getProviderOptions().filter(option =>
-    normalizeProviderSearch(option.name).includes(normalizedQuery));
-  list.replaceChildren();
-  if (visibleProviderOptions.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "provider-option-empty";
-    empty.textContent = "Ingen fordelsprogrammer funnet";
-    list.append(empty);
-    setActiveProviderOption(-1);
-    positionProviderMenu();
-    return;
-  }
-  visibleProviderOptions.forEach((item, index) => {
-    const option = document.createElement("div");
-    option.className = "provider-option";
-    option.id = `provider-option-${index}`;
-    option.setAttribute("role", "option");
-    const selected = item.provider ? selectedProviders.has(item.provider) : !hasProviderFilter();
-    option.setAttribute("aria-selected", String(selected));
-    option.dataset.provider = item.provider;
-    const label = document.createElement("span");
-    label.className = "provider-option-label";
-    const chip = document.createElement("span");
-    chip.className = item.provider ? `cbn-chip badge badge-${item.provider}` : "provider-option-all";
-    const name = document.createElement("span");
-    name.className = "provider-option-name";
-    name.textContent = item.name;
-    chip.title = item.name;
-    chip.append(name, createCountBadge(item.count, `${item.count} butikker`));
-    label.append(chip);
-    const check = document.createElement("span");
-    check.className = "provider-option-check";
-    check.setAttribute("aria-hidden", "true");
-    check.textContent = selected ? "✓" : "";
-    option.append(label, check);
-    list.append(option);
-    if (item.provider) fitCountToChip(chip);
-  });
-  const selectedIndex = visibleProviderOptions.findIndex(option => option.provider && selectedProviders.has(option.provider));
-  setActiveProviderOption(selectedIndex >= 0 ? selectedIndex : 0);
-  positionProviderMenu();
-}
-
-function positionProviderMenu() {
-  const picker = document.getElementById("provider-picker");
-  const menu = document.getElementById("provider-menu");
-  if (!picker || !menu || menu.hidden) return;
-  const anchor = picker.getBoundingClientRect();
-  const width = Math.min(360, window.innerWidth - 24);
-  const left = Math.max(12, Math.min(anchor.left + anchor.width / 2 - width / 2, window.innerWidth - width - 12));
-  const below = window.innerHeight - anchor.bottom - 12;
-  const above = anchor.top - 12;
-  menu.style.maxHeight = `${Math.min(480, window.innerHeight - 24)}px`;
-  const naturalHeight = menu.getBoundingClientRect().height;
-  const openBelow = hasProviderFilter() && above >= naturalHeight
-    ? false
-    : below >= naturalHeight || (below >= above && above < naturalHeight);
-  const availableSpace = Math.max(120, (openBelow ? below : above) - 8);
-  menu.style.maxHeight = `${Math.min(480, availableSpace)}px`;
-  const menuHeight = menu.getBoundingClientRect().height;
-  const top = openBelow ? anchor.bottom + 8 : anchor.top - menuHeight - 8;
-  menu.style.width = `${width}px`;
-  menu.style.left = `${left}px`;
-  menu.style.top = `${Math.max(12, top)}px`;
-}
-
-function closeProviderMenu(restoreFocus = false) {
-  const picker = document.getElementById("provider-picker");
-  const menu = document.getElementById("provider-menu");
-  if (!picker || !menu || menu.hidden) return;
-  menu.hidden = true;
-  picker.classList.remove("is-open");
-  picker.setAttribute("aria-expanded", "false");
-  document.getElementById("provider-menu-search").setAttribute("aria-expanded", "false");
-  if (restoreFocus) picker.focus({ preventScroll: true });
-}
-
-function openProviderMenu() {
-  const picker = document.getElementById("provider-picker");
-  const menu = document.getElementById("provider-menu");
-  const search = document.getElementById("provider-menu-search");
-  if (!picker || !menu || !search) return;
-  menu.hidden = false;
-  picker.classList.add("is-open");
-  picker.setAttribute("aria-expanded", "true");
-  search.setAttribute("aria-expanded", "true");
-  search.value = "";
-  renderProviderOptions();
-  positionProviderMenu();
-  requestAnimationFrame(() => {
-    positionProviderMenu();
-    search.focus({ preventScroll: true });
-  });
-}
-
+let providerSelectionMenu;
+function renderProviderOptions() { providerSelectionMenu?.refresh(); }
+function closeProviderMenu(restoreFocus = false) { providerSelectionMenu?.close(restoreFocus); }
 function setupProviderPicker() {
   const picker = document.getElementById("provider-picker");
-  const menu = document.getElementById("provider-menu");
-  const search = document.getElementById("provider-menu-search");
-  const list = document.getElementById("provider-options");
-  document.body.append(menu);
-  renderProviderOptions();
-  const status = document.getElementById("provider-filter-status");
-  picker.addEventListener("click", () => menu.hidden ? openProviderMenu() : closeProviderMenu(true));
-  document.getElementById("provider-menu-done").addEventListener("click", () => closeProviderMenu(true));
-  search.addEventListener("input", () => renderProviderOptions(search.value));
-  search.addEventListener("keydown", event => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      setActiveProviderOption(activeProviderOption < 0
-        ? (step > 0 ? 0 : visibleProviderOptions.length - 1)
-        : (activeProviderOption + step + visibleProviderOptions.length) % visibleProviderOptions.length);
-      list.querySelector(".provider-option.is-active")?.scrollIntoView({ block: "nearest" });
-    } else if (event.key === "Enter" && visibleProviderOptions.length > 0) {
-      event.preventDefault();
-      const choice = visibleProviderOptions[activeProviderOption < 0 ? 0 : activeProviderOption];
-      toggleProviderFilter(choice.provider);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      closeProviderMenu(true);
-    } else if (event.key === "Tab") {
-      closeProviderMenu();
-    }
+  document.getElementById("provider-menu").remove();
+  providerSelectionMenu = window.SHARED.createSelectionMenu(picker, {
+    id: "provider-menu", multiple: true, placeholder: "Søk i fordelsprogrammer …",
+    getOptions: () => getProviderOptions().map((option) => ({ value: option.provider, label: option.name, count: option.count, ...(option.provider ? { className: `badge-${option.provider}` } : {}) })),
+    isSelected: (value) => value ? selectedProviders.has(value) : !hasProviderFilter(),
+    onSelect: toggleProviderFilter,
   });
-  list.addEventListener("pointerover", event => {
-    const option = event.target.closest(".provider-option");
-    if (option) setActiveProviderOption(Number(option.id.slice("provider-option-".length)));
-  });
-  list.addEventListener("click", event => {
-    const option = event.target.closest(".provider-option");
-    if (!option) return;
-    toggleProviderFilter(option.dataset.provider || "");
-  });
-  status.addEventListener("click", event => {
+  document.getElementById("provider-filter-status").addEventListener("click", (event) => {
     const chip = event.target.closest("[data-remove-provider]");
     if (!chip) return;
     selectedProviders.delete(chip.dataset.removeProvider);
-    updateProviderFilter();
-    syncFilterUrl(true);
-    render(document.querySelector(".search").value);
+    updateProviderFilter(); syncFilterUrl(true); render(document.querySelector(".search").value);
   });
-  document.addEventListener("pointerdown", event => {
-    if (!menu.hidden && !menu.contains(event.target) && !picker.contains(event.target)) closeProviderMenu();
-  });
-  document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && !menu.hidden) closeProviderMenu(true);
-  });
-  window.addEventListener("resize", positionProviderMenu, { passive: true });
-  window.addEventListener("scroll", positionProviderMenu, { passive: true, capture: true });
 }
 
 function getMerchantProviders(merchant) {

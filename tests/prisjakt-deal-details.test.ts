@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readPrisjaktDealDetails } from "../src/shared/prisjakt-deal-details.js";
+import { readPrisjaktDealDetails, readPrisjaktAllTimeHistory } from "../src/shared/prisjakt-deal-details.js";
 import { createDealMerchantLookup } from "../src/shared/deal-merchants.js";
 import type { CashbackOffer } from "../src/shared/cashback.js";
 import type { PrisjaktDeal } from "../src/shared/prisjakt-deals.js";
@@ -64,6 +64,11 @@ test("detail crawler stops at its product bound and a failed detail does not dis
   const warnings: string[] = [];
   const server = createServer((req, res) => {
     requests.push(req.url!);
+    if (req.url === "/history.json") {
+      let body = ""; req.on("data", (chunk) => { body += chunk; });
+      req.on("end", () => { assert.equal(JSON.parse(body).timeRange, "ALL"); res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ priceHistory: { ...history.initialData.priceHistory, historyItems: [event("2026-01-01T00:00:00Z", 1000000), ...history.initialData.priceHistory.historyItems] } })); });
+      return;
+    }
     res.writeHead(req.url === "/123" ? 200 : 403, { "Content-Type": "text/html" }).end(req.url === "/123" ? page(history, row) : "Not available");
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -72,15 +77,27 @@ test("detail crawler stops at its product bound and a failed detail does not dis
   try {
     const result = await enrichPrisjaktDeals({ version: 1, generatedAt: now, source: "Prisjakt", deals: [deal, { ...deal, id: "124" }, { ...deal, id: "125" }].map((d, i) => ({ ...d, rank: i + 1 })) }, {
       generatedAt: now, logger: { info() {}, error() {}, warn: message => warnings.push(message) },
-      maxDetailProducts: 2, productPageUrl: d => `http://127.0.0.1:${address.port}/${d.id}`,
+      historyUrl: `http://127.0.0.1:${address.port}/history.json`, maxDetailProducts: 2, productPageUrl: d => `http://127.0.0.1:${address.port}/${d.id}`,
     });
     assert.equal(result.deals.length, 3);
     assert.equal(result.deals[0]?.lowestPrice90Days, 4990);
     assert.equal(result.deals[1]?.lowestPrice90Days, undefined);
-    assert.deepEqual(requests, ["/123", "/124"]);
+    assert.deepEqual(requests.filter((path) => path !== "/history.json"), ["/123", "/124"]);
+    assert.equal(requests.filter((path) => path === "/history.json").length, 1);
+    assert.equal(result.deals[0]?.lowestPriceEver, 4990);
     assert.match(warnings[0]!, /Prisjakt details.*124.*403/);
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
+});
+
+
+test("all-time minimum uses the ALL response, including prices outside 90 days, with complete coverage", () => {
+  const value = { priceHistory: { ...history.initialData.priceHistory, historyItems: [event("2026-01-01T00:00:00Z", 100000), ...history.initialData.priceHistory.historyItems] } };
+  const result = readPrisjaktAllTimeHistory(value, [], now);
+  assert.equal(result.lowestPriceEver, 1000);
+  assert.equal(result.historyStartedAt, "2026-01-01T00:00:00.000Z");
+  assert.equal(readPrisjaktAllTimeHistory({ priceHistory: history.initialData.priceHistory }, [], now).lowestPriceEver, undefined);
+  assert.throws(() => readPrisjaktAllTimeHistory({}, [], now), /missing priceHistory/);
 });

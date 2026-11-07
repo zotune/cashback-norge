@@ -31,6 +31,9 @@ export const UI_CSS = `
   --cbn-button-bg: var(--cbn-accent); --cbn-button-fg: var(--cbn-on-accent);
   background: var(--cbn-button-bg); color: var(--cbn-button-fg);
 }
+.cbn-button--brand { --cbn-button-bg: var(--group-brand-bg); --cbn-button-fg: var(--group-brand-fg); }
+.cbn-button.cbn-button--brand[aria-pressed="true"] { background: var(--group-brand-bg); color: var(--group-brand-fg); }
+.cbn-button.cbn-button--brand:hover:not(:disabled) { background: color-mix(in srgb, var(--group-brand-bg) 85%, #fff 15%); color: var(--group-brand-fg); }
 .cbn-field, .cbn-field-group {
   border: 0; border-radius: var(--cbn-control-radius); box-shadow: none;
   background: var(--cbn-field); color: var(--cbn-text); outline: none;

@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tilbud · Cashback Norge</title>
-<script src="/theme.js?v=3"></script>
-<link rel="stylesheet" href="/site.css?v=1">
-<link rel="stylesheet" href="/offer-list.css?v=1">
+<script src="/theme.js?v=4"></script>
+<link rel="stylesheet" href="/site.css?v=5">
+<link rel="stylesheet" href="/offer-list.css?v=5">
 <meta name="description" content="Gode tilbud på elektronikk, hjem, sport og mer – sorter på prisfall, pris og butikk, med lenke til prishistorikken.">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
@@ -37,7 +37,7 @@
   <p class="note" id="note"></p>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
-      <a href="/">Cashback</a> · <a href="/dagligvarer/">Dagligvarer</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
+      <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
     </nav>
     <div>© 2026 Cashback Norge · Uavhengig oversikt, ikke tilknyttet butikkene</div>
   </footer>
@@ -45,8 +45,8 @@
 <div class="fixed-footer">
   <div class="tip-line"></div>
 </div>
-<script src="/shared-data.js"></script>
-<script src="/offer-list.js?v=1"></script>
+<script src="/shared-data.js?v=5"></script>
+<script src="/offer-list.js?v=5"></script>
 <script>
 // Data: /prisjakt-deals.json, built by the daily crawl from Prisjakt's "Dagens tilbud".
 // The discount column is Prisjakt's price drop against the usual price; the pre-price is the
@@ -54,6 +54,7 @@
 const { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS, createDealMerchantLookup } = window.SHARED;
 
 let merchantDomain = () => undefined;
+let cashbackIndex;
 
 function read(catalog) {
   const deals = Array.isArray(catalog.deals) ? catalog.deals : [];
@@ -66,27 +67,28 @@ function read(catalog) {
       group: getPrisjaktDealGroup(deal.category),
       store: {
         label: deal.store, className: "cbn-chip--muted",
-        ...(deal.storeUrl || merchantDomain(deal.store) ? { url: deal.storeUrl || `https://${merchantDomain(deal.store)}/` } : {}),
+        ...(deal.storeId ? { url: `https://www.prisjakt.no/shop.php?f=${encodeURIComponent(deal.storeId)}` } : {}),
         ...(deal.storeLogoUrl ? { iconUrl: deal.storeLogoUrl } : merchantDomain(deal.store) ? { iconUrl: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(merchantDomain(deal.store))}&sz=64` } : {}),
       },
       amount: deal.price,
-      lowestPrice90Days: deal.lowestPrice90Days, historyScope: deal.historyScope, historyUpdatedAt: deal.historyUpdatedAt,
+      lowestPriceEver: deal.lowestPriceEver, historyScope: deal.historyScope, historyUpdatedAt: deal.historyUpdatedAt, historyStartedAt: deal.historyStartedAt,
       ...(deal.originalPrice > deal.price ? { prePrice: deal.originalPrice } : {}),
       ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `Prisjakt: ${deal.priceDrop} % under vanlig pris` } : {}),
       ...(deal.imageUrl ? { imageUrl: deal.imageUrl } : {}),
+      ...(deal.copyImageUrl ? { copyImageUrl: deal.copyImageUrl } : {}),
       link: { url: deal.productUrl, label: "Se alle butikker og prishistorikk på Prisjakt" },
       rank: deal.rank,
       ...(deal.validTo ? { validTo: deal.validTo } : {}),
     })),
     updated: catalog.generatedAt,
-    note: "Tilbud Prisjakt vurderer som ekstra gode akkurat nå, oppdatert daglig. Prisfall er målt mot varens vanlige pris; førpris er butikkens egen. Bare nye varer på lager er med. Prisen kan ha endret seg siden – sjekk hos butikken. Stemmene er brukernes egne vurderinger.",
+    note: "Oppdatert daglig. Prisfall er målt mot varens vanlige pris; førpris er butikkens egen. Bare nye varer på lager er med. Prisen kan ha endret seg siden – sjekk hos butikken. Stemmene er brukernes egne vurderinger.",
   };
 }
 
 async function start() {
   try {
     const response = await fetch("/cashback-index.json", { signal: AbortSignal.timeout(10000) });
-    if (response.ok) merchantDomain = createDealMerchantLookup(await response.json());
+    if (response.ok) { cashbackIndex = await response.json(); merchantDomain = createDealMerchantLookup(cashbackIndex); }
   } catch { /* Verified store URLs from the catalogue remain usable. */ }
   createOfferList({
   mount: document.getElementById("offer-list"),

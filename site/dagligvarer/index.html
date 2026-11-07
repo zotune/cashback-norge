@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dagligvarer · Cashback Norge</title>
-<script src="/theme.js?v=3"></script>
-<link rel="stylesheet" href="/site.css?v=1">
-<link rel="stylesheet" href="/offer-list.css?v=1">
+<script src="/theme.js?v=4"></script>
+<link rel="stylesheet" href="/site.css?v=5">
+<link rel="stylesheet" href="/offer-list.css?v=5">
 <meta name="description" content="Ukens tilbud fra kundeavisene til REMA 1000, KIWI, MENY, Coop, SPAR, Joker, Bunnpris og flere – søk, sorter på rabatt og sammenlign på tvers av butikkene.">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
@@ -46,7 +46,7 @@
   <p class="note" id="note"></p>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
-      <a href="/">Cashback</a> · <a href="/dagens-tilbud/">Tilbud</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
+      <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
     </nav>
     <div>© 2026 Cashback Norge · Uavhengig oversikt, ikke tilknyttet butikkene</div>
   </footer>
@@ -54,8 +54,8 @@
 <div class="fixed-footer">
   <div class="tip-line"></div>
 </div>
-<script src="/shared-data.js"></script>
-<script src="/offer-list.js?v=1"></script>
+<script src="/shared-data.js?v=5"></script>
+<script src="/offer-list.js?v=5"></script>
 <script>
 // Data: /grocery-offers.json, built by the daily crawl from the supermarkets' flyers (Tjek's
 // offer data). Votes use the same Supabase functions as the discount codes, key "dagligvarer".
@@ -88,7 +88,7 @@ function toItem(offer) {
     validFrom: offer.validFrom, validTo: offer.validTo,
     link: getGroceryOfferLink(offer.chain, getGrocerySearchQuery(title) || title),
     ...(unit ? { unit } : {}),
-    ...(card ? { bonus: { label: card.label.replace(/ Kredittkort| Mastercard/, "-kort"), rate: card.rate, title: `${card.label}: ${card.rate} ekstra` } } : {}),
+    ...(card ? { bonus: { label: card.label.replace(/ Kredittkort| Mastercard/, "-kort"), rate: card.rate, url: card.url, title: card.tip.replace(/^# /, "") } } : {}),
   };
 }
 

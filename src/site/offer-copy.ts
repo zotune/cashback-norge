@@ -11,6 +11,8 @@ export type CopyableOffer = {
 };
 
 export async function createOfferImage(offer: CopyableOffer): Promise<{ blob: Blob; hasProductImage: boolean }> {
+  const dark = document.documentElement.dataset.cbnTheme === "dark";
+  const colors = dark ? { background: "#161616", text: "#ededed", muted: "#b3b3b3", accent: "#7eddaa" } : { background: "#ffffff", text: "#172026", muted: "#5d6b71", accent: "#166b47" };
   let image: ImageBitmap | undefined;
   if (offer.imageUrl) {
     try {
@@ -53,16 +55,16 @@ export async function createOfferImage(offer: CopyableOffer): Promise<{ blob: Bl
     }
     y += 10;
   };
-  addText(offer.title, 28, 700, "#172026");
-  if (offer.description) addText(offer.description, 20, 400, "#5d6b71");
-  addText(offer.price, 26, 700, "#166b47");
-  addText(offer.where, 20, 500, "#172026");
-  addText(offer.url, 16, 400, "#5d6b71");
-  addText("Cashback Norge · Sjekk pris og vilkår hos butikken", 14, 400, "#5d6b71");
+  addText(offer.title, 28, 700, colors.text);
+  if (offer.description) addText(offer.description, 20, 400, colors.muted);
+  addText(offer.price, 26, 700, colors.accent);
+  addText(offer.where, 20, 500, colors.text);
+  addText(offer.url, 16, 400, colors.muted);
+  addText("Cashback Norge · Sjekk pris og vilkår hos butikken", 14, 400, colors.muted);
   canvas.width = width * 2;
   canvas.height = Math.ceil(y + padding) * 2;
   context.scale(2, 2);
-  context.fillStyle = "#ffffff";
+  context.fillStyle = colors.background;
   context.fillRect(0, 0, width, canvas.height / 2);
   if (image) {
     const scale = Math.min((width - padding * 2) / image.width, 200 / image.height);
