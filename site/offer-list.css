@@ -292,3 +292,9 @@ span.category-crumb { background: var(--cbn-highlight); color: var(--cbn-accent)
 .category-open { border-radius: 0 16px 16px 0; font-size: 15px; min-height: 30px; padding: 0 9px 0 6px; }
 .category-option small { color: inherit; font-size: 10px; opacity: .75; }
 .category-nav .group-heading .list-reset { font-size: 11px; min-height: 24px; }
+.category-crumbs .category-clear { font-size: 11px; margin-left: auto; min-height: 24px; }
+/* Sources on the left and summary/reset/Filter on the right, on one line. */
+.source-row { align-items: flex-start; display: flex; gap: 8px; justify-content: space-between; margin-bottom: 8px; }
+.source-row .source-toggles { margin: 0; min-width: 0; }
+.source-row .offer-filter-bar { align-items: center; display: inline-flex; flex-shrink: 0; gap: 8px; margin: 0; }
+@media (max-width: 520px) { .source-row { flex-direction: column-reverse; align-items: stretch; } .source-row .offer-filter-bar { justify-content: flex-end; } }

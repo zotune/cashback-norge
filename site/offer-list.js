@@ -97,7 +97,7 @@
             <button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-picker" type="button" aria-label="Filtrer butikker, kategorier og kilder"><span>Filter</span><span class="filter-picker-count" data-ol="filter-picker-count" hidden></span>${FILTER_SVG}</button></span>`;
           if (!features.category) return `<span hidden>${bar}</span>`;
           return features.sources
-            ? `<div class="group-heading"><span>Kilder:</span>${bar}</div><div class="chip-toggles group-toggles source-toggles" data-ol="sources" role="group" aria-label="Kilder"></div>`
+            ? `<div class="source-row"><div class="chip-toggles group-toggles source-toggles" data-ol="sources" role="group" aria-label="Kilder"></div>${bar}</div>`
             : `<div class="group-heading"><span></span>${bar}</div>`;
         })()}
         ${features.category ? `<div class="category-nav" data-ol="category-nav"></div>` : ""}
@@ -246,7 +246,7 @@
         return openGroup ? toggle : `<span class="category-chip">${toggle}<button class="cbn-button cbn-button--quiet category-open" type="button" data-cat-open="${esc(name)}" aria-label="Underkategorier i ${esc(label)}" title="Underkategorier i ${esc(label)}">›</button></span>`;
       }).join("");
       const active = groups.size > 0 || state.offCategories.size > 0;
-      nav.innerHTML = `<div class="group-heading"><span>Kategori:</span>${active ? '<button class="cbn-button cbn-button--quiet list-reset" type="button" data-cat-clear>Nullstill kategorier</button>' : ""}</div><nav class="category-crumbs" aria-label="Kategori">${crumbs}</nav><div class="category-level"><span class="category-level-label">${openGroup ? `Underkategorier i ${esc(config.groupName?.(openGroup) ?? openGroup)} – velg én eller flere` : "Velg én eller flere – › viser underkategorier"}</span><div class="chip-toggles category-options" role="group" aria-label="${openGroup ? "Underkategorier" : "Kategorier"}">${chips}</div></div>`;
+      nav.innerHTML = `<nav class="category-crumbs" aria-label="Kategori">${crumbs}${active ? '<button class="cbn-button cbn-button--quiet list-reset category-clear" type="button" data-cat-clear>Nullstill kategorier</button>' : ""}</nav><div class="category-level"><span class="category-level-label">${openGroup ? `Underkategorier i ${esc(config.groupName?.(openGroup) ?? openGroup)} – velg én eller flere` : "Velg én eller flere – › viser underkategorier"}</span><div class="chip-toggles category-options" role="group" aria-label="${openGroup ? "Underkategorier" : "Kategorier"}">${chips}</div></div>`;
     }
     const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0 || state.offSources.size > 0;
     function renderGroups() {
