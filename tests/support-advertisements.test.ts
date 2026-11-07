@@ -38,5 +38,5 @@ test("the footer reuses dated card benefits and rebate limits, never inventing b
   for (const detail of [/November: 3 %/, /Desember: 3 %/, /Alltid: 5 %/, /500/, /3\u00a0000/, /Ingen rentefri periode/, /22,85/]) assert.match(text, detail);
   const fallback = getSupportAdvertisementTooltipParts(INSTABANK_AD, [], november).join("\n");
   assert.doesNotMatch(fallback, /\b5 %/);
-  assert.deepEqual(getSupportAdvertisementTooltipParts(SUPPORT_LINKS[0]!, offers, november), [SUPPORT_LINKS[0]!.text]);
+  assert.deepEqual(getSupportAdvertisementTooltipParts(SUPPORT_LINKS[0]!, offers, november), [SUPPORT_LINKS[0]!.detail]);
 });

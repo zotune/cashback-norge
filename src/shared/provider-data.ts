@@ -161,6 +161,9 @@ export const PROVIDER_TIPS: Record<string, string> = {
 };
 
 export const PROVIDER_COLORS: Record<string, { bg: string; fg: string; border?: string; preserveInDark?: boolean }> = {
+  prisjakt: { bg: "#00a9ce", fg: "#ffffff" },
+  godpris: { bg: "#21003f", fg: "#ffffff" },
+  prisradar: { bg: "#ffffff", fg: "#0c4598" },
   tek: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
   forbrukerradet: { bg: "#004a66", fg: "#ffffff", preserveInDark: true },
   bytt: { bg: "#0075f5", fg: "#ffffff", preserveInDark: true },
@@ -318,30 +321,30 @@ export const INSTABANK_AD = {
   affiliate: true,
   validFrom: "2026-11-01",
   validUntil: "2026-12-31",
-  // Short sign-up incentive per month, shown as the ad text.
+  // Short sign-up incentive per month: `text` fits the one-line ad, `detail` the card and tooltip.
   incentives: [
-    { text: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
-    { text: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" },
+    { text: "Instabank: 3 % rabatt på netthandel", detail: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
+    { text: "Instabank: 3 % rabatt på alle kjøp", detail: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" },
   ],
   // Credit ads must carry the representative example. Keep it to one line.
   example: "Eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr.",
 } as const;
 
 export const SUPPORT_LINKS = [
-  { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
-  { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
+  { text: "Kron: 100 kr i fondsbonus", detail: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
+  { text: "Horde: Oversikt over alle kort", detail: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
   { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
-  { text: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
-  { text: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
-  { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
-  { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
+  { text: "Wise: Gratis overføring til utlandet", detail: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
+  { text: "Tibber: 1 000 kr i Tibber Store", detail: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
+  { text: "Revolut: Gratis valutaveksling", detail: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
+  { text: "Crypto.com: Gratis Spotify/Netflix", detail: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
   { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
-  { text: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
-  { text: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
-  { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-  { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
+  { text: "Curve: Alle kort i ett", detail: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
+  { text: "NordVPN: 1 måned gratis", detail: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
+  { text: "NettBonus: Verv en venn, få 200 kr", detail: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
+  { text: "Sparebørsen: 50 kr med Vipps", detail: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
   // Bulder's referral terms: 500 kr to both when the referred mortgage is paid out (bulder.no/om-oss/vilkaar/bonus-verving).
-  { text: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true },
+  { text: "Bulder: 500 kr ved flytting av lån", detail: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true },
 ];
 
 /**

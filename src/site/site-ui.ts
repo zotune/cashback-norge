@@ -3,7 +3,7 @@
 // Styles live in site/site.css; the pages own their layout.
 import { INSTABANK_AD, PROVIDER_COLORS, type BonusCard } from "../shared/provider-data";
 import type { CashbackOffer } from "../shared/cashback";
-import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement, type SupportAdvertisement } from "../shared/support-advertisements";
+import { getSupportAdvertisementDetail, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement, type SupportAdvertisement } from "../shared/support-advertisements";
 import { formatTooltipHtml } from "../shared/tooltip-content";
 import { getBrandChipCss, getBrandButtonCss } from "../shared/theme";
 import { createCountBadge } from "../shared/ui";
@@ -28,7 +28,7 @@ export function renderSupportFooter(line: HTMLElement, pick: SupportAdvertisemen
   if (pick.affiliate) {
     const ad = document.createElement("span");
     ad.className = "cbn-chip cbn-chip--muted ad-chip";
-    ad.textContent = "Ad";
+    ad.textContent = "Annonse";
     anchor.append(ad);
   }
   const link = document.createElement("a");
@@ -56,7 +56,7 @@ export function getInstabankInvite(draw: number): SupportInvite | undefined {
   if (selectSupportAdvertisement(draw) !== INSTABANK_AD) return undefined;
   return {
     id: "instabank", name: "Instabank", url: INSTABANK_AD.url,
-    title: getSupportAdvertisementText(INSTABANK_AD).replace(/^Instabank: /, "").replace(/^./, (c) => c.toUpperCase()),
+    title: getSupportAdvertisementDetail(INSTABANK_AD).replace(/^Instabank: /, "").replace(/^./, (c) => c.toUpperCase()),
     description: "Pluss fast 5 % rabatt på kollektivtransport og elbillading.",
     finePrint: INSTABANK_AD.example,
     action: "Få Instabank kredittkort",
@@ -177,7 +177,7 @@ export function renderBonusCardGroup(cards: Array<BonusCard & { rewardLabel?: st
     const ad = card.ad || card.badge === "crypto" || card.badge === "curve";
     return `<span class="tooltip-wrap"><span class="tooltip cbn-tooltip-rich">${formatTooltipHtml(card.tip)}</span>
       <a class="cbn-row bonus-chip" href="${esc(card.url)}" target="_blank" rel="${ad ? "sponsored " : ""}noopener noreferrer">
-        <span class="bonus-chip-label">${esc(reward)}</span><span class="bonus-chip-brand">${card.ad ? '<span aria-hidden="true">🥳</span>' : ""}${ad ? '<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>' : ""}<span class="cbn-chip badge badge-${esc(card.badge)}">${esc(card.label)}</span></span>
+        <span class="bonus-chip-label">${esc(reward)}</span><span class="bonus-chip-brand">${card.ad ? '<span aria-hidden="true">🥳</span>' : ""}${ad ? '<span class="cbn-chip cbn-chip--muted ad-chip">Annonse</span>' : ""}<span class="cbn-chip badge badge-${esc(card.badge)}">${esc(card.label)}</span></span>
       </a></span>`;
   }).join("");
 }

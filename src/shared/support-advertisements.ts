@@ -10,6 +10,13 @@ export function isInstabankAdActive(now = new Date()): boolean {
   return today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
 }
 
+/** The longer wording for the ad card and tooltip; the bottom line uses the short text. */
+export function getSupportAdvertisementDetail(ad: SupportAdvertisement, now = new Date()): string {
+  if (ad !== INSTABANK_AD) return "detail" in ad && typeof ad.detail === "string" ? ad.detail : ad.text;
+  const today = osloDate(now);
+  return INSTABANK_AD.incentives.find(incentive => incentive.validUntil >= today)?.detail ?? INSTABANK_AD.text;
+}
+
 export function getSupportAdvertisementText(ad: SupportAdvertisement, now = new Date()): string {
   if (ad !== INSTABANK_AD) return ad.text;
   const today = osloDate(now);
@@ -28,8 +35,8 @@ export function selectSupportAdvertisement(draw: number, now = new Date()): Supp
 
 /** Reuse the dated card benefits and limits already shown in Extra cashback. */
 export function getSupportAdvertisementTooltipParts(ad: SupportAdvertisement, offers: CashbackOffer[], now = new Date()): string[] {
-  if (ad !== INSTABANK_AD) return [ad.text];
+  if (ad !== INSTABANK_AD) return [getSupportAdvertisementDetail(ad, now)];
   const card = getFreeCards(offers, now).find((card) => card.badge === "instabank");
-  const details = (card?.tip ?? getSupportAdvertisementText(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
+  const details = (card?.tip ?? getSupportAdvertisementDetail(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
   return ["# Instabank kredittkort", details, INSTABANK_AD.example];
 }

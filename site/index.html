@@ -1310,7 +1310,7 @@ function merchantCardHtml(m) {
     const fullTip = [cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText, welcome?.tip].filter(Boolean).join("\n\n");
     const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
     const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="cbn-chip cbn-chip--muted app-chip">App</span>` : spennExtension ? `<span class="cbn-chip cbn-chip--muted app-chip">Utvidelse</span>` : "";
-    const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>` : "";
+    const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="cbn-chip cbn-chip--muted ad-chip">Annonse</span>` : "";
     const welcomeChipHtml = welcome ? `<span class="cbn-chip cbn-chip--highlight">${esc(welcome.label)}</span>` : "";
     const supportChipHtml = o.provider === "cbn" ? `<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span><span class="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>` : "";
     const campaignLabel = getOfferCampaignLabel(o);
@@ -1329,12 +1329,12 @@ function merchantCardHtml(m) {
   const cryptoSubName = cryptoSubDomain !== undefined ? CRYPTO_SUBSCRIPTIONS[cryptoSubDomain] : null;
   const cryptoSelectedHtml = selectedQuickFilters.size === 0 && cryptoSubName && (!hasProviderFilter() || selectedProviders.has("crypto")) ? (() => {
     const tipText = `Crypto.com Visa-kort.\nJade/Obsidian: 6 mnd gratis ${cryptoSubName}\nPlatin: 3 mnd gratis ${cryptoSubName}`;
-    return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
+    return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://crypto.com/app/ns3fma5hou" target="_blank" rel="noreferrer"><span class="offer-reward">3-6 mnd gratis</span><span class="cbn-chip cbn-chip--muted ad-chip">Annonse</span></a>${providerFilterChip("crypto", "Crypto")}</span></span>`;
   })() : "";
   const hasCurve = m.domains.some(d => curveDomains.has(d));
   const curveSelectedHtml = selectedQuickFilters.size === 0 && hasCurve && (!hasProviderFilter() || selectedProviders.has("curve")) ? (() => {
     const tipText = `Curve Pro/Pro+.\nVelg ${m.name} i Curve-appen.\nMaks 6 butikker (Pro, €9,99/mnd)\neller 12 (Pro+, €17,99/mnd).\nKombineres med annen cashback.`;
-    return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="cbn-chip cbn-chip--muted ad-chip">Ad</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
+    return `<span class="offer-wrap"><span class="offer-tooltip">${formatTooltipHtml(tipText)}</span><span class="cbn-row offer"><a class="offer-action" href="https://www.curve.com/join#D5GXXJJD" target="_blank" rel="noreferrer"><span class="offer-reward" data-pct-curve="1">${currentAmount > 0 ? `+${Math.round(currentAmount * 0.01)} kr` : '+1 %'}</span><span class="cbn-chip cbn-chip--muted ad-chip">Annonse</span></a>${providerFilterChip("curve", "Curve")}</span></span>`;
   })() : "";
   const selectedHtml = curveSelectedHtml + cryptoSelectedHtml;
   const filterCodes = hasProviderFilter() || selectedQuickFilters.size > 0;

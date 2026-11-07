@@ -391,7 +391,7 @@ function OfferRow(props: { offer: CashbackOffer; amount: number; activated: bool
             </span>
           )}
           {shouldShowAffiliateDisclosure(props.offer) && (
-            <span className="cbn-chip cbn-chip--muted ad-chip">Ad</span>
+            <span className="cbn-chip cbn-chip--muted ad-chip">Annonse</span>
           )}
           {props.offer.provider === "cbn" && (
             <span className="cbn-chip cbn-chip--muted support-chip">Støtt oss</span>

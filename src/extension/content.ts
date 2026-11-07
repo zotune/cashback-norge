@@ -10955,7 +10955,7 @@ function readVinmonopoletUnitPricePerLiter(text: string): number | undefined {
   return Number.isFinite(amount) && amount > 0 ? amount : undefined;
 }
 function makeAdChip(): HTMLSpanElement {
-  const chip = createMutedChip("Ad");
+  const chip = createMutedChip("Annonse");
   chip.classList.add("ad-chip");
   return chip;
 }
@@ -11393,7 +11393,7 @@ function rewriteNettbonusLoginTriggers(): boolean {
       clone.target = "_blank";
       clone.removeAttribute("id");
       const adLabel = document.createElement("span");
-      adLabel.textContent = "Ad";
+      adLabel.textContent = "Annonse";
       adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
       clone.prepend(adLabel);
       loginLink.replaceWith(clone);
@@ -11561,9 +11561,9 @@ function rewriteSpareborsenHandleButton(): boolean {
   link.style.textDecoration = "none";
   link.setAttribute("data-cb-rewrite", "1");
   const adLabel = document.createElement("span");
-  adLabel.textContent = "Ad";
+  adLabel.textContent = "Annonse";
   adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
-  if (!clone.textContent?.trim().startsWith("Ad")) {
+  if (!clone.textContent?.trim().startsWith("Annonse")) {
     clone.prepend(adLabel);
   }
   link.append(clone);
@@ -13139,7 +13139,8 @@ function renderNotice(
       justify-content: space-between;
     }
     .support-ad-anchor { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-    .support-ad-anchor > a { flex: 1; text-align: center; }
+    /* One line: a long ad is shortened rather than wrapped. */
+    .support-ad-anchor > a { flex: 1; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
     .support a {
       color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
