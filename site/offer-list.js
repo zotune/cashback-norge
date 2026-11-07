@@ -198,43 +198,55 @@
     const filterValue = (value) => value.slice(value.indexOf(":") + 1);
     // The number on the Filter button: choices turned off, or price/discount limits set.
     const setFilterCount = (name, count) => { const badge = el(`${name}-count`); if (badge) { badge.hidden = count === 0; badge.textContent = String(count); } };
-    // Categories are a path, not two lists: Alle › Skjønnhet og helse › Ansiktsserum. The path is
-    // stored in the same sets as before (every other group/category turned off).
-    const categoryPath = () => {
-      const groups = [...state.counts.keys()];
-      const group = state.off.size > 0 && state.off.size === groups.length - 1 ? groups.find((name) => !state.off.has(name)) : undefined;
-      const categories = [...new Set(state.items.filter((item) => !group || item.group === group).map((item) => item.category).filter(Boolean))];
-      const category = state.offCategories.size > 0 ? categories.filter((name) => !state.offCategories.has(name)) : [];
-      return { group, category: category.length === 1 ? category[0] : undefined };
-    };
+    // Categories: pick one or more main categories (toggle chips, like the sources), and open
+    // one with › to pick one or more of its subcategories. Nothing picked means everything.
+    // Stored in the same sets as before (the groups/categories that are not picked are off).
+    let openGroup;
+    const groupsOf = () => [...state.counts.keys()];
+    const pickedGroups = () => state.off.size === 0 ? new Set() : new Set(groupsOf().filter((name) => !state.off.has(name)));
+    const categoriesIn = (group) => [...new Set(state.items.filter((item) => item.group === group).map((item) => item.category).filter(Boolean))];
+    const pickedCategories = (group) => { const all = categoriesIn(group); return all.some((name) => state.offCategories.has(name)) ? new Set(all.filter((name) => !state.offCategories.has(name))) : new Set(); };
+    function setPickedGroups(picked) {
+      state.off = picked.size === 0 ? new Set() : new Set(groupsOf().filter((name) => !picked.has(name)));
+      // Subcategory picks only belong to picked (or all) main categories.
+      for (const name of [...state.offCategories]) { const item = state.items.find((entry) => entry.category === name); if (item && picked.size && !picked.has(item.group)) state.offCategories.delete(name); }
+    }
+    function setPickedCategories(group, picked) {
+      for (const name of categoriesIn(group)) { if (picked.size && !picked.has(name)) state.offCategories.add(name); else state.offCategories.delete(name); }
+    }
     function setCategoryPath(group, category) {
-      state.off = group ? new Set([...state.counts.keys()].filter((name) => name !== group)) : new Set();
-      state.offCategories = category ? new Set(state.items.map((item) => item.category).filter((name) => name && name !== category)) : new Set();
+      openGroup = group;
+      setPickedGroups(group ? new Set([group]) : new Set());
+      state.offCategories = new Set();
+      if (group && category) setPickedCategories(group, new Set([category]));
       updateSelectionFilters();
     }
     function renderCategoryNav() {
       const nav = el("category-nav");
       if (!nav) return;
-      const { group, category } = categoryPath();
+      if (openGroup && !state.counts.has(openGroup)) openGroup = undefined;
+      const groups = pickedGroups();
       const crumb = (label, data, current) => current
         ? `<span class="category-crumb" aria-current="true">${esc(label)}</span>`
         : `<button class="cbn-button cbn-button--quiet category-crumb" type="button" ${data}>${esc(label)}</button>`;
-      const crumbs = [crumb("Alle kategorier", 'data-cat-group=""', !group),
-        ...(group ? [crumb(config.groupName?.(group) ?? group, `data-cat-group="${esc(group)}"`, !category)] : []),
-        ...(category ? [crumb(category, "", true)] : [])].join('<span class="category-sep" aria-hidden="true">›</span>');
-      // The level below the path (or the siblings of a chosen subcategory), with counts.
+      const crumbs = [crumb("Alle kategorier", "data-cat-close", !openGroup), ...(openGroup ? [crumb(config.groupName?.(openGroup) ?? openGroup, "", true)] : [])]
+        .join('<span class="category-sep" aria-hidden="true">›</span>');
       const counts = new Map();
       for (const item of state.items) {
-        const key = group ? (item.group === group ? item.category : undefined) : item.group;
+        const key = openGroup ? (item.group === openGroup ? item.category : undefined) : item.group;
         if (key) counts.set(key, (counts.get(key) || 0) + 1);
       }
-      const names = group ? [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb")) : (config.groupOrder?.filter((name) => counts.has(name)) ?? [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb")));
+      const names = openGroup ? [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb")) : (config.groupOrder?.filter((name) => counts.has(name)) ?? [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb")));
+      const picked = openGroup ? pickedCategories(openGroup) : groups;
       const chips = names.map((name) => {
-        const pressed = group ? name === category : false;
-        const data = group ? `data-cat-group="${esc(group)}" data-cat="${esc(name)}"` : `data-cat-group="${esc(name)}"`;
-        return `<button class="cbn-button cbn-button--filter group-toggle category-option" type="button" aria-pressed="${pressed}" ${data}><span>${esc(config.groupName?.(name) ?? name)}</span><span class="cbn-count">${counts.get(name).toLocaleString("nb-NO")}</span>${group ? "" : '<span class="category-arrow" aria-hidden="true">›</span>'}</button>`;
+        const on = picked.has(name);
+        const label = config.groupName?.(name) ?? name;
+        const sub = !openGroup && pickedCategories(name).size ? ` <small>(${pickedCategories(name).size})</small>` : "";
+        const toggle = `<button class="cbn-button cbn-button--filter group-toggle category-option" type="button" aria-pressed="${on}" ${openGroup ? `data-cat-pick="${esc(name)}"` : `data-group-pick="${esc(name)}"`}><span class="group-check" aria-hidden="true">${on ? "✓" : "+"}</span><span>${esc(label)}${sub}</span><span class="cbn-count">${counts.get(name).toLocaleString("nb-NO")}</span></button>`;
+        return openGroup ? toggle : `<span class="category-chip">${toggle}<button class="cbn-button cbn-button--quiet category-open" type="button" data-cat-open="${esc(name)}" aria-label="Underkategorier i ${esc(label)}" title="Underkategorier i ${esc(label)}">›</button></span>`;
       }).join("");
-      nav.innerHTML = `<div class="group-heading"><span>Kategori:</span></div><nav class="category-crumbs" aria-label="Kategori">${crumbs}</nav><div class="category-level"><span class="category-level-label">${group ? `Underkategorier i ${esc(config.groupName?.(group) ?? group)}` : "Velg kategori"}</span><div class="chip-toggles category-options" role="group" aria-label="${group ? "Underkategorier" : "Kategorier"}">${chips}</div></div>`;
+      const active = groups.size > 0 || state.offCategories.size > 0;
+      nav.innerHTML = `<div class="group-heading"><span>Kategori:</span>${active ? '<button class="cbn-button cbn-button--quiet list-reset" type="button" data-cat-clear>Nullstill kategorier</button>' : ""}</div><nav class="category-crumbs" aria-label="Kategori">${crumbs}</nav><div class="category-level"><span class="category-level-label">${openGroup ? `Underkategorier i ${esc(config.groupName?.(openGroup) ?? openGroup)} – velg én eller flere` : "Velg én eller flere – › viser underkategorier"}</span><div class="chip-toggles category-options" role="group" aria-label="${openGroup ? "Underkategorier" : "Kategorier"}">${chips}</div></div>`;
     }
     const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0 || state.offSources.size > 0;
     function renderGroups() {
@@ -703,13 +715,21 @@
         onBulk: (selected, section) => { for (const option of filterOptions().filter((option) => option.section === section && !option.value.endsWith(":*"))) { const set = filterSet(option.value), name = filterValue(option.value); if (selected) set.delete(name); else set.add(name); } updateSelectionFilters(); },
       });
       el("category-nav")?.addEventListener("click", (event) => {
-        const target = event.target.closest("[data-cat-group]");
+        const target = event.target.closest("[data-cat-close], [data-cat-open], [data-group-pick], [data-cat-pick], [data-cat-clear]");
         if (!target) return;
-        const { group, category } = categoryPath();
-        const nextGroup = target.dataset.catGroup || undefined;
-        // A second click on the chosen subcategory goes back up to its main category.
-        const nextCategory = target.dataset.cat && !(nextGroup === group && target.dataset.cat === category) ? target.dataset.cat : undefined;
-        setCategoryPath(nextGroup, nextCategory);
+        if (target.matches("[data-cat-close]")) { openGroup = undefined; renderCategoryNav(); return; }
+        if (target.matches("[data-cat-open]")) { openGroup = target.dataset.catOpen; renderCategoryNav(); return; }
+        if (target.matches("[data-cat-clear]")) { openGroup = undefined; setPickedGroups(new Set()); state.offCategories.clear(); updateSelectionFilters(); return; }
+        if (target.matches("[data-group-pick]")) {
+          const picked = pickedGroups(); const name = target.dataset.groupPick;
+          if (picked.has(name)) { picked.delete(name); setPickedCategories(name, new Set()); } else picked.add(name);
+          setPickedGroups(picked); updateSelectionFilters(); return;
+        }
+        const picked = pickedCategories(openGroup); const name = target.dataset.catPick;
+        if (picked.has(name)) picked.delete(name); else picked.add(name);
+        // Picking a subcategory also picks its main category.
+        const groups = pickedGroups(); if (picked.size && groups.size) { groups.add(openGroup); setPickedGroups(groups); } else if (picked.size) setPickedGroups(new Set([openGroup]));
+        setPickedCategories(openGroup, picked); updateSelectionFilters();
       });
       el("sources")?.addEventListener("click", (event) => {
         const name = event.target.closest("[data-source]")?.dataset.source;
