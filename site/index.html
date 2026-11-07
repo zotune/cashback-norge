@@ -107,8 +107,14 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
 .merchant-table td:last-child { border-radius: 0 8px 8px 0; }
 .merchant-table .num { text-align: right; white-space: nowrap; }
 .merchant-table .merchant-header { padding: 0; }
-.merchant-table .offer-wrap { min-width: 220px; }
-.mini-offers { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.merchant-table td:first-child { width: 260px; }
+.merchant-best { color: var(--cbn-accent); font-size: 15px; font-weight: 800; width: 90px; }
+.merchant-best .offer-reward { font-size: inherit; }
+.mini-offers { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.mini-offer-wrap { display: inline-block; }
+.mini-offer { background: var(--cbn-soft); border-radius: 6px; padding: 3px 4px 3px 7px; }
+.mini-offer:hover { background: var(--cbn-hover); }
+.mini-offer--best .offer-reward { color: var(--cbn-accent); }
 .mini-offer { align-items: center; color: inherit; display: inline-flex; font-size: 12px; gap: 5px; text-decoration: none; white-space: nowrap; }
 .mini-offer:hover .offer-reward { text-decoration: underline; }
 .mini-offer .offer-reward { flex: none; font-size: 12px; }
@@ -1328,10 +1334,10 @@ function sortMerchants(list) {
   return [...list].sort(merchantSort.dir === -1 ? (a, b) => by(b, a) : by);
 }
 function merchantTableHtml() {
-  const head = [["Butikk", "name"], ["Beste fordel", "best"], ["Andre fordeler", ""], ["Fordeler", "count"], ["Rabattkoder", ""]];
+  const head = [["Butikk", "name"], ["Høyest", "best"], ["Fordeler", "count"], ["Rabattkoder", ""]];
   return `<table class="merchant-table"><thead><tr>${head.map(([label, key]) => {
     const sorted = key && key === merchantSort.key ? ` aria-sort="${merchantSort.dir === -1 ? "descending" : "ascending"}"` : "";
-    return `<th${key === "count" ? ' class="num"' : ""}${key ? ` data-sort="${key}" title="Sorter etter ${label.toLowerCase()}"` : ""}${sorted}>${label}</th>`;
+    return `<th${key === "best" ? ' class="num"' : ""}${key ? ` data-sort="${key}" title="Sorter etter ${label.toLowerCase()}"` : ""}${sorted}>${label}</th>`;
   }).join("")}</tr></thead><tbody></tbody></table>`;
 }
 let renderedMerchants = { list: [], count: 0, prevLetter: null, showHeaders: true };
@@ -1429,18 +1435,27 @@ function merchantParts(m) {
   return { iconHtml, nameHtml, cashbackOffers, codeOffers };
 }
 
+// One compact benefit: reward, provider chip and the labels the cards also show (app, ad, welcome bonus).
+function miniOfferHtml(o, best) {
+  const label = (currentAmount > 0 ? calcReward(o, currentAmount) : "") || formatCompactReward(o);
+  const name = PROVIDER_NAMES[o.provider] || o.provider;
+  const ad = ["nettbonus", "spareborsen"].includes(o.provider);
+  const support = o.provider === "cbn";
+  const app = ["klarna", "spenn", "dreams"].includes(o.provider) && !(isSpennExtensionOffer(o) && !SITE_IS_MOBILE);
+  const welcome = PROVIDER_WELCOME_BONUSES[o.provider];
+  const terms = getSiteOfferTerms(o);
+  const reward = formatReward(o);
+  const tip = [reward !== label ? reward : "", terms || PROVIDER_TIPS[o.provider] || "", welcome?.tip].filter(Boolean).join("\n\n");
+  return `<span class="offer-wrap mini-offer-wrap">${tip ? `<span class="offer-tooltip">${formatTooltipHtml(tip)}</span>` : ""}<a class="mini-offer${best ? " mini-offer--best" : ""}" href="${esc(getSiteOfferUrl(o))}" target="_blank" rel="${ad || support ? "sponsored noopener noreferrer" : "noreferrer"}"><span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span><span class="cbn-chip badge badge-${esc(o.provider)}">${esc(name)}</span>${app ? '<span class="cbn-chip cbn-chip--muted app-chip">App</span>' : ""}${welcome ? `<span class="cbn-chip cbn-chip--highlight">${esc(welcome.label)}</span>` : ""}${ad ? '<span class="cbn-chip cbn-chip--muted ad-chip">Annonse</span>' : ""}${support ? '<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span>' : ""}</a></span>`;
+}
+
 function merchantRowHtml(m) {
   const { iconHtml, nameHtml, cashbackOffers, codeOffers } = merchantParts(m);
-  const others = cashbackOffers.slice(1);
-  const otherHtml = others.slice(0, 5).map(o => {
-    const label = (currentAmount > 0 ? calcReward(o, currentAmount) : "") || formatCompactReward(o);
-    return `<a class="mini-offer" href="${esc(getSiteOfferUrl(o))}" target="_blank" rel="${o.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer"}" title="${esc(formatReward(o))} – ${esc(PROVIDER_NAMES[o.provider] || o.provider)}"><span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span><span class="cbn-chip badge badge-${esc(o.provider)}">${esc(PROVIDER_NAMES[o.provider] || o.provider)}</span></a>`;
-  }).join("") + (others.length > 5 ? `<span class="mini-offer">+${others.length - 5}</span>` : "");
+  const best = cashbackOffers[0];
   return `<tr class="merchant merchant-row" data-letter="${esc(merchantLetter(m))}">
     <td><div class="merchant-header">${iconHtml}${nameHtml}</div></td>
-    <td>${cashbackOffers[0] ? offerRowHtml(cashbackOffers[0], 0) : ""}</td>
-    <td><div class="mini-offers">${otherHtml}</div></td>
-    <td class="num">${cashbackOffers.length + codeOffers.length}</td>
+    <td class="num merchant-best">${best ? `<span class="offer-reward" data-reward="${esc(JSON.stringify(best))}">${esc((currentAmount > 0 ? calcReward(best, currentAmount) : "") || formatCompactReward(best))}</span>` : ""}</td>
+    <td><div class="mini-offers">${cashbackOffers.map((o, index) => miniOfferHtml(o, index === 0)).join("")}</div></td>
     <td>${codeOffers.length ? `${codeOffers.length} ${codeOffers.length === 1 ? "kode" : "koder"}` : ""}</td>
   </tr>`;
 }
