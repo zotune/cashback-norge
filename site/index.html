@@ -120,6 +120,13 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
 .mini-offer { background: var(--cbn-soft); border-radius: 6px; padding: 3px 4px 3px 7px; }
 .mini-offer:hover { background: var(--cbn-hover); }
 .mini-offer--best .offer-reward { color: var(--cbn-accent); }
+.mini-codes { display: flex; flex-direction: column; gap: 4px; }
+.mini-code-wrap { display: inline-block; }
+.mini-code { align-items: center; background: var(--cbn-soft); border-radius: 6px; display: inline-flex; font-size: 12px; gap: 6px; padding: 2px 2px 2px 7px; white-space: nowrap; }
+.mini-code-reward { font-weight: 700; }
+.mini-code .code-value { color: var(--cbn-text); font-weight: 600; }
+.mini-code .code-copy-btn { min-height: 26px; min-width: 26px; padding: 4px; }
+.mini-code-more { color: var(--cbn-subtle); font-size: 11px; }
 .mini-offer { align-items: center; color: inherit; display: inline-flex; font-size: 12px; gap: 5px; text-decoration: none; white-space: nowrap; }
 .mini-offer:hover .offer-reward { text-decoration: underline; }
 .mini-offer .offer-reward { flex: none; font-size: 12px; }
@@ -1457,6 +1464,14 @@ function miniOfferHtml(o, best) {
   return `<span class="offer-wrap mini-offer-wrap">${tip ? `<span class="offer-tooltip">${formatTooltipHtml(tip)}</span>` : ""}<a class="mini-offer${best ? " mini-offer--best" : ""}" href="${esc(getSiteOfferUrl(o))}" target="_blank" rel="${ad || support ? "sponsored noopener noreferrer" : "noreferrer"}"><span class="offer-reward" data-reward="${esc(JSON.stringify(o))}">${esc(label)}</span><span class="cbn-chip badge badge-${esc(o.provider)}">${esc(name)}</span>${app ? '<span class="cbn-chip cbn-chip--muted app-chip">App</span>' : ""}${welcome ? `<span class="cbn-chip cbn-chip--highlight">${esc(welcome.label)}</span>` : ""}${ad ? '<span class="cbn-chip cbn-chip--muted ad-chip">Annonse</span>' : ""}${support ? '<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span>' : ""}</a></span>`;
 }
 
+// A discount code in the table: what it gives, the code and a copy button (bound in bindMerchantCards).
+function miniCodeHtml(o) {
+  const code = o.discountCode || "";
+  const isNumericReward = /^\d[\d,.\ \-–]*\s*(?:%|kr)/i.test(o.reward.trim());
+  const tip = isNumericReward ? (o.terms || "") : (o.terms || o.reward);
+  return `<span class="offer-wrap mini-code-wrap">${tip ? `<span class="offer-tooltip">${formatTooltipHtml(tip)}</span>` : ""}<span class="mini-code"><span class="mini-code-reward">${esc(isNumericReward ? o.reward : "Kode")}</span><span class="code-copy-group"><span class="code-value">${esc(code)}</span><button class="cbn-button cbn-button--quiet code-copy-btn" type="button" data-code="${esc(code)}"><span class="copy-tooltip">Kopier: ${esc(code)}</span>${COPY_SVG}</button></span></span></span>`;
+}
+
 function merchantRowHtml(m) {
   const { iconHtml, nameHtml, cashbackOffers, codeOffers } = merchantParts(m);
   const best = cashbackOffers[0];
@@ -1464,7 +1479,7 @@ function merchantRowHtml(m) {
     <td><div class="merchant-header">${iconHtml}${nameHtml}</div></td>
     <td class="num merchant-best">${best ? `<span class="offer-reward" data-reward="${esc(JSON.stringify(best))}">${esc((currentAmount > 0 ? calcReward(best, currentAmount) : "") || formatCompactReward(best))}</span>` : ""}</td>
     <td><div class="mini-offers">${cashbackOffers.map((o, index) => miniOfferHtml(o, index === 0)).join("")}</div></td>
-    <td>${codeOffers.length ? `${codeOffers.length} ${codeOffers.length === 1 ? "kode" : "koder"}` : ""}</td>
+    <td><div class="mini-codes">${codeOffers.slice(0, 3).map(miniCodeHtml).join("")}${codeOffers.length > 3 ? `<span class="mini-code-more">+${codeOffers.length - 3}</span>` : ""}</div></td>
   </tr>`;
 }
 
