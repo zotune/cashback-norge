@@ -467,3 +467,35 @@ body > .fixed-footer { max-width: none; }
 .filter-picker.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
 .filter-picker svg { flex-shrink: 0; pointer-events: none; }
 .filter-picker-count:not([hidden]) { background: var(--cbn-accent); border-radius: 999px; color: var(--cbn-on-accent); font-size: 10px; font-weight: 700; line-height: 16px; min-width: 16px; padding: 0 5px; text-align: center; }
+/* "Ekstra cashback" toggle and its panel in the sticky header (front page, Dagligvarer). */
+.bonus-toggle {
+  align-items: center;
+  appearance: none;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 0;
+}
+.bonus-toggle-arrow {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+.bonus-toggle.open .bonus-toggle-arrow {
+  transform: rotate(90deg);
+}
+.bonus-chips-portal {
+  padding-top: 4px;
+  margin-top: 0;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Back to the top, next to the Filter button once the list is scrolled. */
+.scroll-top { align-items: center; display: inline-flex; flex-shrink: 0; justify-content: center; min-height: 36px; width: 36px; }
+.scroll-top[hidden] { display: none; }

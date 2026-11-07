@@ -90,12 +90,17 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
 }
 @media (min-width: 900px) and (max-width: 1359px) { body .quokka-runner { display: none; } }
 /* Grid: compact store tiles with the two best benefits. */
-.results--grid { align-items: start; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+/* Grid tiles: the same height in a row; the best benefit and a summary line, no gaps. */
+.results--grid { align-items: stretch; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.results--grid .merchant { display: flex; flex-direction: column; }
+.results--grid .offer, .results--grid .offer-action { flex-wrap: wrap; row-gap: 4px; }
+.results--grid .offer .offer-reward { flex: 0 0 auto; white-space: nowrap; }
+.results--grid .offer .offer-action { flex: 1 0 auto; max-width: 100%; }
 .results--grid .az-section-header { grid-column: 1 / -1; }
 .results--grid .merchant-header { padding: 10px 12px; }
 .results--grid .offers { padding: 0 12px 10px; }
-.results--grid .offers > .offer-wrap:nth-child(n+3), .results--grid .codes-inline, .results--grid .selected-retailers { display: none; }
-.more-offers { display: none; color: var(--cbn-subtle); font-size: 11px; padding: 0 14px 10px; }
+.results--grid .offers > .offer-wrap:nth-child(n+2), .results--grid .codes-inline, .results--grid .selected-retailers { display: none; }
+.more-offers { display: none; color: var(--cbn-subtle); font-size: 11px; margin-top: auto; padding: 0 12px 10px; }
 .results--grid .more-offers { display: block; }
 @media (max-width: 520px) { .results--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .results--grid .offer { flex-wrap: wrap; } }
 /* Table: one row per store, sortable. */
@@ -123,7 +128,7 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
 .mini-code-wrap { display: inline-block; }
 .mini-code { align-items: center; background: var(--cbn-soft); border-radius: 6px; display: inline-flex; font-size: 12px; gap: 6px; padding: 2px 2px 2px 7px; white-space: nowrap; }
 .mini-code-reward { font-weight: 700; }
-.mini-code .code-value { color: var(--cbn-text); font-weight: 600; }
+.mini-code .code-value { color: var(--cbn-text); font-family: inherit; font-weight: 600; letter-spacing: .02em; }
 .mini-code .code-copy-btn { min-height: 26px; min-width: 26px; padding: 4px; }
 .mini-code-more { color: var(--cbn-subtle); font-size: 11px; }
 .mini-offer { align-items: center; color: inherit; display: inline-flex; font-size: 12px; gap: 5px; text-decoration: none; white-space: nowrap; }
@@ -250,14 +255,6 @@ a.code-reward { color: inherit; text-decoration: none; }
 .sticky-header .bonus-toggle-arrow { transform: rotate(0deg); }
 .sticky-header .bonus-toggle.open .bonus-toggle-arrow { transform: rotate(90deg); }
 .fixed-footer .bonus-chips { left: 50%; right: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: var(--cbn-surface);  isolation: isolate; }
-.bonus-chips-portal {
-  padding-top: 4px;
-  margin-top: 0;
-  margin-bottom: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 .quokka-runner {
   position: fixed;
   z-index: 90;
@@ -500,26 +497,6 @@ a.code-reward { color: inherit; text-decoration: none; }
 .codes-expired-list { display: none; flex-direction: column; gap: 4px; margin-top: 4px; }
 .codes-expired-list.open { display: flex; }
 .hidden { display: none !important; }
-.bonus-toggle {
-  align-items: center;
-  appearance: none;
-  cursor: pointer;
-  display: flex;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 0;
-}
-.bonus-toggle-arrow {
-  display: inline-block;
-  font-size: 10px;
-  transition: transform 0.15s;
-}
-.bonus-toggle.open .bonus-toggle-arrow {
-  transform: rotate(90deg);
-}
 .bonus-label {
   color: var(--cbn-subtle, #8a9a92);
   font-size: 10px;
@@ -618,6 +595,7 @@ a.code-reward { color: inherit; text-decoration: none; }
   <div class="sticky-header">
   <div class="filter-bar">
     <nav class="quick-filters" id="quick-filters" aria-label="Finn tilbud etter tema"></nav>
+    <button class="cbn-button cbn-button--quiet" id="scroll-top" type="button" hidden></button>
     <button class="cbn-button cbn-button--quiet provider-picker filter-picker" id="provider-picker" type="button" title="Filtrer etter fordelsprogram" aria-label="Filtrer etter fordelsprogram" aria-haspopup="dialog" aria-controls="provider-menu" aria-expanded="false">
       <span>Filter</span><span class="filter-picker-count" hidden></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>
     </button>
@@ -678,7 +656,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js?v=8"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey, renderSupportFooter, getInstabankInvite, createCountBadge, fitCountToChip, renderSupportInvite, createLazyBatches, SUPABASE_URL, SUPABASE_ANON_KEY, fetchMyVotes, apiVote, getMerchantFaviconUrl, createViewToggle } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey, renderSupportFooter, getInstabankInvite, createCountBadge, fitCountToChip, renderSupportInvite, createLazyBatches, SUPABASE_URL, SUPABASE_ANON_KEY, fetchMyVotes, apiVote, getMerchantFaviconUrl, createViewToggle, setupExtraCashbackToggle, installScrollTopButton } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -991,6 +969,7 @@ async function init() {
   }
   setupProviderPicker();
   setupQuickFilters();
+  installScrollTopButton(document.getElementById("scroll-top"));
   merchantView = createViewToggle(document.getElementById("view-toggle"), {
     storageKey: "cbn-cashback-view",
     defaultView: () => "list",
@@ -1543,7 +1522,11 @@ function merchantCardHtml(m) {
       ${nameHtml}
     </div>
     <div class="offers">${offerHtml}</div>
-    ${cashbackOffers.length > 2 ? `<div class="more-offers">+${cashbackOffers.length - 2} fordeler til</div>` : ""}
+    ${(() => {
+      // Grid tiles show the best benefit; the rest is summarised so every tile has content.
+      const parts = [cashbackOffers.length > 1 ? `+${cashbackOffers.length - 1} ${cashbackOffers.length === 2 ? "fordel" : "fordeler"} til` : "", codeOffers.length ? `${codeOffers.length} ${codeOffers.length === 1 ? "rabattkode" : "rabattkoder"}` : ""].filter(Boolean);
+      return parts.length ? `<div class="more-offers">${parts.join(" · ")}</div>` : "";
+    })()}
     ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
     <div class="codes-inline${filterCodes && codesHtml ? " open" : ""}${(filterCodes ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
       <div class="codes-toggle-wrap">
@@ -2098,35 +2081,8 @@ function renderBonusChips() {
 }
 
 function setupBonusToggle() {
-  const btn = document.querySelector(".bonus-toggle");
-  const chips = document.querySelector(".bonus-chips-portal");
   renderBonusChips();
-  const savedOpen = localStorage.getItem("cashback-bonus-open") === "1";
-  if (savedOpen) {
-    chips.style.display = "flex";
-    btn.classList.add("open");
-  }
-  const closeChips = () => {
-    chips.style.display = "none";
-    btn.classList.remove("open");
-    localStorage.setItem("cashback-bonus-open", "0");
-  };
-
-  btn.addEventListener("click", () => {
-    const open = chips.style.display !== "none";
-    chips.style.display = open ? "none" : "flex";
-    btn.classList.toggle("open", !open);
-    localStorage.setItem("cashback-bonus-open", open ? "0" : "1");
-  });
-
-  // Swipe up to close
-  let touchStartY = 0;
-  chips.addEventListener("touchstart", (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
-  chips.addEventListener("touchend", (e) => {
-    const dy = touchStartY - e.changedTouches[0].clientY;
-    if (dy > 40) closeChips();
-  }, { passive: true });
-
+  setupExtraCashbackToggle(document.querySelector(".bonus-toggle"), document.querySelector(".bonus-chips-portal"), "cashback-bonus-open");
 }
 
 

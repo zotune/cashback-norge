@@ -286,3 +286,34 @@ export async function fetchVoteTallies(hostname: string, since?: string): Promis
     }));
   } catch { return []; }
 }
+
+export const SCROLL_TOP_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+
+/** A "back to top" button that appears once the page is scrolled past the introduction. */
+export function installScrollTopButton(button: HTMLButtonElement): void {
+  button.classList.add("scroll-top");
+  button.setAttribute("aria-label", "Til toppen");
+  button.title = "Til toppen";
+  if (!button.innerHTML.trim()) button.innerHTML = SCROLL_TOP_SVG;
+  const sync = () => { button.hidden = window.scrollY < 600; };
+  window.addEventListener("scroll", sync, { passive: true });
+  button.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  sync();
+}
+
+/** The "Ekstra cashback" toggle: opens the card panel inside the sticky header, remembered per page; swipe up closes it. */
+export function setupExtraCashbackToggle(button: HTMLElement, panel: HTMLElement, storageKey: string): void {
+  const set = (open: boolean) => {
+    panel.style.display = open ? "flex" : "none";
+    button.classList.toggle("open", open);
+    button.setAttribute("aria-expanded", String(open));
+    try { localStorage.setItem(storageKey, open ? "1" : "0"); } catch { /* Optional. */ }
+  };
+  let saved = false;
+  try { saved = localStorage.getItem(storageKey) === "1"; } catch { /* Closed by default. */ }
+  set(saved);
+  button.addEventListener("click", () => set(panel.style.display === "none"));
+  let touchStartY = 0;
+  panel.addEventListener("touchstart", (event) => { touchStartY = event.touches[0]!.clientY; }, { passive: true });
+  panel.addEventListener("touchend", (event) => { if (touchStartY - event.changedTouches[0]!.clientY > 40) set(false); }, { passive: true });
+}

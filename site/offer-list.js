@@ -13,6 +13,7 @@
     createCountBadge, fitCountToChip, createChoiceMenu, createLazyBatches,
     renderSupportFooter, getInstabankInvite, renderSupportInvite, selectSupportAdvertisement,
     fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer, createSelectionMenu, getDealLowPrice, createAlphabetTracker,
+    installScrollTopButton, setupExtraCashbackToggle,
   } = window.SHARED;
 
   const BATCH = 40;
@@ -61,7 +62,8 @@
    * @param {string} config.storageKey       localStorage key for the viewer's choices
    * @param {string} config.voteKey          Supabase key the votes are stored under
    * @param {string} config.groupLabel       "Butikker" / "Kategorier"
-   * @param {string} [config.noGroupsText]   shown when every filter is off
+   * @param {(panel: HTMLElement) => void} [config.extraCashback]  fills the "Ekstra cashback" panel
+ * @param {string} [config.noGroupsText]   shown when every filter is off
    * @param {(catalog: any) => {items: object[], updated?: string, note?: string}} config.read
    * @param {string[]} [config.groupOrder]   fixed chip order (else alphabetical)
    * @param {{unit?: boolean, validity?: boolean, bonus?: boolean, category?: boolean}} config.features
@@ -87,14 +89,20 @@
     // ---------- markup ----------
     config.mount.innerHTML = `
       <div class="sticky-header" data-ol="sticky">
-        ${!features.category ? `<div class="group-heading"><span>Butikker</span><span class="group-actions"><button class="cbn-button cbn-button--quiet list-reset" data-ol="all" type="button">Velg alle</button><button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button><button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-toggle" type="button" aria-label="Filtrer på pris og rabatt"><span>Filter</span><span class="filter-picker-count" data-ol="filter-toggle-count" hidden></span>${FILTER_SVG}</button></span></div><div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="Butikker"></div>` : ""}
-        ${features.sources ? `<div class="group-heading"><span>Kilder:</span></div><div class="chip-toggles group-toggles source-toggles" data-ol="sources" role="group" aria-label="Kilder"></div>` : ""}
-        <div class="offer-filter-bar"${!features.category ? " hidden" : ""}>
-          <span data-ol="filter-summary"></span><button class="cbn-button cbn-button--quiet list-reset" data-ol="filter-reset" type="button" hidden>Nullstill valg</button>
-          <button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-picker" type="button" aria-label="Filtrer butikker, kategorier og kilder"><span>Filter</span><span class="filter-picker-count" data-ol="filter-picker-count" hidden></span>${FILTER_SVG}</button>
-        </div>
+        ${!features.category ? `<div class="group-heading"><span>Butikker</span><span class="group-actions"><button class="cbn-button cbn-button--quiet list-reset" data-ol="all" type="button">Velg alle</button><button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button><button class="cbn-button cbn-button--quiet" data-ol="scroll-top" type="button" hidden></button><button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-toggle" type="button" aria-label="Filtrer på pris og rabatt"><span>Filter</span><span class="filter-picker-count" data-ol="filter-toggle-count" hidden></span>${FILTER_SVG}</button></span></div><div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="Butikker"></div>` : ""}
+        ${(() => {
+          // Summary, reset, back-to-top and Filter on the right of the first heading row.
+          const bar = `<span class="offer-filter-bar"><span data-ol="filter-summary"></span><button class="cbn-button cbn-button--quiet list-reset" data-ol="filter-reset" type="button" hidden>Nullstill valg</button>
+            <button class="cbn-button cbn-button--quiet" data-ol="scroll-top" type="button" hidden></button>
+            <button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-picker" type="button" aria-label="Filtrer butikker, kategorier og kilder"><span>Filter</span><span class="filter-picker-count" data-ol="filter-picker-count" hidden></span>${FILTER_SVG}</button></span>`;
+          if (!features.category) return `<span hidden>${bar}</span>`;
+          return features.sources
+            ? `<div class="group-heading"><span>Kilder:</span>${bar}</div><div class="chip-toggles group-toggles source-toggles" data-ol="sources" role="group" aria-label="Kilder"></div>`
+            : `<div class="group-heading"><span></span>${bar}</div>`;
+        })()}
         <div class="active-offer-filters" data-ol="active-filters" hidden></div>
         <div class="list-bar">
+          ${config.extraCashback ? `<button class="cbn-button cbn-button--quiet bonus-toggle" data-ol="bonus-toggle" type="button" aria-expanded="false"><span class="bonus-toggle-arrow">▶</span> Ekstra cashback</button>` : ""}
           <div class="count" data-ol="count" aria-live="polite"></div>
           ${features.category ? `<button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Pris og rabatt">Pris/rabatt</button>` : ""}
           <button class="cbn-button cbn-button--quiet sort-button" data-ol="sort" type="button" aria-label="Sorter tilbud">${SORT_SVG}<span data-choice-label></span></button>
@@ -118,6 +126,7 @@
             <button class="cbn-button cbn-button--quiet input-clear" type="button" aria-label="Tøm søk">✕</button>
           </div>
         </div>
+        ${config.extraCashback ? `<div class="bonus-chips-portal" data-ol="bonus-panel" style="display:none"></div>` : ""}
       </div>
       ${config.toplists ? `<div class="toplists" role="group" aria-label="Topplister"><span>Topplister</span>${config.toplists.map((entry) => `<button class="cbn-button cbn-button--filter" type="button" data-toplist="${esc(entry.sort)}">${esc(entry.label)}</button>`).join("")}<small data-ol="toplist-note"></small></div>` : ""}
       <div class="results" data-ol="results" aria-live="off"><div class="empty">Laster tilbud …</div></div>
@@ -461,7 +470,8 @@
 
     // ---------- preview, copy, votes ----------
     function validityHtml(item) {
-      return item.validTo ? `<span class="deal-validity"><span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span> ${daysLeftHtml(item)}</span>` : `<span class="deal-valid" title="Butikken oppgir ingen sluttdato">—</span>`;
+      // Days left matter most; the date follows.
+      return item.validTo ? `<span class="deal-validity">${daysLeftHtml(item)} <span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span></span>` : `<span class="deal-valid" title="Butikken oppgir ingen sluttdato">—</span>`;
     }
     function showPreview(thumb) {
       const preview = el("preview");
@@ -751,6 +761,11 @@
     el("search").closest(".input-wrap").classList.toggle("has-value", state.query.length > 0);
     setupControls();
     setupAzBar();
+    installScrollTopButton(el("scroll-top"));
+    if (config.extraCashback) {
+      config.extraCashback(el("bonus-panel"));
+      setupExtraCashbackToggle(el("bonus-toggle"), el("bonus-panel"), `${config.storageKey}-bonus-open`);
+    }
     // One draw per page, so the top card and the bottom line agree.
     const draw = Math.random();
     const footer = document.querySelector(".fixed-footer .tip-line");

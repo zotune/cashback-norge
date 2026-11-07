@@ -33,15 +33,6 @@
     <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
     <p class="invite-card-fine-print" data-invite-fine-print hidden></p>
   </aside>
-  <section class="extra-cashback" aria-label="Ekstra cashback">
-    <button class="cbn-button cbn-button--quiet extra-cashback-toggle" id="card-bonus-toggle" type="button" aria-controls="card-bonus" aria-expanded="false"><span aria-hidden="true">▶</span> Ekstra cashback</button>
-    <div class="cbn-card extra-cashback-panel" id="card-bonus" hidden>
-      <div class="chip-group"><span class="chip-group-label">Dagligvarekort</span><div class="chip-group-items" id="grocery-card-chips"></div></div>
-      <div class="chip-group"><span class="chip-group-label">Gratis kort</span><div class="chip-group-items" id="free-chips"></div></div>
-      <div class="chip-group"><span class="chip-group-label">Premium</span><div class="chip-group-items" id="premium-chips"></div></div>
-      <p class="extra-cashback-note">Kortfordeler har egne vilkår og gjelder ikke alle kjøp. Ad er affiliatelenker som kan gi oss provisjon.</p>
-    </div>
-  </section>
   <div id="offer-list"></div>
   <p class="note" id="note"></p>
   <footer class="footer" style="margin-bottom:56px;">
@@ -93,27 +84,23 @@ function toItem(offer) {
 }
 
 let cardBenefitOffers = [];
+let bonusPanel;
 function renderCardBonuses() {
+  if (!bonusPanel) return;
   const groceries = GROCERY_CARD_BONUSES.map((card) => ({
     label: card.label, badge: card.id, pct: 0, rewardLabel: card.rate, url: card.url, approx: false, tip: card.tip,
   }));
-  renderBonusCardGroup(groceries, document.getElementById("grocery-card-chips"));
-  renderBonusCardGroup(getFreeCards(cardBenefitOffers), document.getElementById("free-chips"));
-  renderBonusCardGroup(PREMIUM_CARDS, document.getElementById("premium-chips"));
-  window.CashbackTooltips.attach(document.getElementById("card-bonus"));
+  bonusPanel.innerHTML = `<div class="chip-group"><span class="chip-group-label">Dagligvarekort</span><div class="chip-group-items" data-cards="grocery"></div></div>
+    <div class="chip-group"><span class="chip-group-label">Gratis</span><div class="chip-group-items" data-cards="free"></div></div>
+    <div class="chip-group"><span class="chip-group-label">Premium</span><div class="chip-group-items" data-cards="premium"></div></div>`;
+  renderBonusCardGroup(groceries, bonusPanel.querySelector('[data-cards="grocery"]'));
+  renderBonusCardGroup(getFreeCards(cardBenefitOffers), bonusPanel.querySelector('[data-cards="free"]'));
+  renderBonusCardGroup(PREMIUM_CARDS, bonusPanel.querySelector('[data-cards="premium"]'));
+  window.CashbackTooltips.attach(bonusPanel);
 }
-function setupCardBonuses() {
-  const panel = document.getElementById("card-bonus");
-  const toggle = document.getElementById("card-bonus-toggle");
-  let open = false;
-  try { open = localStorage.getItem("cashback-bonus-open") === "1"; } catch { /* Optional preference. */ }
-  const sync = () => { panel.hidden = !open; toggle.setAttribute("aria-expanded", String(open)); };
-  sync();
-  toggle.addEventListener("click", () => {
-    open = !open;
-    sync();
-    try { localStorage.setItem("cashback-bonus-open", open ? "1" : "0"); } catch { /* Optional preference. */ }
-  });
+// Same "Ekstra cashback" as the front page: a toggle by the count, the cards under the search.
+function fillCardBonuses(panel) {
+  bonusPanel = panel;
   renderCardBonuses();
   watchCardBenefitDate(renderCardBonuses);
   // Instabank uses the same current benefits and affiliate URL as the home page.
@@ -124,7 +111,6 @@ function setupCardBonuses() {
 }
 
 installGroceryChainStyles();
-setupCardBonuses();
 createOfferList({
   mount: document.getElementById("offer-list"),
   dataUrl: "/grocery-offers.json",
@@ -134,6 +120,7 @@ createOfferList({
   noGroupsText: "Velg minst én butikk.",
   searchPlaceholder: "Søk etter vare, f.eks. kaffe...",
   features: { unit: true, validity: true, bonus: true },
+  extraCashback: fillCardBonuses,
   groupName: chainLabel,
   groupClass: (name) => { const chain = getGroceryChain(name); return chain ? `badge-chain-${chain.slug}` : ""; },
   dropUrlParams: ["kjede"],

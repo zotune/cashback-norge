@@ -250,3 +250,9 @@ a.card-chip { text-decoration: none; }
 @media (max-width: 1279px) { .deal-table td, .deal-table th { padding-left: 6px; padding-right: 6px; } }
 .offer-filter-bar .list-reset { margin-left: 0; }
 .group-heading .filter-picker { margin-left: 6px; }
+/* Summary and "Nullstill valg" sit with the Filter button on the right. */
+.offer-filter-bar { justify-content: flex-end; }
+.offer-filter-bar .filter-picker { margin-left: 0; }
+.group-heading .offer-filter-bar { align-items: center; display: inline-flex; gap: 8px; margin: 0; }
+.list-bar .bonus-toggle { margin: 0; padding: 0 8px 0 0; }
+.list-bar:has(.bonus-toggle) .count { text-align: right; }
