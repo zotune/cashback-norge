@@ -53,8 +53,9 @@ export function readPrisjaktDealDetails(html: string, deal: PrisjaktDeal, now: s
     if (chart.variantIds.length > 0 && (variantId === undefined || !chart.variantIds.includes(variantId))) continue;
     const updated = typeof history.newestHistoryItem === "string" ? Date.parse(history.newestHistoryItem) : NaN;
     const oldest = typeof history.oldestHistoryItem === "string" ? Date.parse(history.oldestHistoryItem) : NaN;
-    // A partial chart is not evidence for the whole 90-day period.
-    if (!Number.isFinite(updated) || updated < nowMs - 2 * 86400000 || updated > nowMs || !(oldest <= start)) continue;
+    // These dates describe price changes, not fetch freshness. An unchanged
+    // price may legitimately have its latest event several weeks ago.
+    if (!Number.isFinite(updated) || updated < oldest || updated > nowMs + 5 * 60000 || !(oldest <= start)) continue;
     const events = history.historyItems.filter(isRecord).filter((item) => typeof item.date === "string" && Date.parse(item.date) <= nowMs)
       .sort((a, b) => Date.parse(String(a.date)) - Date.parse(String(b.date)));
     const beforeStart = events.filter((item) => Date.parse(String(item.date)) <= start).at(-1);
@@ -81,7 +82,7 @@ export function readPrisjaktAllTimeHistory(value: unknown, variantIds: number[],
   const oldest = typeof history.oldestHistoryItem === "string" ? Date.parse(history.oldestHistoryItem) : NaN;
   const updated = typeof history.newestHistoryItem === "string" ? Date.parse(history.newestHistoryItem) : NaN;
   const nowMs = Date.parse(now);
-  if (!Number.isFinite(oldest) || !Number.isFinite(updated) || updated < nowMs - 2 * 86400000 || updated > nowMs + 5 * 60000) return {};
+  if (!Number.isFinite(oldest) || !Number.isFinite(updated) || updated < oldest || updated > nowMs + 5 * 60000) return {};
   const events = (history.historyItems as unknown[]).filter(isRecord).filter((item) => typeof item.date === "string" && Date.parse(item.date) <= nowMs + 5 * 60000);
   const first = Math.min(...events.map((item) => Date.parse(String(item.date))).filter(Number.isFinite));
   if (!Number.isFinite(first) || first > oldest + 86400000) return {};

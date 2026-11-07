@@ -140,10 +140,11 @@ async function fetchGodprisProductIds(
     .map((match) => match.id);
 }
 
-function readGodprisProductPage(
+export function readGodprisProductPage(
   html: string,
   fallbackProductId: string,
   anchor: ProductMatchAnchor,
+  requireStructured = false,
 ): PriceMatchOffer | undefined {
   // The current site publishes concrete seller offers as JSON-LD; the older
   // Inertia payload remains a fallback for saved pages and older deployments.
@@ -172,6 +173,7 @@ function readGodprisProductPage(
       productUrl: `${GODPRIS_PRODUCT_URL}${fallbackProductId}`,
       alternatives: offers.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer) };
   }
+  if (requireStructured) return undefined;
   const page = readGodprisDataPage(html);
   const props = isPlainRecord(page?.props) ? page.props : undefined;
   const product = isPlainRecord(props?.product) ? props.product : undefined;

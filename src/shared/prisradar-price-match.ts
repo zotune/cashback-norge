@@ -702,7 +702,7 @@ async function fetchPrisradarOfferForUrl(
   return html !== undefined ? readPrisradarProductPage(html, productUrl) : undefined;
 }
 
-function readPrisradarProductPage(html: string, fallbackProductUrl: string): PriceMatchOffer | undefined {
+export function readPrisradarProductPage(html: string, fallbackProductUrl: string, requireInStock = false): PriceMatchOffer | undefined {
   const product = readNextProductData(html, fallbackProductUrl);
   if (!isPlainRecord(product)) return undefined;
 
@@ -710,6 +710,7 @@ function readPrisradarProductPage(html: string, fallbackProductUrl: string): Pri
   const productUrl = readStringLike(product.url) ?? fallbackProductUrl;
   const rawOffers = Array.isArray(product.offers) ? product.offers : [];
   const offers = dedupePrisradarOffersByShop(rawOffers
+    .filter(value => !requireInStock || isPlainRecord(value) && value.availability === "in_stock" && value.isInactive !== true)
     .map(readPrisradarOffer)
     .filter((offer): offer is PrisradarOffer => offer !== undefined)
     .sort(comparePrisradarOffersByPrice));

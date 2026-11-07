@@ -34,9 +34,9 @@ test("history for a specific colour/size requires that variant, rather than the 
   assert.equal(readPrisjaktDealDetails(page({ ...history, variantIds: [789] }, row), variant, now).lowestPrice90Days, undefined);
 });
 
-test("history remains unknown for partial coverage, another currency, stale data, missing starting price or malformed data", () => {
+test("history remains unknown for partial coverage, another currency, impossible dates, missing starting price or malformed data", () => {
   for (const override of [
-    { oldestHistoryItem: "2026-10-01T00:00:00Z" }, { newestHistoryItem: "2026-10-01T00:00:00Z" },
+    { oldestHistoryItem: "2026-10-01T00:00:00Z" }, { newestHistoryItem: "2025-10-01T00:00:00Z" },
     { historyItems: [event("2026-11-01T00:00:00Z", 10000)] },
     { historyItems: [event("2026-08-01T00:00:00Z", 0)] },
   ]) {
@@ -45,6 +45,13 @@ test("history remains unknown for partial coverage, another currency, stale data
   }
   assert.equal(readPrisjaktDealDetails(page({ ...history, marketConfig: { currency: "SEK" } }), deal, now).lowestPrice90Days, undefined);
   assert.deepEqual(readPrisjaktDealDetails("<html>Just a moment</html>", deal, now), {});
+});
+
+test("a freshly fetched chart stays valid when Starlink's last price change was weeks ago", () => {
+  const priceHistory = { oldestHistoryItem: "2024-09-05T04:05:20.933Z", newestHistoryItem: "2026-10-22T12:20:58.621Z",
+    historyItems: [event("2024-09-04T22:00:00Z", 479500), event("2026-08-01T22:00:00Z", 219900), event("2026-10-21T22:00:00Z", 237900)] };
+  assert.equal(readPrisjaktAllTimeHistory({ priceHistory }, [], now).lowestPriceEver, 2199);
+  assert.equal(readPrisjaktDealDetails(page({ ...history, initialData: { priceHistory } }), deal, now).lowestPrice90Days, 2199);
 });
 
 test("deal merchants reuse unambiguous verified domains and leave ambiguous names unknown", () => {

@@ -34,12 +34,25 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Dependencies are ephemeral; only the ~5 MB model is cached.
+      - run: python -m pip install --no-cache-dir -r scripts/background-removal/requirements.txt
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.u2net/u2netp.onnx
+          key: rembg-u2netp-v1
+
       - run: pnpm run test:backend
 
       - run: pnpm run build:backend
 
       - run: pnpm run crawl
         env:
+          CBN_BACKGROUND_PYTHON: python
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
           SCRAPERAPI_KEY2: ${{ secrets.SCRAPERAPI_KEY2 }}
           SCRAPERAPI_KEY3: ${{ secrets.SCRAPERAPI_KEY3 }}

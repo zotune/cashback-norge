@@ -270,7 +270,6 @@
       list = [...list].sort(state.sortDir === -1 ? (a, b) => sorter(b, a) : sorter);
       el("count").textContent = words.length ? `${list.length} av ${visible.length} tilbud` : `${visible.length} tilbud`;
       state.list = list;
-      state.ranks = new Map((state.sort === "votes" ? list.filter((item) => { const tally = tallies.get(item.id.toUpperCase()); return tally && tally.upvotes + tally.downvotes > 0; }) : list).map((item, index) => [item.id, index + 1]));
       config.mount.querySelectorAll("[data-toplist]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.toplist === state.sort && state.sortDir === 1)));
       if (config.toplists) el("toplist-note").textContent = state.sort === "votes" ? "Tommel opp minus tommel ned. Tilbud uten stemmer har ingen brukerrangering." : state.sort === "saving" ? "Prisfall mot normalpris hos Prisjakt, basert på de siste tre månedene." : state.sort === "relevance" ? "Prisjakts popularitetsrekkefølge innen valgte filtre." : "";
       state.shown = 0;
@@ -313,6 +312,7 @@
 
     // ---------- rows ----------
     const columns = () => [
+      ...(config.toplists ? [{ label: "#", sort: "relevance", num: true }] : []),
       { label: "", sort: "" },
       { label: "Vare", sort: "name" },
       { label: "Butikk", sort: "store" },
@@ -337,7 +337,8 @@
     const thumbHtml = (item) => item.imageUrl
       ? `<a class="deal-thumb" href="${esc(item.link.url)}" target="_blank" rel="noopener" data-preview="${esc(item.imageUrl)}" aria-label="Åpne ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></a>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
-    const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}</a></span>`;
+    const rankHtml = (item) => config.toplists && state.ranks.has(item.id) ? `<span class="cbn-chip cbn-chip--muted deal-rank" title="Plassering i den samlede topplisten før søk og filtrering">#${state.ranks.get(item.id)}</span>` : "";
+    const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
       const initial = features.category ? `<span class="deal-store-initial" aria-hidden="true"${item.store.iconUrl ? ' style="display:none"' : ""}>${esc(item.store.label.charAt(0))}</span>` : "";
       const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.nextElementSibling.style.display='inline-flex';this.remove()">` : ""}${initial}<span class="deal-store-name">${esc(item.store.label)}</span></span>`;
@@ -351,7 +352,7 @@
       if (!low) return `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
       const aboveLow = item.amount > low.lowestPrice;
       const difference = low.dropToLowPercent ? `${new Intl.NumberFormat("nb-NO").format(low.dropToLowPercent)} %` : "0,1 %";
-      const tip = `Laveste registrerte varepris gjennom hele historikken, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`;
+      const tip = `Laveste registrerte varepris gjennom hele historikken, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Siste registrerte prisendring ${formatDate(item.historyUpdatedAt)}.` : ""}`;
       return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight${aboveLow ? " cbn-chip--warning" : ""} card-chip" title="${aboveLow ? `Dagens pris må falle ${low.dropToLowPercent ? "" : "mindre enn "}${difference} for å nå laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${aboveLow ? low.dropToLowPercent ? `−${difference} til lavpris` : "&lt;0,1 % til lavpris" : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
     };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
@@ -377,6 +378,7 @@
     }
     function tableRowHtml(item) {
       return `<tr class="cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}" data-letter="${esc(letterOf(item))}">
+        ${config.toplists ? `<td class="num deal-rank-cell">${rankHtml(item)}</td>` : ""}
         <td>${thumbHtml(item)}</td>
         <td>${titleHtml(item)}${factsHtml(item)}</td>
         <td>${storeHtml(item)}</td>
@@ -399,6 +401,7 @@
       return `<article class="cbn-card cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}" data-letter="${esc(letterOf(item))}">
         ${thumbHtml(item)}
         <div class="deal-main">
+          ${rankHtml(item)}
           ${titleHtml(item)}
           ${factsHtml(item)}
         </div>
@@ -714,6 +717,7 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const { items, updated, note } = config.read(await response.json());
         state.items = items.filter((item) => typeof item.id === "string" && Number.isFinite(item.amount) && item.amount > 0);
+        state.ranks = new Map([...state.items].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)).map((item, index) => [item.id, index + 1]));
         if (state.category) { state.offCategories = new Set(state.items.map((item) => item.category).filter((name) => name !== state.category)); state.category = ""; }
         const now = Date.now();
         for (const item of state.items) if (isRunning(item, now)) state.counts.set(item.group, (state.counts.get(item.group) || 0) + 1);

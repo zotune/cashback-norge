@@ -17,7 +17,7 @@ export type OfferImageOptions = {
 const MAX_IMAGES = 2000;
 const MAX_IMAGE_BYTES = 128 * 1024;
 const MAX_BATCH_BYTES = 32 * 1024 * 1024;
-const hosts = new Set(["cdn.pji.nu", "media.pji.nu", "image-transformer-api.tjek.com"]);
+const hosts = new Set(["cdn.pji.nu", "media.pji.nu", "image-transformer-api.tjek.com", "owp.klarna.com", "assets.klarnacdn.net", "godpris.no", "images.prisradar.no"]);
 const localPath = /^\/(?:offer-images\/[a-f0-9]{32}\.webp|deal-images\/[a-f0-9]{32}\.(?:png|jpe?g|webp))$/;
 export const imageKey = ({ url, size = 320 }: OfferImageInput) => `${size}:${url}`;
 

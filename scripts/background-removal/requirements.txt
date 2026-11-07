@@ -1,0 +1,2 @@
+# CPU only. The lightweight u2netp weights are about 5 MB.
+rembg[cpu]==2.0.69

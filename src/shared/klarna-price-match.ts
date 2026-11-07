@@ -12,6 +12,7 @@ import {
 } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
+import { hasProductVariantConflict } from "./product-match.js";
 
 const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
 const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
@@ -77,14 +78,16 @@ type KlarnaProduct = {
   productUrl: string;
 };
 
-type KlarnaOffer = {
+export type KlarnaOffer = {
   shopName: string;
   amount: number;
   sortAmount: number;
-  shippingAmount: number;
+  shippingAmount?: number;
   currency: string;
   price: string;
   offerUrl?: string;
+  storeUrl?: string;
+  validTo?: string;
 };
 
 async function fetchKlarnaProduct(
@@ -142,13 +145,7 @@ async function fetchKlarnaOfferForProduct(
   const value = await requestJson(`${KLARNA_OFFERS_URL}/${encodeURIComponent(product.id)}?${params.toString()}`, {
     headers: { "Accept": "application/json" },
   });
-  if (!isPlainRecord(value) || !Array.isArray(value.offers)) return undefined;
-
-  const merchants = isPlainRecord(value.merchants) ? value.merchants : {};
-  const offers = dedupeKlarnaOffersByShop(value.offers
-    .map((offer) => readKlarnaOffer(offer, merchants))
-    .filter((offer): offer is KlarnaOffer => offer !== undefined)
-    .sort(compareKlarnaOffersByPrice));
+  const offers = readKlarnaOffers(value);
   const best = offers[0];
   if (best === undefined) return undefined;
 
@@ -169,10 +166,24 @@ async function fetchKlarnaOfferForProduct(
       sortAmount: offer.sortAmount,
       currency: offer.currency,
       price: offer.price,
-      shippingPrice: formatShippingPrice(offer.shippingAmount),
-      ...(offer.shippingAmount > 0 ? { totalPrice: formatNokPrice(offer.sortAmount) } : {}),
+      shippingPrice: offer.shippingAmount === undefined ? "Frakt ukjent" : formatShippingPrice(offer.shippingAmount),
+      ...(offer.shippingAmount !== undefined && offer.shippingAmount > 0 ? { totalPrice: formatNokPrice(offer.sortAmount) } : {}),
     })),
   };
+}
+
+/** Shared by the live client and daily deal snapshots. The catalogue requires
+ * explicit stock and rejects membership-only offers and conflicting variants. */
+export function readKlarnaOffers(value: unknown, options: { requireInStock?: boolean; productName?: string } = {}): KlarnaOffer[] {
+  if (!isPlainRecord(value) || !Array.isArray(value.offers)) return [];
+  const merchants = isPlainRecord(value.merchants) ? value.merchants : {};
+  return dedupeKlarnaOffersByShop(value.offers.filter(offer => {
+    if (!isPlainRecord(offer)) return false;
+    if (!options.requireInStock) return true;
+    if (offer.stockStatus !== "IN_STOCK" || offer.availability !== "AVAILABLE" || offer.campaignMembership != null ||
+      offer.condition !== undefined && offer.condition !== "NEW") return false;
+    return !options.productName || typeof offer.name === "string" && !hasProductVariantConflict({ searchTerm: options.productName }, offer.name);
+  }).map(offer => readKlarnaOffer(offer, merchants)).filter((offer): offer is KlarnaOffer => offer !== undefined));
 }
 
 function dedupeKlarnaOffersByShop(offers: KlarnaOffer[]): KlarnaOffer[] {
@@ -211,7 +222,7 @@ function readKlarnaOffer(value: unknown, merchants: Record<string, unknown>): Kl
   const effectivePrice = campaignPriceValue ?? price;
   const shippingCost = isPlainRecord(value.shippingCost) ? value.shippingCost : undefined;
   const amount = readNumberLike(effectivePrice?.amount);
-  const shippingAmount = readNumberLike(shippingCost?.amount) ?? 0;
+  const shippingAmount = shippingCost?.currency === effectivePrice?.currency ? readNumberLike(shippingCost?.amount) : undefined;
   const currency = readStringLike(effectivePrice?.currency);
   const merchantId = readStringLike(value.merchantId);
   const merchant = merchantId !== undefined && isPlainRecord(merchants[merchantId]) ? merchants[merchantId] : undefined;
@@ -227,11 +238,13 @@ function readKlarnaOffer(value: unknown, merchants: Record<string, unknown>): Kl
   return {
     shopName,
     amount,
-    sortAmount: amount + shippingAmount,
-    shippingAmount,
+    sortAmount: amount + (shippingAmount ?? 0),
+    ...(shippingAmount !== undefined ? { shippingAmount } : {}),
     currency,
     price: formatNokPrice(amount),
     ...(offerUrl !== undefined ? { offerUrl } : {}),
+    ...(readStringLike(merchant?.url) ? { storeUrl: `${KLARNA_PRODUCT_URL}${readStringLike(merchant?.url)}` } : {}),
+    ...(campaignPriceValue && isPlainRecord(campaignPrice?.salePriceEffectiveDate) && typeof campaignPrice.salePriceEffectiveDate.end === "string" ? { validTo: campaignPrice.salePriceEffectiveDate.end } : {}),
   };
 }
 

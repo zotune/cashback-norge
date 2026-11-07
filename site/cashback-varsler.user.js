@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794070956
+// @version      1794073312
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1378,29 +1378,29 @@
     affiliate: true,
     validFrom: "2026-11-01",
     validUntil: "2026-12-31",
-    // Short sign-up incentive per month, shown as the ad text.
+    // Short sign-up incentive per month: `text` fits the one-line ad, `detail` the card and tooltip.
     incentives: [
-      { text: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
-      { text: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" }
+      { text: "Instabank: 3 % rabatt på netthandel", detail: "Instabank: 3 % rabatt på all netthandel i november", validUntil: "2026-11-30" },
+      { text: "Instabank: 3 % rabatt på alle kjøp", detail: "Instabank: 3 % rabatt på alle kjøp i desember", validUntil: "2026-12-31" }
     ],
     // Credit ads must carry the representative example. Keep it to one line.
     example: "Eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr."
   };
   const SUPPORT_LINKS = [
-    { text: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
-    { text: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
+    { text: "Kron: 100 kr i fondsbonus", detail: "Kron: 100 kr fondsbonus ved sparing fra 300 kr", emoji: "💰", url: "https://kron.no/app/invitert/nvu4d", affiliate: true },
+    { text: "Horde: Oversikt over alle kort", detail: "Horde: Oversikt over alle kort + nedbetaling", emoji: "📊", url: "https://app.horde.no/66CS/verve?code=kloube", affiliate: true },
     { text: "Kjøp en kaffe til utvikler ♥", emoji: "☕", url: "https://buymeacoffee.com/adore", affiliate: false },
-    { text: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
-    { text: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
-    { text: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
-    { text: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
+    { text: "Wise: Gratis overføring til utlandet", detail: "Wise: Gratis utlandsoverføring opptil 5 000 kr", emoji: "🌍", url: "https://wise.com/invite/dic/mikaele41", affiliate: true },
+    { text: "Tibber: 1 000 kr i Tibber Store", detail: "Tibber: 1 000 kr i Store eller 12 mnd fri avgift", emoji: "⚡", url: "https://invite.tibber.com/nwm7kene", affiliate: true },
+    { text: "Revolut: Gratis valutaveksling", detail: "Revolut: Gratis valutaveksling + bonus", emoji: "💳", url: "https://revolut.com/referrals?r=FELPJK", affiliate: true },
+    { text: "Crypto.com: Gratis Spotify/Netflix", detail: "Crypto.com: 3-6 mnd gratis Spotify/Netflix", emoji: "🎵", url: "https://crypto.com/app/ns3fma5hou", affiliate: true },
     { text: "NBX: 75 kr i BTC", emoji: "₿", url: "https://app.nbx.com/login/signup?referral=cjgOu54PvA", affiliate: true },
-    { text: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
-    { text: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
-    { text: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
-    { text: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
+    { text: "Curve: Alle kort i ett", detail: "Curve: Alle kort i ett + gratis valutaveksling", emoji: "💱", url: "https://www.curve.com/join#D5GXXJJD", affiliate: true },
+    { text: "NordVPN: 1 måned gratis", detail: "NordVPN: 1 mnd gratis + trygg offentlig wifi", emoji: "🛡️", url: "https://refer-nordvpn.com/OlqraLvOSju", affiliate: true },
+    { text: "NettBonus: Verv en venn, få 200 kr", detail: "NettBonus: Inviter en venn og få 200 kr", emoji: "🎁", url: "https://nettbonus.no/r/28698", affiliate: true },
+    { text: "Sparebørsen: 50 kr med Vipps", detail: "Sparebørsen: 50 kr ved registrering med Vipps", emoji: "💰", url: "https://spareborsen.no/ref/cmoxhkl4bhevrnv9d6uo77an5", affiliate: true },
     // Bulder's referral terms: 500 kr to both when the referred mortgage is paid out (bulder.no/om-oss/vilkaar/bonus-verving).
-    { text: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true }
+    { text: "Bulder: 500 kr ved flytting av lån", detail: "Bulder: 500 kr når du flytter boliglånet", emoji: "🏠", url: "https://www.bulder.no/referral/mikaelell-25", affiliate: true }
   ];
   const PROVIDER_WELCOME_BONUSES = {
     spareborsen: {
@@ -1486,6 +1486,11 @@
     const today = osloDate(now);
     return today >= INSTABANK_AD.validFrom && today <= INSTABANK_AD.validUntil;
   }
+  function getSupportAdvertisementDetail(ad, now = /* @__PURE__ */ new Date()) {
+    if (ad !== INSTABANK_AD) return "detail" in ad && typeof ad.detail === "string" ? ad.detail : ad.text;
+    const today = osloDate(now);
+    return INSTABANK_AD.incentives.find((incentive) => incentive.validUntil >= today)?.detail ?? INSTABANK_AD.text;
+  }
   function getSupportAdvertisementText(ad, now = /* @__PURE__ */ new Date()) {
     if (ad !== INSTABANK_AD) return ad.text;
     const today = osloDate(now);
@@ -1499,9 +1504,9 @@
     return SUPPORT_LINKS[Math.min(SUPPORT_LINKS.length - 1, Math.floor(rest * SUPPORT_LINKS.length))];
   }
   function getSupportAdvertisementTooltipParts(ad, offers, now = /* @__PURE__ */ new Date()) {
-    if (ad !== INSTABANK_AD) return [ad.text];
+    if (ad !== INSTABANK_AD) return [getSupportAdvertisementDetail(ad, now)];
     const card = getFreeCards(offers, now).find((card2) => card2.badge === "instabank");
-    const details = (card?.tip ?? getSupportAdvertisementText(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
+    const details = (card?.tip ?? getSupportAdvertisementDetail(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
     return ["# Instabank kredittkort", details, INSTABANK_AD.example];
   }
   const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
@@ -19015,7 +19020,7 @@ ${darkProviderCss}
     return Number.isFinite(amount) && amount > 0 ? amount : void 0;
   }
   function makeAdChip() {
-    const chip = createMutedChip("Ad");
+    const chip = createMutedChip("Annonse");
     chip.classList.add("ad-chip");
     return chip;
   }
@@ -19334,7 +19339,7 @@ ${darkProviderCss}
         clone.target = "_blank";
         clone.removeAttribute("id");
         const adLabel = document.createElement("span");
-        adLabel.textContent = "Ad";
+        adLabel.textContent = "Annonse";
         adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
         clone.prepend(adLabel);
         loginLink.replaceWith(clone);
@@ -19459,9 +19464,9 @@ ${darkProviderCss}
     link.style.textDecoration = "none";
     link.setAttribute("data-cb-rewrite", "1");
     const adLabel = document.createElement("span");
-    adLabel.textContent = "Ad";
+    adLabel.textContent = "Annonse";
     adLabel.style.cssText = "display:inline-block;font-size:10px;font-weight:700;color:#000;background:#fff;border-radius:3px;padding:1px 4px;margin-right:8px;vertical-align:middle;line-height:14px;";
-    if (!clone.textContent?.trim().startsWith("Ad")) {
+    if (!clone.textContent?.trim().startsWith("Annonse")) {
       clone.prepend(adLabel);
     }
     link.append(clone);
@@ -20959,7 +20964,8 @@ ${darkProviderCss}
       justify-content: space-between;
     }
     .support-ad-anchor { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-    .support-ad-anchor > a { flex: 1; text-align: center; }
+    /* One line: a long ad is shortened rather than wrapped. */
+    .support-ad-anchor > a { flex: 1; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
     .support a {
       color: var(--cbn-subtle, #8a9a92);
       font-size: 11px;
