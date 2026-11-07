@@ -234,7 +234,7 @@
         const data = group ? `data-cat-group="${esc(group)}" data-cat="${esc(name)}"` : `data-cat-group="${esc(name)}"`;
         return `<button class="cbn-button cbn-button--filter group-toggle category-option" type="button" aria-pressed="${pressed}" ${data}><span>${esc(config.groupName?.(name) ?? name)}</span><span class="cbn-count">${counts.get(name).toLocaleString("nb-NO")}</span>${group ? "" : '<span class="category-arrow" aria-hidden="true">›</span>'}</button>`;
       }).join("");
-      nav.innerHTML = `<div class="group-heading"><span>Kategori:</span></div><nav class="category-crumbs" aria-label="Kategori">${crumbs}</nav><div class="chip-toggles category-options" role="group" aria-label="${group ? "Underkategorier" : "Kategorier"}">${chips}</div>`;
+      nav.innerHTML = `<div class="group-heading"><span>Kategori:</span></div><nav class="category-crumbs" aria-label="Kategori">${crumbs}</nav><div class="category-level"><span class="category-level-label">${group ? `Underkategorier i ${esc(config.groupName?.(group) ?? group)}` : "Velg kategori"}</span><div class="chip-toggles category-options" role="group" aria-label="${group ? "Underkategorier" : "Kategorier"}">${chips}</div></div>`;
     }
     const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0 || state.offSources.size > 0;
     function renderGroups() {

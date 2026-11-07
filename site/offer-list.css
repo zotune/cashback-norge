@@ -282,3 +282,8 @@ button.category-crumb { color: var(--cbn-muted); }
 button.category-crumb:hover { background: var(--cbn-plate-hover); color: var(--cbn-text); }
 span.category-crumb { background: var(--cbn-highlight); color: var(--cbn-accent); min-height: 30px; padding: 0 11px; }
 .category-crumbs .category-sep { font-size: 13px; padding: 0 2px; }
+/* The next level sits in its own indented panel under the path. */
+.category-level { background: color-mix(in srgb, var(--cbn-surface) 70%, transparent); border-left: 2px solid var(--cbn-plate-down); border-radius: 0 10px 10px 0; display: grid; gap: 6px; margin-left: 6px; padding: 8px 10px; }
+.category-level-label { color: var(--cbn-subtle); font-size: 11px; font-weight: 600; }
+.category-level .category-option { font-size: 11px; min-height: 30px; }
+@media (max-width: 520px) { .category-level { margin-left: 0; } }
