@@ -462,3 +462,8 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 /* Wins over page sheets that narrowed the bottom bar to the list width. */
 body > .fixed-footer { max-width: none; }
 .visually-hidden { border: 0; clip: rect(0 0 0 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
+/* The Filter button, top right on every list page: word, count, funnel. */
+.filter-picker { align-items: center; display: inline-flex; flex-shrink: 0; font: inherit; font-size: 12px; font-weight: 600; gap: 6px; margin-left: auto; min-height: 36px; padding: 0 10px; }
+.filter-picker.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.filter-picker svg { flex-shrink: 0; pointer-events: none; }
+.filter-picker-count:not([hidden]) { background: var(--cbn-accent); border-radius: 999px; color: var(--cbn-on-accent); font-size: 10px; font-weight: 700; line-height: 16px; min-width: 16px; padding: 0 5px; text-align: center; }
