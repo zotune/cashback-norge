@@ -192,7 +192,8 @@ export function installGroceryChainStyles(): void {
 export function installProviderChipStyles(): void {
   if (!document.getElementById("bonus-card-brand-styles")) {
     const style = document.createElement("style"); style.id = "bonus-card-brand-styles";
-    style.textContent = Object.entries(PROVIDER_COLORS).map(([id, colors]) => getBrandChipCss(`.badge-${id}`, colors)).join("\n");
+    // Chips and toggle buttons (cbn-button--brand) use the same provider colours.
+    style.textContent = Object.entries(PROVIDER_COLORS).map(([id, colors]) => `${getBrandChipCss(`.badge-${id}`, colors)}\n${getBrandButtonCss(`.badge-${id}`, colors)}`).join("\n");
     document.head.append(style);
   }
 }

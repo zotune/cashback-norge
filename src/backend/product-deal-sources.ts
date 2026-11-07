@@ -19,11 +19,12 @@ type Candidate = { id: string; name: string; productUrl: string; sourceRank: num
 export type SourceInput = { source: Source; generatedAt: string; logger: Logger; maxProducts?: number; maxPages?: number; requestUrl?: (url: string) => string; timeoutSecs?: number };
 
 export async function fetchProductDealSource(input: SourceInput): Promise<ProductDeal[]> {
-  const maxProducts = Math.max(1, Math.min(input.source === "klarna" ? 150 : 48, Number.isFinite(input.maxProducts) ? Math.trunc(input.maxProducts!) : input.source === "klarna" ? 150 : 24));
+  // Prisradar lists ~40 offers per page (three pages read); Godpris shows 48 on one page.
+  const maxProducts = Math.max(1, Math.min(150, Number.isFinite(input.maxProducts) ? Math.trunc(input.maxProducts!) : input.source === "klarna" ? 150 : 100));
   const pages = Math.max(1, Math.min(3, Number.isFinite(input.maxPages) ? Math.trunc(input.maxPages!) : 3));
   const candidates = new Set<string>();
   const deals: ProductDeal[] = [];
-  let listed = 0, failures = 0, listingFailed = false;
+  let listed = 0, failures = 0, listingFailed = false, rankOffset = 0;
   const configuration = new Configuration();
   configuration.useStorageClient(new MemoryStorage({ persistStorage: false }));
   const crawler = new CheerioCrawler({
@@ -43,16 +44,23 @@ export async function fetchProductDealSource(input: SourceInput): Promise<Produc
       }
       listed++;
       const offset = Number(request.userData.offset ?? 0);
-      const rows = input.source === "klarna" ? readKlarnaDealCandidates(JSON.parse(html), offset) : readListCandidates(input.source, $);
+      // Ranks continue across pages (Klarna's come with the offset already).
+      const rows = input.source === "klarna" ? readKlarnaDealCandidates(JSON.parse(html), offset)
+        : readListCandidates(input.source, $).map((row) => ({ ...row, sourceRank: row.sourceRank + rankOffset }));
+      if (input.source !== "klarna") rankOffset += rows.length;
       if (!rows.length) { request.noRetry = true; throw new Error(`${input.source}: no deal candidates (format changed?)`); }
+      let added = 0;
       for (const candidate of rows) {
         if (candidates.size >= maxProducts) break;
         if (candidates.has(candidate.id)) continue;
         candidates.add(candidate.id);
+        added++;
         const url = input.source === "klarna" ? klarnaOffersUrl(candidate.id) : candidate.productUrl;
         await crawler.addRequests([new Request({ url: input.requestUrl?.(url) ?? url, uniqueKey: `${input.source}:${candidate.id}`, userData: { kind: "detail", candidate } })]);
       }
       if (input.source === "klarna" && offset / 50 + 1 < pages && candidates.size < maxProducts) await crawler.addRequests([listingRequest(offset + 50)]);
+      // Godpris ignores ?page and repeats its 48 offers; a page without new products ends the list.
+      if (input.source !== "klarna" && added > 0 && offset + 1 < pages && candidates.size < maxProducts) await crawler.addRequests([listingRequest(offset + 1)]);
     },
     async failedRequestHandler({ request }, error) {
       failures++;
@@ -62,6 +70,8 @@ export async function fetchProductDealSource(input: SourceInput): Promise<Produc
   }, configuration);
   function listingRequest(offset = 0): Request {
     const url = new URL(SOURCE_LIST_URLS[input.source]);
+    // Prisradar pages with ?page=2, 3 …; `offset` is the zero-based page there.
+    if (input.source !== "klarna" && offset > 0) url.searchParams.set("page", String(offset + 1));
     if (input.source === "klarna") { url.searchParams.set("sorting", "GLOBALRANK_ASC"); url.searchParams.set("af_PRICE_DROP", "-90_-10"); url.searchParams.set("size", "50"); url.searchParams.set("offset", String(offset)); }
     return new Request({ url: input.requestUrl?.(url.href) ?? url.href, userData: { kind: "list", offset }, uniqueKey: `list:${input.source}:${offset}` });
   }

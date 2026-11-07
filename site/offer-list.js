@@ -41,6 +41,7 @@
 
   const ALL_SORTS = [
     { value: "relevance", label: "Mest relevant" },
+    { value: "rank", label: "Plassering i topplisten", feature: "sources" },
     { value: "saving", label: "Størst rabatt" },
     { value: "savingKr", label: "Mest spart i kr" },
     { value: "price", label: "Lavest pris" },
@@ -86,15 +87,16 @@
     // ---------- markup ----------
     config.mount.innerHTML = `
       <div class="sticky-header" data-ol="sticky">
-        ${!features.category ? `<div class="group-heading"><span>Butikker</span><span class="group-actions"><button class="cbn-button cbn-button--quiet list-reset" data-ol="all" type="button">Velg alle</button><button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button></span></div><div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="Butikker"></div>` : ""}
+        ${!features.category ? `<div class="group-heading"><span>Butikker</span><span class="group-actions"><button class="cbn-button cbn-button--quiet list-reset" data-ol="all" type="button">Velg alle</button><button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button><button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-toggle" type="button" aria-label="Filtrer på pris og rabatt"><span>Filter</span><span class="filter-picker-count" data-ol="filter-toggle-count" hidden></span>${FILTER_SVG}</button></span></div><div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="Butikker"></div>` : ""}
+        ${features.sources ? `<div class="group-heading"><span>Kilder:</span></div><div class="chip-toggles group-toggles source-toggles" data-ol="sources" role="group" aria-label="Kilder"></div>` : ""}
         <div class="offer-filter-bar"${!features.category ? " hidden" : ""}>
-          <button class="cbn-button cbn-button--quiet offer-filter-picker" data-ol="filter-picker" type="button" aria-label="Filtrer butikker og kategorier">${FILTER_SVG} Filtre</button>
           <span data-ol="filter-summary"></span><button class="cbn-button cbn-button--quiet list-reset" data-ol="filter-reset" type="button" hidden>Nullstill valg</button>
+          <button class="cbn-button cbn-button--quiet filter-picker" data-ol="filter-picker" type="button" aria-label="Filtrer butikker, kategorier og kilder"><span>Filter</span><span class="filter-picker-count" data-ol="filter-picker-count" hidden></span>${FILTER_SVG}</button>
         </div>
         <div class="active-offer-filters" data-ol="active-filters" hidden></div>
         <div class="list-bar">
           <div class="count" data-ol="count" aria-live="polite"></div>
-          <button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Pris og rabatt">Pris/rabatt</button>
+          ${features.category ? `<button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Pris og rabatt">Pris/rabatt</button>` : ""}
           <button class="cbn-button cbn-button--quiet sort-button" data-ol="sort" type="button" aria-label="Sorter tilbud">${SORT_SVG}<span data-choice-label></span></button>
           <div class="view-toggle" role="group" aria-label="Visning">
             <button class="cbn-button cbn-button--quiet view-table" type="button" data-view="table" aria-label="Tabell" title="Tabell">${VIEW_ICONS.table}</button>
@@ -175,12 +177,15 @@
         const counts = new Map();
         for (const item of state.items) for (const source of item.sources ?? []) counts.set(source.source, (counts.get(source.source) || 0) + 1);
         options.push({ value: "source:*", label: "Alle kilder", section: "Kilde" });
-        for (const [source, count] of counts) options.push({ value: `source:${source}`, label: window.SHARED.PROVIDER_NAMES[source] || source, section: "Kilde", count, className: `badge-${source}` });
+        const order = ["prisjakt", "klarna", "godpris", "prisradar"];
+        for (const [source, count] of [...counts].sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99))) options.push({ value: `source:${source}`, label: window.SHARED.PROVIDER_NAMES[source] || source, section: "Kilde", count, className: `badge-${source}` });
       }
       return options;
     }
     const filterSet = (value) => value.startsWith("category:") ? state.offCategories : value.startsWith("store:") ? state.offStores : value.startsWith("source:") ? state.offSources : state.off;
     const filterValue = (value) => value.slice(value.indexOf(":") + 1);
+    // The number on the Filter button: choices turned off, or price/discount limits set.
+    const setFilterCount = (name, count) => { const badge = el(`${name}-count`); if (badge) { badge.hidden = count === 0; badge.textContent = String(count); } };
     const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0 || state.offSources.size > 0;
     function renderGroups() {
       const options = filterOptions().filter((option) => !option.value.endsWith(":*"));
@@ -188,6 +193,7 @@
       el("filter-summary").textContent = hasSelectionFilters() ? `${selected.length} av ${options.length} filtervalg` : features.category ? "Alle kategorier og butikker" : "Alle butikker";
       el("filter-reset").hidden = !hasSelectionFilters();
       el("filter-picker").classList.toggle("is-active", hasSelectionFilters());
+      setFilterCount("filter-picker", hasSelectionFilters() ? options.length - selected.length : 0);
       const active = el("active-filters");
       if (!features.category) {
         active.hidden = true;
@@ -208,7 +214,23 @@
         el("none").disabled = options.every((option) => state.off.has(filterValue(option.value)));
         return;
       }
-      const filtered = selected.filter((option) => option.value.startsWith("group:") || option.value.startsWith("source:") || filterSet(option.value).size > 0);
+      if (features.sources) {
+        // Price sources as toggles in each source's colour, like the shops on Dagligvarer.
+        const nav = el("sources"); nav.replaceChildren();
+        for (const option of options.filter((option) => option.value.startsWith("source:"))) {
+          const name = filterValue(option.value), on = !state.offSources.has(name);
+          const chip = document.createElement("button");
+          chip.type = "button"; chip.dataset.source = name;
+          chip.className = `cbn-button group-toggle ${on ? `cbn-button--brand ${option.className}` : "cbn-button--filter"}`;
+          chip.setAttribute("aria-pressed", String(on));
+          chip.title = on ? `Skjul tilbud fra ${option.label}` : `Vis tilbud fra ${option.label}`;
+          const check = document.createElement("span"); check.className = "group-check"; check.textContent = on ? "✓" : "+"; check.setAttribute("aria-hidden", "true");
+          const label = document.createElement("span"); label.textContent = option.label;
+          chip.append(check, label, createCountBadge(option.count || 0, `${option.count || 0} tilbud`));
+          nav.append(chip); fitCountToChip(chip);
+        }
+      }
+      const filtered = selected.filter((option) => !option.value.startsWith("source:") && (option.value.startsWith("group:") || filterSet(option.value).size > 0));
       active.hidden = filtered.length === 0;
       active.replaceChildren();
       const sections = new Map();
@@ -272,6 +294,7 @@
       // Without a search, "most relevant" is the source's own order when it has one.
       const natural = (a, b) => (a.rank ?? 0) - (b.rank ?? 0) || byDiscount(a, b);
       const sorters = {
+        rank: natural,
         relevance: (a, b) => (words.length ? relevance(b, words) - relevance(a, words) : 0) || natural(a, b),
         saving: byDiscount,
         savingKr: (a, b) => savingKr(b) - savingKr(a) || byDiscount(a, b),
@@ -297,6 +320,7 @@
       results.classList.toggle("results--grid", view === "grid");
       results.classList.toggle("results--table", view === "table");
       el("filter-toggle").classList.toggle("is-active", hasFilters());
+      setFilterCount("filter-toggle", Object.keys(FILTER_DEFAULTS).filter((key) => state.filters[key] !== FILTER_DEFAULTS[key]).length);
       alphabet.reset();
       renderAzBar();
       if (list.length === 0) {
@@ -330,7 +354,7 @@
 
     // ---------- rows ----------
     const columns = () => [
-      ...(config.toplists ? [{ label: "#", sort: "relevance", num: true }] : []),
+      ...(config.toplists ? [{ label: "#", sort: "rank", num: true }] : []),
       { label: "", sort: "" },
       { label: "Vare", sort: "name" },
       { label: "Butikk", sort: "store" },
@@ -620,6 +644,13 @@
           updateSelectionFilters();
         },
         onBulk: (selected, section) => { for (const option of filterOptions().filter((option) => option.section === section && !option.value.endsWith(":*"))) { const set = filterSet(option.value), name = filterValue(option.value); if (selected) set.delete(name); else set.add(name); } updateSelectionFilters(); },
+      });
+      el("sources")?.addEventListener("click", (event) => {
+        const name = event.target.closest("[data-source]")?.dataset.source;
+        if (!name) return;
+        if (state.offSources.has(name)) state.offSources.delete(name);
+        else state.offSources.add(name);
+        updateSelectionFilters();
       });
       el("filter-reset").addEventListener("click", () => { state.off.clear(); state.offCategories.clear(); state.offStores.clear(); state.offSources.clear(); updateSelectionFilters(); });
       el("active-filters").addEventListener("click", (event) => {

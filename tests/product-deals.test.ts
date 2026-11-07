@@ -113,3 +113,25 @@ test("bounded Crawlee source failures retry, preserve fallback timestamps, and l
     assert.equal(result.deals[0]?.sources.length, 3);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(directory, { recursive: true, force: true }); }
 });
+
+test("Godpris and Prisradar list pages are followed with ?page=N up to the limit, with ranks continuing across pages", async () => {
+  const listed: string[] = [];
+  const server = createServer((req, res) => {
+    const target = new URL(new URL(req.url!, "http://localhost").searchParams.get("url")!);
+    res.setHeader("Content-Type", "text/html");
+    if (target.pathname === "/tilbud") {
+      const page = Number(target.searchParams.get("page") ?? "1");
+      listed.push(target.search || "?page=1");
+      const id = 12345 + page;
+      res.end(`<div class="search-item-wrapper"><h3><a href="https://godpris.no/produkt/${id}" title="${product.name}">${product.name}</a></h3><a data-price="2990"></a><div class="app-offer-badge"><span aria-hidden="true">25%</span></div></div>`);
+    } else res.end(ld(godProduct([godOffer])));
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address(); assert.ok(address && typeof address === "object");
+  try {
+    const deals = await fetchProductDealSource({ source: "godpris", generatedAt: now, logger: { info() {}, warn() {}, error() {} }, maxPages: 3, timeoutSecs: 5,
+      requestUrl: url => `http://127.0.0.1:${address.port}/?url=${encodeURIComponent(url)}` });
+    assert.deepEqual(listed.sort(), ["?page=1", "?page=2", "?page=3"]);
+    assert.deepEqual(deals.map(deal => deal.sourceRank), [1, 2, 3]);
+  } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+});

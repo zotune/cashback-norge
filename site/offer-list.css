@@ -248,3 +248,5 @@ a.card-chip { text-decoration: none; }
 .deal-table .deal-main-category { display: none; }
 .deal-foot .deal-validity { align-items: center; display: inline-flex; flex-direction: row; gap: 4px; }
 @media (max-width: 1279px) { .deal-table td, .deal-table th { padding-left: 6px; padding-right: 6px; } }
+.offer-filter-bar .list-reset { margin-left: 0; }
+.group-heading .filter-picker { margin-left: 6px; }

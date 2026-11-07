@@ -24,6 +24,18 @@ export async function collectProductDeals(input: ProductDealsInput): Promise<Pro
     const deals: ProductDeal[] = input.prisjakt.deals.map(deal => ({ ...deal, source: "prisjakt", sourceRank: deal.rank, updatedAt: input.prisjakt!.generatedAt, referenceLabel: "Prisjakts normalpris fra de siste tre månedene" }));
     raw.push(...deals);
     sources.push({ source: "prisjakt", updatedAt: input.prisjakt.generatedAt, count: deals.length, reused: input.prisjakt.generatedAt !== input.generatedAt });
+  } else {
+    const seen = new Set<string>();
+    const fallback = previous?.deals.flatMap(deal => deal.sources).filter(deal => {
+      const age = Date.parse(input.generatedAt) - Date.parse(deal.updatedAt);
+      if (deal.source !== "prisjakt" || seen.has(deal.id) || age < 0 || age > 14 * 86400000) return false;
+      seen.add(deal.id); return true;
+    }) ?? [];
+    if (fallback.length) {
+      raw.push(...fallback);
+      sources.push({ source: "prisjakt", updatedAt: fallback[0]!.updatedAt, count: fallback.length, reused: true });
+      input.logger.warn(`prisjakt deals: reusing ${fallback.length} combined-catalogue offers with original timestamps`);
+    }
   }
   const results = await Promise.allSettled(DEAL_SOURCES.filter(source => source !== "prisjakt").map(async source => ({ source, deals: await fetchProductDealSource({ ...input.sourceOptions, source, generatedAt: input.generatedAt, logger: input.logger }) })));
   for (let index = 0; index < results.length; index++) {

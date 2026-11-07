@@ -24,7 +24,9 @@ export type ProductDealsCatalog = {
   deals: RankedProductDeal[];
 };
 
-const weight: Record<DealSource, number> = { prisjakt: 1, klarna: 1, prisradar: 0.5, godpris: 0.5 };
+// Prisjakt and Klarna rank their lists by measured price drops and popularity across far more
+// products, so they weigh slightly more; Godpris and Prisradar still interleave near the top.
+const weight: Record<DealSource, number> = { prisjakt: 1, klarna: 1, prisradar: 0.85, godpris: 0.85 };
 function identityTokens(deal: ProductDeal): string {
   const category = getProductTitleMatchTokens(deal.category ?? "");
   return getProductTitleMatchTokens(deal.name).filter(token => !category.some(word => token.length >= 6 && (word === token || word === `${token}e` || word === `${token}r` || word === `${token}er`))).sort().join(" ");
@@ -78,9 +80,24 @@ export function rankProductDeals(deals: ProductDeal[], generatedAt: string): Ran
 
 export function isProductDealsCatalog(value: unknown): value is ProductDealsCatalog {
   return isRecord(value) && value.version === 1 && typeof value.generatedAt === "string" && Number.isFinite(Date.parse(value.generatedAt)) &&
-    Array.isArray(value.sources) && Array.isArray(value.deals) && value.deals.every(deal => isRecord(deal) &&
-      DEAL_SOURCES.includes(deal.source as DealSource) && typeof deal.id === "string" && typeof deal.name === "string" &&
-      typeof deal.price === "number" && Number.isFinite(deal.price) && deal.price > 0 && deal.currency === "NOK" &&
-      typeof deal.store === "string" && typeof deal.productUrl === "string" && typeof deal.updatedAt === "string" &&
-      Number.isFinite(Date.parse(deal.updatedAt)) && typeof deal.rank === "number" && Array.isArray(deal.sources));
+    Array.isArray(value.sources) && value.sources.every(source => isRecord(source) && DEAL_SOURCES.includes(source.source as DealSource) && typeof source.updatedAt === "string" && Number.isFinite(Date.parse(source.updatedAt)) && typeof source.count === "number" && Number.isFinite(source.count) && source.count >= 0 && typeof source.reused === "boolean") &&
+    Array.isArray(value.deals) && value.deals.every((deal: unknown) => {
+      if (!isProductDeal(deal)) return false;
+      const ranked = deal as unknown as Record<string, unknown>;
+      return typeof ranked.rank === "number" && Number.isFinite(ranked.rank) && ranked.rank >= 1 &&
+        Array.isArray(ranked.sources) && ranked.sources.length > 0 && ranked.sources.every(isProductDeal);
+    });
+}
+
+function isProductDeal(value: unknown): value is ProductDeal {
+  if (!isRecord(value) || !DEAL_SOURCES.includes(value.source as DealSource) || typeof value.id !== "string" || !value.id || typeof value.name !== "string" || !value.name ||
+    typeof value.price !== "number" || !Number.isFinite(value.price) || value.price <= 0 || value.currency !== "NOK" || typeof value.store !== "string" || !value.store ||
+    typeof value.productUrl !== "string" || typeof value.updatedAt !== "string" || !Number.isFinite(Date.parse(value.updatedAt)) ||
+    typeof value.sourceRank !== "number" || !Number.isFinite(value.sourceRank) || value.sourceRank < 1) return false;
+  try {
+    const url = new URL(value.productUrl);
+    const hosts = { prisjakt: "www.prisjakt.no", klarna: "www.klarna.com", prisradar: "prisradar.no", godpris: "godpris.no" };
+    if (url.protocol !== "https:" || url.hostname !== hosts[value.source as DealSource]) return false;
+  } catch { return false; }
+  return value.shippingAmount === undefined || typeof value.shippingAmount === "number" && Number.isFinite(value.shippingAmount) && value.shippingAmount >= 0;
 }
