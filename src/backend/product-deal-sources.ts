@@ -11,6 +11,7 @@ import { readComparisonProductLdJson, readLdJsonScripts, readNextProductData, re
 import { readPriceAmount } from "../shared/price.js";
 import { isValidGtin } from "../shared/product-match.js";
 import type { DealSource, ProductDeal } from "../shared/product-deals.js";
+import { godprisHistoryUrl, klarnaPriceHistoryUrl, prisradarHistoryRequest, readGodprisHistorySection, readKlarnaPriceHistory, readPrisradarPriceHistory } from "../shared/deal-price-history.js";
 import type { Logger } from "./logger.js";
 
 export const SOURCE_LIST_URLS = { klarna: KLARNA_DEALS_API, godpris: "https://godpris.no/tilbud", prisradar: "https://prisradar.no/beste-tilbud" };
@@ -28,18 +29,34 @@ export async function fetchProductDealSource(input: SourceInput): Promise<Produc
   const configuration = new Configuration();
   configuration.useStorageClient(new MemoryStorage({ persistStorage: false }));
   const crawler = new CheerioCrawler({
-    maxConcurrency: 1, maxRequestRetries: 2, maxRequestsPerCrawl: maxProducts + pages,
+    // Klarna answered 429 to a quick run of offers plus histories; keep a steady pace.
+    maxConcurrency: 1, maxRequestRetries: 2, maxRequestsPerCrawl: maxProducts * 2 + pages, maxRequestsPerMinute: input.source === "klarna" ? 90 : 150,
     navigationTimeoutSecs: input.timeoutSecs ?? 30, requestHandlerTimeoutSecs: 30,
-    useSessionPool: false, ignoreSslErrors: false, additionalMimeTypes: ["application/json"],
+    useSessionPool: false, ignoreSslErrors: false, additionalMimeTypes: ["application/json", "application/octet-stream"],
     async requestHandler({ request, body, response, $ }) {
       const html = String(body);
       const status = response.statusCode ?? 0;
       if (status !== 200) { if (status < 500 && status !== 429) request.noRetry = true; throw new Error(`HTTP ${status}`); }
+      if (request.userData.kind === "history") {
+        // A missing or unreadable history leaves the verified deal without a lowest price.
+        const deal = deals[request.userData.index as number]!;
+        let history;
+        try {
+          history = input.source === "klarna" ? readKlarnaPriceHistory(JSON.parse(html), request.userData.productId as string)
+            : input.source === "godpris" ? readGodprisHistorySection(html) : readPrisradarPriceHistory(JSON.parse(html));
+        } catch { history = undefined; }
+        if (history) Object.assign(deal, { ...history, lowestPriceEver: Math.min(deal.price, history.lowestPriceEver) });
+        return;
+      }
       if (request.userData.kind === "detail") {
         const candidate = request.userData.candidate as Candidate;
         const deal = input.source === "klarna" ? readKlarnaDeal(candidate as KlarnaDealCandidate, JSON.parse(html), input.generatedAt)
           : readOtherDealPage(input.source, html, candidate, input.generatedAt);
-        if (deal) deals.push(deal);
+        if (deal) {
+          deals.push(deal);
+          const history = historyRequest(deal, candidate.id, deals.length - 1);
+          if (history) await crawler.addRequests([history]);
+        }
         return;
       }
       listed++;
@@ -64,10 +81,17 @@ export async function fetchProductDealSource(input: SourceInput): Promise<Produc
     },
     async failedRequestHandler({ request }, error) {
       failures++;
-      if (request.userData.kind !== "detail") listingFailed = true;
+      if (request.userData.kind === "list") listingFailed = true;
       input.logger.warn(`${input.source} deals: ${request.url} (${error.message.slice(0, 250)})`);
     },
   }, configuration);
+  function historyRequest(deal: ProductDeal, candidateId: string, index: number): Request | undefined {
+    const userData = { kind: "history", index, productId: candidateId };
+    if (input.source === "klarna") return new Request({ url: input.requestUrl?.(klarnaPriceHistoryUrl(candidateId)) ?? klarnaPriceHistoryUrl(candidateId), uniqueKey: `history:klarna:${candidateId}`, headers: { Accept: "application/json" }, userData });
+    if (input.source === "godpris") { const url = godprisHistoryUrl(candidateId, deal.price, deal.store); return new Request({ url: input.requestUrl?.(url) ?? url, uniqueKey: `history:godpris:${candidateId}`, userData }); }
+    const graphql = prisradarHistoryRequest(deal.productUrl);
+    return graphql ? new Request({ url: input.requestUrl?.(graphql.url) ?? graphql.url, method: "POST", payload: graphql.body, headers: { "Content-Type": "application/json", Accept: "application/json", Origin: "https://prisradar.no" }, uniqueKey: `history:prisradar:${candidateId}`, userData }) : undefined;
+  }
   function listingRequest(offset = 0): Request {
     const url = new URL(SOURCE_LIST_URLS[input.source]);
     // Prisradar pages with ?page=2, 3 …; `offset` is the zero-based page there.

@@ -135,3 +135,22 @@ test("Godpris and Prisradar list pages are followed with ?page=N up to the limit
     assert.deepEqual(deals.map(deal => deal.sourceRank), [1, 2, 3]);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
+
+test("lowest prices come from each source's own history: Klarna two years, Godpris three months, Prisradar all", async () => {
+  const { readKlarnaPriceHistory, readGodprisHistorySection, readPrisradarPriceHistory, prisradarHistoryRequest } = await import("../src/shared/deal-price-history.js");
+  const klarna = { productId: "5051454", lowest: 600, highest: 900, currencyCode: "NOK", history: [
+    { merchantId: "1", timestamp: "2024-11-07T01:00:00.000+01:00", price: 750 }, { merchantId: "2", timestamp: "2026-11-01T01:00:00.000+01:00", price: 600 }] };
+  assert.deepEqual(readKlarnaPriceHistory(klarna, "5051454"), { lowestPriceEver: 600, historyRange: "2y", historyScope: "product", historyStartedAt: "2024-11-07T00:00:00.000Z", historyUpdatedAt: "2026-11-01T00:00:00.000Z" });
+  // Another product's history, another currency or an empty series is never used.
+  assert.equal(readKlarnaPriceHistory(klarna, "999"), undefined);
+  assert.equal(readKlarnaPriceHistory({ ...klarna, currencyCode: "SEK" }, "5051454"), undefined);
+  assert.equal(readKlarnaPriceHistory({ ...klarna, history: [] }, "5051454"), undefined);
+  assert.deepEqual(readGodprisHistorySection('<p>Billigste pris de siste tre månedene er kr <span class="font-semibold">1 409</span></p>'), { lowestPriceEver: 1409, historyRange: "3m", historyScope: "product" });
+  assert.equal(readGodprisHistorySection("<p>Ingen historikk</p>"), undefined);
+  const radar = { data: { ProductPriceHistory: [{ price: 469, date: { iso: "2026-10-23T00:00:00+02:00" } }, { price: 279, date: { iso: "2026-11-06T00:00:00+01:00" } }, { price: null, date: { iso: "2026-11-07T00:00:00+01:00" } }] } };
+  assert.equal(readPrisradarPriceHistory(radar)?.lowestPriceEver, 279);
+  assert.equal(readPrisradarPriceHistory(radar)?.historyRange, "all");
+  assert.equal(readPrisradarPriceHistory({ errors: [{ message: "x" }] }), undefined);
+  assert.match(prisradarHistoryRequest("https://prisradar.no/produkter/sony-wh-1000xm6-black")!.body, /"slug":"sony-wh-1000xm6-black"/);
+  assert.equal(prisradarHistoryRequest("https://prisradar.no/kategori/x"), undefined);
+});

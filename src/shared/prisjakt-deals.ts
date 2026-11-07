@@ -45,6 +45,8 @@ export type PrisjaktDeal = {
   historyStartedAt?: string;
   historyVariantIds?: number[];
   historyScope?: "product" | "variant";
+  /** Period the lowest price covers: Prisjakt and Prisradar all registered history, Klarna two years, Godpris three months. */
+  historyRange?: "all" | "2y" | "3m";
   historyUpdatedAt?: string;
 };
 

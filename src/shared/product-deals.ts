@@ -71,7 +71,7 @@ export function rankProductDeals(deals: ProductDeal[], generatedAt: string): Ran
     const history = sorted.find(item => item.lowestPriceEver !== undefined);
     // All comparisons use item price; known shipping is retained separately.
     const historyFields = history ? { lowestPriceEver: Math.min(best.price, history.lowestPriceEver!),
-      ...(history.historyScope ? { historyScope: history.historyScope } : {}), ...(history.historyStartedAt ? { historyStartedAt: history.historyStartedAt } : {}), ...(history.historyUpdatedAt ? { historyUpdatedAt: history.historyUpdatedAt } : {}) } : {};
+      ...(history.historyScope ? { historyScope: history.historyScope } : {}), ...(history.historyRange ? { historyRange: history.historyRange } : {}), ...(history.historyStartedAt ? { historyStartedAt: history.historyStartedAt } : {}), ...(history.historyUpdatedAt ? { historyUpdatedAt: history.historyUpdatedAt } : {}) } : {};
     const sources = sorted;
     const score = group.reduce((sum, item) => sum + weight[item.source] / (60 + Math.max(1, item.sourceRank)), 0) + Math.min(best.priceDrop ?? 0, 80) / 100_000;
     return { ...best, ...historyFields, key, sources, rank: 0, score };

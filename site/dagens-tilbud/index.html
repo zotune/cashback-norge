@@ -65,7 +65,7 @@ function productItem(deal) {
       ...(deal.storeIconUrl?.startsWith("/offer-images/") ? { iconUrl: deal.storeIconUrl } : {}),
     },
     amount: deal.price, rank: deal.rank,
-    lowestPriceEver: deal.lowestPriceEver, historyScope: deal.historyScope, historyUpdatedAt: deal.historyUpdatedAt, historyStartedAt: deal.historyStartedAt,
+    lowestPriceEver: deal.lowestPriceEver, historyScope: deal.historyScope, historyRange: deal.historyRange, historyUpdatedAt: deal.historyUpdatedAt, historyStartedAt: deal.historyStartedAt,
     ...(deal.originalPrice > deal.price ? { prePrice: deal.originalPrice } : {}),
     ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `${label}: ${deal.priceDrop} % prisfall. ${deal.referenceLabel || "Mot vanlig pris hos Prisjakt"}${deal.referencePrice ? ` (${formatKr(deal.referencePrice)} kr)` : ""}. Frakt er ikke med.` } : {}),
     ...(deal.imageUrl?.startsWith("/offer-images/") ? { imageUrl: deal.imageUrl, copyImageUrl: deal.imageUrl } : {}),

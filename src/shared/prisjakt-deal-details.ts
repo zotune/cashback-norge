@@ -88,5 +88,5 @@ export function readPrisjaktAllTimeHistory(value: unknown, variantIds: number[],
   if (!Number.isFinite(first) || first > oldest + 86400000) return {};
   const prices = events.filter((item) => item.active === true && item.isMembershipPrice === false && item.isPaidMembership === false && typeof item.price === "number" && Number.isFinite(item.price) && item.price > 0).map((item) => (item.price as number) / 100);
   if (!prices.length) return {};
-  return { lowestPriceEver: Math.min(...prices), historyStartedAt: new Date(oldest).toISOString(), historyUpdatedAt: new Date(updated).toISOString(), historyScope: variantIds.length ? "variant" : "product" };
+  return { lowestPriceEver: Math.min(...prices), historyStartedAt: new Date(oldest).toISOString(), historyUpdatedAt: new Date(updated).toISOString(), historyScope: variantIds.length ? "variant" : "product", historyRange: "all" };
 }

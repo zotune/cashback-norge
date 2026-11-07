@@ -286,7 +286,7 @@
         const available = (item.sources ?? []).filter((source) => !state.offSources.has(source.source) && isRunning(source, now) && !state.offStores.has(source.store.label));
         const best = [...available].sort((a, b) => a.amount - b.amount)[0];
         return best ? [{ ...item, ...best, id: item.id, rank: item.rank, group: item.group, category: item.category, sources: available,
-          lowestPriceEver: item.lowestPriceEver, historyScope: item.historyScope, historyStartedAt: item.historyStartedAt, historyUpdatedAt: item.historyUpdatedAt }] : [];
+          lowestPriceEver: item.lowestPriceEver, historyScope: item.historyScope, historyRange: item.historyRange, historyStartedAt: item.historyStartedAt, historyUpdatedAt: item.historyUpdatedAt }] : [];
       }) : state.items;
       const visible = choices.filter((item) => isRunning(item, now) && !state.off.has(item.group) &&
         !state.offCategories.has(item.category) && !state.offStores.has(item.store.label) &&
@@ -405,8 +405,9 @@
       if (!low) return `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
       const aboveLow = item.amount > low.lowestPrice;
       const difference = low.dropToLowPercent ? `${new Intl.NumberFormat("nb-NO").format(low.dropToLowPercent)} %` : "0,1 %";
-      const tip = `Laveste registrerte varepris gjennom hele historikken, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Siste registrerte prisendring ${formatDate(item.historyUpdatedAt)}.` : ""}`;
-      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight${aboveLow ? " cbn-chip--warning" : ""} card-chip" title="${aboveLow ? `Dagens pris må falle ${low.dropToLowPercent ? "" : "mindre enn "}${difference} for å nå laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${aboveLow ? low.dropToLowPercent ? `−${difference} til lavpris` : "&lt;0,1 % til lavpris" : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
+      const period = item.historyRange === "3m" ? "de siste tre månedene" : item.historyRange === "2y" ? "de siste to årene" : "gjennom hele historikken";
+      const tip = `Laveste registrerte varepris ${period}, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Siste registrerte prisendring ${formatDate(item.historyUpdatedAt)}.` : ""}`;
+      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight${aboveLow ? " cbn-chip--warning" : ""} card-chip" title="${aboveLow ? `Dagens pris må falle ${low.dropToLowPercent ? "" : "mindre enn "}${difference} for å nå laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${aboveLow ? low.dropToLowPercent ? `−${difference} til lavpris` : "&lt;0,1 % til lavpris" : "Laveste nå"}</span>${(() => { const notes = [item.historyRange === "3m" ? "siste 3 mnd" : item.historyRange === "2y" ? "siste 2 år" : "", item.historyScope === "product" ? "alle varianter" : ""].filter(Boolean); return notes.length ? `<small>${notes.join(" · ")}</small>` : ""; })()}</span>`;
     };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
