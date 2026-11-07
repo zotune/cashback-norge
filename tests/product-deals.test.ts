@@ -101,7 +101,7 @@ test("bounded Crawlee source failures retry, preserve fallback timestamps, and l
   const old = { ...base, source: "klarna" as const, productUrl: "https://www.klarna.com/no/shopping/pl/12345/", updatedAt: "2026-11-05T12:00:00Z" };
   const previous: ProductDealsCatalog = { version: 1, generatedAt: old.updatedAt, sources: [], deals: rankProductDeals([old], old.updatedAt) };
   try {
-    const result = await collectProductDeals({ generatedAt: now, previous, logger: { info() {}, error() {}, warn: value => warnings.push(value) }, removeBackgrounds: false, imageDirectory: directory,
+    const result = await collectProductDeals({ generatedAt: now, previous, logger: { info() {}, error() {}, warn: value => warnings.push(value) }, imageDirectory: directory,
       sourceOptions: { maxProducts: 1, maxPages: 1, timeoutSecs: 1, requestUrl: url => `http://127.0.0.1:${address.port}/?url=${encodeURIComponent(url)}` },
     });
     assert.equal(result.sources.find(source => source.source === "klarna")?.reused, true);

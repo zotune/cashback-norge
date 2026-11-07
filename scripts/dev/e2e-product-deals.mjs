@@ -1,0 +1,64 @@
+// Local daily-snapshot UI checks. No production votes are sent.
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { readFile, mkdir } from 'node:fs/promises';
+const require = createRequire(new URL('../../node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/package.json', import.meta.url));
+const { chromium } = require('playwright');
+const catalog = JSON.parse(await readFile(new URL('../../site/product-deals.json', import.meta.url), 'utf8'));
+const output = new URL('../../dist/preview/product-deals/', import.meta.url).pathname;
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: 'dark', locale: 'nb-NO' });
+const errors = [], thirdParty = [];
+page.on('pageerror', error => errors.push(error.message));
+page.on('request', request => { if (/(?:prisjakt\.no|etilbudsavis\.no|klarna\.com|klarnacdn\.net|prisradar\.no|godpris\.no|pji\.nu|tjek\.com)$/.test(new URL(request.url()).hostname)) thirdParty.push(request.url()); });
+await page.route('**/*.supabase.co/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: route.request().url().includes('my-votes') ? '{"votes":[]}' : '[]' }));
+try {
+  await page.goto('http://localhost:8765/dagens-tilbud/');
+  await page.locator('.deal-rank-cell').first().waitFor();
+  assert.equal(await page.locator('thead th').first().innerText(), '#');
+  assert.ok(await page.getByRole('columnheader', { name: 'Kilde', exact: true }).count());
+  assert.equal(await page.locator('.deal-title .deal-rank').count(), 0);
+  assert.equal(await page.locator('.active-offer-filter-group[aria-label="Kilde"] .cbn-chip').count(), catalog.sources.length);
+  const search = page.locator('[data-ol="search"]');
+  const starlink = catalog.deals.find(deal => deal.name === 'Starlink Mini');
+  assert.ok(starlink?.lowestPriceEver);
+  await search.fill('Starlink Mini');
+  const starlinkRow = page.locator('.deal-row').filter({ hasText: 'Starlink Mini' }).first();
+  assert.equal(await starlinkRow.locator('.deal-rank').innerText(), `#${starlink.rank}`);
+  assert.match(await starlinkRow.locator('.deal-history').innerText(), /2\s?199\s?kr/);
+  const merged = catalog.deals.find(deal => deal.sources.length > 1);
+  assert.ok(merged, 'live snapshot contains a verified cross-source duplicate');
+  await search.fill(merged.name.split(' ')[0]);
+  const id = merged.key || `${merged.source === 'prisjakt' ? 'pj' : merged.source}${merged.id}`;
+  const mergedRow = page.locator(`[data-id="${id}"]`);
+  assert.equal(await mergedRow.locator('.deal-source').count(), merged.sources.length);
+  assert.equal(await mergedRow.locator('.deal-rank').innerText(), `#${merged.rank}`);
+  await page.locator('[data-ol="filter-picker"]').click();
+  await page.locator('#dagens-tilbud-filters .selection-search').fill('Prisjakt');
+  await page.locator('[role="option"][data-value="source:prisjakt"]').click();
+  await page.keyboard.press('Escape');
+  assert.equal(await mergedRow.locator('.deal-source').count(), 1);
+  assert.equal(await mergedRow.locator('.deal-source').innerText(), 'Prisjakt');
+  assert.equal(await mergedRow.locator('.deal-rank').innerText(), `#${merged.rank}`);
+  assert.match(await mergedRow.locator('.deal-title a').getAttribute('href'), /prisjakt\.no/);
+  await page.locator('[data-ol="filter-reset"]').click();
+  await search.fill('');
+  await page.waitForFunction(count => document.querySelector('[data-ol="count"]').textContent === `${count} tilbud`, catalog.deals.length);
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  assert.equal(await overflow(), false, 'desktop table fits');
+  await page.screenshot({ path: `${output}desktop.png` });
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.locator('[data-view="grid"]').click();
+    assert.equal(await overflow(), false, `grid fits ${width}`);
+    await page.locator('article.deal-row .deal-rank').first().waitFor({ state: 'visible' });
+    assert.deepEqual(await page.locator('.intro-logo').evaluate(image => [image.width, image.height]), [96, 96]);
+    if (width === 390) await page.screenshot({ path: `${output}mobile.png` });
+    await page.locator('[data-view="list"]').click();
+    assert.equal(await overflow(), false, `list fits ${width}`);
+  }
+  assert.deepEqual(errors, []);
+  assert.deepEqual(thirdParty, [], 'all images and data are served from our own snapshot');
+  console.log('PASS: combined sources, filters choose the active source, stable # rank, Starlink history, mobile layout and own-domain assets.');
+} finally { await browser.close(); }

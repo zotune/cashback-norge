@@ -19,8 +19,8 @@ type Candidate = { id: string; name: string; productUrl: string; sourceRank: num
 export type SourceInput = { source: Source; generatedAt: string; logger: Logger; maxProducts?: number; maxPages?: number; requestUrl?: (url: string) => string; timeoutSecs?: number };
 
 export async function fetchProductDealSource(input: SourceInput): Promise<ProductDeal[]> {
-  const maxProducts = Math.max(1, Math.min(input.source === "klarna" ? 150 : 48, input.maxProducts ?? (input.source === "klarna" ? 150 : 24)));
-  const pages = Math.max(1, Math.min(3, input.maxPages ?? 3));
+  const maxProducts = Math.max(1, Math.min(input.source === "klarna" ? 150 : 48, Number.isFinite(input.maxProducts) ? Math.trunc(input.maxProducts!) : input.source === "klarna" ? 150 : 24));
+  const pages = Math.max(1, Math.min(3, Number.isFinite(input.maxPages) ? Math.trunc(input.maxPages!) : 3));
   const candidates = new Set<string>();
   const deals: ProductDeal[] = [];
   let listed = 0, failures = 0, listingFailed = false;
@@ -121,7 +121,7 @@ export function readOtherDealPage(source: "godpris" | "prisradar", html: string,
   const imageUrl = image && isRecord(image.medium) ? image.medium.path : undefined;
   const category = isRecord(product.category) ? product.category.title : undefined;
   const alternative = offer.alternatives?.find(item => item.shopName === offer.shopName && item.amount === offer.amount);
-  return { ...shared, name: offer.productName, store: offer.shopName, price: offer.amount, referencePrice, referenceLabel: "Prisradars sammenligningspris før prisfallet",
+  return { ...shared, ...(typeof product.id === "number" ? { id: String(product.id) } : {}), name: offer.productName, store: offer.shopName, price: offer.amount, referencePrice, referenceLabel: "Prisradars sammenligningspris før prisfallet",
     priceDrop: Math.round((referencePrice - offer.amount) / referencePrice * 100), storeCount: offer.alternatives?.length ?? 1,
     ...(alternative?.sortAmount !== undefined ? { shippingAmount: alternative.sortAmount - offer.amount } : {}),
     ...(typeof imageUrl === "string" ? { imageUrl } : {}), ...(typeof category === "string" ? { category } : {}) };

@@ -78,6 +78,7 @@ function read(catalog) {
   return {
     items: deals.filter((deal) => typeof deal.price === "number" && deal.currency === "NOK").map((deal) => ({
       ...productItem(deal),
+      ...(deal.key ? { id: deal.key } : {}),
       sources: (deal.sources || [{ ...deal, source: "prisjakt", updatedAt: catalog.generatedAt }]).map(productItem),
     })),
     updated: catalog.generatedAt,

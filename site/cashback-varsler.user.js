@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794073312
+// @version      1794074764
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1117,6 +1117,9 @@
   }
   const EB_PER_TRUMF_KR = 13.5;
   const PROVIDER_NAMES = {
+    prisjakt: "Prisjakt",
+    prisradar: "Prisradar",
+    godpris: "Godpris",
     tek: "Tek.no",
     forbrukerradet: "Forbrukerrådet",
     bytt: "Bytt.no",
@@ -1239,6 +1242,9 @@
     lofavor: "LOfavør.\nKrever medlemskap i et LO-forbund.\nSe vilkår på lofavor.no."
   };
   const PROVIDER_COLORS = {
+    prisjakt: { bg: "#00a9ce", fg: "#ffffff" },
+    godpris: { bg: "#21003f", fg: "#ffffff" },
+    prisradar: { bg: "#ffffff", fg: "#0c4598" },
     tek: { bg: "#000000", fg: "#ffffff", preserveInDark: true },
     forbrukerradet: { bg: "#004a66", fg: "#ffffff", preserveInDark: true },
     bytt: { bg: "#0075f5", fg: "#ffffff", preserveInDark: true },
@@ -3330,7 +3336,7 @@
       return readPackageQuantityFromText(String(value));
     }
     if (!isPlainRecord$7(value)) return void 0;
-    const rawAmount = readNumberLike$6(value.value) ?? readNumberLike$6(value.amount) ?? readNumberLike$6(value.weight) ?? readNumberLike$6(value.volume);
+    const rawAmount = readNumberLike$5(value.value) ?? readNumberLike$5(value.amount) ?? readNumberLike$5(value.weight) ?? readNumberLike$5(value.volume);
     const rawUnit = readStringLike$6(value.unitText) ?? readStringLike$6(value.unitCode) ?? readStringLike$6(value.unit) ?? readStringLike$6(value.measurementTechnique);
     if (rawAmount === void 0 || rawUnit === void 0) {
       return readPackageQuantityFromText(Object.values(value).map((item) => String(item)).join(" "));
@@ -3420,7 +3426,7 @@
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
     return void 0;
   }
-  function readNumberLike$6(value) {
+  function readNumberLike$5(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
     const parsed = parseLocalizedNumber$2(value);
@@ -3802,6 +3808,14 @@
       } catch {
       }
     }
+    for (const match of html.matchAll(/<script\b[^>]*>\s*\(self\.__next_s=self\.__next_s\|\|\[\]\)\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
+      try {
+        const row = JSON.parse(match[1]);
+        const props = Array.isArray(row) && isRecord$7(row[1]) ? row[1] : void 0;
+        if (props?.type === "application/ld+json" && typeof props.children === "string") entries.push(parseLdJson(props.children));
+      } catch {
+      }
+    }
     return entries;
   }
   function readNextFlightPayloads(html) {
@@ -3863,14 +3877,13 @@
   }
   function readComparisonProductLdJson(html, rawUrl) {
     const schema = selectProductLdJson(readLdJsonScripts(html));
-    if (schema !== void 0) return schema;
     const url = parseUrl$1(rawUrl);
-    if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return void 0;
+    if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return schema;
     const product = readNextProductData(html, rawUrl);
-    if (product === void 0) return void 0;
+    if (product === void 0) return schema;
     const brand = isRecord$7(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
     const attributes = isRecord$7(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$7).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$7) : []) : [];
-    return {
+    const fallback = {
       "@type": "Product",
       name: product.title,
       url: product.url,
@@ -3878,6 +3891,8 @@
       ...typeof product.ean === "string" && product.ean !== "$undefined" ? { gtin: product.ean } : {},
       additionalProperty: attributes.filter((attribute) => /^(?:språk|language)$/i.test(String(attribute.title))).map((attribute) => ({ name: attribute.title, value: attribute.value }))
     };
+    if (!schema || typeof schema.url === "string" && !isSameProductUrl(schema.url, rawUrl)) return fallback;
+    return { ...fallback, ...schema, additionalProperty: [...fallback.additionalProperty, ...Array.isArray(schema.additionalProperty) ? schema.additionalProperty : []] };
   }
   function findStructuredProperty(value, name) {
     const pending = [value];
@@ -4042,7 +4057,7 @@
     }
     return matches.sort((first, second) => second.score - first.score).slice(0, 3).map((match) => match.id);
   }
-  function readGodprisProductPage(html, fallbackProductId, anchor) {
+  function readGodprisProductPage(html, fallbackProductId, anchor, requireStructured = false) {
     const structured = selectProductLdJson(readLdJsonScripts(html));
     if (structured !== void 0) {
       const productName2 = withLeadingBrand$1(
@@ -4079,6 +4094,7 @@
         alternatives: offers2.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer)
       };
     }
+    if (requireStructured) return void 0;
     const page = readGodprisDataPage(html);
     const props = isPlainRecord$6(page?.props) ? page.props : void 0;
     const product = isPlainRecord$6(props?.product) ? props.product : void 0;
@@ -4229,11 +4245,11 @@
     if (!Array.isArray(value)) return [];
     return value.map((item) => {
       if (!isPlainRecord$5(item)) return void 0;
-      const groceryId = readNumberLike$5(item.groceryId);
+      const groceryId = readNumberLike$4(item.groceryId);
       const name = readStringLike$4(item.name);
       if (groceryId === void 0 || name === void 0) return void 0;
       const ean = readStringLike$4(item.ean);
-      const amount = readNumberLike$5(item.amount);
+      const amount = readNumberLike$4(item.amount);
       const unit = readStringLike$4(item.unit);
       const desc = readStringLike$4(item.desc);
       const disabled = typeof item.disabled === "boolean" ? item.disabled : void 0;
@@ -4365,7 +4381,7 @@
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
     return void 0;
   }
-  function readNumberLike$5(value) {
+  function readNumberLike$4(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
@@ -4582,7 +4598,7 @@
     const shopName = readHtmlAttribute(rowHtml.match(/<img\b[\s\S]*?>/i)?.[0] ?? "", "alt");
     const titleHtml = rowHtml.match(/<p\b[^>]*class=["'][^"']*text-sm[^"']*font-medium[^"']*["'][^>]*>([\s\S]*?)<\/p>/i)?.[1];
     const productName = titleHtml !== void 0 ? decodeHtml$1(stripHtml$1(titleHtml)).trim() : void 0;
-    const amount = readNumberLike$4(rowHtml.match(/<span\b[^>]*class=["'][^"']*text-(?:green|rose)-600[^"']*["'][^>]*>\s*kr\s*([\d\s.,]+)/i)?.[1]);
+    const amount = readNumberLike$3(rowHtml.match(/<span\b[^>]*class=["'][^"']*text-(?:green|rose)-600[^"']*["'][^>]*>\s*kr\s*([\d\s.,]+)/i)?.[1]);
     if (shopName === void 0 || amount === void 0 || amount <= 0) return void 0;
     return {
       shopName,
@@ -4599,7 +4615,7 @@
       if (!isPlainRecord$4(offer)) return void 0;
       const seller = isPlainRecord$4(offer.seller) ? offer.seller : void 0;
       const shopName = readStringLike$3(seller?.name);
-      const amount = readNumberLike$4(offer.price);
+      const amount = readNumberLike$3(offer.price);
       const currency = readStringLike$3(offer.priceCurrency) ?? "NOK";
       if (shopName === void 0 || amount === void 0 || amount <= 0 || currency !== "NOK") return void 0;
       const offerUrl = readStringLike$3(offer.url);
@@ -4691,7 +4707,7 @@
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
     return void 0;
   }
-  function readNumberLike$4(value) {
+  function readNumberLike$3(value) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string") return void 0;
     const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
@@ -4956,9 +4972,7 @@
     const value = await requestJson(`${KLARNA_OFFERS_URL}/${encodeURIComponent(product.id)}?${params.toString()}`, {
       headers: { "Accept": "application/json" }
     });
-    if (!isPlainRecord$3(value) || !Array.isArray(value.offers)) return void 0;
-    const merchants = isPlainRecord$3(value.merchants) ? value.merchants : {};
-    const offers = dedupeKlarnaOffersByShop(value.offers.map((offer) => readKlarnaOffer(offer, merchants)).filter((offer) => offer !== void 0).sort(compareKlarnaOffersByPrice));
+    const offers = readKlarnaOffers(value);
     const best = offers[0];
     if (best === void 0) return void 0;
     return {
@@ -4978,10 +4992,20 @@
         sortAmount: offer.sortAmount,
         currency: offer.currency,
         price: offer.price,
-        shippingPrice: formatShippingPrice$2(offer.shippingAmount),
-        ...offer.shippingAmount > 0 ? { totalPrice: formatNokPrice$3(offer.sortAmount) } : {}
+        shippingPrice: offer.shippingAmount === void 0 ? "Frakt ukjent" : formatShippingPrice$2(offer.shippingAmount),
+        ...offer.shippingAmount !== void 0 && offer.shippingAmount > 0 ? { totalPrice: formatNokPrice$3(offer.sortAmount) } : {}
       }))
     };
+  }
+  function readKlarnaOffers(value, options = {}) {
+    if (!isPlainRecord$3(value) || !Array.isArray(value.offers)) return [];
+    const merchants = isPlainRecord$3(value.merchants) ? value.merchants : {};
+    return dedupeKlarnaOffersByShop(value.offers.filter((offer) => {
+      if (!isPlainRecord$3(offer)) return false;
+      if (!options.requireInStock) return true;
+      if (offer.stockStatus !== "IN_STOCK" || offer.availability !== "AVAILABLE" || offer.campaignMembership != null || offer.condition !== void 0 && offer.condition !== "NEW") return false;
+      return !options.productName || typeof offer.name === "string" && !hasProductVariantConflict({ searchTerm: options.productName }, offer.name);
+    }).map((offer) => readKlarnaOffer(offer, merchants)).filter((offer) => offer !== void 0));
   }
   function dedupeKlarnaOffersByShop(offers) {
     const bestByShopName = /* @__PURE__ */ new Map();
@@ -5008,8 +5032,8 @@
     const campaignPriceValue = isPlainRecord$3(campaignPrice?.price) && isActiveKlarnaCampaignPrice(campaignPrice) ? campaignPrice.price : void 0;
     const effectivePrice = campaignPriceValue ?? price;
     const shippingCost = isPlainRecord$3(value.shippingCost) ? value.shippingCost : void 0;
-    const amount = readNumberLike$3(effectivePrice?.amount);
-    const shippingAmount = readNumberLike$3(shippingCost?.amount) ?? 0;
+    const amount = readPriceAmount(effectivePrice?.amount);
+    const shippingAmount = shippingCost?.currency === effectivePrice?.currency ? readPriceAmount(shippingCost?.amount) : void 0;
     const currency = readStringLike$2(effectivePrice?.currency);
     const merchantId = readStringLike$2(value.merchantId);
     const merchant = merchantId !== void 0 && isPlainRecord$3(merchants[merchantId]) ? merchants[merchantId] : void 0;
@@ -5024,11 +5048,13 @@
     return {
       shopName,
       amount,
-      sortAmount: amount + shippingAmount,
-      shippingAmount,
+      sortAmount: amount + (shippingAmount ?? 0),
+      ...shippingAmount !== void 0 ? { shippingAmount } : {},
       currency,
       price: formatNokPrice$3(amount),
-      ...offerUrl !== void 0 ? { offerUrl } : {}
+      ...offerUrl !== void 0 ? { offerUrl } : {},
+      ...readStringLike$2(merchant?.url) ? { storeUrl: `${KLARNA_PRODUCT_URL}${readStringLike$2(merchant?.url)}` } : {},
+      ...campaignPriceValue && isPlainRecord$3(campaignPrice?.salePriceEffectiveDate) && typeof campaignPrice.salePriceEffectiveDate.end === "string" ? { validTo: campaignPrice.salePriceEffectiveDate.end } : {}
     };
   }
   function isActiveKlarnaCampaignPrice(campaignPrice) {
@@ -5084,12 +5110,6 @@
     if (typeof value !== "string" && typeof value !== "number") return void 0;
     const trimmed = String(value).trim();
     return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function readNumberLike$3(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value !== "string") return void 0;
-    const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
-    return Number.isFinite(parsed) ? parsed : void 0;
   }
   function uniqueStrings$5(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
@@ -5951,13 +5971,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     });
     return html !== void 0 ? readPrisradarProductPage(html, productUrl) : void 0;
   }
-  function readPrisradarProductPage(html, fallbackProductUrl) {
+  function readPrisradarProductPage(html, fallbackProductUrl, requireInStock = false) {
     const product = readNextProductData(html, fallbackProductUrl);
     if (!isPlainRecord$1(product)) return void 0;
     const productName = readStringLike$1(product.title) ?? readStringLike$1(product.name) ?? "Prisradar-produkt";
     const productUrl = readStringLike$1(product.url) ?? fallbackProductUrl;
     const rawOffers = Array.isArray(product.offers) ? product.offers : [];
-    const offers = dedupePrisradarOffersByShop(rawOffers.map(readPrisradarOffer).filter((offer) => offer !== void 0).sort(comparePrisradarOffersByPrice));
+    const offers = dedupePrisradarOffersByShop(rawOffers.filter((value) => !requireInStock || isPlainRecord$1(value) && value.availability === "in_stock" && value.isInactive !== true && typeof value.title === "string" && !hasProductVariantConflict({ searchTerm: productName }, value.title)).map(readPrisradarOffer).filter((offer) => offer !== void 0).sort(comparePrisradarOffersByPrice));
     const best = offers[0];
     if (best === void 0) return void 0;
     return {

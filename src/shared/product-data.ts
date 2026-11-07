@@ -88,20 +88,21 @@ export function readStructuredProductCodes(product: Record<string, unknown> | un
 
 export function readComparisonProductLdJson(html: string, rawUrl: string): Record<string, unknown> | undefined {
   const schema = selectProductLdJson(readLdJsonScripts(html));
-  if (schema !== undefined) return schema;
   const url = parseUrl(rawUrl);
-  if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return undefined;
+  if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return schema;
   const product = readNextProductData(html, rawUrl);
-  if (product === undefined) return undefined;
+  if (product === undefined) return schema;
   const brand = isRecord(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : undefined;
   const attributes = isRecord(product.attributes) && Array.isArray(product.attributes.grouped)
     ? product.attributes.grouped.filter(isRecord).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord) : []) : [];
-  return { "@type": "Product", name: product.title, url: product.url,
+  const fallback = { "@type": "Product", name: product.title, url: product.url,
     ...(brand !== undefined ? { brand } : {}),
     ...(typeof product.ean === "string" && product.ean !== "$undefined" ? { gtin: product.ean } : {}),
     additionalProperty: attributes.filter((attribute) => /^(?:språk|language)$/i.test(String(attribute.title)))
       .map((attribute) => ({ name: attribute.title, value: attribute.value })),
   };
+  if (!schema || typeof schema.url === "string" && !isSameProductUrl(schema.url, rawUrl)) return fallback;
+  return { ...fallback, ...schema, additionalProperty: [...fallback.additionalProperty, ...(Array.isArray(schema.additionalProperty) ? schema.additionalProperty : [])] };
 }
 
 export function findStructuredProperty(value: unknown, name: string): unknown {

@@ -70,6 +70,7 @@
    */
   window.createOfferList = (config) => {
     const features = config.features ?? {};
+    config.mount.classList.toggle("offer-list--products", Boolean(features.category));
     const SORTS = ALL_SORTS.filter((sort) => !sort.feature || features[sort.feature]).map((sort) => sort.value === "saving" && config.savingLabel ? { ...sort, label: `Størst ${config.savingLabel.toLowerCase()}` } : sort);
     const wideScreen = window.matchMedia("(min-width: 1100px)");
     const state = { items: [], counts: new Map(), off: new Set(), offCategories: new Set(), offStores: new Set(), offSources: new Set(), category: "", query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], ranks: new Map(), shown: 0 };
@@ -173,8 +174,8 @@
       if (features.sources) {
         const counts = new Map();
         for (const item of state.items) for (const source of item.sources ?? []) counts.set(source.source, (counts.get(source.source) || 0) + 1);
-        options.push({ value: "source:*", label: "Alle prissammenligninger", section: "Prissammenligning" });
-        for (const [source, count] of counts) options.push({ value: `source:${source}`, label: window.SHARED.PROVIDER_NAMES[source] || source, section: "Prissammenligning", count, className: `badge-${source}` });
+        options.push({ value: "source:*", label: "Alle kilder", section: "Kilde" });
+        for (const [source, count] of counts) options.push({ value: `source:${source}`, label: window.SHARED.PROVIDER_NAMES[source] || source, section: "Kilde", count, className: `badge-${source}` });
       }
       return options;
     }
@@ -333,7 +334,7 @@
       { label: "", sort: "" },
       { label: "Vare", sort: "name" },
       { label: "Butikk", sort: "store" },
-      ...(features.sources ? [{ label: "Prissammenligning", sort: "" }] : []),
+      ...(features.sources ? [{ label: "Kilde", sort: "" }] : []),
       ...(features.category ? [{ label: "Kategori", sort: "group" }] : []),
       { label: "Pris", sort: "price", num: true },
       { label: config.savingLabel ?? "Rabatt", sort: "saving", num: true },
@@ -356,7 +357,7 @@
       ? `<a class="deal-thumb" href="${esc(item.link.url)}" target="_blank" rel="noopener" data-preview="${esc(item.imageUrl)}" aria-label="Åpne ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></a>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
     const rankHtml = (item) => config.toplists && state.ranks.has(item.id) ? `<span class="cbn-chip cbn-chip--muted deal-rank" title="Plassering i den samlede topplisten før søk og filtrering">#${state.ranks.get(item.id)}</span>` : "";
-    const sourcesHtml = (item) => `<span class="deal-sources">${(item.sources ?? []).map((source) => `<a class="cbn-chip badge-${esc(source.source)} deal-source" href="${esc(source.link.url)}" target="_blank" rel="noopener" title="${esc(`${window.SHARED.PROVIDER_NAMES[source.source] || source.source}: ${kr(source.amount)} · ${source.store.label}${source.updatedAt ? ` · Hentet ${formatDate(source.updatedAt)}` : ""}`)}">${esc(window.SHARED.PROVIDER_NAMES[source.source] || source.source)}</a>`).join(" ")}</span>`;
+    const sourcesHtml = (item) => `<span class="deal-sources">${(item.sources ?? []).map((source) => `<a class="cbn-chip badge badge-${esc(source.source)} deal-source" href="${esc(source.link.url)}" target="_blank" rel="noopener" title="${esc(`${window.SHARED.PROVIDER_NAMES[source.source] || source.source}: ${kr(source.amount)} · ${source.store.label}${source.updatedAt ? ` · Hentet ${formatDate(source.updatedAt)}` : ""}`)}">${esc(window.SHARED.PROVIDER_NAMES[source.source] || source.source)}</a>`).join(" ")}</span>`;
     const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
       const initial = features.category ? `<span class="deal-store-initial" aria-hidden="true"${item.store.iconUrl ? ' style="display:none"' : ""}>${esc(item.store.label.charAt(0))}</span>` : "";
@@ -376,7 +377,11 @@
     };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
-    const factsHtml = (item) => `<span class="deal-facts">${(item.details ?? (item.description ? item.description.split(/\s*·\s*|,\s+/) : [])).map((part) => `<span class="cbn-chip cbn-chip--muted deal-fact">${esc(part)}</span>`).join(" ")}</span>`;
+    // Brand, shop count, shipping and pack size as one short muted line.
+    const factsHtml = (item) => {
+      const parts = item.details ?? (item.description ? item.description.split(/\s*·\s*|,\s+/) : []);
+      return parts.length ? `<span class="deal-facts">${parts.map((part) => `<span class="deal-fact">${esc(part)}</span>`).join('<span class="deal-fact-sep" aria-hidden="true">·</span>')}</span>` : "";
+    };
     function daysLeftHtml(item) {
       if (!item.validTo) return "";
       const days = daysLeft(item);
@@ -415,32 +420,24 @@
       </tr>`;
     }
     function cardHtml(item) {
-      const before = item.prePrice > item.amount || saving(item) > 0
-        ? `<span class="deal-before">${item.prePrice > item.amount ? `<s aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""} ${savingChipHtml(item)}</span>`
-        : "";
-      return `<article class="cbn-card cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}" data-letter="${esc(letterOf(item))}">
+      const before = item.prePrice > item.amount ? `<s class="deal-before" aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : "";
+      const validity = item.validTo ? validityHtml(item) : "";
+      return `<article class="cbn-card cbn-row cbn-row--offer deal-row deal-card" data-id="${esc(item.id)}" data-letter="${esc(letterOf(item))}">
         ${thumbHtml(item)}
-        <div class="deal-main">
-          ${rankHtml(item)}
-          ${titleHtml(item)}
-          ${factsHtml(item)}
+        <div class="deal-head">
+          <div class="deal-heading">${rankHtml(item)}${titleHtml(item)}${factsHtml(item)}</div>
+          <div class="deal-pricing"><strong class="deal-price">${esc(kr(item.amount))}</strong><span class="deal-pricing-sub">${before}${savingChipHtml(item)}</span></div>
         </div>
-        <div class="deal-side">
-          <strong class="deal-price">${esc(kr(item.amount))}</strong>
-          ${before}
-          ${features.history ? `<span class="deal-history-summary">Lavest: ${historyHtml(item)}</span>` : ""}
+        <div class="deal-foot">
+          <div class="deal-meta">${storeHtml(item)}${features.sources ? sourcesHtml(item) : ""}${bonusHtml(item)}${features.category ? categoryHtml(item) : ""}${features.history && getDealLowPrice(item.amount, item.lowestPriceEver) ? `<span class="deal-history-summary">Lavest ${historyHtml(item)}</span>` : ""}${validity}</div>
           ${actionsHtml(item)}
-        </div>
-        <div class="deal-details">
-          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? categoryHtml(item) : ""}${features.sources ? sourcesHtml(item) : ""}</div>
-          ${features.validity ? `<div class="deal-meta deal-meta--validity">${validityHtml(item)}</div>` : ""}
         </div>
       </article>`;
     }
 
     // ---------- preview, copy, votes ----------
     function validityHtml(item) {
-      return item.validTo ? `<span class="deal-validity"><span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span> ${daysLeftHtml(item)}</span>` : `<span class="deal-valid">Sluttdato ukjent</span>`;
+      return item.validTo ? `<span class="deal-validity"><span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span> ${daysLeftHtml(item)}</span>` : `<span class="deal-valid" title="Butikken oppgir ingen sluttdato">—</span>`;
     }
     function showPreview(thumb) {
       const preview = el("preview");

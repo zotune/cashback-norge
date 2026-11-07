@@ -16,7 +16,7 @@ export type ProductDeal = PrisjaktDeal & {
   imageSourceUrl?: string;
 };
 export type ProductDealSource = ProductDeal;
-export type RankedProductDeal = ProductDeal & { rank: number; sources: ProductDealSource[] };
+export type RankedProductDeal = ProductDeal & { rank: number; key?: string; sources: ProductDealSource[] };
 export type ProductDealsCatalog = {
   version: 1;
   generatedAt: string;
@@ -25,7 +25,6 @@ export type ProductDealsCatalog = {
 };
 
 const weight: Record<DealSource, number> = { prisjakt: 1, klarna: 1, prisradar: 0.5, godpris: 0.5 };
-const titleKey = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 function identityTokens(deal: ProductDeal): string {
   const category = getProductTitleMatchTokens(deal.category ?? "");
   return getProductTitleMatchTokens(deal.name).filter(token => !category.some(word => token.length >= 6 && (word === token || word === `${token}e` || word === `${token}r` || word === `${token}er`))).sort().join(" ");
@@ -65,13 +64,15 @@ export function rankProductDeals(deals: ProductDeal[], generatedAt: string): Ran
   return groups.map(group => {
     const sorted = [...group].sort((a, b) => a.price - b.price || weight[b.source] - weight[a.source] || a.id.localeCompare(b.id));
     const best = sorted[0]!;
+    const canonical = [...group].sort((a, b) => DEAL_SOURCES.indexOf(a.source) - DEAL_SOURCES.indexOf(b.source) || a.id.localeCompare(b.id))[0]!;
+    const key = `${canonical.source === "prisjakt" ? "pj" : canonical.source}${canonical.id}`;
     const history = sorted.find(item => item.lowestPriceEver !== undefined);
     // All comparisons use item price; known shipping is retained separately.
     const historyFields = history ? { lowestPriceEver: Math.min(best.price, history.lowestPriceEver!),
       ...(history.historyScope ? { historyScope: history.historyScope } : {}), ...(history.historyStartedAt ? { historyStartedAt: history.historyStartedAt } : {}), ...(history.historyUpdatedAt ? { historyUpdatedAt: history.historyUpdatedAt } : {}) } : {};
     const sources = sorted;
     const score = group.reduce((sum, item) => sum + weight[item.source] / (60 + Math.max(1, item.sourceRank)), 0) + Math.min(best.priceDrop ?? 0, 80) / 100_000;
-    return { ...best, ...historyFields, sources, rank: 0, score };
+    return { ...best, ...historyFields, key, sources, rank: 0, score };
   }).sort((a, b) => b.score - a.score || a.source.localeCompare(b.source) || a.id.localeCompare(b.id)).map(({ score: _score, ...deal }, index) => ({ ...deal, rank: index + 1 }));
 }
 

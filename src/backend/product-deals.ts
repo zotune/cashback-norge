@@ -4,7 +4,6 @@ import type { PrisjaktDealsCatalog } from "./prisjakt-deals.js";
 import { fetchProductDealSource, type SourceInput } from "./product-deal-sources.js";
 import { DEAL_SOURCES, isProductDealsCatalog, rankProductDeals, type ProductDeal, type ProductDealsCatalog } from "../shared/product-deals.js";
 import { cacheOfferImages, imageKey } from "./offer-images.js";
-import { removeProductBackgrounds } from "./product-backgrounds.js";
 import { getMerchantFaviconUrl } from "../shared/deal-merchants.js";
 
 export type ProductDealsInput = {
@@ -12,7 +11,7 @@ export type ProductDealsInput = {
   merchantDomain?: (name: string) => string | undefined;
   previous?: ProductDealsCatalog; previousUrl?: string;
   sourceOptions?: Partial<Pick<SourceInput, "maxProducts" | "maxPages" | "requestUrl" | "timeoutSecs">>;
-  imageDirectory?: string; imageRequestUrl?: (url: string) => string; removeBackgrounds?: boolean;
+  imageDirectory?: string; imageRequestUrl?: (url: string) => string;
 };
 
 /** Product prices never enter the cashback index. Failures are isolated by
@@ -47,18 +46,18 @@ export async function collectProductDeals(input: ProductDealsInput): Promise<Pro
     raw.push(...fallback);
     if (fallback.length) sources.push({ source, updatedAt: fallback[0]!.updatedAt, count: fallback.length, reused: true });
   }
-  const prepared = await cacheProductDealImages(raw, input, previous);
+  const prepared = await cacheProductDealImages(raw, input);
   const deals = rankProductDeals(prepared, input.generatedAt);
   input.logger.info(`Combined deals: ${raw.length} source offers → ${deals.length} products; ${sources.map(source => `${source.source} ${source.count}${source.reused ? " (fallback)" : ""}`).join(", ")}`);
   return { version: 1, generatedAt: input.generatedAt, sources, deals };
 }
 
-export async function cacheProductDealImages(deals: ProductDeal[], input: Pick<ProductDealsInput, "logger" | "merchantDomain" | "imageDirectory" | "imageRequestUrl" | "removeBackgrounds">, previous?: ProductDealsCatalog): Promise<ProductDeal[]> {
-  const oldImages = new Map(previous?.deals.flatMap(deal => deal.sources).map(deal => [`${deal.source}:${deal.id}`, deal]) ?? []);
+export async function cacheProductDealImages(deals: ProductDeal[], input: Pick<ProductDealsInput, "logger" | "merchantDomain" | "imageDirectory" | "imageRequestUrl">): Promise<ProductDeal[]> {
   const rows = deals.map(deal => {
-    const old = oldImages.get(`${deal.source}:${deal.id}`);
     const original = deal.imageSourceUrl ?? deal.imageUrl;
-    const imageUrl = original && old?.imageSourceUrl === original ? old.imageUrl : deal.imageUrl;
+    // Preserve the original photo, including white products and their shadows.
+    // Also restores earlier cutouts when reusing a published catalogue.
+    const imageUrl = original;
     const domain = input.merchantDomain?.(deal.store);
     const storeIconUrl = deal.storeIconUrl?.startsWith("/offer-images/") ? deal.storeIconUrl : domain ? getMerchantFaviconUrl(domain) : undefined;
     return { ...deal, ...(original ? { imageSourceUrl: original } : {}), ...(imageUrl ? { imageUrl } : {}), ...(storeIconUrl ? { storeIconUrl } : {}) };
@@ -66,11 +65,9 @@ export async function cacheProductDealImages(deals: ProductDeal[], input: Pick<P
   const snapshots = await cacheOfferImages(rows.flatMap(deal => [
     ...(deal.imageUrl ? [{ url: deal.imageUrl }] : []), ...(deal.storeIconUrl ? [{ url: deal.storeIconUrl, size: 64 }] : []),
   ]), { logger: input.logger, ...(input.imageDirectory ? { directory: input.imageDirectory } : {}), ...(input.imageRequestUrl ? { requestUrl: input.imageRequestUrl } : {}) });
-  const photos = rows.flatMap(deal => { const image = deal.imageUrl && snapshots.get(imageKey({ url: deal.imageUrl })); return image ? [image] : []; });
-  const cutouts = input.removeBackgrounds === false ? new Map<string, string>() : await removeProductBackgrounds(photos, { logger: input.logger, ...(input.imageDirectory ? { directory: input.imageDirectory } : {}) });
   return rows.map(deal => {
     const photo = deal.imageUrl && snapshots.get(imageKey({ url: deal.imageUrl }));
-    const imageUrl = photo && (cutouts.get(photo) ?? photo);
+    const imageUrl = photo;
     const storeIconUrl = deal.storeIconUrl && snapshots.get(imageKey({ url: deal.storeIconUrl, size: 64 }));
     const { imageUrl: _photo, copyImageUrl: _copy, storeIconUrl: _icon, storeLogoUrl: _logo, ...rest } = deal;
     return { ...rest, ...(imageUrl ? { imageUrl, copyImageUrl: imageUrl } : {}), ...(storeIconUrl ? { storeIconUrl } : {}) };

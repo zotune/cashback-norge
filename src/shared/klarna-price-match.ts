@@ -13,6 +13,7 @@ import {
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 import { hasProductVariantConflict } from "./product-match.js";
+import { readPriceAmount as readNumberLike } from "./price.js";
 
 const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
 const KLARNA_SEARCH_URL = "https://www.klarna.com/no/api/instant-search-edge-rest/public/search/suggest/NO";
@@ -310,13 +311,6 @@ function readStringLike(value: unknown): string | undefined {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
   const trimmed = String(value).trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function readNumberLike(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return undefined;
-  const parsed = Number.parseFloat(value.replace(/\s/g, "").replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function uniqueStrings(values: Array<string | undefined>): string[] {
