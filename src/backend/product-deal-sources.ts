@@ -1,3 +1,6 @@
+// Order: each source's own popularity ranking, as on its deal page — Klarna's sale page
+// (GLOBALRANK_ASC), Godpris "Mest populære" (?s=popularity) and Prisradar's default
+// "Populær" sort; Prisjakt's comes from prisjakt-deals.ts.
 // Structured APIs first. Godpris' current list has no verified list API, so
 // only its own product-card links/discounts use Cheerio; prices always come
 // from named Product JSON-LD and concrete in-stock offers. Prisradar list links
@@ -14,7 +17,7 @@ import type { DealSource, ProductDeal } from "../shared/product-deals.js";
 import { godprisHistoryUrl, klarnaPriceHistoryUrl, prisradarHistoryRequest, readGodprisHistorySection, readKlarnaPriceHistory, readPrisradarPriceHistory } from "../shared/deal-price-history.js";
 import type { Logger } from "./logger.js";
 
-export const SOURCE_LIST_URLS = { klarna: KLARNA_DEALS_API, godpris: "https://godpris.no/tilbud", prisradar: "https://prisradar.no/beste-tilbud" };
+export const SOURCE_LIST_URLS = { klarna: KLARNA_DEALS_API, godpris: "https://godpris.no/tilbud?s=popularity", prisradar: "https://prisradar.no/beste-tilbud" };
 type Source = Exclude<DealSource, "prisjakt">;
 type Candidate = { id: string; name: string; productUrl: string; sourceRank: number; advertisedPrice?: number; priceDrop?: number };
 export type SourceInput = { source: Source; generatedAt: string; logger: Logger; maxProducts?: number; maxPages?: number; requestUrl?: (url: string) => string; timeoutSecs?: number };
