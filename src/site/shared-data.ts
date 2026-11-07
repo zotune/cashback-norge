@@ -23,7 +23,7 @@ import { QUICK_FILTERS, matchesOfferQuickFilters } from "../shared/offer-filters
 import { getOfferCampaignLabel, getVisibleOfferKey } from "../shared/offer-context";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 import * as SITE_UI from "./site-ui";
-import { GROCERY_CHAIN_LIST, getGroceryChain } from "../shared/grocery-chains";
+import { GROCERY_CHAIN_LIST, getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery } from "../shared/grocery-chains";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement } from "../shared/support-advertisements";
 
 // Expose shared data as globals for the inline site script
@@ -58,6 +58,8 @@ Object.assign(window, {
     getMaxRewardPercent,
     GROCERY_CHAIN_LIST,
     getGroceryChain,
+    getGroceryOfferLink,
+    getGrocerySearchQuery,
     ...SITE_UI,
   },
 });

@@ -10412,7 +10412,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   const offer = readFirstOffer(productLdJson?.offers);
   const titleMeta = productDialog?.title ?? document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content.trim();
   const ogTitle = productDialog?.title ?? document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
-  const h1 = productDialog?.name ?? document.querySelector("h1")?.textContent?.trim();
+  const h1 = productDialog?.searchName ?? document.querySelector("h1")?.textContent?.trim();
   const codes = uniqueStrings([
     ...collectProductCodes(productLdJson),
     ...collectProductCodesFromSpecificationRows(),
@@ -10496,7 +10496,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   };
 }
 
-type ProductDialogMeta = { name: string; title: string; brand?: string; price?: number };
+type ProductDialogMeta = { name: string; searchName: string; title: string; brand?: string; price?: number };
 
 // An open modal dialog with its own h1 and a kroner price is a product shown as an overlay.
 // The subtitle under the h1 carries the variant and size («0,5%, 1 l, TINE»); the brand comes
@@ -10509,20 +10509,30 @@ function readOpenProductDialog(): ProductDialogMeta | undefined {
   const heading = dialog.querySelector("h1")!;
   const name = heading.textContent?.replace(/\s+/g, " ").trim();
   if (name === undefined || name.length < 3) return undefined;
+  // NorgesGruppen (Joker, MENY, SPAR) splits the øre into a <sup>, so its spoken price
+  // ("39,90 kroner.") is read first; Oda prints "Gjeldende pris er: 19,40 kr".
+  const spokenPrice = [...dialog.querySelectorAll("[aria-label]")]
+    .map((element) => element.getAttribute("aria-label")?.trim().match(/^(\d[\d \u00a0]*,\d{2}) kroner\.?$/i)?.[1])
+    .find((value): value is string => value !== undefined);
   const text = dialog.innerText.slice(0, 4000);
-  const priceText = text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b/i)?.[1];
+  const priceText = spokenPrice ?? text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b(?!\s*\/)/i)?.[1];
   const price = priceText !== undefined ? Number(priceText.replace(/[ \u00a0]/g, "").replace(",", ".")) : undefined;
   if (price === undefined || !Number.isFinite(price) || price <= 0) return undefined;
+  // The line under the name: Oda's "0,5%, 1 l, TINE" or NorgesGruppen's "185g Tube Mills".
   let subtitle: string | undefined;
   for (let element = heading.nextElementSibling; element !== null && subtitle === undefined; element = element.nextElementSibling) {
     const value = element.textContent?.replace(/\s+/g, " ").trim();
-    if (element.tagName === "P" && value !== undefined && value.length > 0) subtitle = value;
+    const isSubtitle = element.tagName === "P" || (element.tagName === "DIV" && /subtitle/i.test(element.className));
+    if (isSubtitle && value !== undefined && value.length > 0 && value.length <= 120) subtitle = value;
   }
   const brand = [...dialog.querySelectorAll("a")]
     .map((link) => link.textContent?.replace(/\s+/g, " ").trim().match(/^Se alle varer fra (.+)$/i)?.[1])
     .find((value): value is string => value !== undefined);
   return {
     name,
+    // NorgesGruppen's name is often just the product type ("Kaviar"); its subtitle carries
+    // size and brand, as in the page's own product name "Kaviar 185g Tube Mills".
+    searchName: brand === undefined && subtitle !== undefined ? `${name} ${subtitle}` : name,
     title: subtitle !== undefined ? `${name} - ${subtitle}` : name,
     ...(brand !== undefined ? { brand } : {}),
     price,

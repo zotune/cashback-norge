@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794057591
+// @version      1794058629
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -18643,7 +18643,7 @@ ${darkProviderCss}
     const offer = readFirstOffer(productLdJson?.offers);
     const titleMeta = productDialog?.title ?? document.querySelector('meta[name="title"]')?.content.trim();
     const ogTitle = productDialog?.title ?? document.querySelector('meta[property="og:title"]')?.content.trim();
-    const h1 = productDialog?.name ?? document.querySelector("h1")?.textContent?.trim();
+    const h1 = productDialog?.searchName ?? document.querySelector("h1")?.textContent?.trim();
     const codes = uniqueStrings([
       ...collectProductCodes(productLdJson),
       ...collectProductCodesFromSpecificationRows(),
@@ -18703,18 +18703,23 @@ ${darkProviderCss}
     const heading = dialog.querySelector("h1");
     const name = heading.textContent?.replace(/\s+/g, " ").trim();
     if (name === void 0 || name.length < 3) return void 0;
+    const spokenPrice = [...dialog.querySelectorAll("[aria-label]")].map((element) => element.getAttribute("aria-label")?.trim().match(/^(\d[\d \u00a0]*,\d{2}) kroner\.?$/i)?.[1]).find((value) => value !== void 0);
     const text = dialog.innerText.slice(0, 4e3);
-    const priceText = text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b/i)?.[1];
+    const priceText = spokenPrice ?? text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b(?!\s*\/)/i)?.[1];
     const price = priceText !== void 0 ? Number(priceText.replace(/[ \u00a0]/g, "").replace(",", ".")) : void 0;
     if (price === void 0 || !Number.isFinite(price) || price <= 0) return void 0;
     let subtitle;
     for (let element = heading.nextElementSibling; element !== null && subtitle === void 0; element = element.nextElementSibling) {
       const value = element.textContent?.replace(/\s+/g, " ").trim();
-      if (element.tagName === "P" && value !== void 0 && value.length > 0) subtitle = value;
+      const isSubtitle = element.tagName === "P" || element.tagName === "DIV" && /subtitle/i.test(element.className);
+      if (isSubtitle && value !== void 0 && value.length > 0 && value.length <= 120) subtitle = value;
     }
     const brand = [...dialog.querySelectorAll("a")].map((link) => link.textContent?.replace(/\s+/g, " ").trim().match(/^Se alle varer fra (.+)$/i)?.[1]).find((value) => value !== void 0);
     return {
       name,
+      // NorgesGruppen's name is often just the product type ("Kaviar"); its subtitle carries
+      // size and brand, as in the page's own product name "Kaviar 185g Tube Mills".
+      searchName: brand === void 0 && subtitle !== void 0 ? `${name} ${subtitle}` : name,
       title: subtitle !== void 0 ? `${name} - ${subtitle}` : name,
       ...brand !== void 0 ? { brand } : {},
       price

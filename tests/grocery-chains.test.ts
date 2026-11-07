@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GROCERY_CHAIN_LIST, GROCERY_CHAINS, getGroceryChain } from "../src/shared/grocery-chains.js";
+import { GROCERY_CHAIN_LIST, GROCERY_CHAINS, getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery } from "../src/shared/grocery-chains.js";
 import { getBrandChipCss, getDarkChipDeclarations } from "../src/shared/theme.js";
 
 test("grocery chains have a unique slug, a label and hex colours for their chip", () => {
@@ -24,4 +24,14 @@ test("brand chips soften white lettering and turn pale fills charcoal in dark mo
   const css = getBrandChipCss(".badge-chain-obs", { bg: "#004993", fg: "#ffffff" });
   assert.match(css, /^\.badge-chain-obs \{ background: #004993; color: #ffffff; \}/);
   assert.match(css, /:root\[data-cbn-theme="dark"\] \.badge-chain-obs \{color:#e5e5e5;\}/);
+});
+
+test("grocery offers link to the chain's product search, or to the flyer offer on eTilbudsavis", () => {
+  assert.equal(getGrocerySearchQuery("Alt av Frostachips 150 G"), "Frostachips");
+  assert.equal(getGrocerySearchQuery("Mills Kaviar Tube 185 g"), "Mills Kaviar Tube");
+  assert.equal(getGrocerySearchQuery("Tine Lettmelk 1% 1,75 l"), "Tine Lettmelk 1%");
+  assert.deepEqual(getGroceryOfferLink("MENY", "Mills Kaviar"), { url: "https://meny.no/sok?query=Mills%20Kaviar&expanded=products", label: "Se varen hos MENY" });
+  assert.equal(getGroceryOfferLink("oda", "Kaviar").url, "https://oda.com/no/search/products/?q=Kaviar");
+  assert.equal(getGroceryOfferLink("KIWI", "Kålrot").url, "https://etilbudsavis.no/soek/K%C3%A5lrot");
+  assert.match(getGroceryOfferLink("REMA 1000", "Pizza").label, /eTilbudsavis/);
 });
