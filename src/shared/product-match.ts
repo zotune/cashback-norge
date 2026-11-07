@@ -62,6 +62,9 @@ export type ProductMatchAnchor = {
   searchTerm: string;
   productLanguage?: string;
   packageQuantity?: ProductPackageQuantity;
+  // Page text with a percentage variant when the product name lacks it
+  // (Oda: name «Tine Lettmelk», title «Tine Lettmelk - 1% fett, 1,75 l - Oda»).
+  variantText?: string;
 };
 
 export type ProductMatchCandidateInfo = {
@@ -73,10 +76,14 @@ export function buildProductMatchAnchor(message: GetPriceMatchForProductMessage)
   const packageQuantity = message.packageAmount !== undefined && message.packageUnit !== undefined
     ? { amount: message.packageAmount, unit: message.packageUnit }
     : undefined;
+  const variantText = readPercentages(message.searchTerm).size === 0
+    ? message.productTitleCandidates?.find((candidate) => readPercentages(candidate).size > 0)
+    : undefined;
   return {
     searchTerm: message.searchTerm,
     ...(message.productLanguage !== undefined ? { productLanguage: message.productLanguage } : {}),
     ...(packageQuantity !== undefined ? { packageQuantity } : {}),
+    ...(variantText !== undefined ? { variantText } : {}),
   };
 }
 
@@ -129,7 +136,26 @@ export function hasProductVariantConflict(anchor: ProductMatchAnchor, candidateT
     hasModelNumberConflict(anchor.searchTerm, candidateTitle) ||
     hasNumericModelConflict(anchor.searchTerm, candidateTitle) ||
     hasModelTierConflict(anchor.searchTerm, candidateTitle) ||
-    hasColorVariantConflict(anchor.searchTerm, candidateTitle);
+    hasColorVariantConflict(anchor.searchTerm, candidateTitle) ||
+    hasPercentageVariantConflict(anchor.variantText ?? anchor.searchTerm, candidateTitle);
+}
+
+// "Tine Lettmelk 1% fett" vs "TINE Lettmelk 0,5% 1,75l", "70% kakao" vs "85%": a percentage
+// in both titles is a variant (fat, cocoa, alcohol); they must share one.
+export function hasPercentageVariantConflict(anchorText: string, candidateTitle: string): boolean {
+  const anchorPercentages = readPercentages(anchorText);
+  const candidatePercentages = readPercentages(candidateTitle);
+  if (anchorPercentages.size === 0 || candidatePercentages.size === 0) return false;
+  return ![...anchorPercentages].some((value) => candidatePercentages.has(value));
+}
+
+function readPercentages(text: string): Set<number> {
+  const values = new Set<number>();
+  for (const match of text.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|prosent\b)/gi)) {
+    const value = Number(match[1]!.replace(",", "."));
+    if (Number.isFinite(value)) values.add(value);
+  }
+  return values;
 }
 
 // "Osmo Action 4" vs "Osmo Action 6" og "iPhone 17" vs "iPhone 17e" er ulike

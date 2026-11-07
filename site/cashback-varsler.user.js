@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794055169
+// @version      1794056627
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -3487,10 +3487,12 @@
   ];
   function buildProductMatchAnchor(message) {
     const packageQuantity = message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
+    const variantText = readPercentages(message.searchTerm).size === 0 ? message.productTitleCandidates?.find((candidate) => readPercentages(candidate).size > 0) : void 0;
     return {
       searchTerm: message.searchTerm,
       ...message.productLanguage !== void 0 ? { productLanguage: message.productLanguage } : {},
-      ...packageQuantity !== void 0 ? { packageQuantity } : {}
+      ...packageQuantity !== void 0 ? { packageQuantity } : {},
+      ...variantText !== void 0 ? { variantText } : {}
     };
   }
   function scoreProductCandidateMatch(anchor, candidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
@@ -3520,7 +3522,21 @@
     return best?.candidate;
   }
   function hasProductVariantConflict(anchor, candidateTitle) {
-    return hasTcgProductVariantConflict(`${anchor.searchTerm} ${anchor.productLanguage ?? ""}`, candidateTitle) || hasPackageQuantityConflict(anchor, candidateTitle) || hasStorageSizeConflict(anchor.searchTerm, candidateTitle) || hasModelNumberConflict(anchor.searchTerm, candidateTitle) || hasNumericModelConflict(anchor.searchTerm, candidateTitle) || hasModelTierConflict(anchor.searchTerm, candidateTitle) || hasColorVariantConflict(anchor.searchTerm, candidateTitle);
+    return hasTcgProductVariantConflict(`${anchor.searchTerm} ${anchor.productLanguage ?? ""}`, candidateTitle) || hasPackageQuantityConflict(anchor, candidateTitle) || hasStorageSizeConflict(anchor.searchTerm, candidateTitle) || hasModelNumberConflict(anchor.searchTerm, candidateTitle) || hasNumericModelConflict(anchor.searchTerm, candidateTitle) || hasModelTierConflict(anchor.searchTerm, candidateTitle) || hasColorVariantConflict(anchor.searchTerm, candidateTitle) || hasPercentageVariantConflict(anchor.variantText ?? anchor.searchTerm, candidateTitle);
+  }
+  function hasPercentageVariantConflict(anchorText, candidateTitle) {
+    const anchorPercentages = readPercentages(anchorText);
+    const candidatePercentages = readPercentages(candidateTitle);
+    if (anchorPercentages.size === 0 || candidatePercentages.size === 0) return false;
+    return ![...anchorPercentages].some((value) => candidatePercentages.has(value));
+  }
+  function readPercentages(text) {
+    const values = /* @__PURE__ */ new Set();
+    for (const match of text.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|prosent\b)/gi)) {
+      const value = Number(match[1].replace(",", "."));
+      if (Number.isFinite(value)) values.add(value);
+    }
+    return values;
   }
   const NUMERIC_MODEL_UNIT_WORDS = /* @__PURE__ */ new Set([
     "a",
@@ -4729,7 +4745,9 @@
       const quantity = readEtilbudsavisQuantity(item.quantity);
       const images = isRecord$4(item.images) ? item.images : void 0;
       const imageUrl = readStringValue(images?.view) ?? readStringValue(images?.zoom) ?? readStringValue(images?.thumb);
+      const id = readStringValue(item.id);
       return [{
+        ...id !== void 0 ? { id } : {},
         heading,
         description: readStringValue(item.description)?.trim() ?? "",
         dealer: dealer.trim(),
@@ -4776,7 +4794,8 @@
   }
   function selectEtilbudsavisMatches(offers, message, now = Date.now()) {
     const quantity = getGroceryPackageQuantity(message);
-    return offers.filter((offer) => isActive(offer, now)).filter((offer) => hasGroceryBrandSignal(message, `${offer.heading} ${offer.description}`)).filter((offer) => isLikelySameGroceryTitle$1(message, offer.heading, 0.45) || isEtilbudsavisAssortment(offer) && message.productBrand !== void 0 && quantity !== void 0).filter((offer) => matchesQuantity(offer, quantity)).sort((left, right) => left.amount - right.amount);
+    const variantText = buildProductMatchAnchor(message).variantText ?? message.searchTerm;
+    return offers.filter((offer) => isActive(offer, now)).filter((offer) => hasGroceryBrandSignal(message, `${offer.heading} ${offer.description}`)).filter((offer) => isLikelySameGroceryTitle$1(message, offer.heading, 0.45) || isEtilbudsavisAssortment(offer) && message.productBrand !== void 0 && quantity !== void 0).filter((offer) => matchesQuantity(offer, quantity)).filter((offer) => !hasPercentageVariantConflict(variantText, `${offer.heading} ${offer.description}`)).sort((left, right) => left.amount - right.amount);
   }
   async function findEtilbudsavisPriceMatch(message, requestJson = fetchEtilbudsavisJson, now = Date.now()) {
     if (!isLikelyGroceryPriceMatchContext(message.url, message.productUrl)) return void 0;
@@ -11778,7 +11797,9 @@ ${darkProviderCss}
         if (!isContentScriptActive()) return;
         const currentUrl = parseUrl(window.location.href);
         if (currentUrl === void 0 || !isDynamicPriceMatchProductPage(currentUrl)) {
+          const leftGroceryProduct = latestMetaKey.length > 0 && currentUrl !== void 0 && isGroceryWebShopHost(currentUrl);
           latestMetaKey = "";
+          if (leftGroceryProduct) requestCurrentOffers();
           return;
         }
         const flightMeta = extractFlightSearchMeta(currentUrl);
@@ -18609,22 +18630,23 @@ ${darkProviderCss}
       return void 0;
     }
     const vinmonopoletText = normalizedHostname === "vinmonopolet.no" ? document.body?.innerText.slice(0, 12e3) ?? "" : "";
-    const productLdJson = findProductLdJson();
+    const productDialog = readOpenProductDialog();
+    const productLdJson = productDialog === void 0 ? findProductLdJson() : void 0;
     const offer = readFirstOffer(productLdJson?.offers);
-    const titleMeta = document.querySelector('meta[name="title"]')?.content.trim();
-    const ogTitle = document.querySelector('meta[property="og:title"]')?.content.trim();
-    const h1 = document.querySelector("h1")?.textContent?.trim();
+    const titleMeta = productDialog?.title ?? document.querySelector('meta[name="title"]')?.content.trim();
+    const ogTitle = productDialog?.title ?? document.querySelector('meta[property="og:title"]')?.content.trim();
+    const h1 = productDialog?.name ?? document.querySelector("h1")?.textContent?.trim();
     const codes = uniqueStrings([
       ...collectProductCodes(productLdJson),
       ...collectProductCodesFromSpecificationRows(),
       ...collectProductCodesFromUrl(parsedUrl)
     ]);
-    const productPageClue = isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
-    if (isLikelyProductListingPage(parsedUrl) && document.querySelector('meta[property="og:type"][content="product"]') === null && !isLikelyCommerceProductPage(parsedUrl)) {
+    const productPageClue = productDialog !== void 0 || isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || hasProductStructuredDataSignal(productLdJson, offer, codes) || document.querySelector('meta[property="og:type"][content="product"]') !== null && (hasVisiblePriceSignal() || hasCommerceActionSignal()) || codes.length > 0 || isLikelyCommerceProductPage(parsedUrl);
+    if (productDialog === void 0 && isLikelyProductListingPage(parsedUrl) && document.querySelector('meta[property="og:type"][content="product"]') === null && !isLikelyCommerceProductPage(parsedUrl)) {
       return void 0;
     }
     const productName = readStringValue(productLdJson?.name);
-    const brandName = readBrandName(productLdJson?.brand);
+    const brandName = readBrandName(productLdJson?.brand) ?? productDialog?.brand;
     const vinmonopoletProductName = normalizedHostname === "vinmonopolet.no" ? readVinmonopoletProductName(parsedUrl, h1) : void 0;
     const searchTerm = vinmonopoletProductName ?? (productName !== void 0 ? brandName !== void 0 && !productName.toLowerCase().includes(brandName.toLowerCase()) ? `${brandName} ${productName}` : productName : h1 ?? titleMeta ?? ogTitle ?? document.title);
     const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
@@ -18635,7 +18657,7 @@ ${darkProviderCss}
       h1,
       titleMeta,
       ogTitle,
-      document.title
+      productDialog === void 0 ? document.title : void 0
     ]);
     const packageQuantity = readProductPackageQuantity(productLdJson, productTitleCandidates);
     const productLanguage = readProductLanguage(productLdJson, productTitleCandidates) ?? (normalizedHostname === "prisjakt.no" && parsedUrl.pathname === "/product.php" && parsedUrl.searchParams.has("p") ? readProductOfferLanguage([...document.querySelectorAll("script")].filter((script) => script.textContent?.includes("self.__next_f.push")).map((script) => script.outerHTML).join(""), parsedUrl.searchParams.get("p")) : void 0);
@@ -18643,8 +18665,8 @@ ${darkProviderCss}
       return void 0;
     }
     const visibleVinmonopoletPrice = vinmonopoletText.length > 0 ? readVinmonopoletPrice(vinmonopoletText) : void 0;
-    const price = readNumberValue(offer?.price) ?? visibleVinmonopoletPrice;
-    const currency = readStringValue(offer?.priceCurrency) ?? (visibleVinmonopoletPrice !== void 0 ? "NOK" : void 0);
+    const price = readNumberValue(offer?.price) ?? visibleVinmonopoletPrice ?? productDialog?.price;
+    const currency = readStringValue(offer?.priceCurrency) ?? (visibleVinmonopoletPrice !== void 0 || productDialog?.price !== void 0 ? "NOK" : void 0);
     const productUrl = readUrlValue(productLdJson?.url);
     const organizationName = findOrganizationName();
     const volumeMl = vinmonopoletText.length > 0 ? readVinmonopoletVolumeMl(vinmonopoletText, price) : void 0;
@@ -18664,6 +18686,30 @@ ${darkProviderCss}
       ...packageQuantity !== void 0 ? { packageAmount: packageQuantity.amount, packageUnit: packageQuantity.unit } : {},
       ...volumeMl !== void 0 ? { volumeMl } : {},
       ...alcoholPercent !== void 0 ? { alcoholPercent } : {}
+    };
+  }
+  function readOpenProductDialog() {
+    const dialogs = [...document.querySelectorAll('[role="dialog"], dialog[open]')].filter((dialog2) => dialog2.getAttribute("data-state") !== "closed" && dialog2.querySelector("h1") !== null && isVisibleElement(dialog2));
+    const dialog = dialogs[dialogs.length - 1];
+    if (dialog === void 0) return void 0;
+    const heading = dialog.querySelector("h1");
+    const name = heading.textContent?.replace(/\s+/g, " ").trim();
+    if (name === void 0 || name.length < 3) return void 0;
+    const text = dialog.innerText.slice(0, 4e3);
+    const priceText = text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b/i)?.[1];
+    const price = priceText !== void 0 ? Number(priceText.replace(/[ \u00a0]/g, "").replace(",", ".")) : void 0;
+    if (price === void 0 || !Number.isFinite(price) || price <= 0) return void 0;
+    let subtitle;
+    for (let element = heading.nextElementSibling; element !== null && subtitle === void 0; element = element.nextElementSibling) {
+      const value = element.textContent?.replace(/\s+/g, " ").trim();
+      if (element.tagName === "P" && value !== void 0 && value.length > 0) subtitle = value;
+    }
+    const brand = [...dialog.querySelectorAll("a")].map((link) => link.textContent?.replace(/\s+/g, " ").trim().match(/^Se alle varer fra (.+)$/i)?.[1]).find((value) => value !== void 0);
+    return {
+      name,
+      title: subtitle !== void 0 ? `${name} - ${subtitle}` : name,
+      ...brand !== void 0 ? { brand } : {},
+      price
     };
   }
   function hasProductStructuredDataSignal(product, offer, codes) {
@@ -18740,11 +18786,17 @@ ${darkProviderCss}
     return hostname === "tax-free.no" && /^\/(?:no\/)?product\d+(?:\/|$)/i.test(parsedUrl.pathname);
   }
   function isDynamicPriceMatchProductPage(parsedUrl) {
-    return extractFlightSearchMeta(parsedUrl) !== void 0 || extractHotelSearchMeta(parsedUrl) !== void 0 || isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isSteamAppProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString());
+    return extractFlightSearchMeta(parsedUrl) !== void 0 || extractHotelSearchMeta(parsedUrl) !== void 0 || isVinmonopoletProductPage(parsedUrl) || isTaxfreeProductPage(parsedUrl) || isEpicGamesStoreProductUrl(parsedUrl.toString()) || isSteamAppProductUrl(parsedUrl.toString()) || isMicrosoftStoreProductUrl(parsedUrl.toString()) || // Grocery web shops route to products client-side or open them as overlays.
+    isGroceryWebShopHost(parsedUrl) && (readOpenProductDialog() !== void 0 || /\/(?:products?|produkt(?:er)?|varer)\//i.test(parsedUrl.pathname));
+  }
+  const GROCERY_WEB_SHOP_HOSTS = ["oda.com", "meny.no", "spar.no", "joker.no", "kiwi.no", "coop.no", "obs.no", "extra.no"];
+  function isGroceryWebShopHost(parsedUrl) {
+    const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+    return GROCERY_WEB_SHOP_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return hostname === "sas.no" || hostname === "wideroe.no" || isAirFranceKlmHostname(hostname) || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "hotels.com" || hostname.endsWith(".hotels.com") || hostname === "expedia.com" || hostname.endsWith(".expedia.com") || hostname === "expedia.no" || hostname.endsWith(".expedia.no") || hostname === "agoda.com" || hostname.endsWith(".agoda.com") || hostname === "momondo.no" || hostname === "kiwi.com" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com";
+    return hostname === "sas.no" || hostname === "wideroe.no" || isAirFranceKlmHostname(hostname) || hostname === "finn.no" || hostname === "hotell.finn.no" || hostname === "booking.com" || hostname.endsWith(".booking.com") || hostname === "hotels.com" || hostname.endsWith(".hotels.com") || hostname === "expedia.com" || hostname.endsWith(".expedia.com") || hostname === "expedia.no" || hostname.endsWith(".expedia.no") || hostname === "agoda.com" || hostname.endsWith(".agoda.com") || hostname === "momondo.no" || hostname === "kiwi.com" || hostname === "panflights.no" || hostname === "panflights.com" || hostname === "travellink.no" || hostname === "trip.com" || hostname.endsWith(".trip.com") || hostname === "shop.lufthansa.com" || hostname === "booking.norwegian.com" || hostname === "skyscanner.no" || hostname === "skyscanner.net" || hostname === "vinmonopolet.no" || hostname === "tax-free.no" || hostname === "store.epicgames.com" || hostname === "store.steampowered.com" || hostname === "xbox.com" || hostname === "apps.microsoft.com" || isGroceryWebShopHost(parsedUrl);
   }
   function readVinmonopoletProductName(parsedUrl, h1) {
     if (!isVinmonopoletProductPage(parsedUrl)) return void 0;

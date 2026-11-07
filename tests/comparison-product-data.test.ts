@@ -4,6 +4,7 @@ import { findGodprisPriceMatch } from "../src/shared/godpris-price-match.js";
 import { isGodprisProductForOfferUrls } from "../src/shared/godpris-price-match.js";
 import { findPrisradarPriceMatch, isPrisradarProductForOfferUrls } from "../src/shared/prisradar-price-match.js";
 import { hasTcgProductVariantConflict, readTcgProductKind } from "../src/shared/tcg-product-match.js";
+import { buildProductMatchAnchor, hasPercentageVariantConflict, hasProductVariantConflict } from "../src/shared/product-match.js";
 import { readComparisonProductLdJson, readNextProductData, readStructuredProductCodes, readProductLanguage } from "../src/shared/product-data.js";
 import type { GetPriceMatchForProductMessage } from "../src/shared/extension-messages.js";
 
@@ -98,4 +99,26 @@ test("the shared full Next product record also feeds Prisradar offer extraction 
   const result = await findPrisradarPriceMatch({ ...message, url: productUrl }, async () => undefined, async () => html);
   assert.equal(result?.amount, 1048);
   assert.equal(result?.alternatives?.length, 1);
+});
+
+test("a percentage in both titles is a variant: fat, cocoa or alcohol content must match", () => {
+  const anchor = { searchTerm: "Tine Lettmelk 1% fett 1,75 l" };
+  // Godpris offered «TINE Lettmelk 0,5% 1,75l» on Oda's 1 % page.
+  assert.equal(hasPercentageVariantConflict(anchor.searchTerm, "TINE Lettmelk 0,5% 1,75l"), true);
+  assert.equal(hasProductVariantConflict(anchor, "TINE Lettmelk 0,5% 1,75l"), true);
+  assert.equal(hasProductVariantConflict(anchor, "Tine Lettmelk 1% 1,75 l"), false);
+  assert.equal(hasPercentageVariantConflict("Lindt Excellence 70 % kakao", "Lindt Excellence 85% Cocoa"), true);
+  assert.equal(hasPercentageVariantConflict("Tine Lettmelk 0,5 %", "TINE LETTMELK 0,5% 1L"), false);
+  // Only one side states a percentage: not decided here.
+  assert.equal(hasPercentageVariantConflict("Tine Lettmelk 1,75 l", "TINE Lettmelk 0,5% 1,75l"), false);
+});
+
+test("the percentage variant is read from the page title when the product name lacks it (Oda)", () => {
+  const anchor = buildProductMatchAnchor({
+    type: "get-price-match-for-product", url: "https://oda.com/no/products/8143-tine-tine-lettmelk-1-fett/",
+    searchTerm: "Tine Lettmelk", productTitleCandidates: ["Tine Lettmelk", "Tine Lettmelk - 1% fett, 1,75 l - Oda"],
+  } as GetPriceMatchForProductMessage);
+  assert.equal(anchor.variantText, "Tine Lettmelk - 1% fett, 1,75 l - Oda");
+  assert.equal(hasProductVariantConflict(anchor, "TINE Lettmelk 0,5% 1,75l"), true);
+  assert.equal(hasProductVariantConflict(anchor, "TINE Lettmelk 1,0% 1,75l"), false);
 });

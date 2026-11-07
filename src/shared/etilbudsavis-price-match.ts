@@ -14,6 +14,7 @@ import {
   isLikelySameGroceryTitle,
   type ProductPackageQuantity,
 } from "./grocery-price-match-utils.js";
+import { buildProductMatchAnchor, hasPercentageVariantConflict } from "./product-match.js";
 import { formatKr } from "./reward-calculation.js";
 import { readRecordArray, readStringValue } from "./values.js";
 
@@ -131,6 +132,7 @@ export function selectEtilbudsavisMatches(
   now = Date.now(),
 ): EtilbudsavisOffer[] {
   const quantity = getGroceryPackageQuantity(message);
+  const variantText = buildProductMatchAnchor(message).variantText ?? message.searchTerm;
   return offers
     .filter((offer) => isActive(offer, now))
     .filter((offer) => hasGroceryBrandSignal(message, `${offer.heading} ${offer.description}`))
@@ -138,6 +140,8 @@ export function selectEtilbudsavisMatches(
     .filter((offer) => isLikelySameGroceryTitle(message, offer.heading, 0.45) ||
       (isEtilbudsavisAssortment(offer) && message.productBrand !== undefined && quantity !== undefined))
     .filter((offer) => matchesQuantity(offer, quantity))
+    // «1 % fett» på siden og «0,5 %» i avisen er ulike varer.
+    .filter((offer) => !hasPercentageVariantConflict(variantText, `${offer.heading} ${offer.description}`))
     .sort((left, right) => left.amount - right.amount);
 }
 

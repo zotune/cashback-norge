@@ -991,7 +991,10 @@ function installDynamicProductPageRefresh(): void {
       if (!isContentScriptActive()) return;
       const currentUrl = parseUrl(window.location.href);
       if (currentUrl === undefined || !isDynamicPriceMatchProductPage(currentUrl)) {
+        // A closed grocery product overlay leaves the listing behind; drop its price match.
+        const leftGroceryProduct = latestMetaKey.length > 0 && currentUrl !== undefined && isGroceryWebShopHost(currentUrl);
         latestMetaKey = "";
+        if (leftGroceryProduct) requestCurrentOffers();
         return;
       }
 
@@ -10402,17 +10405,21 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   const vinmonopoletText = normalizedHostname === "vinmonopolet.no"
     ? document.body?.innerText.slice(0, 12000) ?? ""
     : "";
-  const productLdJson = findProductLdJson();
+  // A product opened as an overlay (Oda's product dialog) changes the URL, but the page's
+  // structured data, title and first h1 still belong to the page behind it.
+  const productDialog = readOpenProductDialog();
+  const productLdJson = productDialog === undefined ? findProductLdJson() : undefined;
   const offer = readFirstOffer(productLdJson?.offers);
-  const titleMeta = document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content.trim();
-  const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
-  const h1 = document.querySelector("h1")?.textContent?.trim();
+  const titleMeta = productDialog?.title ?? document.querySelector<HTMLMetaElement>('meta[name="title"]')?.content.trim();
+  const ogTitle = productDialog?.title ?? document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content.trim();
+  const h1 = productDialog?.name ?? document.querySelector("h1")?.textContent?.trim();
   const codes = uniqueStrings([
     ...collectProductCodes(productLdJson),
     ...collectProductCodesFromSpecificationRows(),
     ...collectProductCodesFromUrl(parsedUrl),
   ]);
   const productPageClue =
+    productDialog !== undefined ||
     isVinmonopoletProductPage(parsedUrl) ||
     isTaxfreeProductPage(parsedUrl) ||
     hasProductStructuredDataSignal(productLdJson, offer, codes) ||
@@ -10420,6 +10427,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     codes.length > 0 ||
     isLikelyCommerceProductPage(parsedUrl);
   if (
+    productDialog === undefined &&
     isLikelyProductListingPage(parsedUrl) &&
     document.querySelector('meta[property="og:type"][content="product"]') === null &&
     !isLikelyCommerceProductPage(parsedUrl)
@@ -10428,7 +10436,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   }
 
   const productName = readStringValue(productLdJson?.name);
-  const brandName = readBrandName(productLdJson?.brand);
+  const brandName = readBrandName(productLdJson?.brand) ?? productDialog?.brand;
   const vinmonopoletProductName = normalizedHostname === "vinmonopolet.no"
     ? readVinmonopoletProductName(parsedUrl, h1)
     : undefined;
@@ -10449,7 +10457,7 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     h1,
     titleMeta,
     ogTitle,
-    document.title,
+    productDialog === undefined ? document.title : undefined,
   ]);
   const packageQuantity = readProductPackageQuantity(productLdJson, productTitleCandidates);
   const productLanguage = readProductLanguage(productLdJson, productTitleCandidates) ??
@@ -10463,8 +10471,8 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
   }
 
   const visibleVinmonopoletPrice = vinmonopoletText.length > 0 ? readVinmonopoletPrice(vinmonopoletText) : undefined;
-  const price = readNumberValue(offer?.price) ?? visibleVinmonopoletPrice;
-  const currency = readStringValue(offer?.priceCurrency) ?? (visibleVinmonopoletPrice !== undefined ? "NOK" : undefined);
+  const price = readNumberValue(offer?.price) ?? visibleVinmonopoletPrice ?? productDialog?.price;
+  const currency = readStringValue(offer?.priceCurrency) ?? (visibleVinmonopoletPrice !== undefined || productDialog?.price !== undefined ? "NOK" : undefined);
   const productUrl = readUrlValue(productLdJson?.url);
   const organizationName = findOrganizationName();
   const volumeMl = vinmonopoletText.length > 0 ? readVinmonopoletVolumeMl(vinmonopoletText, price) : undefined;
@@ -10485,6 +10493,39 @@ function extractProductPageMeta(): ProductPageMeta | undefined {
     ...(packageQuantity !== undefined ? { packageAmount: packageQuantity.amount, packageUnit: packageQuantity.unit } : {}),
     ...(volumeMl !== undefined ? { volumeMl } : {}),
     ...(alcoholPercent !== undefined ? { alcoholPercent } : {}),
+  };
+}
+
+type ProductDialogMeta = { name: string; title: string; brand?: string; price?: number };
+
+// An open modal dialog with its own h1 and a kroner price is a product shown as an overlay.
+// The subtitle under the h1 carries the variant and size («0,5%, 1 l, TINE»); the brand comes
+// from a «Se alle varer fra …» link; the price from the dialog's own text.
+function readOpenProductDialog(): ProductDialogMeta | undefined {
+  const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"], dialog[open]')]
+    .filter((dialog) => dialog.getAttribute("data-state") !== "closed" && dialog.querySelector("h1") !== null && isVisibleElement(dialog));
+  const dialog = dialogs[dialogs.length - 1];
+  if (dialog === undefined) return undefined;
+  const heading = dialog.querySelector("h1")!;
+  const name = heading.textContent?.replace(/\s+/g, " ").trim();
+  if (name === undefined || name.length < 3) return undefined;
+  const text = dialog.innerText.slice(0, 4000);
+  const priceText = text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b/i)?.[1];
+  const price = priceText !== undefined ? Number(priceText.replace(/[ \u00a0]/g, "").replace(",", ".")) : undefined;
+  if (price === undefined || !Number.isFinite(price) || price <= 0) return undefined;
+  let subtitle: string | undefined;
+  for (let element = heading.nextElementSibling; element !== null && subtitle === undefined; element = element.nextElementSibling) {
+    const value = element.textContent?.replace(/\s+/g, " ").trim();
+    if (element.tagName === "P" && value !== undefined && value.length > 0) subtitle = value;
+  }
+  const brand = [...dialog.querySelectorAll("a")]
+    .map((link) => link.textContent?.replace(/\s+/g, " ").trim().match(/^Se alle varer fra (.+)$/i)?.[1])
+    .find((value): value is string => value !== undefined);
+  return {
+    name,
+    title: subtitle !== undefined ? `${name} - ${subtitle}` : name,
+    ...(brand !== undefined ? { brand } : {}),
+    price,
   };
 }
 
@@ -10599,7 +10640,18 @@ function isDynamicPriceMatchProductPage(parsedUrl: URL): boolean {
     isTaxfreeProductPage(parsedUrl) ||
     isEpicGamesStoreProductUrl(parsedUrl.toString()) ||
     isSteamAppProductUrl(parsedUrl.toString()) ||
-    isMicrosoftStoreProductUrl(parsedUrl.toString());
+    isMicrosoftStoreProductUrl(parsedUrl.toString()) ||
+    // Grocery web shops route to products client-side or open them as overlays.
+    (isGroceryWebShopHost(parsedUrl) && (readOpenProductDialog() !== undefined || /\/(?:products?|produkt(?:er)?|varer)\//i.test(parsedUrl.pathname)));
+}
+
+// Single-page grocery shops: a product opened by an ordinary click (or as Oda's overlay)
+// never reloads the page, so the panel follows URL and DOM changes there.
+const GROCERY_WEB_SHOP_HOSTS = ["oda.com", "meny.no", "spar.no", "joker.no", "kiwi.no", "coop.no", "obs.no", "extra.no"];
+
+function isGroceryWebShopHost(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
+  return GROCERY_WEB_SHOP_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
 }
 
 function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
@@ -10635,7 +10687,8 @@ function isDynamicPriceMatchHost(parsedUrl: URL): boolean {
     hostname === "store.epicgames.com" ||
     hostname === "store.steampowered.com" ||
     hostname === "xbox.com" ||
-    hostname === "apps.microsoft.com";
+    hostname === "apps.microsoft.com" ||
+    isGroceryWebShopHost(parsedUrl);
 }
 
 function readVinmonopoletProductName(parsedUrl: URL, h1: string | undefined): string | undefined {
