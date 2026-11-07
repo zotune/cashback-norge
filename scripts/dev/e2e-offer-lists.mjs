@@ -54,6 +54,8 @@ try {
   await page.reload();
   await page.locator('.empty').filter({ hasText: 'Velg minst' }).waitFor();
   await page.locator('[data-ol="all"]').click();
+  assert.equal(await page.locator('[data-group="KIWI"]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(80, 184, 72)');
+  assert.equal(await page.locator('.site-tabs a').nth(1).innerText(), 'Tilbud');
   await chooseSort('votes');
   await page.waitForFunction(id => document.querySelector('.deal-row')?.dataset.id === id, a.id);
   const first = page.locator('.deal-row').first();
@@ -94,6 +96,12 @@ try {
     await noOverflow();
     await page.screenshot({ path: `${output}/grocery-desktop-${colorScheme}.png` });
   }
+  await page.locator('.deal-title a').first().hover();
+  await page.locator('.deal-preview').waitFor({ state: 'visible' });
+  const previewBounds = await page.locator('.deal-preview').boundingBox();
+  const titleBounds = await page.locator('.deal-title a').first().boundingBox();
+  assert.ok(previewBounds.x + previewBounds.width <= titleBounds.x || previewBounds.x >= titleBounds.x + titleBounds.width || previewBounds.y + previewBounds.height <= titleBounds.y || previewBounds.y >= titleBounds.y + titleBounds.height, 'preview overlaps its trigger');
+  await page.mouse.move(10, 10);
   await page.locator('[data-ol="search"]').fill('ertestuing');
   await page.waitForFunction(() => location.search.includes('ertestuing'));
   await page.locator('.copy-btn').first().click();
@@ -110,8 +118,8 @@ try {
     for (const view of ['list', 'grid']) {
       await page.locator(`[data-view="${view}"]`).click();
       await noOverflow();
-      const metadata = await page.locator('.deal-meta--validity').first().evaluate(el => [...el.children].map(child => child.getBoundingClientRect().top));
-      assert.ok(Math.abs(metadata[0] - metadata[1]) < 5, 'date and countdown must share a line');
+      const metadata = await page.locator('.deal-meta--validity .deal-validity').first().evaluate(el => [...el.children].map(child => child.getBoundingClientRect().top));
+      assert.ok(metadata[1] > metadata[0], 'countdown must sit below the date');
       if (width === 390) await page.screenshot({ path: `${output}/grocery-mobile-${view}.png` });
     }
   }
@@ -123,7 +131,7 @@ try {
   await page.locator('.deal-row').first().screenshot({ path: `${output}/grocery-kiwi-card.png` });
   await noOverflow();
   const meta = await page.locator('.deal-meta:not(.deal-meta--validity)').first().evaluate(el => [...el.children].map(child => child.getBoundingClientRect().top));
-  assert.ok(Math.abs(meta[0] - meta[1]) < 5, 'shop and card bonus must share a line');
+  assert.ok(meta[1] > meta[0], 'card bonus must sit below the shop');
   await page.locator('[data-ol="search"]').fill('joker');
   await page.waitForFunction(() => location.search.includes('joker'));
   assert.ok(await page.locator('.badge-chain-joker').first().evaluate(el => ['rgb(255, 255, 255)', 'rgb(229, 229, 229)'].includes(getComputedStyle(el).color)));
@@ -131,7 +139,14 @@ try {
   await goto('/dagens-tilbud/');
   assert.equal(await page.locator('h1').innerText(), 'Tilbud');
   assert.ok(await page.locator('.deal-desc').first().innerText().then(text => text.includes('Frakt ukjent')));
-  await chooseSort('saving');
+  assert.ok(await page.locator('th').filter({ hasText: 'Lavest 90 dager' }).count() === 1);
+  await page.locator('[data-ol="category"]').selectOption('3D-printere');
+  assert.ok((await page.locator('.category-link').allTextContents()).every(text => text === '3D-printere'));
+  await page.reload();
+  await page.locator('.deal-row').first().waitFor();
+  assert.equal(await page.locator('[data-ol="category"]').inputValue(), '3D-printere');
+  await page.locator('[data-ol="category-clear"]').click();
+  await page.locator('[data-toplist="saving"]').click();
   assert.equal(await page.locator('th[data-sort="saving"]').getAttribute('aria-sort'), 'descending');
   await noOverflow();
   await page.locator('.deal-row img').first().evaluate(img => img.decode().catch(() => {}));

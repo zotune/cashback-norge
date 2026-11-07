@@ -32,6 +32,8 @@ test("grocery offers link to the chain's product search, or to the flyer offer o
   assert.equal(getGrocerySearchQuery("Tine Lettmelk 1% 1,75 l"), "Tine Lettmelk 1%");
   assert.deepEqual(getGroceryOfferLink("MENY", "Mills Kaviar"), { url: "https://meny.no/sok?query=Mills%20Kaviar&expanded=products", label: "Se varen hos MENY" });
   assert.equal(getGroceryOfferLink("oda", "Kaviar").url, "https://oda.com/no/search/products/?q=Kaviar");
+  assert.equal(getGroceryOfferLink("Obs", "LEGO City").url, "https://www.obs.no/sok?q=LEGO%20City");
+  assert.match(getGroceryOfferLink("Obs", "Kaviar").label, /nettutvalg.*matvarer kan mangle/);
   assert.equal(getGroceryOfferLink("KIWI", "Kålrot").url, "https://etilbudsavis.no/soek/K%C3%A5lrot");
   assert.match(getGroceryOfferLink("REMA 1000", "Pizza").label, /eTilbudsavis/);
 });

@@ -19,6 +19,10 @@ export type PrisjaktDeal = {
   productUrl: string;
   offerUrl?: string;
   store: string;
+  storeId?: number;
+  shopOfferId?: string;
+  storeLogoUrl?: string;
+  storeUrl?: string;
   price: number;
   currency: "NOK";
   /** The shop's own pre-price, when it shows one. */
@@ -27,6 +31,9 @@ export type PrisjaktDeal = {
   priceDrop?: number;
   storeCount?: number;
   validTo?: string;
+  lowestPrice90Days?: number;
+  historyScope?: "product" | "variant";
+  historyUpdatedAt?: string;
 };
 
 const PRISJAKT_ORIGIN = "https://www.prisjakt.no";
@@ -100,6 +107,8 @@ function toDeal(card: unknown): PrisjaktDeal | undefined {
   const validTo = Number.isFinite(Date.parse(rawExpiry)) ? new Date(rawExpiry).toISOString() : undefined;
   return {
     id, name, store, price, currency: "NOK",
+    ...(typeof offer.storeId === "number" ? { storeId: offer.storeId } : {}),
+    ...(text(offer.shopOfferId) ? { shopOfferId: text(offer.shopOfferId)! } : {}),
     productUrl: productUrl.href,
     ...(offerUrl !== undefined && offerUrl.startsWith(`${PRISJAKT_ORIGIN}/go-to-shop/`) ? { offerUrl } : {}),
     ...(originalPrice !== undefined && originalPrice > price ? { originalPrice } : {}),

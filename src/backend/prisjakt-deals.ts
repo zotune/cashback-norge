@@ -8,6 +8,7 @@
 import { Configuration, HttpCrawler, type HttpCrawlingContext, MemoryStorage, Request } from "crawlee";
 import { readPrisjaktDeals, type PrisjaktDeal } from "../shared/prisjakt-deals.js";
 import type { Logger } from "./logger.js";
+import { readPrisjaktDealDetails } from "../shared/prisjakt-deal-details.js";
 
 export const PRISJAKT_DEALS_URL = "https://www.prisjakt.no/tema/dagens-tilbud";
 export const PRISJAKT_DEALS_PUBLISHED_URL = "https://cashbacknorge.no/prisjakt-deals.json";
@@ -28,11 +29,13 @@ export type CollectPrisjaktDealsInput = {
   previousUrl?: string;
   maxPages?: number;
   navigationTimeoutSecs?: number;
+  maxDetailProducts?: number;
+  productPageUrl?: (deal: PrisjaktDeal) => string;
 };
 
 export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog | undefined> {
   try {
-    return await fetchPrisjaktDeals(input);
+    return await enrichPrisjaktDeals(await fetchPrisjaktDeals(input), input);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const previous = await fetchPreviousCatalog(input).catch((previousError: unknown) => {
@@ -47,6 +50,20 @@ export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Pr
     input.logger.error(`${message}; no usable previous Prisjakt deals catalogue`);
     return undefined;
   }
+}
+
+/** Bounded sequential reads; detail failures leave the verified listing usable. */
+export async function enrichPrisjaktDeals(catalog: PrisjaktDealsCatalog, input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog> {
+  const limit = Math.max(0, Math.min(400, Math.trunc(input.maxDetailProducts ?? 400)));
+  const deals = catalog.deals.map((deal) => ({ ...deal }));
+  let failed = 0;
+  const crawler = createCrawler(input, async ({ request, body }) => {
+    const index = request.userData.index as number;
+    Object.assign(deals[index]!, readPrisjaktDealDetails(body, deals[index]!, catalog.generatedAt));
+  }, (request, reason) => { failed += 1; input.logger.warn(`Prisjakt details: ${request.url} (${reason})`); });
+  await crawler.run(deals.slice(0, limit).map((deal, index) => new Request({ url: input.productPageUrl?.(deal) ?? deal.productUrl, userData: { index } })));
+  input.logger.info(`Prisjakt details: ${Math.min(limit, deals.length)} products, ${deals.filter((deal) => deal.lowestPrice90Days !== undefined).length} verified 90-day histories, ${failed} failed`);
+  return { ...catalog, deals };
 }
 
 export async function fetchPrisjaktDeals(input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog> {

@@ -205,7 +205,7 @@ export function createChoiceMenu(button: HTMLButtonElement, options: ChoiceOptio
 /** Chip colours for the grocery chains, light and dark, as one style element. */
 export function installGroceryChainStyles(): void {
   const style = document.createElement("style");
-  style.textContent = GROCERY_CHAIN_LIST.map((chain) => getBrandChipCss(`.badge-chain-${chain.slug}`, chain)).join("\n");
+  style.textContent = GROCERY_CHAIN_LIST.map((chain) => getBrandChipCss(`.badge-chain-${chain.slug}`, chain) + `\n.badge-chain-${chain.slug} { --group-brand-bg: ${chain.bg}; --group-brand-fg: ${chain.fg}; }`).join("\n");
   document.head.append(style);
 }
 

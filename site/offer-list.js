@@ -73,7 +73,7 @@
     const features = config.features ?? {};
     const SORTS = ALL_SORTS.filter((sort) => !sort.feature || features[sort.feature]).map((sort) => sort.value === "saving" && config.savingLabel ? { ...sort, label: `Størst ${config.savingLabel.toLowerCase()}` } : sort);
     const wideScreen = window.matchMedia("(min-width: 1100px)");
-    const state = { items: [], counts: new Map(), off: new Set(), query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], shown: 0 };
+    const state = { items: [], counts: new Map(), off: new Set(), category: "", query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], ranks: new Map(), shown: 0 };
     const tallies = new Map();
     let myVotes = {};
     let previewFor = null;
@@ -89,6 +89,7 @@
           <button class="cbn-button cbn-button--quiet list-reset" data-ol="none" type="button">Velg ingen</button>
         </span></div>
         <div class="chip-toggles group-toggles" data-ol="groups" role="group" aria-label="${esc(config.groupLabel)}"></div>
+        ${features.category ? `<div class="category-picker"><label for="offer-category">Underkategori</label><select class="cbn-field" id="offer-category" data-ol="category"><option value="">Alle underkategorier</option></select><button class="cbn-button cbn-button--quiet" data-ol="category-clear" type="button" hidden>Vis alle</button></div>` : ""}
         <div class="list-bar">
           <div class="count" data-ol="count" aria-live="polite"></div>
           <button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Flere filtre">${FILTER_SVG}</button>
@@ -114,6 +115,7 @@
           </div>
         </div>
       </div>
+      ${config.toplists ? `<div class="toplists" role="group" aria-label="Topplister"><span>Topplister</span>${config.toplists.map((entry) => `<button class="cbn-button cbn-button--filter" type="button" data-toplist="${esc(entry.sort)}">${esc(entry.label)}</button>`).join("")}<small data-ol="toplist-note"></small></div>` : ""}
       <div class="results" data-ol="results" aria-live="off"><div class="empty">Laster tilbud …</div></div>
       <div data-ol="more" aria-hidden="true"></div>
       <div class="az-bar" data-ol="az" hidden></div>
@@ -128,6 +130,7 @@
         if (SORTS.some((sort) => sort.value === saved.sort)) state.sort = saved.sort;
         if (["grid", "list", "table"].includes(saved.view)) state.view = saved.view;
         if (saved.sortDir === -1) state.sortDir = -1;
+        if (typeof saved.category === "string") state.category = saved.category;
         if (saved.filters && typeof saved.filters === "object") {
           for (const key of Object.keys(FILTER_DEFAULTS)) {
             if (typeof saved.filters[key] === typeof FILTER_DEFAULTS[key]) state.filters[key] = saved.filters[key];
@@ -136,7 +139,7 @@
       } catch { /* Defaults: every group, most relevant, table on wide screens. */ }
     }
     function savePreferences() {
-      try { localStorage.setItem(config.storageKey, JSON.stringify({ off: [...state.off], sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
+      try { localStorage.setItem(config.storageKey, JSON.stringify({ off: [...state.off], category: state.category, sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
     }
 
     // The spreadsheet needs the width; phones get the list instead.
@@ -155,7 +158,8 @@
         const button = document.createElement("button");
         const on = !state.off.has(name);
         button.type = "button";
-        button.className = "cbn-button cbn-button--filter group-toggle";
+        const brand = config.groupClass?.(name);
+        button.className = `cbn-button ${brand && on ? `group-toggle--brand ${brand}` : "cbn-button--filter"} group-toggle`;
         button.dataset.group = name;
         button.setAttribute("aria-pressed", String(on));
         button.title = on ? `Skjul ${name}` : `Vis ${name}`;
@@ -171,6 +175,11 @@
       }
       el("all").disabled = ![...state.counts.keys()].some((name) => state.off.has(name));
       el("none").disabled = ![...state.counts.keys()].some((name) => !state.off.has(name));
+      if (features.category) {
+        const categories = [...new Set(state.items.filter((item) => !state.off.has(item.group)).map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "nb"));
+        if (!categories.includes(state.category)) state.category = "";
+        el("category").innerHTML = `<option value="">Alle underkategorier</option>${categories.map((name) => `<option value="${esc(name)}"${name === state.category ? " selected" : ""}>${esc(name)}</option>`).join("")}`;
+      }
     }
 
     // ---------- list ----------
@@ -183,6 +192,7 @@
       const words = fold(state.query).split(/\s+/).filter(Boolean);
       const { minSaving, maxPrice, maxUnit, onlyPrePrice, endingSoon } = state.filters;
       const visible = state.items.filter((item) => isRunning(item, now) && !state.off.has(item.group) &&
+        (!state.category || item.category === state.category) &&
         (!minSaving || saving(item) >= minSaving) &&
         (!maxPrice || item.amount <= maxPrice) &&
         (!features.unit || !maxUnit || (item.unit && item.unit.amount <= maxUnit)) &&
@@ -212,6 +222,10 @@
       list = [...list].sort(state.sortDir === -1 ? (a, b) => sorter(b, a) : sorter);
       el("count").textContent = words.length ? `${list.length} av ${visible.length} tilbud` : `${visible.length} tilbud`;
       state.list = list;
+      state.ranks = new Map((state.sort === "votes" ? list.filter((item) => { const tally = tallies.get(item.id.toUpperCase()); return tally && tally.upvotes + tally.downvotes > 0; }) : list).map((item, index) => [item.id, index + 1]));
+      if (features.category) el("category-clear").hidden = !state.category;
+      config.mount.querySelectorAll("[data-toplist]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.toplist === state.sort && state.sortDir === 1)));
+      if (config.toplists) el("toplist-note").textContent = state.sort === "votes" ? "Tommel opp minus tommel ned. Tilbud uten stemmer har ingen brukerrangering." : state.sort === "saving" ? "Prisfall mot normalpris hos Prisjakt, basert på de siste tre månedene." : state.sort === "relevance" ? "Prisjakts popularitetsrekkefølge innen valgte filtre." : "";
       state.shown = 0;
       hidePreview();
       const results = el("results");
@@ -257,7 +271,8 @@
       { label: "Pris", sort: "price", num: true },
       { label: "Førpris", sort: "", num: true },
       { label: config.savingLabel ?? "Rabatt", sort: "saving", num: true },
-      { label: "Spart", sort: "savingKr", num: true },
+      ...(!features.history ? [{ label: "Spart", sort: "savingKr", num: true }] : []),
+      ...(features.history ? [{ label: "Lavest 90 dager", sort: "", num: true }] : []),
       ...(features.unit ? [{ label: "Kilo-/literpris", sort: "unit", num: true }] : []),
       ...(features.validity ? [{ label: "Gyldig", sort: "ending" }] : []),
       ...(features.bonus ? [{ label: "Kortbonus", sort: "" }] : []),
@@ -274,11 +289,12 @@
     const thumbHtml = (item) => item.imageUrl
       ? `<button class="deal-thumb" type="button" data-preview="${esc(item.imageUrl)}" aria-label="Vis større bilde av ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></button>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
-    const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}" target="_blank" rel="noopener" title="${esc(item.link.label)}">${esc(item.title)}${EXTERNAL_SVG}</a></span>`;
+    const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}${EXTERNAL_SVG}</a></span>`;
     const storeHtml = (item) => {
-      const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${esc(item.store.label)}</span>`;
-      return item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener sponsored" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
+      const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(item.store.label)}</span>`;
+      return item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
     };
+    const historyHtml = (item) => Number.isFinite(item.lowestPrice90Days) ? `<span class="deal-history" title="${esc(`Laveste registrerte varepris siste 90 dager hos Prisjakt. ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`)}">${esc(kr(item.lowestPrice90Days))}${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>` : `<span class="deal-valid" title="Historikk for riktig produkt/variant og hele perioden er ikke tilgjengelig">—</span>`;
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<span class="cbn-chip cbn-chip--highlight card-chip" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</span>` : "";
     function daysLeftHtml(item) {
@@ -304,13 +320,14 @@
         <td>${thumbHtml(item)}</td>
         <td>${titleHtml(item)}${item.description ? `<br><span class="deal-desc">${esc(item.description)}</span>` : ""}</td>
         <td>${storeHtml(item)}</td>
-        ${features.category ? `<td><span class="deal-desc">${esc(item.category || item.group)}</span></td>` : ""}
+        ${features.category ? `<td><button class="cbn-button cbn-button--quiet category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button></td>` : ""}
         <td class="num"><strong class="deal-price">${esc(kr(item.amount))}</strong></td>
         <td class="num">${item.prePrice > item.amount ? `<s class="deal-before">${esc(kr(item.prePrice))}</s>` : ""}</td>
         <td class="num">${savingChipHtml(item)}</td>
-        <td class="num">${savingKr(item) > 0 ? esc(kr(savingKr(item))) : ""}</td>
+        ${!features.history ? `<td class="num">${savingKr(item) > 0 ? esc(kr(savingKr(item))) : ""}</td>` : ""}
+        ${features.history ? `<td class="num">${historyHtml(item)}</td>` : ""}
         ${features.unit ? `<td class="num">${item.unit ? `${esc(formatKr(item.unit.amount))} kr/${item.unit.unit}` : ""}</td>` : ""}
-        ${features.validity ? `<td>${daysLeftHtml(item)}</td>` : ""}
+        ${features.validity ? `<td>${validityHtml(item)}</td>` : ""}
         ${features.bonus ? `<td>${bonusHtml(item)}</td>` : ""}
         <td class="num deal-vote-cell">${voteButtons(item)}</td>
         <td class="deal-copy-cell">${copyButtonHtml()}</td>
@@ -329,16 +346,20 @@
         <div class="deal-side">
           <strong class="deal-price">${esc(kr(item.amount))}</strong>
           ${before}
+          ${features.history ? `<span class="deal-history-summary">Lavest 90 d: ${historyHtml(item)}</span>` : ""}
           ${actionsHtml(item)}
         </div>
         <div class="deal-details">
-          <div class="deal-meta">${storeHtml(item)}${bonusHtml(item)}${features.category ? `<span class="deal-valid">${esc(item.category || item.group)}</span>` : ""}</div>
-          ${item.validTo ? `<div class="deal-meta deal-meta--validity">${daysLeftHtml(item)}<span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span></div>` : ""}
+          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? `<span class="deal-valid deal-category">${esc(item.category || item.group)}</span>` : ""}</div>
+          ${features.validity ? `<div class="deal-meta deal-meta--validity">${validityHtml(item)}</div>` : ""}
         </div>
       </article>`;
     }
 
     // ---------- preview, copy, votes ----------
+    function validityHtml(item) {
+      return item.validTo ? `<span class="deal-validity"><span class="deal-valid">t.o.m. ${esc(formatDate(item.validTo))}</span>${daysLeftHtml(item)}</span>` : `<span class="deal-valid">Sluttdato ukjent</span>`;
+    }
     function showPreview(thumb) {
       const preview = el("preview");
       previewFor = thumb;
@@ -349,9 +370,12 @@
         const rect = thumb.getBoundingClientRect();
         const width = preview.offsetWidth || 320;
         const height = preview.offsetHeight || 320;
-        const right = rect.right + 12;
-        const left = right + width <= window.innerWidth - 12 ? right : Math.max(12, rect.left - width - 12);
-        const top = Math.min(Math.max(12, rect.top + rect.height / 2 - height / 2), window.innerHeight - height - 12);
+        // Prefer a side, then above/below. Never paint over the triggering link/chip.
+        let left, top;
+        if (rect.right + width + 12 <= window.innerWidth - 12) { left = rect.right + 12; top = rect.top; }
+        else if (rect.left - width - 12 >= 12) { left = rect.left - width - 12; top = rect.top; }
+        else { left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)); top = rect.top - height - 12 >= 12 ? rect.top - height - 12 : rect.bottom + 12; }
+        top = Math.max(12, Math.min(top, window.innerHeight - height - 12));
         preview.style.left = `${left}px`;
         preview.style.top = `${Math.max(12, top)}px`;
       };
@@ -495,6 +519,13 @@
       if (url.href !== location.href) history.replaceState(null, "", url);
     }
     function setupControls() {
+      if (features.category) {
+        el("category").addEventListener("change", () => { state.category = el("category").value; savePreferences(); render(); });
+        el("category-clear").addEventListener("click", () => { state.category = ""; el("category").value = ""; savePreferences(); render(); });
+      }
+      config.mount.querySelectorAll("[data-toplist]").forEach((button) => button.addEventListener("click", () => {
+        state.sort = button.dataset.toplist; state.sortDir = 1; savePreferences(); sortMenu.refresh(); render();
+      }));
       el("groups").addEventListener("click", (event) => {
         const button = event.target.closest(".group-toggle");
         if (!button) return;
@@ -547,15 +578,17 @@
       const results = el("results");
       const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)");
       results.addEventListener("pointerover", (event) => {
-        if (!hoverCapable.matches || effectiveView() === "grid") return;
-        const thumb = event.target.closest(".deal-thumb[data-preview]");
+        if (!hoverCapable.matches) return;
+        const thumb = event.target.closest("[data-preview]");
         if (thumb && thumb !== previewFor) showPreview(thumb);
       });
       results.addEventListener("pointerout", (event) => {
-        const thumb = event.target.closest(".deal-thumb[data-preview]");
+        const thumb = event.target.closest("[data-preview]");
         if (thumb && hoverCapable.matches && !thumb.contains(event.relatedTarget)) hidePreview();
       });
       results.addEventListener("click", (event) => {
+        const category = event.target.closest("[data-category]");
+        if (category) { state.category = category.dataset.category; el("category").value = state.category; savePreferences(); render(); return; }
         const vote = event.target.closest(".vote-btn");
         if (vote) return void castVote(vote);
         const copy = event.target.closest(".copy-btn");
@@ -572,7 +605,8 @@
           render();
         }
       });
-      document.addEventListener("pointerdown", (event) => { if (previewFor && !event.target.closest(".deal-thumb")) hidePreview(); });
+      document.addEventListener("pointerdown", (event) => { if (previewFor && !event.target.closest("[data-preview]")) hidePreview(); });
+      window.addEventListener("scroll", hidePreview, { passive: true });
       window.addEventListener("scroll", () => { if (previewFor && !hoverCapable.matches) hidePreview(); }, { passive: true });
       document.addEventListener("keydown", (event) => { if (event.key === "Escape") hidePreview(); });
     }

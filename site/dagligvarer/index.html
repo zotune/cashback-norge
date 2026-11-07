@@ -17,7 +17,7 @@
 </head>
 <body>
 <div class="container">
-  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/">Cashback</a><a href="/dagligvarer/" aria-current="page">Dagligvarer</a><a href="/dagens-tilbud/">Tilbud</a></nav>
+  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/">Cashback</a><a href="/dagens-tilbud/">Tilbud</a><a href="/dagligvarer/" aria-current="page">Dagligvarer</a></nav>
   <img class="intro-logo" src="/logo.png?v=quokka-1" alt="">
   <h1>Dagligvarer</h1>
   <p class="subtitle">Ukens tilbud fra kundeavisene – søk og sorter på tvers av butikkene.</p>
@@ -135,6 +135,7 @@ createOfferList({
   searchPlaceholder: "Søk etter vare, f.eks. kaffe...",
   features: { unit: true, validity: true, bonus: true },
   groupName: chainLabel,
+  groupClass: (name) => { const chain = getGroceryChain(name); return chain ? `badge-chain-${chain.slug}` : ""; },
   dropUrlParams: ["kjede"],
   // An old link to one chain (?kjede=KIWI) shows only that chain.
   onlyGroupsFromUrl: (params, groups) => groups.includes(params.get("kjede")) ? [params.get("kjede")] : undefined,
