@@ -453,3 +453,11 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .active-provider:hover { filter: brightness(1.12); }
 .active-provider.cbn-chip--highlight { background: var(--cbn-highlight); color: var(--cbn-accent); }
 .active-provider:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 3px; }
+/* Toggle chips with a check and count, and the list/grid/table switch (all list pages). */
+.group-toggle { align-items: center; display: inline-flex; flex-shrink: 0; font: inherit; font-size: 12px; font-weight: 600; gap: 6px; min-height: 34px; padding: 4px 7px 4px 10px; white-space: nowrap; }
+.group-check { font-size: 13px; text-align: center; width: 12px; }
+.group-toggle[aria-pressed="false"] .cbn-count { background: var(--cbn-plate-down); color: var(--cbn-muted); }
+.view-toggle { display: inline-flex; gap: 2px; }
+.view-toggle .cbn-button { align-items: center; display: inline-flex; justify-content: center; min-height: 32px; width: 32px; }
+.view-toggle .view-table { display: none; }
+@media (min-width: 1100px) { .view-toggle .view-table { display: inline-flex; } }

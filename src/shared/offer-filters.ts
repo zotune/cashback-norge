@@ -1,14 +1,20 @@
 import type { CashbackOffer } from "./cashback.js";
+import { PROVIDER_WELCOME_BONUSES } from "./provider-data.js";
 
 export const QUICK_FILTERS = [
   { id: "strom", label: "Strøm" },
   { id: "mobil", label: "Mobil" },
   { id: "bredband", label: "Bredbånd" },
   { id: "student", label: "Student" },
+  { id: "rabattkode", label: "Rabattkoder" },
+  { id: "velkomst", label: "Velkomstbonus" },
 ] as const;
 
+// Qualifiers narrow every selected topic instead of adding one (AND, not OR).
+const QUALIFIERS = new Set<QuickFilterId>(["student", "rabattkode", "velkomst"]);
+
 export type QuickFilterId = typeof QUICK_FILTERS[number]["id"];
-type Topic = Exclude<QuickFilterId, "student">;
+type Topic = Exclude<QuickFilterId, "student" | "rabattkode" | "velkomst">;
 
 const STUDENT_PROVIDERS = new Set(["studentkortet", "studenttorget", "unidays", "utdanningibergen"]);
 const DOMAIN_TOPICS: Record<string, readonly Topic[]> = {
@@ -62,6 +68,9 @@ function explicitTopics(text: string, isMerchantName = false): Topic[] {
 
 export function matchesOfferQuickFilter(offer: CashbackOffer, filter: QuickFilterId | ""): boolean {
   if (filter === "") return true;
+  if (filter === "rabattkode") return typeof offer.discountCode === "string" && offer.discountCode.trim() !== "";
+  // A bonus for new members through our invitation (see PROVIDER_WELCOME_BONUSES).
+  if (filter === "velkomst") return Object.hasOwn(PROVIDER_WELCOME_BONUSES, offer.provider);
   if (filter === "student") {
     return STUDENT_PROVIDERS.has(offer.provider) ||
       /\b(?:studentrabatt\w*|studentpris\w*|studentbevis)\b/.test(fold(offer.terms));
@@ -93,7 +102,7 @@ export function matchesOfferQuickFilter(offer: CashbackOffer, filter: QuickFilte
 
 export function matchesOfferQuickFilters(offer: CashbackOffer, filters: Iterable<QuickFilterId>): boolean {
   const selected = [...filters];
-  if (selected.includes("student") && !matchesOfferQuickFilter(offer, "student")) return false;
-  const topics = selected.filter(filter => filter !== "student");
+  if (selected.some(filter => QUALIFIERS.has(filter) && !matchesOfferQuickFilter(offer, filter))) return false;
+  const topics = selected.filter(filter => !QUALIFIERS.has(filter));
   return topics.length === 0 || topics.some(topic => matchesOfferQuickFilter(offer, topic));
 }

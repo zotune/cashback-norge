@@ -14,9 +14,6 @@
 .group-heading { align-items: center; color: var(--cbn-muted); display: flex; font-size: 12px; font-weight: 600; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .group-heading small { font-size: 11px; font-weight: 400; margin-left: 6px; }
 .group-actions { display: inline-flex; flex-shrink: 0; }
-.group-toggle { align-items: center; display: inline-flex; flex-shrink: 0; font: inherit; font-size: 12px; font-weight: 600; gap: 6px; min-height: 34px; padding: 4px 7px 4px 10px; white-space: nowrap; }
-.group-check { font-size: 13px; text-align: center; width: 12px; }
-.group-toggle[aria-pressed="false"] .cbn-count { background: var(--cbn-plate-down); color: var(--cbn-muted); }
 .group-toggle--brand[aria-pressed="true"] { background: var(--group-brand-bg); color: var(--group-brand-fg); }
 .category-picker { align-items: center; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; font-size: 12px; color: var(--cbn-muted); }
 .category-picker select { font: inherit; min-height: 34px; min-width: 180px; max-width: 100%; padding: 0 10px; }
@@ -35,8 +32,6 @@
 .sort-button { align-items: center; display: inline-flex; font: inherit; font-size: 12px; font-weight: 600; gap: 4px; min-height: 32px; padding: 0 8px 0 10px; }
 .sort-button svg { flex-shrink: 0; }
 .sort-button.is-open { background: var(--cbn-hover); }
-.view-toggle { display: inline-flex; gap: 2px; }
-.view-toggle .cbn-button { align-items: center; display: inline-flex; justify-content: center; min-height: 32px; width: 32px; }
 .results { display: grid; gap: 6px; padding: 10px 0 60px; }
 .deal-row {
   align-items: center;
@@ -136,7 +131,6 @@ a.card-chip { text-decoration: none; }
 .deal-table .deal-vote-cell .deal-votes { justify-content: flex-end; }
 .deal-table .deal-copy-cell { text-align: right; width: 32px; }
 .deal-table .rate-limit-msg { text-align: left; }
-.view-toggle .view-table { display: none; }
 .list-bar > * { white-space: nowrap; }
 /* Keep the introduction ad as compact as the home page; the bottom strip follows the list. */
 .invite-card { margin-left: auto; margin-right: auto; max-width: 422px; }
@@ -156,7 +150,6 @@ a.card-chip { text-decoration: none; }
   .results--table { display: block; }
   .extra-cashback-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (min-width: 1100px) { .view-toggle .view-table { display: inline-flex; } }
 @media (max-width: 520px) {
   .container { padding: 20px 12px 16px; }
   .sticky-header { margin: 0 -12px; padding: 8px 12px 4px; }

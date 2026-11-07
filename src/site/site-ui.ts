@@ -143,6 +143,44 @@ export function createChoiceMenu(button: HTMLButtonElement, options: ChoiceOptio
   return createSelectionMenu(button, { className: "choice-menu", getOptions: () => options, isSelected: (value) => value === getValue(), onSelect, updateLabel: true });
 }
 
+export const VIEW_ICONS: Record<"table" | "list" | "grid", string> = {
+  table: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>`,
+  list: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><rect x="3" y="4.5" width="3" height="3" rx=".5"/><rect x="3" y="10.5" width="3" height="3" rx=".5"/><rect x="3" y="16.5" width="3" height="3" rx=".5"/></svg>`,
+  grid: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg>`,
+};
+export type ListView = keyof typeof VIEW_ICONS;
+export const WIDE_TABLE_QUERY = "(min-width: 1100px)";
+
+/**
+ * The table/list/grid switch shared by the list pages. The table needs a wide screen;
+ * on narrower ones it falls back to the list. The choice is remembered per page.
+ */
+export function createViewToggle(container: HTMLElement, options: { storageKey: string; defaultView: (wide: boolean) => ListView; onChange: (view: ListView) => void }): { effective: () => ListView } {
+  const wide = window.matchMedia(WIDE_TABLE_QUERY);
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(options.storageKey); } catch { /* Browser storage is optional. */ }
+  let view: ListView = saved === "table" || saved === "list" || saved === "grid" ? saved : options.defaultView(wide.matches);
+  const effective = (): ListView => view === "table" && !wide.matches ? "list" : view;
+  container.classList.add("view-toggle");
+  container.setAttribute("role", "group");
+  container.setAttribute("aria-label", "Visning");
+  const labels: Record<ListView, string> = { table: "Tabell", list: "Liste", grid: "Rutenett" };
+  container.innerHTML = (Object.keys(VIEW_ICONS) as ListView[]).map((name) =>
+    `<button class="cbn-button cbn-button--quiet${name === "table" ? " view-table" : ""}" type="button" data-view="${name}" aria-label="${labels[name]}" title="${labels[name]}">${VIEW_ICONS[name]}</button>`).join("");
+  const sync = () => container.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === effective())));
+  container.addEventListener("click", (event) => {
+    const next = (event.target as Element).closest<HTMLButtonElement>("[data-view]")?.dataset.view as ListView | undefined;
+    if (!next || next === view) return;
+    view = next;
+    try { localStorage.setItem(options.storageKey, view); } catch { /* Optional. */ }
+    sync();
+    options.onChange(effective());
+  });
+  wide.addEventListener("change", () => { sync(); options.onChange(effective()); });
+  sync();
+  return { effective };
+}
+
 /** Chip colours for the grocery chains, light and dark, as one style element. */
 export function installGroceryChainStyles(): void {
   const style = document.createElement("style");

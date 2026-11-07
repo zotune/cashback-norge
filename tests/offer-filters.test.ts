@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CashbackOffer } from "../src/shared/cashback.js";
 import { matchesOfferQuickFilter, matchesOfferQuickFilters } from "../src/shared/offer-filters.js";
+import { PROVIDER_WELCOME_BONUSES } from "../src/shared/provider-data.js";
 
 function offer(overrides: Partial<CashbackOffer>): CashbackOffer {
   return {
@@ -77,4 +78,16 @@ test("topic toggles combine with OR while student eligibility applies to each se
   assert.equal(matchesOfferQuickFilters(unrelatedStudentOffer, ["student"]), true);
   assert.equal(matchesOfferQuickFilters(mobile, []), true);
   assert.equal(matchesOfferQuickFilters(unrelatedStudentOffer, []), true);
+});
+
+test("discount-code and welcome-bonus filters narrow the selected topics", () => {
+  const code = offer({ provider: "rabattkode", merchantName: "Talkmore", discountCode: "SPAR10" });
+  const plain = offer({ provider: "trumf", merchantName: "Talkmore" });
+  assert.equal(matchesOfferQuickFilter(code, "rabattkode"), true);
+  assert.equal(matchesOfferQuickFilter(plain, "rabattkode"), false);
+  assert.equal(matchesOfferQuickFilters(code, ["mobil", "rabattkode"]), true);
+  assert.equal(matchesOfferQuickFilters(plain, ["mobil", "rabattkode"]), false);
+  const welcome = Object.keys((PROVIDER_WELCOME_BONUSES as Record<string, unknown>))[0]!;
+  assert.equal(matchesOfferQuickFilter(offer({ provider: welcome }), "velkomst"), true);
+  assert.equal(matchesOfferQuickFilter(plain, "velkomst"), Object.hasOwn(PROVIDER_WELCOME_BONUSES, "trumf"));
 });
