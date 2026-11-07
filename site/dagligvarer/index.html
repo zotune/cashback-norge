@@ -19,7 +19,7 @@
 <div class="container">
   <nav class="site-tabs" aria-label="Velg seksjon"><a href="/">Cashback</a><a href="/dagens-tilbud/">Tilbud</a><a href="/dagligvarer/" aria-current="page">Dagligvarer</a></nav>
   <img class="intro-logo" src="/quokka-dagligvarer-v1.webp" alt="">
-  <h1>Dagligvarer</h1>
+  <h1 class="visually-hidden">Dagligvarer</h1>
   <p class="subtitle">Ukens tilbud fra kundeavisene – søk og sorter på tvers av butikkene.</p>
   <div class="update-row"><span id="updated">Oppdatert daglig</span><span data-theme-control></span></div>
   <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
@@ -62,6 +62,15 @@ function formatDescription(description) {
   return description.split(/\n+/).map((line) => line.trim()).filter(Boolean).join(" · ").replace(/\/(KG|L|STK)\b/g, (m, unit) => `/${unit.toLowerCase()}`);
 }
 const chainLabel = (name) => getGroceryChain(name)?.label ?? name;
+// Flyer text as short facts: split at lines, "·", commas and where a new capitalised phrase
+// starts ("… tapede sømmer Avtakbar hette …"); shouted capitals become sentence case.
+function formatDetails(description) {
+  return description.split(/\n+|\s*·\s*|,\s+|\.\s+(?=[A-ZÆØÅ0-9])|\s+(?=[A-ZÆØÅ][a-zæøå])|(?<=[a-zæøå0-9,)\-])\s+(?=[A-ZÆØÅ]{2,}\b)/)
+    .map((part) => part.trim().replace(/\.$/, ""))
+    .filter((part) => part.length > 0)
+    .map((part) => /[A-ZÆØÅ]{2}/.test(part) && part === part.toUpperCase() ? part.charAt(0) + part.slice(1).toLowerCase() : part)
+    .map((part) => part.replace(/\/(kg|l|stk)\b/gi, (m, unit) => `/${unit.toLowerCase()}`));
+}
 
 function toItem(offer) {
   const title = formatHeading(offer.heading);
@@ -71,6 +80,7 @@ function toItem(offer) {
   return {
     id: offer.id, title,
     description: offer.description ? formatDescription(offer.description) : "",
+    ...(offer.description ? { details: formatDetails(offer.description) } : {}),
     group: offer.chain,
     store: { label: chainLabel(offer.chain), className: chain ? `badge-chain-${chain.slug}` : "cbn-chip--muted" },
     amount: offer.amount,

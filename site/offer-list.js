@@ -411,9 +411,10 @@
     };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
-    // Brand, shop count, shipping and pack size as one short muted line.
+    // Brand, shop count, shipping, pack size and flyer details as one short muted line with
+    // separators; the cards already carry enough chips.
     const factsHtml = (item) => {
-      const parts = item.details ?? (item.description ? item.description.split(/\s*·\s*|,\s+/) : []);
+      const parts = (item.details ?? (item.description ? item.description.split(/\s*·\s*|,\s+/) : [])).filter(Boolean);
       return parts.length ? `<span class="deal-facts">${parts.map((part) => `<span class="deal-fact">${esc(part)}</span>`).join('<span class="deal-fact-sep" aria-hidden="true">·</span>')}</span>` : "";
     };
     function daysLeftHtml(item) {

@@ -565,7 +565,8 @@ a.code-reward { color: inherit; text-decoration: none; }
   <img src="logo.png?v=quokka-1" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <!-- The tabs and logo name the page; the heading stays for screen readers and search. -->
   <h1 class="visually-hidden">Cashback Norge – cashback-tilbud for norske nettbutikker</h1>
-  <div class="update-row"><span>Oppdatert daglig</span>
+  <p class="subtitle">Cashback og rabattkoder for norske nettbutikker.</p>
+  <div class="update-row"><span id="updated">Oppdatert daglig</span>
     <a class="cbn-button cbn-button--quiet social-link" href="https://instagram.com/cashbacknorge" target="_blank" rel="noopener noreferrer" aria-label="Cashback Norge på Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
     <a class="cbn-button cbn-button--quiet social-link" href="https://www.tiktok.com/@cashbacknorge" target="_blank" rel="noopener noreferrer" aria-label="Cashback Norge på TikTok" title="TikTok"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 3c.3 2.6 1.8 4 4 4.2v3.1a8.6 8.6 0 0 1-4-1.2v6.8a5.8 5.8 0 1 1-5-5.7v3.2a2.6 2.6 0 1 0 1.8 2.5V3z"/></svg></a>
     <a class="cbn-button cbn-button--quiet social-link" href="https://www.facebook.com/cashbacknorge.no" target="_blank" rel="noopener noreferrer" aria-label="Cashback Norge på Facebook" title="Facebook"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 21v-8h2.7l.4-3H14V8.1c0-.9.3-1.5 1.6-1.5h1.7V3.9c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3V10H8v3h2.6v8z"/></svg></a>
@@ -944,6 +945,9 @@ async function init() {
   setupBonusToggle();
   const res = await fetch("cashback-index.json", { cache: "no-cache" });
   const data = await res.json();
+  // The date of the index actually shown, as on the offer pages.
+  const updated = Date.parse(data.generatedAt);
+  if (Number.isFinite(updated)) document.getElementById("updated").textContent = `Oppdatert ${new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", timeZone: "Europe/Oslo" }).format(updated).replace(/\.$/, "")}`;
   // One draw per page, so the top card and the bottom line agree.
   const adDraw = Math.random();
   setupSupportInvite(data.offers, adDraw);

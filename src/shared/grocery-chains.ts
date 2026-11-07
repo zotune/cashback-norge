@@ -86,12 +86,12 @@ const COOP = ["Extra", "Coop Mega", "Coop Prix", "Obs", "Coop Marked", "Matkroke
 
 export const GROCERY_CARD_BONUSES: GroceryCardBonus[] = [
   {
-    id: "trumf", label: "Trumf Kredittkort", rate: "2–5 %", chains: NORGESGRUPPEN,
+    id: "trumf", label: "Trumf Kredittkort", rate: "3–5 %", chains: NORGESGRUPPEN,
     url: "https://www.trumf.no/trumf-kredittkort",
-    tip: "# Trumf Kredittkort\n2 % Trumf-bonus hos MENY, SPAR, KIWI, Joker og Nærbutikken.\n3 % når du betaler med kortet i Trumf Pay.\nTrippel-Trumf-torsdag: 4 %, eller 5 % i Trumf Pay.\nI nettbutikkene må du være innlogget Trumf-medlem.\nIngen årsavgift. Gjelder ikke andre dagligvarekjeder.",
+    tip: "# Trumf Kredittkort\n3 % Trumf-bonus når du betaler med kortet i Trumf Pay hos MENY, SPAR, KIWI, Joker og Nærbutikken (2 % med det fysiske kortet).\nTrippel-Trumf-torsdag: 4 %, eller 5 % i Trumf Pay.\nI nettbutikkene må du være innlogget Trumf-medlem.\nIngen årsavgift. Gjelder ikke andre dagligvarekjeder.",
   },
   {
-    id: "coop", label: "Coop Mastercard", rate: "minst 2 %", chains: COOP,
+    id: "coop", label: "Coop Mastercard", rate: "2 %", chains: COOP,
     url: "https://www.coop.no/medlem/fordeler/coop-mastercard",
     tip: "# Coop Mastercard\nMinst 2 % samlet: minst 1 % kjøpeutbytte som Coop-medlem og 1 % ekstra bonus med kortet.\nKjøpeutbyttet varierer mellom samvirkelag.\nKortbonusen er begrenset til 2 500 kr per år.\nIngen årsavgift. Gjelder ikke andre dagligvarekjeder.",
   },
