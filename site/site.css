@@ -311,3 +311,40 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .chip-toggle[aria-pressed="false"] { background: var(--cbn-plate); color: var(--cbn-muted); font-weight: 600; }
 .chip-toggle[aria-pressed="false"] .cbn-count { background: var(--cbn-plate-down); color: var(--cbn-muted); }
 .chip-toggle:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
+/* Alphabet scroll on the right edge. */
+.az-bar {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  z-index: 200;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 4px 2px;
+}
+.az-bar span {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--cbn-subtle, #8a9a92);
+  line-height: 1;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  min-width: 24px;
+  text-align: center;
+}
+.az-bar span:hover { color: var(--cbn-accent, #3a7d55); }
+.az-bar span.active {
+  background: #3a7d55;
+  color: #fff;
+}
+/* Card brands shown on both pages. */
+.badge-trumf { background: #07006b; color: #fff; }
+.badge-coop { background: #003366; color: #ffffff; }
+.badge-sas-amex { background: #00005c; color: #fff; }
+.badge-norwegian { background: #d81939; color: #fff; }

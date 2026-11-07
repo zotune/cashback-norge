@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GROCERY_CHAIN_LIST, GROCERY_CHAINS, getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery } from "../src/shared/grocery-chains.js";
+import { GROCERY_CHAIN_LIST, GROCERY_CHAINS, getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery, getGroceryUnitPrice, getGroceryCardBonus } from "../src/shared/grocery-chains.js";
 import { getBrandChipCss, getDarkChipDeclarations } from "../src/shared/theme.js";
 
 test("grocery chains have a unique slug, a label and hex colours for their chip", () => {
@@ -34,4 +34,19 @@ test("grocery offers link to the chain's product search, or to the flyer offer o
   assert.equal(getGroceryOfferLink("oda", "Kaviar").url, "https://oda.com/no/search/products/?q=Kaviar");
   assert.equal(getGroceryOfferLink("KIWI", "Kålrot").url, "https://etilbudsavis.no/soek/K%C3%A5lrot");
   assert.match(getGroceryOfferLink("REMA 1000", "Pizza").label, /eTilbudsavis/);
+});
+
+test("grocery unit prices are read from the flyer text, and chain cards are found per chain", () => {
+  assert.deepEqual(getGroceryUnitPrice("185 g. Pr stk. Pr kg 162,16\nFørpris 37,90"), { amount: 162.16, unit: "kg" });
+  assert.deepEqual(getGroceryUnitPrice("150 g pr. pk\n193,33/KG"), { amount: 193.33, unit: "kg" });
+  assert.deepEqual(getGroceryUnitPrice("Zero, 250 ml\nEnh.pris 27,60 pr. l\nFørpris 13,90"), { amount: 27.6, unit: "l" });
+  assert.deepEqual(getGroceryUnitPrice("300/350 g. Pr pose Pr kg 78,86/89,67"), { amount: 78.86, unit: "kg" });
+  assert.deepEqual(getGroceryUnitPrice("0,5l, stort utvalg (35,80/l)"), { amount: 35.8, unit: "l" });
+  assert.deepEqual(getGroceryUnitPrice("REMA 1000, 500 g, 39,80 pr. kg"), { amount: 39.8, unit: "kg" });
+  assert.deepEqual(getGroceryUnitPrice("et utvalg, 0,33 l + pant 26,97/liter"), { amount: 26.97, unit: "l" });
+  assert.equal(getGroceryUnitPrice("Pr stk"), undefined);
+  assert.equal(getGroceryUnitPrice("Hvite, Unik, 6 stk. Enh.pris 2,48 pr. stk."), undefined);
+  assert.equal(getGroceryCardBonus("KIWI")?.id, "trumf");
+  assert.equal(getGroceryCardBonus("Obs")?.id, "coop");
+  assert.equal(getGroceryCardBonus("REMA 1000"), undefined);
 });

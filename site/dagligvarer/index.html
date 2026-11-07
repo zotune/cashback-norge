@@ -68,12 +68,68 @@
 .rate-limit-msg { color: #e05555; font-size: 11px; grid-column: 1 / -1; text-align: right; }
 .note { color: var(--cbn-subtle); font-size: 11px; line-height: 1.5; margin-top: 8px; text-align: center; }
 .note a { color: var(--cbn-muted); }
+/* Extra cashback with grocery cards. */
+.card-bonus { margin: 0 0 14px; padding: 12px 14px; }
+.card-bonus h2 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.card-bonus-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-bonus-item { align-items: center; color: inherit; display: inline-flex; font-size: 12px; gap: 6px; min-height: 30px; padding: 3px 8px 3px 3px; text-decoration: none; }
+.card-bonus-item .badge { font-size: 11px; min-height: 22px; }
+.card-bonus-item strong { color: var(--cbn-accent); }
+.card-bonus-item small { color: var(--cbn-muted); font-size: 11px; }
+.card-bonus .offer-wrap { display: inline-block; }
+.card-chip { font-size: 10px; font-weight: 700; line-height: 16px; padding: 0 5px; }
+/* Advanced filters. */
+.filter-button { align-items: center; display: inline-flex; justify-content: center; min-height: 32px; width: 32px; }
+.filter-button.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.filters { align-items: center; display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 8px; }
+.filters[hidden] { display: none; }
+.filters label { align-items: center; color: var(--cbn-muted); display: inline-flex; font-size: 12px; gap: 6px; }
+.filters input[type="number"] { font: inherit; font-size: 13px; height: 32px; padding: 0 8px; width: 74px; }
+.filters input[type="checkbox"] { accent-color: var(--cbn-accent); height: 16px; width: 16px; }
+.filters .cbn-button { font: inherit; font-size: 12px; min-height: 30px; padding: 0 8px; }
+/* Spreadsheet view (wide screens). */
+.grocery-table { border-collapse: separate; border-spacing: 0; font-size: 13px; width: 100%; }
+.grocery-table th { background: var(--cbn-bg); color: var(--cbn-muted); font-size: 11px; font-weight: 700; padding: 8px 8px; position: sticky; text-align: left; top: var(--sticky-height, 0px); white-space: nowrap; z-index: 2; }
+.grocery-table th[data-sort] { cursor: pointer; user-select: none; }
+.grocery-table th[data-sort]:hover { color: var(--cbn-text); }
+.grocery-table th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
+.grocery-table th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
+.grocery-table th.num, .grocery-table td.num { text-align: right; }
+.grocery-table tr.grocery-row { display: table-row; padding: 0; }
+.grocery-table td { background: var(--cbn-surface); border-top: 1px solid var(--cbn-bg); padding: 6px 8px; vertical-align: middle; }
+.grocery-table tr:hover td { background: var(--cbn-hover); }
+.grocery-table td:first-child { border-radius: 8px 0 0 8px; width: 52px; }
+.grocery-table td:last-child { border-radius: 0 8px 8px 0; }
+.grocery-table .grocery-thumb { height: 40px; width: 40px; }
+.grocery-table .grocery-title { font-size: 13px; }
+.grocery-table .grocery-desc { font-size: 11px; }
+.grocery-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.grocery-table .grocery-price { font-size: 14px; }
+.grocery-table .badge { font-size: 10px; min-height: 18px; }
+.grocery-table .grocery-actions { margin: 0; }
+.grocery-table .rate-limit-msg { text-align: left; }
+.view-toggle .view-table { display: none; }
+.list-bar > * { white-space: nowrap; }
+.card-bonus-item strong { white-space: nowrap; }
+.card-bonus .offer-wrap { align-items: center; display: inline-flex; gap: 2px; }
+@media (min-width: 900px) {
+  .container { max-width: 1240px; }
+  .view-toggle .view-table { display: inline-flex; }
+  .results:not(.results--grid):not(.results--table) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .results--grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .results--table { display: block; }
+}
 @media (max-width: 520px) {
   .container { padding: 20px 12px 16px; }
   .sticky-header { margin: 0 -12px; padding: 8px 12px 4px; }
   /* One scrollable line keeps the sticky header short on phones. */
   .chain-toggles { flex-wrap: nowrap; margin: 0 -12px 8px; overflow-x: auto; overscroll-behavior-x: contain; padding: 2px 12px; scrollbar-width: none; }
   .chain-toggles::-webkit-scrollbar { display: none; }
+  .list-bar { gap: 0; }
+  .sort-button [data-choice-label] { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+  .card-bonus .offer-wrap { display: flex; }
+  .card-bonus-item { flex: 1; min-width: 0; }
+  .card-bonus-item small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 @media (max-width: 380px) {
   .grocery-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; }
@@ -101,19 +157,34 @@
     <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
     <p class="invite-card-fine-print" data-invite-fine-print hidden></p>
   </aside>
-  <div class="sticky-header">
+  <section class="cbn-card card-bonus" id="card-bonus" aria-labelledby="card-bonus-title" hidden>
+    <h2 id="card-bonus-title">Ekstra cashback når du betaler</h2>
+    <div class="card-bonus-items" id="card-bonus-items"></div>
+  </section>
+  <div class="sticky-header" id="sticky">
     <div class="chip-toggles chain-toggles" id="chains" role="group" aria-label="Butikker"></div>
     <div class="list-bar">
       <div class="count" id="count" aria-live="polite"></div>
       <button class="cbn-button cbn-button--quiet list-reset" id="reset" type="button" hidden>Velg alle</button>
+      <button class="cbn-button cbn-button--quiet list-reset" id="none" type="button" hidden>Velg ingen</button>
+      <button class="cbn-button cbn-button--quiet filter-button" id="filter-toggle" type="button" aria-expanded="false" aria-controls="filters" aria-label="Flere filtre" title="Flere filtre"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg></button>
       <button class="cbn-button cbn-button--quiet sort-button" id="sort" type="button" aria-label="Sorter tilbud">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>
         <span data-choice-label></span>
       </button>
       <div class="view-toggle" role="group" aria-label="Visning">
+        <button class="cbn-button cbn-button--quiet view-table" type="button" data-view="table" aria-label="Tabell" title="Tabell"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg></button>
         <button class="cbn-button cbn-button--quiet" type="button" data-view="list" aria-label="Liste" title="Liste"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><rect x="3" y="4.5" width="3" height="3" rx=".5"/><rect x="3" y="10.5" width="3" height="3" rx=".5"/><rect x="3" y="16.5" width="3" height="3" rx=".5"/></svg></button>
         <button class="cbn-button cbn-button--quiet" type="button" data-view="grid" aria-label="Rutenett" title="Rutenett"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></button>
       </div>
+    </div>
+    <div class="filters" id="filters" hidden>
+      <label>Min. rabatt <input class="cbn-field" type="number" min="0" max="99" step="5" inputmode="numeric" data-filter="minSaving" placeholder="%"></label>
+      <label>Maks pris <input class="cbn-field" type="number" min="0" step="10" inputmode="decimal" data-filter="maxPrice" placeholder="kr"></label>
+      <label>Maks kilo-/literpris <input class="cbn-field" type="number" min="0" step="10" inputmode="decimal" data-filter="maxUnit" placeholder="kr"></label>
+      <label><input type="checkbox" data-filter="onlyPrePrice"> Bare med førpris</label>
+      <label><input type="checkbox" data-filter="endingSoon"> Utløper innen 2 dager</label>
+      <button class="cbn-button cbn-button--quiet" id="filters-clear" type="button">Nullstill</button>
     </div>
     <div class="search-wrap">
       <div class="input-wrap flex1">
@@ -124,6 +195,7 @@
   </div>
   <div class="results" id="results" aria-live="off"><div class="empty">Laster tilbud …</div></div>
   <div id="results-more" aria-hidden="true"></div>
+  <div class="az-bar" id="az-bar" hidden></div>
   <p class="note" id="note"></p>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
@@ -145,6 +217,7 @@ const {
   GROCERY_CHAIN_LIST, getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery, installGroceryChainStyles, createCountBadge, fitCountToChip, createChoiceMenu, createLazyBatches,
   renderSupportFooter, getInstabankInvite, renderSupportInvite, selectSupportAdvertisement,
   fetchVoteTallies, fetchMyVotes, apiVote, formatKr,
+  getGroceryUnitPrice, getGroceryCardBonus, GROCERY_CARD_BONUSES, FREE_CARDS, formatTooltipHtml,
 } = window.SHARED;
 const VOTE_KEY = "dagligvarer";
 const STORAGE_KEY = "cbn-dagligvarer-v1";
@@ -156,12 +229,18 @@ const SORTS = [
   { value: "price", label: "Lavest pris" },
   { value: "votes", label: "Best vurdert" },
   { value: "ending", label: "Utløper først" },
+  { value: "unit", label: "Lavest kilo-/literpris" },
+  { value: "name", label: "Navn A–Å" },
 ];
+const FILTER_DEFAULTS = { minSaving: 0, maxPrice: 0, maxUnit: 0, onlyPrePrice: false, endingSoon: false };
+const wideScreen = window.matchMedia("(min-width: 900px)");
 const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
 const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
 
 const $ = (id) => document.getElementById(id);
-const state = { offers: [], counts: new Map(), off: new Set(), query: "", sort: "relevance", view: "list", list: [], shown: 0 };
+const state = { offers: [], counts: new Map(), off: new Set(), query: "", sort: "relevance", sortDir: 1, view: wideScreen.matches ? "table" : "list", filters: { ...FILTER_DEFAULTS }, list: [], shown: 0 };
+// The spreadsheet needs the width; phones get the list instead.
+const effectiveView = () => state.view === "table" && !wideScreen.matches ? "list" : state.view;
 // Votes per offer id (upper case, as the vote function stores it).
 const tallies = new Map();
 let myVotes = {};
@@ -171,11 +250,17 @@ function loadPreferences() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     if (Array.isArray(saved.off)) state.off = new Set(saved.off.filter((name) => typeof name === "string"));
     if (SORTS.some((sort) => sort.value === saved.sort)) state.sort = saved.sort;
-    if (saved.view === "grid" || saved.view === "list") state.view = saved.view;
+    if (["grid", "list", "table"].includes(saved.view)) state.view = saved.view;
+    if (saved.sortDir === -1) state.sortDir = -1;
+    if (saved.filters && typeof saved.filters === "object") {
+      for (const key of Object.keys(FILTER_DEFAULTS)) {
+        if (typeof saved.filters[key] === typeof FILTER_DEFAULTS[key]) state.filters[key] = saved.filters[key];
+      }
+    }
   } catch { /* Defaults: every chain, most relevant, list. */ }
 }
 function savePreferences() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ off: [...state.off], sort: state.sort, view: state.view })); } catch { /* Optional. */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ off: [...state.off], sort: state.sort, sortDir: state.sortDir, view: state.view, filters: state.filters })); } catch { /* Optional. */ }
 }
 
 const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -218,6 +303,7 @@ function chainClass(name) {
   const chain = getGroceryChain(name);
   return chain ? `badge-chain-${chain.slug}` : "cbn-chip--muted";
 }
+const unitPrice = (offer) => offer.unitPrice === undefined ? (offer.unitPrice = getGroceryUnitPrice(offer.description || "") ?? null) : offer.unitPrice;
 const savingPercent = (offer) => offer.prePrice > offer.amount ? Math.round((1 - offer.amount / offer.prePrice) * 100) : 0;
 const savingKr = (offer) => offer.prePrice > offer.amount ? offer.prePrice - offer.amount : 0;
 const netVotes = (offer) => { const t = tallies.get(offer.id.toUpperCase()); return t ? t.upvotes - t.downvotes : 0; };
@@ -245,6 +331,7 @@ function renderChains() {
     if (on) fitCountToChip(button);
   }
   $("reset").hidden = ![...state.counts.keys()].some((name) => state.off.has(name));
+  $("none").hidden = ![...state.counts.keys()].some((name) => !state.off.has(name));
 }
 
 function relevance(offer, words) {
@@ -255,7 +342,13 @@ function relevance(offer, words) {
 function render() {
   const now = Date.now();
   const words = fold(state.query).split(/\s+/).filter(Boolean);
-  const inChains = state.offers.filter((offer) => isRunning(offer, now) && !state.off.has(offer.chain));
+  const { minSaving, maxPrice, maxUnit, onlyPrePrice, endingSoon } = state.filters;
+  const inChains = state.offers.filter((offer) => isRunning(offer, now) && !state.off.has(offer.chain) &&
+    (!minSaving || savingPercent(offer) >= minSaving) &&
+    (!maxPrice || offer.amount <= maxPrice) &&
+    (!maxUnit || (unitPrice(offer) !== null && unitPrice(offer).amount <= maxUnit)) &&
+    (!onlyPrePrice || offer.prePrice > offer.amount) &&
+    (!endingSoon || daysLeft(offer, now) <= 2));
   let list = words.length === 0 ? inChains : inChains.filter((offer) => {
     const text = offer.searchText ??= fold(`${offer.heading} ${offer.description} ${chainLabel(offer.chain)}`);
     return words.every((word) => text.includes(word));
@@ -268,15 +361,24 @@ function render() {
     price: (a, b) => a.amount - b.amount,
     votes: (a, b) => netVotes(b) - netVotes(a) || byDiscount(a, b),
     ending: (a, b) => Date.parse(a.validTo) - Date.parse(b.validTo) || byDiscount(a, b),
+    // Offers without a printed unit price go last either way.
+    unit: (a, b) => (unitPrice(a)?.amount ?? Infinity) - (unitPrice(b)?.amount ?? Infinity) || a.amount - b.amount,
+    name: (a, b) => formatHeading(a.heading).localeCompare(formatHeading(b.heading), "nb"),
+    chain: (a, b) => chainLabel(a.chain).localeCompare(chainLabel(b.chain), "nb") || byDiscount(a, b),
   };
-  list = [...list].sort(sorters[state.sort] || sorters.relevance);
+  const sorter = sorters[state.sort] || sorters.relevance;
+  list = [...list].sort(state.sortDir === -1 ? (a, b) => sorter(b, a) : sorter);
   const total = inChains.length;
   $("count").textContent = words.length ? `${list.length} av ${total} tilbud` : `${total} tilbud`;
   state.list = list;
   state.shown = 0;
   hidePreview();
   const results = $("results");
-  results.classList.toggle("results--grid", state.view === "grid");
+  const view = effectiveView();
+  results.classList.toggle("results--grid", view === "grid");
+  results.classList.toggle("results--table", view === "table");
+  updateFilterButton();
+  renderAzBar();
   if (list.length === 0) {
     const message = state.counts.size > 0 && [...state.counts.keys()].every((name) => state.off.has(name))
       ? "Velg minst én butikk."
@@ -285,16 +387,46 @@ function render() {
     return;
   }
   results.replaceChildren();
+  if (view === "table") results.innerHTML = tableHeadHtml();
   renderMore();
   rearmBatches();
+}
+
+const TABLE_COLUMNS = [
+  { label: "", sort: "" },
+  { label: "Vare", sort: "name" },
+  { label: "Butikk", sort: "chain" },
+  { label: "Pris", sort: "price", num: true },
+  { label: "Førpris", sort: "", num: true },
+  { label: "Rabatt", sort: "saving", num: true },
+  { label: "Spart", sort: "savingKr", num: true },
+  { label: "Kilo-/literpris", sort: "unit", num: true },
+  { label: "Gyldig", sort: "ending" },
+  { label: "Kortbonus", sort: "" },
+  { label: "Stemmer", sort: "votes", num: true },
+  { label: "", sort: "" },
+];
+function tableHeadHtml() {
+  return `<table class="grocery-table"><thead><tr>${TABLE_COLUMNS.map((column) => {
+    const sorted = column.sort && column.sort === state.sort ? ` aria-sort="${state.sortDir === -1 ? "descending" : "ascending"}"` : "";
+    return `<th${column.num ? ' class="num"' : ""}${column.sort ? ` data-sort="${column.sort}" title="Sorter etter ${column.label.toLowerCase()}"` : ""}${sorted}>${esc(column.label)}</th>`;
+  }).join("")}</tr></thead><tbody></tbody></table>`;
 }
 
 function renderMore() {
   const end = Math.min(state.list.length, state.shown + BATCH);
   const template = document.createElement("template");
-  template.innerHTML = state.list.slice(state.shown, end).map(offerHtml).join("");
+  const table = effectiveView() === "table";
+  const rows = state.list.slice(state.shown, end).map(table ? tableRowHtml : offerHtml).join("");
   state.shown = end;
-  $("results").append(template.content);
+  if (table) {
+    // Table rows only parse inside a table.
+    template.innerHTML = `<table><tbody>${rows}</tbody></table>`;
+    $("results").querySelector("tbody").append(...template.content.querySelector("tbody").children);
+  } else {
+    template.innerHTML = rows;
+    $("results").append(template.content);
+  }
 }
 
 function voteButtons(offer) {
@@ -307,13 +439,42 @@ function voteButtons(offer) {
   </span>`;
 }
 
+function thumbHtml(offer, heading) {
+  return offer.imageUrl
+    ? `<button class="grocery-thumb" type="button" data-preview="${esc(offer.imageUrl)}" aria-label="Vis større bilde av ${esc(heading)}"><img src="${esc(offer.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('grocery-thumb--empty');this.remove()"></button>`
+    : `<span class="grocery-thumb grocery-thumb--empty" aria-hidden="true"></span>`;
+}
+function cardChipHtml(offer) {
+  const card = getGroceryCardBonus(offer.chain);
+  return card ? `<span class="cbn-chip cbn-chip--highlight card-chip" title="${esc(card.label)}: ${esc(card.rate)} ekstra">${esc(card.label.replace(/ Kredittkort| Mastercard/, "-kort"))} ${esc(card.rate)}</span>` : "";
+}
+function tableRowHtml(offer) {
+  const heading = formatHeading(offer.heading);
+  const link = offerLink(offer);
+  const saving = savingPercent(offer);
+  const unit = unitPrice(offer);
+  const net = netVotes(offer);
+  return `<tr class="grocery-row" data-id="${esc(offer.id)}">
+    <td>${thumbHtml(offer, heading)}</td>
+    <td><span class="grocery-title"><a href="${esc(link.url)}" target="_blank" rel="noopener" title="${esc(link.label)}">${esc(heading)}${EXTERNAL_SVG}</a></span>${offer.description ? `<br><span class="grocery-desc">${esc(formatDescription(offer.description))}</span>` : ""}</td>
+    <td><span class="cbn-chip badge ${chainClass(offer.chain)}">${esc(chainLabel(offer.chain))}</span></td>
+    <td class="num"><strong class="grocery-price">${esc(kr(offer.amount))}</strong></td>
+    <td class="num">${offer.prePrice > offer.amount ? `<s class="grocery-before">${esc(kr(offer.prePrice))}</s>` : ""}</td>
+    <td class="num">${saving > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip">−${saving} %</span>` : ""}</td>
+    <td class="num">${savingKr(offer) > 0 ? esc(kr(savingKr(offer))) : ""}</td>
+    <td class="num">${unit ? `${esc(formatKr(unit.amount))} kr/${unit.unit}` : ""}</td>
+    <td>${daysLeftHtml(offer)}</td>
+    <td>${cardChipHtml(offer)}</td>
+    <td class="num">${net !== 0 ? (net > 0 ? `+${net}` : String(net)) : ""}</td>
+    <td><span class="grocery-actions"><button class="cbn-button cbn-button--quiet copy-btn" type="button" aria-label="Kopier tilbudet">${COPY_SVG}<span class="vote-tooltip">Kopier med bilde</span></button>${voteButtons(offer)}</span></td>
+  </tr>`;
+}
+
 function offerHtml(offer) {
   const heading = formatHeading(offer.heading);
   const link = offerLink(offer);
   const saving = savingPercent(offer);
-  const thumb = offer.imageUrl
-    ? `<button class="grocery-thumb" type="button" data-preview="${esc(offer.imageUrl)}" aria-label="Vis større bilde av ${esc(heading)}"><img src="${esc(offer.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('grocery-thumb--empty');this.remove()"></button>`
-    : `<span class="grocery-thumb grocery-thumb--empty" aria-hidden="true"></span>`;
+  const thumb = thumbHtml(offer, heading);
   const description = offer.description ? `<span class="grocery-desc">${esc(formatDescription(offer.description))}</span>` : "";
   const before = offer.prePrice > offer.amount
     ? `<span class="grocery-before"><s aria-label="Førpris">${esc(kr(offer.prePrice))}</s>${saving > 0 ? `<span class="cbn-chip cbn-chip--highlight">−${saving} %</span>` : ""}</span>`
@@ -323,7 +484,7 @@ function offerHtml(offer) {
     <div class="grocery-main">
       <span class="grocery-title"><a href="${esc(link.url)}" target="_blank" rel="noopener" title="${esc(link.label)}">${esc(heading)}${EXTERNAL_SVG}</a></span>
       ${description}
-      <span class="grocery-meta"><span class="cbn-chip badge ${chainClass(offer.chain)}">${esc(chainLabel(offer.chain))}</span>${daysLeftHtml(offer)}<span class="grocery-valid">t.o.m. ${esc(formatDate(offer.validTo))}</span></span>
+      <span class="grocery-meta"><span class="cbn-chip badge ${chainClass(offer.chain)}">${esc(chainLabel(offer.chain))}</span>${daysLeftHtml(offer)}<span class="grocery-valid">t.o.m. ${esc(formatDate(offer.validTo))}</span>${cardChipHtml(offer)}</span>
     </div>
     <div class="grocery-side">
       <strong class="grocery-price">${esc(kr(offer.amount))}</strong>
@@ -363,7 +524,7 @@ function setupResults() {
   const results = $("results");
   const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)");
   results.addEventListener("pointerover", (event) => {
-    if (!hoverCapable.matches || state.view === "grid") return;
+    if (!hoverCapable.matches || effectiveView() === "grid") return;
     const thumb = event.target.closest(".grocery-thumb[data-preview]");
     if (thumb && thumb !== previewFor) showPreview(thumb);
   });
@@ -377,7 +538,16 @@ function setupResults() {
     const copy = event.target.closest(".copy-btn");
     if (copy) return void copyOffer(copy);
     const thumb = event.target.closest(".grocery-thumb[data-preview]");
-    if (thumb && state.view === "list") previewFor === thumb ? hidePreview() : showPreview(thumb);
+    if (thumb && effectiveView() !== "grid") return void (previewFor === thumb ? hidePreview() : showPreview(thumb));
+    const header = event.target.closest("th[data-sort]");
+    if (header) {
+      // Same column again flips the direction.
+      if (state.sort === header.dataset.sort) state.sortDir = -state.sortDir;
+      else { state.sort = header.dataset.sort; state.sortDir = 1; }
+      savePreferences();
+      sortMenu.refresh();
+      render();
+    }
   });
   document.addEventListener("pointerdown", (event) => {
     if (previewFor && !event.target.closest(".grocery-thumb")) hidePreview();
@@ -441,6 +611,7 @@ async function castVote(button) {
   votes.replaceWith(template.content);
 }
 function showRowMessage(row, text) {
+  if (row.tagName === "TR") row = row.lastElementChild;
   if (row.querySelector(".rate-limit-msg")) return;
   const message = document.createElement("div");
   message.className = "rate-limit-msg";
@@ -468,6 +639,87 @@ async function loadVotes() {
 }
 
 let rearmBatches = () => {};
+let sortMenu = { refresh() {} };
+
+function setupFilters() {
+  const panel = $("filters");
+  const toggle = $("filter-toggle");
+  const sync = () => panel.querySelectorAll("[data-filter]").forEach((input) => {
+    const value = state.filters[input.dataset.filter];
+    if (input.type === "checkbox") input.checked = value;
+    else input.value = value ? String(value) : "";
+  });
+  sync();
+  panel.hidden = !hasFilters();
+  toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  toggle.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  });
+  let timer;
+  panel.addEventListener("input", (event) => {
+    const input = event.target.closest("[data-filter]");
+    if (!input) return;
+    const value = input.type === "checkbox" ? input.checked : Math.max(0, Number(input.value.replace(",", ".")) || 0);
+    state.filters[input.dataset.filter] = value;
+    clearTimeout(timer);
+    timer = setTimeout(() => { savePreferences(); render(); }, 150);
+  });
+  $("filters-clear").addEventListener("click", () => {
+    state.filters = { ...FILTER_DEFAULTS };
+    sync();
+    savePreferences();
+    render();
+  });
+}
+function hasFilters() {
+  return Object.keys(FILTER_DEFAULTS).some((key) => state.filters[key] !== FILTER_DEFAULTS[key]);
+}
+function updateFilterButton() {
+  $("filter-toggle").classList.toggle("is-active", hasFilters());
+}
+
+// Alphabet scroll, as on the front page, while the list is sorted by name.
+function renderAzBar() {
+  const bar = $("az-bar");
+  const show = state.sort === "name" && state.list.length > 20;
+  bar.hidden = !show;
+  if (!show) return;
+  const letters = [...new Set(state.list.map((offer) => letterOf(offer)))];
+  bar.innerHTML = letters.map((letter) => `<span data-letter="${esc(letter)}">${esc(letter)}</span>`).join("");
+}
+function letterOf(offer) {
+  const first = formatHeading(offer.heading).charAt(0).toUpperCase();
+  return /[A-ZÆØÅ]/.test(first) ? first : "#";
+}
+function setupAzBar() {
+  $("az-bar").addEventListener("click", (event) => {
+    const letter = event.target.closest("[data-letter]")?.dataset.letter;
+    if (!letter) return;
+    let index = state.list.findIndex((offer) => letterOf(offer) === letter);
+    if (state.sortDir === -1) index = state.list.length - 1 - [...state.list].reverse().findIndex((offer) => letterOf(offer) === letter);
+    while (state.shown <= index) renderMore();
+    const row = $("results").querySelectorAll(".grocery-row")[index];
+    if (!row) return;
+    const top = row.getBoundingClientRect().top + window.scrollY - $("sticky").offsetHeight - (document.querySelector(".grocery-table thead")?.offsetHeight ?? 0) - 8;
+    window.scrollTo({ top });
+    rearmBatches();
+  });
+}
+
+function renderCardBonuses() {
+  const general = FREE_CARDS.map((card) => ({
+    id: card.badge, label: card.label, rate: card.ebPer100kr ? `~${formatKr(Math.round(card.pct * 10000) / 100)} %` : `${formatKr(Math.round(card.pct * 10000) / 100)} %`,
+    url: card.url, tip: `# ${card.label}\nGjelder alle kjøp med kortet.\n${card.tip}`,
+  }));
+  const items = [...GROCERY_CARD_BONUSES, ...general];
+  $("card-bonus-items").innerHTML = items.map((card) => {
+    const where = card.chains ? card.chains.map(chainLabel).join(", ") : "alle butikker";
+    return `<span class="offer-wrap"><span class="offer-tooltip cbn-tooltip-rich">${formatTooltipHtml(card.tip.split("\n"))}</span><a class="cbn-row card-bonus-item" href="${esc(card.url)}" target="_blank" rel="noopener"><span class="cbn-chip badge badge-${esc(card.id)}">${esc(card.label)}</span><strong>${esc(card.rate)}</strong><small>${esc(where)}</small></a></span>`;
+  }).join("");
+  $("card-bonus").hidden = false;
+  window.CashbackTooltips.attach($("card-bonus"));
+}
 let searchTimer;
 function syncUrl() {
   const url = new URL(location.href);
@@ -494,6 +746,13 @@ function setupControls() {
     renderChains();
     render();
   });
+  $("none").addEventListener("click", () => {
+    state.off = new Set(state.counts.keys());
+    savePreferences();
+    renderChains();
+    render();
+  });
+  setupFilters();
   const search = $("search");
   const wrap = search.closest(".input-wrap");
   search.addEventListener("input", () => {
@@ -509,12 +768,16 @@ function setupControls() {
     syncUrl();
     search.focus();
   });
-  createChoiceMenu($("sort"), SORTS, () => state.sort, (value) => {
+  sortMenu = createChoiceMenu($("sort"), SORTS, () => state.sort, (value) => {
     state.sort = value;
+    state.sortDir = 1;
     savePreferences();
     render();
   });
-  const updateViewButtons = () => document.querySelectorAll("[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === state.view)));
+  const updateViewButtons = () => document.querySelectorAll("[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === effectiveView())));
+  wideScreen.addEventListener("change", () => { updateViewButtons(); render(); });
+  // Sticky table headings sit just under the sticky filter bar.
+  new ResizeObserver(() => document.documentElement.style.setProperty("--sticky-height", `${$("sticky").offsetHeight}px`)).observe($("sticky"));
   document.querySelector(".view-toggle").addEventListener("click", (event) => {
     const button = event.target.closest("[data-view]");
     if (!button || button.dataset.view === state.view) return;
@@ -545,6 +808,8 @@ function setupAds() {
   setupAds();
   setupControls();
   setupResults();
+  setupAzBar();
+  renderCardBonuses();
   try {
     const response = await fetch("/grocery-offers.json", { cache: "no-cache" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -561,7 +826,7 @@ function setupAds() {
       savePreferences();
     }
     $("updated").textContent = `Oppdatert ${formatDate(catalog.generatedAt)}`;
-    $("note").innerHTML = `Priser fra kundeavisene for ${esc(catalog.location || "Oslo")}-området, hentet daglig via <a href="https://etilbudsavis.no/" target="_blank" rel="noopener">eTilbudsavis</a>. Tilbud kan variere mellom regioner og butikker og gjelder så langt lageret rekker. Stemmene er brukernes egne vurderinger.`;
+    $("note").textContent = `Priser fra kundeavisene for ${catalog.location || "Oslo"}-området, oppdatert daglig. Tilbud kan variere mellom regioner og butikker og gjelder så langt lageret rekker. Stemmene er brukernes egne vurderinger.`;
     renderChains();
     render();
     syncUrl();

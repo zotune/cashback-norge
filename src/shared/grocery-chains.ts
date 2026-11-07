@@ -56,3 +56,47 @@ export function getGrocerySearchQuery(heading: string): string {
 export function getGroceryChain(name: string): GroceryChain | undefined {
   return GROCERY_CHAIN_LIST.find((chain) => chain.name === name);
 }
+
+/** The unit price a flyer prints ("Pr kg 162,16", "193,33/KG", "Enh.pris 27,60 pr. l"), first value of a range. */
+export function getGroceryUnitPrice(description: string): { amount: number; unit: "kg" | "l" } | undefined {
+  const number = String.raw`(\d{1,5}(?:[.,]\d{1,2})?)`;
+  const unit = String.raw`(kg|l(?:iter)?)\b`;
+  const patterns: Array<[RegExp, number, number]> = [
+    [new RegExp(String.raw`enh\.?\s*pris\s*${number}\s*(?:kr\s*)?pr\.?\s*${unit}`, "i"), 1, 2],
+    [new RegExp(String.raw`\bpr\.?\s*${unit}\s*(?:fra\s*)?${number}`, "i"), 2, 1],
+    [new RegExp(String.raw`${number}\s*(?:kr\s*)?\/\s*${unit}`, "i"), 1, 2],
+    [new RegExp(String.raw`${number}\s*(?:kr\s*)?pr\.?\s*${unit}`, "i"), 1, 2],
+  ];
+  for (const [pattern, amountGroup, unitGroup] of patterns) {
+    const match = description.match(pattern);
+    if (!match) continue;
+    const amount = Number(match[amountGroup]!.replace(",", "."));
+    if (Number.isFinite(amount) && amount > 0) return { amount, unit: match[unitGroup]!.toLowerCase() === "kg" ? "kg" : "l" };
+  }
+  return undefined;
+}
+
+// Payment cards that give extra bonus on groceries, checked on the issuers' pages
+// November 2026 (trumf.no/trumf-kredittkort and its terms, coop.no/medlem/fordeler/coop-mastercard).
+export type GroceryCardBonus = { id: string; label: string; rate: string; chains?: string[]; url: string; tip: string };
+
+const NORGESGRUPPEN = ["MENY", "SPAR", "Joker", "KIWI", "Nærbutikken"];
+const COOP = ["Extra", "Coop Mega", "Coop Prix", "Obs", "Coop Marked", "Matkroken"];
+
+export const GROCERY_CARD_BONUSES: GroceryCardBonus[] = [
+  {
+    id: "trumf", label: "Trumf Kredittkort", rate: "2–5 %", chains: NORGESGRUPPEN,
+    url: "https://www.trumf.no/trumf-kredittkort",
+    tip: "# Trumf Kredittkort\n2 % Trumf-bonus hos MENY, SPAR, KIWI, Joker og Nærbutikken.\n3 % når du betaler med kortet i Trumf Pay.\nTrippel-Trumf-torsdag: 4 %, eller 5 % i Trumf Pay.\nI nettbutikkene må du være innlogget Trumf-medlem.\nIngen årsavgift. Gjelder ikke andre dagligvarekjeder.",
+  },
+  {
+    id: "coop", label: "Coop Mastercard", rate: "+1 %", chains: COOP,
+    url: "https://www.coop.no/medlem/fordeler/coop-mastercard",
+    tip: "# Coop Mastercard\n1 % ekstra bonus hos Coop, i tillegg til kjøpeutbyttet.\nGjelder opp til 2 500 kr i bonus.\nIngen årsavgift. Gjelder ikke andre dagligvarekjeder.",
+  },
+];
+
+/** The chain's own card bonus, if it has one. */
+export function getGroceryCardBonus(chainName: string): GroceryCardBonus | undefined {
+  return GROCERY_CARD_BONUSES.find((card) => card.chains?.includes(chainName));
+}
