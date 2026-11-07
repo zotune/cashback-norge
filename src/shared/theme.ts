@@ -57,11 +57,23 @@ const darkProviderColors = { ...PROVIDER_COLORS,
   panflights: { bg: "#ffffff", fg: "#0078f8" }, kiwi: { bg: "#00a58e", fg: "#ffffff" }, enhver: { bg: "#ffffff", fg: "#162333" },
   sesum: { bg: "#f3f4f6", fg: "#111827" },
 };
-const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {
-  const pale = ["#ffffff", "#fff7f0", "#f3f4f6"].includes(colors.bg.toLowerCase());
-  const declarations = "preserveInDark" in colors && colors.preserveInDark === true ? ""
-    : pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);`
+/** Brand chips keep their hue in dark mode; pale fills turn charcoal and white lettering softens. */
+export function getDarkChipDeclarations(colors: { bg: string; fg: string; preserveInDark?: boolean }): string {
+  if (colors.preserveInDark === true) return "";
+  const pale = ["#ffffff", "#fff7f0", "#f3f4f6", "#e9e9ed"].includes(colors.bg.toLowerCase());
+  return pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);`
     : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
+}
+
+/** Light and dark rules for a brand chip class, for chips outside the provider metadata. */
+export function getBrandChipCss(selector: string, colors: { bg: string; fg: string; preserveInDark?: boolean }): string {
+  const dark = getDarkChipDeclarations(colors);
+  return `${selector} { background: ${colors.bg}; color: ${colors.fg}; }` +
+    (dark ? `\n:root[data-cbn-theme="dark"] ${selector} {${dark}}` : "");
+}
+
+const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {
+  const declarations = getDarkChipDeclarations(colors);
   return declarations ? `:root[data-cbn-theme="dark"] .provider-${id}, :root[data-cbn-theme="dark"] .badge-${id}, :host([data-cbn-theme="dark"]) .provider-${id} {${declarations}}` : "";
 }).join("\n");
 

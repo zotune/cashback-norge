@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794056627
+// @version      1794057591
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10956,6 +10956,10 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
 .cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
+/* Counts inside a chip or filter: a round white plate with dark figures. */
+.cbn-count { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 18px; height: 16px; padding: 0 5px; border-radius: 999px; background: #fff; color: #111; font-size: 10px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.cbn-count--dark { background: #172026; color: #fff; }
+:root[data-cbn-theme="dark"] .cbn-count, :host([data-cbn-theme="dark"]) .cbn-count { background: #e5e5e5; color: #111; }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 /* Structured terms share chips with the comparison tooltips. Noninteractive
@@ -11054,9 +11058,13 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
     enhver: { bg: "#ffffff", fg: "#162333" },
     sesum: { bg: "#f3f4f6", fg: "#111827" }
   };
+  function getDarkChipDeclarations(colors) {
+    if (colors.preserveInDark === true) return "";
+    const pale = ["#ffffff", "#fff7f0", "#f3f4f6", "#e9e9ed"].includes(colors.bg.toLowerCase());
+    return pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);` : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
+  }
   const darkProviderCss = Object.entries(darkProviderColors).map(([id, colors]) => {
-    const pale = ["#ffffff", "#fff7f0", "#f3f4f6"].includes(colors.bg.toLowerCase());
-    const declarations = "preserveInDark" in colors && colors.preserveInDark === true ? "" : pale ? `background:#34373d;color:color-mix(in srgb, ${colors.fg} 30%, #ededed 70%);` : colors.fg.toLowerCase() === "#ffffff" ? "color:#e5e5e5;" : "";
+    const declarations = getDarkChipDeclarations(colors);
     return declarations ? `:root[data-cbn-theme="dark"] .provider-${id}, :root[data-cbn-theme="dark"] .badge-${id}, :host([data-cbn-theme="dark"]) .provider-${id} {${declarations}}` : "";
   }).join("\n");
   const THEME_CSS = `

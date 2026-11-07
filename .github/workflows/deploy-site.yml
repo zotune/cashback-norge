@@ -38,6 +38,8 @@ jobs:
           mkdir _site
           cp -R site/* _site/
           cp data/cashback-index.json _site/cashback-index.json
+          # Built by the daily crawl and not committed; keep the published copy for /dagligvarer.
+          curl -fsSL --retry 2 https://cashbacknorge.no/grocery-offers.json -o _site/grocery-offers.json || echo "::warning::grocery-offers.json could not be fetched; /dagligvarer shows an error until the next Daily crawl"
 
       - uses: actions/upload-pages-artifact@v3
         with:

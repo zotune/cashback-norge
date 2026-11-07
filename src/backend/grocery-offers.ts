@@ -1,4 +1,4 @@
-// Daily catalogue of this week's supermarket flyer offers for cashbacknorge.no/mattilbud.
+// Daily catalogue of this week's supermarket flyer offers for cashbacknorge.no/dagligvarer.
 //
 // Source: Tjek's public offer API (squid-api.tjek.com/v2), the one etilbudsavis.no and
 // mattilbud.no use. No key; undocumented for third parties, so it may change. The dealer
@@ -9,6 +9,7 @@
 // reused (offers still running, catalogue at most 14 days old).
 import { Configuration, HttpCrawler, type HttpCrawlingContext, MemoryStorage, Request } from "crawlee";
 import { readEtilbudsavisOffers, type EtilbudsavisOffer } from "../shared/etilbudsavis-price-match.js";
+import { GROCERY_CHAINS } from "../shared/grocery-chains.js";
 import type { Logger } from "./logger.js";
 
 export const GROCERY_OFFERS_API = "https://squid-api.tjek.com/v2";
@@ -19,11 +20,8 @@ const PAGE_SIZE = 100;
 const MAX_DEALER_PAGES = 4;
 const MAX_OFFER_PAGES_PER_CHAIN = 5;
 const MAX_CATALOG_AGE_DAYS = 14;
-// Matkjeder slik Tjek navngir dem i Norge.
-export const GROCERY_CHAINS = [
-  "REMA 1000", "KIWI", "MENY", "SPAR", "Joker", "Extra", "Coop Mega", "Coop Prix", "Obs", "Coop Marked",
-  "Bunnpris", "Nærbutikken", "Matkroken", "Europris", "oda",
-];
+// Matkjeder slik Tjek navngir dem i Norge (felles med nettsidens chips).
+export { GROCERY_CHAINS };
 
 export type GroceryOffer = Omit<EtilbudsavisOffer, "id"> & { id: string; chain: string };
 export type GroceryOffersCatalog = {

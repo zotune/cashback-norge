@@ -277,7 +277,7 @@ async function main(): Promise<void> {
   const electricityCatalogPromise = config.skipElectricityCatalog ? undefined : startEarly(collectElectricitySupplierCatalog({
     generatedAt, logger, previousPath: config.electricityCatalogPath,
   }));
-  // Not a cashback source: this week's supermarket flyer offers for cashbacknorge.no/mattilbud.
+  // Not a cashback source: this week's supermarket flyer offers for cashbacknorge.no/dagligvarer.
   const groceryOffersPromise = config.skipGroceryOffers ? undefined : startEarly(collectGroceryOffers({ generatedAt, logger }));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",

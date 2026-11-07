@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cashback Norge</title>
 <script src="/theme.js?v=3"></script>
+<link rel="stylesheet" href="/site.css?v=1">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="favicon.png?v=quokka-1">
 <script>
@@ -12,40 +13,9 @@
 if (location.hash === "#iphone-guide") location.replace("iphone/" + location.search);
 </script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: rgba(0,0,0,0); }
-body {
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--cbn-bg, #f7faf8);
-  color: var(--cbn-text, #172026);
-  min-height: 100dvh;
-  -webkit-font-smoothing: antialiased;
-  touch-action: pan-y;
-}
-.container { max-width: 480px; margin: 0 auto; padding: 24px 29px 16px; overflow-x: clip; }
-@media (max-width: 520px) {
-  .container { margin: 0; max-width: 100%; padding: 24px 30px 16px 8px; }
-  .sticky-header { margin: 0 -8px; padding: 8px 8px 4px; }
-}
-.sticky-header {
-  position: sticky;
-  top: 0;
-  background: var(--cbn-bg);
-  z-index: 100;
-  margin: 0 -29px;
-  padding: 8px 29px 4px;
-}
-/* The fixed footer shares z-index 100; an open tooltip must not end under it. */
-.sticky-header:has(.cbn-tooltip-open, .tooltip-wrap:hover) { z-index: 101; }
-h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
-.subtitle { color: var(--cbn-muted, #5d6b71); font-size: 13px; text-align: center; margin-bottom: 3px; }
-.subtitle a { color: var(--cbn-accent, #3a7d55); }
-.update-row { display: flex; align-items: center; justify-content: center; gap: 3px; margin-bottom: 8px; color: var(--cbn-muted, #75847d); font-size: 12px; }
-.update-row > span { margin-right: 4px; }
 .install-intro { max-width: 380px; margin: 0 auto 12px; text-align: center; text-wrap: pretty; font-size: 12px; line-height: 1.5; }
 .install-intro strong { display: block; margin-bottom: 3px; font-weight: 650; }
 .install-intro span { color: var(--cbn-muted); }
-.social-link { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;   }
-.social-link svg { width: 17px; height: 17px; }
 .install-links { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 6px; max-width: 380px; margin: 0 auto 16px; }
 .install-link { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 44px; padding: 6px;   text-decoration: none; font-size: 12px; font-weight: 650; }
 .install-link svg { width: 15px; height: 15px; flex-shrink: 0; }
@@ -58,21 +28,6 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   .install-link { padding: 6px 4px; font-size: 11px; gap: 4px; }
   .install-link svg { width: 12px; height: 12px; }
 }
-.search-wrap {
-  display: flex;
-  gap: 8px;
-  position: relative;
-  margin-bottom: 8px;
-}
-.search {
-  font: inherit;
-  font-size: 16px;
-  height: 48px;
-  padding: 0 14px;
-  flex: 1;
-  min-width: 0;
-}
-.search::placeholder { color: var(--cbn-subtle, #8a9a92); }
 .global-sum {
   font: inherit;
   font-size: 16px;
@@ -80,27 +35,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
   padding: 0 14px;
 }
 .global-sum::placeholder { color: var(--cbn-subtle, #8a9a92); }
-.input-wrap { position: relative; display: flex; align-items: center; }
-.input-wrap.flex1 { flex: 1; min-width: 0; }
-.input-wrap .search { flex: 1; width: 100%; padding-right: 32px; }
 .input-wrap .global-sum { width: 110px; padding-right: 32px; }
-.input-clear {
-  position: absolute;
-  right: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 8px;
-  display: none;
-  -webkit-appearance: none;
-  min-width: 36px;
-  min-height: 36px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-.input-wrap.has-value .input-clear { display: flex; }
-.search::-webkit-search-cancel-button { -webkit-appearance: none; }
 .provider-picker {
   align-items: center;
   display: flex;
@@ -112,22 +47,6 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .provider-picker.is-active { background: var(--cbn-highlight, #eaf7ef);  color: var(--cbn-accent, #166b47); }
 .provider-picker.is-open { background: var(--cbn-hover); }
 .provider-picker svg { pointer-events: none; }
-.provider-menu[hidden] { display: none; }
-.provider-menu {
-  background: var(--cbn-surface);
-  border-radius: 14px;
-  box-shadow: 0 12px 36px #0005;
-  color: var(--cbn-text);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: min(480px, calc(100dvh - 24px));
-  overflow: hidden;
-  padding: 10px;
-  position: fixed;
-  width: min(360px, calc(100vw - 24px));
-  z-index: 1000;
-}
 .provider-menu-search { flex: 0 0 42px; font: inherit; font-size: 15px; min-height: 42px; padding: 0 52px 0 36px; width: 100%; }
 .provider-menu-search-wrap { min-height: 42px; position: relative; }
 .provider-search-icon { color: var(--cbn-muted); height: 16px; left: 12px; pointer-events: none; position: absolute; top: 13px; width: 16px; }
@@ -138,31 +57,6 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .provider-menu-hint { align-items: center; color: var(--cbn-muted); display: flex; font-size: 12px; justify-content: space-between; padding: 0 2px; }
 .provider-menu-done { align-self: flex-end; font: inherit; font-size: 13px; min-height: 36px; padding: 0 14px; }
 .provider-option-list { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; }
-.provider-option {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
-  color: var(--cbn-text);
-  cursor: pointer;
-  display: grid;
-  font: inherit;
-  column-gap: 10px;
-  flex-shrink: 0;
-  grid-template-columns: minmax(0, 1fr) 4ch 18px;
-  min-height: 44px;
-  padding: 8px 10px;
-  text-align: left;
-  width: 100%;
-}
-.provider-option:hover, .provider-option.is-active { background: var(--cbn-hover); }
-.provider-option[aria-selected="true"] { background: var(--cbn-highlight); }
-.provider-option-label { display: flex; min-width: 0; }
-.provider-option .badge { display: block; font-size: 12px; line-height: 24px; max-width: 100%; min-height: 24px; min-width: 0; overflow: hidden; padding: 0 9px; text-overflow: ellipsis; }
-.provider-option-all { color: var(--cbn-text); font-size: 12px; font-weight: 650; overflow: hidden; padding-left: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.provider-option[aria-selected="true"] .provider-option-all { color: var(--cbn-accent); }
-.provider-option-count { color: var(--cbn-subtle); font-size: 12px; font-variant-numeric: tabular-nums; justify-self: stretch; text-align: right; white-space: nowrap; }
-.provider-option-check { color: var(--cbn-accent); font-size: 15px; font-weight: 700; text-align: center; }
 .provider-option-empty { color: var(--cbn-muted); font-size: 13px; padding: 14px 8px; text-align: center; }
 .provider-filter-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .provider-filter-status[hidden] { display: none; }
@@ -183,15 +77,6 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .active-provider:focus-visible, .provider-filter-link:focus-visible, .offer-action:focus-visible { outline: 2px solid #1f8f5f; outline-offset: 3px; }
 .filter-bar { align-items: center; display: flex; gap: 4px; margin-bottom: 8px; }
 .filter-bar .provider-picker { align-self: stretch; min-height: 36px; width: 36px; }
-.invite-card { margin: 4px 0 16px; padding: 14px; }
-.invite-card[hidden] { display: none; }
-.invite-card-header { align-items: center; display: flex; gap: 6px; margin: -4px -4px 6px 0; color: var(--cbn-muted); font-size: 11px; }
-.invite-card-dismiss { align-items: center; display: inline-flex; flex-shrink: 0; justify-content: center; margin-left: auto; min-height: 32px; width: 32px; }
-.invite-card h2 { font-size: 18px; font-weight: 700; line-height: 1.3; }
-.invite-card p { color: var(--cbn-muted); font-size: 13px; line-height: 1.5; margin: 7px 0 12px; }
-.invite-card .invite-card-fine-print { font-size: 10px; line-height: 1.35; margin: 8px 0 0; }
-.invite-card .invite-card-fine-print[hidden] { display: none; }
-.invite-card-action { align-items: center; display: flex; font-size: 13px; font-weight: 650; gap: 8px; justify-content: center; min-height: 44px; padding: 10px 12px; text-align: center; }
 .quick-filters { display: flex; flex: 1; gap: 6px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding: 3px; scrollbar-width: thin; }
 .quick-filter { flex: 1 0 auto; font: inherit; font-size: 12px; font-weight: 600; min-height: 36px; padding: 0 11px; white-space: nowrap; }
 @media (max-width: 380px) {
@@ -301,89 +186,10 @@ a.code-reward { color: inherit; text-decoration: none; }
 .offer-card-only { justify-content: space-between; }
 .offer-card-only .offer-reward { flex: 1; }
 .offer-card-only-warn { color: var(--cbn-subtle, #b0bec5); font-size: 11px; cursor: help; }
-.offer-wrap {
-  position: relative;
-  display: block;
-}
-.offer-tooltip {
-  background: var(--cbn-tooltip, #172026);
-  border-radius: 8px;
-  bottom: calc(100% + 6px);
-  color: #fff;
-  /* Closed tooltips stay out of layout; thousands of max-content tooltips made long lists slow. */
-  display: none;
-  font-size: 12px;
-  left: 0;
-  line-height: 1.45;
-  opacity: 0;
-  padding: 8px 12px;
-  pointer-events: none;
-  position: absolute;
-  transition: opacity 0.15s;
-  transition-property: opacity, display;
-  transition-behavior: allow-discrete;
-  white-space: normal;
-  width: max-content;
-  max-width: min(340px, calc(100vw - 32px));
-  z-index: 200;
-}
-.offer-tooltip-section + .offer-tooltip-section {
-  margin-top: 8px;
-}
-.offer-tooltip-title {
-  display: block;
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-.offer-tooltip-text {
-  display: block;
-  white-space: pre-line;
-}
-.offer-tooltip-list {
-  display: grid;
-  gap: 5px;
-  margin: 0;
-  padding-left: 0;
-}
-.offer-tooltip-list-item {
-  display: grid;
-  gap: 7px;
-  grid-template-columns: 10px minmax(0, 1fr);
-}
-.offer-tooltip-bullet {
-  line-height: 1.45;
-}
-.offer-tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 20px;
-}
-.offer-wrap:hover > .offer-tooltip,
-.code-item-row:hover > .offer-tooltip {
-  display: block;
-  opacity: 1;
-  pointer-events: auto;
-}
-@starting-style {
-  .offer-wrap:hover > .offer-tooltip,
-  .code-item-row:hover > .offer-tooltip { opacity: 0; }
-}
 .offer-reward {
   font-size: 14px;
   font-weight: 700;
   flex: 1;
-}
-.badge {
-  align-items: center;
-  border-radius: 5px;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  min-height: 20px;
-  padding: 0 6px;
-  white-space: nowrap;
 }
 .badge-trumf { background: #07006b; color: #fff; }
 .badge-klarna { background: #ffa8cd; color: #0b051d; }
@@ -426,44 +232,6 @@ a.code-reward { color: inherit; text-decoration: none; }
 .badge-ys { background: #006e26; color: #fff; }
 .badge-lofavor { background: #dc141a; color: #fff; }
 .badge-cbn { background: #f7d7e6; color: #8f164f; }
-.empty {
-  color: var(--cbn-subtle, #8a9a92);
-  font-size: 14px;
-  padding: 40px 0;
-  text-align: center;
-}
-.footer {
-  color: var(--cbn-subtle, #8a9a92);
-  font-size: 11px;
-  margin-top: 32px;
-  padding-top: 12px;
-  text-align: center;
-}
-.footer a { color: var(--cbn-muted, #5d6b71); }
-.fixed-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  background: var(--cbn-bg);
-  color: var(--cbn-subtle, #8a9a92);
-  font-size: 11px;
-  padding: 7px 16px;
-  text-align: center;
-  z-index: 100;
-  max-width: 480px;
-  overflow: hidden;
-}
-.support-ad-anchor { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
-.fixed-footer:has(.support-ad-anchor:hover, .cbn-tooltip-open) { overflow: visible; }
-.fixed-footer .support-ad-anchor > .offer-tooltip { bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); }
-.fixed-footer .tip-line { gap: 4px; justify-content: center; margin-bottom: 0; }
-@media (max-width: 520px) { .fixed-footer { padding-left: 8px; } }
-.fixed-footer .tip-line .ad-chip { position: static !important; }
-.fixed-footer .tip-line a { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fixed-footer .bonus-section-wrap { display: flex; justify-content: space-between; align-items: center; }
 .fixed-footer .bonus-toggle { margin: 0; }
 .fixed-footer .bonus-toggle-arrow { transform: rotate(0deg); }
@@ -479,32 +247,6 @@ a.code-reward { color: inherit; text-decoration: none; }
   flex-direction: column;
   gap: 12px;
 }
-.fixed-footer a { color: var(--cbn-muted, #5d6b71); }
-.count {
-  color: var(--cbn-subtle, #8a9a92);
-  font-size: 12px;
-  margin-bottom: 4px;
-  padding-bottom: 2px;
-}
-.tip-line {
-  color: var(--cbn-muted, #5d6b71);
-  font-size: 11px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-.tip-line .ad-chip {
-  position: static;
-  margin-right: 6px;
-  flex-shrink: 0;
-}
-.tip-line a {
-  text-align: center;
-  color: var(--cbn-muted, #5d6b71);
-  text-decoration: none;
-}
-.tip-line a:hover { text-decoration: underline; }
 .quokka-runner {
   position: fixed;
   z-index: 90;
@@ -522,10 +264,6 @@ a.code-reward { color: inherit; text-decoration: none; }
 @keyframes quokka-run { to { transform: translateY(calc(-50% - 8px)) rotate(-8deg) scale(1.06); } }
 @media (max-width: 760px) { .quokka-runner { display: none; } }
 @media (prefers-reduced-motion: reduce) { .quokka-runner { animation: none; } }
-.fixed-footer .quokka-love { margin-left: 7px; }
-.fixed-footer .quokka-love img { width: 15px; height: 15px; }
-.fixed-footer .quokka-love--couple img { width: 38px; height: 30px; }
-.fixed-footer .quokka-love-heart { font-size: 10px; }
 .adblock-warning {
   align-items: center;
   background: #fff8e1;
@@ -678,36 +416,6 @@ a.code-reward { color: inherit; text-decoration: none; }
 .code-item-row .code-item { flex: 1; min-width: 0; }
 .code-item-row--best .code-reward,
 .code-item-row--best .code-value { color: var(--cbn-accent, #3a7d55); }
-.vote-btn {
-  align-items: center;
-  cursor: pointer;
-  display: inline-flex;
-  flex-shrink: 0;
-  font: inherit;
-  font-size: 11px;
-  gap: 2px;
-  padding: 3px 5px;
-}
-.vote-btn.voted { color: var(--cbn-accent, #1f8f5f); }
-.vote-btn.downvoted { color: #e05555; }
-.vote-btn { position: relative; }
-.vote-tooltip {
-  background: #222;
-  border-radius: 4px;
-  bottom: calc(100% + 6px);
-  color: #fff;
-  font-size: 11px;
-  left: 50%;
-  opacity: 0;
-  padding: 4px 8px;
-  pointer-events: none;
-  position: absolute;
-  transform: translateX(-50%);
-  transition: opacity 0.15s;
-  white-space: nowrap;
-  z-index: 20;
-}
-.vote-btn:hover .vote-tooltip { opacity: 1; }
 .codes-add-btn {
   align-items: center;
   cursor: pointer;
@@ -932,6 +640,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 </head>
 <body>
 <div class="container">
+  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/" aria-current="page">Cashback</a><a href="/dagligvarer/">Dagligvarer</a></nav>
   <img src="logo.png?v=quokka-1" alt="" style="width:96px;height:96px;display:block;margin:0 auto 8px;">
   <h1>Cashback Norge</h1>
   <p class="subtitle">Finn cashback-tilbud for norske nettbutikker.</p>
@@ -955,13 +664,13 @@ a.code-reward { color: inherit; text-decoration: none; }
   <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
     <div class="invite-card-header">
       <span class="cbn-chip cbn-chip--muted">Annonse</span>
-      <span id="support-invite-provider"></span>
+      <span id="support-invite-provider" data-invite-provider></span>
       <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul annonsen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </div>
-    <h2 id="support-invite-title"></h2>
-    <p id="support-invite-description"></p>
+    <h2 id="support-invite-title" data-invite-title></h2>
+    <p id="support-invite-description" data-invite-description></p>
     <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer" data-goatcounter-click="support-invite-card" data-goatcounter-title="Annonse"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
-    <p class="invite-card-fine-print" id="support-invite-fine-print" hidden></p>
+    <p class="invite-card-fine-print" id="support-invite-fine-print" data-invite-fine-print hidden></p>
   </aside>
   <div class="sticky-header">
   <div class="filter-bar">
@@ -1015,7 +724,7 @@ a.code-reward { color: inherit; text-decoration: none; }
   <div class="az-bar" id="az-bar"></div>
   <footer class="footer" style="margin-bottom:56px;">
     <nav style="margin-bottom:6px;">
-      <a href="/mattilbud/">Mattilbud</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a> · <a class="js-email" data-u="c" data-d="adoretunes.com" data-keep-text href="#">Kontakt</a>
+      <a href="/dagligvarer/">Dagligvarer</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a> · <a class="js-email" data-u="c" data-d="adoretunes.com" data-keep-text href="#">Kontakt</a>
     </nav>
     <div>© 2026 Cashback Norge · Uavhengig cashback-oversikt for norske nettbutikker</div>
   </footer>
@@ -1026,7 +735,7 @@ a.code-reward { color: inherit; text-decoration: none; }
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
 <script src="shared-data.js"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey, renderSupportFooter, getInstabankInvite, createCountBadge, fitCountToChip, renderSupportInvite, createLazyBatches, SUPABASE_URL, SUPABASE_ANON_KEY, fetchMyVotes, apiVote } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -1130,19 +839,19 @@ function renderProviderOptions(query = "") {
     label.className = "provider-option-label";
     const chip = document.createElement("span");
     chip.className = item.provider ? `cbn-chip badge badge-${item.provider}` : "provider-option-all";
-    chip.textContent = item.name;
+    const name = document.createElement("span");
+    name.className = "provider-option-name";
+    name.textContent = item.name;
     chip.title = item.name;
+    chip.append(name, createCountBadge(item.count, `${item.count} butikker`));
     label.append(chip);
-    const count = document.createElement("span");
-    count.className = "provider-option-count";
-    count.textContent = item.count.toLocaleString("nb-NO");
-    count.setAttribute("aria-label", `${item.count} butikker`);
     const check = document.createElement("span");
     check.className = "provider-option-check";
     check.setAttribute("aria-hidden", "true");
     check.textContent = selected ? "✓" : "";
-    option.append(label, count, check);
+    option.append(label, check);
     list.append(option);
+    if (item.provider) fitCountToChip(chip);
   });
   const selectedIndex = visibleProviderOptions.findIndex(option => option.provider && selectedProviders.has(option.provider));
   setActiveProviderOption(selectedIndex >= 0 ? selectedIndex : 0);
@@ -1378,8 +1087,9 @@ function updateProviderFilter() {
     const remove = document.createElement("span");
     remove.setAttribute("aria-hidden", "true");
     remove.textContent = "×";
-    chip.append(label, remove);
+    chip.append(label, createCountBadge(providerCounts.get(provider) || 0, `${providerCounts.get(provider) || 0} butikker`), remove);
     status.append(chip);
+    fitCountToChip(chip);
   }
   document.querySelector(".search").placeholder = names.length === 1
     ? `Søk i ${names[0]}...`
@@ -1792,7 +1502,6 @@ function render(query) {
 // Building all ~1700 cards at once takes seconds on phones, so the list grows in batches while scrolling.
 const MERCHANT_BATCH_SIZE = 40;
 let renderedMerchants = { list: [], count: 0, prevLetter: null, showHeaders: true };
-let moreMerchantsObserver;
 
 function merchantLetter(m) {
   return /^[A-ZÆØÅ]/i.test(m.name) ? m.name.charAt(0).toUpperCase() : '#';
@@ -1818,16 +1527,12 @@ function renderMerchantsThroughLetter(letter) {
   if (index >= renderedMerchants.count) renderMoreMerchants(index - renderedMerchants.count + MERCHANT_BATCH_SIZE);
 }
 
+let rearmMoreMerchants;
 function watchMoreMerchants() {
-  const sentinel = document.getElementById("results-more");
-  moreMerchantsObserver ||= new IntersectionObserver(entries => {
-    if (!entries.some(entry => entry.isIntersecting) || renderedMerchants.count >= renderedMerchants.list.length) return;
-    renderMoreMerchants(MERCHANT_BATCH_SIZE);
-    watchMoreMerchants();
-  }, { rootMargin: "0px 0px 1500px 0px" });
-  // Observing again reports the current position, so a sentinel still near the viewport loads another batch.
-  moreMerchantsObserver.unobserve(sentinel);
-  moreMerchantsObserver.observe(sentinel);
+  rearmMoreMerchants ||= createLazyBatches(document.getElementById("results-more"),
+    () => renderedMerchants.count < renderedMerchants.list.length,
+    () => renderMoreMerchants(MERCHANT_BATCH_SIZE));
+  rearmMoreMerchants();
 }
 
 function merchantCardHtml(m) {
@@ -2248,8 +1953,6 @@ function esc(s) {
 }
 
 
-const SUPABASE_URL = "https://tektckikcspxzhwjfzyn.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_FYwbz2OizGygwHzAJ4dbeQ_k4j6PX8s";
 
 const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
 const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
@@ -2269,32 +1972,6 @@ async function fetchCodesForHost(hostname) {
       downvotes: (r.code_votes || []).filter(v => v.vote === -1).length,
     }));
   } catch { return []; }
-}
-
-async function fetchMyVotes(hostname) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/my-votes`, {
-      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-      body: JSON.stringify({ hostname }),
-    });
-    if (!res.ok) return {};
-    const data = await res.json();
-    const map = {};
-    for (const v of (data.votes || [])) map[v.code_id] = v.vote;
-    return map;
-  } catch { return {}; }
-}
-
-async function apiVote(codeId, vote, staticCode) {
-  try {
-    const body = { vote, ...(codeId > 0 ? { code_id: codeId } : {}), ...(staticCode || {}) };
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/vote`, {
-      method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-      body: JSON.stringify(body),
-    });
-    if (res.status === 429) return { rate_limited: true };
-    return await res.json();
-  } catch { return null; }
 }
 
 async function apiSubmitCode(hostname, code, reward) {
@@ -2409,40 +2086,8 @@ function makeDeleteBtn(codeId, row, hostname) {
 // Same slot and rule as the bottom line in the extension: one draw per page,
 // 80 % Instabank while the campaign runs, otherwise a support link.
 function setupFooterAd(draw) {
-  const footer = document.querySelector(".fixed-footer");
-  const update = () => {
-    const pick = selectSupportAdvertisement(draw);
-    const line = footer.querySelector(".tip-line");
-    line.replaceChildren();
-    const anchor = document.createElement("span");
-    anchor.className = "offer-wrap support-ad-anchor";
-    const tooltip = document.createElement("span");
-    tooltip.className = "offer-tooltip cbn-tooltip-rich";
-    tooltip.innerHTML = formatTooltipHtml(getSupportAdvertisementTooltipParts(pick, cardBenefitOffers));
-    anchor.append(tooltip);
-    if (pick.affiliate) {
-      const ad = document.createElement("span");
-      ad.className = "cbn-chip cbn-chip--muted ad-chip";
-      ad.textContent = "Ad";
-      anchor.append(ad);
-    }
-    const link = document.createElement("a");
-    link.href = pick.url;
-    link.target = "_blank";
-    link.rel = pick.affiliate ? "sponsored noopener noreferrer" : "noopener noreferrer";
-    link.textContent = getSupportAdvertisementText(pick);
-    const mascot = document.createElement("span");
-    mascot.className = "quokka-love quokka-love--couple";
-    mascot.setAttribute("role", "img");
-    mascot.setAttribute("aria-label", "To quokkaer støtter veldedighet sammen");
-    const image = document.createElement("img");
-    image.src = "quokka-couple.png?v=quokka-1";
-    image.alt = "";
-    mascot.append(image);
-    anchor.append(link);
-    line.append(anchor, mascot);
-    window.CashbackTooltips.attach(line);
-  };
+  const line = document.querySelector(".fixed-footer .tip-line");
+  const update = () => renderSupportFooter(line, selectSupportAdvertisement(draw), cardBenefitOffers, window.CashbackTooltips.attach);
   update();
   return update;
 }
@@ -2459,32 +2104,10 @@ function setupSupportInvite(offers, draw) {
     action: "Se gjeldsoversikten hos Uno Score",
   } : undefined;
   const invites = SUPPORT_INVITES.filter(invite => invite.url);
-  const instabankAd = selectSupportAdvertisement(draw) === INSTABANK_AD ? {
-    id: "instabank", name: "Instabank", url: INSTABANK_AD.url,
-    title: getSupportAdvertisementText(INSTABANK_AD).replace(/^Instabank: /, "").replace(/^./, c => c.toUpperCase()),
-    description: "Pluss fast 5 % rabatt på kollektivtransport og elbillading.",
-    finePrint: INSTABANK_AD.example,
-    action: "Få Instabank kredittkort",
-  } : undefined;
+  const instabankAd = getInstabankInvite(draw);
   if (!featuredAd && invites.length === 0 && !instabankAd) return;
   const invite = instabankAd ?? featuredAd ?? invites[Math.floor(Math.random() * invites.length)];
-  card.dataset.invite = invite.id;
-  document.getElementById("support-invite-provider").textContent = invite.name;
-  document.getElementById("support-invite-title").textContent = invite.title;
-  document.getElementById("support-invite-description").textContent = invite.description;
-  const finePrint = document.getElementById("support-invite-fine-print");
-  finePrint.textContent = invite.finePrint ?? "";
-  finePrint.hidden = !invite.finePrint;
-  const action = card.querySelector(".invite-card-action");
-  action.href = invite.url;
-  action.querySelector("span").textContent = invite.action;
-  action.dataset.goatcounterClick = `${invite.id}-invite-card`;
-  action.dataset.goatcounterTitle = `${invite.name}: annonse`;
-  card.hidden = false;
-  card.querySelector("button").addEventListener("click", () => {
-    card.hidden = true;
-    document.querySelector(".search").focus({ preventScroll: true });
-  });
+  renderSupportInvite(card, invite, () => document.querySelector(".search").focus({ preventScroll: true }));
 }
 
 function installQuokkaRunner() {

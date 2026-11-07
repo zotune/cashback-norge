@@ -6,6 +6,8 @@ installation guides, React popup, shadow DOM panel and generated userscript.
 - `cbn-field`, `cbn-field-group`: inputs and grouped inputs.
 - `cbn-card`, `cbn-row`: content surfaces and interactive offer rows.
 - `cbn-chip`, `cbn-chip--muted`: provider brands and small status labels.
+- `cbn-count` (`createCountBadge`): the number of offers or stores inside a chip or
+  filter, a round white plate with dark figures (`cbn-count--dark` on pale chips).
 - `cbn-popover`: floating menus.
 
 Keep layout, typography and sizing in the screen's stylesheet. Change fills,

@@ -52,6 +52,10 @@ export const UI_CSS = `
 .cbn-chip[href]:hover, button.cbn-chip:hover { filter: brightness(1.14); }
 .cbn-chip--muted { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 600; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-plate); color: var(--cbn-muted); }
 .cbn-chip--highlight { display: inline-block; padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap; vertical-align: middle; background: var(--cbn-highlight); color: var(--cbn-accent); }
+/* Counts inside a chip or filter: a round white plate with dark figures. */
+.cbn-count { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 18px; height: 16px; padding: 0 5px; border-radius: 999px; background: #fff; color: #111; font-size: 10px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.cbn-count--dark { background: #172026; color: #fff; }
+:root[data-cbn-theme="dark"] .cbn-count, :host([data-cbn-theme="dark"]) .cbn-count { background: #e5e5e5; color: #111; }
 .cbn-popover { border: 0; border-radius: var(--cbn-card-radius); background: var(--cbn-surface); box-shadow: 0 8px 30px #0003; }
 .cbn-button:focus-visible, .cbn-chip:focus-visible, .cbn-row:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 /* Structured terms share chips with the comparison tooltips. Noninteractive
@@ -85,6 +89,14 @@ export const UI_CSS = `
   .quokka-runner, .cbn-quokka-tooltip-anchor::before, .cbn-quokka-tooltip-anchor::after { animation: none; }
 }
 `;
+
+export function createCountBadge(count: number, label?: string): HTMLSpanElement {
+  const badge = document.createElement("span");
+  badge.className = "cbn-count";
+  badge.textContent = count.toLocaleString("nb-NO");
+  if (label) badge.setAttribute("aria-label", label);
+  return badge;
+}
 
 export function createMutedChip(label: string): HTMLSpanElement {
   const chip = document.createElement("span");

@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dagligvarer · Cashback Norge</title>
+<script src="/theme.js?v=3"></script>
+<link rel="stylesheet" href="/site.css?v=1">
+<meta name="description" content="Ukens tilbud fra kundeavisene til REMA 1000, KIWI, MENY, Coop, SPAR, Joker, Bunnpris og flere – søk, sorter på rabatt og sammenlign på tvers av butikkene.">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
+<link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
+<style>
+.intro-logo { width: 72px; height: 72px; display: block; margin: 0 auto 6px; }
+.sticky-header { padding-top: 10px; }
+.chain-toggles { margin-bottom: 8px; }
+.list-bar { align-items: center; display: flex; gap: 4px; margin-bottom: 6px; }
+.list-bar .count { flex: 1; margin: 0; padding: 0; }
+.list-reset { font: inherit; font-size: 12px; min-height: 30px; padding: 0 8px; }
+.sort-button { align-items: center; display: inline-flex; font: inherit; font-size: 12px; font-weight: 600; gap: 4px; min-height: 32px; padding: 0 8px 0 10px; }
+.sort-button svg { flex-shrink: 0; }
+.sort-button.is-open { background: var(--cbn-hover); }
+.view-toggle { display: inline-flex; gap: 2px; }
+.view-toggle .cbn-button { align-items: center; display: inline-flex; justify-content: center; min-height: 32px; width: 32px; }
+.results { display: grid; gap: 6px; padding: 10px 0 60px; }
+.grocery-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  padding: 8px 10px 8px 8px;
+}
+.grocery-thumb { align-items: center; background: #fff; border: 0; border-radius: 6px; cursor: zoom-in; display: flex; height: 52px; justify-content: center; overflow: hidden; padding: 2px; width: 52px; }
+.grocery-thumb img { display: block; max-height: 100%; max-width: 100%; object-fit: contain; }
+.grocery-thumb--empty { background: var(--cbn-plate); cursor: default; }
+.grocery-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.grocery-title { font-size: 14px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.grocery-desc { color: var(--cbn-muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+.grocery-meta { align-items: center; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.grocery-meta .badge { font-size: 10px; min-height: 18px; }
+.grocery-valid { color: var(--cbn-subtle); font-size: 11px; }
+.grocery-side { align-items: flex-end; align-self: stretch; display: flex; flex-direction: column; gap: 2px; justify-content: space-between; text-align: right; }
+.grocery-price { color: var(--cbn-accent); font-size: 17px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.grocery-before { align-items: center; color: var(--cbn-subtle); display: inline-flex; font-size: 11px; gap: 5px; white-space: nowrap; }
+.grocery-before .cbn-chip--highlight { font-size: 10px; line-height: 16px; padding: 0 5px; }
+.grocery-votes { display: inline-flex; gap: 0; margin-right: -5px; }
+.grocery-votes .vote-btn { min-height: 28px; }
+.results--grid { gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.results--grid .grocery-row { align-items: stretch; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.results--grid .grocery-thumb { aspect-ratio: 4 / 3; cursor: default; height: auto; padding: 6px; width: 100%; }
+.results--grid .grocery-main { flex: 1; }
+.results--grid .grocery-side { align-items: center; flex-direction: row; flex-wrap: wrap; justify-content: space-between; text-align: left; }
+.results--grid .grocery-votes { margin-left: auto; }
+.grocery-preview { background: #fff; border-radius: 12px; box-shadow: 0 12px 36px #0006; display: block; height: auto; max-height: min(320px, 70vh); max-width: min(320px, calc(100vw - 24px)); object-fit: contain; padding: 8px; pointer-events: none; position: fixed; z-index: 1001; }
+.grocery-preview[hidden] { display: none; }
+.rate-limit-msg { color: #e05555; font-size: 11px; grid-column: 1 / -1; text-align: right; }
+.note { color: var(--cbn-subtle); font-size: 11px; line-height: 1.5; margin-top: 8px; text-align: center; }
+@media (max-width: 520px) {
+  .container { padding: 20px 12px 16px; }
+  .sticky-header { margin: 0 -12px; padding: 8px 12px 4px; }
+  /* One scrollable line keeps the sticky header short on phones. */
+  .chain-toggles { flex-wrap: nowrap; margin: 0 -12px 8px; overflow-x: auto; overscroll-behavior-x: contain; padding: 2px 12px; scrollbar-width: none; }
+  .chain-toggles::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 380px) {
+  .grocery-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; }
+  .grocery-thumb { height: 44px; width: 44px; }
+  .sort-button [data-choice-label] { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+</style>
+<script data-goatcounter="https://cashbacknorge.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<div class="container">
+  <nav class="site-tabs" aria-label="Velg seksjon"><a href="/">Cashback</a><a href="/dagligvarer/" aria-current="page">Dagligvarer</a></nav>
+  <img class="intro-logo" src="/logo.png?v=quokka-1" alt="">
+  <h1>Dagligvarer</h1>
+  <p class="subtitle">Ukens tilbud fra kundeavisene – søk og sorter på tvers av butikkene.</p>
+  <div class="update-row"><span id="updated">Oppdatert daglig</span><span data-theme-control></span></div>
+  <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
+    <div class="invite-card-header">
+      <span class="cbn-chip cbn-chip--muted">Annonse</span>
+      <span data-invite-provider></span>
+      <button class="cbn-button cbn-button--quiet invite-card-dismiss" type="button" aria-label="Skjul annonsen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <h2 id="support-invite-title" data-invite-title></h2>
+    <p data-invite-description></p>
+    <a class="cbn-button cbn-button--primary invite-card-action" target="_blank" rel="sponsored noopener noreferrer"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+    <p class="invite-card-fine-print" data-invite-fine-print hidden></p>
+  </aside>
+  <div class="sticky-header">
+    <div class="chip-toggles chain-toggles" id="chains" role="group" aria-label="Butikker"></div>
+    <div class="list-bar">
+      <div class="count" id="count" aria-live="polite"></div>
+      <button class="cbn-button cbn-button--quiet list-reset" id="reset" type="button" hidden>Velg alle</button>
+      <button class="cbn-button cbn-button--quiet sort-button" id="sort" type="button" aria-label="Sorter tilbud">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>
+        <span data-choice-label></span>
+      </button>
+      <div class="view-toggle" role="group" aria-label="Visning">
+        <button class="cbn-button cbn-button--quiet" type="button" data-view="list" aria-label="Liste" title="Liste"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><rect x="3" y="4.5" width="3" height="3" rx=".5"/><rect x="3" y="10.5" width="3" height="3" rx=".5"/><rect x="3" y="16.5" width="3" height="3" rx=".5"/></svg></button>
+        <button class="cbn-button cbn-button--quiet" type="button" data-view="grid" aria-label="Rutenett" title="Rutenett"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <div class="input-wrap flex1">
+        <input class="cbn-field search" id="search" type="search" placeholder="Søk etter vare, f.eks. kaffe..." autocomplete="off" aria-label="Søk i ukens tilbud">
+        <button class="cbn-button cbn-button--quiet input-clear" type="button" aria-label="Tøm søk">✕</button>
+      </div>
+    </div>
+  </div>
+  <div class="results" id="results" aria-live="off"><div class="empty">Laster tilbud …</div></div>
+  <div id="results-more" aria-hidden="true"></div>
+  <p class="note" id="note"></p>
+  <footer class="footer" style="margin-bottom:56px;">
+    <nav style="margin-bottom:6px;">
+      <a href="/">Cashback</a> · <a href="/om-oss/">Om oss</a> · <a href="/informasjonskapsler/">Informasjonskapsler</a>
+    </nav>
+    <div>© 2026 Cashback Norge · Uavhengig oversikt, ikke tilknyttet butikkene</div>
+  </footer>
+</div>
+<div class="fixed-footer">
+  <div class="tip-line"></div>
+</div>
+<img class="grocery-preview" id="preview" alt="" hidden>
+<script src="/shared-data.js"></script>
+<script>
+// Data: /grocery-offers.json, built by the daily crawl from the supermarkets' flyers (Tjek's
+// offer data, the data behind etilbudsavis.no). Votes use the same Supabase functions as
+// the discount codes, under the key "dagligvarer".
+const {
+  GROCERY_CHAIN_LIST, getGroceryChain, installGroceryChainStyles, createCountBadge, fitCountToChip, createChoiceMenu, createLazyBatches,
+  renderSupportFooter, getInstabankInvite, renderSupportInvite, selectSupportAdvertisement,
+  fetchVoteTallies, fetchMyVotes, apiVote, formatKr,
+} = window.SHARED;
+const VOTE_KEY = "dagligvarer";
+const STORAGE_KEY = "cbn-dagligvarer-v1";
+const BATCH = 40;
+const SORTS = [
+  { value: "relevance", label: "Mest relevant" },
+  { value: "saving", label: "Størst rabatt" },
+  { value: "savingKr", label: "Mest spart i kr" },
+  { value: "price", label: "Lavest pris" },
+  { value: "votes", label: "Best vurdert" },
+  { value: "ending", label: "Utløper først" },
+];
+const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
+
+const $ = (id) => document.getElementById(id);
+const state = { offers: [], counts: new Map(), off: new Set(), query: "", sort: "relevance", view: "list", list: [], shown: 0 };
+// Votes per offer id (upper case, as the vote function stores it).
+const tallies = new Map();
+let myVotes = {};
+
+function loadPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    if (Array.isArray(saved.off)) state.off = new Set(saved.off.filter((name) => typeof name === "string"));
+    if (SORTS.some((sort) => sort.value === saved.sort)) state.sort = saved.sort;
+    if (saved.view === "grid" || saved.view === "list") state.view = saved.view;
+  } catch { /* Defaults: every chain, most relevant, list. */ }
+}
+function savePreferences() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ off: [...state.off], sort: state.sort, view: state.view })); } catch { /* Optional. */ }
+}
+
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch]);
+function fold(value) {
+  return String(value).toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+const kr = (amount) => `${formatKr(Math.round(amount * 100) / 100)} kr`;
+function formatDate(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", timeZone: "Europe/Oslo" }).format(date).replace(/\.$/, "");
+}
+// Flyer headings are often in capitals ("MILLS KAVIAR TUBE").
+function formatHeading(heading) {
+  return heading === heading.toUpperCase() ? heading.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, s, l) => s + l.toUpperCase()) : heading;
+}
+function formatDescription(description) {
+  return description.split(/\n+/).map((line) => line.trim()).filter(Boolean).join(" · ").replace(/\/(KG|L|STK)\b/g, (m, unit) => `/${unit.toLowerCase()}`);
+}
+function chainLabel(name) {
+  return getGroceryChain(name)?.label ?? name;
+}
+function chainClass(name) {
+  const chain = getGroceryChain(name);
+  return chain ? `badge-chain-${chain.slug}` : "cbn-chip--muted";
+}
+const savingPercent = (offer) => offer.prePrice > offer.amount ? Math.round((1 - offer.amount / offer.prePrice) * 100) : 0;
+const savingKr = (offer) => offer.prePrice > offer.amount ? offer.prePrice - offer.amount : 0;
+const netVotes = (offer) => { const t = tallies.get(offer.id.toUpperCase()); return t ? t.upvotes - t.downvotes : 0; };
+function isRunning(offer, now) {
+  return Date.parse(offer.validTo) >= now && Date.parse(offer.validFrom) <= now;
+}
+
+function renderChains() {
+  const nav = $("chains");
+  nav.replaceChildren();
+  const chains = [...state.counts.keys()].sort((a, b) => chainLabel(a).localeCompare(chainLabel(b), "nb"));
+  for (const name of chains) {
+    const button = document.createElement("button");
+    const on = !state.off.has(name);
+    button.type = "button";
+    button.className = `cbn-chip chip-toggle ${on ? chainClass(name) : ""}`;
+    button.dataset.chain = name;
+    button.setAttribute("aria-pressed", String(on));
+    button.title = on ? `Skjul ${chainLabel(name)}` : `Vis ${chainLabel(name)}`;
+    const label = document.createElement("span");
+    label.textContent = chainLabel(name);
+    const count = createCountBadge(state.counts.get(name), `${state.counts.get(name)} tilbud`);
+    button.append(label, count);
+    nav.append(button);
+    if (on) fitCountToChip(button);
+  }
+  $("reset").hidden = ![...state.counts.keys()].some((name) => state.off.has(name));
+}
+
+function relevance(offer, words) {
+  const heading = fold(offer.heading);
+  return words.reduce((score, word) => score + (heading.startsWith(word) ? 3 : heading.includes(word) ? 2 : 1), 0);
+}
+
+function render() {
+  const now = Date.now();
+  const words = fold(state.query).split(/\s+/).filter(Boolean);
+  const inChains = state.offers.filter((offer) => isRunning(offer, now) && !state.off.has(offer.chain));
+  let list = words.length === 0 ? inChains : inChains.filter((offer) => {
+    const text = offer.searchText ??= fold(`${offer.heading} ${offer.description} ${chainLabel(offer.chain)}`);
+    return words.every((word) => text.includes(word));
+  });
+  const byDiscount = (a, b) => savingPercent(b) - savingPercent(a) || a.amount - b.amount;
+  const sorters = {
+    relevance: (a, b) => (words.length ? relevance(b, words) - relevance(a, words) : 0) || byDiscount(a, b),
+    saving: byDiscount,
+    savingKr: (a, b) => savingKr(b) - savingKr(a) || byDiscount(a, b),
+    price: (a, b) => a.amount - b.amount,
+    votes: (a, b) => netVotes(b) - netVotes(a) || byDiscount(a, b),
+    ending: (a, b) => Date.parse(a.validTo) - Date.parse(b.validTo) || byDiscount(a, b),
+  };
+  list = [...list].sort(sorters[state.sort] || sorters.relevance);
+  const total = inChains.length;
+  $("count").textContent = words.length ? `${list.length} av ${total} tilbud` : `${total} tilbud`;
+  state.list = list;
+  state.shown = 0;
+  hidePreview();
+  const results = $("results");
+  results.classList.toggle("results--grid", state.view === "grid");
+  if (list.length === 0) {
+    const message = state.counts.size > 0 && [...state.counts.keys()].every((name) => state.off.has(name))
+      ? "Velg minst én butikk."
+      : words.length ? `Ingen tilbud på «${esc(state.query)}» akkurat nå.` : "Ingen tilbud akkurat nå.";
+    results.innerHTML = `<div class="empty">${message}</div>`;
+    return;
+  }
+  results.replaceChildren();
+  renderMore();
+  rearmBatches();
+}
+
+function renderMore() {
+  const end = Math.min(state.list.length, state.shown + BATCH);
+  const template = document.createElement("template");
+  template.innerHTML = state.list.slice(state.shown, end).map(offerHtml).join("");
+  state.shown = end;
+  $("results").append(template.content);
+}
+
+function voteButtons(offer) {
+  const tally = tallies.get(offer.id.toUpperCase());
+  const net = tally ? tally.upvotes - tally.downvotes : 0;
+  const mine = tally ? myVotes[tally.id] : undefined;
+  return `<span class="grocery-votes">
+    <button class="cbn-button cbn-button--quiet vote-btn${mine === -1 ? " downvoted" : ""}" type="button" data-vote="-1" aria-label="Dårlig tilbud">${THUMBS_DOWN_SVG}<span class="vote-count">${net < 0 ? -net : ""}</span><span class="vote-tooltip">Ikke noe tilbud</span></button>
+    <button class="cbn-button cbn-button--quiet vote-btn${mine === 1 ? " voted" : ""}" type="button" data-vote="1" aria-label="Godt tilbud">${THUMBS_UP_SVG}<span class="vote-count">${net > 0 ? net : ""}</span><span class="vote-tooltip">Godt tilbud!</span></button>
+  </span>`;
+}
+
+function offerHtml(offer) {
+  const heading = formatHeading(offer.heading);
+  const saving = savingPercent(offer);
+  const thumb = offer.imageUrl
+    ? `<button class="grocery-thumb" type="button" data-preview="${esc(offer.imageUrl)}" aria-label="Vis større bilde av ${esc(heading)}"><img src="${esc(offer.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('grocery-thumb--empty');this.remove()"></button>`
+    : `<span class="grocery-thumb grocery-thumb--empty" aria-hidden="true"></span>`;
+  const description = offer.description ? `<span class="grocery-desc">${esc(formatDescription(offer.description))}</span>` : "";
+  const before = offer.prePrice > offer.amount
+    ? `<span class="grocery-before"><s aria-label="Førpris">${esc(kr(offer.prePrice))}</s>${saving > 0 ? `<span class="cbn-chip cbn-chip--highlight">−${saving} %</span>` : ""}</span>`
+    : "";
+  return `<article class="cbn-card grocery-row" data-id="${esc(offer.id)}">
+    ${thumb}
+    <div class="grocery-main">
+      <span class="grocery-title">${esc(heading)}</span>
+      ${description}
+      <span class="grocery-meta"><span class="cbn-chip badge ${chainClass(offer.chain)}">${esc(chainLabel(offer.chain))}</span><span class="grocery-valid">t.o.m. ${esc(formatDate(offer.validTo))}</span></span>
+    </div>
+    <div class="grocery-side">
+      <strong class="grocery-price">${esc(kr(offer.amount))}</strong>
+      ${before}
+      ${voteButtons(offer)}
+    </div>
+  </article>`;
+}
+
+// Larger product image on hover (or tap on touch screens), clamped to the viewport.
+let previewFor = null;
+function showPreview(thumb) {
+  const preview = $("preview");
+  previewFor = thumb;
+  preview.src = thumb.dataset.preview;
+  preview.hidden = false;
+  const place = () => {
+    if (previewFor !== thumb) return;
+    const rect = thumb.getBoundingClientRect();
+    const width = preview.offsetWidth || 320;
+    const height = preview.offsetHeight || 320;
+    const right = rect.right + 12;
+    const left = right + width <= window.innerWidth - 12 ? right : Math.max(12, rect.left - width - 12);
+    const top = Math.min(Math.max(12, rect.top + rect.height / 2 - height / 2), window.innerHeight - height - 12);
+    preview.style.left = `${left}px`;
+    preview.style.top = `${Math.max(12, top)}px`;
+  };
+  place();
+  preview.onload = place;
+}
+function hidePreview() {
+  previewFor = null;
+  $("preview").hidden = true;
+}
+
+function setupResults() {
+  const results = $("results");
+  const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)");
+  results.addEventListener("pointerover", (event) => {
+    if (!hoverCapable.matches || state.view === "grid") return;
+    const thumb = event.target.closest(".grocery-thumb[data-preview]");
+    if (thumb && thumb !== previewFor) showPreview(thumb);
+  });
+  results.addEventListener("pointerout", (event) => {
+    const thumb = event.target.closest(".grocery-thumb[data-preview]");
+    if (thumb && hoverCapable.matches && !thumb.contains(event.relatedTarget)) hidePreview();
+  });
+  results.addEventListener("click", (event) => {
+    const vote = event.target.closest(".vote-btn");
+    if (vote) return void castVote(vote);
+    const thumb = event.target.closest(".grocery-thumb[data-preview]");
+    if (thumb && state.view === "list") previewFor === thumb ? hidePreview() : showPreview(thumb);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (previewFor && !event.target.closest(".grocery-thumb")) hidePreview();
+  });
+  window.addEventListener("scroll", () => { if (previewFor && !hoverCapable.matches) hidePreview(); }, { passive: true });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") hidePreview(); });
+}
+
+async function castVote(button) {
+  const row = button.closest(".grocery-row");
+  const offer = state.offers.find((item) => item.id === row?.dataset.id);
+  if (!offer || button.disabled) return;
+  const vote = Number(button.dataset.vote);
+  const key = offer.id.toUpperCase();
+  const tally = tallies.get(key);
+  button.closest(".grocery-votes").querySelectorAll(".vote-btn").forEach((item) => { item.disabled = true; });
+  const result = await apiVote(tally?.id ?? 0, vote, { hostname: VOTE_KEY, code: offer.id, reward: formatHeading(offer.heading).slice(0, 80) });
+  if (result?.rate_limited) {
+    showRowMessage(row, "Du har nådd grensen på 5 stemmer per dag.");
+  } else if (result && typeof result.upvotes === "number") {
+    const id = result.registered_id ?? tally?.id;
+    if (result.deleted || id === undefined) tallies.delete(key);
+    else tallies.set(key, { id, code: key, upvotes: result.upvotes, downvotes: result.downvotes });
+    if (id !== undefined) {
+      if (result.toggled_off || result.deleted) delete myVotes[id];
+      else myVotes[id] = vote;
+    }
+  } else {
+    showRowMessage(row, "Klarte ikke å lagre stemmen. Prøv igjen.");
+  }
+  const votes = row.querySelector(".grocery-votes");
+  const template = document.createElement("template");
+  template.innerHTML = voteButtons(offer);
+  votes.replaceWith(template.content);
+}
+function showRowMessage(row, text) {
+  if (row.querySelector(".rate-limit-msg")) return;
+  const message = document.createElement("div");
+  message.className = "rate-limit-msg";
+  message.textContent = text;
+  row.append(message);
+  setTimeout(() => message.remove(), 2500);
+}
+
+async function loadVotes() {
+  // Offers run for a week or two; older votes are not needed.
+  const since = new Date(Date.now() - 21 * 86_400_000).toISOString();
+  const [rows, mine] = await Promise.all([fetchVoteTallies(VOTE_KEY, since), fetchMyVotes(VOTE_KEY)]);
+  myVotes = mine;
+  for (const row of rows) tallies.set(row.code.toUpperCase(), row);
+  if (rows.length === 0 && Object.keys(mine).length === 0) return;
+  // Refresh the visible vote buttons without losing the scroll position.
+  document.querySelectorAll(".grocery-row").forEach((row) => {
+    const offer = state.offers.find((item) => item.id === row.dataset.id);
+    if (!offer) return;
+    const template = document.createElement("template");
+    template.innerHTML = voteButtons(offer);
+    row.querySelector(".grocery-votes").replaceWith(template.content);
+  });
+  if (state.sort === "votes") render();
+}
+
+let rearmBatches = () => {};
+let searchTimer;
+function syncUrl() {
+  const url = new URL(location.href);
+  if (state.query) url.searchParams.set("q", state.query);
+  else url.searchParams.delete("q");
+  url.searchParams.delete("kjede");
+  if (url.href !== location.href) history.replaceState(null, "", url);
+}
+
+function setupControls() {
+  $("chains").addEventListener("click", (event) => {
+    const button = event.target.closest(".chip-toggle");
+    if (!button) return;
+    const name = button.dataset.chain;
+    if (state.off.has(name)) state.off.delete(name);
+    else state.off.add(name);
+    savePreferences();
+    renderChains();
+    render();
+  });
+  $("reset").addEventListener("click", () => {
+    state.off.clear();
+    savePreferences();
+    renderChains();
+    render();
+  });
+  const search = $("search");
+  const wrap = search.closest(".input-wrap");
+  search.addEventListener("input", () => {
+    wrap.classList.toggle("has-value", search.value.length > 0);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { state.query = search.value.trim(); render(); syncUrl(); }, 120);
+  });
+  wrap.querySelector(".input-clear").addEventListener("click", () => {
+    search.value = "";
+    wrap.classList.remove("has-value");
+    state.query = "";
+    render();
+    syncUrl();
+    search.focus();
+  });
+  createChoiceMenu($("sort"), SORTS, () => state.sort, (value) => {
+    state.sort = value;
+    savePreferences();
+    render();
+  });
+  const updateViewButtons = () => document.querySelectorAll("[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === state.view)));
+  document.querySelector(".view-toggle").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view]");
+    if (!button || button.dataset.view === state.view) return;
+    state.view = button.dataset.view;
+    savePreferences();
+    updateViewButtons();
+    render();
+  });
+  updateViewButtons();
+  rearmBatches = createLazyBatches($("results-more"), () => state.shown < state.list.length, renderMore);
+}
+
+function setupAds() {
+  // One draw per page, so the top card and the bottom line agree.
+  const draw = Math.random();
+  renderSupportFooter(document.querySelector(".fixed-footer .tip-line"), selectSupportAdvertisement(draw), [], window.CashbackTooltips.attach, "/");
+  const invite = getInstabankInvite(draw);
+  if (invite) renderSupportInvite($("support-invite"), invite, () => $("search").focus({ preventScroll: true }));
+}
+
+(async () => {
+  installGroceryChainStyles();
+  loadPreferences();
+  const params = new URLSearchParams(location.search);
+  state.query = params.get("q") || "";
+  $("search").value = state.query;
+  $("search").closest(".input-wrap").classList.toggle("has-value", state.query.length > 0);
+  setupAds();
+  setupControls();
+  setupResults();
+  try {
+    const response = await fetch("/grocery-offers.json", { cache: "no-cache" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const catalog = await response.json();
+    state.offers = Array.isArray(catalog.offers)
+      ? catalog.offers.filter((offer) => typeof offer.id === "string" && typeof offer.amount === "number" && Number.isFinite(offer.amount) && offer.amount > 0)
+      : [];
+    const now = Date.now();
+    for (const offer of state.offers) if (isRunning(offer, now)) state.counts.set(offer.chain, (state.counts.get(offer.chain) || 0) + 1);
+    // An old link to one chain (?kjede=KIWI) shows only that chain.
+    const only = params.get("kjede");
+    if (only && state.counts.has(only)) {
+      state.off = new Set([...state.counts.keys()].filter((name) => name !== only));
+      savePreferences();
+    }
+    $("updated").textContent = `Oppdatert ${formatDate(catalog.generatedAt)}`;
+    $("note").textContent = `Priser fra kundeavisene for ${catalog.location || "Oslo"}-området, hentet daglig via eTilbudsavis. Tilbud kan variere mellom regioner og butikker og gjelder så langt lageret rekker. Stemmene er brukernes egne vurderinger.`;
+    renderChains();
+    render();
+    syncUrl();
+    void loadVotes();
+  } catch {
+    $("results").innerHTML = `<div class="empty">Klarte ikke å hente tilbudene akkurat nå. Prøv igjen senere.</div>`;
+  }
+})();
+</script>
+</body>
+</html>
