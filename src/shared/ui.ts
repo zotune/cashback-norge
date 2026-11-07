@@ -27,6 +27,8 @@ export const UI_CSS = `
 .cbn-button:disabled { opacity: .4; cursor: default; }
 .cbn-button--quiet { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
 .cbn-button--primary { --cbn-button-bg: var(--cbn-accent); --cbn-button-fg: var(--cbn-on-accent); }
+.site-tabs a[aria-current="page"] { background: var(--cbn-surface); color: var(--cbn-text); }
+.site-tabs a:hover, .site-tabs a[aria-current="page"]:hover { background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-button[aria-pressed="true"], .cbn-button.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-button--filter { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
 .cbn-button--filter[aria-pressed="true"] {

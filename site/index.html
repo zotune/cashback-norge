@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cashback Norge</title>
-<script src="/theme.js?v=5"></script>
-<link rel="stylesheet" href="/site.css?v=7">
+<script src="/theme.js?v=6"></script>
+<link rel="stylesheet" href="/site.css?v=8">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="favicon.png?v=quokka-1">
 <script>
@@ -545,7 +545,6 @@ a.code-reward { color: inherit; text-decoration: none; }
     <a id="iphone-guide-btn" class="cbn-button install-link install-iphone" href="iphone/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4m-3 14h2"/></svg><span class="install-label">iPhone/iPad<small>Safari</small></span></a>
     <a id="android-guide-btn" class="cbn-button install-link install-android" href="android/" aria-label="Installer på Android med Firefox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 5-2-3m12 3 2-3M4 10a8 8 0 0 1 16 0zM4 13v6h16v-6M8 19v3m8-3v3M1 12v6m22-6v6"/><circle cx="8" cy="7" r=".7" fill="currentColor" stroke="none"/><circle cx="16" cy="7" r=".7" fill="currentColor" stroke="none"/></svg><span class="install-label">Android<small>Firefox</small></span></a>
   </nav>
-  <p style="font-size:11px;color:var(--cbn-muted);text-align:center;margin-bottom:12px;">Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.</p>
   <div class="adblock-warning">⚠ Adblock er aktivert – husk å deaktivere det på butikkens side for å sikre cashback-sporing</div>
   <aside class="cbn-card invite-card" id="support-invite" aria-labelledby="support-invite-title" hidden>
     <div class="invite-card-header">
@@ -619,9 +618,9 @@ a.code-reward { color: inherit; text-decoration: none; }
   <div class="tip-line"></div>
 </div>
 <img class="quokka-runner" src="quokka-mascot.png?v=quokka-1" alt="" aria-hidden="true">
-<script src="shared-data.js?v=7"></script>
+<script src="shared-data.js?v=8"></script>
 <script>
-const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey, renderSupportFooter, getInstabankInvite, createCountBadge, fitCountToChip, renderSupportInvite, createLazyBatches, SUPABASE_URL, SUPABASE_ANON_KEY, fetchMyVotes, apiVote } = window.SHARED;
+const { PROVIDER_NAMES, PROVIDER_TIPS, PROVIDER_WELCOME_BONUSES, EB_PER_TRUMF_KR, PREMIUM_CARDS, SUPPORT_LINKS, MERCHANT_ALIASES, QUICK_FILTERS, matchesOfferQuickFilters, getCardBenefitOffers, getFreeCards, watchCardBenefitDate, INSTABANK_AD, selectSupportAdvertisement, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, formatTooltipHtml, getOfferCampaignLabel, getVisibleOfferKey, renderSupportFooter, getInstabankInvite, createCountBadge, fitCountToChip, renderSupportInvite, createLazyBatches, SUPABASE_URL, SUPABASE_ANON_KEY, fetchMyVotes, apiVote, getMerchantFaviconUrl } = window.SHARED;
 const SITE_PROVIDER_REFERRAL_URLS = {
   nettbonus: SUPPORT_LINKS.find(link => link.url.includes("nettbonus.no/r/"))?.url,
   spareborsen: SUPPORT_LINKS.find(link => link.url.includes("spareborsen.no/ref/"))?.url,
@@ -1278,10 +1277,11 @@ function merchantCardHtml(m) {
   renderedMerchants.prevLetter = currentLetter;
   const key = m.name.toLowerCase();
   const domain = pickBestDomain(m.domains);
-  const hasIcon = domain.length > 0;
+  const favicon = getMerchantFaviconUrl(domain);
+  const hasIcon = Boolean(favicon);
   const letter = esc(m.name.charAt(0).toUpperCase());
   const iconHtml = hasIcon
-    ? `<img class="merchant-icon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
+    ? `<img class="merchant-icon" src="${favicon}" alt="" loading="lazy" onload="if(this.naturalWidth<20){this.style.display='none';this.nextElementSibling.style.display='flex'}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="merchant-icon merchant-icon-fallback" style="display:none">${letter}</span>`
     : `<span class="merchant-icon merchant-icon-fallback">${letter}</span>`;
   const visibleOffers = getVisibleMerchantOffers(m);
   const cashbackOffers = visibleOffers.filter(o => o.provider !== "rabattkode" && (o.provider !== "dnb" || !o.discountCode) && o.provider !== "tfbank");
@@ -1877,9 +1877,8 @@ function setupAzBar() {
   const letters = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ".split("")];
   bar.innerHTML = letters.map(l => `<span data-l="${l}">${l}</span>`).join("");
 
-  const setActive = (letter) => {
-    bar.querySelectorAll("span").forEach(s => s.classList.toggle("active", s.dataset.l === letter));
-  };
+  const alphabet = window.SHARED.createAlphabetTracker(bar, () => (document.querySelector(".sticky-header")?.offsetHeight ?? 0) + 8);
+  const setActive = alphabet.select;
 
   const jumpTo = (letter) => {
     renderMerchantsThroughLetter(letter);
@@ -1893,18 +1892,8 @@ function setupAzBar() {
     setActive(letter);
   };
 
-  // Update active letter on scroll
-  const observer = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        setActive(entry.target.dataset.letter);
-        break;
-      }
-    }
-  }, { threshold: 0, rootMargin: "-40% 0px -55% 0px" });
-
-  window._azReset = () => observer.disconnect();
-  window._azObserve = (merchants) => merchants.forEach(el => observer.observe(el));
+  window._azReset = alphabet.reset;
+  window._azObserve = alphabet.observe;
 
   bar.addEventListener("click", (e) => {
     const span = e.target.closest("span[data-l]");

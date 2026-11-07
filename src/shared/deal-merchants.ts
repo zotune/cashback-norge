@@ -1,6 +1,13 @@
 import { normalizeDomainInput, type CashbackIndex } from "./cashback.js";
 import { normalizePriceMatchShopName } from "./product-match.js";
 
+/** Shared favicon source for the home page and the daily offer image snapshot. */
+export function getMerchantFaviconUrl(value: string): string | undefined {
+  const domain = normalizeDomainInput(value);
+  if (!domain || !domain.includes(".")) return undefined;
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+}
+
 /** Reuse verified merchant/domain links, accepting a name only when it is unambiguous.
  * A CDN logo or a click tracking hostname never supplies a merchant domain.
  */

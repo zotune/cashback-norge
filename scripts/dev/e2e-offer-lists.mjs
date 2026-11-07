@@ -68,6 +68,7 @@ try {
   assert.equal(await page.locator('.group-toggle[aria-pressed="true"]').count(), 1);
   assert.ok((await page.locator('.deal-store-filter').allTextContents()).every(text => text.trim() === 'Coop Prix'));
   assert.match(await page.locator('a.card-chip').first().innerText(), /minst 2 %/);
+  assert.equal(await page.locator('a.card-chip').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'none');
   assert.match(await page.locator('a.card-chip').first().getAttribute('title'), /minst 1 % kjøpeutbytte.*1 % ekstra/);
   await page.locator('[data-ol="all"]').click();
   assert.equal(await page.locator('.site-tabs a').nth(1).innerText(), 'Tilbud');
@@ -92,7 +93,9 @@ try {
   await chooseSort('name');
   await page.locator('[data-ol="az"]').waitFor({ state: 'visible' });
   await page.locator('[data-ol="az"] [data-letter="T"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-ol="az"] [aria-current="true"]')?.dataset.letter === 'T');
   await page.evaluate(() => scrollTo(0, 0));
+  await page.waitForFunction(() => document.querySelector('[data-ol="az"] [aria-current="true"]')?.dataset.letter === document.querySelector('.deal-row')?.dataset.letter);
   await page.locator('[data-ol="filter-toggle"]').click();
   await page.locator('[data-filter="maxPrice"]').fill('10');
   await page.waitForFunction(() => [...document.querySelectorAll('.deal-price')].every(el => Number(el.textContent.replace(/[^\d,]/g, '').replace(',', '.')) <= 10));
@@ -110,6 +113,11 @@ try {
   await page.locator('#card-bonus-toggle').click();
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });
+    for (const href of ['/dagligvarer/', '/dagens-tilbud/']) {
+      const tab = page.locator(`.site-tabs a[href="${href}"]`);
+      await tab.hover();
+      assert.deepEqual(await rgb(tab), colorScheme === 'dark' ? [25, 53, 38] : [234, 247, 239]);
+    }
     const shop = page.locator('[data-group="Nærbutikken"]');
     await shop.hover();
     const hoverBackground = await rgb(shop);
@@ -147,6 +155,8 @@ try {
     for (const view of ['list', 'grid']) {
       await page.locator(`[data-view="${view}"]`).click();
       await noOverflow();
+      const buttons = await page.locator('.deal-actions').first().locator('button').all();
+      assert.equal(await buttons.at(-1).getAttribute('aria-label'), 'Kopier tilbudet som bilde');
       const metadata = await page.locator('.deal-meta--validity .deal-validity').first().evaluate(el => [...el.children].map(child => child.getBoundingClientRect().top));
       assert.ok(metadata[1] >= metadata[0] + 15, 'countdown must sit below the date with a gap');
       if (width === 390) await page.screenshot({ path: `${output}/grocery-mobile-${view}.png` });
@@ -180,6 +190,8 @@ try {
   const aboveLowRow = page.locator(`[data-id="pj${aboveLow.id}"]`);
   const warning = aboveLowRow.locator('.deal-history .cbn-chip--warning');
   await warning.waitFor();
+  assert.match(await warning.innerText(), /til lavpris$/);
+  assert.ok(!(await warning.innerText()).includes('+'), 'historical comparison shows a required reduction from today’s price');
   const warningColor = await rgb(warning, 'color');
   assert.ok(warningColor[0] > warningColor[1], 'a price above the historical low uses an amber warning');
   await page.locator('[data-ol="search"]').fill('Starlink Mini');
@@ -205,23 +217,30 @@ try {
   await filterMenu.locator('.selection-search').fill('3d-printer');
   await filterMenu.locator('[data-value="category:3D-printere"]').click();
   await page.keyboard.press('Escape');
-  assert.ok((await page.locator('.category-link').allTextContents()).every(text => text === '3D-printere'));
+  assert.ok((await page.locator('[data-category]').allTextContents()).every(text => text === '3D-printere'));
   assert.match(await page.locator('.active-offer-filter-group[aria-label="Underkategorier"]').innerText(), /^Underkategorier:\s+3D-printere/);
   await page.reload();
   await page.locator('.deal-row').first().waitFor();
-  assert.ok((await page.locator('.category-link').allTextContents()).every(text => text === '3D-printere'));
+  assert.ok((await page.locator('[data-category]').allTextContents()).every(text => text === '3D-printere'));
+  const mainCategory = await page.locator('[data-only-group]').first().innerText();
+  await page.locator('[data-only-group]').first().click();
+  assert.ok((await page.locator('[data-only-group]').allTextContents()).every(text => text === mainCategory));
+  assert.equal(await page.locator('.active-offer-filter-group[aria-label="Underkategorier"]').count(), 0);
   await page.locator('[data-ol="filter-reset"]').click();
   await page.locator('[data-ol="filter-picker"]').click();
   await filterMenu.locator('.selection-search').fill('Skousen');
   await filterMenu.locator('[data-value="store:Skousen"]').click();
   await page.keyboard.press('Escape');
-  assert.ok((await page.locator('.deal-store-link').allTextContents()).every(text => text.trim() === 'Skousen'));
+  assert.ok((await page.locator('.deal-store-link .deal-store-name').allTextContents()).every(text => text.trim() === 'Skousen'));
   assert.match(await page.locator('.deal-store-link').first().getAttribute('href'), /^https:\/\/www\.prisjakt\.no\/shop\.php\?f=/);
   assert.equal(await page.locator('.deal-store-benefits').count(), 0);
   assert.ok((await page.locator('.deal-thumb img, .deal-store-icon').evaluateAll(images => images.map(img => new URL(img.src).origin))).every(origin => origin === 'http://localhost:8765'));
   assert.equal(await page.locator('.deal-title a svg').count(), 0);
-  const shopBadge = page.locator('.deal-store-badge--logo').first();
-  assert.ok(await shopBadge.evaluate(badge => badge.querySelector('img').getBoundingClientRect().bottom <= badge.querySelector('.deal-store-name').getBoundingClientRect().top), 'retailer logo sits above its name inside the chip');
+  const shopIcon = page.locator('.deal-store-icon').first();
+  await shopIcon.scrollIntoViewIfNeeded();
+  await shopIcon.evaluate(img => img.decode());
+  const shopBadge = shopIcon.locator('..');
+  assert.ok(await shopBadge.evaluate(badge => badge.querySelector('img').getBoundingClientRect().right <= badge.querySelector('.deal-store-name').getBoundingClientRect().left), 'favicon sits to the left of the retailer name');
   const hoveredRow = page.locator('.deal-row').first();
   await hoveredRow.hover();
   const rowColor = await rgb(hoveredRow.locator('td').first());
@@ -238,9 +257,23 @@ try {
   await page.screenshot({ path: `${output}/deals-desktop.png` });
   await page.setViewportSize({ width: 390, height: 900 });
   await noOverflow();
+  const categoryChips = page.locator('.active-offer-filter-group[aria-label="Kategorier"] .active-offer-filter-chips');
+  assert.ok(await categoryChips.evaluate(el => el.scrollWidth > el.clientWidth && getComputedStyle(el).flexWrap === 'nowrap'), 'mobile categories have one horizontally scrollable row');
+  const box = await categoryChips.boundingBox();
+  const touch = await context.newCDPSession(page);
+  await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  await touch.send('Input.synthesizeScrollGesture', { x: Math.round(box.x + box.width * .7), y: Math.round(box.y + box.height / 2), xDistance: -200, yDistance: 0, gestureSourceType: 'touch', speed: 500 });
+  await page.waitForFunction(() => document.querySelector('.active-offer-filter-chips').scrollLeft > 0);
+  await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await touch.detach();
   await page.screenshot({ path: `${output}/deals-mobile.png` });
   await goto('/');
   await page.locator('.merchant').first().waitFor();
+  await page.locator('#az-bar [data-l="M"]').click();
+  await page.waitForFunction(() => document.querySelector('#az-bar [aria-current="true"]')?.dataset.l === 'M');
+  await page.locator('.merchant[data-letter="L"]').first().evaluate(row => scrollTo(0, row.getBoundingClientRect().top + scrollY - document.querySelector('.sticky-header').offsetHeight - 8));
+  await page.waitForFunction(() => document.querySelector('#az-bar [aria-current="true"]')?.dataset.l === 'L');
+  await page.evaluate(() => scrollTo(0, 0));
   await page.locator('.bonus-toggle').click();
   await page.locator('.bonus-chips-portal .bonus-chip').first().waitFor({ state: 'visible' });
   await page.locator('#provider-picker').click();

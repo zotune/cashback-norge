@@ -12,7 +12,7 @@
   const {
     createCountBadge, fitCountToChip, createChoiceMenu, createLazyBatches,
     renderSupportFooter, getInstabankInvite, renderSupportInvite, selectSupportAdvertisement,
-    fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer, createSelectionMenu, getDealLowPrice,
+    fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer, createSelectionMenu, getDealLowPrice, createAlphabetTracker,
   } = window.SHARED;
 
   const BATCH = 40;
@@ -121,6 +121,8 @@
       <div class="az-bar" data-ol="az" hidden></div>
       <img class="deal-preview" data-ol="preview" alt="" hidden>`;
     const el = (name) => config.mount.querySelector(`[data-ol="${name}"]`);
+
+    const alphabet = createAlphabetTracker(el("az"), () => el("sticky").offsetHeight + (config.mount.querySelector("thead")?.offsetHeight ?? 0) + 8);
 
     // ---------- preferences ----------
     function loadPreferences() {
@@ -278,6 +280,7 @@
       results.classList.toggle("results--grid", view === "grid");
       results.classList.toggle("results--table", view === "table");
       el("filter-toggle").classList.toggle("is-active", hasFilters());
+      alphabet.reset();
       renderAzBar();
       if (list.length === 0) {
         const message = state.counts.size > 0 && [...state.counts.keys()].every((name) => state.off.has(name))
@@ -305,6 +308,7 @@
         template.innerHTML = rows;
         el("results").append(template.content);
       }
+      if (!el("az").hidden) alphabet.observe(el("results").querySelectorAll(".deal-row"));
     }
 
     // ---------- rows ----------
@@ -335,18 +339,20 @@
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
     const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
-      const chip = `<span class="cbn-chip badge${item.store.iconUrl ? " deal-store-badge--logo" : ""} ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<span class="deal-store-name">${esc(item.store.label)}</span></span>`;
+      const initial = features.category ? `<span class="deal-store-initial" aria-hidden="true"${item.store.iconUrl ? ' style="display:none"' : ""}>${esc(item.store.label.charAt(0))}</span>` : "";
+      const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.nextElementSibling.style.display='inline-flex';this.remove()">` : ""}${initial}<span class="deal-store-name">${esc(item.store.label)}</span></span>`;
       if (!features.category) return `<button class="cbn-button cbn-button--quiet deal-store-filter" type="button" data-store-group="${esc(item.group)}" title="Vis bare ${esc(item.store.label)}" aria-label="Vis bare ${esc(item.store.label)}">${chip}</button>`;
       const store = item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
       return store;
     };
+    const categoryHtml = (item) => `<span class="deal-categories"><button class="cbn-button cbn-chip cbn-chip--muted category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button>${item.group && item.category && item.group !== item.category ? `<button class="cbn-button cbn-chip cbn-chip--muted category-link deal-main-category" type="button" data-only-group="${esc(item.group)}" title="Vis hele kategorien ${esc(item.group)}">${esc(item.group)}</button>` : ""}</span>`;
     const historyHtml = (item) => {
       const low = getDealLowPrice(item.amount, item.lowestPriceEver);
       if (!low) return `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
       const aboveLow = item.amount > low.lowestPrice;
-      const difference = low.abovePercent ? `${new Intl.NumberFormat("nb-NO").format(low.abovePercent)} %` : "0,1 %";
+      const difference = low.dropToLowPercent ? `${new Intl.NumberFormat("nb-NO").format(low.dropToLowPercent)} %` : "0,1 %";
       const tip = `Laveste registrerte varepris gjennom hele historikken, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`;
-      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight${aboveLow ? " cbn-chip--warning" : ""} card-chip" title="${aboveLow ? `Dagens pris er ${low.abovePercent ? "" : "mindre enn "}${difference} over laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${aboveLow ? low.abovePercent ? `+${difference}` : "&lt;0,1 % over" : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
+      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight${aboveLow ? " cbn-chip--warning" : ""} card-chip" title="${aboveLow ? `Dagens pris må falle ${low.dropToLowPercent ? "" : "mindre enn "}${difference} for å nå laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${aboveLow ? low.dropToLowPercent ? `−${difference} til lavpris` : "&lt;0,1 % til lavpris" : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
     };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
@@ -359,7 +365,7 @@
       return `<span class="days-left days-left--${tone}" title="Gyldig t.o.m. ${esc(formatDate(item.validTo))}">${label}</span>`;
     }
     const copyButtonHtml = () => `<button class="cbn-button cbn-button--quiet copy-btn" type="button" aria-label="Kopier tilbudet som bilde">${COPY_SVG}<span class="vote-tooltip">Kopier som bilde</span></button>`;
-    const actionsHtml = (item) => `<span class="deal-actions">${copyButtonHtml()}${voteButtons(item)}</span>`;
+    const actionsHtml = (item) => `<span class="deal-actions">${voteButtons(item)}${copyButtonHtml()}</span>`;
     function voteButtons(item) {
       const tally = tallies.get(item.id.toUpperCase());
       const net = tally ? tally.upvotes - tally.downvotes : 0;
@@ -370,11 +376,11 @@
       </span>`;
     }
     function tableRowHtml(item) {
-      return `<tr class="cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}">
+      return `<tr class="cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}" data-letter="${esc(letterOf(item))}">
         <td>${thumbHtml(item)}</td>
         <td>${titleHtml(item)}${factsHtml(item)}</td>
         <td>${storeHtml(item)}</td>
-        ${features.category ? `<td><button class="cbn-button cbn-chip cbn-chip--muted category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button></td>` : ""}
+        ${features.category ? `<td>${categoryHtml(item)}</td>` : ""}
         <td class="num"><span class="deal-price-stack"><strong class="deal-price">${esc(kr(item.amount))}</strong> ${item.prePrice > item.amount ? `<s class="deal-before" aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""}</span></td>
         <td class="num">${savingChipHtml(item)}</td>
         ${!features.history ? `<td class="num">${savingKr(item) > 0 ? esc(kr(savingKr(item))) : ""}</td>` : ""}
@@ -390,7 +396,7 @@
       const before = item.prePrice > item.amount || saving(item) > 0
         ? `<span class="deal-before">${item.prePrice > item.amount ? `<s aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""} ${savingChipHtml(item)}</span>`
         : "";
-      return `<article class="cbn-card cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}">
+      return `<article class="cbn-card cbn-row cbn-row--offer deal-row" data-id="${esc(item.id)}" data-letter="${esc(letterOf(item))}">
         ${thumbHtml(item)}
         <div class="deal-main">
           ${titleHtml(item)}
@@ -403,7 +409,7 @@
           ${actionsHtml(item)}
         </div>
         <div class="deal-details">
-          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? `<button class="cbn-button cbn-chip cbn-chip--muted category-link" type="button" data-category="${esc(item.category || item.group)}">${esc(item.category || item.group)}</button>` : ""}</div>
+          <div class="deal-meta deal-meta--store">${storeHtml(item)}${bonusHtml(item)}${features.category ? categoryHtml(item) : ""}</div>
           ${features.validity ? `<div class="deal-meta deal-meta--validity">${validityHtml(item)}</div>` : ""}
         </div>
       </article>`;
@@ -561,6 +567,7 @@
         if (!row) return;
         const top = row.getBoundingClientRect().top + window.scrollY - el("sticky").offsetHeight - (config.mount.querySelector(".deal-table thead")?.offsetHeight ?? 0) - 8;
         window.scrollTo({ top });
+        alphabet.select(letter);
         rearmBatches();
       });
     }
@@ -661,6 +668,8 @@
       results.addEventListener("click", (event) => {
         const store = event.target.closest("[data-store-group]");
         if (store) { state.off = new Set([...state.counts.keys()].filter((name) => name !== store.dataset.storeGroup)); updateSelectionFilters(); return; }
+        const group = event.target.closest("[data-only-group]");
+        if (group) { state.off = new Set([...state.counts.keys()].filter(name => name !== group.dataset.onlyGroup)); state.offCategories.clear(); updateSelectionFilters(); return; }
         const category = event.target.closest("[data-category]");
         if (category) { state.off.clear(); state.offCategories = new Set(state.items.map((item) => item.category).filter((name) => name !== category.dataset.category)); updateSelectionFilters(); return; }
         const vote = event.target.closest(".vote-btn");

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794070158
+// @version      1794070956
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -10931,6 +10931,8 @@ Ufullstendig oppslag: ${errors.join("; ")}`;
 .cbn-button:disabled { opacity: .4; cursor: default; }
 .cbn-button--quiet { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
 .cbn-button--primary { --cbn-button-bg: var(--cbn-accent); --cbn-button-fg: var(--cbn-on-accent); }
+.site-tabs a[aria-current="page"] { background: var(--cbn-surface); color: var(--cbn-text); }
+.site-tabs a:hover, .site-tabs a[aria-current="page"]:hover { background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-button[aria-pressed="true"], .cbn-button.is-active { background: var(--cbn-highlight); color: var(--cbn-accent); }
 .cbn-button--filter { --cbn-button-bg: transparent; --cbn-button-fg: var(--cbn-muted); }
 .cbn-button--filter[aria-pressed="true"] {

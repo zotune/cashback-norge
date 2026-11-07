@@ -104,8 +104,9 @@ test("all-time minimum uses the ALL response, including prices outside 90 days, 
 
 
 test("current verified prices count towards the low, with a meaningful distance from it", () => {
-  assert.deepEqual(getDealLowPrice(6999, 8159), { lowestPrice: 6999, abovePercent: 0 });
-  assert.deepEqual(getDealLowPrice(6000, 4000), { lowestPrice: 4000, abovePercent: 50 });
+  assert.deepEqual(getDealLowPrice(6999, 8159), { lowestPrice: 6999, dropToLowPercent: 0 });
+  assert.deepEqual(getDealLowPrice(6000, 4000), { lowestPrice: 4000, dropToLowPercent: 33.3 });
+  assert.deepEqual(getDealLowPrice(28990, 5999), { lowestPrice: 5999, dropToLowPercent: 79.3 });
   assert.equal(getDealLowPrice(100, undefined), undefined);
   assert.equal(getDealLowPrice(100, 0), undefined);
 });

@@ -40,6 +40,12 @@ test("daily image assets are resized, deduplicated, reused and pruned, with inva
     requests.length = 0;
     await cachePrisjaktCopyImages(result, input);
     assert.deepEqual(requests, []);
+    const withIcons = await cachePrisjaktCopyImages(result, { ...input, merchantDomain: () => "butikk.no", imageRequestUrl: url => {
+      assert.match(url, /^https:\/\/www\.google\.com\/s2\/favicons\?domain=butikk\.no&sz=64$/);
+      return `http://127.0.0.1:${address.port}/good`;
+    } });
+    assert.equal((await sharp(await readFile(join(directory, basename(withIcons.deals[0]!.storeIconUrl!)))).metadata()).width, 64);
+    assert.equal(withIcons.deals[0]!.storeLogoUrl, undefined);
     snapshot = await readFile(file);
     const redeployed = await cachePrisjaktCopyImages(result, { ...input, copyImageDirectory: deployDirectory, imageRequestUrl: () => `http://127.0.0.1:${address.port}/published` });
     assert.deepEqual(await readFile(join(deployDirectory, basename(redeployed.deals[0]!.imageUrl!))), snapshot, "manual deploys preserve published WebP bytes without another lossy conversion");

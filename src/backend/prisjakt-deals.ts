@@ -10,6 +10,7 @@ import { readPrisjaktDeals, getDealLowPrice, type PrisjaktDeal } from "../shared
 import type { Logger } from "./logger.js";
 import { readPrisjaktDealDetails, readPrisjaktAllTimeHistory } from "../shared/prisjakt-deal-details.js";
 import { cacheOfferImages, imageKey } from "./offer-images.js";
+import { getMerchantFaviconUrl } from "../shared/deal-merchants.js";
 
 export const PRISJAKT_DEALS_URL = "https://www.prisjakt.no/tema/dagens-tilbud";
 export const PRISJAKT_DEALS_PUBLISHED_URL = "https://cashbacknorge.no/prisjakt-deals.json";
@@ -35,6 +36,7 @@ export type CollectPrisjaktDealsInput = {
   historyUrl?: string;
   copyImageDirectory?: string;
   imageRequestUrl?: (url: string) => string;
+  merchantDomain?: (name: string) => string | undefined;
 };
 
 export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog | undefined> {
@@ -58,15 +60,20 @@ export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Pr
 
 /** Publish thumbnails and retailer logos from our own daily snapshot. */
 export async function cachePrisjaktCopyImages(catalog: PrisjaktDealsCatalog, input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog> {
-  const images = await cacheOfferImages(catalog.deals.flatMap(deal => [
+  const deals = catalog.deals.map(deal => {
+    const domain = input.merchantDomain?.(deal.store);
+    const icon = deal.storeIconUrl?.startsWith("/offer-images/") ? deal.storeIconUrl : domain ? getMerchantFaviconUrl(domain) : undefined;
+    return { ...deal, ...(icon ? { storeIconUrl: icon } : {}) };
+  });
+  const images = await cacheOfferImages(deals.flatMap(deal => [
     ...(deal.imageUrl ? [{ url: deal.imageUrl }] : []),
-    ...(deal.storeLogoUrl ? [{ url: deal.storeLogoUrl, size: 64 }] : []),
+    ...(deal.storeIconUrl ? [{ url: deal.storeIconUrl, size: 64 }] : []),
   ]), { logger: input.logger, ...(input.copyImageDirectory ? { directory: input.copyImageDirectory } : {}), ...(input.imageRequestUrl ? { requestUrl: input.imageRequestUrl } : {}) });
-  return { ...catalog, deals: catalog.deals.map(deal => {
+  return { ...catalog, deals: deals.map(deal => {
     const imageUrl = deal.imageUrl && images.get(imageKey({ url: deal.imageUrl }));
-    const storeLogoUrl = deal.storeLogoUrl && images.get(imageKey({ url: deal.storeLogoUrl, size: 64 }));
-    const { imageUrl: _image, copyImageUrl: _copy, storeLogoUrl: _logo, ...rest } = deal;
-    return { ...rest, ...(imageUrl ? { imageUrl, copyImageUrl: imageUrl } : {}), ...(storeLogoUrl ? { storeLogoUrl } : {}) };
+    const storeIconUrl = deal.storeIconUrl && images.get(imageKey({ url: deal.storeIconUrl, size: 64 }));
+    const { imageUrl: _image, copyImageUrl: _copy, storeLogoUrl: _logo, storeIconUrl: _icon, ...rest } = deal;
+    return { ...rest, ...(imageUrl ? { imageUrl, copyImageUrl: imageUrl } : {}), ...(storeIconUrl ? { storeIconUrl } : {}) };
   }) };
 }
 

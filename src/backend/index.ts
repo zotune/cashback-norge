@@ -32,6 +32,7 @@ import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog
 import { collectGroceryOffers } from "./grocery-offers.js";
 import { collectPrisjaktDeals } from "./prisjakt-deals.js";
 import { pruneOfferImages } from "./offer-images.js";
+import { createDealMerchantLookup } from "../shared/deal-merchants.js";
 import { collectElectricitySupplierCatalog } from "./electricity-supplier-catalog.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
@@ -284,7 +285,9 @@ async function main(): Promise<void> {
   // Not a cashback source: this week's supermarket flyer offers for cashbacknorge.no/dagligvarer.
   const groceryOffersPromise = config.skipGroceryOffers ? undefined : startEarly(collectGroceryOffers({ generatedAt, logger }));
   // Not a cashback source either: Prisjakt's "Dagens tilbud" for cashbacknorge.no/dagens-tilbud.
-  const prisjaktDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(collectPrisjaktDeals({ generatedAt, logger }));
+  const prisjaktDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(collectPrisjaktDeals({ generatedAt, logger,
+    merchantDomain: createDealMerchantLookup({ offers: [...previousOffersByProvider.values()].flat() }),
+  }));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
     maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
@@ -1168,7 +1171,7 @@ async function main(): Promise<void> {
   }
   await pruneOfferImages([
     ...(groceryOffers?.offers.map(offer => offer.imageUrl) ?? []),
-    ...(prisjaktDeals?.deals.flatMap(deal => [deal.imageUrl, deal.storeLogoUrl]) ?? []),
+    ...(prisjaktDeals?.deals.flatMap(deal => [deal.imageUrl, deal.storeIconUrl]) ?? []),
   ]);
 }
 

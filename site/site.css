@@ -297,8 +297,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 /* Section switch at the top of every page. */
 .site-tabs { display: flex; gap: 2px; width: max-content; max-width: 100%; margin: 0 auto 14px; padding: 3px; border-radius: 10px; background: var(--cbn-plate); }
 .site-tabs a { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 8px; color: var(--cbn-muted); font-size: 13px; font-weight: 650; text-decoration: none; }
-.site-tabs a:hover { color: var(--cbn-text); }
-.site-tabs a[aria-current="page"] { background: var(--cbn-surface); color: var(--cbn-text); box-shadow: 0 1px 3px #0002; }
+.site-tabs a[aria-current="page"] { box-shadow: 0 1px 3px #0002; }
 .site-tabs a:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; }
 /* Single-choice menus (sorting) reuse the filter menu rows without the count column. */
 .choice-menu { gap: 2px; padding: 6px; }

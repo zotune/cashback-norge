@@ -101,6 +101,43 @@ export function createLazyBatches(sentinel: Element, hasMore: () => boolean, loa
 
 export type ChoiceOption = { value: string; label: string };
 
+/** Share the active-letter marker between the merchant and product lists. */
+export function createAlphabetTracker(bar: HTMLElement, getOffset: () => number) {
+  const rows: HTMLElement[] = [];
+  const observed = new Set<HTMLElement>();
+  let frame = 0;
+  const select = (letter: string) => bar.querySelectorAll<HTMLElement>("[data-l], [data-letter]").forEach(item => {
+    const active = (item.dataset.letter ?? item.dataset.l) === letter;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "true"); else item.removeAttribute("aria-current");
+  });
+  const update = () => {
+    frame = 0;
+    if (bar.hidden || !rows.length) return;
+    const line = Math.min(window.innerHeight - 1, Math.max(0, getOffset() + 4));
+    // Rows are appended in reading order. Binary search also picks the first
+    // card of a grid row, without measuring every loaded product on scroll.
+    let low = 0, high = rows.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (rows[middle]!.getBoundingClientRect().bottom <= line) low = middle + 1;
+      else high = middle;
+    }
+    select(rows[Math.min(low, rows.length - 1)]!.dataset.letter ?? "#");
+  };
+  const refresh = () => { if (!frame) frame = requestAnimationFrame(update); };
+  const reset = () => { cancelAnimationFrame(frame); frame = 0; rows.length = 0; observed.clear(); select(""); };
+  const observe = (items: Iterable<HTMLElement>) => {
+    for (const item of items) if (!observed.has(item)) { observed.add(item); rows.push(item); }
+    refresh();
+  };
+  window.addEventListener("scroll", refresh, { passive: true });
+  window.addEventListener("resize", refresh, { passive: true });
+  const header = document.querySelector(".sticky-header");
+  if (header) new ResizeObserver(refresh).observe(header);
+  return { select, reset, observe, refresh };
+}
+
 /** A single-choice popover menu in the same style as the filter menu (sorting and similar). */
 export function createChoiceMenu(button: HTMLButtonElement, options: ChoiceOption[], getValue: () => string, onSelect: (value: string) => void): { refresh: () => void } {
   return createSelectionMenu(button, { className: "choice-menu", getOptions: () => options, isSelected: (value) => value === getValue(), onSelect, updateLabel: true });
