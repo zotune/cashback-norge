@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794076588
+// @version      1794077241
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -18743,7 +18743,7 @@ ${darkProviderCss}
     const heading = dialog.querySelector("h1");
     const name = heading.textContent?.replace(/\s+/g, " ").trim();
     if (name === void 0 || name.length < 3) return void 0;
-    const spokenPrice = [...dialog.querySelectorAll("[aria-label]")].map((element) => element.getAttribute("aria-label")?.trim().match(/^(\d[\d \u00a0]*,\d{2}) kroner\.?$/i)?.[1]).find((value) => value !== void 0);
+    const spokenPrice = [...dialog.querySelectorAll("[aria-label]")].map((element) => element.getAttribute("aria-label")?.trim().match(/^(?:tilbud,\s*nå\s+)?(\d[\d \u00a0]*,\d{2}) kroner(?: pluss pant)?\.?$/i)?.[1]).find((value) => value !== void 0);
     const text = dialog.innerText.slice(0, 4e3);
     const priceText = spokenPrice ?? text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b(?!\s*\/)/i)?.[1];
     const price = priceText !== void 0 ? Number(priceText.replace(/[ \u00a0]/g, "").replace(",", ".")) : void 0;

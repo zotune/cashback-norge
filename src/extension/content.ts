@@ -10512,7 +10512,8 @@ function readOpenProductDialog(): ProductDialogMeta | undefined {
   // NorgesGruppen (Joker, MENY, SPAR) splits the øre into a <sup>, so its spoken price
   // ("39,90 kroner.") is read first; Oda prints "Gjeldende pris er: 19,40 kr".
   const spokenPrice = [...dialog.querySelectorAll("[aria-label]")]
-    .map((element) => element.getAttribute("aria-label")?.trim().match(/^(\d[\d \u00a0]*,\d{2}) kroner\.?$/i)?.[1])
+    // Also "Tilbud, nå 17,90 kroner pluss pant."; never "Før …" (pre-price) or "Spar …".
+    .map((element) => element.getAttribute("aria-label")?.trim().match(/^(?:tilbud,\s*nå\s+)?(\d[\d \u00a0]*,\d{2}) kroner(?: pluss pant)?\.?$/i)?.[1])
     .find((value): value is string => value !== undefined);
   const text = dialog.innerText.slice(0, 4000);
   const priceText = spokenPrice ?? text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b(?!\s*\/)/i)?.[1];
