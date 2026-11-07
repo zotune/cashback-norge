@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { readPrisjaktDealDetails, readPrisjaktAllTimeHistory } from "../src/shared/prisjakt-deal-details.js";
 import { createDealMerchantLookup } from "../src/shared/deal-merchants.js";
 import type { CashbackOffer } from "../src/shared/cashback.js";
-import type { PrisjaktDeal } from "../src/shared/prisjakt-deals.js";
+import { getDealLowPrice, type PrisjaktDeal } from "../src/shared/prisjakt-deals.js";
 
 const now = "2026-11-07T14:00:00Z";
 const deal: PrisjaktDeal = { id: "123", name: "Robotstøvsuger", store: "Skousen", storeId: 10, shopOfferId: "abc", price: 5990, currency: "NOK", productUrl: "https://www.prisjakt.no/product.php?p=123" };
@@ -100,4 +100,12 @@ test("all-time minimum uses the ALL response, including prices outside 90 days, 
   assert.equal(result.historyStartedAt, "2026-01-01T00:00:00.000Z");
   assert.equal(readPrisjaktAllTimeHistory({ priceHistory: history.initialData.priceHistory }, [], now).lowestPriceEver, undefined);
   assert.throws(() => readPrisjaktAllTimeHistory({}, [], now), /missing priceHistory/);
+});
+
+
+test("current verified prices count towards the low, with a meaningful distance from it", () => {
+  assert.deepEqual(getDealLowPrice(6999, 8159), { lowestPrice: 6999, abovePercent: 0 });
+  assert.deepEqual(getDealLowPrice(6000, 4000), { lowestPrice: 4000, abovePercent: 50 });
+  assert.equal(getDealLowPrice(100, undefined), undefined);
+  assert.equal(getDealLowPrice(100, 0), undefined);
 });

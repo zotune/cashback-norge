@@ -12,14 +12,13 @@
   const {
     createCountBadge, fitCountToChip, createChoiceMenu, createLazyBatches,
     renderSupportFooter, getInstabankInvite, renderSupportInvite, selectSupportAdvertisement,
-    fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer, createSelectionMenu,
+    fetchVoteTallies, fetchMyVotes, apiVote, formatKr, copyOffer, createSelectionMenu, getDealLowPrice,
   } = window.SHARED;
 
   const BATCH = 40;
   const THUMBS_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
   const THUMBS_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>`;
   const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-  const EXTERNAL_SVG = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>`;
   const FILTER_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>`;
   const SORT_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>`;
   const VIEW_ICONS = {
@@ -317,7 +316,7 @@
       { label: "Pris", sort: "price", num: true },
       { label: config.savingLabel ?? "Rabatt", sort: "saving", num: true },
       ...(!features.history ? [{ label: "Spart", sort: "savingKr", num: true }] : []),
-      ...(features.history ? [{ label: "Lavest", sort: "", num: true }] : []),
+      ...(features.history ? [{ label: "Mot lavpris", sort: "", num: true }] : []),
       ...(features.unit ? [{ label: "Kilo-/literpris", sort: "unit", num: true }] : []),
       ...(features.validity ? [{ label: "Gyldig", sort: "ending" }] : []),
       ...(features.bonus ? [{ label: "Kortbonus", sort: "" }] : []),
@@ -334,17 +333,22 @@
     const thumbHtml = (item) => item.imageUrl
       ? `<a class="deal-thumb" href="${esc(item.link.url)}" target="_blank" rel="noopener" data-preview="${esc(item.imageUrl)}" aria-label="Åpne ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></a>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
-    const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}${EXTERNAL_SVG}</a></span>`;
+    const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${config.toplists && state.ranks.has(item.id) && ["relevance", "saving", "votes"].includes(state.sort) ? `<span class="deal-rank">${state.ranks.get(item.id)}.</span> ` : ""}${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
       const chip = `<span class="cbn-chip badge ${esc(item.store.className ?? "cbn-chip--muted")}">${item.store.iconUrl ? `<img class="deal-store-icon" src="${esc(item.store.iconUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(item.store.label)}</span>`;
       if (!features.category) return `<button class="cbn-button cbn-button--quiet deal-store-filter" type="button" data-store-group="${esc(item.group)}" title="Vis bare ${esc(item.store.label)}" aria-label="Vis bare ${esc(item.store.label)}">${chip}</button>`;
       const store = item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
       return store;
     };
-    const historyHtml = (item) => Number.isFinite(item.lowestPriceEver) ? `<span class="deal-history" title="${esc(`Laveste registrerte varepris gjennom hele historikken hos Prisjakt.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`)}">${esc(kr(item.lowestPriceEver))}${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>` : `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
+    const historyHtml = (item) => {
+      const low = getDealLowPrice(item.amount, item.lowestPriceEver);
+      if (!low) return `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
+      const tip = `Laveste registrerte varepris gjennom hele historikken, inkludert dagens bekreftede pris.${item.historyStartedAt ? ` Registrert siden ${formatDate(item.historyStartedAt)}.` : ""} ${item.historyScope === "variant" ? "Valgt variant." : "Alle varianter av produktet."} Frakt er ikke med.${item.historyUpdatedAt ? ` Historikk oppdatert ${formatDate(item.historyUpdatedAt)}.` : ""}`;
+      return `<span class="deal-history" title="${esc(tip)}"><span>${esc(kr(low.lowestPrice))}</span> <span class="cbn-chip cbn-chip--highlight card-chip" title="${low.abovePercent ? `Dagens pris er ${low.abovePercent} % over laveste registrerte pris` : "Dagens pris er på laveste registrerte nivå"}">${low.abovePercent ? `+${new Intl.NumberFormat("nb-NO").format(low.abovePercent)} %` : "Laveste nå"}</span>${item.historyScope === "product" ? '<small>alle varianter</small>' : ""}</span>`;
+    };
     const savingChipHtml = (item) => saving(item) > 0 ? `<span class="cbn-chip cbn-chip--highlight card-chip"${item.savingTitle ? ` title="${esc(item.savingTitle)}"` : ""}>−${saving(item)} %</span>` : "";
     const bonusHtml = (item) => item.bonus ? `<a class="cbn-chip cbn-chip--highlight card-chip" href="${esc(item.bonus.url)}" target="_blank" rel="noopener" title="${esc(item.bonus.title ?? item.bonus.label)}">${esc(item.bonus.label)} ${esc(item.bonus.rate)}</a>` : "";
-    const factsHtml = (item) => `<span class="deal-facts">${(item.details ?? (item.description ? item.description.split(/\s*·\s*/) : [])).map((part) => `<span class="cbn-chip cbn-chip--muted deal-fact">${esc(part)}</span>`).join(" ")}</span>`;
+    const factsHtml = (item) => `<span class="deal-facts">${(item.details ?? (item.description ? item.description.split(/\s*·\s*|,\s+/) : [])).map((part) => `<span class="cbn-chip cbn-chip--muted deal-fact">${esc(part)}</span>`).join(" ")}</span>`;
     function daysLeftHtml(item) {
       if (!item.validTo) return "";
       const days = daysLeft(item);
@@ -368,7 +372,7 @@
         <td>${thumbHtml(item)}</td>
         <td>${titleHtml(item)}${factsHtml(item)}</td>
         <td>${storeHtml(item)}</td>
-        ${features.category ? `<td><button class="cbn-button cbn-button--quiet category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button></td>` : ""}
+        ${features.category ? `<td><button class="cbn-button cbn-chip cbn-chip--muted category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button></td>` : ""}
         <td class="num"><span class="deal-price-stack"><strong class="deal-price">${esc(kr(item.amount))}</strong> ${item.prePrice > item.amount ? `<s class="deal-before" aria-label="Førpris">${esc(kr(item.prePrice))}</s>` : ""}</span></td>
         <td class="num">${savingChipHtml(item)}</td>
         ${!features.history ? `<td class="num">${savingKr(item) > 0 ? esc(kr(savingKr(item))) : ""}</td>` : ""}

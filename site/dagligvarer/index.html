@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dagligvarer · Cashback Norge</title>
 <script src="/theme.js?v=4"></script>
-<link rel="stylesheet" href="/site.css?v=5">
-<link rel="stylesheet" href="/offer-list.css?v=5">
+<link rel="stylesheet" href="/site.css?v=6">
+<link rel="stylesheet" href="/offer-list.css?v=6">
 <meta name="description" content="Ukens tilbud fra kundeavisene til REMA 1000, KIWI, MENY, Coop, SPAR, Joker, Bunnpris og flere – søk, sorter på rabatt og sammenlign på tvers av butikkene.">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
 <style>
-.intro-logo { width: 72px; height: 72px; display: block; margin: 0 auto 6px; }
+.intro-logo { width: 96px; height: 96px; display: block; margin: 0 auto 8px; }
 </style>
 <script data-goatcounter="https://cashbacknorge.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -54,8 +54,8 @@
 <div class="fixed-footer">
   <div class="tip-line"></div>
 </div>
-<script src="/shared-data.js?v=5"></script>
-<script src="/offer-list.js?v=5"></script>
+<script src="/shared-data.js?v=6"></script>
+<script src="/offer-list.js?v=6"></script>
 <script>
 // Data: /grocery-offers.json, built by the daily crawl from the supermarkets' flyers (Tjek's
 // offer data). Votes use the same Supabase functions as the discount codes, key "dagligvarer".
@@ -84,7 +84,7 @@ function toItem(offer) {
     store: { label: chainLabel(offer.chain), className: chain ? `badge-chain-${chain.slug}` : "cbn-chip--muted" },
     amount: offer.amount,
     ...(offer.prePrice > offer.amount ? { prePrice: offer.prePrice, saving: Math.round((1 - offer.amount / offer.prePrice) * 100) } : {}),
-    ...(offer.imageUrl ? { imageUrl: offer.imageUrl } : {}),
+    ...(offer.imageUrl?.startsWith("/offer-images/") ? { imageUrl: offer.imageUrl } : {}),
     validFrom: offer.validFrom, validTo: offer.validTo,
     link: getGroceryOfferLink(offer.chain, getGrocerySearchQuery(title) || title),
     ...(unit ? { unit } : {}),

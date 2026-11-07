@@ -11,6 +11,7 @@ import { Configuration, HttpCrawler, type HttpCrawlingContext, MemoryStorage, Re
 import { readEtilbudsavisOffers, type EtilbudsavisOffer } from "../shared/etilbudsavis-price-match.js";
 import { GROCERY_CHAINS } from "../shared/grocery-chains.js";
 import type { Logger } from "./logger.js";
+import { cacheOfferImages, imageKey, type OfferImageOptions } from "./offer-images.js";
 
 export const GROCERY_OFFERS_API = "https://squid-api.tjek.com/v2";
 export const GROCERY_OFFERS_PUBLISHED_URL = "https://cashbacknorge.no/grocery-offers.json";
@@ -43,7 +44,7 @@ export type CollectGroceryOffersInput = {
 
 export async function collectGroceryOffers(input: CollectGroceryOffersInput): Promise<GroceryOffersCatalog | undefined> {
   try {
-    return await fetchGroceryOffers(input);
+    return await cacheGroceryImages(await fetchGroceryOffers(input), input);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const previous = await fetchPreviousCatalog(input).catch((previousError: unknown) => {
@@ -54,11 +55,20 @@ export async function collectGroceryOffers(input: CollectGroceryOffersInput): Pr
     if (previous !== undefined && now - Date.parse(previous.generatedAt) <= MAX_CATALOG_AGE_DAYS * 86_400_000) {
       const running = previous.offers.filter((offer) => Date.parse(offer.validTo) >= now);
       input.logger.warn(`${message}; reusing ${running.length} running offers from the catalogue generated ${previous.generatedAt}`);
-      return { ...previous, offers: running };
+      return await cacheGroceryImages({ ...previous, offers: running }, input);
     }
     input.logger.error(`${message}; no usable previous grocery offers catalogue`);
     return undefined;
   }
+}
+
+export async function cacheGroceryImages(catalog: GroceryOffersCatalog, input: OfferImageOptions): Promise<GroceryOffersCatalog> {
+  const images = await cacheOfferImages(catalog.offers.flatMap(offer => offer.imageUrl ? [{ url: offer.imageUrl }] : []), input);
+  return { ...catalog, offers: catalog.offers.map(offer => {
+    const { imageUrl: source, ...rest } = offer;
+    const imageUrl = source && images.get(imageKey({ url: source }));
+    return { ...rest, ...(imageUrl ? { imageUrl } : {}) };
+  }) };
 }
 
 export async function fetchGroceryOffers(input: CollectGroceryOffersInput): Promise<GroceryOffersCatalog> {

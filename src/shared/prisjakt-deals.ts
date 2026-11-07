@@ -10,6 +10,13 @@
 
 import { readLdJsonScripts, readNextFlightPayloads } from "./product-data.js";
 
+/** A verified current offer is also an observed price, even before the chart updates. */
+export function getDealLowPrice(current: number, historical: number | undefined): { lowestPrice: number; abovePercent: number } | undefined {
+  if (!Number.isFinite(current) || current <= 0 || historical === undefined || !Number.isFinite(historical) || historical <= 0) return undefined;
+  const lowestPrice = Math.min(current, historical);
+  return { lowestPrice, abovePercent: Math.round((current / lowestPrice - 1) * 1000) / 10 };
+}
+
 export type PrisjaktDeal = {
   id: string;
   name: string;

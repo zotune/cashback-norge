@@ -181,6 +181,11 @@
 .deal-store-icon { height: 14px; object-fit: contain; width: 14px; }
 .deal-store-link .badge { gap: 5px; }
 .deal-history { font-size: 11px; white-space: nowrap; }
+.deal-history > span { display: block; }
+.deal-history .card-chip { margin-top: 4px; width: fit-content; margin-left: auto; }
+.results--grid .deal-history .card-chip { margin-left: 0; }
+.deal-table .category-link { font: inherit; font-size: 11px; padding: 4px 6px; white-space: normal; }
+.deal-row:hover .deal-fact, .deal-row:hover .category-link { background: var(--cbn-plate-down); }
 .deal-history small { color: var(--cbn-muted); display: block; font-size: 9px; }
 .deal-history-summary { color: var(--cbn-muted); font-size: 10px; }
 @media (max-width: 520px) {

@@ -31,6 +31,7 @@ import { crawlKlarna } from "./providers/klarna.js";
 import { collectPokeprisCatalog, writePokeprisCatalog } from "./pokepris-catalog.js";
 import { collectGroceryOffers } from "./grocery-offers.js";
 import { collectPrisjaktDeals } from "./prisjakt-deals.js";
+import { pruneOfferImages } from "./offer-images.js";
 import { collectElectricitySupplierCatalog } from "./electricity-supplier-catalog.js";
 import { crawlRemember } from "./providers/remember.js";
 import { fetchSas } from "./providers/sas.js";
@@ -703,6 +704,8 @@ async function main(): Promise<void> {
     }),
     config.skipRabattkode ? Promise.resolve([]) : collectOffers({
       label: "Rabattkode",
+      provider: "rabattkode", reusePreviousOnFailure: true,
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       run: () => crawlRabattkode(),
     }),
     config.skipCuponation ? Promise.resolve([]) : collectOffers({
@@ -1163,6 +1166,10 @@ async function main(): Promise<void> {
     await copyFile(config.prisjaktDealsPath, resolve("site/prisjakt-deals.json"));
     logger.info(`Wrote Prisjakt deals (${prisjaktDeals.deals.length} deals) to ${config.prisjaktDealsPath}`);
   }
+  await pruneOfferImages([
+    ...(groceryOffers?.offers.map(offer => offer.imageUrl) ?? []),
+    ...(prisjaktDeals?.deals.flatMap(deal => [deal.imageUrl, deal.storeLogoUrl]) ?? []),
+  ]);
 }
 
 function readCliConfig(args: string[]): CliConfig {

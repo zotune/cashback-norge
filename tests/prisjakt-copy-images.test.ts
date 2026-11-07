@@ -4,10 +4,12 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { test } from "node:test";
+import sharp from "sharp";
+import { pruneOfferImages } from "../src/backend/offer-images.js";
 import { cachePrisjaktCopyImages, type PrisjaktDealsCatalog } from "../src/backend/prisjakt-deals.js";
 
-const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0e8AAAAASUVORK5CYII=", "base64");
-test("clipboard image assets retain binary bytes, deduplicate, reuse local files and omit invalid responses", async () => {
+const png = await sharp({ create: { width: 600, height: 400, channels: 3, background: "#50b848" } }).png().toBuffer();
+test("daily image assets are resized, deduplicated, reused and pruned, with invalid responses omitted", async () => {
   const directory = await mkdtemp(join(tmpdir(), "prisjakt-copy-images-"));
   const requests: string[] = [];
   const warnings: string[] = [];
@@ -27,12 +29,19 @@ test("clipboard image assets retain binary bytes, deduplicate, reuse local files
     assert.equal(requests.filter(path => path === "/good").length, 1);
     assert.equal(result.deals[0]?.copyImageUrl, result.deals[1]?.copyImageUrl);
     assert.equal(result.deals[2]?.copyImageUrl, undefined);
-    assert.match(result.deals[0]!.copyImageUrl!, /^\/deal-images\/[a-f0-9]{32}\.png$/);
-    assert.deepEqual(await readFile(join(directory, basename(result.deals[0]!.copyImageUrl!))), png);
+    assert.match(result.deals[0]!.copyImageUrl!, /^\/offer-images\/[a-f0-9]{32}\.webp$/);
+    const file = join(directory, basename(result.deals[0]!.imageUrl!));
+    const metadata = await sharp(await readFile(file)).metadata();
+    assert.equal(metadata.format, "webp"); assert.equal(metadata.width, 320);
+    assert.ok((await readFile(file)).length < 128 * 1024);
     assert.match(warnings[0]!, /unexpected image format/);
     requests.length = 0;
     await cachePrisjaktCopyImages(result, input);
-    assert.deepEqual(requests, ["/bad"]);
+    assert.deepEqual(requests, []);
+    await pruneOfferImages([result.deals[0]!.imageUrl], directory);
+    assert.ok(await readFile(file));
+    await pruneOfferImages([], directory);
+    await assert.rejects(readFile(file));
   } finally {
     server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(directory, { recursive: true, force: true });
   }

@@ -30,6 +30,10 @@ export async function crawlRabattkode(): Promise<CashbackOffer[]> {
     responseType: "json",
     throwHttpErrors: false,
     timeout: { request: 30_000 },
+  }).catch((error: unknown) => {
+    const describe = (value: unknown) => value instanceof Error ? value.message || value.name : String(value);
+    const reason = error instanceof AggregateError ? error.errors.map(describe).join("; ") : describe(error);
+    throw new Error(`Rabattkode Firestore request ${FIRESTORE_URL} failed: ${reason}`, { cause: error });
   });
 
   if (response.statusCode < 200 || response.statusCode >= 300) {

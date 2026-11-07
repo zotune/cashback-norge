@@ -1,7 +1,7 @@
 // Shared website pieces for cashbacknorge.no and /dagligvarer: the support ad line at the
 // bottom, the ad card, the sort menu, lazy batches and the Supabase votes.
 // Styles live in site/site.css; the pages own their layout.
-import { INSTABANK_AD, type BonusCard } from "../shared/provider-data";
+import { INSTABANK_AD, PROVIDER_COLORS, type BonusCard } from "../shared/provider-data";
 import type { CashbackOffer } from "../shared/cashback";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement, type SupportAdvertisement } from "../shared/support-advertisements";
 import { formatTooltipHtml } from "../shared/tooltip-content";
@@ -115,6 +115,11 @@ export function installGroceryChainStyles(): void {
 
 /** Identical extra-cashback rows on the home and grocery pages. */
 export function renderBonusCardGroup(cards: Array<BonusCard & { rewardLabel?: string }>, container: HTMLElement, amount = 0): void {
+  if (!document.getElementById("bonus-card-brand-styles")) {
+    const style = document.createElement("style"); style.id = "bonus-card-brand-styles";
+    style.textContent = Object.entries(PROVIDER_COLORS).map(([id, colors]) => getBrandChipCss(`.badge-${id}`, colors)).join("\n");
+    document.head.append(style);
+  }
   const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
   container.innerHTML = cards.map((card) => {
     const sum = amount > 0 && !card.conditional ? amount : 0;

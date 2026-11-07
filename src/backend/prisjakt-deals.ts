@@ -6,12 +6,10 @@
 // request at a time. Prisjakt sits behind Cloudflare, so a challenge page is reported as a
 // format error and the previously published catalogue is reused (at most 14 days old).
 import { Configuration, HttpCrawler, type HttpCrawlingContext, MemoryStorage, Request } from "crawlee";
-import { readPrisjaktDeals, type PrisjaktDeal } from "../shared/prisjakt-deals.js";
+import { readPrisjaktDeals, getDealLowPrice, type PrisjaktDeal } from "../shared/prisjakt-deals.js";
 import type { Logger } from "./logger.js";
 import { readPrisjaktDealDetails, readPrisjaktAllTimeHistory } from "../shared/prisjakt-deal-details.js";
-import { createHash } from "node:crypto";
-import { mkdir, writeFile, access } from "node:fs/promises";
-import { resolve, basename } from "node:path";
+import { cacheOfferImages, imageKey } from "./offer-images.js";
 
 export const PRISJAKT_DEALS_URL = "https://www.prisjakt.no/tema/dagens-tilbud";
 export const PRISJAKT_DEALS_PUBLISHED_URL = "https://cashbacknorge.no/prisjakt-deals.json";
@@ -58,42 +56,18 @@ export async function collectPrisjaktDeals(input: CollectPrisjaktDealsInput): Pr
   }
 }
 
-/** Legacy cdn.pji.nu images omit CORS headers. Store those exact public images
- * with the published site so the browser can include them in a clipboard PNG.
- * The normal thumbnail retains its source URL. No third-party image proxy.
- */
+/** Publish thumbnails and retailer logos from our own daily snapshot. */
 export async function cachePrisjaktCopyImages(catalog: PrisjaktDealsCatalog, input: CollectPrisjaktDealsInput): Promise<PrisjaktDealsCatalog> {
-  const directory = input.copyImageDirectory ?? resolve("site/deal-images");
-  const deals = catalog.deals.map((deal) => ({ ...deal }));
-  const requests: Request[] = [];
-  const pendingPaths = new Map<number, string>();
-  const availablePaths = new Set<string>();
-  for (const [index, deal] of deals.entries()) {
-    if (index >= 400) break;
-    let url: URL;
-    try { url = new URL(deal.imageUrl ?? ""); } catch { continue; }
-    const previous = deal.copyImageUrl && /^\/deal-images\/[a-f0-9]{32}\.(?:png|jpe?g|webp)$/.test(deal.copyImageUrl) ? deal.copyImageUrl : undefined;
-    const extension = url.pathname.match(/\.(png|jpe?g|webp)$/i)?.[1]?.toLowerCase();
-    if (!previous && (url.hostname !== "cdn.pji.nu" || !url.pathname.startsWith("/product/") || !extension)) continue;
-    const path = previous ?? `/deal-images/${createHash("sha256").update(url.href).digest("hex").slice(0, 32)}.${extension}`;
-    try { await access(resolve(directory, basename(path))); deal.copyImageUrl = path; continue; } catch { /* Download below. */ }
-    delete deal.copyImageUrl;
-    pendingPaths.set(index, path);
-    const sourceUrl = previous ? `https://cashbacknorge.no${previous}` : url.href;
-    requests.push(new Request({ url: input.imageRequestUrl?.(sourceUrl) ?? sourceUrl, userData: { index, path } }));
-  }
-  if (!requests.length) return { ...catalog, deals };
-  await mkdir(directory, { recursive: true });
-  const crawler = createCrawler(input, async ({ request, buffer, contentType }) => {
-    if (!/^image\/(?:jpeg|png|webp)(?:;|$)/i.test(contentType) || buffer.length < 8 || buffer.length > 5 * 1024 * 1024) throw new NoRetryError(`Prisjakt copy image: unexpected image format/size (${contentType}, ${buffer.length} bytes)`);
-    await writeFile(resolve(directory, basename(request.userData.path as string)), buffer);
-    deals[request.userData.index as number]!.copyImageUrl = request.userData.path as string;
-    availablePaths.add(request.userData.path as string);
-  }, (request, reason) => input.logger.warn(`Prisjakt copy image: ${request.url} (${reason})`), ["image/jpeg", "image/png", "image/webp"]);
-  await crawler.run(requests);
-  for (const [index, path] of pendingPaths) if (availablePaths.has(path)) deals[index]!.copyImageUrl = path;
-  input.logger.info(`Prisjakt copy images: ${deals.filter((deal) => deal.copyImageUrl).length} available`);
-  return { ...catalog, deals };
+  const images = await cacheOfferImages(catalog.deals.flatMap(deal => [
+    ...(deal.imageUrl ? [{ url: deal.imageUrl }] : []),
+    ...(deal.storeLogoUrl ? [{ url: deal.storeLogoUrl, size: 64 }] : []),
+  ]), { logger: input.logger, ...(input.copyImageDirectory ? { directory: input.copyImageDirectory } : {}), ...(input.imageRequestUrl ? { requestUrl: input.imageRequestUrl } : {}) });
+  return { ...catalog, deals: catalog.deals.map(deal => {
+    const imageUrl = deal.imageUrl && images.get(imageKey({ url: deal.imageUrl }));
+    const storeLogoUrl = deal.storeLogoUrl && images.get(imageKey({ url: deal.storeLogoUrl, size: 64 }));
+    const { imageUrl: _image, copyImageUrl: _copy, storeLogoUrl: _logo, ...rest } = deal;
+    return { ...rest, ...(imageUrl ? { imageUrl, copyImageUrl: imageUrl } : {}), ...(storeLogoUrl ? { storeLogoUrl } : {}) };
+  }) };
 }
 
 /** Bounded sequential reads; detail failures leave the verified listing usable. */
@@ -107,6 +81,8 @@ export async function enrichPrisjaktDeals(catalog: PrisjaktDealsCatalog, input: 
       let json: unknown;
       try { json = JSON.parse(body); } catch { throw new NoRetryError("Prisjakt history: invalid JSON"); }
       Object.assign(deals[index]!, readPrisjaktAllTimeHistory(json, deals[index]!.historyVariantIds!, catalog.generatedAt));
+      const low = getDealLowPrice(deals[index]!.price, deals[index]!.lowestPriceEver);
+      if (low) deals[index]!.lowestPriceEver = low.lowestPrice;
       return;
     }
     Object.assign(deals[index]!, readPrisjaktDealDetails(body, deals[index]!, catalog.generatedAt));

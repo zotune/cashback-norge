@@ -13,6 +13,7 @@ site/grocery-offers.json
 data/prisjakt-deals.json
 site/prisjakt-deals.json
 site/deal-images/
+site/offer-images/
 *tmp*
 *.log*
 # Plan and roadmap: kept out of the public repository

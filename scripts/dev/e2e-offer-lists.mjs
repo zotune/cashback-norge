@@ -46,6 +46,7 @@ const noOverflow = async () => {
   assert.ok(await page.locator('.deal-row').evaluateAll(rows => rows.every(row => { const bounds = row.getBoundingClientRect(); return [...row.querySelectorAll('.deal-thumb, .deal-main, .deal-side, .deal-details, .deal-meta, .deal-meta > *, .deal-price')].every(el => { const r = el.getBoundingClientRect(); return r.left >= bounds.left - 1 && r.right <= bounds.right + 1; }); })), 'offer content overflows');
 };
 try {
+  if (!process.argv.includes('--deals-only')) {
   await goto('/dagligvarer/');
   assert.ok(await page.locator('.group-toggle').count() > 10);
   assert.equal(await page.locator('.group-toggle[aria-pressed="false"]').count(), 0);
@@ -94,6 +95,8 @@ try {
   assert.match(await page.locator('#free-chips .badge-instabank').locator('..').locator('..').getAttribute('href'), /oriomed\.com\/click\.track/);
   assert.equal(await page.locator('#free-chips .badge-instabank').locator('..').locator('..').getAttribute('rel'), 'sponsored noopener noreferrer');
   assert.ok(await page.locator('#premium-chips .bonus-chip').count() >= 3);
+  assert.equal(await page.locator('#free-chips .badge-instabank').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(0, 255, 133)');
+  assert.equal(await page.locator('.intro-logo').evaluate(el => Math.round(el.getBoundingClientRect().width)), 96);
   assert.equal(await page.locator('.invite-card').evaluate(el => Math.round(el.getBoundingClientRect().width)), 422);
   assert.equal(await page.locator('.fixed-footer').evaluate(el => Math.round(el.getBoundingClientRect().width)), 1240);
   await page.locator('#card-bonus-toggle').click();
@@ -103,6 +106,12 @@ try {
     await noOverflow();
     await page.screenshot({ path: `${output}/grocery-desktop-${colorScheme}.png` });
   }
+  await page.locator('[data-ol=search]').fill('skumnisser');
+  await page.waitForFunction(() => document.querySelector('.deal-title')?.textContent.includes('Skumnisser'));
+  assert.ok(await page.locator('.deal-row').filter({ has: page.locator('[data-store-group="REMA 1000"]') }).locator('.deal-fact').count() >= 3);
+  assert.ok((await page.locator('.deal-fact').allTextContents()).some(text => text.includes('110,00')));
+  await page.locator('[data-ol=search]').fill('');
+  await page.waitForFunction(() => location.search === '');
   await page.locator('.deal-title a').first().hover();
   await page.locator('.deal-preview').waitFor({ state: 'visible' });
   const previewBounds = await page.locator('.deal-preview').boundingBox();
@@ -142,11 +151,13 @@ try {
   await page.locator('[data-ol="search"]').fill('joker');
   await page.waitForFunction(() => location.search.includes('joker'));
   assert.ok(await page.locator('.badge-chain-joker').first().evaluate(el => ['rgb(255, 255, 255)', 'rgb(229, 229, 229)'].includes(getComputedStyle(el).color)));
+  }
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ colorScheme: 'dark' });
   await goto('/dagens-tilbud/');
   assert.equal(await page.locator('h1').innerText(), 'Tilbud');
   assert.ok(await page.locator('.deal-facts').first().innerText().then(text => text.includes('Frakt ukjent')));
-  assert.ok(await page.locator('th').filter({ hasText: 'Lavest' }).count() === 1);
+  assert.ok(await page.locator('th').filter({ hasText: 'Mot lavpris' }).count() === 1);
   assert.equal(await page.locator('.active-offer-filter-label').first().innerText(), 'Kategorier:');
   assert.deepEqual(await page.locator('footer nav a').allTextContents(), ['Om oss', 'Informasjonskapsler']);
   assert.ok(!(await page.locator('#note').innerText()).includes('Prisjakt'));
@@ -186,6 +197,8 @@ try {
   assert.ok((await page.locator('.deal-store-link').allTextContents()).every(text => text.trim() === 'Skousen'));
   assert.match(await page.locator('.deal-store-link').first().getAttribute('href'), /^https:\/\/www\.prisjakt\.no\/shop\.php\?f=/);
   assert.equal(await page.locator('.deal-store-benefits').count(), 0);
+  assert.ok((await page.locator('.deal-thumb img, .deal-store-icon').evaluateAll(images => images.map(img => new URL(img.src).origin))).every(origin => origin === 'http://localhost:8765'));
+  assert.equal(await page.locator('.deal-title a svg').count(), 0);
   await page.locator('[data-ol="filter-reset"]').click();
   await page.locator('[data-toplist="saving"]').click();
   assert.equal(await page.locator('th[data-sort="saving"]').getAttribute('aria-sort'), 'descending');
