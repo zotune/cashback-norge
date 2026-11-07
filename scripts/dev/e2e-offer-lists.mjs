@@ -109,7 +109,7 @@ try {
   assert.equal(await page.locator('#free-chips .badge-instabank').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(0, 255, 133)');
   assert.equal(await page.locator('.intro-logo').evaluate(el => Math.round(el.getBoundingClientRect().width)), 96);
   assert.equal(await page.locator('.invite-card').evaluate(el => Math.round(el.getBoundingClientRect().width)), 422);
-  assert.equal(await page.locator('.fixed-footer').evaluate(el => Math.round(el.getBoundingClientRect().width)), 1240);
+  assert.equal(await page.locator('.fixed-footer').evaluate(el => Math.round(el.getBoundingClientRect().width)), await page.evaluate(() => innerWidth));
   await page.locator('#card-bonus-toggle').click();
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });

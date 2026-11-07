@@ -89,8 +89,7 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
   body .quokka-runner { left: max(4px, calc(50% - 620px - 54px)); }
 }
 @media (min-width: 900px) and (max-width: 1359px) { body .quokka-runner { display: none; } }
-/* Grid: compact store tiles with the two best benefits. */
-/* Grid tiles: the same height in a row; the best benefit and a summary line, no gaps. */
+/* Grid uses the same visible benefits and code rows as the list. */
 .results--grid { align-items: stretch; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .results--grid .merchant { display: flex; flex-direction: column; }
 .results--grid .offer, .results--grid .offer-action { flex-wrap: wrap; row-gap: 4px; }
@@ -99,9 +98,8 @@ if (location.hash === "#iphone-guide") location.replace("iphone/" + location.sea
 .results--grid .az-section-header { grid-column: 1 / -1; }
 .results--grid .merchant-header { padding: 10px 12px; }
 .results--grid .offers { padding: 0 12px 10px; }
-.results--grid .offers > .offer-wrap:nth-child(n+2), .results--grid .codes-inline, .results--grid .selected-retailers { display: none; }
-.more-offers { display: none; color: var(--cbn-subtle); font-size: 11px; margin-top: auto; padding: 0 12px 10px; }
-.results--grid .more-offers { display: block; }
+.results--grid .code-item { flex-wrap: wrap; gap: 4px; }
+.results--grid .code-copy-group { flex-basis: 70px; }
 @media (max-width: 520px) { .results--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .results--grid .offer { flex-wrap: wrap; } }
 /* Table: one row per store, sortable. */
 .results--table { display: block; }
@@ -1515,6 +1513,7 @@ function merchantCardHtml(m) {
       </div>
     </div>`;
   }).join("");
+  const codesOpen = Boolean(codesHtml) && (filterCodes || currentView() === "grid");
   const hostname = domain ? domain.replace(/^www\./, "") : null;
   const storeUrl = domain ? `https://${domain}` : "";
   const nameHtml = storeUrl
@@ -1526,15 +1525,10 @@ function merchantCardHtml(m) {
       ${nameHtml}
     </div>
     <div class="offers">${offerHtml}</div>
-    ${(() => {
-      // Grid tiles show the best benefit; the rest is summarised so every tile has content.
-      const parts = [cashbackOffers.length > 1 ? `+${cashbackOffers.length - 1} ${cashbackOffers.length === 2 ? "fordel" : "fordeler"} til` : "", codeOffers.length ? `${codeOffers.length} ${codeOffers.length === 1 ? "rabattkode" : "rabattkoder"}` : ""].filter(Boolean);
-      return parts.length ? `<div class="more-offers">${parts.join(" · ")}</div>` : "";
-    })()}
     ${selectedHtml ? `<div class="selected-retailers"><span class="selected-label">Premium for enkelte butikker</span><div class="selected-items">${selectedHtml}</div></div>` : ""}
-    <div class="codes-inline${filterCodes && codesHtml ? " open" : ""}${(filterCodes ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
+    <div class="codes-inline${codesOpen ? " open" : ""}${(filterCodes ? codesHtml : codesHtml || hostname) ? "" : " hidden"}" data-hostname="${esc(hostname || "")}">
       <div class="codes-toggle-wrap">
-        <button class="cbn-button cbn-button--quiet codes-toggle${filterCodes && codesHtml ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
+        <button class="cbn-button cbn-button--quiet codes-toggle${codesOpen ? " open" : ""}" type="button"><span class="codes-toggle-arrow">&#9654;</span> Rabattkoder</button>
         <button class="cbn-button cbn-button--quiet codes-add-icon-btn" type="button" ${filterCodes ? 'hidden style="display:none"' : ""}><span class="add-tooltip">Legg til rabattkode</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
       </div>
       <div class="codes-items">

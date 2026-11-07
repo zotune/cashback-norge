@@ -19,7 +19,7 @@ try {
   assert.equal(await page.locator('thead th').first().innerText(), '#');
   assert.ok(await page.getByRole('columnheader', { name: 'Kilde', exact: true }).count());
   assert.equal(await page.locator('.deal-title .deal-rank').count(), 0);
-  assert.equal(await page.locator('.active-offer-filter-group[aria-label="Kilde"] .cbn-chip').count(), catalog.sources.length);
+  assert.equal(await page.locator('[data-ol="sources"] [data-source][aria-pressed="true"]').count(), catalog.sources.length);
   const search = page.locator('[data-ol="search"]');
   const starlink = catalog.deals.find(deal => deal.name === 'Starlink Mini');
   assert.ok(starlink?.lowestPriceEver);
