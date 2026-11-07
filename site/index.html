@@ -1565,9 +1565,24 @@ function compareOffers(a, b) {
   return (PROVIDER_NAMES[a.provider] || a.provider).localeCompare(PROVIDER_NAMES[b.provider] || b.provider, "nb");
 }
 
+// Spenn-butikkene krever Spenns utvidelse, som bare finnes på datamaskin; på mobil brukes Spenn-appen
+// (samme regler som extensionen, se src/shared/provider-data.ts).
+const SPENN_EXTENSION_URL = "https://spenn.refunder.com/no/extension";
+const SPENN_APP_URL = "https://app.spenngroup.com/home";
+const SITE_IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function isSpennExtensionOffer(o) {
+  return o.provider === "spenn" && o.activationUrl === SPENN_EXTENSION_URL;
+}
+function getSiteOfferTerms(o) {
+  const terms = o.terms || "";
+  if (!isSpennExtensionOffer(o) || !SITE_IS_MOBILE) return terms;
+  return terms.replace(/Krever Spenns egen nettleserutvidelse[^\n]*/, "På mobil tjenes Spenn via Spenn-appen: åpne butikken fra appen og fullfør kjøpet der.");
+}
+
 function getSiteOfferUrl(o) {
   const referralUrl = SITE_PROVIDER_REFERRAL_URLS[o.provider];
   if (referralUrl) return referralUrl;
+  if (isSpennExtensionOffer(o) && SITE_IS_MOBILE) return SPENN_APP_URL;
   return o.provider === "trumf" || o.provider === "klarna" ? o.sourceUrl : o.activationUrl;
 }
 
@@ -1835,7 +1850,7 @@ function merchantCardHtml(m) {
     const label = calculatedLabel || formatCompactReward(o);
     const fullReward = formatReward(o);
     const compact = formatCompactReward(o);
-    const terms = o.terms || "";
+    const terms = getSiteOfferTerms(o);
     const hasBreakdown = terms.includes("\n") && (/\d+.*%/.test(terms) || /\d+\s*prosent/i.test(terms));
     const rewardDetail = o.provider === "cbn" ? "" : (compact !== fullReward) ? fullReward : "";
     const tipBase = o.provider === "cbn"
@@ -1845,13 +1860,14 @@ function merchantCardHtml(m) {
       : (terms || PROVIDER_TIPS[o.provider] || "");
     const tipText = [rewardDetail, tipBase].filter(Boolean).join("\n\n");
     const cardOnly = ["sparebank1", "remember"].includes(o.provider);
-    const appOnly = ["klarna", "spenn", "dreams"].includes(o.provider);
+    const spennExtension = isSpennExtensionOffer(o) && !SITE_IS_MOBILE;
+    const appOnly = ["klarna", "spenn", "dreams"].includes(o.provider) && !spennExtension;
     const warnText = "⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort";
     const appText = "Krever " + (PROVIDER_NAMES[o.provider] || o.provider) + "-appen for å aktivere cashback";
     const welcome = PROVIDER_WELCOME_BONUSES[o.provider];
     const fullTip = [cardOnly ? [tipText, warnText].filter(Boolean).join("\n\n") : appOnly ? [tipText, appText].filter(Boolean).join("\n\n") : tipText, welcome?.tip].filter(Boolean).join("\n\n");
     const tooltipHtml = fullTip ? `<span class="offer-tooltip">${formatTooltipHtml(fullTip)}</span>` : "";
-    const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="cbn-chip cbn-chip--muted app-chip">App</span>` : "";
+    const warnIconHtml = cardOnly ? `<span class="offer-card-only-warn">⚠</span>` : appOnly ? `<span class="cbn-chip cbn-chip--muted app-chip">App</span>` : spennExtension ? `<span class="cbn-chip cbn-chip--muted app-chip">Utvidelse</span>` : "";
     const adChipHtml = ["nettbonus", "spareborsen"].includes(o.provider) ? `<span class="cbn-chip cbn-chip--muted ad-chip">Ad</span>` : "";
     const welcomeChipHtml = welcome ? `<span class="cbn-chip cbn-chip--highlight">${esc(welcome.label)}</span>` : "";
     const supportChipHtml = o.provider === "cbn" ? `<span class="cbn-chip cbn-chip--muted support-chip">Støtt oss</span><span class="cbn-chip cbn-chip--muted charity-chip">10% til veldedighet</span>` : "";

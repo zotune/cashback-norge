@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer, type IncomingMessage } from "node:http";
 import { test } from "node:test";
 import { buildSpennOffers, fetchSpennSource } from "../src/backend/providers/spenn.js";
-import { requiresSpennExtension, SPENN_EXTENSION_URL } from "../src/shared/provider-data.js";
+import { isMobileBrowser, requiresSpennExtension, SPENN_EXTENSION_TERMS, SPENN_EXTENSION_URL } from "../src/shared/provider-data.js";
 
 const NORWAY_SITE_ID = "4aefb3fa-6549-11ef-be75-0aaed722973b";
 const STORES = { rate: "a1", dropped: "b2", hanging: "c3" };
@@ -208,4 +208,13 @@ test("Spenn rejects a catalogue whose content_hash does not match status.json", 
     catalog: () => ({ generated_at: "2026-11-05T10:45:04+01:00", market: "NO", locale: "nb", stores: [] }),
     contentfulItems: () => [],
   });
+});
+
+test("Spenn's extension is desktop-only; mobile browsers use the Spenn app", () => {
+  assert.equal(isMobileBrowser({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148" }), true);
+  assert.equal(isMobileBrowser({ userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/140.0 Mobile Safari/537.36" }), true);
+  // iPadOS oppgir seg som Mac med berøringsskjerm.
+  assert.equal(isMobileBrowser({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15", platform: "MacIntel", maxTouchPoints: 5 }), true);
+  assert.equal(isMobileBrowser({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36", platform: "MacIntel", maxTouchPoints: 0 }), false);
+  assert.ok(SPENN_EXTENSION_TERMS.includes("nettleserutvidelse"));
 });

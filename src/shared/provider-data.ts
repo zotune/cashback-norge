@@ -20,6 +20,20 @@ export function requiresSpennExtension(offer: { provider: string; activationUrl?
   return offer.provider === "spenn" && offer.activationUrl === SPENN_EXTENSION_URL;
 }
 
+export const SPENN_EXTENSION_TERMS =
+  "Krever Spenns egen nettleserutvidelse «Tjen Spenn på nett», innlogget med SpennID fra profilen i Spenn-appen. " +
+  "Trykk «Tjen Spenn» i utvidelsen før du handler, og godta alle cookies i butikken.";
+// Spenns utvidelse finnes bare for Chrome, Firefox og Edge på datamaskin («Mobilen din støttes
+// ikke ennå»); på mobil startes kjøpet i Spenn-appen, som for Spenns app-merker.
+export const SPENN_APP_URL = "https://app.spenngroup.com/home";
+export const SPENN_MOBILE_TERMS = "På mobil tjenes Spenn via Spenn-appen: åpne butikken fra appen og fullfør kjøpet der.";
+
+export function isMobileBrowser(nav: { userAgent: string; maxTouchPoints?: number; platform?: string }): boolean {
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent)) return true;
+  // iPadOS oppgir seg som Mac, men har berøringsskjerm.
+  return nav.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1;
+}
+
 export const EB_PER_TRUMF_KR = 13.5;
 
 export const PROVIDER_NAMES: Record<string, string> = {

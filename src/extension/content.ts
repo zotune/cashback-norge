@@ -2,7 +2,7 @@ import { createTooltipSection, setTooltipContent } from "../shared/tooltip-conte
 import { createAutomaticComparison } from "./automatic-comparison";
 import { getMobileSupplier, loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers";
 import { isMobilePriceDetails, mobileTierLabel, type MobilePriceDetails } from "../shared/mobile-price-match";
-import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, requiresSpennExtension, REVOLUT_SUBSCRIPTIONS, SPENN_EXTENSION_ELEMENT } from "../shared/provider-data";
+import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, isMobileBrowser, requiresSpennExtension, REVOLUT_SUBSCRIPTIONS, SPENN_APP_URL, SPENN_EXTENSION_ELEMENT, SPENN_EXTENSION_TERMS, SPENN_MOBILE_TERMS } from "../shared/provider-data";
 import { getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement } from "../shared/support-advertisements";
 import {
   calculateCashback,
@@ -870,6 +870,7 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
 ]);
 function startContentScript(): void {
   installSpennActivationReceiptListener();
+  installSpennExtensionDetection();
   if (isNoticeBlockedHost(CURRENT_HOST)) return;
   disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
   installOfferActivationClickTracker();
@@ -10981,17 +10982,63 @@ function showOfferActivated(
   providerWrap.prepend(createActivationBadge(offer, shadowRoot));
 }
 
-// Spenn tjenes bare via Spenns egen utvidelse. Er den aktiv på siden (elementet den legger
-// inn når butikken gir Spenn), peker raden til Spenn-boksen i stedet for å åpne
-// installasjonssiden; ellers åpnes Spenns offisielle side for utvidelsen.
-function bindSpennExtensionClick(offerLink: HTMLAnchorElement, chip: HTMLElement): void {
+// Spenn tjenes bare via Spenns egen utvidelse. Vi ser den bare når boksen dens ligger på siden,
+// og etter aktivering viser Spenn ikke boksen igjen. Derfor huskes det lokalt når vi har sett tegn
+// til den: boksen, merket consent-skriptet dens setter, eller klikksiden den åpner (source=extension).
+const SPENN_EXTENSION_SEEN_KEY = "cashback-varsler-spenn-extension-seen";
+let spennExtensionSeen = false;
+// På mobil finnes ikke Spenns utvidelse; der behandles Spenn-butikkene som app-tilbud.
+const SPENN_USES_APP = isMobileBrowser(navigator);
+
+function usesSpennExtensionHere(offer: Pick<CashbackOffer, "provider" | "activationUrl">): boolean {
+  return requiresSpennExtension(offer) && !SPENN_USES_APP;
+}
+
+function getOfferLinkUrl(offer: CashbackOffer): string {
+  if (offer.provider === "trumf" || offer.provider === "klarna") return offer.sourceUrl;
+  return requiresSpennExtension(offer) && SPENN_USES_APP ? SPENN_APP_URL : offer.activationUrl;
+}
+
+function formatOfferTerms(offer: CashbackOffer): string {
+  return requiresSpennExtension(offer) && SPENN_USES_APP ? offer.terms.replace(SPENN_EXTENSION_TERMS, SPENN_MOBILE_TERMS) : offer.terms;
+}
+
+function hasVisibleSpennExtensionSign(): boolean {
+  return document.querySelector(SPENN_EXTENSION_ELEMENT) !== null ||
+    document.documentElement.hasAttribute("data-spenn-consent-tool");
+}
+
+function rememberSpennExtension(): void {
+  if (spennExtensionSeen) return;
+  spennExtensionSeen = true;
+  void setLocalStorageValue(SPENN_EXTENSION_SEEN_KEY, Date.now());
+}
+
+function installSpennExtensionDetection(): void {
+  if (SPENN_USES_APP) return;
+  void getLocalStorageValue(SPENN_EXTENSION_SEEN_KEY).then((value) => {
+    if (typeof value === "number") spennExtensionSeen = true;
+  }, () => undefined);
+  // Boksen og consent-merket kommer etter at siden har lastet.
+  for (const delayMs of [3000, 10000]) {
+    window.setTimeout(() => { if (hasVisibleSpennExtensionSign()) rememberSpennExtension(); }, delayMs);
+  }
+}
+
+// Med boksen på siden pekes det dit; har vi sett utvidelsen før, eller er Spenn aktivert her,
+// pekes det til Spenn-ikonet i verktøylinjen; ellers åpnes Spenns side for utvidelsen.
+function bindSpennExtensionClick(offerLink: HTMLAnchorElement, chip: HTMLElement, activated: boolean): void {
   let resetTimer: number | undefined;
   offerLink.addEventListener("click", (event) => {
-    if (document.querySelector(SPENN_EXTENSION_ELEMENT) === null) return;
+    const boxVisible = document.querySelector(SPENN_EXTENSION_ELEMENT) !== null;
+    if (boxVisible || hasVisibleSpennExtensionSign()) rememberSpennExtension();
+    if (!boxVisible && !spennExtensionSeen && !activated) return;
     event.preventDefault();
-    chip.textContent = "Bruk Spenn-boksen";
+    chip.textContent = boxVisible ? "Bruk Spenn-boksen" : "Åpne Spenn-ikonet";
     chip.classList.add("cbn-chip--highlight");
-    chip.title = "Spenn-utvidelsen er aktiv her: trykk «Tjen Spenn» i Spenn-boksen før du handler.";
+    chip.title = boxVisible
+      ? "Spenn-utvidelsen er aktiv her: trykk «Tjen Spenn» i Spenn-boksen før du handler."
+      : "Åpne Spenn-ikonet i verktøylinjen og trykk «Tjen Spenn» før du handler.";
     window.clearTimeout(resetTimer);
     resetTimer = window.setTimeout(() => {
       chip.textContent = "Utvidelse";
@@ -11113,6 +11160,7 @@ function readSpennClickActivationDomain(rawUrl: string): string | undefined {
 function installSpennActivationReceiptListener(): void {
   const pageDomain = readSpennClickActivationDomain(window.location.href);
   if (pageDomain === undefined) return;
+  if (new URLSearchParams(window.location.search).get("source") === "extension") rememberSpennExtension();
   const markActivated = () => { void markOfferActivated("spenn", buildSpennActivationUrl(pageDomain)); };
   // Videresendingssiden selv (redirect=1), hvis innholdsskriptet rekker å kjøre før den går videre.
   if (new URLSearchParams(window.location.search).get("redirect") === "1") markActivated();
@@ -13208,7 +13256,7 @@ function renderNotice(
     const isBestOffer = offerIdx === 0;
     offerRow.className = isBestOffer ? "cbn-row offer-link offer-link--best" : "cbn-row offer-link";
     offerLink.className = "offer-action";
-    offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
+    offerLink.href = getOfferLinkUrl(currentOffer);
     offerLink.target = "_blank";
     offerLink.rel = currentOffer.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer";
     const offerLabel = document.createElement("span");
@@ -13244,12 +13292,12 @@ function renderNotice(
       warnIcon.className = "card-only-warn";
       warnIcon.textContent = "⚠";
       offerLink.append(offerLabel, warnIcon);
-    } else if (requiresSpennExtension(currentOffer)) {
+    } else if (usesSpennExtensionHere(currentOffer)) {
       const extensionChip = document.createElement("span");
       extensionChip.className = "cbn-chip cbn-chip--muted app-chip";
       extensionChip.textContent = "Utvidelse";
       offerLink.append(offerLabel, extensionChip);
-      bindSpennExtensionClick(offerLink, extensionChip);
+      bindSpennExtensionClick(offerLink, extensionChip, isOfferActivated(currentOffer, activeOfferKey));
     } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
       const appChip = document.createElement("span");
       appChip.className = "cbn-chip cbn-chip--muted app-chip";
@@ -14295,7 +14343,7 @@ function renderNotice(
     const showRewardInTooltip = compact !== undefined && fullReward !== compact;
     const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
     // Spenn's extension offers explain the extension in their terms instead of the app.
-    const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider) && !requiresSpennExtension(currentOffer);
+    const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider) && !usesSpennExtensionHere(currentOffer);
     const hasTerms = currentOffer.terms.trim().length > 0;
     const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
     if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer && welcome === undefined) continue;
@@ -14304,7 +14352,7 @@ function renderNotice(
     const tooltip = document.createElement("div");
     tooltip.className = "offer-tooltip";
     const tooltipParts: string[] = [];
-    if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
+    if (currentOffer.terms) tooltipParts.push(formatOfferTerms(currentOffer));
     if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
     if (isAppOnlyOffer) tooltipParts.push("Krever " + formatProviderName(currentOffer.provider) + "-appen for å aktivere cashback");
     if (welcome !== undefined) tooltipParts.push(welcome.tip);

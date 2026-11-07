@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794053490
+// @version      1794054169
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1106,6 +1106,13 @@
   const SPENN_EXTENSION_ELEMENT = "spenn-notification";
   function requiresSpennExtension(offer) {
     return offer.provider === "spenn" && offer.activationUrl === SPENN_EXTENSION_URL;
+  }
+  const SPENN_EXTENSION_TERMS = "Krever Spenns egen nettleserutvidelse «Tjen Spenn på nett», innlogget med SpennID fra profilen i Spenn-appen. Trykk «Tjen Spenn» i utvidelsen før du handler, og godta alle cookies i butikken.";
+  const SPENN_APP_URL = "https://app.spenngroup.com/home";
+  const SPENN_MOBILE_TERMS = "På mobil tjenes Spenn via Spenn-appen: åpne butikken fra appen og fullfør kjøpet der.";
+  function isMobileBrowser(nav) {
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent)) return true;
+    return nav.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1;
   }
   const EB_PER_TRUMF_KR = 13.5;
   const PROVIDER_NAMES = {
@@ -11537,6 +11544,7 @@ ${darkProviderCss}
   ]);
   function startContentScript() {
     installSpennActivationReceiptListener();
+    installSpennExtensionDetection();
     if (isNoticeBlockedHost(CURRENT_HOST)) return;
     disposeContentWatchers.push(watchCardBenefitDate(requestCurrentOffers));
     installOfferActivationClickTracker();
@@ -18850,14 +18858,48 @@ ${darkProviderCss}
     }
     providerWrap.prepend(createActivationBadge(offer, shadowRoot));
   }
-  function bindSpennExtensionClick(offerLink, chip) {
+  const SPENN_EXTENSION_SEEN_KEY = "cashback-varsler-spenn-extension-seen";
+  let spennExtensionSeen = false;
+  const SPENN_USES_APP = isMobileBrowser(navigator);
+  function usesSpennExtensionHere(offer) {
+    return requiresSpennExtension(offer) && !SPENN_USES_APP;
+  }
+  function getOfferLinkUrl(offer) {
+    if (offer.provider === "trumf" || offer.provider === "klarna") return offer.sourceUrl;
+    return requiresSpennExtension(offer) && SPENN_USES_APP ? SPENN_APP_URL : offer.activationUrl;
+  }
+  function formatOfferTerms(offer) {
+    return requiresSpennExtension(offer) && SPENN_USES_APP ? offer.terms.replace(SPENN_EXTENSION_TERMS, SPENN_MOBILE_TERMS) : offer.terms;
+  }
+  function hasVisibleSpennExtensionSign() {
+    return document.querySelector(SPENN_EXTENSION_ELEMENT) !== null || document.documentElement.hasAttribute("data-spenn-consent-tool");
+  }
+  function rememberSpennExtension() {
+    if (spennExtensionSeen) return;
+    spennExtensionSeen = true;
+    void setLocalStorageValue(SPENN_EXTENSION_SEEN_KEY, Date.now());
+  }
+  function installSpennExtensionDetection() {
+    if (SPENN_USES_APP) return;
+    void getLocalStorageValue(SPENN_EXTENSION_SEEN_KEY).then((value) => {
+      if (typeof value === "number") spennExtensionSeen = true;
+    }, () => void 0);
+    for (const delayMs of [3e3, 1e4]) {
+      window.setTimeout(() => {
+        if (hasVisibleSpennExtensionSign()) rememberSpennExtension();
+      }, delayMs);
+    }
+  }
+  function bindSpennExtensionClick(offerLink, chip, activated) {
     let resetTimer;
     offerLink.addEventListener("click", (event) => {
-      if (document.querySelector(SPENN_EXTENSION_ELEMENT) === null) return;
+      const boxVisible = document.querySelector(SPENN_EXTENSION_ELEMENT) !== null;
+      if (boxVisible || hasVisibleSpennExtensionSign()) rememberSpennExtension();
+      if (!boxVisible && !spennExtensionSeen && !activated) return;
       event.preventDefault();
-      chip.textContent = "Bruk Spenn-boksen";
+      chip.textContent = boxVisible ? "Bruk Spenn-boksen" : "Åpne Spenn-ikonet";
       chip.classList.add("cbn-chip--highlight");
-      chip.title = "Spenn-utvidelsen er aktiv her: trykk «Tjen Spenn» i Spenn-boksen før du handler.";
+      chip.title = boxVisible ? "Spenn-utvidelsen er aktiv her: trykk «Tjen Spenn» i Spenn-boksen før du handler." : "Åpne Spenn-ikonet i verktøylinjen og trykk «Tjen Spenn» før du handler.";
       window.clearTimeout(resetTimer);
       resetTimer = window.setTimeout(() => {
         chip.textContent = "Utvidelse";
@@ -18946,6 +18988,7 @@ ${darkProviderCss}
   function installSpennActivationReceiptListener() {
     const pageDomain = readSpennClickActivationDomain(window.location.href);
     if (pageDomain === void 0) return;
+    if (new URLSearchParams(window.location.search).get("source") === "extension") rememberSpennExtension();
     const markActivated = () => {
       void markOfferActivated("spenn", buildSpennActivationUrl(pageDomain));
     };
@@ -20864,7 +20907,7 @@ ${darkProviderCss}
       const isBestOffer = offerIdx === 0;
       offerRow.className = isBestOffer ? "cbn-row offer-link offer-link--best" : "cbn-row offer-link";
       offerLink.className = "offer-action";
-      offerLink.href = currentOffer.provider === "trumf" || currentOffer.provider === "klarna" ? currentOffer.sourceUrl : currentOffer.activationUrl;
+      offerLink.href = getOfferLinkUrl(currentOffer);
       offerLink.target = "_blank";
       offerLink.rel = currentOffer.provider === "cbn" ? "sponsored noopener noreferrer" : "noreferrer";
       const offerLabel = document.createElement("span");
@@ -20899,12 +20942,12 @@ ${darkProviderCss}
         warnIcon.className = "card-only-warn";
         warnIcon.textContent = "⚠";
         offerLink.append(offerLabel, warnIcon);
-      } else if (requiresSpennExtension(currentOffer)) {
+      } else if (usesSpennExtensionHere(currentOffer)) {
         const extensionChip = document.createElement("span");
         extensionChip.className = "cbn-chip cbn-chip--muted app-chip";
         extensionChip.textContent = "Utvidelse";
         offerLink.append(offerLabel, extensionChip);
-        bindSpennExtensionClick(offerLink, extensionChip);
+        bindSpennExtensionClick(offerLink, extensionChip, isOfferActivated(currentOffer, activeOfferKey));
       } else if (APP_ONLY_PROVIDERS.has(currentOffer.provider)) {
         const appChip = document.createElement("span");
         appChip.className = "cbn-chip cbn-chip--muted app-chip";
@@ -21918,7 +21961,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const fullReward = formatRewardLabel(currentOffer.reward, currentOffer.provider);
       const showRewardInTooltip = compact !== void 0 && fullReward !== compact;
       const isCardOnlyOffer = CARD_ONLY_PROVIDERS.has(currentOffer.provider);
-      const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider) && !requiresSpennExtension(currentOffer);
+      const isAppOnlyOffer = APP_ONLY_PROVIDERS.has(currentOffer.provider) && !usesSpennExtensionHere(currentOffer);
       const hasTerms = currentOffer.terms.trim().length > 0;
       const welcome = PROVIDER_WELCOME_BONUSES[currentOffer.provider];
       if (currentOffer.provider !== "cbn" && !showRewardInTooltip && !hasTerms && !isCardOnlyOffer && !isAppOnlyOffer && welcome === void 0) continue;
@@ -21927,7 +21970,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const tooltip = document.createElement("div");
       tooltip.className = "offer-tooltip";
       const tooltipParts = [];
-      if (currentOffer.terms) tooltipParts.push(currentOffer.terms);
+      if (currentOffer.terms) tooltipParts.push(formatOfferTerms(currentOffer));
       if (isCardOnlyOffer) tooltipParts.push("⚠ Betales med kort – kan ikke kombineres med ekstra cashback fra andre kort");
       if (isAppOnlyOffer) tooltipParts.push("Krever " + formatProviderName(currentOffer.provider) + "-appen for å aktivere cashback");
       if (welcome !== void 0) tooltipParts.push(welcome.tip);

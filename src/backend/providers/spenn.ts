@@ -4,7 +4,7 @@ import { Configuration, HttpCrawler, MemoryStorage, Request } from "crawlee";
 import { normalizeDomainInput, parseUrl, type CashbackOffer } from "../../shared/cashback.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
-import { SPENN_EXTENSION_URL } from "../../shared/provider-data.js";
+import { SPENN_EXTENSION_TERMS, SPENN_EXTENSION_URL } from "../../shared/provider-data.js";
 
 /**
  * Primary source: the public store catalogue that Spenn's own browser extension
@@ -24,9 +24,6 @@ const CATALOG_LOCALE = "nb";
  * therefore link to Spenn's official extension page (Chrome, Firefox, Edge),
  * the catalogue's links.plugin, without any user ID or campaign parameters.
  */
-const SPENN_EXTENSION_TERMS =
-  "Krever Spenns egen nettleserutvidelse «Tjen Spenn på nett», innlogget med SpennID fra profilen i Spenn-appen. " +
-  "Trykk «Tjen Spenn» i utvidelsen før du handler, og godta alle cookies i butikken.";
 
 const CONTENTFUL_URL =
   "https://graphql.eu.contentful.com/content/v1/spaces/eu01y9qnrf4v/environments/master";
