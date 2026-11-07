@@ -100,6 +100,7 @@
             ? `<div class="group-heading"><span>Kilder:</span>${bar}</div><div class="chip-toggles group-toggles source-toggles" data-ol="sources" role="group" aria-label="Kilder"></div>`
             : `<div class="group-heading"><span></span>${bar}</div>`;
         })()}
+        ${features.category ? `<div class="category-nav" data-ol="category-nav"></div>` : ""}
         <div class="active-offer-filters" data-ol="active-filters" hidden></div>
         <div class="list-bar">
           ${config.extraCashback ? `<button class="cbn-button cbn-button--quiet bonus-toggle" data-ol="bonus-toggle" type="button" aria-expanded="false"><span class="bonus-toggle-arrow">▶</span> Ekstra cashback</button>` : ""}
@@ -172,7 +173,9 @@
       const names = config.groupOrder?.filter((name) => state.counts.has(name)) ?? [...state.counts.keys()].sort((a, b) => a.localeCompare(b, "nb"));
       const options = [{ value: "group:*", label: `Alle ${config.groupLabel.toLowerCase()}`, section: config.groupLabel }, ...names.map((name) => ({ value: `group:${name}`, label: config.groupName?.(name) ?? name, count: state.counts.get(name), section: config.groupLabel, className: config.groupClass?.(name) }))];
       if (features.category) {
-        for (const [kind, field, section] of [["category", "category", "Underkategorier"], ["store", "store", "Butikker"]]) {
+        // Categories are chosen in the navigator above the list; the menu keeps the shops.
+        options.splice(0, options.length);
+        for (const [kind, field, section] of [["store", "store", "Butikker"]]) {
           const counts = new Map();
           for (const item of state.items) {
             const values = kind === "store" ? [...new Set((item.sources ?? [item]).map(source => source.store.label))] : [item.category];
@@ -195,14 +198,55 @@
     const filterValue = (value) => value.slice(value.indexOf(":") + 1);
     // The number on the Filter button: choices turned off, or price/discount limits set.
     const setFilterCount = (name, count) => { const badge = el(`${name}-count`); if (badge) { badge.hidden = count === 0; badge.textContent = String(count); } };
+    // Categories are a path, not two lists: Alle › Skjønnhet og helse › Ansiktsserum. The path is
+    // stored in the same sets as before (every other group/category turned off).
+    const categoryPath = () => {
+      const groups = [...state.counts.keys()];
+      const group = state.off.size > 0 && state.off.size === groups.length - 1 ? groups.find((name) => !state.off.has(name)) : undefined;
+      const categories = [...new Set(state.items.filter((item) => !group || item.group === group).map((item) => item.category).filter(Boolean))];
+      const category = state.offCategories.size > 0 ? categories.filter((name) => !state.offCategories.has(name)) : [];
+      return { group, category: category.length === 1 ? category[0] : undefined };
+    };
+    function setCategoryPath(group, category) {
+      state.off = group ? new Set([...state.counts.keys()].filter((name) => name !== group)) : new Set();
+      state.offCategories = category ? new Set(state.items.map((item) => item.category).filter((name) => name && name !== category)) : new Set();
+      updateSelectionFilters();
+    }
+    function renderCategoryNav() {
+      const nav = el("category-nav");
+      if (!nav) return;
+      const { group, category } = categoryPath();
+      const crumb = (label, data, current) => current
+        ? `<span class="category-crumb" aria-current="true">${esc(label)}</span>`
+        : `<button class="cbn-button cbn-button--quiet category-crumb" type="button" ${data}>${esc(label)}</button>`;
+      const crumbs = [crumb("Alle kategorier", 'data-cat-group=""', !group),
+        ...(group ? [crumb(config.groupName?.(group) ?? group, `data-cat-group="${esc(group)}"`, !category)] : []),
+        ...(category ? [crumb(category, "", true)] : [])].join('<span class="category-sep" aria-hidden="true">›</span>');
+      // The level below the path (or the siblings of a chosen subcategory), with counts.
+      const counts = new Map();
+      for (const item of state.items) {
+        const key = group ? (item.group === group ? item.category : undefined) : item.group;
+        if (key) counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const names = group ? [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb")) : (config.groupOrder?.filter((name) => counts.has(name)) ?? [...counts.keys()].sort((a, b) => a.localeCompare(b, "nb")));
+      const chips = names.map((name) => {
+        const pressed = group ? name === category : false;
+        const data = group ? `data-cat-group="${esc(group)}" data-cat="${esc(name)}"` : `data-cat-group="${esc(name)}"`;
+        return `<button class="cbn-button cbn-button--filter group-toggle category-option" type="button" aria-pressed="${pressed}" ${data}><span>${esc(config.groupName?.(name) ?? name)}</span><span class="cbn-count">${counts.get(name).toLocaleString("nb-NO")}</span>${group ? "" : '<span class="category-arrow" aria-hidden="true">›</span>'}</button>`;
+      }).join("");
+      nav.innerHTML = `<nav class="category-crumbs" aria-label="Kategori"><span class="category-nav-label">Kategori:</span>${crumbs}</nav><div class="chip-toggles category-options" role="group" aria-label="${group ? "Underkategorier" : "Kategorier"}">${chips}</div>`;
+    }
     const hasSelectionFilters = () => state.off.size > 0 || state.offCategories.size > 0 || state.offStores.size > 0 || state.offSources.size > 0;
     function renderGroups() {
       const options = filterOptions().filter((option) => !option.value.endsWith(":*"));
       const selected = options.filter((option) => !filterSet(option.value).has(filterValue(option.value)));
-      el("filter-summary").textContent = hasSelectionFilters() ? `${selected.length} av ${options.length} filtervalg` : features.category ? "Alle kategorier og butikker" : "Alle butikker";
+      // The category path shows itself; the summary counts the shop choices.
+      const shopFilters = selected.length < options.length;
+      el("filter-summary").textContent = shopFilters ? `${selected.length} av ${options.length} butikker` : "";
+      el("filter-picker").classList.toggle("is-active", shopFilters);
       el("filter-reset").hidden = !hasSelectionFilters();
-      el("filter-picker").classList.toggle("is-active", hasSelectionFilters());
-      setFilterCount("filter-picker", hasSelectionFilters() ? options.length - selected.length : 0);
+
+      setFilterCount("filter-picker", options.length - selected.length);
       const active = el("active-filters");
       if (!features.category) {
         active.hidden = true;
@@ -239,7 +283,8 @@
           nav.append(chip); fitCountToChip(chip);
         }
       }
-      const filtered = selected.filter((option) => !option.value.startsWith("source:") && (option.value.startsWith("group:") || filterSet(option.value).size > 0));
+      renderCategoryNav();
+      const filtered = selected.filter((option) => !option.value.startsWith("source:") && !option.value.startsWith("group:") && !option.value.startsWith("category:") && filterSet(option.value).size > 0);
       active.hidden = filtered.length === 0;
       active.replaceChildren();
       const sections = new Map();
@@ -399,7 +444,7 @@
       const store = item.store.url ? `<a class="deal-store-link" href="${esc(item.store.url)}" target="_blank" rel="noopener" title="Gå til ${esc(item.store.label)}">${chip}</a>` : chip;
       return store;
     };
-    const categoryHtml = (item) => `<span class="deal-categories"><button class="cbn-button cbn-chip cbn-chip--muted category-link" type="button" data-category="${esc(item.category || item.group)}" title="Vis bare ${esc(item.category || item.group)}">${esc(item.category || item.group)}</button>${item.group && item.category && item.group !== item.category ? `<button class="cbn-button cbn-chip cbn-chip--muted category-link deal-main-category" type="button" data-only-group="${esc(item.group)}" title="Vis hele kategorien ${esc(item.group)}">${esc(item.group)}</button>` : ""}</span>`;
+    const categoryHtml = (item) => `<span class="deal-categories">${item.group ? `<button class="category-link deal-main-category" type="button" data-only-group="${esc(item.group)}" title="Vis hele ${esc(item.group)}">${esc(item.group)}</button>` : ""}${item.group && item.category && item.group !== item.category ? `<span class="category-sep" aria-hidden="true">›</span><button class="category-link" type="button" data-category="${esc(item.category)}" data-category-group="${esc(item.group)}" title="Vis bare ${esc(item.category)}">${esc(item.category)}</button>` : ""}</span>`;
     const historyHtml = (item) => {
       const low = getDealLowPrice(item.amount, item.lowestPriceEver);
       if (!low) return `<span class="deal-valid" title="Full historikk for riktig produkt/variant er ikke tilgjengelig">—</span>`;
@@ -657,6 +702,15 @@
         },
         onBulk: (selected, section) => { for (const option of filterOptions().filter((option) => option.section === section && !option.value.endsWith(":*"))) { const set = filterSet(option.value), name = filterValue(option.value); if (selected) set.delete(name); else set.add(name); } updateSelectionFilters(); },
       });
+      el("category-nav")?.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-cat-group]");
+        if (!target) return;
+        const { group, category } = categoryPath();
+        const nextGroup = target.dataset.catGroup || undefined;
+        // A second click on the chosen subcategory goes back up to its main category.
+        const nextCategory = target.dataset.cat && !(nextGroup === group && target.dataset.cat === category) ? target.dataset.cat : undefined;
+        setCategoryPath(nextGroup, nextCategory);
+      });
       el("sources")?.addEventListener("click", (event) => {
         const name = event.target.closest("[data-source]")?.dataset.source;
         if (!name) return;
@@ -732,9 +786,9 @@
         const store = event.target.closest("[data-store-group]");
         if (store) { state.off = new Set([...state.counts.keys()].filter((name) => name !== store.dataset.storeGroup)); updateSelectionFilters(); return; }
         const group = event.target.closest("[data-only-group]");
-        if (group) { state.off = new Set([...state.counts.keys()].filter(name => name !== group.dataset.onlyGroup)); state.offCategories.clear(); updateSelectionFilters(); return; }
+        if (group) return void setCategoryPath(group.dataset.onlyGroup);
         const category = event.target.closest("[data-category]");
-        if (category) { state.off.clear(); state.offCategories = new Set(state.items.map((item) => item.category).filter((name) => name !== category.dataset.category)); updateSelectionFilters(); return; }
+        if (category) return void setCategoryPath(category.dataset.categoryGroup || state.items.find((item) => item.category === category.dataset.category)?.group, category.dataset.category);
         const vote = event.target.closest(".vote-btn");
         if (vote) return void castVote(vote);
         const copy = event.target.closest(".copy-btn");

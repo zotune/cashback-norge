@@ -256,3 +256,21 @@ a.card-chip { text-decoration: none; }
 .group-heading .offer-filter-bar { align-items: center; display: inline-flex; gap: 8px; margin: 0; }
 .list-bar .bonus-toggle { margin: 0; padding: 0 8px 0 0; }
 .list-bar:has(.bonus-toggle) .count { text-align: right; }
+/* Category path: Alle kategorier › Skjønnhet og helse › Ansiktsserum, with the next level as chips. */
+.category-nav { display: grid; gap: 6px; margin-bottom: 8px; }
+.category-crumbs { align-items: center; color: var(--cbn-muted); display: flex; flex-wrap: wrap; font-size: 12px; font-weight: 600; gap: 2px; }
+.category-crumb { font: inherit; min-height: 28px; padding: 0 6px; }
+.category-crumb { align-items: center; display: inline-flex; }
+span.category-crumb { color: var(--cbn-text); min-height: 28px; padding: 0 6px; }
+.category-nav-label { margin-right: 4px; }
+.category-sep { color: var(--cbn-subtle); padding: 0 1px; }
+.category-option .category-arrow { color: var(--cbn-subtle); font-size: 14px; line-height: 1; margin-left: -2px; }
+.category-option[aria-pressed="true"] .category-arrow { color: inherit; }
+.deal-categories { align-items: center; display: inline-flex; flex-wrap: wrap; gap: 2px; }
+.deal-categories .category-link { background: none; border: 0; color: var(--cbn-muted); cursor: pointer; font: inherit; font-size: 11px; padding: 0; }
+.deal-categories .category-link:hover { color: var(--cbn-text); text-decoration: underline; }
+.deal-categories .deal-main-category { color: var(--cbn-subtle); font-size: 11px; font-weight: 400; }
+.deal-table .deal-main-category { display: inline; }
+@media (max-width: 520px) {
+  .category-options { flex-wrap: nowrap; margin: 0 -12px; overflow-x: auto; padding: 2px 12px; scrollbar-width: none; }
+}

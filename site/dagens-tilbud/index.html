@@ -77,10 +77,17 @@ function productItem(deal) {
     ...(deal.validTo ? { validTo: deal.validTo } : {}),
   };
 }
+// Sources name the same category in singular or plural ("Parfyme"/"Parfymer"); one name each.
+function canonicalCategories(deals) {
+  const names = new Set(deals.flatMap((deal) => [deal.category, ...(deal.sources || []).map((source) => source.category)]).filter(Boolean));
+  const canonical = (name) => !name ? name : name.endsWith("er") && names.has(name.slice(0, -2)) ? name.slice(0, -2) : name.endsWith("r") && names.has(name.slice(0, -1)) ? name.slice(0, -1) : name;
+  return (deal) => ({ ...deal, ...(deal.category ? { category: canonical(deal.category) } : {}), ...(deal.sources ? { sources: deal.sources.map((source) => source.category ? { ...source, category: canonical(source.category) } : source) } : {}) });
+}
 function read(catalog) {
   const deals = Array.isArray(catalog.deals) ? catalog.deals : [];
+  const unify = canonicalCategories(deals);
   return {
-    items: deals.filter((deal) => typeof deal.price === "number" && deal.currency === "NOK").map((deal) => ({
+    items: deals.filter((deal) => typeof deal.price === "number" && deal.currency === "NOK").map(unify).map((deal) => ({
       ...productItem(deal),
       ...(deal.key ? { id: deal.key } : {}),
       sources: (deal.sources || [{ ...deal, source: "prisjakt", updatedAt: catalog.generatedAt }]).map(productItem),
