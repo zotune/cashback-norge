@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-07T12:48:45.127Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-07T16:32:36.567Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1440,6 +1440,9 @@
 "boosterkongen.no/products/pokemon-white-flare-booster-pack-jp":3378,
 "boosterkongen.no/products/pre-order-pokemon-30th-celebration-ultra-premium-collection-umbreon-night":13006,
 "boosterkongen.no/products/pre-order-pokemon-tcg-chaos-rising-booster-bundle":6374,
+"boosterkongen.no/products/pre-order-pokemon-tcg-delta-reign-booster-box":22032,
+"boosterkongen.no/products/pre-order-pokemon-tcg-delta-reign-booster-pack":22035,
+"boosterkongen.no/products/pre-order-pokemon-tcg-delta-reign-elite-trainer-box-etb":22033,
 "boosterkongen.no/products/pre-order-pokemon-tcg-silver-tempest-booster-pack":3339,
 "boosterkongen.no/products/scarlet-violet-base-set-3-pk-blister":3947,
 "braspill.no/products/ascended-heroes-booster-bundle":4589,
@@ -2705,6 +2708,8 @@
 "gameninja.no/produkt/pokemon-30th-celebration-booster-box-japanese":12613,
 "gameninja.no/produkt/pokemon-30th-celebration-booster-bundle":12994,
 "gameninja.no/produkt/pokemon-30th-celebration-booster-pack-japanese":13523,
+"gameninja.no/produkt/pokemon-30th-celebration-ultra-premium-collection-day-sealed":13005,
+"gameninja.no/produkt/pokemon-30th-celebration-ultra-premium-collection-night-sealed":13006,
 "gameninja.no/produkt/pokemon-abyss-eye-japansk-display-booster-box":10489,
 "gameninja.no/produkt/pokemon-ancient-roar-japansk-booster":3791,
 "gameninja.no/produkt/pokemon-ancient-roar-japansk-booster-2":3789,
