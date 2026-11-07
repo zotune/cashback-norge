@@ -274,3 +274,11 @@ span.category-crumb { color: var(--cbn-text); min-height: 28px; padding: 0 6px; 
 @media (max-width: 520px) {
   .category-options { flex-wrap: nowrap; margin: 0 -12px; overflow-x: auto; padding: 2px 12px; scrollbar-width: none; }
 }
+/* The path as chips on its own line under "Kategori:"; the current step is highlighted. */
+.category-nav .group-heading { margin-bottom: 0; }
+.category-crumbs { gap: 4px; }
+.category-crumb { background: var(--cbn-plate); border-radius: 16px; font-size: 12px; font-weight: 600; min-height: 30px; padding: 0 11px; }
+button.category-crumb { color: var(--cbn-muted); }
+button.category-crumb:hover { background: var(--cbn-plate-hover); color: var(--cbn-text); }
+span.category-crumb { background: var(--cbn-highlight); color: var(--cbn-accent); min-height: 30px; padding: 0 11px; }
+.category-crumbs .category-sep { font-size: 13px; padding: 0 2px; }
