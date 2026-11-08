@@ -21,6 +21,8 @@ export const SOURCE_LIST_URLS = { klarna: KLARNA_DEALS_API, godpris: "https://go
 type Source = Exclude<DealSource, "prisjakt">;
 type Candidate = { id: string; name: string; productUrl: string; sourceRank: number; advertisedPrice?: number; priceDrop?: number };
 export type SourceInput = { source: Source; generatedAt: string; logger: Logger; maxProducts?: number; maxPages?: number; requestUrl?: (url: string) => string; timeoutSecs?: number };
+// Keys in a forwarding URL (ScraperAPI's api_key) never reach the logs.
+const safeUrl = (url: string) => url.replace(/([?&](?:api_key|key|token)=)[^&]+/gi, "$1***");
 
 export async function fetchProductDealSource(input: SourceInput): Promise<ProductDeal[]> {
   // Prisradar lists ~40 offers per page (three pages read); Godpris shows 48 on one page.
@@ -85,7 +87,7 @@ export async function fetchProductDealSource(input: SourceInput): Promise<Produc
     async failedRequestHandler({ request }, error) {
       failures++;
       if (request.userData.kind === "list") listingFailed = true;
-      input.logger.warn(`${input.source} deals: ${request.url} (${error.message.slice(0, 250)})`);
+      input.logger.warn(`${input.source} deals: ${safeUrl(request.url)} (${safeUrl(error.message).slice(0, 250)})`);
     },
   }, configuration);
   function historyRequest(deal: ProductDeal, candidateId: string, index: number): Request | undefined {

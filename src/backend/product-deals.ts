@@ -11,6 +11,8 @@ export type ProductDealsInput = {
   merchantDomain?: (name: string) => string | undefined;
   previous?: ProductDealsCatalog; previousUrl?: string;
   sourceOptions?: Partial<Pick<SourceInput, "maxProducts" | "maxPages" | "requestUrl" | "timeoutSecs">>;
+  /** Godpris answers HTTP 405 to GitHub Actions; the daily crawl forwards its requests through ScraperAPI. */
+  godprisRequestUrl?: (url: string) => string;
   imageDirectory?: string; imageRequestUrl?: (url: string) => string;
 };
 
@@ -37,7 +39,7 @@ export async function collectProductDeals(input: ProductDealsInput): Promise<Pro
       input.logger.warn(`prisjakt deals: reusing ${fallback.length} combined-catalogue offers with original timestamps`);
     }
   }
-  const results = await Promise.allSettled(DEAL_SOURCES.filter(source => source !== "prisjakt").map(async source => ({ source, deals: await fetchProductDealSource({ ...input.sourceOptions, source, generatedAt: input.generatedAt, logger: input.logger }) })));
+  const results = await Promise.allSettled(DEAL_SOURCES.filter(source => source !== "prisjakt").map(async source => ({ source, deals: await fetchProductDealSource({ ...input.sourceOptions, source, generatedAt: input.generatedAt, logger: input.logger, ...(source === "godpris" && input.godprisRequestUrl ? { requestUrl: input.godprisRequestUrl } : {}) }) })));
   for (let index = 0; index < results.length; index++) {
     const source = (["klarna", "prisradar", "godpris"] as const)[index]!;
     const result = results[index]!;

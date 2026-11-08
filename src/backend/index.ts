@@ -296,6 +296,8 @@ async function main(): Promise<void> {
   }));
   const productDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(prisjaktDealsPromise!.then(prisjakt => collectProductDeals({ generatedAt, logger,
     ...(prisjakt ? { prisjakt } : {}), merchantDomain: createDealMerchantLookup({ offers: [...previousOffersByProvider.values()].flat() }),
+    // Godpris blocks GitHub Actions (HTTP 405); its requests go through ScraperAPI's API with a Norwegian exit.
+    ...(process.env.SCRAPERAPI_KEY?.trim() ? { godprisRequestUrl: (url: string) => `https://api.scraperapi.com/?api_key=${encodeURIComponent(process.env.SCRAPERAPI_KEY!.trim())}&country_code=no&url=${encodeURIComponent(url)}` } : {}),
   })));
   const rabattaOffersPromise = startEarly(config.skipRabatta ? Promise.resolve([]) : collectOffers({
     label: "Rabatta",
