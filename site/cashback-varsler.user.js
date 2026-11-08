@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794163222
+// @version      1794163428
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -766,7 +766,7 @@
       if (rawUrl === void 0) return false;
       try {
         const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
-        return GROCERY_CONTEXT_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+        return GROCERY_CONTEXT_HOSTS.some((host2) => hostname === host2 || hostname.endsWith(`.${host2}`));
       } catch {
         return false;
       }
@@ -3611,8 +3611,8 @@
   function pricelistUrl(value) {
     const url = typeof value === "string" ? parseUrl$1(value.trim()) : void 0;
     if (url === void 0 || !["http:", "https:"].includes(url.protocol) || url.username || url.password || url.port) return void 0;
-    const host = normalizeHostname$1(url.hostname);
-    if (!host.includes(".") || /^[\d.]+$/.test(host) || SOURCE_HOSTS.has(host)) return void 0;
+    const host2 = normalizeHostname$1(url.hostname);
+    if (!host2.includes(".") || /^[\d.]+$/.test(host2) || SOURCE_HOSTS.has(host2)) return void 0;
     url.search = "";
     url.hash = "";
     return url;
@@ -4301,8 +4301,8 @@
       const click = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
       const target = click?.hostname === "godpris.no" ? parseUrl$1(click.searchParams.get("u") ?? "") : void 0;
       if (!shopName || target === void 0 || target.protocol !== "https:") continue;
-      const host = target.hostname.replace(/^www\./, "");
-      if (!merchantKey(host.split(".")[0]).includes(merchantKey(shopName)) && !merchantKey(shopName).includes(merchantKey(host.split(".")[0]))) continue;
+      const host2 = target.hostname.replace(/^www\./, "");
+      if (!merchantKey(host2.split(".")[0]).includes(merchantKey(shopName)) && !merchantKey(shopName).includes(merchantKey(host2.split(".")[0]))) continue;
       if (!links.has(target.hostname)) links.set(target.hostname, { shopName, url: withoutTracking(target.href) });
     }
     return [...links.values()];
@@ -7397,6 +7397,38 @@ query SearchSuggestions($query: String!, $category: Int) {
     }));
     return ratings.filter((rating) => rating !== void 0);
   }
+  const SEARCH = "query ShopSearch($query: String!) { search(query: $query) { shops { nodes { id } } } }";
+  const SHOPS = "query Shops($ids: [Int!]!) { shops(ids: $ids) { id name homePage { url } userReviews { count rating } } }";
+  const host = (raw) => parseUrl$1(raw)?.hostname.toLowerCase().replace(/^www\./, "");
+  async function graphql(requestJson, query, variables) {
+    return requestJson(PRISJAKT_NATIVE_GRAPHQL_URL, {
+      method: "POST",
+      headers: { "Accept": "application/json", "Authorization": PRISJAKT_NATIVE_AUTHORIZATION, "Content-Type": "application/json", "Market": "no" },
+      body: JSON.stringify({ query, variables })
+    });
+  }
+  function readPrisjaktShops(value, pageHost) {
+    const shops = isRecord$7(value) && isRecord$7(value.data) && Array.isArray(value.data.shops) ? value.data.shops.filter(isRecord$7) : [];
+    for (const shop of shops) {
+      const home = isRecord$7(shop.homePage) && typeof shop.homePage.url === "string" ? shop.homePage.url : "";
+      const reviews = isRecord$7(shop.userReviews) ? shop.userReviews : void 0;
+      const score = typeof reviews?.rating === "number" ? reviews.rating : void 0;
+      const count = typeof reviews?.count === "number" ? reviews.count : void 0;
+      const id = typeof shop.id === "string" || typeof shop.id === "number" ? String(shop.id) : "";
+      if (host(home) !== pageHost || !/^\d+$/.test(id) || typeof shop.name !== "string" || score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, 10) === void 0) continue;
+      return { source: "prisjakt", shopName: shop.name, score, maxScore: 10, count, url: `https://www.prisjakt.no/shop.php?f=${id}` };
+    }
+    return void 0;
+  }
+  async function findPrisjaktShopRating(pageUrl, requestJson) {
+    const pageHost = host(pageUrl);
+    const label = pageHost?.split(".")[0];
+    if (!pageHost || !label || label.length < 3) return void 0;
+    const found = await graphql(requestJson, SEARCH, { query: label });
+    const nodes = isRecord$7(found) && isRecord$7(found.data) && isRecord$7(found.data.search) && isRecord$7(found.data.search.shops) && Array.isArray(found.data.search.shops.nodes) ? found.data.search.shops.nodes.filter(isRecord$7) : [];
+    const ids = nodes.map((node) => Number(node.id)).filter((id) => Number.isInteger(id) && id > 0).slice(0, 5);
+    return ids.length === 0 ? void 0 : readPrisjaktShops(await graphql(requestJson, SHOPS, { ids }), pageHost);
+  }
   const TAXFREE_ORIGIN = "https://www.tax-free.no";
   const TAXFREE_ALGOLIA_URL = "https://namx6ho175-dsn.algolia.net/1/indexes/*/queries";
   const TAXFREE_ALGOLIA_APP_ID = "NAMX6HO175";
@@ -8231,6 +8263,15 @@ query SearchSuggestions($query: String!, $category: Int) {
       findTekReview(message, requestJson ?? fetchReviewJson).catch(() => void 0),
       findGtinStoreRatings(message, requestText ?? fetchReviewPage).catch(() => [])
     ]);
+    const shop = rated.length === 0 ? void 0 : await findPrisjaktShopRating(message.url, requestJson ?? fetchReviewJson).catch(() => void 0);
+    if (shop !== void 0) {
+      for (const [index, offer] of rated.entries()) {
+        if (offer.reviews?.store?.source !== "prisjakt") continue;
+        const { store: _replaced, ...reviews } = offer.reviews;
+        rated[index] = { ...offer, reviews };
+      }
+      rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, store: shop } };
+    }
     if (gtinStores.length > 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], ...gtinStores] } };
     if (tek !== void 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, critics: [...rated[0].reviews?.critics ?? [], tek] } };
     if (power !== void 0 && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
@@ -19512,7 +19553,7 @@ ${darkProviderCss}
   const GROCERY_WEB_SHOP_HOSTS = ["oda.com", "meny.no", "spar.no", "joker.no", "kiwi.no", "coop.no", "obs.no", "extra.no"];
   function isGroceryWebShopHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
-    return GROCERY_WEB_SHOP_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+    return GROCERY_WEB_SHOP_HOSTS.some((host2) => hostname === host2 || hostname.endsWith(`.${host2}`));
   }
   function isDynamicPriceMatchHost(parsedUrl) {
     const hostname = parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
@@ -20317,10 +20358,10 @@ ${darkProviderCss}
       searchKey: buildFlightSearchMetaKey(noticeFlightMeta),
       rerender: () => renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices)
     } : void 0;
-    const host = document.createElement("div");
-    host.id = HOST_ID;
-    applyHostOverlayStyle(host);
-    const shadowRoot = host.attachShadow({ mode: "open" });
+    const host2 = document.createElement("div");
+    host2.id = HOST_ID;
+    applyHostOverlayStyle(host2);
+    const shadowRoot = host2.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = `
     :host {
@@ -22888,7 +22929,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (!existingFooter) themeFooter.className = "theme-footer";
     themeFooter.append(themeSlot);
     if (!existingFooter) panel.append(themeFooter);
-    const unbindTheme = bindThemeTarget(extensionTheme, host);
+    const unbindTheme = bindThemeTarget(extensionTheme, host2);
     const unmountTheme = mountThemeControl(extensionTheme, themeSlot, "up");
     disposeNoticeTheme = () => {
       unmountTheme();
@@ -22896,7 +22937,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       tooltipControls.dispose();
     };
     const mountTarget = document.body ?? document.documentElement;
-    mountTarget.append(host);
+    mountTarget.append(host2);
     void detectConflicts(shadowRoot, title);
     attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls);
     attachReviewTooltips(shadowRoot, tooltipControls);
@@ -23219,20 +23260,20 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     tooltip.addEventListener("mouseenter", showTooltip);
     tooltip.addEventListener("mouseleave", scheduleHideTooltip);
   }
-  function applyHostOverlayStyle(host) {
-    host.style.setProperty("background", "transparent", "important");
-    host.style.setProperty("border", "0", "important");
-    host.style.setProperty("bottom", "16px", "important");
-    host.style.setProperty("display", "block", "important");
-    host.style.setProperty("height", "0", "important");
-    host.style.setProperty("inset", "auto auto 16px 0", "important");
-    host.style.setProperty("left", "0", "important");
-    host.style.setProperty("margin", "0", "important");
-    host.style.setProperty("overflow", "visible", "important");
-    host.style.setProperty("padding", "0", "important");
-    host.style.setProperty("position", "fixed", "important");
-    host.style.setProperty("width", "0", "important");
-    host.style.setProperty("z-index", "2147483647", "important");
+  function applyHostOverlayStyle(host2) {
+    host2.style.setProperty("background", "transparent", "important");
+    host2.style.setProperty("border", "0", "important");
+    host2.style.setProperty("bottom", "16px", "important");
+    host2.style.setProperty("display", "block", "important");
+    host2.style.setProperty("height", "0", "important");
+    host2.style.setProperty("inset", "auto auto 16px 0", "important");
+    host2.style.setProperty("left", "0", "important");
+    host2.style.setProperty("margin", "0", "important");
+    host2.style.setProperty("overflow", "visible", "important");
+    host2.style.setProperty("padding", "0", "important");
+    host2.style.setProperty("position", "fixed", "important");
+    host2.style.setProperty("width", "0", "important");
+    host2.style.setProperty("z-index", "2147483647", "important");
   }
   function createSiteIcon() {
     const siteIcon = document.createElement("img");
@@ -23560,12 +23601,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
   }
   function readCurrentPageUserRating() {
-    const host = window.location.hostname;
-    if (!/\.no$/.test(host)) return void 0;
-    const name = host.replace(/^www\./, "").split(".")[0];
+    const host2 = window.location.hostname;
+    const norwegianPage = /\.no$/.test(host2) || /^(nb|nn|no)\b/i.test(document.documentElement.lang) || /^\/no(\/|$)/.test(window.location.pathname);
+    if (!norwegianPage) return void 0;
+    const name = host2.replace(/^www\./, "").split(".")[0];
     const sourceName = name.charAt(0).toUpperCase() + name.slice(1);
     const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.outerHTML).join("");
-    const fromLd = readJsonLdUserRating(scripts, `store:${host}`, sourceName, window.location.href.split("#")[0]);
+    const fromLd = readJsonLdUserRating(scripts, `store:${host2}`, sourceName, window.location.href.split("#")[0]);
     if (fromLd !== void 0) return fromLd;
     const block = document.querySelector('[itemprop="aggregateRating"]');
     const read = (prop) => {
@@ -23576,7 +23618,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const count = read("reviewCount") ?? read("ratingCount");
     const maxScore = read("bestRating") ?? 5;
     if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
-    return { source: `store:${host}`, sourceName, score, maxScore, count, url: window.location.href.split("#")[0] };
+    return { source: `store:${host2}`, sourceName, score, maxScore, count, url: window.location.href.split("#")[0] };
   }
   function addCurrentPageUserRating(priceMatches) {
     const first = priceMatches[0];

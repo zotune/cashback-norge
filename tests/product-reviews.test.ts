@@ -212,3 +212,19 @@ test("GTIN search shops: the landing page's own GTIN must match before its ratin
   assert.deepEqual(await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://lyko.com/no/x", searchTerm: "x", codes: ["7046110321911"] } as never, requestText), []);
   assert.deepEqual(await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://x.no/", searchTerm: "x", codes: [] } as never, requestText), []);
 });
+
+test("Prisjakt shop rating: found by the page's domain, only when the shop's home page has that host", async () => {
+  const { findPrisjaktShopRating, readPrisjaktShops } = await import("../src/shared/prisjakt-shop-rating.js");
+  // native-backend.cloud.pji.nu GraphQL search + shops(ids) (2026-11-08), shortened.
+  const shops = { data: { shops: [
+    { id: "99", name: "Skousen Outlet", homePage: { url: "https://skousen-outlet.no" }, userReviews: { count: 10, rating: 2 } },
+    { id: "22884", name: "Skousen", homePage: { url: "https://www.skousen.no" }, userReviews: { count: 18360, rating: 9.12 } },
+  ] } };
+  assert.deepEqual(readPrisjaktShops(shops, "skousen.no"), { source: "prisjakt", shopName: "Skousen", score: 9.12, maxScore: 10, count: 18360, url: "https://www.prisjakt.no/shop.php?f=22884" });
+  assert.equal(readPrisjaktShops(shops, "elkjop.no"), undefined);
+  const bodies: string[] = [];
+  const requestJson = async (_url: string, init?: { body?: string }) => { bodies.push(init!.body!); return bodies.length === 1 ? { data: { search: { shops: { nodes: [{ id: "99" }, { id: "22884" }] } } } } : shops; };
+  assert.equal((await findPrisjaktShopRating("https://www.skousen.no/produkt/1", requestJson as never))?.count, 18360);
+  assert.equal(JSON.parse(bodies[0]!).variables.query, "skousen");
+  assert.deepEqual(JSON.parse(bodies[1]!).variables.ids, [99, 22884]);
+});

@@ -53,8 +53,8 @@ export async function isPrisjaktProductForAnyOffer(
   return false;
 }
 
-const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
-const PRISJAKT_NATIVE_AUTHORIZATION = "Bearer JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmY";
+export const PRISJAKT_NATIVE_GRAPHQL_URL = "https://native-backend.cloud.pji.nu/v1/graphql";
+export const PRISJAKT_NATIVE_AUTHORIZATION = "Bearer JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmY";
 
 const PRISJAKT_PRODUCT_BY_OFFER_URL_QUERY = `
 query SearchProductsByOfferURL($offerUrl: String!) {

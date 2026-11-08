@@ -15374,7 +15374,9 @@ function buildElectricityPriceMatchChips(priceMatch: Pick<PriceMatchOffer, "elec
 // schema.org microdata), shown with the other buyers. Read from the page, no request.
 function readCurrentPageUserRating(): UserRating | undefined {
   const host = window.location.hostname;
-  if (!/\.no$/.test(host)) return undefined;
+  // Norwegian shops: a .no host, or a Norwegian page on a .com shop (lyko.com/no, lang="nb").
+  const norwegianPage = /\.no$/.test(host) || /^(nb|nn|no)\b/i.test(document.documentElement.lang) || /^\/no(\/|$)/.test(window.location.pathname);
+  if (!norwegianPage) return undefined;
   const name = host.replace(/^www\./, "").split(".")[0]!;
   const sourceName = name.charAt(0).toUpperCase() + name.slice(1);
   const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.outerHTML).join("");
