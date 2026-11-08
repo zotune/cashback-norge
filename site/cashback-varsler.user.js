@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794159422
+// @version      1794159504
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -20741,7 +20741,9 @@ ${darkProviderCss}
     .review-chip--none { background: var(--cbn-soft); color: var(--cbn-muted); }
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-row .price-match-price { color: var(--cbn-muted); font-size: 11px; font-weight: 600; }
-    .reviews-copy { font-size: 12px; font-weight: 700; justify-content: center; }
+    .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
+    .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
+    .reviews-copy { flex-shrink: 0; margin-left: auto; }
     .reviews-section.collapsed .reviews-chips { display: none; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
@@ -23090,7 +23092,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet."
       ].join("\n"))
     );
-    header.append(toggle, chips);
+    const titleRow = document.createElement("span");
+    titleRow.className = "reviews-title-row";
+    titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch));
+    header.append(titleRow, chips);
     const rows = [
       ...summary.critics.slice(0, 5).map((critic) => buildReviewRow(critic.site, critic.score, critic.maxScore, critic.quote ?? critic.title, critic.url, [
         [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...critic.title ? [critic.title] : [], ...critic.quote ? [`«${critic.quote}»`] : []].join("\n"),
@@ -23106,12 +23111,23 @@ Antallet er kildens eget, og kan omfatte andre varianter av produktet
 Vi ser ikke de enkelte vurderingene`
       ]))
     ];
+    section.append(header, ...rows);
+    return section;
+  }
+  function buildReviewCopyButton(summary, priceMatch) {
     const copy = document.createElement("button");
     copy.type = "button";
-    copy.className = "cbn-button cbn-button--quiet price-match-card reviews-copy";
-    copy.textContent = "Kopier til AI-oppsummering";
-    setReviewTip(copy, ["## Kopier til AI-oppsummering\nKopierer produktet, poengsummene, sitatene og lenkene til kildene, med instruksjoner for en oppsummering som HTML-side.\nLim inn i Claude, ChatGPT eller en annen assistent du bruker.\nVi sender ingenting til noen AI selv."]);
-    copy.addEventListener("click", () => {
+    copy.className = "cbn-button cbn-button--quiet copy-code-btn reviews-copy";
+    copy.innerHTML = COPY_ICON_SVG;
+    copy.setAttribute("aria-label", "Kopier til AI-oppsummering");
+    copy.dataset.reviewHoverTip = JSON.stringify([
+      "## Kopier til AI-oppsummering\nLim inn i Claude, ChatGPT eller en annen AI-assistent du bruker, og få en oppsummert side om produktet.",
+      "## Dette kopieres\nProduktet og prisen\nPoengsummene og hver kilde med lenke\nSitater fra testene\nInstruksjoner: bare norske kilder, kilde ved hver påstand, ikke finne på noe",
+      "## Svaret du får\nDet folk liker best\nVanlige problemer og klager\nHvem produktet passer for\nUenighet mellom testere og kjøpere\nHva du bør sjekke før kjøp",
+      "Vi sender ingenting til noen AI selv."
+    ]);
+    copy.addEventListener("click", (event) => {
+      event.stopPropagation();
       const prompt = buildReviewAiPrompt({
         productName: priceMatch?.productName ?? document.title,
         ...priceMatch ? { price: priceMatch.price, shopName: priceMatch.shopName } : {},
@@ -23119,16 +23135,16 @@ Vi ser ikke de enkelte vurderingene`
         summary,
         date: (/* @__PURE__ */ new Date()).toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" })
       });
-      const done = (text2) => {
-        copy.textContent = text2;
+      void navigator.clipboard.writeText(prompt).then(() => {
+        copy.innerHTML = CHECK_ICON_SVG;
+        copy.setAttribute("aria-label", "Kopiert – lim inn i AI-assistenten");
         window.setTimeout(() => {
-          copy.textContent = "Kopier til AI-oppsummering";
-        }, 2600);
-      };
-      navigator.clipboard.writeText(prompt).then(() => done("Kopiert – lim inn i AI-assistenten"), () => done("Kunne ikke kopiere"));
+          copy.innerHTML = COPY_ICON_SVG;
+          copy.setAttribute("aria-label", "Kopier til AI-oppsummering");
+        }, 1500);
+      });
     });
-    section.append(header, ...rows, copy);
-    return section;
+    return copy;
   }
   function formatRatingCount(count) {
     return `${count.toLocaleString("nb-NO")} ${count === 1 ? "vurdering" : "vurderinger"}`;
@@ -23140,6 +23156,14 @@ Vi ser ikke de enkelte vurderingene`
     element.dataset.reviewTip = JSON.stringify(parts);
   }
   function attachReviewTooltips(shadowRoot, tooltipControls) {
+    for (const element of shadowRoot.querySelectorAll(".reviews-section [data-review-hover-tip]")) {
+      const tooltip = document.createElement("div");
+      tooltip.className = "bonus-chip-tooltip";
+      setTooltipContent(tooltip, JSON.parse(element.dataset.reviewHoverTip));
+      shadowRoot.append(tooltip);
+      element.addEventListener("mouseenter", () => showChipTooltipRightOfPanel(tooltip, element, shadowRoot));
+      element.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
+    }
     for (const element of shadowRoot.querySelectorAll(".reviews-section [data-review-tip]")) {
       const tooltip = document.createElement("div");
       tooltip.className = element.classList.contains("price-match-card") ? "offer-tooltip price-match-tooltip" : "bonus-chip-tooltip";

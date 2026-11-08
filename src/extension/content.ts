@@ -12735,7 +12735,9 @@ function renderNotice(
     .review-chip--none { background: var(--cbn-soft); color: var(--cbn-muted); }
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-row .price-match-price { color: var(--cbn-muted); font-size: 11px; font-weight: 600; }
-    .reviews-copy { font-size: 12px; font-weight: 700; justify-content: center; }
+    .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
+    .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
+    .reviews-copy { flex-shrink: 0; margin-left: auto; }
     .reviews-section.collapsed .reviews-chips { display: none; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
@@ -15311,7 +15313,10 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet.",
     ].join("\n")),
   );
-  header.append(toggle, chips);
+  const titleRow = document.createElement("span");
+  titleRow.className = "reviews-title-row";
+  titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch));
+  header.append(titleRow, chips);
 
   const rows = [
     ...summary.critics.slice(0, 5).map((critic) => buildReviewRow(critic.site, critic.score, critic.maxScore, critic.quote ?? critic.title, critic.url, [
@@ -15323,12 +15328,25 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       `Fra kildens produktside (strukturerte data)\nAntallet er kildens eget, og kan omfatte andre varianter av produktet\nVi ser ikke de enkelte vurderingene`,
     ])),
   ];
+  section.append(header, ...rows);
+  return section;
+}
+
+// Small copy button beside the «Anmeldelser» heading, like the code copy buttons.
+function buildReviewCopyButton(summary: ProductReviewSummary, priceMatch: PriceMatchOffer | undefined): HTMLButtonElement {
   const copy = document.createElement("button");
   copy.type = "button";
-  copy.className = "cbn-button cbn-button--quiet price-match-card reviews-copy";
-  copy.textContent = "Kopier til AI-oppsummering";
-  setReviewTip(copy, ["## Kopier til AI-oppsummering\nKopierer produktet, poengsummene, sitatene og lenkene til kildene, med instruksjoner for en oppsummering som HTML-side.\nLim inn i Claude, ChatGPT eller en annen assistent du bruker.\nVi sender ingenting til noen AI selv."]);
-  copy.addEventListener("click", () => {
+  copy.className = "cbn-button cbn-button--quiet copy-code-btn reviews-copy";
+  copy.innerHTML = COPY_ICON_SVG;
+  copy.setAttribute("aria-label", "Kopier til AI-oppsummering");
+  copy.dataset.reviewHoverTip = JSON.stringify([
+    "## Kopier til AI-oppsummering\nLim inn i Claude, ChatGPT eller en annen AI-assistent du bruker, og få en oppsummert side om produktet.",
+    "## Dette kopieres\nProduktet og prisen\nPoengsummene og hver kilde med lenke\nSitater fra testene\nInstruksjoner: bare norske kilder, kilde ved hver påstand, ikke finne på noe",
+    "## Svaret du får\nDet folk liker best\nVanlige problemer og klager\nHvem produktet passer for\nUenighet mellom testere og kjøpere\nHva du bør sjekke før kjøp",
+    "Vi sender ingenting til noen AI selv.",
+  ]);
+  copy.addEventListener("click", (event) => {
+    event.stopPropagation();
     const prompt = buildReviewAiPrompt({
       productName: priceMatch?.productName ?? document.title,
       ...(priceMatch ? { price: priceMatch.price, shopName: priceMatch.shopName } : {}),
@@ -15336,15 +15354,16 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       summary,
       date: new Date().toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" }),
     });
-    const done = (text: string) => {
-      copy.textContent = text;
-      window.setTimeout(() => { copy.textContent = "Kopier til AI-oppsummering"; }, 2600);
-    };
-    navigator.clipboard.writeText(prompt).then(() => done("Kopiert – lim inn i AI-assistenten"), () => done("Kunne ikke kopiere"));
+    void navigator.clipboard.writeText(prompt).then(() => {
+      copy.innerHTML = CHECK_ICON_SVG;
+      copy.setAttribute("aria-label", "Kopiert – lim inn i AI-assistenten");
+      window.setTimeout(() => {
+        copy.innerHTML = COPY_ICON_SVG;
+        copy.setAttribute("aria-label", "Kopier til AI-oppsummering");
+      }, 1500);
+    });
   });
-
-  section.append(header, ...rows, copy);
-  return section;
+  return copy;
 }
 
 function formatRatingCount(count: number): string {
@@ -15361,6 +15380,14 @@ function setReviewTip(element: HTMLElement, parts: string[]): void {
 }
 
 function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipController): void {
+  for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section [data-review-hover-tip]")) {
+    const tooltip = document.createElement("div");
+    tooltip.className = "bonus-chip-tooltip";
+    setTooltipContent(tooltip, JSON.parse(element.dataset.reviewHoverTip!) as string[]);
+    shadowRoot.append(tooltip);
+    element.addEventListener("mouseenter", () => showChipTooltipRightOfPanel(tooltip, element, shadowRoot));
+    element.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
+  }
   for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section [data-review-tip]")) {
     const tooltip = document.createElement("div");
     tooltip.className = element.classList.contains("price-match-card") ? "offer-tooltip price-match-tooltip" : "bonus-chip-tooltip";
