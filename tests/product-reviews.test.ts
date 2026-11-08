@@ -255,3 +255,19 @@ test("Boozt: title search links, GTIN on one JSON-LD entry and the rating on ano
   assert.deepEqual(ratings, [{ source: "store:www.boozt.com", sourceName: "Boozt", score: 5, maxScore: 5, count: 1, url: link, productName: "L'Oréal Professionnel Metal DX Anti-Deposit Protector Concentrated Oil 50 ml (50 ml)" }]);
   assert.equal(requested.filter((url) => url === link).length, 1);
 });
+
+test("Nordicfeel: the rendered TestFreaks summary, named for all sizes", async () => {
+  const { readNordicfeelUserRating } = await import("../src/shared/product-reviews.js");
+  // nordicfeel.com/no/product/loreal-professionnel-serie-expert-metal-dx-shampoo-96036 (2026-11-08), shortened.
+  const html = `<title>L&#x27;Oréal Professionnel Metal DX Shampoo 300 ml | Nordicfeel</title><div id="testfreaks-reviews"><section class="reviews-summary" data-v-1e51223c><h2 data-v-1e51223c>Vurderinger og anmeldelser</h2><p data-v-1e51223c>Gjennomsnittlig vurdering : <strong data-v-1e51223c>4.8 / 5</strong> · Anmeldelser: 160</p></section></div>`;
+  const url = "https://www.nordicfeel.com/no/product/loreal-professionnel-serie-expert-metal-dx-shampoo-96036";
+  assert.deepEqual(readNordicfeelUserRating(html, url), { source: "store:www.nordicfeel.com", sourceName: "Nordicfeel, alle størrelser", score: 4.8, maxScore: 5, count: 160, url, productName: "L'Oréal Professionnel Metal DX Shampoo 300 ml" });
+  assert.equal(readNordicfeelUserRating("<title>X | Nordicfeel</title>", url), undefined);
+});
+
+test("JSON-LD: the named Product with a rating wins over a rating-less one first (Kicks)", async () => {
+  const { readJsonLdUserRating } = await import("../src/shared/product-reviews.js");
+  // kicks.no/loreal-professionnel-metal-dx-shampoo-refill-300-ml (2026-11-08), shortened.
+  const html = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"L'Oréal Professionnel Metal DX Shampoo 300 ml"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"L'Oréal Professionnel Metal DX Shampoo 300 ml","gtin13":"30163188","aggregateRating":{"@type":"AggregateRating","ratingValue":"5","reviewCount":"5"}}</script>`;
+  assert.equal(readJsonLdUserRating(html, "store:www.kicks.no", "Kicks", "https://www.kicks.no/x")?.count, 5);
+});

@@ -81,9 +81,12 @@ export function readGodprisReviewCards(html: string): CriticReview[] {
 /** Buyer rating from the page's named Product JSON-LD. */
 export function readJsonLdUserRating(html: string, source: string, sourceName: string, pageUrl: string): UserRating | undefined {
   // Prisjakt publishes a ProductGroup (the product with its colour variants) instead of a Product.
+  // Some shops (Kicks) put a rating-less Product first; the named Product with a rating wins.
   const scripts = readLdJsonScripts(html);
-  const product = selectProductLdJson(scripts) ?? scripts.flatMap((item) => Array.isArray(item) ? item : [item]).find((item): item is Record<string, unknown> =>
-    isRecord(item) && item["@type"] === "ProductGroup" && typeof item.name === "string" && item.name.trim().length > 0);
+  const flat = (value: unknown): unknown[] => Array.isArray(value) ? value.flatMap(flat) : isRecord(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+  const named = scripts.flatMap(flat).filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.name === "string" && item.name.trim().length > 0 &&
+    [item["@type"]].flat().some((type) => type === "Product" || type === "ProductGroup"));
+  const product = named.find((item) => isRecord(item.aggregateRating)) ?? selectProductLdJson(scripts) ?? named[0];
   const rating = product !== undefined && isRecord(product.aggregateRating) ? product.aggregateRating : undefined;
   if (rating === undefined) return undefined;
   const score = finite(rating.ratingValue);
@@ -165,9 +168,23 @@ export function readPrisradarEditorReviews(product: Record<string, unknown>): Cr
   });
 }
 
+/**
+ * Nordicfeel renders its TestFreaks review summary into the page ("Gjennomsnittlig vurdering :
+ * 4.8 / 5 · Anmeldelser: 160"); it covers every size of the product, which the name says.
+ */
+export function readNordicfeelUserRating(html: string, pageUrl: string): UserRating | undefined {
+  const match = html.match(/Gjennomsnittlig vurdering\s*:\s*<strong[^>]*>\s*([\d.,]+)\s*\/\s*(\d+)\s*<\/strong>\s*·\s*Anmeldelser:\s*(\d+)/);
+  const title = decodeHtmlEntities(html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "").replace(/\s*\|\s*Nordicfeel\s*$/i, "").trim();
+  const score = finite(match?.[1]);
+  const maxScore = finite(match?.[2]);
+  const count = finite(match?.[3]);
+  if (score === undefined || maxScore === undefined || count === undefined || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === undefined || !title) return undefined;
+  return { source: "store:www.nordicfeel.com", sourceName: "Nordicfeel, alle størrelser", score, maxScore, count, url: pageUrl, productName: title.slice(0, 300) };
+}
+
 // Shops whose product pages we read for buyer ratings. Each needs host_permissions in the
 // extension manifest and @connect in the userscript, so the list is explicit configuration.
-export const STORE_REVIEW_HOSTS = ["www.power.no", "www.kicks.no", "www.blivakker.no", "www.boozt.com", "lyko.com"];
+export const STORE_REVIEW_HOSTS = ["www.power.no", "www.kicks.no", "www.blivakker.no", "www.boozt.com", "lyko.com", "www.nordicfeel.com"];
 
 const merchantKey = (value: string) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")
   .replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").replace(/[^a-z0-9]+/g, "");

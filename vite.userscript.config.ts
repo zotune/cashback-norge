@@ -43,6 +43,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      www.boozt.com
 // @connect      www.kicks.no
 // @connect      www.blivakker.no
+// @connect      www.nordicfeel.com
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no

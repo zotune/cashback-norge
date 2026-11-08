@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794164043
+// @version      1794164304
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -23,6 +23,7 @@
 // @connect      www.boozt.com
 // @connect      www.kicks.no
 // @connect      www.blivakker.no
+// @connect      www.nordicfeel.com
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -1965,7 +1966,9 @@ query OfferList($productId: Int!) {
   }
   function readJsonLdUserRating(html, source2, sourceName, pageUrl) {
     const scripts = readLdJsonScripts(html);
-    const product = selectProductLdJson(scripts) ?? scripts.flatMap((item) => Array.isArray(item) ? item : [item]).find((item) => isRecord$7(item) && item["@type"] === "ProductGroup" && typeof item.name === "string" && item.name.trim().length > 0);
+    const flat = (value) => Array.isArray(value) ? value.flatMap(flat) : isRecord$7(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+    const named = scripts.flatMap(flat).filter((item) => isRecord$7(item) && typeof item.name === "string" && item.name.trim().length > 0 && [item["@type"]].flat().some((type) => type === "Product" || type === "ProductGroup"));
+    const product = named.find((item) => isRecord$7(item.aggregateRating)) ?? selectProductLdJson(scripts) ?? named[0];
     const rating = product !== void 0 && isRecord$7(product.aggregateRating) ? product.aggregateRating : void 0;
     if (rating === void 0) return void 0;
     const score = finite$1(rating.ratingValue);
@@ -2027,7 +2030,16 @@ query OfferList($productId: Int!) {
       return [{ site, score, maxScore, url: withoutTracking(link), ...title ? { title } : {}, ...quote ? { quote } : {} }];
     });
   }
-  const STORE_REVIEW_HOSTS = ["www.power.no", "www.kicks.no", "www.blivakker.no", "www.boozt.com", "lyko.com"];
+  function readNordicfeelUserRating(html, pageUrl) {
+    const match = html.match(/Gjennomsnittlig vurdering\s*:\s*<strong[^>]*>\s*([\d.,]+)\s*\/\s*(\d+)\s*<\/strong>\s*·\s*Anmeldelser:\s*(\d+)/);
+    const title = decodeHtmlEntities(html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "").replace(/\s*\|\s*Nordicfeel\s*$/i, "").trim();
+    const score = finite$1(match?.[1]);
+    const maxScore = finite$1(match?.[2]);
+    const count = finite$1(match?.[3]);
+    if (score === void 0 || maxScore === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0 || !title) return void 0;
+    return { source: "store:www.nordicfeel.com", sourceName: "Nordicfeel, alle størrelser", score, maxScore, count, url: pageUrl, productName: title.slice(0, 300) };
+  }
+  const STORE_REVIEW_HOSTS = ["www.power.no", "www.kicks.no", "www.blivakker.no", "www.boozt.com", "lyko.com", "www.nordicfeel.com"];
   const merchantKey = (value) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").replace(/[^a-z0-9]+/g, "");
   function readGodprisStoreLinks(html) {
     const product = selectProductLdJson(readLdJsonScripts(html));
@@ -4911,7 +4923,8 @@ query OfferList($productId: Int!) {
     const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 4);
     const ratings = await Promise.all(links.map(async (link) => {
       const page = await requestText(link.url, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => void 0);
-      const rating = page === void 0 ? void 0 : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+      const host2 = new URL(link.url).hostname;
+      const rating = page === void 0 ? void 0 : host2 === "www.nordicfeel.com" ? readNordicfeelUserRating(page, link.url) : readJsonLdUserRating(page, `store:${host2}`, link.shopName, link.url);
       if (rating !== void 0 && anchor !== void 0 && (rating.productName === void 0 || hasProductVariantConflict(anchor, rating.productName) || scoreProductCandidateMatch(anchor, { title: rating.productName }) < MIN_PRODUCT_MATCH_SCORE)) return void 0;
       return rating;
     }));
@@ -23723,15 +23736,19 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, trustpilot?.status === "ok" ? trustpilot.profile : sources.find((offer) => offer.reviews?.store)?.reviews?.store));
     header.append(titleRow);
     const rows = [];
+    const storeRows = [];
+    const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
+    const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
+    const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
     const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
     const profile = trustpilot?.status === "ok" ? trustpilot.profile : void 0;
     const shopRatings = [...stores.map(({ store: store2 }) => store2), ...profile ? [profile] : []];
     if (shopRatings.length > 0 || trustpilot) {
-      const shopName = shopRatings[0]?.shopName;
+      shopRatings[0]?.shopName;
       const count = shopRatings.reduce((sum, rating) => sum + rating.count, 0);
       const score = count > 0 ? Math.round(shopRatings.reduce((sum, rating) => sum + (toHundredScale(rating.score, rating.maxScore) ?? 0) * rating.count, 0) / count) : void 0;
       const tip = {
-        title: `Butikk (kjøpere)${shopName ? ` · ${shopName}` : ""}`,
+        title: storeTitle,
         note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
         items: stores.map(({ offer, store: store2 }) => ({
           name: getPriceMatchSourceName(offer),
@@ -23740,7 +23757,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           chips: [`${formatReviewScore(store2.score, store2.maxScore)}${store2.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store2.count)]
         }))
       };
-      const chips = [...shopName ? [shopName] : [], ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...count > 0 ? [formatRatingCount(count)] : []];
+      const chips = [...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...count > 0 ? [formatRatingCount(count)] : []];
       if (profile) {
         const updated = new Date(trustpilot.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
         chips.splice(chips.length - (count > 0 ? 1 : 0), 0, "Trustpilot");
@@ -23756,10 +23773,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         tip.note += " Trustpilot svarte ikke automatisk. Åpne profilen under, så hentes vurderingen og vises her når du går tilbake til butikken.";
         tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
       }
-      const row = buildReviewRow("Butikk (kjøpere)", chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot.profileUrl, tip);
+      const row = buildReviewRow(storeTitle, chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot.profileUrl, tip);
       row.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source;
       if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
-      rows.push(row);
+      storeRows.push(row);
     }
     const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
     const seenBuyers = /* @__PURE__ */ new Set();
@@ -23767,9 +23784,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-      rows.push(buildReviewRow("Produkt (kjøpere)", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
-        title: "Produkt (kjøpere)",
-        note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
+      rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
+        title: productTitle,
+        note: "Hva norske kjøpere mener om produktet. Snittet er vektet etter antall vurderinger.",
         // Like the price match: the product found at the source on top, the source as the first chip.
         items: buyers.map(({ offer, user }) => ({
           name: user.productName ?? buyerName(offer, user),
@@ -23790,12 +23807,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
       const via = tests[0].offer;
       rows.push(buildReviewRow(
-        "Produkt (anmeldere)",
+        "Eksperttester",
         [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)],
         score,
         via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
         {
-          title: "Produkt (anmeldere)",
+          title: "Eksperttester",
           note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
           items: tests.map(({ critic }) => ({
             name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site,
@@ -23807,7 +23824,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         }
       ));
     }
-    section.append(header, ...rows);
+    section.append(header, ...rows, ...storeRows);
     return section;
   }
   function buildReviewCopyButton(summary, priceMatch, store2) {

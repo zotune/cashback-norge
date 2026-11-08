@@ -18,7 +18,7 @@ import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
 import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 import { parseUrl, isRecord } from "./cashback.js";
-import { readGodprisReviewCards, readGodprisStoreLinks, readJsonLdUserRating, STORE_REVIEW_HOSTS, type CriticReview, type UserRating } from "./product-reviews.js";
+import { readGodprisReviewCards, readGodprisStoreLinks, readJsonLdUserRating, readNordicfeelUserRating, STORE_REVIEW_HOSTS, type CriticReview, type UserRating } from "./product-reviews.js";
 
 type TextRequest = (
   url: string,
@@ -187,7 +187,8 @@ export async function readGodprisStoreRatings(html: string, requestText: TextReq
   const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 4);
   const ratings = await Promise.all(links.map(async (link) => {
     const page = await requestText(link.url, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => undefined);
-    const rating = page === undefined ? undefined : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+    const host = new URL(link.url).hostname;
+    const rating = page === undefined ? undefined : host === "www.nordicfeel.com" ? readNordicfeelUserRating(page, link.url) : readJsonLdUserRating(page, `store:${host}`, link.shopName, link.url);
     // The shop's page must name the same product (size, variant) as the page the reader is on.
     if (rating !== undefined && anchor !== undefined && (rating.productName === undefined || hasProductVariantConflict(anchor, rating.productName) ||
       scoreProductCandidateMatch(anchor, { title: rating.productName }) < MIN_PRODUCT_MATCH_SCORE)) return undefined;

@@ -15465,7 +15465,14 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   // Three rows with the average on the row and every source in the tooltip, like a review
   // aggregator: the shop (its users' rating of service), buyers of the product, professional tests.
   // Chip lines on the rows and in the tooltips, like the flight price match.
+  // Rows: the product (its buyers), expert tests, then the shop. The product and shop rows are
+  // titled by name; the sources are chips.
   const rows: HTMLAnchorElement[] = [];
+  const storeRows: HTMLAnchorElement[] = [];
+  const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
+  const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
+  const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ??
+    (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
   const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
   const profile = trustpilot?.status === "ok" ? trustpilot.profile : undefined;
   // Every rating of the shop on one 0–100 scale; the row shows the average weighted by count.
@@ -15475,12 +15482,12 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     const count = shopRatings.reduce((sum, rating) => sum + rating.count, 0);
     const score = count > 0 ? Math.round(shopRatings.reduce((sum, rating) => sum + (toHundredScale(rating.score, rating.maxScore) ?? 0) * rating.count, 0) / count) : undefined;
     const tip: ReviewTooltip = {
-      title: `Butikk (kjøpere)${shopName ? ` · ${shopName}` : ""}`,
+      title: storeTitle,
       note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
       items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), url: store.url, score: toHundredScale(store.score, store.maxScore) ?? 0,
         chips: [`${formatReviewScore(store.score, store.maxScore)}${store.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store.count)] })),
     };
-    const chips = [...(shopName ? [shopName] : []), ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
+    const chips = [...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
     if (profile) {
       const updated = new Date(trustpilot!.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
       chips.splice(chips.length - (count > 0 ? 1 : 0), 0, "Trustpilot");
@@ -15493,10 +15500,10 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       tip.note += " Trustpilot svarte ikke automatisk. Åpne profilen under, så hentes vurderingen og vises her når du går tilbake til butikken.";
       tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
     }
-    const row = buildReviewRow("Butikk (kjøpere)", chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot!.profileUrl, tip);
+    const row = buildReviewRow(storeTitle, chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot!.profileUrl, tip);
     row.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source;
     if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
-    rows.push(row);
+    storeRows.push(row);
   }
   // Comparison sites first, then the shops' own ratings (source "store:<host>").
   const buyerName = (offer: PriceMatchOffer, user: { source: string; sourceName: string }) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
@@ -15507,9 +15514,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
     const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-    rows.push(buildReviewRow("Produkt (kjøpere)", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
-      title: "Produkt (kjøpere)",
-      note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
+    rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
+      title: productTitle,
+      note: "Hva norske kjøpere mener om produktet. Snittet er vektet etter antall vurderinger.",
       // Like the price match: the product found at the source on top, the source as the first chip.
       items: buyers.map(({ offer, user }) => ({ name: user.productName ?? buyerName(offer, user), url: user.url, score: toHundredScale(user.score, user.maxScore) ?? 0,
         chips: [...(user.productName ? [buyerName(offer, user)] : []), `${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
@@ -15525,15 +15532,15 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (tests.length > 0) {
     const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
     const via = tests[0]!.offer;
-    rows.push(buildReviewRow("Produkt (anmeldere)", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
+    rows.push(buildReviewRow("Eksperttester", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
-        title: "Produkt (anmeldere)",
+        title: "Eksperttester",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
         items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, url: critic.url, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
-  section.append(header, ...rows);
+  section.append(header, ...rows, ...storeRows);
   return section;
 }
 
