@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-08",
+  "page": "https://cashbacknorge.no/dagligvarer/",
+  "capture": "assets/capture.json"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Orker du å bla i {15|femten} *kundeaviser?*",
+   "gap": 0.3
+  },
+  {
+   "id": "samlet",
+   "line": "Her er ukens tilbud fra {15|femten} kjeder samlet i én *liste.*"
+  },
+  {
+   "id": "butikker",
+   "line": "Skru av de butikkene du *aldri* går i."
+  },
+  {
+   "id": "rabatt",
+   "line": "Sorter på størst rabatt, og vips: kjøttpølse til *{30 kr|tretti kroner}*, ned fra nesten sytti."
+  },
+  {
+   "id": "sok",
+   "line": "Søk etter det du trenger, og se nøyaktig *når* tilbudet gjelder."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

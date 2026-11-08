@@ -1,0 +1,35 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-08",
+  "page": "https://cashbacknorge.no/dagens-tilbud/",
+  "capture": "assets/capture.json"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "{18 % ned|Atten prosent ned}. Er det et *kupp?*",
+   "gap": 0.3
+  },
+  {
+   "id": "lav",
+   "line": "Ikke nødvendigvis. Den har vært helt nede i *{1 264 kr|tolv hundre og sekstifire kroner}*, og nå koster den {1 724|sytten hundre og tjuefire}."
+  },
+  {
+   "id": "forskjell",
+   "line": "Vanlige topplister viser rabatten. Vi viser også avstanden til *bunnen.*"
+  },
+  {
+   "id": "laveste",
+   "line": "Og her er det motsatte: *laveste* pris som er registrert, akkurat nå."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}
