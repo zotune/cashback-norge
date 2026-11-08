@@ -8,7 +8,8 @@
 import { decodeHtmlEntities, isRecord, parseUrl } from "./cashback.js";
 import { readLdJsonScripts, readNextFlightPayloads, selectProductLdJson } from "./product-data.js";
 
-export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string; pros?: string[]; cons?: string[] };
+// foundAt: the comparison page that listed the test (Godpris, Prisradar); the tooltip links there.
+export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string; pros?: string[]; cons?: string[]; foundAt?: string };
 // productName: the product the rating belongs to at that source, shown so readers can judge the match.
 export type UserRating = { source: string; sourceName: string; score: number; maxScore: number; count: number; url: string; productName?: string };
 // A rating of the shop itself (service, delivery), not of the product.
@@ -319,6 +320,7 @@ export function isProductReviews(value: unknown): value is ProductReviews {
     isScore(store.score, store.maxScore) && typeof store.count === "number" && Number.isInteger(store.count) && store.count > 0 && isHttpsUrl(store.url))) && (critics === undefined || (Array.isArray(critics) && critics.length <= 50 && critics.every((critic) =>
     isRecord(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) &&
     (critic.title === undefined || typeof critic.title === "string") && (critic.quote === undefined || typeof critic.quote === "string") &&
+    (critic.foundAt === undefined || isHttpsUrl(critic.foundAt)) &&
     [critic.pros, critic.cons].every((list) => list === undefined || (Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))))) &&
     (users === undefined || (Array.isArray(users) && users.length <= 10 && users.every((user) =>
       isRecord(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) &&

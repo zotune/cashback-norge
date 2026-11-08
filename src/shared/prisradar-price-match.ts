@@ -738,7 +738,7 @@ export function readPrisradarProductPage(html: string, fallbackProductUrl: strin
       ...(offer.shippingPrice !== undefined ? { shippingPrice: offer.shippingPrice } : {}),
       ...(offer.totalPrice !== undefined ? { totalPrice: offer.totalPrice } : {}),
     })),
-    ...(readPrisradarEditorReviews(product).length > 0 ? { reviews: { critics: readPrisradarEditorReviews(product) } } : {}),
+    ...(readPrisradarEditorReviews(product).length > 0 ? { reviews: { critics: readPrisradarEditorReviews(product).map((critic) => ({ ...critic, foundAt: productUrl })) } } : {}),
   };
 }
 

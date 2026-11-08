@@ -109,7 +109,7 @@ async function withDuplicateListingReviews(offer: PriceMatchOffer, productIds: s
       readStringLike(isRecord(structured.brand) ? structured.brand.name : structured.brand));
     if (name === undefined || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE ||
       isAccessoryMismatch(anchor.searchTerm, name)) continue;
-    critics.push(...readGodprisReviewCards(html));
+    critics.push(...readGodprisReviewCards(html).map((critic) => ({ ...critic, foundAt: `${GODPRIS_PRODUCT_URL}${productId}#tester` })));
   }
   return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
 }
@@ -176,7 +176,7 @@ export function readGodprisProductPage(
   const offer = readGodprisProductOffer(html, fallbackProductId, anchor, requireStructured);
   if (offer === undefined) return undefined;
   // The same page lists professional tests; only Norwegian ones are kept.
-  const critics = readGodprisReviewCards(html);
+  const critics = readGodprisReviewCards(html).map((critic) => ({ ...critic, foundAt: `${GODPRIS_PRODUCT_URL}${fallbackProductId}#tester` }));
   return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
 }
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794166058
+// @version      1794166109
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -2133,7 +2133,7 @@ query OfferList($productId: Int!) {
     const critics = value.critics;
     const users = value.users;
     const store2 = value.store;
-    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string") && [critic.pros, critic.cons].every((list) => list === void 0 || Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url) && (user.productName === void 0 || typeof user.productName === "string" && user.productName.length <= 300)));
+    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string") && (critic.foundAt === void 0 || isHttpsUrl(critic.foundAt)) && [critic.pros, critic.cons].every((list) => list === void 0 || Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url) && (user.productName === void 0 || typeof user.productName === "string" && user.productName.length <= 300)));
   }
   const SEARCH = "query ShopSearch($query: String!) { search(query: $query) { shops { nodes { id } } } }";
   const SHOPS = "query Shops($ids: [Int!]!) { shops(ids: $ids) { id name homePage { url } userReviews { count rating } } }";
@@ -4877,7 +4877,7 @@ query OfferList($productId: Int!) {
         readStringLike$5(isRecord$7(structured.brand) ? structured.brand.name : structured.brand)
       );
       if (name === void 0 || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE || isAccessoryMismatch(anchor.searchTerm, name)) continue;
-      critics.push(...readGodprisReviewCards(html));
+      critics.push(...readGodprisReviewCards(html).map((critic) => ({ ...critic, foundAt: `${GODPRIS_PRODUCT_URL}${productId}#tester` })));
     }
     return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
   }
@@ -4923,7 +4923,7 @@ query OfferList($productId: Int!) {
   function readGodprisProductPage(html, fallbackProductId, anchor, requireStructured = false) {
     const offer = readGodprisProductOffer(html, fallbackProductId, anchor, requireStructured);
     if (offer === void 0) return void 0;
-    const critics = readGodprisReviewCards(html);
+    const critics = readGodprisReviewCards(html).map((critic) => ({ ...critic, foundAt: `${GODPRIS_PRODUCT_URL}${fallbackProductId}#tester` }));
     return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
   }
   async function readGodprisStoreRatings(html, requestText, anchor) {
@@ -6492,7 +6492,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         ...offer.shippingPrice !== void 0 ? { shippingPrice: offer.shippingPrice } : {},
         ...offer.totalPrice !== void 0 ? { totalPrice: offer.totalPrice } : {}
       })),
-      ...readPrisradarEditorReviews(product).length > 0 ? { reviews: { critics: readPrisradarEditorReviews(product) } } : {}
+      ...readPrisradarEditorReviews(product).length > 0 ? { reviews: { critics: readPrisradarEditorReviews(product).map((critic) => ({ ...critic, foundAt: productUrl })) } } : {}
     };
   }
   function dedupePrisradarOffersByShop(offers) {
@@ -23878,9 +23878,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         {
           title: `${productTitle}: eksperttester`,
           note: "Norske tester, omregnet til 0–100.",
+          // Link to the comparison page that listed the test when we found it there.
           items: tests.map(({ critic }) => ({
             name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site,
-            url: critic.url,
+            url: critic.foundAt ?? critic.url,
             score: toHundredScale(critic.score, critic.maxScore) ?? 0,
             chips: [...critic.title ? [critic.site] : [], formatReviewScore(critic.score, critic.maxScore)],
             ...critic.quote ? { quote: critic.quote } : {}

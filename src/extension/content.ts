@@ -15587,7 +15587,8 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
         title: `${productTitle}: eksperttester`,
         note: "Norske tester, omregnet til 0–100.",
-        items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, url: critic.url, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
+        // Link to the comparison page that listed the test when we found it there.
+        items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, url: critic.foundAt ?? critic.url, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
