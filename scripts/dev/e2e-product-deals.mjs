@@ -12,6 +12,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, co
 const errors = [], thirdParty = [];
 page.on('pageerror', error => errors.push(error.message));
 page.on('request', request => { if (/(?:prisjakt\.no|etilbudsavis\.no|klarna\.com|klarnacdn\.net|prisradar\.no|godpris\.no|pji\.nu|tjek\.com)$/.test(new URL(request.url()).hostname)) thirdParty.push(request.url()); });
+await page.addInitScript(time => { Date.now = () => time; }, Date.parse(catalog.generatedAt));
 await page.route('**/*.supabase.co/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: route.request().url().includes('my-votes') ? '{"votes":[]}' : '[]' }));
 try {
   await page.goto('http://localhost:8765/dagens-tilbud/');
@@ -20,6 +21,12 @@ try {
   assert.ok(await page.getByRole('columnheader', { name: 'Kilde', exact: true }).count());
   assert.equal(await page.locator('.deal-title .deal-rank').count(), 0);
   assert.equal(await page.locator('[data-ol="sources"] [data-source][aria-pressed="true"]').count(), catalog.sources.length);
+  await page.locator('[data-ol="bonus-toggle"]').click();
+  await page.locator('[data-ol="bonus-panel"] .badge-sas-amex').waitFor();
+  assert.ok(await page.locator('[data-ol="bonus-panel"] .badge-curve').count());
+  const summary = await page.locator('.list-summary').evaluate(el => { const toggle = el.querySelector('[data-ol="bonus-toggle"]').getBoundingClientRect(); const count = el.querySelector('[data-ol="count"]').getBoundingClientRect(); return { toggle: toggle.x, count: count.x }; });
+  assert.ok(summary.toggle < summary.count, 'cashback left, offer count right');
+  await page.locator('[data-ol="bonus-toggle"]').click();
   const search = page.locator('[data-ol="search"]');
   const starlink = catalog.deals.find(deal => deal.name === 'Starlink Mini');
   assert.ok(starlink?.lowestPriceEver);
@@ -27,17 +34,16 @@ try {
   const starlinkRow = page.locator('.deal-row').filter({ hasText: 'Starlink Mini' }).first();
   assert.equal(await starlinkRow.locator('.deal-rank').innerText(), `#${starlink.rank}`);
   assert.match(await starlinkRow.locator('.deal-history').innerText(), /2\s?199\s?kr/);
-  const merged = catalog.deals.find(deal => deal.sources.length > 1);
+  const merged = catalog.deals.find(deal => deal.sources.length > 1 && deal.sources.some(source => source.source === 'prisjakt'));
   assert.ok(merged, 'live snapshot contains a verified cross-source duplicate');
   await search.fill(merged.name.split(' ')[0]);
   const id = merged.key || `${merged.source === 'prisjakt' ? 'pj' : merged.source}${merged.id}`;
   const mergedRow = page.locator(`[data-id="${id}"]`);
   assert.equal(await mergedRow.locator('.deal-source').count(), merged.sources.length);
   assert.equal(await mergedRow.locator('.deal-rank').innerText(), `#${merged.rank}`);
-  await page.locator('[data-ol="filter-picker"]').click();
-  await page.locator('#dagens-tilbud-filters .selection-search').fill('Prisjakt');
-  await page.locator('[role="option"][data-value="source:prisjakt"]').click();
-  await page.keyboard.press('Escape');
+  await mergedRow.locator('[data-only-source="prisjakt"]').click();
+  assert.equal(await page.locator('[data-ol="sources"] [aria-pressed="true"]').count(), 1);
+  assert.equal(await page.locator('[data-source="prisjakt"]').getAttribute('aria-pressed'), 'true');
   assert.equal(await mergedRow.locator('.deal-source').count(), 1);
   assert.equal(await mergedRow.locator('.deal-source').innerText(), 'Prisjakt');
   assert.equal(await mergedRow.locator('.deal-rank').innerText(), `#${merged.rank}`);
@@ -47,6 +53,19 @@ try {
   await page.waitForFunction(count => document.querySelector('[data-ol="count"]').textContent === `${count} tilbud`, catalog.deals.length);
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   assert.equal(await overflow(), false, 'desktop table fits');
+  await page.locator('[data-ol="sort"]').click();
+  await page.locator('[data-value="name"]').click();
+  await page.locator('[data-ol="az"]').waitFor({ state: 'visible' });
+  await page.evaluate(() => scrollTo(0, 1200));
+  const up = page.locator('.az-navigation .scroll-top');
+  await up.waitFor({ state: 'visible' });
+  const upBounds = await up.boundingBox();
+  const firstLetter = await page.locator('[data-ol="az"] [data-letter]').first().boundingBox();
+  assert.ok(upBounds.y + upBounds.height <= firstLetter.y, 'back-to-top sits above the alphabet');
+  assert.ok(Math.abs(upBounds.x + upBounds.width / 2 - firstLetter.x - firstLetter.width / 2) < 2);
+  await up.click();
+  await page.waitForFunction(() => scrollY < 10);
+
   await page.screenshot({ path: `${output}desktop.png` });
   for (const width of [320, 390, 768]) {
     await page.setViewportSize({ width, height: 900 });
@@ -58,7 +77,19 @@ try {
     await page.locator('[data-view="list"]').click();
     assert.equal(await overflow(), false, `list fits ${width}`);
   }
+  await page.goto('http://localhost:8765/');
+  await page.locator('.merchant').first().waitFor();
+  await page.evaluate(() => scrollTo(0, 1200));
+  const homeUp = page.locator('.az-navigation #scroll-top');
+  await homeUp.waitFor({ state: 'visible' });
+  const arrow = await homeUp.boundingBox();
+  const hash = await page.locator('#az-bar [data-l="#"]').boundingBox();
+  assert.ok(arrow.y + arrow.height <= hash.y, 'home page arrow sits above #');
+  assert.equal(await homeUp.evaluate(button => button.closest('.sticky-header') === null), true);
+  await page.screenshot({ path: `${output}home-scroll-top.png` });
+  await homeUp.click();
+  await page.waitForFunction(() => scrollY < 10);
   assert.deepEqual(errors, []);
   assert.deepEqual(thirdParty, [], 'all images and data are served from our own snapshot');
-  console.log('PASS: combined sources, filters choose the active source, stable # rank, Starlink history, mobile layout and own-domain assets.');
+  console.log('PASS: combined sources, filters choose the active source, stable # rank, Starlink history, shared cashback panel, mobile layout, back-to-top above the alphabet and own-domain assets.');
 } finally { await browser.close(); }

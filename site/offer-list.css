@@ -28,10 +28,12 @@
 .deal-rank { color: var(--cbn-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .deal-main > .deal-rank { align-self: flex-start; font-size: 10px; margin-bottom: 2px; padding: 1px 5px; }
 .deal-sources { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.deal-source { font-size: 10px; text-decoration: none; }
+.deal-source { font-family: inherit; font-size: 10px; text-decoration: none; cursor: pointer; }
 .deal-source:hover { filter: brightness(1.15); }
 .list-bar { align-items: center; display: flex; gap: 4px; margin-bottom: 6px; }
 .list-bar .count { flex: 1; margin: 0; padding: 0; }
+.list-summary { align-items: center; display: flex; flex: 1; gap: 8px; min-width: 0; }
+.list-controls { align-items: center; display: flex; gap: 4px; margin-left: auto; }
 .list-reset { font: inherit; font-size: 12px; min-height: 30px; padding: 0 8px; }
 .sort-button { align-items: center; display: inline-flex; font: inherit; font-size: 12px; font-weight: 600; gap: 4px; min-height: 32px; padding: 0 8px 0 10px; }
 .sort-button svg { flex-shrink: 0; }
@@ -70,6 +72,8 @@
 .deal-title a svg { color: var(--cbn-subtle); margin-left: 3px; vertical-align: -1px; }
 .days-left { border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 16px; padding: 0 5px; white-space: nowrap; }
 .days-left--ok { background: var(--cbn-highlight); color: var(--cbn-accent); }
+.days-left--upcoming { background: #e3efff; color: #215a9c; }
+:root[data-cbn-theme="dark"] .days-left--upcoming { background: #1b3048; color: #9bc3ff; }
 .days-left--soon { background: #fff1dc; color: #a35a00; }
 .days-left--last { background: #fde4e4; color: #c62828; }
 :root[data-cbn-theme="dark"] .days-left--soon { background: #3d2c14; color: #f2b366; }
@@ -162,7 +166,8 @@ a.card-chip { text-decoration: none; }
   /* One scrollable line keeps the sticky header short on phones. */
   .group-toggles { flex-wrap: nowrap; margin: 0 -12px 8px; overflow-x: auto; overscroll-behavior-x: contain; padding: 2px 12px; scrollbar-width: none; }
   .group-toggles::-webkit-scrollbar { display: none; }
-  .list-bar { gap: 0; }
+  .list-bar { gap: 4px; flex-wrap: wrap; }
+  .list-summary { flex-basis: 100%; }
   .sort-button [data-choice-label] { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
 }
 @media (max-width: 380px) {

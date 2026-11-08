@@ -1,8 +1,9 @@
 // Shared website pieces for cashbacknorge.no and /dagligvarer: the support ad line at the
 // bottom, the ad card, the sort menu, lazy batches and the Supabase votes.
 // Styles live in site/site.css; the pages own their layout.
-import { INSTABANK_AD, PROVIDER_COLORS, type BonusCard } from "../shared/provider-data";
-import type { CashbackOffer } from "../shared/cashback";
+import { INSTABANK_AD, PROVIDER_COLORS, PREMIUM_CARDS, type BonusCard } from "../shared/provider-data";
+import { isCashbackOffer, isRecord, type CashbackOffer } from "../shared/cashback";
+import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 import { getSupportAdvertisementDetail, getSupportAdvertisementText, getSupportAdvertisementTooltipParts, selectSupportAdvertisement, type SupportAdvertisement } from "../shared/support-advertisements";
 import { formatTooltipHtml } from "../shared/tooltip-content";
 import { getBrandChipCss, getBrandButtonCss } from "../shared/theme";
@@ -225,6 +226,30 @@ export function renderBonusCardGroup(cards: Array<BonusCard & { rewardLabel?: st
   }).join("");
 }
 
+/** The same card groups and current benefits on both offer pages. */
+export function fillExtraCashbackPanel(panel: HTMLElement, attach: Attach, extraGroups: Array<{ label: string; cards: Array<BonusCard & { rewardLabel?: string }> }> = []): void {
+  let benefits: CashbackOffer[] = [];
+  const render = () => {
+    panel.replaceChildren();
+    for (const group of [...extraGroups, { label: "Gratis", cards: getFreeCards(benefits) }, { label: "Premium", cards: PREMIUM_CARDS }]) {
+      const section = document.createElement("div"); section.className = "chip-group";
+      const label = document.createElement("span"); label.className = "chip-group-label"; label.textContent = group.label;
+      const items = document.createElement("div"); items.className = "chip-group-items";
+      renderBonusCardGroup(group.cards, items);
+      section.append(label, items); panel.append(section);
+    }
+    attach(panel);
+  };
+  render();
+  watchCardBenefitDate(render);
+  void fetch("/cashback-index.json", { cache: "no-cache", signal: AbortSignal.timeout(10000) })
+    .then(async (response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return await response.json() as unknown; })
+    .then((index) => {
+      benefits = getCardBenefitOffers(isRecord(index) && Array.isArray(index.offers) ? index.offers.filter(isCashbackOffer) : []);
+      render();
+    }).catch(() => { /* The static cards remain available offline. */ });
+}
+
 export { createCountBadge };
 
 /** Pale brand chips (white, yellow, silver) get the dark count plate so the number stays visible. */
@@ -295,8 +320,18 @@ export function installScrollTopButton(button: HTMLButtonElement): void {
   button.setAttribute("aria-label", "Til toppen");
   button.title = "Til toppen";
   if (!button.innerHTML.trim()) button.innerHTML = SCROLL_TOP_SVG;
-  const sync = () => { button.hidden = window.scrollY < 600; };
+  const bar = document.querySelector<HTMLElement>(".az-bar");
+  const navigation = document.createElement("div"); navigation.className = "az-navigation";
+  if (bar) { bar.before(navigation); navigation.append(button, bar); }
+  else { document.body.append(navigation); navigation.append(button); }
+  const sync = () => {
+    button.hidden = window.scrollY < 600;
+    const hasAlphabet = bar !== null && !bar.hidden;
+    navigation.classList.toggle("has-alphabet", hasAlphabet);
+    navigation.hidden = button.hidden && !hasAlphabet;
+  };
   window.addEventListener("scroll", sync, { passive: true });
+  if (bar) new MutationObserver(sync).observe(bar, { attributes: true, attributeFilter: ["hidden"] });
   button.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
   sync();
 }

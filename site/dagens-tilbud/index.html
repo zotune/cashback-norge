@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tilbud · Cashback Norge</title>
 <script src="/theme.js?v=6"></script>
-<link rel="stylesheet" href="/site.css?v=8">
-<link rel="stylesheet" href="/offer-list.css?v=8">
+<link rel="stylesheet" href="/site.css?v=9">
+<link rel="stylesheet" href="/offer-list.css?v=9">
 <meta name="description" content="Gode tilbud på elektronikk, hjem, sport og mer – sorter på prisfall, pris og butikk, med lenke til prishistorikken.">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
@@ -49,11 +49,11 @@
 <div class="fixed-footer">
   <div class="tip-line"></div>
 </div>
-<script src="/shared-data.js?v=8"></script>
-<script src="/offer-list.js?v=8"></script>
+<script src="/shared-data.js?v=9"></script>
+<script src="/offer-list.js?v=9"></script>
 <script>
 // Only our daily snapshot is read here. Product/source links open on explicit click.
-const { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS, PROVIDER_NAMES, formatKr } = window.SHARED;
+const { getPrisjaktDealGroup, PRISJAKT_DEAL_GROUPS, PROVIDER_NAMES, formatKr, fillExtraCashbackPanel } = window.SHARED;
 function productItem(deal) {
   const source = deal.source || "prisjakt";
   const label = PROVIDER_NAMES[source] || source;
@@ -109,6 +109,7 @@ async function start() {
   savingLabel: "Prisfall",
   searchPlaceholder: "Søk etter vare, merke eller butikk...",
   features: { category: true, validity: true, history: true, sources: true },
+  extraCashback: (panel) => fillExtraCashbackPanel(panel, window.CashbackTooltips.attach),
   toplists: [{ sort: "relevance", label: "Topplisten" }, { sort: "saving", label: "Størst prisfall" }, { sort: "votes", label: "Brukernes favoritter" }],
   groupOrder: PRISJAKT_DEAL_GROUPS,
   read,

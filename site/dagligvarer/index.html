@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dagligvarer · Cashback Norge</title>
 <script src="/theme.js?v=6"></script>
-<link rel="stylesheet" href="/site.css?v=8">
-<link rel="stylesheet" href="/offer-list.css?v=8">
+<link rel="stylesheet" href="/site.css?v=9">
+<link rel="stylesheet" href="/offer-list.css?v=9">
 <meta name="description" content="Ukens tilbud fra kundeavisene til REMA 1000, KIWI, MENY, Coop, SPAR, Joker, Bunnpris og flere – søk, sorter på rabatt og sammenlign på tvers av butikkene.">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=quokka-1">
 <link rel="icon" type="image/png" href="/favicon.png?v=quokka-1">
@@ -49,14 +49,14 @@
 <div class="fixed-footer">
   <div class="tip-line"></div>
 </div>
-<script src="/shared-data.js?v=8"></script>
-<script src="/offer-list.js?v=8"></script>
+<script src="/shared-data.js?v=9"></script>
+<script src="/offer-list.js?v=9"></script>
 <script>
 // Data: /grocery-offers.json, built by the daily crawl from the supermarkets' flyers (Tjek's
 // offer data). Votes use the same Supabase functions as the discount codes, key "dagligvarer".
 const {
   getGroceryChain, getGroceryOfferLink, getGrocerySearchQuery, installGroceryChainStyles,
-  getGroceryUnitPrice, getGroceryCardBonus, GROCERY_CARD_BONUSES, PREMIUM_CARDS, getFreeCards, getCardBenefitOffers, watchCardBenefitDate, renderBonusCardGroup,
+  getGroceryUnitPrice, getGroceryCardBonus, GROCERY_CHAIN_LIST, GROCERY_CARD_BONUSES, fillExtraCashbackPanel,
 } = window.SHARED;
 // Flyer headings are often in capitals ("MILLS KAVIAR TUBE").
 function formatHeading(heading) {
@@ -97,31 +97,12 @@ function toItem(offer) {
   };
 }
 
-let cardBenefitOffers = [];
-let bonusPanel;
-function renderCardBonuses() {
-  if (!bonusPanel) return;
-  const groceries = GROCERY_CARD_BONUSES.map((card) => ({
+// The shared panel keeps card colours, current benefits and affiliate links in sync.
+function fillCardBonuses(panel) {
+  const cards = GROCERY_CARD_BONUSES.map((card) => ({
     label: card.label, badge: card.id, pct: 0, rewardLabel: card.rate, url: card.url, approx: false, tip: card.tip,
   }));
-  bonusPanel.innerHTML = `<div class="chip-group"><span class="chip-group-label">Dagligvarekort</span><div class="chip-group-items" data-cards="grocery"></div></div>
-    <div class="chip-group"><span class="chip-group-label">Gratis</span><div class="chip-group-items" data-cards="free"></div></div>
-    <div class="chip-group"><span class="chip-group-label">Premium</span><div class="chip-group-items" data-cards="premium"></div></div>`;
-  renderBonusCardGroup(groceries, bonusPanel.querySelector('[data-cards="grocery"]'));
-  renderBonusCardGroup(getFreeCards(cardBenefitOffers), bonusPanel.querySelector('[data-cards="free"]'));
-  renderBonusCardGroup(PREMIUM_CARDS, bonusPanel.querySelector('[data-cards="premium"]'));
-  window.CashbackTooltips.attach(bonusPanel);
-}
-// Same "Ekstra cashback" as the front page: a toggle by the count, the cards under the search.
-function fillCardBonuses(panel) {
-  bonusPanel = panel;
-  renderCardBonuses();
-  watchCardBenefitDate(renderCardBonuses);
-  // Instabank uses the same current benefits and affiliate URL as the home page.
-  fetch("/cashback-index.json", { cache: "no-cache", signal: AbortSignal.timeout(10000) })
-    .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
-    .then((index) => { cardBenefitOffers = getCardBenefitOffers(Array.isArray(index.offers) ? index.offers : []); renderCardBonuses(); })
-    .catch(() => { /* Static cards remain usable when the daily index is unavailable. */ });
+  fillExtraCashbackPanel(panel, window.CashbackTooltips.attach, [{ label: "Dagligvarekort", cards }]);
 }
 
 installGroceryChainStyles();
@@ -132,8 +113,9 @@ createOfferList({
   voteKey: "dagligvarer",
   groupLabel: "Butikker",
   noGroupsText: "Velg minst én butikk.",
+  noActiveGroupsText: "Ingen aktive kundeavistilbud fra de valgte butikkene i den lagrede katalogen. Nye kundeaviser hentes daglig.",
   searchPlaceholder: "Søk etter vare, f.eks. kaffe...",
-  features: { unit: true, validity: true, bonus: true },
+  features: { unit: true, validity: true, bonus: true, upcoming: true },
   extraCashback: fillCardBonuses,
   groupName: chainLabel,
   groupClass: (name) => { const chain = getGroceryChain(name); return chain ? `badge-chain-${chain.slug}` : ""; },
@@ -141,9 +123,10 @@ createOfferList({
   // An old link to one chain (?kjede=KIWI) shows only that chain.
   onlyGroupsFromUrl: (params, groups) => groups.includes(params.get("kjede")) ? [params.get("kjede")] : undefined,
   read: (catalog) => ({
+    groups: GROCERY_CHAIN_LIST.map((chain) => chain.name),
     items: (Array.isArray(catalog.offers) ? catalog.offers : []).filter((offer) => typeof offer.amount === "number").map(toItem),
     updated: catalog.generatedAt,
-    note: `Priser fra kundeavisene for ${catalog.location || "Oslo"}-området, oppdatert daglig. Tilbud kan variere mellom regioner og butikker og gjelder så langt lageret rekker. Stemmene er brukernes egne vurderinger.`,
+    note: `Priser fra kundeavisene for ${catalog.location || "Oslo"}-området, oppdatert daglig. Kommende tilbud er merket med startdato. Tilbud kan variere mellom regioner og butikker og gjelder så langt lageret rekker. Stemmene er brukernes egne vurderinger.`,
   }),
 });
 </script>

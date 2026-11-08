@@ -63,10 +63,11 @@
    * @param {string} config.voteKey          Supabase key the votes are stored under
    * @param {string} config.groupLabel       "Butikker" / "Kategorier"
    * @param {(panel: HTMLElement) => void} [config.extraCashback]  fills the "Ekstra cashback" panel
- * @param {string} [config.noGroupsText]   shown when every filter is off
-   * @param {(catalog: any) => {items: object[], updated?: string, note?: string}} config.read
+   * @param {string} [config.noGroupsText]   shown when every filter is off
+   * @param {string} [config.noActiveGroupsText] shown when selected shops have no current offers
+   * @param {(catalog: any) => {items: object[], groups?: string[], updated?: string, note?: string}} config.read
    * @param {string[]} [config.groupOrder]   fixed chip order (else alphabetical)
-   * @param {{unit?: boolean, validity?: boolean, bonus?: boolean, category?: boolean}} config.features
+   * @param {{unit?: boolean, validity?: boolean, bonus?: boolean, category?: boolean, upcoming?: boolean}} config.features
    * @param {string} [config.savingLabel]    column heading for `saving`
    * @param {string} [config.searchPlaceholder]
    * @param {(params: URLSearchParams, groups: string[]) => string[] | undefined} [config.onlyGroupsFromUrl]
@@ -102,9 +103,10 @@
         })()}
         ${features.category ? `<div class="category-nav" data-ol="category-nav"></div>` : ""}
         <div class="active-offer-filters" data-ol="active-filters" hidden></div>
-        <div class="list-bar">
+        <div class="list-bar"><div class="list-summary">
           ${config.extraCashback ? `<button class="cbn-button cbn-button--quiet bonus-toggle" data-ol="bonus-toggle" type="button" aria-expanded="false"><span class="bonus-toggle-arrow">▶</span> Ekstra cashback</button>` : ""}
           <div class="count" data-ol="count" aria-live="polite"></div>
+          </div><div class="list-controls">
           ${features.category ? `<button class="cbn-button cbn-button--quiet filter-button" data-ol="filter-toggle" type="button" aria-expanded="false" aria-label="Flere filtre" title="Pris og rabatt">Pris/rabatt</button>` : ""}
           <button class="cbn-button cbn-button--quiet sort-button" data-ol="sort" type="button" aria-label="Sorter tilbud">${SORT_SVG}<span data-choice-label></span></button>
           <div class="view-toggle" role="group" aria-label="Visning">
@@ -112,7 +114,7 @@
             <button class="cbn-button cbn-button--quiet" type="button" data-view="list" aria-label="Liste" title="Liste">${VIEW_ICONS.list}</button>
             <button class="cbn-button cbn-button--quiet" type="button" data-view="grid" aria-label="Rutenett" title="Rutenett">${VIEW_ICONS.grid}</button>
           </div>
-        </div>
+        </div></div>
         <div class="filters" data-ol="filters" hidden>
           <label>Min. ${esc((config.savingLabel ?? "Rabatt").toLowerCase())} <input class="cbn-field" type="number" min="0" max="99" step="5" inputmode="numeric" data-filter="minSaving" placeholder="%"></label>
           <label>Maks pris <input class="cbn-field" type="number" min="0" step="10" inputmode="decimal" data-filter="maxPrice" placeholder="kr"></label>
@@ -164,6 +166,8 @@
     // The spreadsheet needs the width; phones get the list instead.
     const effectiveView = () => state.view === "table" && !wideScreen.matches ? "list" : state.view;
     const isRunning = (item, now) => (!item.validTo || Date.parse(item.validTo) >= now) && (!item.validFrom || Date.parse(item.validFrom) <= now);
+    const isUpcoming = (item, now = Date.now()) => item.validFrom && Date.parse(item.validFrom) > now;
+    const isAvailable = (item, now) => isRunning(item, now) || (features.upcoming && isUpcoming(item, now) && (!item.validTo || Date.parse(item.validTo) >= now));
     const saving = (item) => item.saving ?? 0;
     const savingKr = (item) => item.prePrice > item.amount ? item.prePrice - item.amount : 0;
     const netVotes = (item) => { const t = tallies.get(item.id.toUpperCase()); return t ? t.upvotes - t.downvotes : 0; };
@@ -269,7 +273,9 @@
           chip.type = "button"; chip.dataset.group = name;
           chip.className = `cbn-button group-toggle ${on && option.className ? `cbn-button--brand ${option.className}` : "cbn-button--filter"}`;
           chip.setAttribute("aria-pressed", String(on));
-          chip.title = on ? `Skjul ${option.label}` : `Vis ${option.label}`;
+          chip.title = option.count === 0
+            ? `${option.label}: Ingen aktive tilbud i den lagrede katalogen. Katalogen oppdateres daglig.`
+            : on ? `Skjul ${option.label}` : `Vis ${option.label}`;
           const check = document.createElement("span"); check.className = "group-check"; check.textContent = on ? "✓" : "+"; check.setAttribute("aria-hidden", "true");
           const label = document.createElement("span"); label.textContent = option.label;
           chip.append(check, label, createCountBadge(option.count || 0, `${option.count || 0} tilbud`));
@@ -340,12 +346,12 @@
       const words = fold(state.query).split(/\s+/).filter(Boolean);
       const { minSaving, maxPrice, maxUnit, onlyPrePrice, endingSoon } = state.filters;
       const choices = features.sources ? state.items.flatMap((item) => {
-        const available = (item.sources ?? []).filter((source) => !state.offSources.has(source.source) && isRunning(source, now) && !state.offStores.has(source.store.label));
+        const available = (item.sources ?? []).filter((source) => !state.offSources.has(source.source) && isAvailable(source, now) && !state.offStores.has(source.store.label));
         const best = [...available].sort((a, b) => a.amount - b.amount)[0];
         return best ? [{ ...item, ...best, id: item.id, rank: item.rank, group: item.group, category: item.category, sources: available,
           lowestPriceEver: item.lowestPriceEver, historyScope: item.historyScope, historyRange: item.historyRange, historyStartedAt: item.historyStartedAt, historyUpdatedAt: item.historyUpdatedAt }] : [];
       }) : state.items;
-      const visible = choices.filter((item) => isRunning(item, now) && !state.off.has(item.group) &&
+      const visible = choices.filter((item) => isAvailable(item, now) && !state.off.has(item.group) &&
         !state.offCategories.has(item.category) && !state.offStores.has(item.store.label) &&
         (!minSaving || saving(item) >= minSaving) &&
         (!maxPrice || item.amount <= maxPrice) &&
@@ -390,9 +396,12 @@
       alphabet.reset();
       renderAzBar();
       if (list.length === 0) {
+        const selectedGroups = [...state.counts.keys()].filter((name) => !state.off.has(name));
         const message = state.counts.size > 0 && [...state.counts.keys()].every((name) => state.off.has(name))
           ? (config.noGroupsText ?? "Velg minst én.")
-          : words.length ? `Ingen tilbud på «${esc(state.query)}» akkurat nå.` : "Ingen tilbud med disse filtrene.";
+          : !words.length && config.noActiveGroupsText && selectedGroups.length > 0 && selectedGroups.every((name) => state.counts.get(name) === 0)
+            ? esc(config.noActiveGroupsText)
+            : words.length ? `Ingen tilbud på «${esc(state.query)}» akkurat nå.` : "Ingen tilbud med disse filtrene.";
         results.innerHTML = `<div class="empty">${message}</div>`;
         return;
       }
@@ -447,7 +456,7 @@
       ? `<a class="deal-thumb" href="${esc(item.link.url)}" target="_blank" rel="noopener" data-preview="${esc(item.imageUrl)}" aria-label="Åpne ${esc(item.title)}"><img src="${esc(item.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('deal-thumb--empty');this.remove()"></a>`
       : `<span class="deal-thumb deal-thumb--empty" aria-hidden="true"></span>`;
     const rankHtml = (item) => config.toplists && state.ranks.has(item.id) ? `<span class="cbn-chip cbn-chip--muted deal-rank" title="Plassering i den samlede topplisten før søk og filtrering">#${state.ranks.get(item.id)}</span>` : "";
-    const sourcesHtml = (item) => `<span class="deal-sources">${(item.sources ?? []).map((source) => `<a class="cbn-chip badge badge-${esc(source.source)} deal-source" href="${esc(source.link.url)}" target="_blank" rel="noopener" title="${esc(`${window.SHARED.PROVIDER_NAMES[source.source] || source.source}: ${kr(source.amount)} · ${source.store.label}${source.updatedAt ? ` · Hentet ${formatDate(source.updatedAt)}` : ""}`)}">${esc(window.SHARED.PROVIDER_NAMES[source.source] || source.source)}</a>`).join(" ")}</span>`;
+    const sourcesHtml = (item) => `<span class="deal-sources">${(item.sources ?? []).map((source) => `<button class="cbn-button cbn-button--brand cbn-chip badge badge-${esc(source.source)} deal-source" type="button" data-only-source="${esc(source.source)}" aria-label="Vis bare tilbud fra ${esc(window.SHARED.PROVIDER_NAMES[source.source] || source.source)}" title="${esc(`Vis bare ${window.SHARED.PROVIDER_NAMES[source.source] || source.source} · ${kr(source.amount)} · ${source.store.label}${source.updatedAt ? ` · Hentet ${formatDate(source.updatedAt)}` : ""}`)}">${esc(window.SHARED.PROVIDER_NAMES[source.source] || source.source)}</button>`).join(" ")}</span>`;
     const titleHtml = (item) => `<span class="deal-title"><a href="${esc(item.link.url)}"${item.imageUrl ? ` data-preview="${esc(item.imageUrl)}"` : ""} target="_blank" rel="noopener" title="${esc(item.link.label)}">${esc(item.title)}</a></span>`;
     const storeHtml = (item) => {
       const initial = features.category ? `<span class="deal-store-initial" aria-hidden="true"${item.store.iconUrl ? ' style="display:none"' : ""}>${esc(item.store.label.charAt(0))}</span>` : "";
@@ -475,6 +484,7 @@
       return parts.length ? `<span class="deal-facts">${parts.map((part) => `<span class="deal-fact">${esc(part)}</span>`).join('<span class="deal-fact-sep" aria-hidden="true">·</span>')}</span>` : "";
     };
     function daysLeftHtml(item) {
+      if (features.upcoming && isUpcoming(item)) return `<span class="days-left days-left--upcoming" title="Tilbudet gjelder fra ${esc(formatDate(item.validFrom))}">Fra ${esc(formatDate(item.validFrom))}</span>`;
       if (!item.validTo) return "";
       const days = daysLeft(item);
       const label = days <= 0 ? "Siste dag" : days === 1 ? "1 dag igjen" : `${days} dager igjen`;
@@ -565,7 +575,7 @@
       const item = itemOf(button);
       if (!item || button.disabled) return;
       const price = `${kr(item.amount)}${item.prePrice > item.amount ? ` (før ${kr(item.prePrice)})` : ""}${saving(item) > 0 ? ` −${saving(item)} %` : ""}`;
-      const where = [item.store.label, item.validTo ? `t.o.m. ${formatDate(item.validTo)}` : ""].filter(Boolean).join(" · ");
+      const where = [item.store.label, isUpcoming(item) ? `Gjelder fra ${formatDate(item.validFrom)}` : "", item.validTo ? `t.o.m. ${formatDate(item.validTo)}` : ""].filter(Boolean).join(" · ");
       const tooltip = button.querySelector(".vote-tooltip");
       button.disabled = true;
       button.classList.add("copied");
@@ -803,6 +813,11 @@
         if (thumb && hoverCapable.matches && !thumb.contains(event.relatedTarget)) hidePreview();
       });
       results.addEventListener("click", (event) => {
+        const source = event.target.closest("[data-only-source]");
+        if (source) {
+          state.offSources = new Set(filterOptions().filter((option) => option.value.startsWith("source:") && !option.value.endsWith(":*")).map((option) => filterValue(option.value)).filter((name) => name !== source.dataset.onlySource));
+          updateSelectionFilters(); return;
+        }
         const store = event.target.closest("[data-store-group]");
         if (store) { state.off = new Set([...state.counts.keys()].filter((name) => name !== store.dataset.storeGroup)); updateSelectionFilters(); return; }
         const group = event.target.closest("[data-only-group]");
@@ -855,12 +870,15 @@
         let response = await fetch(config.dataUrl, { cache: "no-cache" });
         if (!response.ok && config.fallbackDataUrl) response = await fetch(config.fallbackDataUrl, { cache: "no-cache" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const { items, updated, note } = config.read(await response.json());
+        const { items, groups, updated, note } = config.read(await response.json());
         state.items = items.filter((item) => typeof item.id === "string" && Number.isFinite(item.amount) && item.amount > 0);
         state.ranks = new Map([...state.items].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)).map((item, index) => [item.id, index + 1]));
         if (state.category) { state.offCategories = new Set(state.items.map((item) => item.category).filter((name) => name !== state.category)); state.category = ""; }
         const now = Date.now();
-        for (const item of state.items) if (isRunning(item, now)) state.counts.set(item.group, (state.counts.get(item.group) || 0) + 1);
+        // Known shops keep their filter even between flyers. Their count still
+        // includes current and explicitly enabled upcoming offers; expired prices stay hidden.
+        for (const group of groups ?? []) if (typeof group === "string" && group.trim()) state.counts.set(group, 0);
+        for (const item of state.items) if (isAvailable(item, now)) state.counts.set(item.group, (state.counts.get(item.group) || 0) + 1);
         const only = config.onlyGroupsFromUrl?.(params, [...state.counts.keys()]);
         if (only?.length) {
           state.off = new Set([...state.counts.keys()].filter((name) => !only.includes(name)));
