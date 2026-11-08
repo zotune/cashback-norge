@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794165593
+// @version      1794165888
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1467,7 +1467,8 @@
           }
           try {
             if (!rateLimited) {
-              const response = await request(profile?.url ?? base.profileUrl);
+              let response = await request(profile?.url ?? base.profileUrl);
+              if (response.status === 404 && !profile) response = await request(trustpilotProfileUrl(`www.${domain}`));
               if (response.status === 200) {
                 const page = readTrustpilotPage(response.text, domain);
                 if (page && (!profile || page.businessUnitId === profile.businessUnitId)) profile = page;

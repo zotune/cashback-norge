@@ -141,3 +141,9 @@ test("AI copy identifies TrustScore as a separate shop score with the correct so
   assert.match(prompt, /Trustpilot \(TrustScore/);
   assert.doesNotMatch(prompt, /hos Prisjakt/);
 });
+
+test("profile at /review/www.<domain> is tried when /review/<domain> is 404", async () => {
+  const { client } = harness(async (url) => url.includes("/api/") ? { status: 200, text: JSON.stringify({ businessUnits: [] }) }
+    : url.endsWith("/review/www.komplett.no") ? { status: 200, text: html() } : { status: 404, text: "" });
+  assert.equal((await client.get("komplett.no"))?.status, "ok");
+});

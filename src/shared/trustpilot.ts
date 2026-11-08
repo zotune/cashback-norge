@@ -148,7 +148,9 @@ export function createTrustpilotClient(options: ClientOptions) {
         } catch (error) { status = "unavailable"; reason = `Trustpilot: virksomhetssøk: ${error instanceof Error ? error.message : String(error)}`; }
         // One profile page only; never crawl review pagination or execute third-party scripts.
         try { if (!rateLimited) {
-          const response = await request(profile?.url ?? base.profileUrl);
+          // Profiles live at /review/<domain> or /review/www.<domain>; try the other form on a 404.
+          let response = await request(profile?.url ?? base.profileUrl);
+          if (response.status === 404 && !profile) response = await request(trustpilotProfileUrl(`www.${domain}`));
           if (response.status === 200) {
             const page = readTrustpilotPage(response.text, domain);
             if (page && (!profile || page.businessUnitId === profile.businessUnitId)) profile = page;
