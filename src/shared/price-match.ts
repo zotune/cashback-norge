@@ -38,6 +38,7 @@ import { findSesumPriceMatch } from "./sesum-price-match.js";
 import { findPowerUserRating } from "./power-reviews.js";
 import { findTekReview } from "./tek-reviews.js";
 import { findGtinStoreRatings } from "./store-reviews.js";
+import { isAccessoryMismatch } from "./product-reviews.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
@@ -155,7 +156,9 @@ export async function findPriceMatches(
     .filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms))
     .filter((offer) => hasContextualVolumeMatching(offer) || !hasProductVariantConflict(variantAnchor, offer.productName))
     .filter((offer) => isPriceMatchOfferPricePlausible(offer, message))
-    .filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
+    .filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message))
+    // A device page never matches an accessory for it ("silikonetui for AirPods Pro 3"), nor the reverse.
+    .filter((offer) => !isAccessoryMismatch(offer.productName, message.searchTerm));
 
   if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
     return [];
@@ -168,6 +171,13 @@ export async function findPriceMatches(
     findTekReview(message, requestJson ?? fetchReviewJson).catch(() => undefined),
     findGtinStoreRatings(message, requestText ?? fetchReviewPage).catch(() => []),
   ]);
+  // An accessory page ("etui for AirPods Pro 3") keeps no reviews of the device itself.
+  for (const [index, offer] of rated.entries()) {
+    if (offer.reviews !== undefined && isAccessoryMismatch(message.searchTerm, offer.productName)) {
+      const { reviews: _dropped, ...rest } = offer;
+      rated[index] = rest;
+    }
+  }
   if (gtinStores.length > 0) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, users: [...(rated[0]!.reviews?.users ?? []), ...gtinStores] } };
   if (tek !== undefined) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, critics: [...(rated[0]!.reviews?.critics ?? []), tek] } };
   if (power !== undefined && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {

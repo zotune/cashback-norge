@@ -279,3 +279,15 @@ test("JSON-LD: a ProductGroup's variant can carry the rating (Kicks)", async () 
     hasVariant: [{ "@type": "Product", name: "L'Oréal Professionnel Metal DX Shampoo 300 ml 300 ml", gtin13: "30163188", aggregateRating: { "@type": "AggregateRating", ratingValue: "5", reviewCount: "5" } }] })}</script>`;
   assert.equal(readJsonLdUserRating(html, "store:www.kicks.no", "Kicks", "https://www.kicks.no/x")?.count, 5);
 });
+
+test("accessory pages never take the device's reviews", async () => {
+  const { isAccessoryMismatch } = await import("../src/shared/product-reviews.js");
+  assert.equal(isAccessoryMismatch("Fixed Silky silikonetui for Apple AirPods Pro 3", "Apple AirPods Pro 3"), true);
+  assert.equal(isAccessoryMismatch("Apple AirPods Pro 3 trådløse ørepropper", "Apple AirPods Pro 3"), false);
+  assert.equal(isAccessoryMismatch("Spigen deksel til iPhone 17", "Apple iPhone 17 256GB"), true);
+  assert.equal(isAccessoryMismatch("Spigen deksel til iPhone 17", "Spigen Ultra Hybrid deksel iPhone 17"), false);
+  const { readTekReview } = await import("../src/shared/tek-reviews.js");
+  const response = { data: { reviewedProducts: { items: [{ id: "1", name: "Apple AirPods Pro 3", latestReview: { rating: { value: 9 }, articleId: "abc", sectionName: "test", articleSlug: "airpods" } }] } } };
+  assert.equal(readTekReview(response, "Fixed Silky silikonetui for Apple AirPods Pro 3"), undefined);
+  assert.equal(readTekReview(response, "Apple AirPods Pro 3 (USB-C)")?.score, 9);
+});

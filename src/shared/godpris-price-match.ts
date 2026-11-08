@@ -18,7 +18,7 @@ import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
 import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 import { parseUrl, isRecord } from "./cashback.js";
-import { readGodprisReviewCards, readGodprisStoreLinks, readJsonLdUserRating, readNordicfeelUserRating, STORE_REVIEW_HOSTS, type CriticReview, type UserRating } from "./product-reviews.js";
+import { isAccessoryMismatch, readGodprisReviewCards, readGodprisStoreLinks, readJsonLdUserRating, readNordicfeelUserRating, STORE_REVIEW_HOSTS, type CriticReview, type UserRating } from "./product-reviews.js";
 
 type TextRequest = (
   url: string,
@@ -107,7 +107,8 @@ async function withDuplicateListingReviews(offer: PriceMatchOffer, productIds: s
     const structured = selectProductLdJson(readLdJsonScripts(html));
     const name = structured === undefined ? undefined : withLeadingBrand(readStringLike(structured.name),
       readStringLike(isRecord(structured.brand) ? structured.brand.name : structured.brand));
-    if (name === undefined || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE) continue;
+    if (name === undefined || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE ||
+      isAccessoryMismatch(anchor.searchTerm, name)) continue;
     critics.push(...readGodprisReviewCards(html));
   }
   return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;

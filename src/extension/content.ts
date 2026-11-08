@@ -15511,7 +15511,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   // titled by name; the sources are chips.
   const rows: HTMLAnchorElement[] = [];
   const storeRows: HTMLAnchorElement[] = [];
-  const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
+  // The page's own product name; the cheapest match can be another product entirely.
+  const productTitle = (extractProductPageMeta()?.searchTerm ?? sources.find((offer) => offer.source === "prisjakt" || offer.source === "klarna")?.productName ??
+    priceMatch?.productName ?? document.title).trim().slice(0, 160);
   const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
   const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ??
     (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
@@ -15582,7 +15584,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     rows.push(buildReviewRow(productTitle, ["Eksperter", `${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))], score,
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
         title: `${productTitle}: eksperttester`,
-        note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
+        note: "Norske tester, omregnet til 0–100.",
         items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, url: critic.url, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));

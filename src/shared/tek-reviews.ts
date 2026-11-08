@@ -7,7 +7,7 @@ import type { GetPriceMatchForProductMessage } from "./extension-messages.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { buildProductMatchAnchor, hasProductVariantConflict } from "./product-match.js";
 import { isRecord } from "./cashback.js";
-import { toHundredScale, type CriticReview } from "./product-reviews.js";
+import { isAccessoryMismatch, toHundredScale, type CriticReview } from "./product-reviews.js";
 
 export const TEK_REVIEW_GRAPHQL_URL = "https://www.tek.no/api/review-platform/graphql";
 const QUERY = "query ReviewedProducts($query: String, $limit: Int) { reviewedProducts(query: $query, limit: $limit) { items { id name slug latestReview { rating { value conclusion pros cons } articleId sectionName articleSlug title } } } }";
@@ -25,7 +25,7 @@ export function readTekReview(value: unknown, pageTitle: string, anchor = buildP
     const score = typeof rating?.value === "number" ? rating.value : undefined;
     const nameWords = words(name);
     if (!name || !review || score === undefined || toHundredScale(score, 10) === undefined || nameWords.length < 2 ||
-      !nameWords.every((word) => titleWords.has(word)) || hasProductVariantConflict(anchor, name)) return [];
+      !nameWords.every((word) => titleWords.has(word)) || hasProductVariantConflict(anchor, name) || isAccessoryMismatch(pageTitle, name)) return [];
     const section = typeof review.sectionName === "string" ? review.sectionName : "";
     const article = typeof review.articleId === "string" ? review.articleId : "";
     const slug = typeof review.articleSlug === "string" ? review.articleSlug : "";

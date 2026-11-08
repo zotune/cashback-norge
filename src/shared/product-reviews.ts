@@ -218,6 +218,17 @@ export function readGodprisStoreLinks(html: string): Array<{ shopName: string; u
   return [...links.values()];
 }
 
+// Accessory words: a page for "Silikonetui for Apple AirPods Pro 3" must not take the tests or
+// ratings of the AirPods themselves.
+// Norwegian compounds count too ("silikonetui", "mobildeksel"); short words need a word start.
+const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
+const accessoryWord = (text: string) => text.toLowerCase().match(ACCESSORY_WORDS)?.[0];
+/** The page is an accessory of the candidate (or the reverse): its accessory word is missing there. */
+export function isAccessoryMismatch(pageTitle: string, candidateName: string): boolean {
+  // Only when the other side is no accessory at all ("deksel" and "case" may name the same thing).
+  return accessoryWord(pageTitle) !== undefined && accessoryWord(candidateName) === undefined;
+}
+
 /** Combines every source's reviews: one entry per test, buyer ratings weighted by count. */
 export function summarizeProductReviews(all: Array<ProductReviews | undefined>): ProductReviewSummary | undefined {
   const critics = new Map<string, CriticReview>();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794165216
+// @version      1794165383
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -2059,6 +2059,11 @@ query OfferList($productId: Int!) {
       if (!links.has(target.hostname)) links.set(target.hostname, { shopName, url: withoutTracking(target.href) });
     }
     return [...links.values()];
+  }
+  const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
+  const accessoryWord = (text2) => text2.toLowerCase().match(ACCESSORY_WORDS)?.[0];
+  function isAccessoryMismatch(pageTitle, candidateName) {
+    return accessoryWord(pageTitle) !== void 0 && accessoryWord(candidateName) === void 0;
   }
   function summarizeProductReviews(all) {
     const critics = /* @__PURE__ */ new Map();
@@ -4869,7 +4874,7 @@ query OfferList($productId: Int!) {
         readStringLike$5(structured.name),
         readStringLike$5(isRecord$7(structured.brand) ? structured.brand.name : structured.brand)
       );
-      if (name === void 0 || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE) continue;
+      if (name === void 0 || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE || isAccessoryMismatch(anchor.searchTerm, name)) continue;
       critics.push(...readGodprisReviewCards(html));
     }
     return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
@@ -7387,7 +7392,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       const rating = review && isRecord$7(review.rating) ? review.rating : void 0;
       const score = typeof rating?.value === "number" ? rating.value : void 0;
       const nameWords = words(name);
-      if (!name || !review || score === void 0 || toHundredScale(score, 10) === void 0 || nameWords.length < 2 || !nameWords.every((word) => titleWords.has(word)) || hasProductVariantConflict(anchor, name)) return [];
+      if (!name || !review || score === void 0 || toHundredScale(score, 10) === void 0 || nameWords.length < 2 || !nameWords.every((word) => titleWords.has(word)) || hasProductVariantConflict(anchor, name) || isAccessoryMismatch(pageTitle, name)) return [];
       const section = typeof review.sectionName === "string" ? review.sectionName : "";
       const article = typeof review.articleId === "string" ? review.articleId : "";
       const slug = typeof review.articleSlug === "string" ? review.articleSlug : "";
@@ -8314,7 +8319,7 @@ query SearchSuggestions($query: String!, $category: Int) {
       message.searchTerm,
       ...anchorOffers.map((offer) => offer.productName)
     ]);
-    const allowedOffers = offers.filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms)).filter((offer) => hasContextualVolumeMatching(offer) || !hasProductVariantConflict(variantAnchor, offer.productName)).filter((offer) => isPriceMatchOfferPricePlausible(offer, message)).filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message));
+    const allowedOffers = offers.filter((offer) => isSupplementalPriceMatchOfferAligned(offer, productAnchorTerms)).filter((offer) => hasContextualVolumeMatching(offer) || !hasProductVariantConflict(variantAnchor, offer.productName)).filter((offer) => isPriceMatchOfferPricePlausible(offer, message)).filter((offer) => isPriceMatchOfferAllowedForCurrentPage(offer, message)).filter((offer) => !isAccessoryMismatch(offer.productName, message.searchTerm));
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
@@ -8324,6 +8329,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       findTekReview(message, requestJson ?? fetchReviewJson).catch(() => void 0),
       findGtinStoreRatings(message, requestText ?? fetchReviewPage).catch(() => [])
     ]);
+    for (const [index, offer] of rated.entries()) {
+      if (offer.reviews !== void 0 && isAccessoryMismatch(message.searchTerm, offer.productName)) {
+        const { reviews: _dropped, ...rest } = offer;
+        rated[index] = rest;
+      }
+    }
     if (gtinStores.length > 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], ...gtinStores] } };
     if (tek !== void 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, critics: [...rated[0].reviews?.critics ?? [], tek] } };
     if (power !== void 0 && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
@@ -23785,7 +23796,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     header.append(titleRow);
     const rows = [];
     const storeRows = [];
-    const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
+    const productTitle = (extractProductPageMeta()?.searchTerm ?? sources.find((offer) => offer.source === "prisjakt" || offer.source === "klarna")?.productName ?? priceMatch?.productName ?? document.title).trim().slice(0, 160);
     const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
     const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
     const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
@@ -23862,7 +23873,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
         {
           title: `${productTitle}: eksperttester`,
-          note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
+          note: "Norske tester, omregnet til 0–100.",
           items: tests.map(({ critic }) => ({
             name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site,
             url: critic.url,
