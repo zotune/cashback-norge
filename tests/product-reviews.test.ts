@@ -131,3 +131,17 @@ test("Godpris: tests from duplicate listings of the same product, never from ano
   assert.deepEqual(offer?.reviews?.critics?.map((critic) => critic.site), ["Tek.no"]);
   assert.ok(requested.length <= 4, `bounded page reads: ${requested.length}`);
 });
+
+test("Prisradar editorReviews: Norwegian tests with the source's own scale", async () => {
+  const { readPrisradarEditorReviews } = await import("../src/shared/product-reviews.js");
+  // From prisradar.no/produkter/playstation-5-slim-digital-edition-2023 (2026-11-08), shortened.
+  const source = (title: string, url: string, ratingMax: number) => ({ __typename: "EditorReviewSource", title, url, ratingMin: 0, ratingMax });
+  const product = { editorReviews: [
+    { __typename: "EditorReview", id: 4760, title: "Sony PlayStation 5 - Test - Tek.no", content: "Et spennende og stort sett vellykket steg", rating: 9, link: "https://www.tek.no/test/i/aPPkLE/playstation-5-innfrir-paa-det-aller-meste", source: source("Tek.no", "https://tek.no", 10) },
+    { __typename: "EditorReview", id: 4761, title: "TEST: Sony PlayStation 5", content: "Lynrask ytelse", rating: 5, link: "https://www.lydogbilde.no/test/gaming/sony-playstation-5/", source: source("Lyd & bilde", "https://lydogbilde.no", 6) },
+    { __typename: "EditorReview", id: 1, title: "Review", rating: 4, link: "https://www.ign.com/x", source: source("IGN", "https://ign.com", 5) },
+    { __typename: "EditorReview", id: 2, title: "Broken", rating: 12, link: "https://www.tek.no/y", source: source("Tek.no", "https://tek.no", 10) },
+  ] };
+  assert.deepEqual(readPrisradarEditorReviews(product).map((critic) => [critic.site, critic.score, critic.maxScore, critic.quote]), [["Tek.no", 9, 10, "Et spennende og stort sett vellykket steg"], ["Lyd & bilde", 5, 6, "Lynrask ytelse"]]);
+  assert.deepEqual(readPrisradarEditorReviews({ editorReviews: "$undefined" }), []);
+});

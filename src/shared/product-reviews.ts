@@ -144,6 +144,25 @@ export function readPrisjaktShopRatings(html: string): Map<string, { score: numb
   return ratings;
 }
 
+/**
+ * Prisradar: the product's own Next entry lists professional tests as `editorReviews`
+ * (title, content, rating, link, source with ratingMin/ratingMax). Norwegian publications only.
+ */
+export function readPrisradarEditorReviews(product: Record<string, unknown>): CriticReview[] {
+  const reviews = Array.isArray(product.editorReviews) ? product.editorReviews.filter(isRecord) : [];
+  return reviews.flatMap((review): CriticReview[] => {
+    const source = isRecord(review.source) ? review.source : undefined;
+    const site = typeof source?.title === "string" ? source.title.trim() : "";
+    const score = finite(review.rating);
+    const maxScore = finite(source?.ratingMax);
+    const link = typeof review.link === "string" ? review.link : "";
+    if (!site || score === undefined || maxScore === undefined || toHundredScale(score, maxScore) === undefined || !isNorwegianReviewUrl(link)) return [];
+    const title = typeof review.title === "string" ? review.title.trim() : "";
+    const quote = typeof review.content === "string" ? review.content.trim() : "";
+    return [{ site, score, maxScore, url: withoutTracking(link), ...(title ? { title } : {}), ...(quote ? { quote } : {}) }];
+  });
+}
+
 /** Combines every source's reviews: one entry per test, buyer ratings weighted by count. */
 export function summarizeProductReviews(all: Array<ProductReviews | undefined>): ProductReviewSummary | undefined {
   const critics = new Map<string, CriticReview>();

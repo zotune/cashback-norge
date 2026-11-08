@@ -5,6 +5,7 @@ import type {
 import { hasModelNumberConflict, hasNumericModelConflict, hasProductVariantConflict, isSameProductUrl, isValidGtin, readProductCodesFromUrl } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { readNextProductData } from "./product-data.js";
+import { readPrisradarEditorReviews } from "./product-reviews.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 
 type TextRequest = (
@@ -737,6 +738,7 @@ export function readPrisradarProductPage(html: string, fallbackProductUrl: strin
       ...(offer.shippingPrice !== undefined ? { shippingPrice: offer.shippingPrice } : {}),
       ...(offer.totalPrice !== undefined ? { totalPrice: offer.totalPrice } : {}),
     })),
+    ...(readPrisradarEditorReviews(product).length > 0 ? { reviews: { critics: readPrisradarEditorReviews(product) } } : {}),
   };
 }
 

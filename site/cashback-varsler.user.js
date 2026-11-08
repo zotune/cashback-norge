@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794161480
+// @version      1794161681
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4088,6 +4088,20 @@
     }
     return ratings;
   }
+  function readPrisradarEditorReviews(product) {
+    const reviews = Array.isArray(product.editorReviews) ? product.editorReviews.filter(isRecord$7) : [];
+    return reviews.flatMap((review) => {
+      const source2 = isRecord$7(review.source) ? review.source : void 0;
+      const site = typeof source2?.title === "string" ? source2.title.trim() : "";
+      const score = finite(review.rating);
+      const maxScore = finite(source2?.ratingMax);
+      const link = typeof review.link === "string" ? review.link : "";
+      if (!site || score === void 0 || maxScore === void 0 || toHundredScale(score, maxScore) === void 0 || !isNorwegianReviewUrl(link)) return [];
+      const title = typeof review.title === "string" ? review.title.trim() : "";
+      const quote = typeof review.content === "string" ? review.content.trim() : "";
+      return [{ site, score, maxScore, url: withoutTracking(link), ...title ? { title } : {}, ...quote ? { quote } : {} }];
+    });
+  }
   function summarizeProductReviews(all) {
     const critics = /* @__PURE__ */ new Map();
     const users = /* @__PURE__ */ new Map();
@@ -6199,7 +6213,8 @@ query SearchSuggestions($query: String!, $category: Int) {
         price: offer.price,
         ...offer.shippingPrice !== void 0 ? { shippingPrice: offer.shippingPrice } : {},
         ...offer.totalPrice !== void 0 ? { totalPrice: offer.totalPrice } : {}
-      }))
+      })),
+      ...readPrisradarEditorReviews(product).length > 0 ? { reviews: { critics: readPrisradarEditorReviews(product) } } : {}
     };
   }
   function dedupePrisradarOffersByShop(offers) {
