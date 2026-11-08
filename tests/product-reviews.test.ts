@@ -156,10 +156,13 @@ test("Godpris store links: the shop's own page from the click link's u parameter
     offer("Elkjøp", "https://www.elkjop.no/product/pc-mus/logitech-g-pro-x2-superstrike-tradlos-gamingmus/101908"),
     offer("Netonnet", "https://no-go.kelkoogroup.net/offersearchGo?affiliationId=97007182&comId=6995723"),
     offer("CDON", "https://pdt.tradedoubler.com/click?a(3365759)p(116)url(https%3A%2F%2Fcdon.no%2Fx)"),
+    // godpris.no/produkt/1589824: an affiliate host whose name contains the shop's.
+    offer("Boozt", "https://booztfashionab.pxf.io/c/6034808/3881586/51152?prodsku=LPLE3548600_223277360&u=https%3A%2F%2Fwww.boozt.com%2Fno%2Fno%2Floreal-professionnel%2Fmetal-dx-shampoo_29356961%2F223277360"),
   ] } })}</script>`;
   assert.deepEqual(readGodprisStoreLinks(html), [
     { shopName: "POWER", url: "https://www.power.no/gaming/gamingmus/logitech-g-pro-x2-superstrike/p-4229653/" },
     { shopName: "Elkjøp", url: "https://www.elkjop.no/product/pc-mus/logitech-g-pro-x2-superstrike-tradlos-gamingmus/101908" },
+    { shopName: "Boozt", url: "https://www.boozt.com/no/no/loreal-professionnel/metal-dx-shampoo_29356961/223277360" },
   ]);
 });
 

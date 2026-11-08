@@ -167,7 +167,7 @@ export function readPrisradarEditorReviews(product: Record<string, unknown>): Cr
 
 // Shops whose product pages we read for buyer ratings. Each needs host_permissions in the
 // extension manifest and @connect in the userscript, so the list is explicit configuration.
-export const STORE_REVIEW_HOSTS = ["www.power.no"];
+export const STORE_REVIEW_HOSTS = ["www.power.no", "www.kicks.no", "www.blivakker.no", "www.boozt.com", "lyko.com"];
 
 const merchantKey = (value: string) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")
   .replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").replace(/[^a-z0-9]+/g, "");
@@ -185,10 +185,15 @@ export function readGodprisStoreLinks(html: string): Array<{ shopName: string; u
   for (const offer of offers) {
     const shopName = isRecord(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
     const click = typeof offer.url === "string" ? parseUrl(offer.url) : undefined;
-    const target = click?.hostname === "godpris.no" ? parseUrl(click.searchParams.get("u") ?? "") : undefined;
-    if (!shopName || target === undefined || target.protocol !== "https:") continue;
-    const host = target.hostname.replace(/^www\./, "");
-    if (!merchantKey(host.split(".")[0]!).includes(merchantKey(shopName)) && !merchantKey(shopName).includes(merchantKey(host.split(".")[0]!))) continue;
+    let target = click?.hostname === "godpris.no" ? parseUrl(click.searchParams.get("u") ?? "") : undefined;
+    // The shop's own host must name the seller exactly; an affiliate host (booztfashionab.pxf.io)
+    // only counts through its own nested link to the shop.
+    const ownHost = (url: URL | undefined) => url !== undefined && url.protocol === "https:" && merchantKey(url.hostname.replace(/^www\./, "").split(".")[0]!) === merchantKey(shopName);
+    if (target !== undefined && !ownHost(target)) {
+      const nested = ["u", "url", "dl", "dest", "htmlurl"].map((key) => parseUrl(target!.searchParams.get(key) ?? "")).find(ownHost);
+      target = nested;
+    }
+    if (!shopName || target === undefined || !ownHost(target)) continue;
     if (!links.has(target.hostname)) links.set(target.hostname, { shopName, url: withoutTracking(target.href) });
   }
   return [...links.values()];

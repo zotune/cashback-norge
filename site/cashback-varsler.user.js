@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794163872
+// @version      1794164043
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -21,6 +21,8 @@
 // @connect      www.power.no
 // @connect      lyko.com
 // @connect      www.boozt.com
+// @connect      www.kicks.no
+// @connect      www.blivakker.no
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -2025,7 +2027,7 @@ query OfferList($productId: Int!) {
       return [{ site, score, maxScore, url: withoutTracking(link), ...title ? { title } : {}, ...quote ? { quote } : {} }];
     });
   }
-  const STORE_REVIEW_HOSTS = ["www.power.no"];
+  const STORE_REVIEW_HOSTS = ["www.power.no", "www.kicks.no", "www.blivakker.no", "www.boozt.com", "lyko.com"];
   const merchantKey = (value) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").replace(/[^a-z0-9]+/g, "");
   function readGodprisStoreLinks(html) {
     const product = selectProductLdJson(readLdJsonScripts(html));
@@ -2035,10 +2037,13 @@ query OfferList($productId: Int!) {
     for (const offer of offers) {
       const shopName = isRecord$7(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
       const click = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
-      const target = click?.hostname === "godpris.no" ? parseUrl$1(click.searchParams.get("u") ?? "") : void 0;
-      if (!shopName || target === void 0 || target.protocol !== "https:") continue;
-      const host2 = target.hostname.replace(/^www\./, "");
-      if (!merchantKey(host2.split(".")[0]).includes(merchantKey(shopName)) && !merchantKey(shopName).includes(merchantKey(host2.split(".")[0]))) continue;
+      let target = click?.hostname === "godpris.no" ? parseUrl$1(click.searchParams.get("u") ?? "") : void 0;
+      const ownHost = (url) => url !== void 0 && url.protocol === "https:" && merchantKey(url.hostname.replace(/^www\./, "").split(".")[0]) === merchantKey(shopName);
+      if (target !== void 0 && !ownHost(target)) {
+        const nested = ["u", "url", "dl", "dest", "htmlurl"].map((key) => parseUrl$1(target.searchParams.get(key) ?? "")).find(ownHost);
+        target = nested;
+      }
+      if (!shopName || target === void 0 || !ownHost(target)) continue;
       if (!links.has(target.hostname)) links.set(target.hostname, { shopName, url: withoutTracking(target.href) });
     }
     return [...links.values()];
@@ -4820,7 +4825,7 @@ query OfferList($productId: Int!) {
       const id = directUrl.pathname.split("/")[2];
       const html = await requestText(`${GODPRIS_PRODUCT_URL}${id}`);
       const offer = html === void 0 ? void 0 : readGodprisProductPage(html, id, anchor);
-      return offer === void 0 ? void 0 : withStoreRatings({ ...offer, matchedExactProduct: true }, html, requestText);
+      return offer === void 0 ? void 0 : withStoreRatings({ ...offer, matchedExactProduct: true }, html, requestText, anchor);
     }
     const visitedProductIds = /* @__PURE__ */ new Set();
     for (const query of searchQueries) {
@@ -4832,13 +4837,13 @@ query OfferList($productId: Int!) {
           headers: { "Accept": "text/html,application/xhtml+xml" }
         });
         const offer = html !== void 0 ? readGodprisProductPage(html, productId, anchor) : void 0;
-        if (offer !== void 0) return withStoreRatings(offer.reviews !== void 0 ? offer : await withDuplicateListingReviews(offer, [...productIds, ...query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => [])], visitedProductIds, anchor, requestText), html, requestText);
+        if (offer !== void 0) return withStoreRatings(offer.reviews !== void 0 ? offer : await withDuplicateListingReviews(offer, [...productIds, ...query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => [])], visitedProductIds, anchor, requestText), html, requestText, anchor);
       }
     }
     return void 0;
   }
-  async function withStoreRatings(offer, html, requestText) {
-    const users = await readGodprisStoreRatings(html, requestText).catch(() => []);
+  async function withStoreRatings(offer, html, requestText, anchor) {
+    const users = await readGodprisStoreRatings(html, requestText, anchor).catch(() => []);
     return users.length > 0 ? { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], ...users] } } : offer;
   }
   async function withDuplicateListingReviews(offer, productIds, visited, anchor, requestText) {
@@ -4902,11 +4907,13 @@ query OfferList($productId: Int!) {
     const critics = readGodprisReviewCards(html);
     return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
   }
-  async function readGodprisStoreRatings(html, requestText) {
-    const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 3);
+  async function readGodprisStoreRatings(html, requestText, anchor) {
+    const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 4);
     const ratings = await Promise.all(links.map(async (link) => {
       const page = await requestText(link.url, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => void 0);
-      return page === void 0 ? void 0 : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+      const rating = page === void 0 ? void 0 : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+      if (rating !== void 0 && anchor !== void 0 && (rating.productName === void 0 || hasProductVariantConflict(anchor, rating.productName) || scoreProductCandidateMatch(anchor, { title: rating.productName }) < MIN_PRODUCT_MATCH_SCORE)) return void 0;
+      return rating;
     }));
     return ratings.filter((rating) => rating !== void 0);
   }
@@ -21326,6 +21333,9 @@ ${darkProviderCss}
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }
+    /* The source's own product page; plain text that underlines on hover. */
+    .review-tooltip-option > a { color: inherit; text-decoration: none; }
+    .review-tooltip-option > a:hover { text-decoration: underline; }
     .review-score--high { background: #00a33c; }
     .review-score--good { background: #00a33c; }
     .review-score--mixed { background: #d9a000; color: #1a1a1a !important; }
@@ -23725,6 +23735,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
         items: stores.map(({ offer, store: store2 }) => ({
           name: getPriceMatchSourceName(offer),
+          url: store2.url,
           score: toHundredScale(store2.score, store2.maxScore) ?? 0,
           chips: [`${formatReviewScore(store2.score, store2.maxScore)}${store2.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store2.count)]
         }))
@@ -23736,6 +23747,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         tip.note += ` Trustpilot oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}`;
         tip.items.push({
           name: "Trustpilot",
+          url: profile.url,
           score: toHundredScale(profile.score, 5) ?? 0,
           chips: [`${formatReviewScore(profile.score, 5)} stjerner`, formatRatingCount(profile.count)]
         });
@@ -23750,7 +23762,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       rows.push(row);
     }
     const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
-    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
+    const seenBuyers = /* @__PURE__ */ new Set();
+    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source))).sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
@@ -23760,6 +23773,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         // Like the price match: the product found at the source on top, the source as the first chip.
         items: buyers.map(({ offer, user }) => ({
           name: user.productName ?? buyerName(offer, user),
+          url: user.url,
           score: toHundredScale(user.score, user.maxScore) ?? 0,
           chips: [...user.productName ? [buyerName(offer, user)] : [], `${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...user.source === "klarna" ? ["Bare norske"] : []]
         }))
@@ -23785,6 +23799,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
           items: tests.map(({ critic }) => ({
             name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site,
+            url: critic.url,
             score: toHundredScale(critic.score, critic.maxScore) ?? 0,
             chips: [...critic.title ? [critic.site] : [], formatReviewScore(critic.score, critic.maxScore)],
             ...critic.quote ? { quote: critic.quote } : {}

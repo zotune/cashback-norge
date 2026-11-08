@@ -65,7 +65,7 @@ export async function findGodprisPriceMatch(
     const id = directUrl.pathname.split("/")[2]!;
     const html = await requestText(`${GODPRIS_PRODUCT_URL}${id}`);
     const offer = html === undefined ? undefined : readGodprisProductPage(html, id, anchor);
-    return offer === undefined ? undefined : withStoreRatings({ ...offer, matchedExactProduct: true }, html!, requestText);
+    return offer === undefined ? undefined : withStoreRatings({ ...offer, matchedExactProduct: true }, html!, requestText, anchor);
   }
 
   const visitedProductIds = new Set<string>();
@@ -81,15 +81,15 @@ export async function findGodprisPriceMatch(
         headers: { "Accept": "text/html,application/xhtml+xml" },
       });
       const offer = html !== undefined ? readGodprisProductPage(html, productId, anchor) : undefined;
-      if (offer !== undefined) return withStoreRatings(offer.reviews !== undefined ? offer : await withDuplicateListingReviews(offer, [...productIds, ...(query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => []))], visitedProductIds, anchor, requestText), html!, requestText);
+      if (offer !== undefined) return withStoreRatings(offer.reviews !== undefined ? offer : await withDuplicateListingReviews(offer, [...productIds, ...(query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => []))], visitedProductIds, anchor, requestText), html!, requestText, anchor);
     }
   }
 
   return undefined;
 }
 
-async function withStoreRatings(offer: PriceMatchOffer, html: string, requestText: TextRequest): Promise<PriceMatchOffer> {
-  const users = await readGodprisStoreRatings(html, requestText).catch(() => []);
+async function withStoreRatings(offer: PriceMatchOffer, html: string, requestText: TextRequest, anchor?: ProductMatchAnchor): Promise<PriceMatchOffer> {
+  const users = await readGodprisStoreRatings(html, requestText, anchor).catch(() => []);
   return users.length > 0 ? { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), ...users] } } : offer;
 }
 
@@ -183,11 +183,15 @@ export function readGodprisProductPage(
  * Buyer ratings from the shops' own product pages, reached through the direct links on the
  * matched Godpris page (no click links are followed). Only configured shops, one bounded read each.
  */
-export async function readGodprisStoreRatings(html: string, requestText: TextRequest): Promise<UserRating[]> {
-  const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 3);
+export async function readGodprisStoreRatings(html: string, requestText: TextRequest, anchor?: ProductMatchAnchor): Promise<UserRating[]> {
+  const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 4);
   const ratings = await Promise.all(links.map(async (link) => {
     const page = await requestText(link.url, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => undefined);
-    return page === undefined ? undefined : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+    const rating = page === undefined ? undefined : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+    // The shop's page must name the same product (size, variant) as the page the reader is on.
+    if (rating !== undefined && anchor !== undefined && (rating.productName === undefined || hasProductVariantConflict(anchor, rating.productName) ||
+      scoreProductCandidateMatch(anchor, { title: rating.productName }) < MIN_PRODUCT_MATCH_SCORE)) return undefined;
+    return rating;
   }));
   return ratings.filter((rating): rating is UserRating => rating !== undefined);
 }

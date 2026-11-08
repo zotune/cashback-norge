@@ -12844,6 +12844,9 @@ function renderNotice(
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }
+    /* The source's own product page; plain text that underlines on hover. */
+    .review-tooltip-option > a { color: inherit; text-decoration: none; }
+    .review-tooltip-option > a:hover { text-decoration: underline; }
     .review-score--high { background: #00a33c; }
     .review-score--good { background: #00a33c; }
     .review-score--mixed { background: #d9a000; color: #1a1a1a !important; }
@@ -15474,7 +15477,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     const tip: ReviewTooltip = {
       title: `Butikk (kjøpere)${shopName ? ` · ${shopName}` : ""}`,
       note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
-      items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0,
+      items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), url: store.url, score: toHundredScale(store.score, store.maxScore) ?? 0,
         chips: [`${formatReviewScore(store.score, store.maxScore)}${store.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store.count)] })),
     };
     const chips = [...(shopName ? [shopName] : []), ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
@@ -15483,7 +15486,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       chips.splice(chips.length - (count > 0 ? 1 : 0), 0, "Trustpilot");
       tip.note += ` Trustpilot oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}`;
       // Same design as the other sources: name, 0–100 score and chips. No individual reviews.
-      tip.items.push({ name: "Trustpilot", score: toHundredScale(profile.score, 5) ?? 0,
+      tip.items.push({ name: "Trustpilot", url: profile.url, score: toHundredScale(profile.score, 5) ?? 0,
         chips: [`${formatReviewScore(profile.score, 5)} stjerner`, formatRatingCount(profile.count)] });
     } else if (trustpilot) {
       chips.push("Hent fra Trustpilot");
@@ -15497,7 +15500,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   }
   // Comparison sites first, then the shops' own ratings (source "store:<host>").
   const buyerName = (offer: PriceMatchOffer, user: { source: string; sourceName: string }) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
+  const seenBuyers = new Set<string>();
   const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user })))
+    .filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source)))
     .sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
@@ -15506,7 +15511,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       title: "Produkt (kjøpere)",
       note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
       // Like the price match: the product found at the source on top, the source as the first chip.
-      items: buyers.map(({ offer, user }) => ({ name: user.productName ?? buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
+      items: buyers.map(({ offer, user }) => ({ name: user.productName ?? buyerName(offer, user), url: user.url, score: toHundredScale(user.score, user.maxScore) ?? 0,
         chips: [...(user.productName ? [buyerName(offer, user)] : []), `${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
     }));
   }
@@ -15524,7 +15529,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
         title: "Produkt (anmeldere)",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
-        items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
+        items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, url: critic.url, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
