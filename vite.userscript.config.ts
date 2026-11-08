@@ -36,6 +36,7 @@ const USERSCRIPT_BANNER = `\
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
 // @connect      www.prisjakt.no
+// @connect      www.power.no
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no

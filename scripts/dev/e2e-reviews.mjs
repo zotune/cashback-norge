@@ -48,7 +48,7 @@ try {
       await page.waitForTimeout(700);
       const tip = await page.evaluate(() => [...document.getElementById("cashback-varsler-notice").shadowRoot.querySelectorAll(".price-match-tooltip.visible, .offer-tooltip.visible")].map((t) => t.innerText.replace(/\s+/g, " ")).join(" | "));
       console.log(`tooltip: ${tip}`);
-      assert.match(tip, /Prisjakt|Godpris|Klarna|Tek|techradar|Komputer/, "row tooltip names the sources");
+      assert.match(tip, /Prisjakt|Godpris|Klarna|Tek|techradar|Komputer|POWER/, "row tooltip names the sources");
       await page.screenshot({ path: join(out, `reviews-${index}.png`) });
       console.log(`OK, screenshot ${join(out, `reviews-${index}.png`)}`);
     } catch (error) {

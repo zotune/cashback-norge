@@ -18,7 +18,7 @@ import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
 import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 import { parseUrl, isRecord } from "./cashback.js";
-import { readGodprisReviewCards, type CriticReview } from "./product-reviews.js";
+import { readGodprisReviewCards, readGodprisStoreLinks, readJsonLdUserRating, STORE_REVIEW_HOSTS, type CriticReview, type UserRating } from "./product-reviews.js";
 
 type TextRequest = (
   url: string,
@@ -65,7 +65,7 @@ export async function findGodprisPriceMatch(
     const id = directUrl.pathname.split("/")[2]!;
     const html = await requestText(`${GODPRIS_PRODUCT_URL}${id}`);
     const offer = html === undefined ? undefined : readGodprisProductPage(html, id, anchor);
-    return offer === undefined ? undefined : { ...offer, matchedExactProduct: true };
+    return offer === undefined ? undefined : withStoreRatings({ ...offer, matchedExactProduct: true }, html!, requestText);
   }
 
   const visitedProductIds = new Set<string>();
@@ -81,11 +81,16 @@ export async function findGodprisPriceMatch(
         headers: { "Accept": "text/html,application/xhtml+xml" },
       });
       const offer = html !== undefined ? readGodprisProductPage(html, productId, anchor) : undefined;
-      if (offer !== undefined) return offer.reviews !== undefined ? offer : await withDuplicateListingReviews(offer, [...productIds, ...(query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => []))], visitedProductIds, anchor, requestText);
+      if (offer !== undefined) return withStoreRatings(offer.reviews !== undefined ? offer : await withDuplicateListingReviews(offer, [...productIds, ...(query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => []))], visitedProductIds, anchor, requestText), html!, requestText);
     }
   }
 
   return undefined;
+}
+
+async function withStoreRatings(offer: PriceMatchOffer, html: string, requestText: TextRequest): Promise<PriceMatchOffer> {
+  const users = await readGodprisStoreRatings(html, requestText).catch(() => []);
+  return users.length > 0 ? { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), ...users] } } : offer;
 }
 
 // Godpris sometimes lists the same product twice (e.g. "PlayStation 5 Pro 2TB" 5186542 with
@@ -172,6 +177,19 @@ export function readGodprisProductPage(
   // The same page lists professional tests; only Norwegian ones are kept.
   const critics = readGodprisReviewCards(html);
   return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
+}
+
+/**
+ * Buyer ratings from the shops' own product pages, reached through the direct links on the
+ * matched Godpris page (no click links are followed). Only configured shops, one bounded read each.
+ */
+export async function readGodprisStoreRatings(html: string, requestText: TextRequest): Promise<UserRating[]> {
+  const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 3);
+  const ratings = await Promise.all(links.map(async (link) => {
+    const page = await requestText(link.url, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => undefined);
+    return page === undefined ? undefined : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+  }));
+  return ratings.filter((rating): rating is UserRating => rating !== undefined);
 }
 
 function readGodprisProductOffer(

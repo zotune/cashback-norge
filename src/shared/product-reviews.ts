@@ -163,6 +163,35 @@ export function readPrisradarEditorReviews(product: Record<string, unknown>): Cr
   });
 }
 
+// Shops whose product pages we read for buyer ratings. Each needs host_permissions in the
+// extension manifest and @connect in the userscript, so the list is explicit configuration.
+export const STORE_REVIEW_HOSTS = ["www.power.no"];
+
+const merchantKey = (value: string) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")
+  .replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").replace(/[^a-z0-9]+/g, "");
+
+/**
+ * Shops' own product links from Godpris' JSON-LD offers. Each offer URL is a Godpris click link
+ * whose `u` parameter is the shop's product page; reading it follows no link and registers no
+ * click. Only a link whose host names the seller is kept (affiliate networks such as Kelkoo are not).
+ */
+export function readGodprisStoreLinks(html: string): Array<{ shopName: string; url: string }> {
+  const product = selectProductLdJson(readLdJsonScripts(html));
+  const aggregate = product !== undefined && isRecord(product.offers) ? product.offers : undefined;
+  const offers = Array.isArray(aggregate?.offers) ? aggregate.offers.filter(isRecord) : [];
+  const links = new Map<string, { shopName: string; url: string }>();
+  for (const offer of offers) {
+    const shopName = isRecord(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
+    const click = typeof offer.url === "string" ? parseUrl(offer.url) : undefined;
+    const target = click?.hostname === "godpris.no" ? parseUrl(click.searchParams.get("u") ?? "") : undefined;
+    if (!shopName || target === undefined || target.protocol !== "https:") continue;
+    const host = target.hostname.replace(/^www\./, "");
+    if (!merchantKey(host.split(".")[0]!).includes(merchantKey(shopName)) && !merchantKey(shopName).includes(merchantKey(host.split(".")[0]!))) continue;
+    if (!links.has(target.hostname)) links.set(target.hostname, { shopName, url: withoutTracking(target.href) });
+  }
+  return [...links.values()];
+}
+
 /** Combines every source's reviews: one entry per test, buyer ratings weighted by count. */
 export function summarizeProductReviews(all: Array<ProductReviews | undefined>): ProductReviewSummary | undefined {
   const critics = new Map<string, CriticReview>();

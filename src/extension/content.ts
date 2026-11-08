@@ -15320,15 +15320,17 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0, chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)] })),
     }));
   }
+  // Comparison sites first, then the shops' own ratings (source "store:<host>").
+  const buyerName = (offer: PriceMatchOffer, user: { source: string; sourceName: string }) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
   const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user })))
-    .sort((a, b) => reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
+    .sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
     const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-    rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0]!.user.url, {
+    rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
       title: "Kjøpere av varen",
       note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
-      items: buyers.map(({ offer, user }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(user.score, user.maxScore) ?? 0,
+      items: buyers.map(({ offer, user }) => ({ name: user.source.startsWith("store:") ? `${user.sourceName} (butikken)` : buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
         chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
     }));
   }

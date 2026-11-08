@@ -145,3 +145,20 @@ test("Prisradar editorReviews: Norwegian tests with the source's own scale", asy
   assert.deepEqual(readPrisradarEditorReviews(product).map((critic) => [critic.site, critic.score, critic.maxScore, critic.quote]), [["Tek.no", 9, 10, "Et spennende og stort sett vellykket steg"], ["Lyd & bilde", 5, 6, "Lynrask ytelse"]]);
   assert.deepEqual(readPrisradarEditorReviews({ editorReviews: "$undefined" }), []);
 });
+
+test("Godpris store links: the shop's own page from the click link's u parameter, never affiliate networks", async () => {
+  const { readGodprisStoreLinks } = await import("../src/shared/product-reviews.js");
+  const click = (u: string) => `https://godpris.no/api/services/click?u=${encodeURIComponent(u)}&si=1&i=15346856`;
+  const offer = (name: string, u: string) => ({ "@type": "Offer", url: click(u), price: 1295, priceCurrency: "NOK", availability: "InStock", seller: { "@type": "Organization", name } });
+  // Offers from godpris.no/produkt/15346856 (2026-11-08), shortened.
+  const html = `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org/", "@type": "Product", name: "G PRO X2 SUPERSTRIKE", offers: { "@type": "AggregateOffer", offers: [
+    offer("POWER", "https://www.power.no/gaming/gamingmus/logitech-g-pro-x2-superstrike/p-4229653/?utm_source=godpris&utm_medium=cpc"),
+    offer("Elkjøp", "https://www.elkjop.no/product/pc-mus/logitech-g-pro-x2-superstrike-tradlos-gamingmus/101908"),
+    offer("Netonnet", "https://no-go.kelkoogroup.net/offersearchGo?affiliationId=97007182&comId=6995723"),
+    offer("CDON", "https://pdt.tradedoubler.com/click?a(3365759)p(116)url(https%3A%2F%2Fcdon.no%2Fx)"),
+  ] } })}</script>`;
+  assert.deepEqual(readGodprisStoreLinks(html), [
+    { shopName: "POWER", url: "https://www.power.no/gaming/gamingmus/logitech-g-pro-x2-superstrike/p-4229653/" },
+    { shopName: "Elkjøp", url: "https://www.elkjop.no/product/pc-mus/logitech-g-pro-x2-superstrike-tradlos-gamingmus/101908" },
+  ]);
+});
