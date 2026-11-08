@@ -32,7 +32,7 @@ export async function findPowerUserRating(message: GetPriceMatchForProductMessag
       const count = typeof review?.overallTotalReviewCount === "number" ? review.overallTotalReviewCount : undefined;
       const path = typeof product.url === "string" && product.url.startsWith("/") ? product.url : undefined;
       if (score === undefined || count === undefined || !Number.isInteger(count) || count <= 0 || toHundredScale(score, 5) === undefined || path === undefined) return undefined;
-      return { source: "store:www.power.no", sourceName: "Power", score: Number(score.toFixed(2)), maxScore: 5, count, url: `https://www.power.no${path}` };
+      return { source: "store:www.power.no", sourceName: "Power", score: Number(score.toFixed(2)), maxScore: 5, count, url: `https://www.power.no${path}`, productName: title.slice(0, 300) };
     }
   }
   return undefined;

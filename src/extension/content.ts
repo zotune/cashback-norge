@@ -15505,8 +15505,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     rows.push(buildReviewRow("Produkt (kjøpere)", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
       title: "Produkt (kjøpere)",
       note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
-      items: buyers.map(({ offer, user }) => ({ name: buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
-        chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
+      // Like the price match: the product found at the source on top, the source as the first chip.
+      items: buyers.map(({ offer, user }) => ({ name: user.productName ?? buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
+        chips: [...(user.productName ? [buyerName(offer, user)] : []), `${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
     }));
   }
   const seenTests = new Set<string>();
@@ -15523,8 +15524,8 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
         title: "Produkt (anmeldere)",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
-        items: tests.map(({ critic }) => ({ name: critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
-          chips: [formatReviewScore(critic.score, critic.maxScore), ...(critic.title ? [critic.title.replace(/^[<\s]+/, "")] : [])], ...(critic.quote ? { quote: critic.quote } : {}) })),
+        items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
+          chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
   section.append(header, ...rows);

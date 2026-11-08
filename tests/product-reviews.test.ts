@@ -34,7 +34,7 @@ const klarnaHtml = `<script type="application/ld+json">{"@context":"https://sche
 
 test("buyer rating from the named Product JSON-LD; missing or invalid ratings give none", () => {
   assert.deepEqual(readJsonLdUserRating(klarnaHtml, "klarna", "Kjøpere hos Klarna", "https://www.klarna.com/no/shopping/pl/cl110/3447588155/"),
-    { source: "klarna", sourceName: "Kjøpere hos Klarna", score: 4.7, maxScore: 5, count: 613, url: "https://www.klarna.com/no/shopping/pl/cl110/3447588155/" });
+    { source: "klarna", sourceName: "Kjøpere hos Klarna", score: 4.7, maxScore: 5, count: 613, url: "https://www.klarna.com/no/shopping/pl/cl110/3447588155/", productName: "Logitech G PRO X 2 Superstrike Wireless Gaming Mus" });
   assert.equal(readJsonLdUserRating(klarnaHtml.replace('"ratingCount":"613"', '"ratingCount":"0"'), "klarna", "K", "https://x.no/"), undefined);
   assert.equal(readJsonLdUserRating(klarnaHtml.replace('"ratingValue":4.7', '"ratingValue":7'), "klarna", "K", "https://x.no/"), undefined);
   // Prisjakt: a ProductGroup with its variants (prisjakt.no/product.php?p=16029953, 2026-11-08).
@@ -171,7 +171,7 @@ test("Power: buyer rating from its product search, only for the page's own part 
   const respond = (products: unknown[]) => async (url: string) => { urls.push(url); return { products }; };
   const message = { type: "get-price-match-for-product", url: "https://www.komplett.no/product/1313146", searchTerm: "Apple AirPods 4 trådløse ørepropper, In-Ear (hvit)", codes: ["MXP63DN/A"] } as never;
   assert.deepEqual(await findPowerUserRating(message, respond([product("Apple AirPods 4", "MXP63DN/A", { overallAverageRating: 4.2727, overallTotalReviewCount: 3190 })]) as never),
-    { source: "store:www.power.no", sourceName: "Power", score: 4.27, maxScore: 5, count: 3190, url: "https://www.power.no/tv-og-lyd/hodetelefoner/apple-airpods-4/p-3614399/" });
+    { source: "store:www.power.no", sourceName: "Power", score: 4.27, maxScore: 5, count: 3190, url: "https://www.power.no/tv-og-lyd/hodetelefoner/apple-airpods-4/p-3614399/", productName: "Apple AirPods 4" });
   assert.match(urls[0]!, /productlists\?q=MXP63DN%2FA/);
   assert.equal(await findPowerUserRating(message, respond([product("Apple AirPods 4 med aktiv støyreduksjon", "MXP93DN/A", { overallAverageRating: 4.5, overallTotalReviewCount: 900 })]) as never), undefined);
   assert.equal(await findPowerUserRating(message, respond([product("Apple AirPods 4", "MXP63DN/A", { overallAverageRating: 0, overallTotalReviewCount: 0 })]) as never), undefined);
@@ -202,7 +202,7 @@ test("GTIN search shops: the landing page's own GTIN must match before its ratin
   // Product JSON-LD from lyko.com (2026-11-08), shortened.
   const page = (gtin: string) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: "SAWE Skin Science Derm-Alert Barrier Repair Cream 75 ml", gtin13: gtin, aggregateRating: { "@type": "AggregateRating", ratingCount: 70, ratingValue: 3.6, worstRating: 1, bestRating: 5 } })}</script>`;
   assert.deepEqual(readGtinPageRating(page("7046110321911"), "7046110321911", lyko, "https://lyko.com/no/sok?q=7046110321911"),
-    { source: "store:lyko.com", sourceName: "Lyko", score: 3.6, maxScore: 5, count: 70, url: "https://lyko.com/no/sok?q=7046110321911" });
+    { source: "store:lyko.com", sourceName: "Lyko", score: 3.6, maxScore: 5, count: 70, url: "https://lyko.com/no/sok?q=7046110321911", productName: "SAWE Skin Science Derm-Alert Barrier Repair Cream 75 ml" });
   assert.equal(readGtinPageRating(page("7046110321928"), "7046110321911", lyko, "https://lyko.com/"), undefined);
   assert.equal(readGtinPageRating("<html>Søkeresultater</html>", "7046110321911", lyko, "https://lyko.com/"), undefined);
   const requested: string[] = [];
@@ -249,6 +249,6 @@ test("Boozt: title search links, GTIN on one JSON-LD entry and the rating on ano
     return url === link ? productPage : undefined;
   };
   const ratings = await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://www.blivakker.no/p/1", searchTerm: "L'Oréal Professionnel Metal DX Anti-Deposit Protector Concentrated Oil 50 ml", codes: ["3474637090616"] } as never, requestText);
-  assert.deepEqual(ratings, [{ source: "store:www.boozt.com", sourceName: "Boozt", score: 5, maxScore: 5, count: 1, url: link }]);
+  assert.deepEqual(ratings, [{ source: "store:www.boozt.com", sourceName: "Boozt", score: 5, maxScore: 5, count: 1, url: link, productName: "L'Oréal Professionnel Metal DX Anti-Deposit Protector Concentrated Oil 50 ml (50 ml)" }]);
   assert.equal(requested.filter((url) => url === link).length, 1);
 });

@@ -53,7 +53,7 @@ export function readGtinPageRating(html: string, gtin: string, store: GtinSearch
   if (!Number.isFinite(score) || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === undefined) return undefined;
   const own = (value: unknown) => typeof value === "string" && value.startsWith(`https://${store.host}/`) ? value : undefined;
   const pageUrl = own(matching.url) ?? (isRecord(matching.offers) ? own(matching.offers.url) : undefined) ?? url;
-  return { source: `store:${store.host}`, sourceName: store.name, score, maxScore, count, url: pageUrl };
+  return { source: `store:${store.host}`, sourceName: store.name, score, maxScore, count, url: pageUrl, ...(name ? { productName: name.slice(0, 300) } : {}) };
 }
 
 export async function findGtinStoreRatings(message: GetPriceMatchForProductMessage, requestText: TextRequest): Promise<UserRating[]> {

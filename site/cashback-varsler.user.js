@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794163763
+// @version      1794163872
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1970,7 +1970,8 @@ query OfferList($productId: Int!) {
     const maxScore = finite$1(rating.bestRating) ?? 5;
     const count = finite$1(rating.ratingCount) ?? finite$1(rating.reviewCount);
     if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
-    return { source: source2, sourceName, score, maxScore, count, url: pageUrl };
+    const productName = typeof product?.name === "string" ? product.name.trim().slice(0, 300) : "";
+    return { source: source2, sourceName, score, maxScore, count, url: pageUrl, ...productName ? { productName } : {} };
   }
   const klarnaReviewsUrl = (productId, kind) => `https://www.klarna.com/no/api/review-edge-rest/public/v2/products/reviews/NO/${encodeURIComponent(productId)}/${kind}?limit=50`;
   const isNorwegianReview = (review) => review.country === "NO" || review.lang === "no" || review.lang === "nb" || review.lang === "nn";
@@ -2108,7 +2109,7 @@ query OfferList($productId: Int!) {
     const critics = value.critics;
     const users = value.users;
     const store2 = value.store;
-    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string") && [critic.pros, critic.cons].every((list) => list === void 0 || Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url)));
+    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string") && [critic.pros, critic.cons].every((list) => list === void 0 || Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url) && (user.productName === void 0 || typeof user.productName === "string" && user.productName.length <= 300)));
   }
   const SEARCH = "query ShopSearch($query: String!) { search(query: $query) { shops { nodes { id } } } }";
   const SHOPS = "query Shops($ids: [Int!]!) { shops(ids: $ids) { id name homePage { url } userReviews { count rating } } }";
@@ -7349,7 +7350,7 @@ query SearchSuggestions($query: String!, $category: Int) {
         const count = typeof review?.overallTotalReviewCount === "number" ? review.overallTotalReviewCount : void 0;
         const path = typeof product.url === "string" && product.url.startsWith("/") ? product.url : void 0;
         if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, 5) === void 0 || path === void 0) return void 0;
-        return { source: "store:www.power.no", sourceName: "Power", score: Number(score.toFixed(2)), maxScore: 5, count, url: `https://www.power.no${path}` };
+        return { source: "store:www.power.no", sourceName: "Power", score: Number(score.toFixed(2)), maxScore: 5, count, url: `https://www.power.no${path}`, productName: title.slice(0, 300) };
       }
     }
     return void 0;
@@ -7438,7 +7439,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!Number.isFinite(score) || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
     const own = (value) => typeof value === "string" && value.startsWith(`https://${store2.host}/`) ? value : void 0;
     const pageUrl = own(matching.url) ?? (isRecord$7(matching.offers) ? own(matching.offers.url) : void 0) ?? url;
-    return { source: `store:${store2.host}`, sourceName: store2.name, score, maxScore, count, url: pageUrl };
+    return { source: `store:${store2.host}`, sourceName: store2.name, score, maxScore, count, url: pageUrl, ...name ? { productName: name.slice(0, 300) } : {} };
   }
   async function findGtinStoreRatings(message, requestText) {
     const gtin = (message.codes ?? []).map((code) => code.trim()).find(isValidGtin);
@@ -23756,10 +23757,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       rows.push(buildReviewRow("Produkt (kjøpere)", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
         title: "Produkt (kjøpere)",
         note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
+        // Like the price match: the product found at the source on top, the source as the first chip.
         items: buyers.map(({ offer, user }) => ({
-          name: buyerName(offer, user),
+          name: user.productName ?? buyerName(offer, user),
           score: toHundredScale(user.score, user.maxScore) ?? 0,
-          chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...user.source === "klarna" ? ["Bare norske"] : []]
+          chips: [...user.productName ? [buyerName(offer, user)] : [], `${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...user.source === "klarna" ? ["Bare norske"] : []]
         }))
       }));
     }
@@ -23782,9 +23784,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           title: "Produkt (anmeldere)",
           note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
           items: tests.map(({ critic }) => ({
-            name: critic.site,
+            name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site,
             score: toHundredScale(critic.score, critic.maxScore) ?? 0,
-            chips: [formatReviewScore(critic.score, critic.maxScore), ...critic.title ? [critic.title.replace(/^[<\s]+/, "")] : []],
+            chips: [...critic.title ? [critic.site] : [], formatReviewScore(critic.score, critic.maxScore)],
             ...critic.quote ? { quote: critic.quote } : {}
           }))
         }

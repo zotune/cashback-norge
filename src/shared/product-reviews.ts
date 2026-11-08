@@ -9,7 +9,8 @@ import { decodeHtmlEntities, isRecord, parseUrl } from "./cashback.js";
 import { readLdJsonScripts, readNextFlightPayloads, selectProductLdJson } from "./product-data.js";
 
 export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string; pros?: string[]; cons?: string[] };
-export type UserRating = { source: string; sourceName: string; score: number; maxScore: number; count: number; url: string };
+// productName: the product the rating belongs to at that source, shown so readers can judge the match.
+export type UserRating = { source: string; sourceName: string; score: number; maxScore: number; count: number; url: string; productName?: string };
 // A rating of the shop itself (service, delivery), not of the product.
 export type StoreRating = { source: string; shopName: string; score: number; maxScore: number; count: number; url: string };
 export type ProductReviews = { critics?: CriticReview[]; users?: UserRating[]; store?: StoreRating };
@@ -89,7 +90,8 @@ export function readJsonLdUserRating(html: string, source: string, sourceName: s
   const maxScore = finite(rating.bestRating) ?? 5;
   const count = finite(rating.ratingCount) ?? finite(rating.reviewCount);
   if (score === undefined || count === undefined || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === undefined) return undefined;
-  return { source, sourceName, score, maxScore, count, url: pageUrl };
+  const productName = typeof product?.name === "string" ? product.name.trim().slice(0, 300) : "";
+  return { source, sourceName, score, maxScore, count, url: pageUrl, ...(productName ? { productName } : {}) };
 }
 
 // Klarna's review service (review-edge-rest, sourced from TestFreaks) mixes reviews from many
@@ -285,5 +287,6 @@ export function isProductReviews(value: unknown): value is ProductReviews {
     [critic.pros, critic.cons].every((list) => list === undefined || (Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))))) &&
     (users === undefined || (Array.isArray(users) && users.length <= 10 && users.every((user) =>
       isRecord(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) &&
-      typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url))));
+      typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url) &&
+      (user.productName === undefined || (typeof user.productName === "string" && user.productName.length <= 300)))));
 }
