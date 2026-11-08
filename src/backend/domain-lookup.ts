@@ -56,7 +56,7 @@ function extractLookupKeys(merchantName: string): string[] {
   return parts.map(normalizeMerchantName).filter((key) => key.length > 0);
 }
 
-function normalizeMerchantName(name: string): string {
+export function normalizeMerchantName(name: string): string {
   return name
     .toLowerCase()
     .replace(/\.(com|no|se|dk|fi|eu|net|io|org|de|co\.uk)$/i, "")

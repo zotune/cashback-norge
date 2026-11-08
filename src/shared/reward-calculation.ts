@@ -3,7 +3,7 @@ import {
   normalizeCurrencyForExchange,
   type NokBaseRates,
 } from "./exchange-rates.js";
-import type { CardBenefit, RewardCalculationRules } from "./cashback.js";
+import type { CardBenefit, OfferPromotion, RewardCalculationRules } from "./cashback.js";
 
 export const EB_PER_TRUMF_KR = 13.5;
 
@@ -13,6 +13,7 @@ type RewardOffer = {
   rewardSortValueNok?: number;
   rewardCalculation?: RewardCalculationRules;
   cardBenefit?: CardBenefit;
+  promotion?: OfferPromotion;
 };
 
 export function formatRewardLabel(reward: string, provider: string): string {
@@ -40,6 +41,8 @@ function isGenericMembershipReward(reward: string): boolean {
 }
 
 export function formatCompactRewardLabel(offer: RewardOffer): string | undefined {
+  if (offer.promotion?.priceNok === 0) return "0 kr totalsum";
+  if (offer.promotion) return offer.promotion.label;
   const label = formatRewardLabel(offer.reward, offer.provider);
   const fixedReward = readFixedRewardMax(label);
   const rewardSortValueNok = readRewardSortValueNok(offer);
@@ -80,7 +83,7 @@ export function formatCompactRewardLabel(offer: RewardOffer): string | undefined
 }
 
 export function calculateCashback(offer: RewardOffer, amount: number): string {
-  if (offer.cardBenefit !== undefined) return "";
+  if (offer.cardBenefit !== undefined || offer.promotion !== undefined) return "";
   if (!canCalculateForPurchase(offer, amount)) return "";
   if (offer.provider === "cbn") {
     const pctMatch = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
@@ -146,7 +149,7 @@ export function calculateCashback(offer: RewardOffer, amount: number): string {
 }
 
 export function calculateCashbackMaxKr(offer: RewardOffer, amount: number): number {
-  if (offer.cardBenefit !== undefined) return 0;
+  if (offer.cardBenefit !== undefined || offer.promotion !== undefined) return 0;
   if (!canCalculateForPurchase(offer, amount)) return 0;
   if (offer.provider === "cbn") return 0;
 
@@ -187,6 +190,7 @@ function canCalculateForPurchase(offer: RewardOffer, amount: number): boolean {
 }
 
 export function getMaxRewardPercent(offer: RewardOffer): number {
+  if (offer.promotion) return 0;
   // "opptil 15 %" must rank as 15, not fall through the anchored patterns
   const reward = offer.reward.trim().replace(/^(?:opptil|inntil|up to)\s+/i, "");
   const rewardSortValueNok = readRewardSortValueNok(offer);

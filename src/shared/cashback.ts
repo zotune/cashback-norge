@@ -29,6 +29,10 @@ export type CardBenefit = {
   validUntil?: string;
 };
 
+// The customer's introductory price is not a cashback/discount amount.
+// An absent price means unknown, including gifts with unspecified postage.
+export type OfferPromotion = { label: string; priceNok?: number; id?: string; validUntil?: string };
+
 export type CashbackOffer = {
   provider: CashbackProvider;
   merchantName: string;
@@ -37,6 +41,7 @@ export type CashbackOffer = {
   rewardSortValueNok?: number;
   rewardCalculation?: RewardCalculationRules;
   cardBenefit?: CardBenefit;
+  promotion?: OfferPromotion;
   sourceUrl: string;
   activationUrl: string;
   terms: string;
@@ -89,12 +94,20 @@ export function isCashbackOffer(value: unknown): value is CashbackOffer {
       (typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok))) &&
     (value.rewardCalculation === undefined || isRewardCalculationRules(value.rewardCalculation)) &&
     (value.cardBenefit === undefined || isCardBenefit(value.cardBenefit)) &&
+    (value.promotion === undefined || isOfferPromotion(value.promotion)) &&
     typeof value.sourceUrl === "string" &&
     typeof value.activationUrl === "string" &&
     typeof value.terms === "string" &&
     (value.discountCode === undefined || typeof value.discountCode === "string") &&
     typeof value.updatedAt === "string"
   );
+}
+
+function isOfferPromotion(value: unknown): value is OfferPromotion {
+  return isRecord(value) && typeof value.label === "string" && value.label.trim().length > 0 &&
+    (value.id === undefined || (typeof value.id === "string" && value.id.trim().length > 0)) &&
+    (value.validUntil === undefined || (typeof value.validUntil === "string" && Number.isFinite(Date.parse(value.validUntil)))) &&
+    (value.priceNok === undefined || (typeof value.priceNok === "number" && Number.isFinite(value.priceNok) && value.priceNok >= 0));
 }
 
 function isCardBenefit(value: unknown): value is CardBenefit {
@@ -387,7 +400,7 @@ export function uniqueOffers(offers: CashbackOffer[]): CashbackOffer[] {
 
   for (const offer of offers) {
     const codeSuffix = offer.discountCode !== undefined ? `:${offer.discountCode}` : "";
-    const key = offer.provider === "cbn" ? getVisibleOfferKey(offer) : `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
+    const key = offer.provider === "cbn" || offer.promotion ? getVisibleOfferKey(offer) : `${offer.provider}:${offer.merchantName.toLowerCase()}${codeSuffix}`;
     const existing = byKey.get(key);
     // Keep the offer with the best reward value; prefer range over single when equal
     const newVal = parseRewardValue(offer);
@@ -496,6 +509,7 @@ type RewardValue = {
 };
 
 function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
+  if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
   const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
   const rewardSortValueNok = typeof offerOrReward === "string"
     ? undefined

@@ -26,6 +26,7 @@ export function getOfferCampaignLabel(offer: CashbackOffer): string | undefined 
 // Ordinary cashback rows still collapse per provider/code. Separate affiliate
 // campaigns must retain their own action even when they share a merchant domain.
 export function getVisibleOfferKey(offer: CashbackOffer): string {
+  if (offer.promotion) return `${offer.provider}:${offer.merchantName.toLowerCase()}:${offer.promotion.id ?? `${offer.sourceUrl}:${offer.promotion.label}`}`;
   if (offer.provider === "cbn") {
     return `cbn:${unoCampaignId(offer) ?? (offer.activationUrl || offer.merchantName)}`;
   }

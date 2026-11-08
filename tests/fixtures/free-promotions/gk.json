@@ -1,0 +1,173 @@
+{
+  "result": [
+    {
+      "_id": "1dec368d-8584-472e-a154-166f6e528dde",
+      "active": true,
+      "content": [
+        {
+          "_key": "5d7d6e0f854e",
+          "_type": "block",
+          "children": [
+            {
+              "_key": "5eed496c07f2",
+              "_type": "span",
+              "marks": [],
+              "text": "Kosttilskuddet hevder å styrke og beskytte ledd og brusk, redusere ubehag i knær, skuldre, fingre, rygg og hofter, samt å fremme smidighet og bevegelighet."
+            }
+          ],
+          "markDefs": [],
+          "style": "normal"
+        }
+      ],
+      "id": "61201",
+      "link": {
+        "_type": "storyLink",
+        "provider": "Medical.no",
+        "url": "https://ssormed.com/click.track?CID=430460&AFID=422828&SID=REF"
+      },
+      "manualCheck": "2026-04-27",
+      "publish_time": "2025-10-27T11:01:34.621Z",
+      "short_description": "Nå kan du prøve Artrogen, et kosttilskudd som markedsføres som at kan hjelpe mot stivhet, smerter og ubehag i muskler og ledd, gratis - om du selv dekker porto. Kosttilskuddet inneholder blant annet ingefær, gurkemeie, piperin, vitamin c og d, sink og magnesium. ",
+      "slug": "Gratis-ting-og-velkomstgaver/Helse-og-kosttilskudd/Prov-kosttilskudd-for-muskler-og-ledd-gratis-i-30-dager",
+      "title": "Prøv kosttilskudd for muskler og ledd gratis i 30 dager",
+      "valid_until_time": null,
+      "visible": true
+    },
+    {
+      "_id": "8a2abcc6-a8f4-45a6-826b-b4df1aad1f31",
+      "active": true,
+      "content": [
+        {
+          "_key": "334a87968e8f",
+          "_type": "block",
+          "children": [
+            {
+              "_key": "189fdb2b8d3b",
+              "_type": "span",
+              "marks": [],
+              "text": "Merk at tilbudet gjelder for nye registrerte kontoer og på første bestilling. Bestillingen må være på minst 300 kroner."
+            }
+          ],
+          "markDefs": [],
+          "style": "normal"
+        },
+        {
+          "_key": "db0aa49066f3",
+          "_type": "block",
+          "children": [
+            {
+              "_key": "3a07d2bbb66d",
+              "_type": "span",
+              "marks": [],
+              "text": "Bruk "
+            },
+            {
+              "_key": "cd15d1004ef2",
+              "_type": "span",
+              "marks": [
+                "0d38a809a467"
+              ],
+              "text": "denne lenken"
+            },
+            {
+              "_key": "733726f473e2",
+              "_type": "span",
+              "marks": [],
+              "text": " for å få tilbudet om 150 kroner gratis."
+            }
+          ],
+          "markDefs": [
+            {
+              "_key": "0d38a809a467",
+              "_type": "link",
+              "blank": true,
+              "button": false,
+              "followLink": false,
+              "hideReferrer": true,
+              "href": "https://www.foodora.no/referral?code=cbea1db9c2479d7d2fe7cf6c1a4cbab2&geid=FO_NO&ts=1767262473",
+              "paid": true
+            }
+          ],
+          "style": "normal"
+        }
+      ],
+      "id": "61269",
+      "link": {
+        "provider": "Foodora",
+        "url": "https://www.foodora.no/referral?code=cbea1db9c2479d7d2fe7cf6c1a4cbab2&geid=FO_NO&ts=1767262473"
+      },
+      "manualCheck": null,
+      "publish_time": "2026-01-01T10:27:57.203Z",
+      "short_description": "Visste du at du kan få 150 kroner gratis til Foodora? Det hele er ganske enkelt: Trykk deg inn via lenken i denne saken og last ned Foodora-appen. Gjør så en bestilling på minst 300 kroner - og vips får du 150 kroner i avslag - helt gratis.",
+      "slug": "Gratis-ting-og-velkomstgaver/Matvarer-drikke-og-sotsaker/Fa-150-kroner-gratis-til-Foodora-matbestillinger",
+      "title": "Få 150 kroner gratis til Foodora",
+      "valid_until_time": null,
+      "visible": true
+    },
+    {
+      "_id": "ab1cedc7-e2a9-4d7a-a205-01d907dbe356",
+      "active": true,
+      "content": [
+        {
+          "_key": "6a2ff6fa9c70",
+          "_type": "block",
+          "children": [
+            {
+              "_key": "39621ce30d250",
+              "_type": "span",
+              "marks": [],
+              "text": "I Normal-appen finner du spill og konkurranser hvor du kan vinne ting - hver dag. I tillegg kan du vinne pengene tilbake for dine Normal-kjøp hver måned. "
+            }
+          ],
+          "markDefs": [],
+          "style": "normal"
+        },
+        {
+          "_key": "22c869444c27",
+          "_type": "block",
+          "children": [
+            {
+              "_key": "5b01d8d8696b",
+              "_type": "span",
+              "marks": [],
+              "text": "Dersom du også klikker på nyhetene i appen, samler du opp til en stor ballong som sprekker og gir deg et gratis produkt. "
+            }
+          ],
+          "markDefs": [],
+          "style": "normal"
+        }
+      ],
+      "id": "60770",
+      "link": {
+        "_type": "storyLink",
+        "provider": "Normal",
+        "url": "https://www.normal.no/app/"
+      },
+      "manualCheck": "2025-03-24",
+      "publish_time": "2024-09-24T12:13:36.003Z",
+      "short_description": "Liker du å handle på Normal og spare penger på både det ene og andre? I tillegg kan du med ujevne mellomrom sikre deg gratis produkter - dersom du er aktiv i appen deres. Jeg handler av og til på Normal, men er titt og ofte innom for å hente ting jeg får uten at det koster meg et rødt øre.",
+      "slug": "Gratis-ting-og-velkomstgaver/Diverse/Slik-fikser-du-deg-gratis-produkter-fra-Normal",
+      "title": "Slik fikser du deg gratis produkter fra Normal",
+      "valid_until_time": null,
+      "visible": true
+    },
+    {
+      "_id": "b4ecdc5d-c748-4dd3-a2fe-e67e3b6d0d8d",
+      "active": true,
+      "content": null,
+      "id": "39784",
+      "link": {
+        "_type": "storyLink",
+        "provider": "Fabel",
+        "url": "https://in.fabel.no/t/t?a=1550298256&as=1057927217&t=2&tk=1&epi=web-39784&url=https://registrering.fabel.no/produkter/adtraction6w/"
+      },
+      "manualCheck": "2024-12-29",
+      "publish_time": "2026-11-02T10:15:00.000Z",
+      "short_description": "Liker du å lytte til lydbøker, kan du prøve tilbyderen Fabel helt gratis i seks uker. Enkelt å avmelde seg i etterkant av gratisperioden, men husk å gjøre det før betalperioden starter - om du ikke ønsker å fortsette da.",
+      "slug": "Underholdning/Lydboker-og-podcast/Prov-Fabel-og-lytt-til-lydboker-helt-gratis-i-6-uker",
+      "title": "Prøv Fabel og lytt til lydbøker helt gratis i 6 uker",
+      "valid_until_time": null,
+      "visible": true
+    }
+  ]
+}

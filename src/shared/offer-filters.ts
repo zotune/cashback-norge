@@ -8,13 +8,14 @@ export const QUICK_FILTERS = [
   { id: "student", label: "Student" },
   { id: "rabattkode", label: "Rabattkoder" },
   { id: "velkomst", label: "Velkomstbonus" },
+  { id: "gratis", label: "Gratis" },
 ] as const;
 
 // Qualifiers narrow every selected topic instead of adding one (AND, not OR).
-const QUALIFIERS = new Set<QuickFilterId>(["student", "rabattkode", "velkomst"]);
+const QUALIFIERS = new Set<QuickFilterId>(["student", "rabattkode", "velkomst", "gratis"]);
 
 export type QuickFilterId = typeof QUICK_FILTERS[number]["id"];
-type Topic = Exclude<QuickFilterId, "student" | "rabattkode" | "velkomst">;
+type Topic = Exclude<QuickFilterId, "student" | "rabattkode" | "velkomst" | "gratis">;
 
 const STUDENT_PROVIDERS = new Set(["studentkortet", "studenttorget", "unidays", "utdanningibergen"]);
 const DOMAIN_TOPICS: Record<string, readonly Topic[]> = {
@@ -28,6 +29,7 @@ const DOMAIN_TOPICS: Record<string, readonly Topic[]> = {
   "trondelagkraft.no": ["strom"],
   "chilimobil.no": ["mobil"],
   "ice.no": ["mobil"],
+  "onecall.no": ["mobil"],
   "lyca-mobile.no": ["mobil"],
   "plussmobil.no": ["mobil"],
   "talkmore.no": ["mobil"],
@@ -68,6 +70,7 @@ function explicitTopics(text: string, isMerchantName = false): Topic[] {
 
 export function matchesOfferQuickFilter(offer: CashbackOffer, filter: QuickFilterId | ""): boolean {
   if (filter === "") return true;
+  if (filter === "gratis") return offer.promotion ? offer.promotion.priceNok === 0 : /^0\s*kr\s+totalsum$/i.test(offer.reward.trim());
   if (filter === "rabattkode") return typeof offer.discountCode === "string" && offer.discountCode.trim() !== "";
   // A bonus for new members through our invitation (see PROVIDER_WELCOME_BONUSES).
   if (filter === "velkomst") return Object.hasOwn(PROVIDER_WELCOME_BONUSES, offer.provider);

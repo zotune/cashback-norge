@@ -102,6 +102,8 @@ import { fetchTradedoubler } from "./providers/tradedoubler.js";
 import { fetchCoupert } from "./providers/coupert.js";
 import { fetchRabatta } from "./providers/rabatta.js";
 import { fetchGratisbursdag } from "./providers/gratisbursdag.js";
+import { fetchGratis, fetchGjerrigknark } from "./providers/free-offers.js";
+import { fetchSparelosen } from "./providers/sparelosen.js";
 
 const STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS = 14;
 
@@ -197,6 +199,9 @@ type CliConfig = {
   skipCoupert: boolean;
   skipRabatta: boolean;
   skipGratisbursdag: boolean;
+  skipGratis: boolean;
+  skipGjerrigknark: boolean;
+  skipSparelosen: boolean;
   skipPokeprisCatalog: boolean;
   pokeprisOrigin: string;
   pokeprisCatalogPath: string;
@@ -1068,6 +1073,21 @@ async function main(): Promise<void> {
       source: await spennSourcePromise, domainLookup: fullDomainLookup, generatedAt, logger,
     }),
   });
+  const promotionOffers: CashbackOffer[] = [];
+  for (const [provider, skip, fetch] of [
+    ["gratis", config.skipGratis, fetchGratis],
+    ["gjerrigknark", config.skipGjerrigknark, fetchGjerrigknark],
+    ["sparelosen", config.skipSparelosen, fetchSparelosen],
+  ] as const) {
+    if (skip) continue;
+    promotionOffers.push(...await collectOffers({
+      label: provider, provider, fallbackWhenEmpty: true,
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
+      reusePreviousOnFailure: true,
+      previousOfferFilter: (offer) => !offer.promotion?.validUntil || Date.parse(offer.promotion.validUntil) > Date.parse(generatedAt),
+      run: () => fetch({ domainLookup: fullDomainLookup, generatedAt, logger, overrides: providerOverrides }),
+    }));
+  }
   logger.info(`Rabattkode: ${rabattkodeOffers.length} discount codes`);
 
   // Phase 5: Rabatta (started before Phase 1)
@@ -1079,6 +1099,7 @@ async function main(): Promise<void> {
   const offersBeforeCoupert: CashbackOffer[] = [
     ...instabankOffers,
     ...gratisbursdagOffers,
+    ...promotionOffers,
     ...manualOffers, ...klarnaOffers, ...rememberOffers, ...trumfOffers, ...sasOffers, ...tfBankOffers, ...santanderOffers, ...vestboOffers, ...bblOffers, ...elbilOffers, ...ysOffers, ...lofavorOffers, ...norwegianOffers, ...dnbOffers, ...dnbSatsOffers, ...dnbSupertilbudOffers, ...curveOffers, ...rabattkodeOffers, ...rabattaOffers, ...cuponationOffers, ...trustdealsOffers, ...kickbackOffers, ...finnkupongkoderOffers, ...norskfamilieOffers, ...logbuyOffers, ...obosOffers, ...bobOffers, ...usblOffers, ...bateOffers, ...tobbOffers, ...nafOffers, ...teknaOffers, ...nitoOffers, ...sparebank1Offers, ...studentkortetOffers, ...nettbonusOffers, ...spennOffers, ...spareborsenOffers, ...rabbleOffers, ...dreamsOffers, ...utdanningibergenOffers, ...unidaysOffers, ...unioOffers, ...coopOffers, ...partnerAdsOffers, ...tradeTrackerOffers, ...awinOffers, ...addrevenueOffers, ...orionOffers, ...daisyconOffers, ...tradedoublerOffers, ...studentTorgetOffers, ...elkjopOffers, ...akademikerneOffers, ...huseierneOffers, ...huseierforbundetOffers, ...amcarOffers, ...horselsforbundetOffers, ...knbfOffers, ...njffOffers, ...pensjonistforbundetOffers, ...knaOffers, ...syklistforeningenOffers, ...revmatikerforbundetOffers, ...redningsselskapetOffers, ...lhlOffers, ...skiforeningenOffers, ...agrolOffers, ...kondisOffers,
   ];
   const knownCoupertDomains = new Set(
@@ -1319,6 +1340,9 @@ function readCliConfig(args: string[]): CliConfig {
     skipCoupert: args.includes("--skip-coupert"),
     skipRabatta: args.includes("--skip-rabatta"),
     skipGratisbursdag: args.includes("--skip-gratisbursdag"),
+    skipGratis: args.includes("--skip-gratis"),
+    skipGjerrigknark: args.includes("--skip-gjerrigknark"),
+    skipSparelosen: args.includes("--skip-sparelosen"),
     skipPokeprisCatalog: args.includes("--skip-pokepris-catalog"),
     pokeprisOrigin: readArgumentValue(args, "--pokepris-origin") ?? "https://www.pokepris.no",
     pokeprisCatalogPath: resolve(readArgumentValue(args, "--pokepris-catalog-output") ?? "data/pokepris-catalog.json"),

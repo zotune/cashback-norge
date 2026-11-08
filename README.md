@@ -76,4 +76,22 @@ Gratisvarer følger standardformatet `0 kr totalsum`; ukjent gaveverdi og «2 fo
 gjøres ikke om til cashback. Ved kildefeil gjenbrukes tidligere data i maksimalt
 14 dager. Bruk `--skip-gratisbursdag` for å hoppe over kilden ved lokal crawling.
 
+`gratis` (Gratis.no) og `gjerrigknark` henter publiserte tilbud fra kildenes
+offentlige Sanity-JSON-API. Bare aktive oppføringer med kjent tilbyder tas med;
+utløpte tilbud og fremtidig publisering utelates. `sparelosen` følger
+mobilkampanjesidens lenke til kalkulatoren og leser JSON-katalogen i den aktuelle
+Astro-komponenten, uten å kjøre tredjepartskode. Sparelosen har ikke et eget
+offentlig JSON-API for kampanjeartikkelen. Bare abonnementer merket som
+prøvekjøp/kampanje tas med, ikke ordinære mobilpriser.
+
+Tilbudene bruker samme indeks, kildechips, vilkår og domenekoblinger på nettsiden,
+i extensionen og userscriptet. Filteret **Gratis** inkluderer dokumenterte
+gratisperioder og gratis bursdagsgaver; betalt porto, kjøpskrav, ukjente kostnader
+og betalte introduksjonspriser blir ikke gratispriser. Gaver får ingen oppdiktet
+kroneverdi, og abonnementspriser regnes ikke som cashback. Kildens status er
+oppgitt i tooltipen, ikke fremstilt som bekreftelse fra Cashback Norge.
+Ukjent butikkdomene gir visning på nettsiden uten extension-varsel. Kildene
+bruker den vanlige fallbacken på høyst 14 dager, med opprinnelige tidsstempler.
+CLI-valg: `--skip-gratis`, `--skip-gjerrigknark` og `--skip-sparelosen`.
+
 The crawlers only extract publicly available information. No proprietary or copyrighted content from third parties is included in this repository. Offers requiring authentication/login are not shown. If a discount code is shown, it is because it is available without login.

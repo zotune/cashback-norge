@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794086879
+// @version      1794102350
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -280,6 +280,7 @@
     return id ? UNO_CAMPAIGNS[id].label : void 0;
   }
   function getVisibleOfferKey(offer) {
+    if (offer.promotion) return `${offer.provider}:${offer.merchantName.toLowerCase()}:${offer.promotion.id ?? `${offer.sourceUrl}:${offer.promotion.label}`}`;
     if (offer.provider === "cbn") {
       return `cbn:${unoCampaignId(offer) ?? (offer.activationUrl || offer.merchantName)}`;
     }
@@ -315,7 +316,10 @@
     if (!isRecord$7(value)) {
       return false;
     }
-    return isCashbackProvider(value.provider) && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every((domain) => typeof domain === "string") && typeof value.reward === "string" && (value.rewardSortValueNok === void 0 || typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok)) && (value.rewardCalculation === void 0 || isRewardCalculationRules(value.rewardCalculation)) && (value.cardBenefit === void 0 || isCardBenefit(value.cardBenefit)) && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
+    return isCashbackProvider(value.provider) && typeof value.merchantName === "string" && Array.isArray(value.domains) && value.domains.every((domain) => typeof domain === "string") && typeof value.reward === "string" && (value.rewardSortValueNok === void 0 || typeof value.rewardSortValueNok === "number" && Number.isFinite(value.rewardSortValueNok)) && (value.rewardCalculation === void 0 || isRewardCalculationRules(value.rewardCalculation)) && (value.cardBenefit === void 0 || isCardBenefit(value.cardBenefit)) && (value.promotion === void 0 || isOfferPromotion(value.promotion)) && typeof value.sourceUrl === "string" && typeof value.activationUrl === "string" && typeof value.terms === "string" && (value.discountCode === void 0 || typeof value.discountCode === "string") && typeof value.updatedAt === "string";
+  }
+  function isOfferPromotion(value) {
+    return isRecord$7(value) && typeof value.label === "string" && value.label.trim().length > 0 && (value.id === void 0 || typeof value.id === "string" && value.id.trim().length > 0) && (value.validUntil === void 0 || typeof value.validUntil === "string" && Number.isFinite(Date.parse(value.validUntil))) && (value.priceNok === void 0 || typeof value.priceNok === "number" && Number.isFinite(value.priceNok) && value.priceNok >= 0);
   }
   function isCardBenefit(value) {
     if (!isRecord$7(value) || typeof value.category !== "string" || !value.category.trim()) return false;
@@ -672,6 +676,8 @@
     return /^(?:medlemsfordel|medlemstilbud|medlemspris)$/i.test(reward.trim());
   }
   function formatCompactRewardLabel(offer) {
+    if (offer.promotion?.priceNok === 0) return "0 kr totalsum";
+    if (offer.promotion) return offer.promotion.label;
     const label = formatRewardLabel(offer.reward, offer.provider);
     const fixedReward = readFixedRewardMax(label);
     const rewardSortValueNok = readRewardSortValueNok$1(offer);
@@ -703,7 +709,7 @@
     return label.length <= 14 ? label : void 0;
   }
   function calculateCashback(offer, amount) {
-    if (offer.cardBenefit !== void 0) return "";
+    if (offer.cardBenefit !== void 0 || offer.promotion !== void 0) return "";
     if (!canCalculateForPurchase(offer, amount)) return "";
     if (offer.provider === "cbn") {
       const pctMatch2 = offer.reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
@@ -765,6 +771,7 @@
     return rules.minimumPurchaseExclusive === true ? amount > rules.minimumPurchaseNok : amount >= rules.minimumPurchaseNok;
   }
   function getMaxRewardPercent(offer) {
+    if (offer.promotion) return 0;
     const reward = offer.reward.trim().replace(/^(?:opptil|inntil|up to)\s+/i, "");
     const rewardSortValueNok = readRewardSortValueNok$1(offer);
     const rangeMatch = reward.match(/^([\d,.]+)%?-([\d,.]+)\s*%$/);
@@ -1154,6 +1161,9 @@
     utdanningibergen: "Utdanning i Bergen",
     unidays: "UNiDAYS",
     gratisbursdag: "Gratis bursdag",
+    gratis: "Gratis",
+    sparelosen: "Sparelosen",
+    gjerrigknark: "Gjerrigknark",
     cbn: "♥",
     unio: "Unio",
     coop: "Coop",
@@ -1213,6 +1223,9 @@
     utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
     unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
     gratisbursdag: "Bursdagsgaver og bursdagsrabatter fra gratisbursdag.no.\nKan kreve kundeklubb, app eller registrert fødselsdato.\nSe vilkår, gyldighet og bekreftelsesstatus for hvert tilbud.",
+    gratis: "Gratisvarer, bursdagsgaver og prøveperioder fra Gratis.no.\nSe vilkår for porto, medlemskap, oppsigelse og videre betaling.\nOppføringer fra kilden er ikke kontrollert av Cashback Norge.",
+    sparelosen: "Prøvekjøp og introduksjonstilbud fra Sparelosen.\nPrisen er det kunden betaler, ikke cashback. Se varighet, ordinær pris og operatørens vilkår.",
+    gjerrigknark: "Gratisvarer, velkomstgaver og prøveperioder fra Gjerrigknark.com.\nPorto, kjøpskrav og videre abonnement kan tilkomme. Se vilkårene for hvert tilbud.",
     unio: "Unio medlemsfordeler.\nKrever medlemskap i et Unio-forbund.\nOppgi rabattkode eller vis medlemsbevis.",
     coop: "Coop medlemsfordeler.\nKrever Coop-medlemskap.\nBruk rabattkode eller aktiver via Coop-siden der det kreves.",
     elkjop: "Elkjøps Kundeklubb.\nKrever gratis kundeklubbmedlemskap.\nAktiver eller hent kode via Elkjøp.",
@@ -1280,6 +1293,9 @@
     utdanningibergen: { bg: "#ffffff", fg: "#000000" },
     unidays: { bg: "#00b140", fg: "#ffffff" },
     gratisbursdag: { bg: "#7c3aed", fg: "#ffffff" },
+    gratis: { bg: "#ffdd00", fg: "#000000" },
+    sparelosen: { bg: "#00473f", fg: "#ffffff" },
+    gjerrigknark: { bg: "#b4d8d8", fg: "#000000" },
     unio: { bg: "#ffffff", fg: "#6b5330" },
     coop: { bg: "#003366", fg: "#ffffff" },
     elkjop: { bg: "#1d1b58", fg: "#ffffff" },
@@ -19845,9 +19861,11 @@ ${darkProviderCss}
     }
     .offer-list {
       display: grid;
+      min-width: 0;
       align-content: start;
       gap: 4px;
     }
+    .offer-link-wrapper { min-width: 0; }
     .offer-link.offer-link--best {
       color: var(--cbn-accent, #3a7d55);
     }
@@ -19907,6 +19925,7 @@ ${darkProviderCss}
       align-items: center;
       display: flex;
       flex-wrap: wrap;
+      min-width: 0;
       font-size: 14px;
       font-weight: 700;
       gap: 6px;
@@ -22735,6 +22754,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     });
   }
   function parseRewardValue(offerOrReward) {
+    if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
     const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
     const rewardSortValueNok = typeof offerOrReward === "string" ? void 0 : readRewardSortValueNok(offerOrReward);
     const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);

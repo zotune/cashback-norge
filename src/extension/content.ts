@@ -12001,9 +12001,11 @@ function renderNotice(
     }
     .offer-list {
       display: grid;
+      min-width: 0;
       align-content: start;
       gap: 4px;
     }
+    .offer-link-wrapper { min-width: 0; }
     .offer-link.offer-link--best {
       color: var(--cbn-accent, #3a7d55);
     }
@@ -12063,6 +12065,7 @@ function renderNotice(
       align-items: center;
       display: flex;
       flex-wrap: wrap;
+      min-width: 0;
       font-size: 14px;
       font-weight: 700;
       gap: 6px;
@@ -15084,6 +15087,7 @@ type RewardValue = {
   amount: number;
 };
 function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
+  if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
   const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
   const rewardSortValueNok = typeof offerOrReward === "string"
     ? undefined

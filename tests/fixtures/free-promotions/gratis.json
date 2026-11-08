@@ -1,0 +1,434 @@
+{
+  "result": [
+    {
+      "_id": "brandOffer-gratis-31538",
+      "facts": {
+        "audience": "Medlemmer i kundeklubben til Plantasjen",
+        "cancellation": "ukjent",
+        "commitment": "Medlemskap i kundeklubben til Plantasjen",
+        "value": "ukjent",
+        "whatYouGet": "Rosebukett med 10 roser"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "På telefon eller e-post.",
+          "question": "Hvordan får jeg kupongen?"
+        },
+        {
+          "_key": "f1",
+          "_type": "brandFaqItem",
+          "answer": "Logg inn på nettsiden og kontroller at fødselsdatoen din er registrert.",
+          "question": "Hva må jeg sjekke?"
+        }
+      ],
+      "intro": "Plantasjen gir medlemmer i kundeklubben 10 roser hver bursdag, år etter år.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "En rosebukett med 10 roser hvert år på bursdagen din.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Meld deg inn i kundeklubben og sjekk at fødselsdatoen står på profilen din. Kupongen kommer på telefon eller e-post, og du henter buketten i nærmeste butikk.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "gratis-bukett-med-10-roser-fra-plantasjen-pa-bursdagen",
+      "source": {
+        "_id": "588eecfb-7d64-4b42-86b9-4cb40869a8ea",
+        "active": true,
+        "link": {
+          "_type": "storyLink",
+          "provider": "Plantasjen",
+          "url": "https://www.plantasjen.no/kundeklubb.html"
+        },
+        "publish_time": "2023-09-09T08:09:39.090Z",
+        "short_description": "Dersom du melder deg inn i Plantasjens kundeklubb får du hvert år en rosebukett med 10 roser hver gang du har bursdag. Du får en kupong på telefon eller e-post og kan så hente buketten i nærmeste forretning.",
+        "slug": "Gratis-ting-og-vareprover/Diverse/Fa-en-rosebukett-fra-Plantasjen",
+        "title": "Få en rosebukett fra Plantasjen",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Gratis bukett med 10 roser fra Plantasjen på bursdagen"
+    },
+    {
+      "_id": "brandOffer-gratis-39784",
+      "facts": {
+        "audience": "Deg som liker lydbøker",
+        "cancellation": "Meld deg av før betalperioden starter",
+        "commitment": "Går over i betalt periode hvis du ikke melder deg av",
+        "value": "ukjent",
+        "whatYouGet": "6 ukers gratis prøveperiode hos Fabel"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Da starter betalperioden, med mindre du har meldt deg av.",
+          "question": "Hva skjer etter seks uker?"
+        }
+      ],
+      "intro": "Lytt til lydbøker hos Fabel i seks uker uten å betale. Meld deg av før betalperioden starter hvis du ikke vil fortsette.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "Seks uker gratis tilgang til lydbøkene hos Fabel.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Start prøveperioden hos Fabel. Avmelding er enkel, men den må skje før gratisperioden er over.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "fabel-lydboker-gratis-i-6-uker",
+      "source": {
+        "_id": "b4ecdc5d-c748-4dd3-a2fe-e67e3b6d0d8d",
+        "active": true,
+        "link": {
+          "_type": "storyLink",
+          "provider": "Fabel",
+          "url": "https://in.fabel.no/t/t?a=1550298256&as=1057927217&t=2&tk=1&epi=web-39784&url=https://registrering.fabel.no/produkter/adtraction6w/"
+        },
+        "publish_time": "2026-11-02T10:15:00.000Z",
+        "short_description": "Liker du å lytte til lydbøker, kan du prøve tilbyderen Fabel helt gratis i seks uker. Enkelt å avmelde seg i etterkant av gratisperioden, men husk å gjøre det før betalperioden starter - om du ikke ønsker å fortsette da.",
+        "slug": "Underholdning/Lydboker-og-podcast/Prov-Fabel-og-lytt-til-lydboker-helt-gratis-i-6-uker",
+        "title": "Prøv Fabel og lytt til lydbøker helt gratis i 6 uker",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Fabel: lydbøker gratis i 6 uker"
+    },
+    {
+      "_id": "brandOffer-gratis-43191",
+      "facts": {
+        "audience": "Nye medlemmer i Disneyklubben",
+        "cancellation": "ukjent",
+        "commitment": "Du betaler 59 kr i porto. Ingen kjøpeplikt eller bindingstid.",
+        "value": "ukjent",
+        "whatYouGet": "Frost-bok, Andeby-bok, e-bok, lydbok, Olaf-figur og Disneypose"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Nei, og heller ingen kjøpeplikt.",
+          "question": "Er det bindingstid i Disneyklubben?"
+        }
+      ],
+      "intro": "Seks Disney-ting i én pakke, med Frost og Andeby. Du betaler 59 kr i porto og har ingen kjøpeplikt.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "Frost-bok, Andeby-bok, e-bok, lydbok, en Olaf-figur og en Disneypose.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Bli med i Disneyklubben og dekk 59 kr i porto. Klubben har ingen bindingstid.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "disneyklubben-seks-ting-i-velkomstgave-for-59-kr-i-porto",
+      "source": {
+        "_id": "3d50f3bb-ab1e-4ef6-8352-be4106076bba",
+        "active": true,
+        "link": {
+          "_type": "storyLink",
+          "provider": "Disneyklubben",
+          "url": "https://aslinkhub.com/?bid=2080618&media_id=4022&sub=web-43191"
+        },
+        "publish_time": "2024-01-07T07:59:43.581Z",
+        "short_description": "Blir du med i Disneyklubben, får du en stor velkomstgave bestående av Frost-bok, e-bok, lydbok, Andeby-bok, Olaf-figur og Disneypose. Det eneste du må dekke er porto kr 59 - ingen kjøpeplikt eller bindingstid.",
+        "slug": "Gratis-ting-og-vareprover/Barn-og-baby/Fa-stor-Disney-pakke-i-velkomstgave",
+        "title": "Få stor Disney-pakke i velkomstgave",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Disneyklubben: seks ting i velkomstgave for 59 kr i porto"
+    },
+    {
+      "_id": "brandOffer-gratis-43690",
+      "facts": {
+        "audience": "Nye abonnenter med barn",
+        "cancellation": "Ingen bindingstid, si opp når som helst etter én bokpakke",
+        "commitment": "79 kr i porto og kjøp av én bokpakke",
+        "value": "616 kr",
+        "whatYouGet": "Velkomstpakke fra Leseløveklubben, inkludert tusjer"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Én. Deretter kan du si opp når du vil.",
+          "question": "Hvor mange bokpakker må jeg kjøpe?"
+        }
+      ],
+      "intro": "Start abonnement i Leseløveklubben og få en velkomstpakke med tusjer, verdt 616 kr. Du betaler 79 kr i porto.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "En stor velkomstpakke med bøker og tusjer for barn som øver på å lese.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Tegn abonnement og betal 79 kr i porto. Kjøp minst én bokpakke, så står du fritt til å si opp.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "leseloveklubben-velkomstpakke-til-616-kr-for-79-kr-i-porto",
+      "source": {
+        "_id": "d55e5357-6bad-407c-9361-00c7eaf957b7",
+        "active": false,
+        "link": {
+          "_type": "storyLink",
+          "provider": "Leseløveklubben",
+          "url": "https://tc.tradetracker.net/?c=37138&m=12&a=81337&r=web-43690&u=%2Fklubbmedlemskap%2Fregistration%2Fenter-code.action%3FpromotionCode%3DINTLLTT19016"
+        },
+        "publish_time": "2025-08-07T09:01:00.000Z",
+        "short_description": "Vil du støtte opp om barnas leseglede og -læring? I Leseløveklubben får du lærerike bokpakker som gir mange kosestunder fulle av lek og læring! Nye abonnenter får en stor velkomstpakke (inkl. tusjer) verdt kr 616 gratis - du betaler kun porto kr 79.",
+        "slug": "Gratis-ting-og-vareprover/Barn-og-baby/Fa-gratis-velkomstpakke-i-Leseloveklubben",
+        "title": "Få gratis velkomstpakke i Leseløveklubben",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Leseløveklubben: velkomstpakke til 616 kr for 79 kr i porto"
+    },
+    {
+      "_id": "brandOffer-gratis-60888",
+      "facts": {
+        "audience": "Nye medlemmer i Bestselgerklubben",
+        "cancellation": "ukjent",
+        "commitment": "Medlem i ett år. Du betaler porto for velkomstgaven. Ingen kjøpsforpliktelser.",
+        "value": "Opptil 2046 kroner",
+        "whatYouGet": "Stelton vannkoker og tre valgfrie bøker"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Porto for velkomstgaven. Selve medlemskapet koster ingenting.",
+          "question": "Hva må jeg betale?"
+        }
+      ],
+      "intro": "Bestselgerklubben gir deg en Stelton vannkoker og tre bøker du velger selv, verdt opptil 2046 kroner. Du betaler porto og er medlem i minst ett år.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "En Stelton vannkoker og tre valgfrie bøker. Samlet verdi opptil 2046 kroner.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Meld deg inn gratis og betal porto for pakken. Medlemsbladet kommer ca. 22 ganger i året, og hovedboken må avbestilles hvis du ikke vil ha den.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "stelton-vannkoker-og-3-boker-fra-bestselgerklubben",
+      "source": {
+        "_id": "eed6912d-b34f-4957-a785-640f5d40305d",
+        "active": true,
+        "link": {
+          "_type": "storyLink",
+          "provider": "Bestselgerklubben",
+          "url": "https://c.trackmytarget.com/?a=8kg0y8&i=07f215&ref1=web-60888"
+        },
+        "publish_time": "2026-04-22T06:15:00.000Z",
+        "short_description": "Blir du medlem i Bestselgerklubben (det koster ingenting!), får du en flott Stelton vannkoker og tre valgfrie bøker i velkomstgave! Total verdi opptil 2046 kroner.",
+        "slug": "Gratis-ting-og-velkomstgaver/Interior-og-kjokken/Fa-Stelton-vannkoker-og-tre-valgfrie-boker-i-velkomstgave",
+        "title": "Få Stelton vannkoker og tre valgfrie bøker i velkomstgave",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Stelton vannkoker og 3 bøker fra Bestselgerklubben"
+    },
+    {
+      "_id": "brandOffer-gratis-61261",
+      "facts": {
+        "audience": "Nye medlemmer i Bestselgerklubben",
+        "cancellation": "ukjent",
+        "commitment": "Medlemskap i ett år. Du betaler porto. Ingen kjøpsforpliktelser, men hovedboken må avbestilles om du ikke vil ha den.",
+        "value": "Opptil 2750 kr",
+        "whatYouGet": "Trådløse hodetelefoner fra Kreafunk og tre valgfrie bøker"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Nei, det er ingen kjøpsforpliktelser. Men hovedboken i hvert medlemsblad må avbestilles hvis du ikke vil ha den.",
+          "question": "Må jeg kjøpe bøker?"
+        },
+        {
+          "_key": "f1",
+          "_type": "brandFaqItem",
+          "answer": "I ett år.",
+          "question": "Hvor lenge må jeg være medlem?"
+        },
+        {
+          "_key": "f2",
+          "_type": "brandFaqItem",
+          "answer": "Du betaler porto.",
+          "question": "Koster velkomstgaven noe?"
+        }
+      ],
+      "intro": "Nye medlemmer i Bestselgerklubben får trådløse hodetelefoner fra Kreafunk og tre bøker, verdt opptil 2750 kr. Du betaler porto og er medlem i minst ett år.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "Trådløse hodetelefoner fra Kreafunk og tre bestselgerbøker du velger selv. Samlet verdi er opptil 2750 kr.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Meld deg inn og betal porto for gaven. Du må være medlem i ett år og får medlemsbladet ca. 22 ganger i året, og hovedboken må avbestilles hvis du ikke vil ha den.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "kreafunk-hodetelefoner-og-tre-boker-i-bestselgerklubben",
+      "source": {
+        "_id": "7f4e18fa-30ab-416e-8f2c-a60062f1dcec",
+        "active": true,
+        "link": {
+          "_type": "storyLink",
+          "provider": "Bestselgerklubben",
+          "url": "https://c.trackmytarget.com/?a=dmf2ez&i=07f215&ref1=REF"
+        },
+        "publish_time": "2025-12-26T15:13:46+00:00",
+        "short_description": "Har du lyst på et par stilige trådløse hodetelefoner fra Kreafunk? Nye medlemmer i Bestselgerklubben får nå dette og tre valgfrie bestselgerbøker i velkomstgave - til sammen verdt opptil hele 2750 kroner!",
+        "slug": "Gratis-ting-og-velkomstgaver/Diverse/Fa-et-par-lekre-tradlose-hodetelefoner-fra-Kreafunk",
+        "title": "Få et par lekre trådløse hodetelefoner fra Kreafunk",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Kreafunk-hodetelefoner og tre bøker i Bestselgerklubben"
+    },
+    {
+      "_id": "brandOffer-gratis-61362",
+      "facts": {
+        "audience": "Nye medlemmer i Bestselgerklubben",
+        "cancellation": "ukjent",
+        "commitment": "Medlemskap i Bestselgerklubben. Øvrige vilkår ukjent.",
+        "value": "Opptil 2106 kr",
+        "whatYouGet": "Hverdagssekk fra Vinga og tre bøker"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Opptil 2106 kr.",
+          "question": "Hva er velkomstpakken verdt?"
+        },
+        {
+          "_key": "f1",
+          "_type": "brandFaqItem",
+          "answer": "Ja, gaven gjelder når du melder deg inn i Bestselgerklubben.",
+          "question": "Må jeg bli medlem?"
+        }
+      ],
+      "intro": "Nye medlemmer i Bestselgerklubben får en hverdagssekk fra Vinga og tre bøker. Velkomstpakken er verdt opptil 2106 kr.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "En hverdagssekk fra Vinga og tre bøker i velkomstgave. Samlet verdi er opptil 2106 kr.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Meld deg inn i Bestselgerklubben via lenken. Sjekk medlemsvilkårene før du registrerer deg, siden de ikke står i tilbudet.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "vinga-sekk-og-tre-boker-nar-du-blir-medlem-i-bestselgerklubben",
+      "source": {
+        "_id": "content-1771971975310-lqkufz4",
+        "active": true,
+        "link": {
+          "provider": "Bestselgerklubben",
+          "url": "https://c.trackmytarget.com/?a=uyks8o&i=07f215&ref1=REF"
+        },
+        "publish_time": "2026-02-24T22:26:15.310Z",
+        "short_description": "Meld deg inn i Bestselgerklubben og få en stilig hverdagssekk fra Vinga og tre bøker gratis. Velkomstpakken har en totalverdi på opptil 2106 kroner.",
+        "slug": "Gratis-ting-og-velkomstgaver/Boker-og-lydboker/Fa-en-stilfull-hverdagssekk-fra-Vinga-og-tre-boker-gratis",
+        "title": "Få en stilfull hverdagssekk fra Vinga og tre bøker gratis",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Vinga-sekk og tre bøker når du blir medlem i Bestselgerklubben"
+    },
+    {
+      "_id": "brandOffer-gratis-61452",
+      "facts": {
+        "audience": "Nye medlemmer i Bestselgerklubben",
+        "cancellation": "ukjent",
+        "commitment": "Medlem i ett år. Du betaler porto for velkomstpakken. Ingen kjøpsforpliktelser.",
+        "value": "Opptil 2956 kroner",
+        "whatYouGet": "Kreafunk toCharge GO Powerbank med ørepropper og tre valgfrie bøker"
+      },
+      "faq": [
+        {
+          "_key": "f0",
+          "_type": "brandFaqItem",
+          "answer": "Nei, men du betaler porto og må avbestille hovedboken hvis du ikke vil ha den.",
+          "question": "Må jeg kjøpe noe?"
+        }
+      ],
+      "intro": "Bli medlem i Bestselgerklubben og få Kreafunk toCharge GO Powerbank med ørepropper og tre bøker, verdt opptil 2956 kroner. Du dekker porto og er medlem i ett år.",
+      "needsReview": false,
+      "sections": [
+        {
+          "_key": "s0",
+          "_type": "brandCopySection",
+          "body": "Kreafunk toCharge GO Powerbank med ørepropper og tre valgfrie bøker. Verdi opptil 2956 kroner.",
+          "heading": "Dette får du"
+        },
+        {
+          "_key": "s1",
+          "_type": "brandCopySection",
+          "body": "Meld deg inn og betal porto for pakken. Du får medlemsbladet 22 ganger i året og avbestiller hovedboken hvis du ikke vil ha den.",
+          "heading": "Slik gjør du"
+        }
+      ],
+      "slug": "kreafunk-powerbank-med-orepropper-og-3-boker-i-velkomstgave",
+      "source": {
+        "_id": "7d95cd0a-d6d3-4875-8e7a-8c212fea2695",
+        "active": true,
+        "link": {
+          "provider": "Bestselgerklubben",
+          "url": "https://c.trackmytarget.com/?a=43jqlw&i=07f215&ref1=web-61452"
+        },
+        "publish_time": "2026-04-14T08:15:00.000Z",
+        "short_description": "Om du slår til på dette velkomsttilbudet i Bestselgerklubben, vil du motta Kreafunk toCharge GO Powerbank m/ørepropper samt tre valgfrie bøker. Total verdi på velkomstpakken er opptil 2956 kr!",
+        "slug": "Gratis-ting-og-velkomstgaver/Diverse/Fa-praktisk-powerbank-med-orepropper-i-velkomstgave",
+        "title": "Få praktisk powerbank med ørepropper i velkomstgave",
+        "valid_until_time": null,
+        "visible": true
+      },
+      "title": "Kreafunk powerbank med ørepropper og 3 bøker i velkomstgave"
+    }
+  ]
+}
