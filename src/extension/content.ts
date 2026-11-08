@@ -12728,6 +12728,7 @@ function renderNotice(
     .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
     /* Only a title and the score: the score takes the badge column at the right edge. */
     .reviews-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .price-match-tooltip-row .reviews-row .review-score { grid-column: -2; }
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }
@@ -15337,7 +15338,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     if (seenTests.has(key)) return false;
     seenTests.add(key);
     return true;
-  });
+  }).sort((a, b) => (toHundredScale(b.critic.score, b.critic.maxScore) ?? 0) - (toHundredScale(a.critic.score, a.critic.maxScore) ?? 0));
   if (tests.length > 0) {
     const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
     const via = tests[0]!.offer;
@@ -15346,7 +15347,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
         title: "Tester av varen",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
         items: tests.map(({ critic }) => ({ name: critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
-          chips: [formatReviewScore(critic.score, critic.maxScore), ...(critic.title ? [critic.title] : [])], ...(critic.quote ? { quote: critic.quote } : {}) })),
+          chips: [formatReviewScore(critic.score, critic.maxScore), ...(critic.title ? [critic.title.replace(/^[<\s]+/, "")] : [])], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
   section.append(header, ...rows);

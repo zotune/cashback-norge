@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794161681
+// @version      1794161861
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -20823,6 +20823,7 @@ ${darkProviderCss}
     .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
     /* Only a title and the score: the score takes the badge column at the right edge. */
     .reviews-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .price-match-tooltip-row .reviews-row .review-score { grid-column: -2; }
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }
@@ -23201,7 +23202,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       if (seenTests.has(key)) return false;
       seenTests.add(key);
       return true;
-    });
+    }).sort((a, b) => (toHundredScale(b.critic.score, b.critic.maxScore) ?? 0) - (toHundredScale(a.critic.score, a.critic.maxScore) ?? 0));
     if (tests.length > 0) {
       const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
       const via = tests[0].offer;
@@ -23216,7 +23217,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           items: tests.map(({ critic }) => ({
             name: critic.site,
             score: toHundredScale(critic.score, critic.maxScore) ?? 0,
-            chips: [formatReviewScore(critic.score, critic.maxScore), ...critic.title ? [critic.title] : []],
+            chips: [formatReviewScore(critic.score, critic.maxScore), ...critic.title ? [critic.title.replace(/^[<\s]+/, "")] : []],
             ...critic.quote ? { quote: critic.quote } : {}
           }))
         }
