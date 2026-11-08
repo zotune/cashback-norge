@@ -35,6 +35,7 @@ import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
 import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-match.js";
 import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
+import { readJsonLdUserRating } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
   findVinmonopoletPriceMatch,
@@ -157,7 +158,28 @@ export async function findPriceMatches(
     return [];
   }
 
-  return sortPriceMatchOffers(allowedOffers);
+  return sortPriceMatchOffers(await withKlarnaUserRating(allowedOffers, requestText));
+}
+
+// Klarna's product page carries the buyers' rating in its Product JSON-LD; the offers API
+// does not. One bounded page read for the matched product, and a failure only drops the rating.
+const KLARNA_PRODUCT_PAGE = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\//;
+async function withKlarnaUserRating(offers: PriceMatchOffer[], requestText: TextRequest | undefined): Promise<PriceMatchOffer[]> {
+  return Promise.all(offers.map(async (offer) => {
+    if (offer.source !== "klarna" || !KLARNA_PRODUCT_PAGE.test(offer.productUrl)) return offer;
+    try {
+      const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
+      const user = html === undefined ? undefined : readJsonLdUserRating(html, "klarna", "Kjøpere hos Klarna", offer.productUrl);
+      return user === undefined ? offer : { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), user] } };
+    } catch {
+      return offer;
+    }
+  }));
+}
+
+async function fetchReviewPage(url: string, init?: { headers?: Record<string, string> }): Promise<string | undefined> {
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+  return response.ok ? response.text() : undefined;
 }
 
 // Taxfree/Vinmonopolet matcher allerede eksplisitt på volum (volumeMl), og

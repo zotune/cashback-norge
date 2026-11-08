@@ -1,0 +1,175 @@
+// Norwegian product reviews gathered alongside the price match:
+// - Professional tests: Godpris' product page lists them as `review-card` links (site, score,
+//   scale, title, short quote, link to the test). Only one of them is in its JSON-LD, so the
+//   HTML is read; tests from non-Norwegian publications are left out.
+// - Buyer ratings: the comparison site's own Product JSON-LD `aggregateRating` (Klarna).
+// Scores are kept with their own scale and only converted to 0–100 for the summary.
+import { decodeHtmlEntities, isRecord, parseUrl } from "./cashback.js";
+import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
+
+export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string };
+export type UserRating = { source: string; sourceName: string; score: number; maxScore: number; count: number; url: string };
+export type ProductReviews = { critics?: CriticReview[]; users?: UserRating[] };
+export type ProductReviewSummary = {
+  critics: CriticReview[];
+  users: UserRating[];
+  criticScore?: number;
+  userScore?: number;
+  userCount: number;
+};
+
+export const MIN_CRITIC_REVIEWS = 3;
+export const MIN_USER_RATINGS = 20;
+const MAX_CRITICS = 12;
+
+const finite = (value: unknown): number | undefined => {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim().replace(",", ".")) : NaN;
+  return Number.isFinite(number) ? number : undefined;
+};
+const text = (html: string | undefined): string | undefined => {
+  if (html === undefined) return undefined;
+  const value = decodeHtmlEntities(html.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+  return value.length > 0 ? value : undefined;
+};
+
+/** 0–100, or undefined for a score outside its own scale. */
+export function toHundredScale(score: number, maxScore: number): number | undefined {
+  if (!(maxScore > 0) || !(score >= 0) || score > maxScore) return undefined;
+  return (score / maxScore) * 100;
+}
+
+/** A Norwegian publication: a .no address or a Norwegian edition (…/no-no/, …/nb-no/). */
+export function isNorwegianReviewUrl(rawUrl: string): boolean {
+  const url = parseUrl(rawUrl);
+  if (url === undefined || url.protocol !== "https:") return false;
+  return /\.no$/i.test(url.hostname) || /^\/(?:no|nb|nn)(?:-no)?\//i.test(url.pathname);
+}
+
+const withoutTracking = (rawUrl: string): string => {
+  const url = new URL(rawUrl);
+  for (const key of [...url.searchParams.keys()]) if (/^utm_/i.test(key)) url.searchParams.delete(key);
+  return url.href;
+};
+
+export function readGodprisReviewCards(html: string): CriticReview[] {
+  const reviews: CriticReview[] = [];
+  for (const match of html.matchAll(/<a\b([^>]*\bclass="review-card"[^>]*)>([\s\S]*?)<\/a>/g)) {
+    const attributes = match[1]!;
+    const body = match[2]!;
+    const href = decodeHtmlEntities(attributes.match(/\bhref="([^"]+)"/)?.[1] ?? "");
+    const site = text(body.match(/class="review-card__site"[^>]*>([\s\S]*?)<\/span>/)?.[1]);
+    // Most cards print the score as text; some publications (Tek.no) use a badge image whose
+    // alt text carries it ("Karakter 9.5 av 10 hos Tek.no").
+    const badge = body.match(/\balt="Karakter ([\d.,]+) av ([\d.,]+)/i);
+    const score = finite(text(body.match(/class="review-card__score"[^>]*>([\s\S]*?)<\/span>/)?.[1]) ?? badge?.[1]);
+    const maxScore = finite(text(body.match(/class="review-card__max"[^>]*>([\s\S]*?)<\/span>/)?.[1])?.replace(/^av\s+/i, "") ?? badge?.[2]);
+    if (site === undefined || score === undefined || maxScore === undefined || toHundredScale(score, maxScore) === undefined) continue;
+    if (!isNorwegianReviewUrl(href)) continue;
+    const title = text(body.match(/class="review-card__title"[^>]*>([\s\S]*?)<\/h3>/)?.[1]);
+    const quote = text(body.match(/class="review-card__quote"[^>]*>([\s\S]*?)<\/p>/)?.[1])?.replace(/^«|»$/g, "").trim();
+    reviews.push({ site, score, maxScore, url: withoutTracking(href), ...(title ? { title } : {}), ...(quote ? { quote } : {}) });
+  }
+  return reviews;
+}
+
+/** Buyer rating from the page's named Product JSON-LD. */
+export function readJsonLdUserRating(html: string, source: string, sourceName: string, pageUrl: string): UserRating | undefined {
+  const product = selectProductLdJson(readLdJsonScripts(html));
+  const rating = product !== undefined && isRecord(product.aggregateRating) ? product.aggregateRating : undefined;
+  if (rating === undefined) return undefined;
+  const score = finite(rating.ratingValue);
+  const maxScore = finite(rating.bestRating) ?? 5;
+  const count = finite(rating.ratingCount) ?? finite(rating.reviewCount);
+  if (score === undefined || count === undefined || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === undefined) return undefined;
+  return { source, sourceName, score, maxScore, count, url: pageUrl };
+}
+
+/** Combines every source's reviews: one entry per test, buyer ratings weighted by count. */
+export function summarizeProductReviews(all: Array<ProductReviews | undefined>): ProductReviewSummary | undefined {
+  const critics = new Map<string, CriticReview>();
+  const users = new Map<string, UserRating>();
+  for (const reviews of all) {
+    for (const critic of reviews?.critics ?? []) {
+      const key = parseUrl(critic.url)?.href ?? `${critic.site}|${critic.score}`;
+      if (!critics.has(key)) critics.set(key, critic);
+    }
+    for (const user of reviews?.users ?? []) if (!users.has(user.source)) users.set(user.source, user);
+  }
+  if (critics.size === 0 && users.size === 0) return undefined;
+  const criticList = [...critics.values()]
+    .sort((a, b) => toHundredScale(b.score, b.maxScore)! - toHundredScale(a.score, a.maxScore)!)
+    .slice(0, MAX_CRITICS);
+  const userList = [...users.values()].sort((a, b) => b.count - a.count);
+  const userCount = userList.reduce((sum, user) => sum + user.count, 0);
+  const criticScore = criticList.length >= MIN_CRITIC_REVIEWS
+    ? Math.round(criticList.reduce((sum, critic) => sum + toHundredScale(critic.score, critic.maxScore)!, 0) / criticList.length)
+    : undefined;
+  const userScore = userCount >= MIN_USER_RATINGS
+    ? Math.round(userList.reduce((sum, user) => sum + toHundredScale(user.score, user.maxScore)! * user.count, 0) / userCount)
+    : undefined;
+  return { critics: criticList, users: userList, userCount, ...(criticScore !== undefined ? { criticScore } : {}), ...(userScore !== undefined ? { userScore } : {}) };
+}
+
+export function getReviewScoreLevel(score: number): "high" | "good" | "mixed" | "low" {
+  return score >= 85 ? "high" : score >= 75 ? "good" : score >= 60 ? "mixed" : "low";
+}
+
+const formatScore = (score: number) => String(Number(score.toFixed(2))).replace(".", ",");
+
+/**
+ * Text for the reader's own AI assistant: the sources, and instructions for a summary page.
+ * Nothing is sent anywhere by us; the reader pastes it into Claude, ChatGPT or similar.
+ */
+export function buildReviewAiPrompt(input: { productName: string; price?: string; shopName?: string; pageUrl?: string; summary: ProductReviewSummary; date: string }): string {
+  const { summary } = input;
+  const critics = summary.critics.map((critic) =>
+    `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
+  const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} vurderinger. ${user.url}`);
+  return [
+    "Du er en nøytral norsk produktrådgiver. Lag en oversiktlig oppsummering av hva norske testere og kjøpere mener om produktet under.",
+    "",
+    "Slik vil jeg ha svaret:",
+    "- Lag det som en pen, selvstendig HTML-side (i Claude som en Artifact, i ChatGPT som Canvas). Bruk lyst og mørkt tema, tydelige overskrifter, poengsummene som merker øverst, og kort tekst som fungerer på mobil.",
+    "- Bruk bare kildene i listen. Åpne lenkene og les testene og kjøperanmeldelsene hvis du kan. Bare norske kilder.",
+    "- Oppgi kilden ved hver påstand, med lenke. Si tydelig fra når noe bare nevnes av én kilde eller når du ikke fikk lest en kilde.",
+    "- Ikke finn på egenskaper, priser eller problemer som ikke står i kildene.",
+    "",
+    "Seksjoner på siden:",
+    "1. Kort konklusjon (2–3 setninger)",
+    "2. Det testere og kjøpere liker best",
+    "3. Vanlige problemer og klager (holdbarhet, programvare, batteri, passform, støy, kundeservice osv.)",
+    "4. Hvem produktet passer for, og hvem som bør velge noe annet",
+    "5. Der testere og kjøpere er uenige",
+    "6. Hva jeg bør sjekke før jeg kjøper",
+    "7. Kildeliste med lenker",
+    "",
+    "PRODUKT",
+    input.productName,
+    ...(input.price ? [`Pris: ${input.price}${input.shopName ? ` hos ${input.shopName}` : ""} (${input.date})`] : []),
+    ...(input.pageUrl ? [`Siden jeg ser på: ${input.pageUrl}`] : []),
+    "",
+    `PROFESJONELLE TESTER${summary.criticScore !== undefined ? ` – snitt ${summary.criticScore}/100` : ""} (${summary.critics.length})`,
+    ...(critics.length ? critics : ["- Ingen norske tester funnet."]),
+    "",
+    `KJØPERE${summary.userScore !== undefined ? ` – snitt ${summary.userScore}/100` : ""} (${summary.userCount} vurderinger)`,
+    ...(users.length ? users : ["- Ingen kjøpervurderinger funnet."]),
+    "",
+    "Hentet av Cashback Norge. Poengsummene er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger.",
+  ].join("\n");
+}
+
+const isHttpsUrl = (value: unknown): value is string => typeof value === "string" && value.length <= 2048 && parseUrl(value)?.protocol === "https:";
+const isScore = (score: unknown, maxScore: unknown) => typeof score === "number" && typeof maxScore === "number" && toHundredScale(score, maxScore) !== undefined;
+
+/** Runtime check for reviews arriving in extension messages. */
+export function isProductReviews(value: unknown): value is ProductReviews {
+  if (!isRecord(value)) return false;
+  const critics = value.critics;
+  const users = value.users;
+  return (critics === undefined || (Array.isArray(critics) && critics.length <= 50 && critics.every((critic) =>
+    isRecord(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) &&
+    (critic.title === undefined || typeof critic.title === "string") && (critic.quote === undefined || typeof critic.quote === "string")))) &&
+    (users === undefined || (Array.isArray(users) && users.length <= 10 && users.every((user) =>
+      isRecord(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) &&
+      typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url))));
+}

@@ -1,3 +1,4 @@
+import type { ProductReviews } from "./product-reviews.js";
 import {
   type CashbackOffer,
   type ProviderMeta,
@@ -103,6 +104,8 @@ export type PriceMatchOffer = {
   // Bilde av tilbudet (f.eks. utklipp fra kundeavisen), bare https.
   imageUrl?: string;
   alternatives?: PriceMatchAlternative[];
+  // Norske tester og kjøpervurderinger fra kilden (src/shared/product-reviews.ts).
+  reviews?: ProductReviews;
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
 };

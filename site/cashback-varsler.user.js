@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794102350
+// @version      1794159159
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -162,7 +162,7 @@
     if (!categories.length) return void 0;
     return {
       title: `${match[1]} ${match[2]}`,
-      items: categories.map((text) => ({ kind: "chip", text }))
+      items: categories.map((text2) => ({ kind: "chip", text: text2 }))
     };
   }
   function parseTooltipSections(parts) {
@@ -199,15 +199,15 @@
       const hasHeading = markdownHeading || lines.length > 1 && (/^(medlemsfordel|medlemstilbud)$/i.test(first) || / tilbud$/i.test(first) || lines.slice(1).some((line) => marker.test(line)));
       const title = hasHeading ? clean(first).replace(/^#{1,3}\s+|^\*\*|\*\*$/g, "") : void 0;
       const items = (hasHeading ? lines.slice(1) : lines).map((line) => {
-        const text = clean(line);
-        const short = text.length <= 72 && text.split(/\s+/).length <= 12 && !/https?:\/\/|^⚠/.test(text);
-        return { kind: short ? "chip" : "text", text };
+        const text2 = clean(line);
+        const short = text2.length <= 72 && text2.split(/\s+/).length <= 12 && !/https?:\/\/|^⚠/.test(text2);
+        return { kind: short ? "chip" : "text", text: text2 };
       });
       return [{ ...title ? { title } : {}, items }];
     });
   }
   const escapes = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-  const escape = (text) => text.replace(/[&<>"']/g, (char) => escapes[char]);
+  const escape = (text2) => text2.replace(/[&<>"']/g, (char) => escapes[char]);
   function formatTooltipHtml(parts) {
     return parseTooltipSections(parts).map((section) => `<span class="offer-tooltip-section cbn-tooltip-content">${section.title ? `<strong class="offer-tooltip-title">${escape(section.title)}</strong>` : ""}<span class="tooltip-content-items">${section.items.map((item) => `<span class="${item.kind === "chip" ? "cbn-chip cbn-chip--muted tooltip-content-chip" : "tooltip-content-note"}">${escape(item.text)}</span>`).join("")}</span></span>`).join("");
   }
@@ -971,7 +971,7 @@
     return typeof value === "string";
   }
   function isMobilePriceDetails(value) {
-    return isRecord$7(value) && ["mobile", "unlimited", "broadband"].includes(String(value.category)) && finite(value.requestedGb) && value.requestedGb >= 0 && finite(value.includedGb) && value.includedGb >= 0 && typeof value.network === "string" && value.network.length <= 80 && typeof value.unlimitedData === "boolean" && TEK_MOBILE_NETWORKS.some((network) => network.id === value.networkId) && (value.meteredData === void 0 || typeof value.meteredData === "boolean") && (value.speedMbps === void 0 || finite(value.speedMbps) && value.speedMbps > 0) && (value.afterQuotaMbps === void 0 || finite(value.afterQuotaMbps) && value.afterQuotaMbps > 0) && (value.terms === void 0 || typeof value.terms === "string" && value.terms.length <= 1e4);
+    return isRecord$7(value) && ["mobile", "unlimited", "broadband"].includes(String(value.category)) && finite$1(value.requestedGb) && value.requestedGb >= 0 && finite$1(value.includedGb) && value.includedGb >= 0 && typeof value.network === "string" && value.network.length <= 80 && typeof value.unlimitedData === "boolean" && TEK_MOBILE_NETWORKS.some((network) => network.id === value.networkId) && (value.meteredData === void 0 || typeof value.meteredData === "boolean") && (value.speedMbps === void 0 || finite$1(value.speedMbps) && value.speedMbps > 0) && (value.afterQuotaMbps === void 0 || finite$1(value.afterQuotaMbps) && value.afterQuotaMbps > 0) && (value.terms === void 0 || typeof value.terms === "string" && value.terms.length <= 1e4);
   }
   async function findMobilePriceMatches(message, requestJson = requestTekJson) {
     if (message.mobile !== true || getMobileSupplier(message.url) === void 0) return [];
@@ -983,9 +983,9 @@
         try {
           lists.set(gb, readTekPage(await requestJson(tekPlansUrl(gb), { credentials: "omit" })).rows);
         } catch (error) {
-          const text = error instanceof Error ? error.message : "nettverksfeil";
-          errors.push(`${gb} GB: ${text}`);
-          if (/HTTP (?:403|429)/.test(text)) blocked = true;
+          const text2 = error instanceof Error ? error.message : "nettverksfeil";
+          errors.push(`${gb} GB: ${text2}`);
+          if (/HTTP (?:403|429)/.test(text2)) blocked = true;
         }
       }));
     }
@@ -1003,14 +1003,14 @@
           }
           eligible.push(...selectPlans(page.rows, gb, category));
         } catch (error) {
-          const text = error instanceof Error ? error.message : "nettverksfeil";
-          warnings.push(`${network.name}: ${text}`);
-          if (/HTTP (?:403|429)/.test(text)) blocked = true;
+          const text2 = error instanceof Error ? error.message : "nettverksfeil";
+          warnings.push(`${network.name}: ${text2}`);
+          if (/HTTP (?:403|429)/.test(text2)) blocked = true;
         }
       }));
       const plans = selectMobileComparisonPlans(eligible);
       for (const network of TEK_MOBILE_NETWORKS) {
-        if (!plans.some((plan) => plan.mobile.networkId === network.id) && !warnings.some((text) => text.startsWith(`${network.name}:`))) {
+        if (!plans.some((plan) => plan.mobile.networkId === network.id) && !warnings.some((text2) => text2.startsWith(`${network.name}:`))) {
           warnings.push(`${network.name}: ${blocked ? "oppslag stoppet etter blokkering/ratebegrensning" : "ingen sammenlignbare treff"}`);
         }
       }
@@ -1028,9 +1028,9 @@
           const best = selectPlans(page.rows, choice.mobile.requestedGb, "broadband")[0];
           if (best) choice.broadband = best;
         } catch (error) {
-          const text = error instanceof Error ? error.message : "nettverksfeil";
-          choice.warnings.push(`Mobilt bredbånd: ${text}`);
-          if (/HTTP (?:403|429)/.test(text)) blocked = true;
+          const text2 = error instanceof Error ? error.message : "nettverksfeil";
+          choice.warnings.push(`Mobilt bredbånd: ${text2}`);
+          if (/HTTP (?:403|429)/.test(text2)) blocked = true;
         }
       }));
     }
@@ -1072,7 +1072,7 @@
   function selectPlans(rows, gb, category) {
     const plans = rows.flatMap((row) => {
       const networkId = isRecord$7(row.operator) && isRecord$7(row.operator.network) ? row.operator.network.id : void 0;
-      if (row.type !== (category === "broadband" ? "mobile-broadband-plan" : "mobile-plan") || typeof row.name !== "string" || !isRecord$7(row.operator) || typeof row.operator.name !== "string" || !isRecord$7(row.operator.network) || typeof row.operator.network.name !== "string" || !TEK_MOBILE_NETWORKS.some((network) => network.id === networkId) || !Array.isArray(row.features) || !row.features.every(isRecord$7) || row.features.some((feature) => ["for-unge", "kontantkort", "familie"].includes(String(feature.slug))) || !isRecord$7(row.pricingModel) || !["regular", "incremental_data", "data_only"].includes(String(row.pricingModel.type)) || !isRecord$7(row.pricingModel.attributes) || !isRecord$7(row.estimatedInvoice) || row.estimatedInvoice.meetsUsageRequirements !== true || !finite(row.estimatedInvoice.total) || row.estimatedInvoice.total <= 0) return [];
+      if (row.type !== (category === "broadband" ? "mobile-broadband-plan" : "mobile-plan") || typeof row.name !== "string" || !isRecord$7(row.operator) || typeof row.operator.name !== "string" || !isRecord$7(row.operator.network) || typeof row.operator.network.name !== "string" || !TEK_MOBILE_NETWORKS.some((network) => network.id === networkId) || !Array.isArray(row.features) || !row.features.every(isRecord$7) || row.features.some((feature) => ["for-unge", "kontantkort", "familie"].includes(String(feature.slug))) || !isRecord$7(row.pricingModel) || !["regular", "incremental_data", "data_only"].includes(String(row.pricingModel.type)) || !isRecord$7(row.pricingModel.attributes) || !isRecord$7(row.estimatedInvoice) || row.estimatedInvoice.meetsUsageRequirements !== true || !finite$1(row.estimatedInvoice.total) || row.estimatedInvoice.total <= 0) return [];
       const a = row.pricingModel.attributes;
       if (typeof row.comment === "string" && /\b(?:MB|GB)\s+(?:data\s+)?(?:hver|per)\s+dag\b/i.test(stripHtml$2(row.comment))) return [];
       const meteredData = row.pricingModel.type === "incremental_data" && Array.isArray(a.dataSteps) && isRecord$7(a.dataSteps[0]) && (numericField(a.dataSteps[0].length) ?? 0) > 0 && (readNumberValue(a.dataSteps[0].per_megabyte) ?? 0) > 0;
@@ -1100,9 +1100,9 @@
     return plans.sort((a, b) => a.amount - b.amount || a.productName.localeCompare(b.productName, "nb"));
   }
   function numericField(value) {
-    return typeof value === "number" ? finite(value) ? value : void 0 : typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value) ? readNumberValue(value) : void 0;
+    return typeof value === "number" ? finite$1(value) ? value : void 0 : typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value) ? readNumberValue(value) : void 0;
   }
-  function finite(value) {
+  function finite$1(value) {
     return typeof value === "number" && Number.isFinite(value);
   }
   function getProviderPageUrl(provider) {
@@ -2247,8 +2247,8 @@
     try {
       const response = await fetch(url, init);
       if (!response.ok) return void 0;
-      const text = await response.text();
-      return text.length > 0 ? JSON.parse(text) : void 0;
+      const text2 = await response.text();
+      return text2.length > 0 ? JSON.parse(text2) : void 0;
     } catch {
       return void 0;
     }
@@ -2673,7 +2673,7 @@
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-07T19:18:20.884Z";
+  const generatedAt = "2026-11-08T13:54:45.652Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -3217,10 +3217,10 @@
       return void 0;
     }
   }
-  function readTcgProductKind(text) {
-    const normalized = normalizeTcgProductTitle(text.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
+  function readTcgProductKind(text2) {
+    const normalized = normalizeTcgProductTitle(text2.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
     if (/\b(?:case|kartong)\b/.test(normalized)) return "case";
-    if (/\bpokemon center\b/.test(normalizeTcgText(text)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
+    if (/\bpokemon center\b/.test(normalizeTcgText(text2)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
     if (/\b(?:elite trainer box|etb)\b/.test(normalized)) return "etb";
     if (/\bbooster (?:box|display)\b/.test(normalized)) return "booster-box";
     if (/\bblister\b/.test(normalized)) return "blister";
@@ -3240,12 +3240,12 @@
     if (/\bcollection\b/.test(normalized)) return "collection";
     return void 0;
   }
-  function readTcgLanguage(text) {
-    const languages = readTcgLanguages(text);
+  function readTcgLanguage(text2) {
+    const languages = readTcgLanguages(text2);
     return languages.length === 1 ? languages[0] : void 0;
   }
-  function readTcgLanguages(text) {
-    const normalized = normalizeTcgText(text);
+  function readTcgLanguages(text2) {
+    const normalized = normalizeTcgText(text2);
     const languages = [];
     for (const [code, label, pattern] of [
       ["en", "Engelsk", /\b(?:engelsk|english|en)\b/],
@@ -3270,34 +3270,34 @@
     if (languages.length > 1) return "ambiguous-language";
     if (languages[0] !== void 0 && languages[0].code !== language) return "language-mismatch";
     if (offerName.split("+").filter((part) => readTcgProductKind(part) !== void 0).length > 1) return "combined-products";
-    const unitCount = (text) => {
-      const title = normalizeTcgProductTitle(text);
+    const unitCount = (text2) => {
+      const title = normalizeTcgProductTitle(text2);
       return Number(title.match(/\b(\d+)\s*x\b/)?.[1] ?? title.match(/^(\d+)\s+(?:elite trainer box|booster box|mini tins?|tins?)\b/)?.[1] ?? "1");
     };
     if (["etb", "pokemon-center-etb", "booster-box", "mini-tin", "tin"].includes(offerKind) && unitCount(productName) !== unitCount(offerName)) return "quantity-mismatch";
-    const packCount = (text) => normalizeTcgText(text).match(/\b(\d+)\s*(?:booster packs?|boosters?|packs?|pakker)\b/)?.[1];
+    const packCount = (text2) => normalizeTcgText(text2).match(/\b(\d+)\s*(?:booster packs?|boosters?|packs?|pakker)\b/)?.[1];
     const expectedPacks = packCount(productName) ?? (expectedKind === "booster-pack" ? "1" : void 0);
     const offeredPacks = packCount(offerName);
     if (expectedPacks !== void 0 && offeredPacks !== void 0 && Number(expectedPacks) !== Number(offeredPacks)) return "quantity-mismatch";
     return void 0;
   }
-  function normalizeTcgText(text) {
-    return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  function normalizeTcgText(text2) {
+    return text2.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
-  function normalizeTcgProductTitle(text) {
-    return normalizeTcgText(text).replace(/\bpokemon(?:\s+tcg)?\b|\btrading card game\b/g, " ").replace(/\b(?:engelsk|english|en|japansk|japanese|jpn|jp|ja|koreansk|korean|kor|ko|kinesisk|chinese|zh|cn|spansk|spanish|espanol|es|tysk|german|deutsch|de|fransk|french|francais|fr|italiensk|italian|italiano|it)\b/g, " ").replace(/\bbooster\s*(?:box|boks)\s+display\b|\bbooster\s+display\s+(?:box|boks)\b|\bbooster\s*(?:box|boks|display)\b/g, "booster box").replace(/\bbooster\s*(?:pack|pakke)\b/g, "booster pack").replace(/\bbooster bundle\b/g, "bundle").replace(/\betb\b/g, "elite trainer box").replace(/\belite trainer boks\b/g, "elite trainer box").replace(/\bpremium samleboks\b/g, "premium collection").replace(/\bex (?:box|boks|samleboks)\b/g, "ex collection box").replace(/\bsamlekortspill\b|\bkortspill fra outland\b/g, " ").replace(/\bcelebration collection 30th(?: anniversary)?\b/g, "30th celebration").replace(/\b30th anniversary first partner illustration\b/g, "first partner illustration").replace(/\bserie\b/g, "series").replace(/\bbinder collection\b/g, "binder").replace(/\bcollection box surprise box\b/g, "surprise box").replace(/\s+/g, " ").trim();
+  function normalizeTcgProductTitle(text2) {
+    return normalizeTcgText(text2).replace(/\bpokemon(?:\s+tcg)?\b|\btrading card game\b/g, " ").replace(/\b(?:engelsk|english|en|japansk|japanese|jpn|jp|ja|koreansk|korean|kor|ko|kinesisk|chinese|zh|cn|spansk|spanish|espanol|es|tysk|german|deutsch|de|fransk|french|francais|fr|italiensk|italian|italiano|it)\b/g, " ").replace(/\bbooster\s*(?:box|boks)\s+display\b|\bbooster\s+display\s+(?:box|boks)\b|\bbooster\s*(?:box|boks|display)\b/g, "booster box").replace(/\bbooster\s*(?:pack|pakke)\b/g, "booster pack").replace(/\bbooster bundle\b/g, "bundle").replace(/\betb\b/g, "elite trainer box").replace(/\belite trainer boks\b/g, "elite trainer box").replace(/\bpremium samleboks\b/g, "premium collection").replace(/\bex (?:box|boks|samleboks)\b/g, "ex collection box").replace(/\bsamlekortspill\b|\bkortspill fra outland\b/g, " ").replace(/\bcelebration collection 30th(?: anniversary)?\b/g, "30th celebration").replace(/\b30th anniversary first partner illustration\b/g, "first partner illustration").replace(/\bserie\b/g, "series").replace(/\bbinder collection\b/g, "binder").replace(/\bcollection box surprise box\b/g, "surprise box").replace(/\s+/g, " ").trim();
   }
   function isSameTcgProductTitle(first, second) {
     if (hasTcgProductVariantConflict(first, second)) return false;
-    const canonical = (text) => normalizeTcgProductTitle(text).replace(/\b(?:scarlet violet|sword shield)\s+/g, "").replace(/^mega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/, "");
+    const canonical = (text2) => normalizeTcgProductTitle(text2).replace(/\b(?:scarlet violet|sword shield)\s+/g, "").replace(/^mega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/, "");
     return canonical(first) === canonical(second);
   }
   function hasTcgSetNameConflict(first, second) {
-    const signature = (text) => [...readTcgSetWords(text)].sort().join(" ");
+    const signature = (text2) => [...readTcgSetWords(text2)].sort().join(" ");
     return signature(first) !== signature(second);
   }
-  function readTcgSetWords(text) {
-    return new Set(normalizeTcgProductTitle(text).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean));
+  function readTcgSetWords(text2) {
+    return new Set(normalizeTcgProductTitle(text2).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean));
   }
   function hasTcgProductVariantConflict(first, second) {
     if (!/pok[eé]mon|\btcg\b/i.test(`${first} ${second}`)) return false;
@@ -3334,10 +3334,10 @@
     "sesum.no",
     "enhver.no"
   ];
-  function readPackageQuantityFromText(text) {
-    if (text === void 0) return void 0;
+  function readPackageQuantityFromText(text2) {
+    if (text2 === void 0) return void 0;
     const quantities = [];
-    for (const match of text.matchAll(PACKAGE_QUANTITY_PATTERN)) {
+    for (const match of text2.matchAll(PACKAGE_QUANTITY_PATTERN)) {
       const amount = parseLocalizedNumber$2(match[1] ?? "");
       const unit = normalizePackageUnit(match[2] ?? "");
       if (unit === void 0 || !Number.isFinite(amount) || amount <= 0) continue;
@@ -3469,11 +3469,11 @@
   function normalizeGroceryBrandText(value) {
     return transliterateNorwegianCharacters$4(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
   }
-  function hasGroceryBrandSignal(message, text) {
+  function hasGroceryBrandSignal(message, text2) {
     if (message.productBrand === void 0) return true;
     const brand = normalizeGroceryBrandText(message.productBrand);
     if (brand.length < 3) return true;
-    return normalizeGroceryBrandText(text).includes(brand);
+    return normalizeGroceryBrandText(text2).includes(brand);
   }
   const MIN_PRODUCT_MATCH_SCORE = 0.45;
   function isSameProductUrl(first, second) {
@@ -3557,9 +3557,9 @@
     if (anchorPercentages.size === 0 || candidatePercentages.size === 0) return false;
     return ![...anchorPercentages].some((value) => candidatePercentages.has(value));
   }
-  function readPercentages(text) {
+  function readPercentages(text2) {
     const values = /* @__PURE__ */ new Set();
-    for (const match of text.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|prosent\b)/gi)) {
+    for (const match of text2.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|prosent\b)/gi)) {
       const value = Number(match[1].replace(",", "."));
       if (Number.isFinite(value)) values.add(value);
     }
@@ -3626,8 +3626,8 @@
       return !first.numbers.has(base) && second.numbers.has(base) && !second.unitSuffixed.has(token);
     });
   }
-  function readNumericModelTokens(text) {
-    const normalized = text.toLowerCase().replace(/\d+[.,]\d+/g, " ").replace(/\b\d+\s*x\s*\d+/g, " ").replace(/\d+\s*%/g, " ");
+  function readNumericModelTokens(text2) {
+    const normalized = text2.toLowerCase().replace(/\d+[.,]\d+/g, " ").replace(/\b\d+\s*x\s*\d+/g, " ").replace(/\d+\s*%/g, " ");
     const tokens = normalized.split(/[^a-z0-9æøå]+/).filter((token) => token.length > 0);
     const numbers = /* @__PURE__ */ new Set();
     const unitSuffixed = /* @__PURE__ */ new Map();
@@ -3694,9 +3694,9 @@
     if (candidateColors.size === 0) return false;
     return ![...anchorColors].some((color) => candidateColors.has(color));
   }
-  function readColorVariantTokens(text) {
+  function readColorVariantTokens(text2) {
     const colors = /* @__PURE__ */ new Set();
-    for (const token of tokenizeBrandText(text)) {
+    for (const token of tokenizeBrandText(text2)) {
       const color = COLOR_VARIANT_TOKEN_GROUPS.get(token);
       if (color !== void 0) colors.add(color);
     }
@@ -3708,8 +3708,8 @@
     const candidateTiers = readModelTierTokens(candidateTitle);
     return anchorTiers.size !== candidateTiers.size || ![...anchorTiers].every((tier) => candidateTiers.has(tier));
   }
-  function readModelTierTokens(text) {
-    return new Set(tokenizeBrandText(text).filter((token) => MODEL_TIER_TOKENS.has(token)));
+  function readModelTierTokens(text2) {
+    return new Set(tokenizeBrandText(text2).filter((token) => MODEL_TIER_TOKENS.has(token)));
   }
   function hasModelNumberConflict(anchorText, candidateTitle) {
     const anchorModels = readModelNumberTokens(anchorText);
@@ -3740,9 +3740,9 @@
     return /^[a-z]/.test(token) && isStrongModelNumberToken(token);
   }
   const GENERIC_SPEC_TOKENS = /* @__PURE__ */ new Set(["wifi5", "wifi6", "wifi7", "usb2", "usb3", "usb4", "hdmi2", "bt50"]);
-  function readModelNumberTokens(text) {
-    const bareTokens = text.split(/[^A-Za-z0-9]+/).map((token) => token.toLowerCase()).filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token));
-    const joinedTokens = [...text.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)].filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase())).map((match) => `${match[1]}${match[2]}`.toLowerCase()).filter((token) => !isUnitLikeToken(token));
+  function readModelNumberTokens(text2) {
+    const bareTokens = text2.split(/[^A-Za-z0-9]+/).map((token) => token.toLowerCase()).filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token));
+    const joinedTokens = [...text2.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)].filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase())).map((match) => `${match[1]}${match[2]}`.toLowerCase()).filter((token) => !isUnitLikeToken(token));
     return uniqueStrings$9([...bareTokens, ...joinedTokens]);
   }
   function isUnitLikeToken(token) {
@@ -3761,9 +3761,9 @@
     if (candidateSizes.length === 0) return false;
     return !anchorSizes.some((size) => candidateSizes.includes(size));
   }
-  function readStorageSizesGb(text) {
+  function readStorageSizesGb(text2) {
     const sizes = /* @__PURE__ */ new Set();
-    for (const match of text.matchAll(STORAGE_SIZE_PATTERN)) {
+    for (const match of text2.matchAll(STORAGE_SIZE_PATTERN)) {
       const amount = Number.parseFloat((match[1] ?? "").replace(",", "."));
       if (!Number.isFinite(amount) || amount <= 0) continue;
       sizes.add((match[2] ?? "").toLowerCase() === "tb" ? amount * 1024 : amount);
@@ -3813,8 +3813,8 @@
       maximumFractionDigits: 2
     }).format(amount);
   }
-  function parseLdJson(text) {
-    return decodeLdJsonStrings(JSON.parse(text));
+  function parseLdJson(text2) {
+    return decodeLdJsonStrings(JSON.parse(text2));
   }
   function readLdJsonScripts(html) {
     const entries = [];
@@ -3851,10 +3851,10 @@
     for (let index = 0; index < data.length; ) {
       const separator = data.indexOf(":", index);
       if (separator < 0) break;
-      const text = /^T([0-9a-f]+),/.exec(data.slice(separator + 1, separator + 12));
-      if (text !== null) {
-        let end2 = separator + 1 + text[0].length;
-        for (let bytes = 0, length = parseInt(text[1], 16); end2 < data.length && bytes < length; ) {
+      const text2 = /^T([0-9a-f]+),/.exec(data.slice(separator + 1, separator + 12));
+      if (text2 !== null) {
+        let end2 = separator + 1 + text2[0].length;
+        for (let bytes = 0, length = parseInt(text2[1], 16); end2 < data.length && bytes < length; ) {
           const code = data.codePointAt(end2);
           bytes += code < 128 ? 1 : code < 2048 ? 2 : code < 65536 ? 3 : 4;
           end2 += code > 65535 ? 2 : 1;
@@ -3993,6 +3993,126 @@
       details
     };
   }
+  const MIN_CRITIC_REVIEWS = 3;
+  const MIN_USER_RATINGS = 20;
+  const MAX_CRITICS = 12;
+  const finite = (value) => {
+    const number = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim().replace(",", ".")) : NaN;
+    return Number.isFinite(number) ? number : void 0;
+  };
+  const text = (html) => {
+    if (html === void 0) return void 0;
+    const value = decodeHtmlEntities(html.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+    return value.length > 0 ? value : void 0;
+  };
+  function toHundredScale(score, maxScore) {
+    if (!(maxScore > 0) || !(score >= 0) || score > maxScore) return void 0;
+    return score / maxScore * 100;
+  }
+  function isNorwegianReviewUrl(rawUrl) {
+    const url = parseUrl$1(rawUrl);
+    if (url === void 0 || url.protocol !== "https:") return false;
+    return /\.no$/i.test(url.hostname) || /^\/(?:no|nb|nn)(?:-no)?\//i.test(url.pathname);
+  }
+  const withoutTracking = (rawUrl) => {
+    const url = new URL(rawUrl);
+    for (const key of [...url.searchParams.keys()]) if (/^utm_/i.test(key)) url.searchParams.delete(key);
+    return url.href;
+  };
+  function readGodprisReviewCards(html) {
+    const reviews = [];
+    for (const match of html.matchAll(/<a\b([^>]*\bclass="review-card"[^>]*)>([\s\S]*?)<\/a>/g)) {
+      const attributes = match[1];
+      const body = match[2];
+      const href = decodeHtmlEntities(attributes.match(/\bhref="([^"]+)"/)?.[1] ?? "");
+      const site = text(body.match(/class="review-card__site"[^>]*>([\s\S]*?)<\/span>/)?.[1]);
+      const badge = body.match(/\balt="Karakter ([\d.,]+) av ([\d.,]+)/i);
+      const score = finite(text(body.match(/class="review-card__score"[^>]*>([\s\S]*?)<\/span>/)?.[1]) ?? badge?.[1]);
+      const maxScore = finite(text(body.match(/class="review-card__max"[^>]*>([\s\S]*?)<\/span>/)?.[1])?.replace(/^av\s+/i, "") ?? badge?.[2]);
+      if (site === void 0 || score === void 0 || maxScore === void 0 || toHundredScale(score, maxScore) === void 0) continue;
+      if (!isNorwegianReviewUrl(href)) continue;
+      const title = text(body.match(/class="review-card__title"[^>]*>([\s\S]*?)<\/h3>/)?.[1]);
+      const quote = text(body.match(/class="review-card__quote"[^>]*>([\s\S]*?)<\/p>/)?.[1])?.replace(/^«|»$/g, "").trim();
+      reviews.push({ site, score, maxScore, url: withoutTracking(href), ...title ? { title } : {}, ...quote ? { quote } : {} });
+    }
+    return reviews;
+  }
+  function readJsonLdUserRating(html, source2, sourceName, pageUrl) {
+    const product = selectProductLdJson(readLdJsonScripts(html));
+    const rating = product !== void 0 && isRecord$7(product.aggregateRating) ? product.aggregateRating : void 0;
+    if (rating === void 0) return void 0;
+    const score = finite(rating.ratingValue);
+    const maxScore = finite(rating.bestRating) ?? 5;
+    const count = finite(rating.ratingCount) ?? finite(rating.reviewCount);
+    if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
+    return { source: source2, sourceName, score, maxScore, count, url: pageUrl };
+  }
+  function summarizeProductReviews(all) {
+    const critics = /* @__PURE__ */ new Map();
+    const users = /* @__PURE__ */ new Map();
+    for (const reviews of all) {
+      for (const critic of reviews?.critics ?? []) {
+        const key = parseUrl$1(critic.url)?.href ?? `${critic.site}|${critic.score}`;
+        if (!critics.has(key)) critics.set(key, critic);
+      }
+      for (const user of reviews?.users ?? []) if (!users.has(user.source)) users.set(user.source, user);
+    }
+    if (critics.size === 0 && users.size === 0) return void 0;
+    const criticList = [...critics.values()].sort((a, b) => toHundredScale(b.score, b.maxScore) - toHundredScale(a.score, a.maxScore)).slice(0, MAX_CRITICS);
+    const userList = [...users.values()].sort((a, b) => b.count - a.count);
+    const userCount = userList.reduce((sum, user) => sum + user.count, 0);
+    const criticScore = criticList.length >= MIN_CRITIC_REVIEWS ? Math.round(criticList.reduce((sum, critic) => sum + toHundredScale(critic.score, critic.maxScore), 0) / criticList.length) : void 0;
+    const userScore = userCount >= MIN_USER_RATINGS ? Math.round(userList.reduce((sum, user) => sum + toHundredScale(user.score, user.maxScore) * user.count, 0) / userCount) : void 0;
+    return { critics: criticList, users: userList, userCount, ...criticScore !== void 0 ? { criticScore } : {}, ...userScore !== void 0 ? { userScore } : {} };
+  }
+  function getReviewScoreLevel(score) {
+    return score >= 85 ? "high" : score >= 75 ? "good" : score >= 60 ? "mixed" : "low";
+  }
+  const formatScore = (score) => String(Number(score.toFixed(2))).replace(".", ",");
+  function buildReviewAiPrompt(input) {
+    const { summary } = input;
+    const critics = summary.critics.map((critic) => `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
+    const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} vurderinger. ${user.url}`);
+    return [
+      "Du er en nøytral norsk produktrådgiver. Lag en oversiktlig oppsummering av hva norske testere og kjøpere mener om produktet under.",
+      "",
+      "Slik vil jeg ha svaret:",
+      "- Lag det som en pen, selvstendig HTML-side (i Claude som en Artifact, i ChatGPT som Canvas). Bruk lyst og mørkt tema, tydelige overskrifter, poengsummene som merker øverst, og kort tekst som fungerer på mobil.",
+      "- Bruk bare kildene i listen. Åpne lenkene og les testene og kjøperanmeldelsene hvis du kan. Bare norske kilder.",
+      "- Oppgi kilden ved hver påstand, med lenke. Si tydelig fra når noe bare nevnes av én kilde eller når du ikke fikk lest en kilde.",
+      "- Ikke finn på egenskaper, priser eller problemer som ikke står i kildene.",
+      "",
+      "Seksjoner på siden:",
+      "1. Kort konklusjon (2–3 setninger)",
+      "2. Det testere og kjøpere liker best",
+      "3. Vanlige problemer og klager (holdbarhet, programvare, batteri, passform, støy, kundeservice osv.)",
+      "4. Hvem produktet passer for, og hvem som bør velge noe annet",
+      "5. Der testere og kjøpere er uenige",
+      "6. Hva jeg bør sjekke før jeg kjøper",
+      "7. Kildeliste med lenker",
+      "",
+      "PRODUKT",
+      input.productName,
+      ...input.price ? [`Pris: ${input.price}${input.shopName ? ` hos ${input.shopName}` : ""} (${input.date})`] : [],
+      ...input.pageUrl ? [`Siden jeg ser på: ${input.pageUrl}`] : [],
+      "",
+      `PROFESJONELLE TESTER${summary.criticScore !== void 0 ? ` – snitt ${summary.criticScore}/100` : ""} (${summary.critics.length})`,
+      ...critics.length ? critics : ["- Ingen norske tester funnet."],
+      "",
+      `KJØPERE${summary.userScore !== void 0 ? ` – snitt ${summary.userScore}/100` : ""} (${summary.userCount} vurderinger)`,
+      ...users.length ? users : ["- Ingen kjøpervurderinger funnet."],
+      "",
+      "Hentet av Cashback Norge. Poengsummene er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger."
+    ].join("\n");
+  }
+  const isHttpsUrl = (value) => typeof value === "string" && value.length <= 2048 && parseUrl$1(value)?.protocol === "https:";
+  const isScore = (score, maxScore) => typeof score === "number" && typeof maxScore === "number" && toHundredScale(score, maxScore) !== void 0;
+  function isProductReviews(value) {
+    if (!isRecord$7(value)) return false;
+    const critics = value.critics;
+    const users = value.users;
+    return (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string"))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url)));
+  }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
   const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
     "discontinued",
@@ -4074,6 +4194,12 @@
     return matches.sort((first, second) => second.score - first.score).slice(0, 3).map((match) => match.id);
   }
   function readGodprisProductPage(html, fallbackProductId, anchor, requireStructured = false) {
+    const offer = readGodprisProductOffer(html, fallbackProductId, anchor, requireStructured);
+    if (offer === void 0) return void 0;
+    const critics = readGodprisReviewCards(html);
+    return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
+  }
+  function readGodprisProductOffer(html, fallbackProductId, anchor, requireStructured) {
     const structured = selectProductLdJson(readLdJsonScripts(html));
     if (structured !== void 0) {
       const productName2 = withLeadingBrand$1(
@@ -6366,11 +6492,11 @@ query SearchSuggestions($query: String!, $category: Int) {
   async function loadCatalog(requestText, options) {
     const cached = catalogCache.get(requestText);
     const promise = cached !== void 0 && cached.expires > Date.now() ? cached.promise : (async () => {
-      const text = await requestText(POKEPRIS_CATALOG_URL);
-      if (text === void 0) throw new Error(`Pokepris catalog: empty response from ${POKEPRIS_CATALOG_URL}`);
+      const text2 = await requestText(POKEPRIS_CATALOG_URL);
+      if (text2 === void 0) throw new Error(`Pokepris catalog: empty response from ${POKEPRIS_CATALOG_URL}`);
       let value;
       try {
-        value = JSON.parse(text);
+        value = JSON.parse(text2);
       } catch {
         throw new Error(`Pokepris catalog: invalid JSON from ${POKEPRIS_CATALOG_URL}`);
       }
@@ -6504,8 +6630,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   function readPokeprisSearchAction(source2) {
     return source2.match(/createServerReference\)\(\s*["']([a-f0-9]{40,})["'][^;]{0,250}?["']getProducts["']/)?.[1];
   }
-  function readPokeprisSearchResult(text) {
-    for (const line of text.split("\n")) {
+  function readPokeprisSearchResult(text2) {
+    for (const line of text2.split("\n")) {
       const separator = line.indexOf(":");
       if (separator < 0) continue;
       try {
@@ -6585,8 +6711,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       alternatives: offers.slice(0, 8).map(({ offerUrl: _offerUrl, ...offer }) => offer)
     };
   }
-  function buildSearchTerm(text) {
-    return text.replace(/pok[eé]mon(?:\s+tcg)?/gi, "").replace(/(?:scarlet\s*[&/]\s*violet|sword\s*[&/]\s*shield|trading card game|\b(?:sv|swsh)\s*\d+(?:[.]\d+)?\b)/gi, "").replace(/\bmega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/gi, "").replace(/[:–—-]/g, " ").replace(/\betb\b/gi, "Elite Trainer Box").replace(/\b(?:engelsk|english|japansk|japanese|koreansk|korean|kinesisk|chinese)\b/gi, "").replace(/\bbooster display\b/gi, "Booster Box").replace(/\s+/g, " ").trim();
+  function buildSearchTerm(text2) {
+    return text2.replace(/pok[eé]mon(?:\s+tcg)?/gi, "").replace(/(?:scarlet\s*[&/]\s*violet|sword\s*[&/]\s*shield|trading card game|\b(?:sv|swsh)\s*\d+(?:[.]\d+)?\b)/gi, "").replace(/\bmega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/gi, "").replace(/[:–—-]/g, " ").replace(/\betb\b/gi, "Elite Trainer Box").replace(/\b(?:engelsk|english|japansk|japanese|koreansk|korean|kinesisk|chinese)\b/gi, "").replace(/\bbooster display\b/gi, "Booster Box").replace(/\s+/g, " ").trim();
   }
   async function fetchText$1(url, init) {
     try {
@@ -7707,7 +7833,24 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    return sortPriceMatchOffers(allowedOffers);
+    return sortPriceMatchOffers(await withKlarnaUserRating(allowedOffers, requestText));
+  }
+  const KLARNA_PRODUCT_PAGE = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\//;
+  async function withKlarnaUserRating(offers, requestText) {
+    return Promise.all(offers.map(async (offer) => {
+      if (offer.source !== "klarna" || !KLARNA_PRODUCT_PAGE.test(offer.productUrl)) return offer;
+      try {
+        const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
+        const user = html === void 0 ? void 0 : readJsonLdUserRating(html, "klarna", "Kjøpere hos Klarna", offer.productUrl);
+        return user === void 0 ? offer : { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], user] } };
+      } catch {
+        return offer;
+      }
+    }));
+  }
+  async function fetchReviewPage(url, init) {
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8e3) });
+    return response.ok ? response.text() : void 0;
   }
   function hasContextualVolumeMatching(offer) {
     return offer.source === "taxfree" || offer.source === "vinmonopolet";
@@ -8157,7 +8300,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     return leg.stopCount === 0 ? "direkte" : `${leg.stopCount} stopp`;
   }
   function flightLegPanelChipTexts(leg) {
-    return [formatCompactFlightDuration(leg.durationMinutes), formatFlightLegStops(leg)].filter((text) => text !== void 0);
+    return [formatCompactFlightDuration(leg.durationMinutes), formatFlightLegStops(leg)].filter((text2) => text2 !== void 0);
   }
   function flightLegTooltipChipTexts(leg) {
     const carriers = leg.carriers !== void 0 ? [...new Set(leg.carriers)].join("+") : void 0;
@@ -8166,10 +8309,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       formatCompactFlightDuration(leg.durationMinutes),
       leg.timeRange,
       carriers
-    ].filter((text) => text !== void 0 && text.length > 0);
+    ].filter((text2) => text2 !== void 0 && text2.length > 0);
   }
   function flightTooltipExtraTexts(platform, legs) {
-    const perLegCarriers = legs.map((leg) => [...new Set(leg.carriers ?? [])].join("+")).filter((text) => text.length > 0);
+    const perLegCarriers = legs.map((leg) => [...new Set(leg.carriers ?? [])].join("+")).filter((text2) => text2.length > 0);
     const allCarriers = [...new Set(legs.flatMap((leg) => leg.carriers ?? []))];
     const carrierTexts = /* @__PURE__ */ new Set([
       ...perLegCarriers,
@@ -8179,13 +8322,13 @@ query SearchSuggestions($query: String!, $category: Int) {
       allCarriers.join("+")
     ]);
     const legFact = /^(?:(?:\d+ stopp|direkte)(?: \/ (?:\d+ stopp|direkte))*|\d{2}:\d{2}-\d{2}:\d{2}(?: \/ \d{2}:\d{2}-\d{2}:\d{2})*|(?:\d+ t(?: \d+ min)?|\d+ min)(?: \/ (?:\d+ t(?: \d+ min)?|\d+ min))*)$/;
-    return [...new Set(platform?.split(/,\s*/) ?? [])].filter((text) => text.length > 0 && !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text) && !legFact.test(text) && !carrierTexts.has(text));
+    return [...new Set(platform?.split(/,\s*/) ?? [])].filter((text2) => text2.length > 0 && !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text2) && !legFact.test(text2) && !carrierTexts.has(text2));
   }
   function flightTooltipChipTexts(candidate) {
     return [.../* @__PURE__ */ new Set([
       ...candidate.durationText?.split(" · ") ?? [],
       ...candidate.platform?.split(/,\s*/) ?? []
-    ])].filter((text) => !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text));
+    ])].filter((text2) => !FLIGHT_BAGGAGE_TEXT_PATTERN.test(text2));
   }
   function applyFlightSortMode(offers, mode) {
     if (mode === "best" || !offers.some((offer) => offer.flightSortVariants !== void 0)) return offers;
@@ -8217,8 +8360,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (value === null || values === void 0) return void 0;
     return ["best", "cheapest", "fastest"].find((mode) => values[mode] === value);
   }
-  function readFlightSortLabel(text) {
-    const normalized = text?.toLowerCase() ?? "";
+  function readFlightSortLabel(text2) {
+    const normalized = text2?.toLowerCase() ?? "";
     if (/rimeligste|cheapest/.test(normalized)) return "cheapest";
     if (/raskeste|fastest/.test(normalized)) return "fastest";
     if (/\bbeste\b|recommended/.test(normalized)) return "best";
@@ -8429,8 +8572,8 @@ query SearchSuggestions($query: String!, $category: Int) {
       flightMeta.includeCheckedBag === true ? "FreeCheckedBaggage" : void 0
     ].filter((flag) => flag !== void 0).map((flag) => ({ flag, allow: true, journeyNoList: [1] }));
   }
-  function readTripComTotalDurationRange(text) {
-    const match = text.match(/Total\s+(\d+)h(?:\s+(\d+)m)?\s*[–-]?\s*(\d+)h(?:\s+(\d+)m)?/i);
+  function readTripComTotalDurationRange(text2) {
+    const match = text2.match(/Total\s+(\d+)h(?:\s+(\d+)m)?\s*[–-]?\s*(\d+)h(?:\s+(\d+)m)?/i);
     if (match === null) return void 0;
     return {
       minMinutes: Number(match[1]) * 60 + Number(match[2] ?? 0),
@@ -9157,9 +9300,9 @@ query SearchSuggestions($query: String!, $category: Int) {
             if (best) results.push(best);
             else errors.push(`${area.areaCode}: ingen sammenlignbare avtaler`);
           } catch (error) {
-            const text = error instanceof Error ? error.message : "nettverksfeil";
-            errors.push(`${area.areaCode}: ${text}`);
-            if (/HTTP (?:403|429)/.test(text)) break;
+            const text2 = error instanceof Error ? error.message : "nettverksfeil";
+            errors.push(`${area.areaCode}: ${text2}`);
+            if (/HTTP (?:403|429)/.test(text2)) break;
           }
         }
         if (!results.length && errors.length) throw new Error(errors.join("; "));
@@ -14328,15 +14471,15 @@ ${darkProviderCss}
   function isPanFlightsVisiblePackageElement(element) {
     if (!element.isConnected) return false;
     if (element.closest("template, #package_templ, #offer_templ, #offerlink_templ, #domtemplates") !== null) return false;
-    const text = cleanPanFlightsVisibleText(element.innerText);
-    if (text === void 0) return false;
+    const text2 = cleanPanFlightsVisibleText(element.innerText);
+    if (text2 === void 0) return false;
     if (readPanFlightsVisibleOfferAmount(element) === void 0) return false;
     return element.getClientRects().length > 0 || isVisibleElement(element);
   }
   function readPanFlightsVisibleOfferAmount(element) {
     const priceElementText = [
       ...element.querySelectorAll(".offer .price, .price")
-    ].map((priceElement) => priceElement.innerText).find((text) => readNokAmountFromText(text) !== void 0);
+    ].map((priceElement) => priceElement.innerText).find((text2) => readNokAmountFromText(text2) !== void 0);
     const priceElementAmount = readNokAmountFromText(priceElementText);
     if (priceElementAmount !== void 0) return priceElementAmount;
     return readNokAmountFromPriceLikeText(element.innerText);
@@ -15182,14 +15325,14 @@ ${darkProviderCss}
     };
   }
   async function fetchTripComFlightListSearch(flightMeta, session, sortOrder, grade) {
-    const text = await userscriptTextRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
+    const text2 = await userscriptTextRequest(TRIP_COM_FLIGHT_LIST_SEARCH_ENDPOINT, {
       method: "POST",
       headers: TRIP_COM_COMMON_HEADERS,
       body: JSON.stringify(buildTripComFlightListSearchPayload(flightMeta, sortOrder, grade, session)),
       credentials: "omit",
       timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
     });
-    return text !== void 0 ? parseTripComSseResponse(text) : void 0;
+    return text2 !== void 0 ? parseTripComSseResponse(text2) : void 0;
   }
   async function findTripComCalendarOfferCandidate(flightMeta, resultUrl, airportLookup, rates) {
     const resultData = await userscriptJsonRequest(TRIP_COM_LOW_PRICE_ENDPOINT, {
@@ -15314,8 +15457,8 @@ ${darkProviderCss}
       appid: "700020"
     };
   }
-  function parseTripComSseResponse(text) {
-    const records = text.split(/\n\n+/).flatMap((block) => {
+  function parseTripComSseResponse(text2) {
+    const records = text2.split(/\n\n+/).flatMap((block) => {
       const data = block.split(/\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n").trim();
       if (data.length === 0 || data === "[DONE]") return [];
       const parsed = parseJsonValue(data);
@@ -15423,7 +15566,7 @@ ${darkProviderCss}
   async function requestTripComReturnLeg(lookup, flightMeta, session) {
     const payload = buildTripComFlightListSearchPayload(flightMeta, "Score", 3, session);
     const searchCriteria = isRecord(payload.searchCriteria) ? payload.searchCriteria : {};
-    const text = await userscriptTextRequest(TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT, {
+    const text2 = await userscriptTextRequest(TRIP_COM_FLIGHT_RETURN_SEARCH_ENDPOINT, {
       method: "POST",
       headers: TRIP_COM_COMMON_HEADERS,
       body: JSON.stringify({
@@ -15434,8 +15577,8 @@ ${darkProviderCss}
       credentials: "omit",
       timeoutMs: TRIP_COM_FLIGHT_REQUEST_TIMEOUT_MS
     });
-    const parsedText = text !== void 0 ? parseJsonValue(text) : void 0;
-    const resultData = isRecord(parsedText) ? parsedText : text !== void 0 ? parseTripComSseResponse(text) : void 0;
+    const parsedText = text2 !== void 0 ? parseJsonValue(text2) : void 0;
+    const resultData = isRecord(parsedText) ? parsedText : text2 !== void 0 ? parseTripComSseResponse(text2) : void 0;
     if (!isRecord(resultData)) return void 0;
     return selectTripComReturnLeg(resultData, flightMeta);
   }
@@ -15955,18 +16098,18 @@ ${darkProviderCss}
     return extractSkyscannerVisibleOfferCandidates(window.location.href).slice(0, 5).map((candidate) => `${Math.round(candidate.amount)}:${candidate.platform ?? ""}`).join(";");
   }
   function extractSkyscannerVisibleOfferCandidates(productUrl) {
-    const text = (document.body?.innerText ?? "").replace(/\u00a0/g, " ");
+    const text2 = (document.body?.innerText ?? "").replace(/\u00a0/g, " ");
     const candidates = [
-      ...extractSkyscannerVisibleOfferCandidatesFromPattern(text, /(\d+)\s+tilbud\s+fra\s+(\d[\d\s]*)\s*kr\b/gi, productUrl)
+      ...extractSkyscannerVisibleOfferCandidatesFromPattern(text2, /(\d+)\s+tilbud\s+fra\s+(\d[\d\s]*)\s*kr\b/gi, productUrl)
     ];
     if (candidates.length === 0) {
-      candidates.push(...extractSkyscannerFallbackVisibleOfferCandidates(text, productUrl));
+      candidates.push(...extractSkyscannerFallbackVisibleOfferCandidates(text2, productUrl));
     }
     return dedupeSkyscannerOfferCandidates(candidates).sort((left, right) => left.amount - right.amount);
   }
-  function extractSkyscannerVisibleOfferCandidatesFromPattern(text, pattern, productUrl) {
+  function extractSkyscannerVisibleOfferCandidatesFromPattern(text2, pattern, productUrl) {
     const candidates = [];
-    for (const match of text.matchAll(pattern)) {
+    for (const match of text2.matchAll(pattern)) {
       const offerCount = readPositiveIntegerValue(match[1]);
       const amount = readPositiveNumberValue(match[2]);
       if (amount === void 0) continue;
@@ -15985,14 +16128,14 @@ ${darkProviderCss}
     }
     return candidates;
   }
-  function extractSkyscannerFallbackVisibleOfferCandidates(text, productUrl) {
+  function extractSkyscannerFallbackVisibleOfferCandidates(text2, productUrl) {
     const candidates = [];
     const pattern = /\b(\d[\d\s]{0,8})\s*kr\b/gi;
-    for (const match of text.matchAll(pattern)) {
+    for (const match of text2.matchAll(pattern)) {
       const amount = readPositiveNumberValue(match[1]);
       if (amount === void 0) continue;
       const index = match.index ?? 0;
-      const context = text.slice(Math.max(0, index - 160), Math.min(text.length, index + 160));
+      const context = text2.slice(Math.max(0, index - 160), Math.min(text2.length, index + 160));
       if (!/\b(?:tilbud|se mer|vis tilbud|detaljer)\b/i.test(context)) continue;
       candidates.push({
         shopName: "Skyscanner",
@@ -16154,9 +16297,9 @@ ${darkProviderCss}
     const parsedUrl = parseUrl(window.location.href);
     if (parsedUrl === void 0 || readCurrentMomondoFlightSearchUrl(flightMeta) === void 0) return void 0;
     if (readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return void 0;
-    const text = document.body?.innerText;
-    if (text === void 0 || text.length === 0) return void 0;
-    const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
+    const text2 = document.body?.innerText;
+    if (text2 === void 0 || text2.length === 0) return void 0;
+    const sections = text2.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
     for (const section of sections) {
       const normalized = section.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
       if (!/\b(?:Velg|Select)\b/i.test(normalized)) continue;
@@ -16173,9 +16316,9 @@ ${darkProviderCss}
     if (!isMomondoFlightSearchPage(parsedUrl) || readMomondoFlightSortMode(parsedUrl.toString()) !== "bestflight_a") return void 0;
     const flightMeta = extractMomondoFlightSearchMeta(parsedUrl);
     if (flightMeta === void 0 || hasFlightSearchResultFilters(flightMeta)) return void 0;
-    const text = document.body?.innerText;
-    if (text === void 0 || text.length === 0) return void 0;
-    const sections = text.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
+    const text2 = document.body?.innerText;
+    if (text2 === void 0 || text2.length === 0) return void 0;
+    const sections = text2.match(/\bBest\b[\s\S]{0,900}?(?=\bBest\b|\bBilligst\b|\bCheapest\b|\bRaskest\b|\bFastest\b|$)/gi) ?? [];
     for (const section of sections) {
       const normalized = section.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
       if (!/\b(?:Velg|Select)\b/i.test(normalized)) continue;
@@ -18251,7 +18394,7 @@ ${darkProviderCss}
     return route !== void 0 ? { route } : {};
   }
   function formatFlightCarriersByLeg(carriersPerLeg) {
-    const legTexts = carriersPerLeg.map((carriers) => uniqueStrings(carriers).join("+")).filter((text) => text.length > 0);
+    const legTexts = carriersPerLeg.map((carriers) => uniqueStrings(carriers).join("+")).filter((text2) => text2.length > 0);
     if (legTexts.length === 0) return void 0;
     const uniqueLegTexts = uniqueStrings(legTexts);
     return uniqueLegTexts.length === 1 ? uniqueLegTexts[0] : legTexts.join(" / ");
@@ -18760,8 +18903,8 @@ ${darkProviderCss}
     const name = heading.textContent?.replace(/\s+/g, " ").trim();
     if (name === void 0 || name.length < 3) return void 0;
     const spokenPrice = [...dialog.querySelectorAll("[aria-label]")].map((element) => element.getAttribute("aria-label")?.trim().match(/^(?:tilbud,\s*nå\s+)?(\d[\d \u00a0]*,\d{2}) kroner(?: pluss pant)?\.?$/i)?.[1]).find((value) => value !== void 0);
-    const text = dialog.innerText.slice(0, 4e3);
-    const priceText = spokenPrice ?? text.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b(?!\s*\/)/i)?.[1];
+    const text2 = dialog.innerText.slice(0, 4e3);
+    const priceText = spokenPrice ?? text2.match(/(?:Gjeldende pris er:?\s*)?(\d[\d \u00a0]*,\d{2})\s*kr\b(?!\s*\/)/i)?.[1];
     const price = priceText !== void 0 ? Number(priceText.replace(/[ \u00a0]/g, "").replace(",", ".")) : void 0;
     if (price === void 0 || !Number.isFinite(price) || price <= 0) return void 0;
     let subtitle;
@@ -18914,8 +19057,8 @@ ${darkProviderCss}
       "add to basket"
     ];
     for (const element of document.querySelectorAll("button, a, input")) {
-      const text = `${element.textContent ?? ""} ${element.value ?? ""} ${element.getAttribute("aria-label") ?? ""}`.trim().toLowerCase();
-      if (commerceText.some((needle) => text.includes(needle))) return true;
+      const text2 = `${element.textContent ?? ""} ${element.value ?? ""} ${element.getAttribute("aria-label") ?? ""}`.trim().toLowerCase();
+      if (commerceText.some((needle) => text2.includes(needle))) return true;
     }
     return false;
   }
@@ -19012,25 +19155,25 @@ ${darkProviderCss}
   function uniqueStrings(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
-  function readVinmonopoletPrice(text) {
-    const match = text.match(/\bKr\s+(\d[\d\s]*(?:,\d{1,2})?)/i);
+  function readVinmonopoletPrice(text2) {
+    const match = text2.match(/\bKr\s+(\d[\d\s]*(?:,\d{1,2})?)/i);
     if (match?.[1] === void 0) return void 0;
     const amount = parseLocalizedNumber(match[1].replace(/\s/g, ""));
     return Number.isFinite(amount) && amount > 0 ? amount : void 0;
   }
-  function readVinmonopoletVolumeMl(text, price) {
-    const priceLine = text.match(/\bKr\s+\d[\d\s]*(?:,\d{1,2})?[\s\S]{0,80}/i)?.[0];
-    return readVolumeMl(priceLine) ?? readVolumeMl(text) ?? readVolumeMlFromLiterPrice(text, price);
+  function readVinmonopoletVolumeMl(text2, price) {
+    const priceLine = text2.match(/\bKr\s+\d[\d\s]*(?:,\d{1,2})?[\s\S]{0,80}/i)?.[0];
+    return readVolumeMl(priceLine) ?? readVolumeMl(text2) ?? readVolumeMlFromLiterPrice(text2, price);
   }
-  function readVinmonopoletAlcoholPercent(text) {
-    const match = text.match(/\bAlkohol\s+(\d+(?:[,.]\d+)?)\s*%/i);
+  function readVinmonopoletAlcoholPercent(text2) {
+    const match = text2.match(/\bAlkohol\s+(\d+(?:[,.]\d+)?)\s*%/i);
     if (match?.[1] === void 0) return void 0;
     const amount = parseLocalizedNumber(match[1]);
     return Number.isFinite(amount) && amount > 0 ? amount : void 0;
   }
-  function readVolumeMl(text) {
-    if (text === void 0) return void 0;
-    const match = text.match(/\b(\d+(?:[,.]\d+)?)\s*(ml|cl|l)(?=$|[^A-Za-z])/i);
+  function readVolumeMl(text2) {
+    if (text2 === void 0) return void 0;
+    const match = text2.match(/\b(\d+(?:[,.]\d+)?)\s*(ml|cl|l)(?=$|[^A-Za-z])/i);
     if (match === null) return void 0;
     const amount = parseLocalizedNumber(match[1] ?? "");
     const unit = match[2]?.toLowerCase();
@@ -19039,9 +19182,9 @@ ${darkProviderCss}
     if (unit === "cl") return amount * 10;
     return amount * 1e3;
   }
-  function readVolumeMlFromLiterPrice(text, price) {
+  function readVolumeMlFromLiterPrice(text2, price) {
     if (price === void 0 || price <= 0) return void 0;
-    const unitPrice = readVinmonopoletUnitPricePerLiter(text);
+    const unitPrice = readVinmonopoletUnitPricePerLiter(text2);
     if (unitPrice === void 0 || unitPrice <= 0) return void 0;
     const volumeMl = Math.round(price / unitPrice * 1e3);
     if (!Number.isFinite(volumeMl) || volumeMl < 20 || volumeMl > 5e3) return void 0;
@@ -19049,8 +19192,8 @@ ${darkProviderCss}
     const closest = commonVolumeMl.reduce((best, candidate) => Math.abs(candidate - volumeMl) < Math.abs(best - volumeMl) ? candidate : best, commonVolumeMl[0] ?? volumeMl);
     return Math.abs(closest - volumeMl) <= Math.max(5, closest * 0.03) ? closest : volumeMl;
   }
-  function readVinmonopoletUnitPricePerLiter(text) {
-    const match = text.match(/\b(\d[\d\s]*(?:,\d{1,2})?)\s*kr\s*\/\s*l\b/i);
+  function readVinmonopoletUnitPricePerLiter(text2) {
+    const match = text2.match(/\b(\d[\d\s]*(?:,\d{1,2})?)\s*kr\s*\/\s*l\b/i);
     if (match?.[1] === void 0) return void 0;
     const amount = parseLocalizedNumber(match[1].replace(/\s/g, ""));
     return Number.isFinite(amount) && amount > 0 ? amount : void 0;
@@ -19324,8 +19467,8 @@ ${darkProviderCss}
       return true;
     }
     const clickable = target.closest("button,a,[role='button']");
-    const text = clickable?.textContent?.trim().replace(/\s+/g, " ").toLowerCase();
-    return text === "handle nå" || text === "shop now";
+    const text2 = clickable?.textContent?.trim().replace(/\s+/g, " ").toLowerCase();
+    return text2 === "handle nå" || text2 === "shop now";
   }
   function getCurrentSasOfferActivationUrl() {
     const parsedUrl = parseUrl(window.location.href);
@@ -19455,8 +19598,8 @@ ${darkProviderCss}
       return "logged-in";
     }
     if (header.querySelector('a[href="/auth/login"], a[href="/auth/register"]') !== null || [...header.querySelectorAll("button")].some((button) => {
-      const text = button.textContent?.trim();
-      return text === "Logg inn" || text === "Kom i gang";
+      const text2 = button.textContent?.trim();
+      return text2 === "Logg inn" || text2 === "Kom i gang";
     })) {
       return "logged-out";
     }
@@ -19478,8 +19621,8 @@ ${darkProviderCss}
     return null;
   }
   function isSpareborsenPartnerCtaText(value) {
-    const text = value?.replace(/^Ad\s*/i, "").trim().replace(/\s+/g, " ") ?? "";
-    return (text.startsWith("Handle hos") || text.startsWith("Aktiver og gå til")) && text.endsWith("→");
+    const text2 = value?.replace(/^Ad\s*/i, "").trim().replace(/\s+/g, " ") ?? "";
+    return (text2.startsWith("Handle hos") || text2.startsWith("Aktiver og gå til")) && text2.endsWith("→");
   }
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -20582,6 +20725,18 @@ ${darkProviderCss}
       font-size: 10px;
       transition: transform 0.15s;
     }
+    .reviews-chips { display: inline-flex; flex-basis: 100%; flex-wrap: wrap; gap: 4px; }
+    .reviews-chips .review-chip { font-size: 11px; font-weight: 700; line-height: 20px; padding: 0 6px; }
+    .review-chip { color: #fff; font-variant-numeric: tabular-nums; }
+    .review-chip--high { background: #2f8a57; }
+    .review-chip--good { background: #4d9a3f; }
+    .review-chip--mixed { background: #b7861b; }
+    .review-chip--low { background: #b8453f; }
+    .review-chip--none { background: var(--cbn-soft); color: var(--cbn-muted); }
+    .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reviews-row .price-match-price { color: var(--cbn-muted); font-size: 11px; font-weight: 600; }
+    .reviews-copy { font-size: 12px; font-weight: 700; justify-content: center; }
+    .reviews-section.collapsed .reviews-chips { display: none; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
@@ -21583,7 +21738,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const rawReward = addRewardInput.value.trim();
       const reward = rawReward.length > 0 ? `${rawReward} %` : "?";
       if (code.length === 0) return;
-      const hasProfanity = (text) => text.toLowerCase().split(/[^a-z0-9æøå]+/).some((w) => w.length > 0 && PROFANITY_SET.has(w));
+      const hasProfanity = (text2) => text2.toLowerCase().split(/[^a-z0-9æøå]+/).some((w) => w.length > 0 && PROFANITY_SET.has(w));
       if (hasProfanity(code) || hasProfanity(rawReward)) {
         addCodeInput.style.outline = "2px solid #e05555";
         setTimeout(() => {
@@ -22011,6 +22166,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (mainOffers.length > 0) body.append(offerList);
     if (regionPrices !== void 0 && regionPrices.prices.length > 0) body.append(regionPricesSection);
     if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
+    const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch2) => priceMatch2.reviews));
+    if (reviewSummary !== void 0) body.append(buildReviewsSection(reviewSummary, priceMatches[0]));
     body.append(chipsSection);
     if (offers.length > 0) body.append(codesSection);
     let userHasVoted = false;
@@ -22226,6 +22383,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     mountTarget.append(host);
     void detectConflicts(shadowRoot, title);
     attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls);
+    attachReviewTooltips(shadowRoot, tooltipControls);
     const wrappers = shadowRoot.querySelectorAll(".offer-link-wrapper");
     for (let idx = 0; idx < mainOffers.length; idx++) {
       const currentOffer = mainOffers[idx];
@@ -22420,11 +22578,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         subsidy.textContent = `Med vanlig strømstøtte: ~${formatKr(e2.stromstotteMonthlyNok)} kr/mnd`;
         row.append(subsidy);
       }
-      for (const text of [e2.invoiceRequirement, e2.conditionsText]) {
-        if (!text) continue;
+      for (const text2 of [e2.invoiceRequirement, e2.conditionsText]) {
+        if (!text2) continue;
         const condition = document.createElement("span");
         condition.className = "electricity-tooltip-terms";
-        condition.textContent = text;
+        condition.textContent = text2;
         row.append(condition);
       }
       tooltip.append(row);
@@ -22499,7 +22657,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   }
   function attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls) {
     if (priceMatches.length === 0) return;
-    const cards = shadowRoot.querySelectorAll(".price-match-card");
+    const cards = shadowRoot.querySelectorAll(".price-match-section:not(.reviews-section) .price-match-card");
     for (let index = 0; index < priceMatches.length; index++) {
       const card = cards[index];
       const priceMatch = priceMatches[index];
@@ -22634,7 +22792,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return isRecord(value) && typeof value.planName === "string" && (value.formattedPrice === void 0 || typeof value.formattedPrice === "string") && (value.formattedNok === void 0 || typeof value.formattedNok === "string") && (value.unavailableReason === void 0 || typeof value.unavailableReason === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "etilbudsavis" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && isOptionalHttpsImageUrl(value.imageUrl) && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative));
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "etilbudsavis" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && isOptionalHttpsImageUrl(value.imageUrl) && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)) && (value.reviews === void 0 || isProductReviews(value.reviews));
   }
   function isOptionalHttpsImageUrl(value) {
     return value === void 0 || typeof value === "string" && value.startsWith("https://") && value.length <= 2048;
@@ -22827,7 +22985,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const dateChips = [
       priceMatch.dateFlex !== void 0 ? formatFlightCompactDateRange(priceMatch.dateFlex.outboundDate, priceMatch.dateFlex.inboundDate) : void 0,
       dateWindow
-    ].filter((text) => text !== void 0 && text.length > 0);
+    ].filter((text2) => text2 !== void 0 && text2.length > 0);
     const legChips = priceMatch.flightLegs?.map(flightLegPanelChipTexts);
     if (legChips !== void 0 && legChips.length > 0 && legChips.every((chips) => chips.length > 0)) {
       const flex = priceMatch.dateFlex;
@@ -22871,11 +23029,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       chips.classList.add("price-match-chip-line--leg");
       chips.append(labelElement);
     }
-    for (const text of texts) {
-      if (text === void 0 || text.length === 0) continue;
+    for (const text2 of texts) {
+      if (text2 === void 0 || text2.length === 0) continue;
       const chip = document.createElement("span");
       chip.className = "cbn-chip cbn-chip--muted price-match-info-chip";
-      chip.textContent = text;
+      chip.textContent = text2;
       chips.append(chip);
     }
     return chips;
@@ -22884,6 +23042,144 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   function buildElectricityPriceMatchChips(priceMatch) {
     const e = priceMatch.electricity;
     return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
+  }
+  const REVIEWS_COLLAPSED_KEY = "cashback-varsler-reviews-collapsed";
+  function buildReviewsSection(summary, priceMatch) {
+    const section = document.createElement("div");
+    section.className = "price-match-section reviews-section";
+    const toggle = document.createElement("button");
+    toggle.className = "cbn-button cbn-button--quiet price-match-toggle";
+    toggle.type = "button";
+    const arrow = document.createElement("span");
+    arrow.className = "price-match-toggle-arrow";
+    arrow.textContent = "▼";
+    const label = document.createElement("span");
+    label.textContent = "Anmeldelser";
+    toggle.append(arrow, label);
+    toggle.addEventListener("click", () => {
+      const collapsed = section.classList.toggle("collapsed");
+      chrome.storage.local.set({ [REVIEWS_COLLAPSED_KEY]: collapsed });
+    });
+    try {
+      chrome.storage.local.get(REVIEWS_COLLAPSED_KEY, (stored) => {
+        if (stored?.[REVIEWS_COLLAPSED_KEY] === true) section.classList.add("collapsed");
+      });
+    } catch {
+    }
+    const header = document.createElement("div");
+    header.className = "price-match-header";
+    const chips = document.createElement("span");
+    chips.className = "reviews-chips";
+    chips.append(
+      buildReviewScoreChip("Tester", summary.criticScore, summary.critics.length, [
+        `## Tester ${summary.criticScore ?? "–"}/100`,
+        ...summary.critics.map((critic) => `${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`),
+        "Vanlig snitt av norske tester, omregnet til 0–100. Krever minst 3 tester.",
+        "Kilde: testlisten på Godpris' produktside."
+      ].join("\n")),
+      buildReviewScoreChip("Kjøpere", summary.userScore, summary.userCount, [
+        `## Kjøpere ${summary.userScore ?? "–"}/100`,
+        ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${user.count.toLocaleString("nb-NO")} vurderinger`),
+        "Snitt vektet etter antall vurderinger. Krever minst 20 vurderinger.",
+        "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet."
+      ].join("\n"))
+    );
+    header.append(toggle, chips);
+    const rows = [
+      ...summary.critics.slice(0, 5).map((critic) => buildReviewRow(critic.site, critic.score, critic.maxScore, critic.quote ?? critic.title, critic.url, [
+        [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...critic.title ? [critic.title] : [], ...critic.quote ? [`«${critic.quote}»`] : []].join("\n"),
+        `Profesjonell test, ${new URL(critic.url).hostname.replace(/^www\./, "")}
+Funnet via Godpris' testliste
+Åpner testen hos utgiveren`
+      ])),
+      ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${user.count.toLocaleString("nb-NO")} vurderinger`, user.url, [
+        `## ${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)}
+${user.count.toLocaleString("nb-NO")} vurderinger`,
+        `Fra kildens produktside (strukturerte data)
+Antallet er kildens eget, og kan omfatte andre varianter av produktet
+Vi ser ikke de enkelte vurderingene`
+      ]))
+    ];
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "cbn-button cbn-button--quiet price-match-card reviews-copy";
+    copy.textContent = "Kopier til AI-oppsummering";
+    setReviewTip(copy, ["## Kopier til AI-oppsummering\nKopierer produktet, poengsummene, sitatene og lenkene til kildene, med instruksjoner for en oppsummering som HTML-side.\nLim inn i Claude, ChatGPT eller en annen assistent du bruker.\nVi sender ingenting til noen AI selv."]);
+    copy.addEventListener("click", () => {
+      const prompt = buildReviewAiPrompt({
+        productName: priceMatch?.productName ?? document.title,
+        ...priceMatch ? { price: priceMatch.price, shopName: priceMatch.shopName } : {},
+        pageUrl: window.location.href,
+        summary,
+        date: (/* @__PURE__ */ new Date()).toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" })
+      });
+      const done = (text2) => {
+        copy.textContent = text2;
+        window.setTimeout(() => {
+          copy.textContent = "Kopier til AI-oppsummering";
+        }, 2600);
+      };
+      navigator.clipboard.writeText(prompt).then(() => done("Kopiert – lim inn i AI-assistenten"), () => done("Kunne ikke kopiere"));
+    });
+    section.append(header, ...rows, copy);
+    return section;
+  }
+  function formatReviewScore(score, maxScore) {
+    return `${String(Number(score.toFixed(2))).replace(".", ",")} av ${String(maxScore).replace(".", ",")}`;
+  }
+  function setReviewTip(element, parts) {
+    element.dataset.reviewTip = JSON.stringify(parts);
+  }
+  function attachReviewTooltips(shadowRoot, tooltipControls) {
+    for (const element of shadowRoot.querySelectorAll(".reviews-section [data-review-tip]")) {
+      const tooltip = document.createElement("div");
+      tooltip.className = element.classList.contains("price-match-card") ? "offer-tooltip price-match-tooltip" : "bonus-chip-tooltip";
+      setTooltipContent(tooltip, JSON.parse(element.dataset.reviewTip));
+      shadowRoot.append(tooltip);
+      const row = tooltipControls.addBeside(element, tooltip, "Vis kildene");
+      if (element.classList.contains("price-match-card")) {
+        row.classList.add("price-match-tooltip-row");
+        bindPanelTooltipHover(element, tooltip, shadowRoot);
+      } else {
+        bindPanelTooltipHover(row, tooltip, shadowRoot);
+      }
+    }
+  }
+  function buildReviewScoreChip(label, score, count, tip) {
+    const chip = document.createElement("span");
+    chip.className = `cbn-chip price-match-info-chip review-chip review-chip--${score === void 0 ? "none" : getReviewScoreLevel(score)}`;
+    chip.textContent = `${label} ${score ?? "–"} · ${count.toLocaleString("nb-NO")}`;
+    setReviewTip(chip, [tip]);
+    return chip;
+  }
+  function buildReviewRow(name, score, maxScore, detail, url, tip) {
+    const row = document.createElement("a");
+    row.className = "cbn-row price-match-card reviews-row";
+    row.href = url;
+    row.target = "_blank";
+    row.rel = "noreferrer";
+    const title = document.createElement("span");
+    title.className = "price-match-title";
+    const product = document.createElement("span");
+    product.className = "price-match-product";
+    product.textContent = name;
+    title.append(product);
+    if (detail) {
+      const shop = document.createElement("span");
+      shop.className = "price-match-shop";
+      shop.textContent = detail;
+      title.append(shop);
+    }
+    const raw = document.createElement("span");
+    raw.className = "price-match-price";
+    raw.textContent = `${String(Number(score.toFixed(2))).replace(".", ",")}/${String(maxScore).replace(".", ",")}`;
+    const hundred = Math.round(toHundredScale(score, maxScore) ?? 0);
+    const chip = document.createElement("span");
+    chip.className = `cbn-chip provider-badge review-chip review-chip--${getReviewScoreLevel(hundred)}`;
+    chip.textContent = String(hundred);
+    row.append(title, raw, chip);
+    setReviewTip(row, tip);
+    return row;
   }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
@@ -23385,18 +23681,18 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     return "Cashback";
   }
-  function addChipTooltip(chip, text, shadowRoot, tooltipControls) {
+  function addChipTooltip(chip, text2, shadowRoot, tooltipControls) {
     const tooltip = document.createElement("div");
     tooltip.className = "bonus-chip-tooltip";
-    setTooltipContent(tooltip, [text]);
+    setTooltipContent(tooltip, [text2]);
     shadowRoot.append(tooltip);
     const row = tooltipControls.addBeside(chip, tooltip);
     bindPanelTooltipHover(row, tooltip, shadowRoot);
   }
-  function addHoverChipTooltip(anchor, text, shadowRoot) {
+  function addHoverChipTooltip(anchor, text2, shadowRoot) {
     const tooltip = document.createElement("div");
     tooltip.className = "bonus-chip-tooltip";
-    tooltip.textContent = text;
+    tooltip.textContent = text2;
     shadowRoot.append(tooltip);
     anchor.addEventListener("mouseenter", () => {
       showChipTooltipRightOfPanel(tooltip, anchor, shadowRoot);

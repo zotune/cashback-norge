@@ -14,6 +14,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import { buildReviewAiPrompt, getReviewScoreLevel, isProductReviews, summarizeProductReviews, toHundredScale, type ProductReviews, type ProductReviewSummary } from "../shared/product-reviews";
 import {
   buildKiwiAirportId,
   buildKiwiItinerariesRequest,
@@ -407,6 +408,8 @@ type PriceMatchOffer = {
   // Én oppføring per etappe (tur, retur) med reisetid, stopp, rute, flyselskap og tider.
   flightLegs?: FlightLegDetails[];
   alternatives?: PriceMatchAlternative[];
+  // Norske tester og kjøpervurderinger (src/shared/product-reviews.ts).
+  reviews?: ProductReviews;
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
   // Hotelltreff gjenbruker fly-kildene (finnreise/skyscanner/momondo) men trenger egen tooltip-tekst.
@@ -12722,6 +12725,18 @@ function renderNotice(
       font-size: 10px;
       transition: transform 0.15s;
     }
+    .reviews-chips { display: inline-flex; flex-basis: 100%; flex-wrap: wrap; gap: 4px; }
+    .reviews-chips .review-chip { font-size: 11px; font-weight: 700; line-height: 20px; padding: 0 6px; }
+    .review-chip { color: #fff; font-variant-numeric: tabular-nums; }
+    .review-chip--high { background: #2f8a57; }
+    .review-chip--good { background: #4d9a3f; }
+    .review-chip--mixed { background: #b7861b; }
+    .review-chip--low { background: #b8453f; }
+    .review-chip--none { background: var(--cbn-soft); color: var(--cbn-muted); }
+    .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reviews-row .price-match-price { color: var(--cbn-muted); font-size: 11px; font-weight: 600; }
+    .reviews-copy { font-size: 12px; font-weight: 700; justify-content: center; }
+    .reviews-section.collapsed .reviews-chips { display: none; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
@@ -14158,6 +14173,8 @@ function renderNotice(
   if (mainOffers.length > 0) body.append(offerList);
   if (regionPrices !== undefined && regionPrices.prices.length > 0) body.append(regionPricesSection);
   if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
+  const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch) => priceMatch.reviews));
+  if (reviewSummary !== undefined) body.append(buildReviewsSection(reviewSummary, priceMatches[0]));
   body.append(chipsSection);
   if (offers.length > 0) body.append(codesSection);
 
@@ -14408,6 +14425,7 @@ function renderNotice(
   mountTarget.append(host);
   void detectConflicts(shadowRoot, title);
   attachPriceMatchTooltips(shadowRoot, priceMatches, tooltipControls);
+  attachReviewTooltips(shadowRoot, tooltipControls);
   // Attach tooltips to shadow root (outside panel) so they escape overflow:hidden
   const wrappers = shadowRoot.querySelectorAll<HTMLElement>(".offer-link-wrapper");
   for (let idx = 0; idx < mainOffers.length; idx++) {
@@ -14694,7 +14712,7 @@ function buildFlightPriceMatchTooltip(tooltip: HTMLElement, offer: PriceMatchOff
 function attachPriceMatchTooltips(shadowRoot: ShadowRoot, priceMatches: PriceMatchOffer[], tooltipControls: TooltipController): void {
   if (priceMatches.length === 0) return;
 
-  const cards = shadowRoot.querySelectorAll<HTMLElement>(".price-match-card");
+  const cards = shadowRoot.querySelectorAll<HTMLElement>(".price-match-section:not(.reviews-section) .price-match-card");
   for (let index = 0; index < priceMatches.length; index++) {
     const card = cards[index];
     const priceMatch = priceMatches[index];
@@ -14911,7 +14929,8 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     isOptionalHttpsImageUrl(value.imageUrl) &&
     (value.durationText === undefined || typeof value.durationText === "string") &&
     (value.flightLegs === undefined || (Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails))) &&
-    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)))
+    (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative))) &&
+    (value.reviews === undefined || isProductReviews(value.reviews))
   );
 }
 function isOptionalHttpsImageUrl(value: unknown): boolean {
@@ -15245,6 +15264,150 @@ const supportAdvertisementDraw = Math.random();
 function buildElectricityPriceMatchChips(priceMatch: Pick<PriceMatchOffer, "electricity" | "productName">): HTMLElement {
   const e = priceMatch.electricity!;
   return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
+}
+
+const REVIEWS_COLLAPSED_KEY = "cashback-varsler-reviews-collapsed";
+
+// «Anmeldelser»: norske tester og kjøpervurderinger fra prismatch-kildene, med en knapp som
+// kopierer en ferdig ledetekst til brukerens egen AI-assistent. Vi sender ingenting selv.
+function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMatchOffer | undefined): HTMLElement {
+  const section = document.createElement("div");
+  section.className = "price-match-section reviews-section";
+  const toggle = document.createElement("button");
+  toggle.className = "cbn-button cbn-button--quiet price-match-toggle";
+  toggle.type = "button";
+  const arrow = document.createElement("span");
+  arrow.className = "price-match-toggle-arrow";
+  arrow.textContent = "\u25BC";
+  const label = document.createElement("span");
+  label.textContent = "Anmeldelser";
+  toggle.append(arrow, label);
+  toggle.addEventListener("click", () => {
+    const collapsed = section.classList.toggle("collapsed");
+    chrome.storage.local.set({ [REVIEWS_COLLAPSED_KEY]: collapsed });
+  });
+  try {
+    chrome.storage.local.get(REVIEWS_COLLAPSED_KEY, (stored) => {
+      if (stored?.[REVIEWS_COLLAPSED_KEY] === true) section.classList.add("collapsed");
+    });
+  } catch { /* storage unavailable: stay open */ }
+
+  // Same look as the price match: the totals as chips beside the heading, one row per source.
+  const header = document.createElement("div");
+  header.className = "price-match-header";
+  const chips = document.createElement("span");
+  chips.className = "reviews-chips";
+  chips.append(
+    buildReviewScoreChip("Tester", summary.criticScore, summary.critics.length, [
+      `## Tester ${summary.criticScore ?? "–"}/100`,
+      ...summary.critics.map((critic) => `${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`),
+      "Vanlig snitt av norske tester, omregnet til 0–100. Krever minst 3 tester.",
+      "Kilde: testlisten på Godpris' produktside.",
+    ].join("\n")),
+    buildReviewScoreChip("Kjøpere", summary.userScore, summary.userCount, [
+      `## Kjøpere ${summary.userScore ?? "–"}/100`,
+      ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${user.count.toLocaleString("nb-NO")} vurderinger`),
+      "Snitt vektet etter antall vurderinger. Krever minst 20 vurderinger.",
+      "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet.",
+    ].join("\n")),
+  );
+  header.append(toggle, chips);
+
+  const rows = [
+    ...summary.critics.slice(0, 5).map((critic) => buildReviewRow(critic.site, critic.score, critic.maxScore, critic.quote ?? critic.title, critic.url, [
+      [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...(critic.title ? [critic.title] : []), ...(critic.quote ? [`«${critic.quote}»`] : [])].join("\n"),
+      `Profesjonell test, ${new URL(critic.url).hostname.replace(/^www\./, "")}\nFunnet via Godpris' testliste\nÅpner testen hos utgiveren`,
+    ])),
+    ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${user.count.toLocaleString("nb-NO")} vurderinger`, user.url, [
+      `## ${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)}\n${user.count.toLocaleString("nb-NO")} vurderinger`,
+      `Fra kildens produktside (strukturerte data)\nAntallet er kildens eget, og kan omfatte andre varianter av produktet\nVi ser ikke de enkelte vurderingene`,
+    ])),
+  ];
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "cbn-button cbn-button--quiet price-match-card reviews-copy";
+  copy.textContent = "Kopier til AI-oppsummering";
+  setReviewTip(copy, ["## Kopier til AI-oppsummering\nKopierer produktet, poengsummene, sitatene og lenkene til kildene, med instruksjoner for en oppsummering som HTML-side.\nLim inn i Claude, ChatGPT eller en annen assistent du bruker.\nVi sender ingenting til noen AI selv."]);
+  copy.addEventListener("click", () => {
+    const prompt = buildReviewAiPrompt({
+      productName: priceMatch?.productName ?? document.title,
+      ...(priceMatch ? { price: priceMatch.price, shopName: priceMatch.shopName } : {}),
+      pageUrl: window.location.href,
+      summary,
+      date: new Date().toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" }),
+    });
+    const done = (text: string) => {
+      copy.textContent = text;
+      window.setTimeout(() => { copy.textContent = "Kopier til AI-oppsummering"; }, 2600);
+    };
+    navigator.clipboard.writeText(prompt).then(() => done("Kopiert – lim inn i AI-assistenten"), () => done("Kunne ikke kopiere"));
+  });
+
+  section.append(header, ...rows, copy);
+  return section;
+}
+
+function formatReviewScore(score: number, maxScore: number): string {
+  return `${String(Number(score.toFixed(2))).replace(".", ",")} av ${String(maxScore).replace(".", ",")}`;
+}
+
+// Tooltip parts on the element; attachReviewTooltips mounts them like the price match tooltips.
+function setReviewTip(element: HTMLElement, parts: string[]): void {
+  element.dataset.reviewTip = JSON.stringify(parts);
+}
+
+function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipController): void {
+  for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section [data-review-tip]")) {
+    const tooltip = document.createElement("div");
+    tooltip.className = element.classList.contains("price-match-card") ? "offer-tooltip price-match-tooltip" : "bonus-chip-tooltip";
+    setTooltipContent(tooltip, JSON.parse(element.dataset.reviewTip!) as string[]);
+    shadowRoot.append(tooltip);
+    const row = tooltipControls.addBeside(element, tooltip, "Vis kildene");
+    if (element.classList.contains("price-match-card")) {
+      row.classList.add("price-match-tooltip-row");
+      bindPanelTooltipHover(element, tooltip, shadowRoot);
+    } else {
+      bindPanelTooltipHover(row, tooltip, shadowRoot);
+    }
+  }
+}
+
+function buildReviewScoreChip(label: string, score: number | undefined, count: number, tip: string): HTMLElement {
+  const chip = document.createElement("span");
+  chip.className = `cbn-chip price-match-info-chip review-chip review-chip--${score === undefined ? "none" : getReviewScoreLevel(score)}`;
+  chip.textContent = `${label} ${score ?? "–"} · ${count.toLocaleString("nb-NO")}`;
+  setReviewTip(chip, [tip]);
+  return chip;
+}
+
+function buildReviewRow(name: string, score: number, maxScore: number, detail: string | undefined, url: string, tip: string[]): HTMLAnchorElement {
+  const row = document.createElement("a");
+  row.className = "cbn-row price-match-card reviews-row";
+  row.href = url;
+  row.target = "_blank";
+  row.rel = "noreferrer";
+  const title = document.createElement("span");
+  title.className = "price-match-title";
+  const product = document.createElement("span");
+  product.className = "price-match-product";
+  product.textContent = name;
+  title.append(product);
+  if (detail) {
+    const shop = document.createElement("span");
+    shop.className = "price-match-shop";
+    shop.textContent = detail;
+    title.append(shop);
+  }
+  const raw = document.createElement("span");
+  raw.className = "price-match-price";
+  raw.textContent = `${String(Number(score.toFixed(2))).replace(".", ",")}/${String(maxScore).replace(".", ",")}`;
+  const hundred = Math.round(toHundredScale(score, maxScore) ?? 0);
+  const chip = document.createElement("span");
+  chip.className = `cbn-chip provider-badge review-chip review-chip--${getReviewScoreLevel(hundred)}`;
+  chip.textContent = String(hundred);
+  row.append(title, raw, chip);
+  setReviewTip(row, tip);
+  return row;
 }
 
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {

@@ -18,6 +18,7 @@ import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
 import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 import { parseUrl, isRecord } from "./cashback.js";
+import { readGodprisReviewCards } from "./product-reviews.js";
 
 type TextRequest = (
   url: string,
@@ -145,6 +146,19 @@ export function readGodprisProductPage(
   fallbackProductId: string,
   anchor: ProductMatchAnchor,
   requireStructured = false,
+): PriceMatchOffer | undefined {
+  const offer = readGodprisProductOffer(html, fallbackProductId, anchor, requireStructured);
+  if (offer === undefined) return undefined;
+  // The same page lists professional tests; only Norwegian ones are kept.
+  const critics = readGodprisReviewCards(html);
+  return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
+}
+
+function readGodprisProductOffer(
+  html: string,
+  fallbackProductId: string,
+  anchor: ProductMatchAnchor,
+  requireStructured: boolean,
 ): PriceMatchOffer | undefined {
   // The current site publishes concrete seller offers as JSON-LD; the older
   // Inertia payload remains a fallback for saved pages and older deployments.
