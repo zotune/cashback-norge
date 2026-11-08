@@ -15513,7 +15513,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   const storeRows: HTMLAnchorElement[] = [];
   // The page's own product name; the cheapest match can be another product entirely.
   const productTitle = (extractProductPageMeta()?.searchTerm ?? sources.find((offer) => offer.source === "prisjakt" || offer.source === "klarna")?.productName ??
-    priceMatch?.productName ?? document.title).trim().slice(0, 160);
+    priceMatch?.productName ?? readCurrentPageUserRating()?.productName ?? document.title)
+    // Drop a trailing site name ("PlayStation 5 Pro-konsoll - Power.no").
+    .replace(/\s+[-|–]\s+[^-|–]*\.(?:no|com)\s*$/i, "").trim().slice(0, 160);
   const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
   const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ??
     (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));

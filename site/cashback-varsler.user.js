@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794165383
+// @version      1794165593
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -23796,7 +23796,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     header.append(titleRow);
     const rows = [];
     const storeRows = [];
-    const productTitle = (extractProductPageMeta()?.searchTerm ?? sources.find((offer) => offer.source === "prisjakt" || offer.source === "klarna")?.productName ?? priceMatch?.productName ?? document.title).trim().slice(0, 160);
+    const productTitle = (extractProductPageMeta()?.searchTerm ?? sources.find((offer) => offer.source === "prisjakt" || offer.source === "klarna")?.productName ?? priceMatch?.productName ?? readCurrentPageUserRating()?.productName ?? document.title).replace(/\s+[-|–]\s+[^-|–]*\.(?:no|com)\s*$/i, "").trim().slice(0, 160);
     const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
     const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
     const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
