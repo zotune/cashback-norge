@@ -6,11 +6,13 @@
 //   and the Norwegian reviews in Klarna's review service.
 // Scores are kept with their own scale and only converted to 0–100 for the summary.
 import { decodeHtmlEntities, isRecord, parseUrl } from "./cashback.js";
-import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
+import { readLdJsonScripts, readNextFlightPayloads, selectProductLdJson } from "./product-data.js";
 
 export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string };
 export type UserRating = { source: string; sourceName: string; score: number; maxScore: number; count: number; url: string };
-export type ProductReviews = { critics?: CriticReview[]; users?: UserRating[] };
+// A rating of the shop itself (service, delivery), not of the product.
+export type StoreRating = { source: string; shopName: string; score: number; maxScore: number; count: number; url: string };
+export type ProductReviews = { critics?: CriticReview[]; users?: UserRating[]; store?: StoreRating };
 export type ProductReviewSummary = {
   critics: CriticReview[];
   users: UserRating[];
@@ -123,6 +125,23 @@ export function readKlarnaUserReviews(value: unknown, pageUrl: string): UserRati
   return { source: "klarna", sourceName: "Norske kjøpere hos Klarna", score: Number((scores.reduce((sum, score) => sum + score, 0) / scores.length / 20).toFixed(2)), maxScore: 5, count: scores.length, url: pageUrl };
 }
 
+/**
+ * Shop ratings from Prisjakt's product page: each offer row in the Next data carries
+ * `shopUserReviews` (Prisjakt users' rating of the shop) and `shop.name`.
+ */
+export function readPrisjaktShopRatings(html: string): Map<string, { score: number; count: number }> {
+  const ratings = new Map<string, { score: number; count: number }>();
+  const text = readNextFlightPayloads(html).join("");
+  for (const match of text.matchAll(/"shopUserReviews":\{"score":([\d.]+),"numberOfReviewsInScore":(\d+)\}[\s\S]{0,2500}?"shop":\{"name":"([^"]{1,80})"/g)) {
+    const score = Number(match[1]);
+    const count = Number(match[2]);
+    const name = match[3]!;
+    if (!(score >= 0 && score <= 5) || !Number.isInteger(count) || count <= 0 || ratings.has(name)) continue;
+    ratings.set(name, { score, count });
+  }
+  return ratings;
+}
+
 /** Combines every source's reviews: one entry per test, buyer ratings weighted by count. */
 export function summarizeProductReviews(all: Array<ProductReviews | undefined>): ProductReviewSummary | undefined {
   const critics = new Map<string, CriticReview>();
@@ -160,7 +179,7 @@ const formatScore = (score: number) => String(Number(score.toFixed(2))).replace(
  * Text for the reader's own AI assistant: the sources, and instructions for a summary page.
  * Nothing is sent anywhere by us; the reader pastes it into Claude, ChatGPT or similar.
  */
-export function buildReviewAiPrompt(input: { productName: string; price?: string; shopName?: string; pageUrl?: string; summary: ProductReviewSummary; date: string }): string {
+export function buildReviewAiPrompt(input: { productName: string; price?: string; shopName?: string; pageUrl?: string; summary: ProductReviewSummary; store?: StoreRating; date: string }): string {
   const { summary } = input;
   const critics = summary.critics.map((critic) =>
     `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
@@ -193,6 +212,7 @@ export function buildReviewAiPrompt(input: { productName: string; price?: string
     "",
     `KJØPERE${summary.userScore !== undefined ? ` – snitt ${summary.userScore}/100` : ""} (${summary.userCount} vurderinger)`,
     ...(users.length ? users : ["- Ingen kjøpervurderinger funnet."]),
+    ...(input.store ? ["", "BUTIKKEN JEG SER PÅ (vurdering av butikken, ikke produktet)", `- ${input.store.shopName}: ${formatScore(input.store.score)} av ${formatScore(input.store.maxScore)} fra ${input.store.count} vurderinger hos Prisjakt. ${input.store.url}`] : []),
     "",
     "Hentet av Cashback Norge. Poengsummene er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger.",
   ].join("\n");
@@ -206,7 +226,9 @@ export function isProductReviews(value: unknown): value is ProductReviews {
   if (!isRecord(value)) return false;
   const critics = value.critics;
   const users = value.users;
-  return (critics === undefined || (Array.isArray(critics) && critics.length <= 50 && critics.every((critic) =>
+  const store = value.store;
+  return (store === undefined || (isRecord(store) && typeof store.source === "string" && typeof store.shopName === "string" &&
+    isScore(store.score, store.maxScore) && typeof store.count === "number" && Number.isInteger(store.count) && store.count > 0 && isHttpsUrl(store.url))) && (critics === undefined || (Array.isArray(critics) && critics.length <= 50 && critics.every((critic) =>
     isRecord(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) &&
     (critic.title === undefined || typeof critic.title === "string") && (critic.quote === undefined || typeof critic.quote === "string")))) &&
     (users === undefined || (Array.isArray(users) && users.length <= 10 && users.every((user) =>

@@ -97,3 +97,15 @@ test("the same test from Godpris and Klarna counts once", () => {
   const klarna = [{ site: "Tek.no", score: 9.5, maxScore: 10, url: "https://b2b.testfreaks.com/click/out/?url=tek" }];
   assert.equal(summarizeProductReviews([{ critics: godpris }, { critics: klarna }])!.critics.length, 3);
 });
+
+test("Prisjakt shop ratings: shop name and its own users' score from each offer row", async () => {
+  const { readPrisjaktShopRatings } = await import("../src/shared/product-reviews.js");
+  // Offer rows from prisjakt.no/product.php?p=13395263 (2026-11-08), shortened.
+  const row = (name: string, score: number, count: number) => `{"index":0,"shopId":1,"name":"PlayStation 5 Pro","condition":"New","shopUserReviews":{"score":${score},"numberOfReviewsInScore":${count}},"isPaidMembership":true,"stockStatus":"InStock","shipping":{"nodes":[]},"shop":{"name":"${name}","membershipProgram":{"name":"Coop Medlem"}}}`;
+  const flight = `f:["$","$L8f","",{"offerRows":[${row("Obs", 2.68, 13)},${row("Komplett", 4.5, 33793)},${row("Bad", 9, 3)}]}]`;
+  const html = `<script>self.__next_f.push(${JSON.stringify([1, flight])})</script>`;
+  assert.deepEqual([...readPrisjaktShopRatings(html)], [["Obs", { score: 2.68, count: 13 }], ["Komplett", { score: 4.5, count: 33793 }]]);
+  assert.equal(readPrisjaktShopRatings("<html></html>").size, 0);
+  assert.equal(isProductReviews({ store: { source: "prisjakt", shopName: "Komplett", score: 4.5, maxScore: 5, count: 33793, url: "https://www.prisjakt.no/product.php?p=1" } }), true);
+  assert.equal(isProductReviews({ store: { source: "prisjakt", shopName: "Komplett", score: 4.5, maxScore: 5, count: 0, url: "https://www.prisjakt.no/" } }), false);
+});

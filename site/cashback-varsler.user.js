@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794159848
+// @version      1794160691
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4075,6 +4075,18 @@
     if (scores.length === 0) return void 0;
     return { source: "klarna", sourceName: "Norske kjøpere hos Klarna", score: Number((scores.reduce((sum, score) => sum + score, 0) / scores.length / 20).toFixed(2)), maxScore: 5, count: scores.length, url: pageUrl };
   }
+  function readPrisjaktShopRatings(html) {
+    const ratings = /* @__PURE__ */ new Map();
+    const text2 = readNextFlightPayloads(html).join("");
+    for (const match of text2.matchAll(/"shopUserReviews":\{"score":([\d.]+),"numberOfReviewsInScore":(\d+)\}[\s\S]{0,2500}?"shop":\{"name":"([^"]{1,80})"/g)) {
+      const score = Number(match[1]);
+      const count = Number(match[2]);
+      const name = match[3];
+      if (!(score >= 0 && score <= 5) || !Number.isInteger(count) || count <= 0 || ratings.has(name)) continue;
+      ratings.set(name, { score, count });
+    }
+    return ratings;
+  }
   function summarizeProductReviews(all) {
     const critics = /* @__PURE__ */ new Map();
     const users = /* @__PURE__ */ new Map();
@@ -4129,6 +4141,7 @@
       "",
       `KJØPERE${summary.userScore !== void 0 ? ` – snitt ${summary.userScore}/100` : ""} (${summary.userCount} vurderinger)`,
       ...users.length ? users : ["- Ingen kjøpervurderinger funnet."],
+      ...input.store ? ["", "BUTIKKEN JEG SER PÅ (vurdering av butikken, ikke produktet)", `- ${input.store.shopName}: ${formatScore(input.store.score)} av ${formatScore(input.store.maxScore)} fra ${input.store.count} vurderinger hos Prisjakt. ${input.store.url}`] : [],
       "",
       "Hentet av Cashback Norge. Poengsummene er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger."
     ].join("\n");
@@ -4139,7 +4152,8 @@
     if (!isRecord$7(value)) return false;
     const critics = value.critics;
     const users = value.users;
-    return (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string"))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url)));
+    const store2 = value.store;
+    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string"))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url)));
   }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
   const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
@@ -7861,17 +7875,22 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText, requestJson));
+    return sortPriceMatchOffers(await withUserRatings(allowedOffers, message, requestText, requestJson));
   }
   const PRISJAKT_PRODUCT_PAGE = /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/;
   const KLARNA_PRODUCT_ID = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
-  async function withUserRatings(offers, requestText, requestJson) {
+  async function withUserRatings(offers, message, requestText, requestJson) {
     return Promise.all(offers.map(async (offer) => {
       try {
         if (offer.source === "prisjakt" && PRISJAKT_PRODUCT_PAGE.test(offer.productUrl)) {
           const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
-          const user = html === void 0 ? void 0 : readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
-          return user === void 0 ? offer : { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], user] } };
+          if (html === void 0) return offer;
+          const user = readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
+          const merchantKeys = getCurrentMerchantKeys(message);
+          const shop = merchantKeys.length === 0 ? void 0 : [...readPrisjaktShopRatings(html)].find(([name]) => isCurrentMerchantName(name, merchantKeys));
+          const store2 = shop === void 0 ? void 0 : { source: "prisjakt", shopName: shop[0], score: shop[1].score, maxScore: 5, count: shop[1].count, url: offer.productUrl };
+          if (user === void 0 && store2 === void 0) return offer;
+          return { ...offer, reviews: { ...offer.reviews, ...user ? { users: [...offer.reviews?.users ?? [], user] } : {}, ...store2 ? { store: store2 } : {} } };
         }
         const klarnaId = offer.source === "klarna" ? offer.productUrl.match(KLARNA_PRODUCT_ID)?.[1] : void 0;
         if (klarnaId !== void 0) {
@@ -20769,20 +20788,14 @@ ${darkProviderCss}
       font-size: 10px;
       transition: transform 0.15s;
     }
-    .reviews-chips { display: inline-flex; flex-basis: 100%; flex-wrap: wrap; gap: 4px; }
-    .reviews-chips .review-chip { font-size: 11px; font-weight: 700; line-height: 20px; padding: 0 6px; }
-    .review-chip { color: #fff; font-variant-numeric: tabular-nums; }
-    .review-chip--high { background: #2f8a57; }
-    .review-chip--good { background: #4d9a3f; }
-    .review-chip--mixed { background: #b7861b; }
-    .review-chip--low { background: #b8453f; }
-    .review-chip--none { background: var(--cbn-soft); color: var(--cbn-muted); }
+    .review-score--high { color: #2f8a57; }
+    .review-score--good { color: #4d9a3f; }
+    .review-score--mixed { color: #b7861b; }
+    .review-score--low { color: #b8453f; }
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .reviews-row .price-match-price { color: var(--cbn-muted); font-size: 11px; font-weight: 600; }
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
     .reviews-copy { flex-shrink: 0; margin-left: auto; }
-    .reviews-section.collapsed .reviews-chips { display: none; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
@@ -22212,8 +22225,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (mainOffers.length > 0) body.append(offerList);
     if (regionPrices !== void 0 && regionPrices.prices.length > 0) body.append(regionPricesSection);
     if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
-    const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch2) => priceMatch2.reviews));
-    if (reviewSummary !== void 0) body.append(buildReviewsSection(reviewSummary, priceMatches[0]));
+    const hasStoreRating = priceMatches.some((priceMatch2) => priceMatch2.reviews?.store !== void 0);
+    const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch2) => priceMatch2.reviews)) ?? (hasStoreRating ? { critics: [], users: [], userCount: 0 } : void 0);
+    if (reviewSummary !== void 0) body.append(buildReviewsSection(reviewSummary, priceMatches[0], priceMatches.filter((offer2) => offer2.reviews !== void 0)));
     body.append(chipsSection);
     if (offers.length > 0) body.append(codesSection);
     let userHasVoted = false;
@@ -23090,7 +23104,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
   }
   const REVIEWS_COLLAPSED_KEY = "cashback-varsler-reviews-collapsed";
-  function buildReviewsSection(summary, priceMatch) {
+  function buildReviewsSection(summary, priceMatch, sources) {
     const section = document.createElement("div");
     section.className = "price-match-section reviews-section";
     const toggle = document.createElement("button");
@@ -23114,45 +23128,66 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     const header = document.createElement("div");
     header.className = "price-match-header";
-    const chips = document.createElement("span");
-    chips.className = "reviews-chips";
-    chips.append(
-      buildReviewScoreChip("Tester", summary.criticScore, summary.critics.length, [
-        `## Tester ${summary.criticScore ?? "–"}/100`,
-        ...summary.critics.map((critic) => `${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`),
-        "Vanlig snitt av norske tester, omregnet til 0–100. Krever minst 3 tester.",
-        "Kilde: testlisten på Godpris' produktside."
-      ].join("\n")),
-      buildReviewScoreChip("Kjøpere", summary.userScore, summary.userCount, [
-        `## Kjøpere ${summary.userScore ?? "–"}/100`,
-        ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${formatRatingCount(user.count)}`),
-        "Snitt vektet etter antall vurderinger. Krever minst 20 vurderinger.",
-        "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet."
-      ].join("\n"))
-    );
     const titleRow = document.createElement("span");
     titleRow.className = "reviews-title-row";
-    titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch));
-    header.append(titleRow, chips);
-    const rows = [
-      ...summary.critics.slice(0, 5).map((critic) => buildReviewRow(critic.site, critic.score, critic.maxScore, critic.quote ?? critic.title, critic.url, [
-        [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...critic.title ? [critic.title] : [], ...critic.quote ? [`«${critic.quote}»`] : []].join("\n"),
-        `Profesjonell test, ${new URL(critic.url).hostname.replace(/^www\./, "")}
-Funnet via Godpris' testliste
-Åpner testen hos utgiveren`
-      ])),
-      ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${formatRatingCount(user.count)}`, user.url, [
-        `## ${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)}
+    titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, sources.find((offer) => offer.reviews?.store)?.reviews?.store));
+    header.append(titleRow);
+    const storeOffer = sources.find((offer) => offer.reviews?.store !== void 0);
+    const store2 = storeOffer?.reviews?.store;
+    const storeRows = storeOffer === void 0 || store2 === void 0 ? [] : [(() => {
+      const score = Math.round(toHundredScale(store2.score, store2.maxScore) ?? 0);
+      return buildReviewRow(storeOffer, store2.shopName, `Butikken · ${formatRatingCount(store2.count)}`, score, store2.url, [
+        `## Butikken ${store2.shopName}: ${score}/100
+${formatReviewScore(store2.score, store2.maxScore)} stjerner
+${formatRatingCount(store2.count)}`,
+        `Vurdering av butikken, ikke produktet: service, levering og retur
+Kilde: ${getPriceMatchSourceName(storeOffer)}s brukere`
+      ]);
+    })()];
+    const seenTests = /* @__PURE__ */ new Set();
+    const testRows = [];
+    const buyerRows = [];
+    for (const offer of sources) {
+      const critics = (offer.reviews?.critics ?? []).filter((critic) => {
+        const key = `${critic.site.toLowerCase()}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
+        if (seenTests.has(key)) return false;
+        seenTests.add(key);
+        return true;
+      });
+      if (critics.length > 0) {
+        const score = Math.round(critics.reduce((sum, critic) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / critics.length);
+        testRows.push(buildReviewRow(
+          offer,
+          "Tester",
+          critics.map((critic) => critic.site).join(" · "),
+          score,
+          offer.source === "godpris" ? `${offer.productUrl}#tester` : offer.productUrl,
+          [
+            `## Tester ${score}/100
+${critics.length} ${critics.length === 1 ? "norsk test" : "norske tester"}, snitt omregnet til 0–100`,
+            ...critics.map((critic) => [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...critic.title ? [critic.title] : [], ...critic.quote ? [`«${critic.quote}»`] : []].join("\n")),
+            `Kilde: testlisten hos ${getPriceMatchSourceName(offer)}
+Bare norske utgivere`
+          ]
+        ));
+      }
+      for (const user of offer.reviews?.users ?? []) {
+        const score = Math.round(toHundredScale(user.score, user.maxScore) ?? 0);
+        buyerRows.push(buildReviewRow(offer, "Kjøpere", formatRatingCount(user.count), score, user.url, [
+          `## Kjøpere ${score}/100
+${formatReviewScore(user.score, user.maxScore)} stjerner
 ${formatRatingCount(user.count)}`,
-        `Fra kildens produktside (strukturerte data)
-Antallet er kildens eget, og kan omfatte andre varianter av produktet
-Vi ser ikke de enkelte vurderingene`
-      ]))
-    ];
+          `Kilde: ${getPriceMatchSourceName(offer)}s produktside
+${user.source === "klarna" ? "Bare anmeldelser merket norske" : "Norske brukere"}
+Antallet er kildens eget og kan omfatte andre varianter av produktet`
+        ]));
+      }
+    }
+    const rows = [...storeRows, ...testRows, ...buyerRows];
     section.append(header, ...rows);
     return section;
   }
-  function buildReviewCopyButton(summary, priceMatch) {
+  function buildReviewCopyButton(summary, priceMatch, store2) {
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "cbn-button cbn-button--quiet copy-code-btn reviews-copy";
@@ -23171,6 +23206,7 @@ Vi ser ikke de enkelte vurderingene`
         ...priceMatch ? { price: priceMatch.price, shopName: priceMatch.shopName } : {},
         pageUrl: window.location.href,
         summary,
+        ...store2 ? { store: store2 } : {},
         date: (/* @__PURE__ */ new Date()).toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" })
       });
       void navigator.clipboard.writeText(prompt).then(() => {
@@ -23216,14 +23252,7 @@ Vi ser ikke de enkelte vurderingene`
       }
     }
   }
-  function buildReviewScoreChip(label, score, count, tip) {
-    const chip = document.createElement("span");
-    chip.className = `cbn-chip price-match-info-chip review-chip review-chip--${score === void 0 ? "none" : getReviewScoreLevel(score)}`;
-    chip.textContent = `${label} ${score ?? "–"} · ${count.toLocaleString("nb-NO")}`;
-    setReviewTip(chip, [tip]);
-    return chip;
-  }
-  function buildReviewRow(name, score, maxScore, detail, url, tip) {
+  function buildReviewRow(offer, name, detail, score, url, tip) {
     const row = document.createElement("a");
     row.className = "cbn-row price-match-card reviews-row";
     row.href = url;
@@ -23234,21 +23263,17 @@ Vi ser ikke de enkelte vurderingene`
     const product = document.createElement("span");
     product.className = "price-match-product";
     product.textContent = name;
-    title.append(product);
-    if (detail) {
-      const shop = document.createElement("span");
-      shop.className = "price-match-shop";
-      shop.textContent = detail;
-      title.append(shop);
-    }
-    const raw = document.createElement("span");
-    raw.className = "price-match-price";
-    raw.textContent = `${String(Number(score.toFixed(2))).replace(".", ",")}/${String(maxScore).replace(".", ",")}`;
-    const hundred = Math.round(toHundredScale(score, maxScore) ?? 0);
+    const shop = document.createElement("span");
+    shop.className = "price-match-shop";
+    shop.textContent = detail;
+    title.append(product, shop);
     const chip = document.createElement("span");
-    chip.className = `cbn-chip provider-badge review-chip review-chip--${getReviewScoreLevel(hundred)}`;
-    chip.textContent = String(hundred);
-    row.append(title, raw, chip);
+    chip.className = `price-match-price review-score review-score--${getReviewScoreLevel(score)}`;
+    chip.textContent = String(score);
+    const badge = document.createElement("span");
+    badge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(offer)}`;
+    badge.textContent = getPriceMatchSourceName(offer);
+    row.append(title, chip, badge);
     setReviewTip(row, tip);
     return row;
   }

@@ -35,7 +35,7 @@ import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
 import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-match.js";
 import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
-import { klarnaReviewsUrl, readJsonLdUserRating, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
+import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
   findVinmonopoletPriceMatch,
@@ -158,7 +158,7 @@ export async function findPriceMatches(
     return [];
   }
 
-  return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText, requestJson));
+  return sortPriceMatchOffers(await withUserRatings(allowedOffers, message, requestText, requestJson));
 }
 
 // Reviews are not in the APIs the price match uses. Prisjakt: the ProductGroup JSON-LD on the
@@ -167,13 +167,19 @@ export async function findPriceMatches(
 // Bounded: one page or two JSON reads per matched product; a failure only drops the reviews.
 const PRISJAKT_PRODUCT_PAGE = /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/;
 const KLARNA_PRODUCT_ID = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
-async function withUserRatings(offers: PriceMatchOffer[], requestText: TextRequest | undefined, requestJson: JsonRequest | undefined): Promise<PriceMatchOffer[]> {
+async function withUserRatings(offers: PriceMatchOffer[], message: GetPriceMatchForProductMessage, requestText: TextRequest | undefined, requestJson: JsonRequest | undefined): Promise<PriceMatchOffer[]> {
   return Promise.all(offers.map(async (offer) => {
     try {
       if (offer.source === "prisjakt" && PRISJAKT_PRODUCT_PAGE.test(offer.productUrl)) {
         const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
-        const user = html === undefined ? undefined : readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
-        return user === undefined ? offer : { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), user] } };
+        if (html === undefined) return offer;
+        const user = readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
+        // Prisjakt users' rating of the shop the reader is on, when it sells the product.
+        const merchantKeys = getCurrentMerchantKeys(message);
+        const shop = merchantKeys.length === 0 ? undefined : [...readPrisjaktShopRatings(html)].find(([name]) => isCurrentMerchantName(name, merchantKeys));
+        const store = shop === undefined ? undefined : { source: "prisjakt", shopName: shop[0], score: shop[1].score, maxScore: 5, count: shop[1].count, url: offer.productUrl };
+        if (user === undefined && store === undefined) return offer;
+        return { ...offer, reviews: { ...offer.reviews, ...(user ? { users: [...(offer.reviews?.users ?? []), user] } : {}), ...(store ? { store } : {}) } };
       }
       const klarnaId = offer.source === "klarna" ? offer.productUrl.match(KLARNA_PRODUCT_ID)?.[1] : undefined;
       if (klarnaId !== undefined) {
