@@ -271,3 +271,11 @@ test("JSON-LD: the named Product with a rating wins over a rating-less one first
   const html = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"L'Oréal Professionnel Metal DX Shampoo 300 ml"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"L'Oréal Professionnel Metal DX Shampoo 300 ml","gtin13":"30163188","aggregateRating":{"@type":"AggregateRating","ratingValue":"5","reviewCount":"5"}}</script>`;
   assert.equal(readJsonLdUserRating(html, "store:www.kicks.no", "Kicks", "https://www.kicks.no/x")?.count, 5);
 });
+
+test("JSON-LD: a ProductGroup's variant can carry the rating (Kicks)", async () => {
+  const { readJsonLdUserRating } = await import("../src/shared/product-reviews.js");
+  // kicks.no ProductGroup with hasVariant (2026-11-08), shortened.
+  const html = `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "ProductGroup", name: "L'Oréal Professionnel Metal DX Shampoo 300 ml",
+    hasVariant: [{ "@type": "Product", name: "L'Oréal Professionnel Metal DX Shampoo 300 ml 300 ml", gtin13: "30163188", aggregateRating: { "@type": "AggregateRating", ratingValue: "5", reviewCount: "5" } }] })}</script>`;
+  assert.equal(readJsonLdUserRating(html, "store:www.kicks.no", "Kicks", "https://www.kicks.no/x")?.count, 5);
+});

@@ -24,7 +24,9 @@ const MAX_TITLE_LINKS = 3;
 const gtin14 = (value: string) => value.replace(/\D/g, "").padStart(14, "0");
 
 function ldProducts(html: string): Record<string, unknown>[] {
-  const flat = (value: unknown): unknown[] => Array.isArray(value) ? value.flatMap(flat) : isRecord(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+  // A ProductGroup's variants (hasVariant) can carry the rating (Kicks).
+  const flat = (value: unknown): unknown[] => Array.isArray(value) ? value.flatMap(flat) : !isRecord(value) ? [value] :
+    Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value, ...(Array.isArray(value.hasVariant) ? value.hasVariant.flatMap(flat) : [])];
   return readLdJsonScripts(html).flatMap(flat).filter(isRecord).filter((item) => {
     const types = Array.isArray(item["@type"]) ? item["@type"] : [item["@type"]];
     return types.includes("Product") || types.includes("ProductGroup");

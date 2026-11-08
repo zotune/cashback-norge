@@ -15510,11 +15510,15 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   const seenBuyers = new Set<string>();
   const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user })))
     .filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source)))
-    .sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
+    .sort((a, b) => {
+      const aStore = a.user.source.startsWith("store:");
+      const bStore = b.user.source.startsWith("store:");
+      return Number(aStore) - Number(bStore) || (aStore ? b.user.count - a.user.count : reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
+    });
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
     const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-    rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
+    rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...compactSourceChips(buyers.map(({ offer, user }) => buyerName(offer, user).split(",")[0]!))], score, buyers[0]!.user.url, {
       title: productTitle,
       note: "Hva norske kjøpere mener om produktet. Snittet er vektet etter antall vurderinger.",
       // Like the price match: the product found at the source on top, the source as the first chip.
@@ -15532,7 +15536,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (tests.length > 0) {
     const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
     const via = tests[0]!.offer;
-    rows.push(buildReviewRow("Eksperttester", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
+    rows.push(buildReviewRow("Eksperttester", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))], score,
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
         title: "Eksperttester",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
@@ -15612,6 +15616,12 @@ function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipCo
       bindPanelTooltipHover(row, tooltip, shadowRoot);
     }
   }
+}
+
+// The row names its first source and how many more ("Lyko", "+2"); the tooltip lists them all.
+function compactSourceChips(names: string[]): string[] {
+  const unique = [...new Set(names)];
+  return unique.length === 0 ? [] : [unique[0]!, ...(unique.length > 1 ? [`+${unique.length - 1}`] : [])];
 }
 
 // Comparison sites first, in the price match's order, then shops.

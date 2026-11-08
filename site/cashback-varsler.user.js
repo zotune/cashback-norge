@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794164304
+// @version      1794164536
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1966,7 +1966,7 @@ query OfferList($productId: Int!) {
   }
   function readJsonLdUserRating(html, source2, sourceName, pageUrl) {
     const scripts = readLdJsonScripts(html);
-    const flat = (value) => Array.isArray(value) ? value.flatMap(flat) : isRecord$7(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+    const flat = (value) => Array.isArray(value) ? value.flatMap(flat) : !isRecord$7(value) ? [value] : Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value, ...Array.isArray(value.hasVariant) ? value.hasVariant.flatMap(flat) : []];
     const named = scripts.flatMap(flat).filter((item) => isRecord$7(item) && typeof item.name === "string" && item.name.trim().length > 0 && [item["@type"]].flat().some((type) => type === "Product" || type === "ProductGroup"));
     const product = named.find((item) => isRecord$7(item.aggregateRating)) ?? selectProductLdJson(scripts) ?? named[0];
     const rating = product !== void 0 && isRecord$7(product.aggregateRating) ? product.aggregateRating : void 0;
@@ -7435,7 +7435,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   const MAX_TITLE_LINKS = 3;
   const gtin14 = (value) => value.replace(/\D/g, "").padStart(14, "0");
   function ldProducts(html) {
-    const flat = (value) => Array.isArray(value) ? value.flatMap(flat) : isRecord$7(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+    const flat = (value) => Array.isArray(value) ? value.flatMap(flat) : !isRecord$7(value) ? [value] : Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value, ...Array.isArray(value.hasVariant) ? value.hasVariant.flatMap(flat) : []];
     return readLdJsonScripts(html).flatMap(flat).filter(isRecord$7).filter((item) => {
       const types = Array.isArray(item["@type"]) ? item["@type"] : [item["@type"]];
       return types.includes("Product") || types.includes("ProductGroup");
@@ -23780,11 +23780,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
     const seenBuyers = /* @__PURE__ */ new Set();
-    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source))).sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
+    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source))).sort((a, b) => {
+      const aStore = a.user.source.startsWith("store:");
+      const bStore = b.user.source.startsWith("store:");
+      return Number(aStore) - Number(bStore) || (aStore ? b.user.count - a.user.count : reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
+    });
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-      rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
+      rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...compactSourceChips(buyers.map(({ offer, user }) => buyerName(offer, user).split(",")[0]))], score, buyers[0].user.url, {
         title: productTitle,
         note: "Hva norske kjøpere mener om produktet. Snittet er vektet etter antall vurderinger.",
         // Like the price match: the product found at the source on top, the source as the first chip.
@@ -23808,7 +23812,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const via = tests[0].offer;
       rows.push(buildReviewRow(
         "Eksperttester",
-        [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)],
+        [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))],
         score,
         via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
         {
@@ -23890,6 +23894,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         bindPanelTooltipHover(row, tooltip, shadowRoot);
       }
     }
+  }
+  function compactSourceChips(names) {
+    const unique = [...new Set(names)];
+    return unique.length === 0 ? [] : [unique[0], ...unique.length > 1 ? [`+${unique.length - 1}`] : []];
   }
   function reviewSourceRank(offer) {
     return ["prisjakt", "prisradar", "klarna", "godpris"].indexOf(offer.source ?? "") >>> 0;

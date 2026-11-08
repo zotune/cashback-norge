@@ -83,7 +83,9 @@ export function readJsonLdUserRating(html: string, source: string, sourceName: s
   // Prisjakt publishes a ProductGroup (the product with its colour variants) instead of a Product.
   // Some shops (Kicks) put a rating-less Product first; the named Product with a rating wins.
   const scripts = readLdJsonScripts(html);
-  const flat = (value: unknown): unknown[] => Array.isArray(value) ? value.flatMap(flat) : isRecord(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+  // A ProductGroup's variants (hasVariant) can carry the rating (Kicks).
+  const flat = (value: unknown): unknown[] => Array.isArray(value) ? value.flatMap(flat) : !isRecord(value) ? [value] :
+    Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value, ...(Array.isArray(value.hasVariant) ? value.hasVariant.flatMap(flat) : [])];
   const named = scripts.flatMap(flat).filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.name === "string" && item.name.trim().length > 0 &&
     [item["@type"]].flat().some((type) => type === "Product" || type === "ProductGroup"));
   const product = named.find((item) => isRecord(item.aggregateRating)) ?? selectProductLdJson(scripts) ?? named[0];
