@@ -1,6 +1,7 @@
 import { createTooltipSection, setTooltipContent } from "../shared/tooltip-content";
 import { createAutomaticComparison } from "./automatic-comparison";
 import { createStoredTrustpilotClient } from "./trustpilot-client";
+import { findPrisjaktShopRating } from "../shared/prisjakt-shop-rating";
 import { isFreshTrustpilotResult, readTrustpilotPage, trustpilotPageDomain, trustpilotDomain, type TrustpilotResult, type TrustpilotRequest } from "../shared/trustpilot";
 import type { StoreReviewsResponse } from "../shared/extension-messages";
 import { getMobileSupplier, loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers";
@@ -1490,12 +1491,26 @@ function updateTrustpilotResult(result: TrustpilotResult): void {
 async function loadCurrentStoreReviews(): Promise<void> {
   if (!isContentScriptActive()) return;
   if (__USERSCRIPT_BUILD__) {
-    const result = await userscriptStoreReviews.get(CURRENT_HOST);
+    const [result, prisjakt] = await Promise.all([
+      userscriptStoreReviews.get(CURRENT_HOST),
+      prisjaktShopRating ? Promise.resolve(prisjaktShopRating) : findPrisjaktShopRating(location.origin, userscriptJsonRequest).catch(() => undefined),
+    ]);
+    updatePrisjaktShopRating(prisjakt);
     if (result) updateTrustpilotResult(result);
   } else {
     const response = await sendRuntimeMessage<StoreReviewsResponse>({ type: "get-store-reviews", url: location.origin });
+    if (response?.ok) updatePrisjaktShopRating(response.prisjakt && isProductReviews({ store: response.prisjakt }) ? response.prisjakt : undefined);
     if (response?.ok && response.result && isFreshTrustpilotResult(response.result, CURRENT_HOST)) updateTrustpilotResult(response.result);
   }
+}
+
+// Prisjakt's rating of the current shop by domain, kept for the session like the Trustpilot result.
+let prisjaktShopRating: StoreRating | undefined;
+function updatePrisjaktShopRating(rating: StoreRating | undefined): void {
+  if (rating === undefined || prisjaktShopRating?.count === rating.count) return;
+  prisjaktShopRating = rating;
+  if (rerenderStoreReviews) rerenderStoreReviews();
+  else requestCurrentOffers();
 }
 
 function startStoreReviews(offers: CashbackOffer[]): void {
@@ -1597,7 +1612,7 @@ async function renderCurrentContext(): Promise<void> {
   ]);
   priceMatchesSettled = true;
   if (generation !== renderGeneration) return;
-  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported() || visibleTrustpilotResult() !== undefined) {
+  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported() || visibleTrustpilotResult() !== undefined || prisjaktShopRating !== undefined) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
     scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
     return;
@@ -14276,9 +14291,17 @@ function renderNotice(
   addCurrentPageUserRating(priceMatches);
   const hasStoreRating = priceMatches.some((priceMatch) => priceMatch.reviews?.store !== undefined);
   const storeReviews = visibleTrustpilotResult();
-  const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch) => priceMatch.reviews)) ??
-    (hasStoreRating || storeReviews !== undefined ? { critics: [], users: [], userCount: 0 } : undefined);
-  if (reviewSummary !== undefined) body.append(buildReviewsSection(reviewSummary, priceMatches[0], priceMatches.filter((offer) => offer.reviews !== undefined), storeReviews));
+  // The shop's ratings and its own product rating need no price match: a page-only source
+  // carries them when nothing was matched.
+  const pageRating = priceMatches.length === 0 ? readCurrentPageUserRating() : undefined;
+  const reviewSources: PriceMatchOffer[] = [
+    ...priceMatches.filter((offer) => offer.reviews !== undefined).map((offer) => prisjaktShopRating && offer.reviews?.store?.source === "prisjakt" ? { ...offer, reviews: (({ store: _store, ...rest }) => rest)(offer.reviews) } : offer),
+    ...(prisjaktShopRating || pageRating ? [{ source: "prisjakt" as const, shopName: "", price: "", amount: 0, currency: "NOK", productName: document.title, productUrl: window.location.href,
+      reviews: { ...(prisjaktShopRating ? { store: prisjaktShopRating } : {}), ...(pageRating ? { users: [pageRating] } : {}) } }] : []),
+  ];
+  const reviewSummary = summarizeProductReviews(reviewSources.map((offer) => offer.reviews)) ??
+    (hasStoreRating || storeReviews !== undefined || prisjaktShopRating !== undefined ? { critics: [], users: [], userCount: 0 } : undefined);
+  if (reviewSummary !== undefined) body.append(buildReviewsSection(reviewSummary, priceMatches[0], reviewSources, storeReviews));
   body.append(chipsSection);
   if (offers.length > 0) body.append(codesSection);
 
@@ -15452,7 +15475,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       title: `Butikk (kjøpere)${shopName ? ` · ${shopName}` : ""}`,
       note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
       items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0,
-        chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)] })),
+        chips: [`${formatReviewScore(store.score, store.maxScore)}${store.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store.count)] })),
     };
     const chips = [...(shopName ? [shopName] : []), ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
     if (profile) {

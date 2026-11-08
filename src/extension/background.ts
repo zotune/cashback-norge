@@ -8,6 +8,7 @@ import {
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import { createCashbackIndexCache, type CachedIndex } from "./cashback-index-cache.js";
 import { createStoredTrustpilotClient } from "./trustpilot-client.js";
+import { findPrisjaktShopRating } from "../shared/prisjakt-shop-rating.js";
 import { trustpilotDomain } from "../shared/trustpilot.js";
 import { getCardBenefitOffers } from "../shared/card-benefits.js";
 import { findPriceMatches } from "../shared/price-match.js";
@@ -129,8 +130,15 @@ async function handleRuntimeMessage(
       sendResponse({ ok: false, reason: "Trustpilot: butikkdomenet stemmer ikke med fanen" });
       return;
     }
-    const result = await storeReviewsClient.get(message.url);
-    sendResponse({ ok: true, ...(result ? { result } : {}) });
+    // Prisjakt's own rating of the shop (by domain) comes with Trustpilot, also without a price match.
+    const [result, prisjakt] = await Promise.all([
+      storeReviewsClient.get(message.url),
+      findPrisjaktShopRating(message.url, async (url, init) => {
+        const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+        return response.ok ? response.json() : undefined;
+      }).catch(() => undefined),
+    ]);
+    sendResponse({ ok: true, ...(result ? { result } : {}), ...(prisjakt ? { prisjakt } : {}) });
     return;
   }
   if (isCaptureStoreReviewsMessage(message)) {

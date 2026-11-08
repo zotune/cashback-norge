@@ -38,7 +38,6 @@ import { findSesumPriceMatch } from "./sesum-price-match.js";
 import { findPowerUserRating } from "./power-reviews.js";
 import { findTekReview } from "./tek-reviews.js";
 import { findGtinStoreRatings } from "./store-reviews.js";
-import { findPrisjaktShopRating } from "./prisjakt-shop-rating.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
@@ -169,18 +168,6 @@ export async function findPriceMatches(
     findTekReview(message, requestJson ?? fetchReviewJson).catch(() => undefined),
     findGtinStoreRatings(message, requestText ?? fetchReviewPage).catch(() => []),
   ]);
-  // Prisjakt's rating of the shop on the page, looked up by the page's own domain: all its
-  // ratings, also when the shop does not sell this product on Prisjakt. The product page's
-  // offer-row rating stays as the fallback.
-  const shop = rated.length === 0 ? undefined : await findPrisjaktShopRating(message.url, requestJson ?? fetchReviewJson).catch(() => undefined);
-  if (shop !== undefined) {
-    for (const [index, offer] of rated.entries()) {
-      if (offer.reviews?.store?.source !== "prisjakt") continue;
-      const { store: _replaced, ...reviews } = offer.reviews;
-      rated[index] = { ...offer, reviews };
-    }
-    rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, store: shop } };
-  }
   if (gtinStores.length > 0) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, users: [...(rated[0]!.reviews?.users ?? []), ...gtinStores] } };
   if (tek !== undefined) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, critics: [...(rated[0]!.reviews?.critics ?? []), tek] } };
   if (power !== undefined && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {

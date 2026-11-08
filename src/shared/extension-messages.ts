@@ -1,4 +1,4 @@
-import type { ProductReviews } from "./product-reviews.js";
+import type { ProductReviews, StoreRating } from "./product-reviews.js";
 import { isTrustpilotProfile, type TrustpilotProfile, type TrustpilotResult } from "./trustpilot.js";
 import {
   type CashbackOffer,
@@ -35,7 +35,7 @@ export type GetOffersForUrlMessage = {
 
 export type GetStoreReviewsMessage = { type: "get-store-reviews"; url: string };
 export type CaptureStoreReviewsMessage = { type: "capture-store-reviews"; profile: TrustpilotProfile };
-export type StoreReviewsResponse = { ok: true; result?: TrustpilotResult } | { ok: false; reason: string };
+export type StoreReviewsResponse = { ok: true; result?: TrustpilotResult; prisjakt?: StoreRating } | { ok: false; reason: string };
 
 export function isGetStoreReviewsMessage(value: unknown): value is GetStoreReviewsMessage {
   return isRecord(value) && value.type === "get-store-reviews" && typeof value.url === "string" && value.url.length <= 2048;
