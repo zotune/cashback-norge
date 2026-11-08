@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794160691
+// @version      1794161077
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4106,7 +4106,7 @@
     return { critics: criticList, users: userList, userCount, ...criticScore !== void 0 ? { criticScore } : {}, ...userScore !== void 0 ? { userScore } : {} };
   }
   function getReviewScoreLevel(score) {
-    return score >= 85 ? "high" : score >= 75 ? "good" : score >= 60 ? "mixed" : "low";
+    return score >= 85 ? "high" : score >= 75 ? "good" : score >= 50 ? "mixed" : "low";
   }
   const formatScore = (score) => String(Number(score.toFixed(2))).replace(".", ",");
   function buildReviewAiPrompt(input) {
@@ -20788,10 +20788,14 @@ ${darkProviderCss}
       font-size: 10px;
       transition: transform 0.15s;
     }
-    .review-score--high { color: #2f8a57; }
-    .review-score--good { color: #4d9a3f; }
-    .review-score--mixed { color: #b7861b; }
-    .review-score--low { color: #b8453f; }
+    .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
+    .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
+    .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
+    .review-tooltip-score { font-size: 12px; line-height: 20px; }
+    .review-score--high { background: #00a33c; }
+    .review-score--good { background: #00a33c; }
+    .review-score--mixed { background: #d9a000; color: #1a1a1a !important; }
+    .review-score--low { background: #e0352b; }
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
@@ -23114,7 +23118,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     arrow.className = "price-match-toggle-arrow";
     arrow.textContent = "▼";
     const label = document.createElement("span");
-    label.textContent = "Anmeldelser";
+    label.textContent = "Vurderinger";
     toggle.append(arrow, label);
     toggle.addEventListener("click", () => {
       const collapsed = section.classList.toggle("collapsed");
@@ -23132,58 +23136,58 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     titleRow.className = "reviews-title-row";
     titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, sources.find((offer) => offer.reviews?.store)?.reviews?.store));
     header.append(titleRow);
-    const storeOffer = sources.find((offer) => offer.reviews?.store !== void 0);
-    const store2 = storeOffer?.reviews?.store;
-    const storeRows = storeOffer === void 0 || store2 === void 0 ? [] : [(() => {
-      const score = Math.round(toHundredScale(store2.score, store2.maxScore) ?? 0);
-      return buildReviewRow(storeOffer, store2.shopName, `Butikken · ${formatRatingCount(store2.count)}`, score, store2.url, [
-        `## Butikken ${store2.shopName}: ${score}/100
-${formatReviewScore(store2.score, store2.maxScore)} stjerner
-${formatRatingCount(store2.count)}`,
-        `Vurdering av butikken, ikke produktet: service, levering og retur
-Kilde: ${getPriceMatchSourceName(storeOffer)}s brukere`
-      ]);
-    })()];
-    const seenTests = /* @__PURE__ */ new Set();
-    const testRows = [];
-    const buyerRows = [];
-    for (const offer of sources) {
-      const critics = (offer.reviews?.critics ?? []).filter((critic) => {
-        const key = `${critic.site.toLowerCase()}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
-        if (seenTests.has(key)) return false;
-        seenTests.add(key);
-        return true;
-      });
-      if (critics.length > 0) {
-        const score = Math.round(critics.reduce((sum, critic) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / critics.length);
-        testRows.push(buildReviewRow(
-          offer,
-          "Tester",
-          critics.map((critic) => critic.site).join(" · "),
-          score,
-          offer.source === "godpris" ? `${offer.productUrl}#tester` : offer.productUrl,
-          [
-            `## Tester ${score}/100
-${critics.length} ${critics.length === 1 ? "norsk test" : "norske tester"}, snitt omregnet til 0–100`,
-            ...critics.map((critic) => [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...critic.title ? [critic.title] : [], ...critic.quote ? [`«${critic.quote}»`] : []].join("\n")),
-            `Kilde: testlisten hos ${getPriceMatchSourceName(offer)}
-Bare norske utgivere`
-          ]
-        ));
-      }
-      for (const user of offer.reviews?.users ?? []) {
-        const score = Math.round(toHundredScale(user.score, user.maxScore) ?? 0);
-        buyerRows.push(buildReviewRow(offer, "Kjøpere", formatRatingCount(user.count), score, user.url, [
-          `## Kjøpere ${score}/100
-${formatReviewScore(user.score, user.maxScore)} stjerner
-${formatRatingCount(user.count)}`,
-          `Kilde: ${getPriceMatchSourceName(offer)}s produktside
-${user.source === "klarna" ? "Bare anmeldelser merket norske" : "Norske brukere"}
-Antallet er kildens eget og kan omfatte andre varianter av produktet`
-        ]));
-      }
+    const rows = [];
+    const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
+    if (stores.length > 0) {
+      const count = stores.reduce((sum, item) => sum + item.store.count, 0);
+      const score = Math.round(stores.reduce((sum, item) => sum + (toHundredScale(item.store.score, item.store.maxScore) ?? 0) * item.store.count, 0) / count);
+      rows.push(buildReviewRow("Butikk", [stores[0].store.shopName, formatRatingCount(count)], score, stores[0].store.url, {
+        title: `Butikken ${stores[0].store.shopName}`,
+        note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
+        items: stores.map(({ offer, store: store2 }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store2.score, store2.maxScore) ?? 0, chips: [`${formatReviewScore(store2.score, store2.maxScore)} stjerner`, formatRatingCount(store2.count)] }))
+      }));
     }
-    const rows = [...storeRows, ...testRows, ...buyerRows];
+    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).sort((a, b) => reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
+    if (buyers.length > 0) {
+      const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
+      const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
+      rows.push(buildReviewRow("Kjøpere", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0].user.url, {
+        title: "Kjøpere",
+        note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
+        items: buyers.map(({ offer, user }) => ({
+          name: getPriceMatchSourceName(offer),
+          score: toHundredScale(user.score, user.maxScore) ?? 0,
+          chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...user.source === "klarna" ? ["Bare norske"] : []]
+        }))
+      }));
+    }
+    const seenTests = /* @__PURE__ */ new Set();
+    const tests = sources.flatMap((offer) => (offer.reviews?.critics ?? []).map((critic) => ({ offer, critic }))).filter(({ critic }) => {
+      const key = `${critic.site.toLowerCase()}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
+      if (seenTests.has(key)) return false;
+      seenTests.add(key);
+      return true;
+    });
+    if (tests.length > 0) {
+      const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
+      const via = tests[0].offer;
+      rows.push(buildReviewRow(
+        "Anmeldelser",
+        [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)],
+        score,
+        via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
+        {
+          title: "Anmeldelser",
+          note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
+          items: tests.map(({ critic }) => ({
+            name: critic.site,
+            score: toHundredScale(critic.score, critic.maxScore) ?? 0,
+            chips: [formatReviewScore(critic.score, critic.maxScore), ...critic.title ? [critic.title] : []],
+            ...critic.quote ? { quote: critic.quote } : {}
+          }))
+        }
+      ));
+    }
     section.append(header, ...rows);
     return section;
   }
@@ -23226,9 +23230,6 @@ Antallet er kildens eget og kan omfatte andre varianter av produktet`
   function formatReviewScore(score, maxScore) {
     return `${String(Number(score.toFixed(2))).replace(".", ",")} av ${String(maxScore).replace(".", ",")}`;
   }
-  function setReviewTip(element, parts) {
-    element.dataset.reviewTip = JSON.stringify(parts);
-  }
   function attachReviewTooltips(shadowRoot, tooltipControls) {
     for (const element of shadowRoot.querySelectorAll(".reviews-section [data-review-hover-tip]")) {
       const tooltip = document.createElement("div");
@@ -23238,10 +23239,12 @@ Antallet er kildens eget og kan omfatte andre varianter av produktet`
       element.addEventListener("mouseenter", () => showChipTooltipRightOfPanel(tooltip, element, shadowRoot));
       element.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
     }
-    for (const element of shadowRoot.querySelectorAll(".reviews-section [data-review-tip]")) {
+    for (const element of shadowRoot.querySelectorAll(".reviews-section .reviews-row")) {
+      const tip = reviewTooltips.get(element);
+      if (tip === void 0) continue;
       const tooltip = document.createElement("div");
-      tooltip.className = element.classList.contains("price-match-card") ? "offer-tooltip price-match-tooltip" : "bonus-chip-tooltip";
-      setTooltipContent(tooltip, JSON.parse(element.dataset.reviewTip));
+      tooltip.className = "offer-tooltip price-match-tooltip";
+      buildReviewTooltipContent(tooltip, tip);
       shadowRoot.append(tooltip);
       const row = tooltipControls.addBeside(element, tooltip, "Vis kildene");
       if (element.classList.contains("price-match-card")) {
@@ -23252,7 +23255,18 @@ Antallet er kildens eget og kan omfatte andre varianter av produktet`
       }
     }
   }
-  function buildReviewRow(offer, name, detail, score, url, tip) {
+  function reviewSourceRank(offer) {
+    return ["prisjakt", "prisradar", "klarna", "godpris"].indexOf(offer.source ?? "") >>> 0;
+  }
+  const reviewTooltips = /* @__PURE__ */ new WeakMap();
+  function buildReviewScoreBox(score, className = "price-match-price") {
+    const box = document.createElement("span");
+    const rounded = Math.round(score);
+    box.className = `${className} review-score review-score--${getReviewScoreLevel(rounded)}`;
+    box.textContent = String(rounded);
+    return box;
+  }
+  function buildReviewRow(name, chips, score, url, tip) {
     const row = document.createElement("a");
     row.className = "cbn-row price-match-card reviews-row";
     row.href = url;
@@ -23263,19 +23277,37 @@ Antallet er kildens eget og kan omfatte andre varianter av produktet`
     const product = document.createElement("span");
     product.className = "price-match-product";
     product.textContent = name;
-    const shop = document.createElement("span");
-    shop.className = "price-match-shop";
-    shop.textContent = detail;
-    title.append(product, shop);
-    const chip = document.createElement("span");
-    chip.className = `price-match-price review-score review-score--${getReviewScoreLevel(score)}`;
-    chip.textContent = String(score);
-    const badge = document.createElement("span");
-    badge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(offer)}`;
-    badge.textContent = getPriceMatchSourceName(offer);
-    row.append(title, chip, badge);
-    setReviewTip(row, tip);
+    title.append(product, buildPriceMatchInfoChips(chips));
+    row.append(title, buildReviewScoreBox(score));
+    reviewTooltips.set(row, tip);
     return row;
+  }
+  function buildReviewTooltipContent(tooltip, tip) {
+    tooltip.classList.add("cbn-tooltip-details");
+    const section = document.createElement("div");
+    section.className = "offer-tooltip-section";
+    const heading = document.createElement("span");
+    heading.className = "offer-tooltip-title";
+    heading.textContent = tip.title;
+    const note = document.createElement("span");
+    note.className = "tooltip-content-note";
+    note.textContent = tip.note;
+    section.append(heading, note);
+    for (const item of tip.items) {
+      const row = document.createElement("div");
+      row.className = "cbn-row cbn-row--details comparison-tooltip-option review-tooltip-option";
+      const name = document.createElement("span");
+      name.textContent = item.name;
+      row.append(name, buildReviewScoreBox(item.score, "review-tooltip-score"), buildPriceMatchInfoChips(item.chips));
+      if (item.quote) {
+        const quote = document.createElement("span");
+        quote.className = "tooltip-content-note review-tooltip-quote";
+        quote.textContent = `«${item.quote}»`;
+        row.append(quote);
+      }
+      section.append(row);
+    }
+    tooltip.append(section);
   }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");

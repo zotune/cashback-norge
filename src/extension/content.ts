@@ -12725,10 +12725,14 @@ function renderNotice(
       font-size: 10px;
       transition: transform 0.15s;
     }
-    .review-score--high { color: #2f8a57; }
-    .review-score--good { color: #4d9a3f; }
-    .review-score--mixed { color: #b7861b; }
-    .review-score--low { color: #b8453f; }
+    .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
+    .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
+    .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
+    .review-tooltip-score { font-size: 12px; line-height: 20px; }
+    .review-score--high { background: #00a33c; }
+    .review-score--good { background: #00a33c; }
+    .review-score--mixed { background: #d9a000; color: #1a1a1a !important; }
+    .review-score--low { background: #e0352b; }
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
@@ -15278,7 +15282,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   arrow.className = "price-match-toggle-arrow";
   arrow.textContent = "\u25BC";
   const label = document.createElement("span");
-  label.textContent = "Anmeldelser";
+  label.textContent = "Vurderinger";
   toggle.append(arrow, label);
   toggle.addEventListener("click", () => {
     const collapsed = section.classList.toggle("collapsed");
@@ -15299,44 +15303,50 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, sources.find((offer) => offer.reviews?.store)?.reviews?.store));
   header.append(titleRow);
 
-  // The shop the reader is on, rated by the comparison site's users: service, not the product.
-  const storeOffer = sources.find((offer) => offer.reviews?.store !== undefined);
-  const store = storeOffer?.reviews?.store;
-  const storeRows = storeOffer === undefined || store === undefined ? [] : [(() => {
-    const score = Math.round(toHundredScale(store.score, store.maxScore) ?? 0);
-    return buildReviewRow(storeOffer, store.shopName, `Butikken · ${formatRatingCount(store.count)}`, score, store.url, [
-      `## Butikken ${store.shopName}: ${score}/100\n${formatReviewScore(store.score, store.maxScore)} stjerner\n${formatRatingCount(store.count)}`,
-      `Vurdering av butikken, ikke produktet: service, levering og retur\nKilde: ${getPriceMatchSourceName(storeOffer)}s brukere`,
-    ]);
-  })()];
-  const seenTests = new Set<string>();
-  const testRows: HTMLAnchorElement[] = [];
-  const buyerRows: HTMLAnchorElement[] = [];
-  for (const offer of sources) {
-    const critics = (offer.reviews?.critics ?? []).filter((critic) => {
-      const key = `${critic.site.toLowerCase()}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
-      if (seenTests.has(key)) return false;
-      seenTests.add(key);
-      return true;
-    });
-    if (critics.length > 0) {
-      const score = Math.round(critics.reduce((sum, critic) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / critics.length);
-      testRows.push(buildReviewRow(offer, "Tester", critics.map((critic) => critic.site).join(" · "), score,
-        offer.source === "godpris" ? `${offer.productUrl}#tester` : offer.productUrl, [
-          `## Tester ${score}/100\n${critics.length} ${critics.length === 1 ? "norsk test" : "norske tester"}, snitt omregnet til 0–100`,
-          ...critics.map((critic) => [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...(critic.title ? [critic.title] : []), ...(critic.quote ? [`«${critic.quote}»`] : [])].join("\n")),
-          `Kilde: testlisten hos ${getPriceMatchSourceName(offer)}\nBare norske utgivere`,
-        ]));
-    }
-    for (const user of offer.reviews?.users ?? []) {
-      const score = Math.round(toHundredScale(user.score, user.maxScore) ?? 0);
-      buyerRows.push(buildReviewRow(offer, "Kjøpere", formatRatingCount(user.count), score, user.url, [
-        `## Kjøpere ${score}/100\n${formatReviewScore(user.score, user.maxScore)} stjerner\n${formatRatingCount(user.count)}`,
-        `Kilde: ${getPriceMatchSourceName(offer)}s produktside\n${user.source === "klarna" ? "Bare anmeldelser merket norske" : "Norske brukere"}\nAntallet er kildens eget og kan omfatte andre varianter av produktet`,
-      ]));
-    }
+  // Three rows with the average on the row and every source in the tooltip, like a review
+  // aggregator: the shop (its users' rating of service), buyers of the product, professional tests.
+  // Chip lines on the rows and in the tooltips, like the flight price match.
+  const rows: HTMLAnchorElement[] = [];
+  const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
+  if (stores.length > 0) {
+    const count = stores.reduce((sum, item) => sum + item.store.count, 0);
+    const score = Math.round(stores.reduce((sum, item) => sum + (toHundredScale(item.store.score, item.store.maxScore) ?? 0) * item.store.count, 0) / count);
+    rows.push(buildReviewRow("Butikk", [stores[0]!.store.shopName, formatRatingCount(count)], score, stores[0]!.store.url, {
+      title: `Butikken ${stores[0]!.store.shopName}`,
+      note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
+      items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0, chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)] })),
+    }));
   }
-  const rows = [...storeRows, ...testRows, ...buyerRows];
+  const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user })))
+    .sort((a, b) => reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
+  if (buyers.length > 0) {
+    const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
+    const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
+    rows.push(buildReviewRow("Kjøpere", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0]!.user.url, {
+      title: "Kjøpere",
+      note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
+      items: buyers.map(({ offer, user }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(user.score, user.maxScore) ?? 0,
+        chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
+    }));
+  }
+  const seenTests = new Set<string>();
+  const tests = sources.flatMap((offer) => (offer.reviews?.critics ?? []).map((critic) => ({ offer, critic }))).filter(({ critic }) => {
+    const key = `${critic.site.toLowerCase()}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
+    if (seenTests.has(key)) return false;
+    seenTests.add(key);
+    return true;
+  });
+  if (tests.length > 0) {
+    const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
+    const via = tests[0]!.offer;
+    rows.push(buildReviewRow("Anmeldelser", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
+      via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
+        title: "Anmeldelser",
+        note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
+        items: tests.map(({ critic }) => ({ name: critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
+          chips: [formatReviewScore(critic.score, critic.maxScore), ...(critic.title ? [critic.title] : [])], ...(critic.quote ? { quote: critic.quote } : {}) })),
+      }));
+  }
   section.append(header, ...rows);
   return section;
 }
@@ -15384,10 +15394,6 @@ function formatReviewScore(score: number, maxScore: number): string {
   return `${String(Number(score.toFixed(2))).replace(".", ",")} av ${String(maxScore).replace(".", ",")}`;
 }
 
-// Tooltip parts on the element; attachReviewTooltips mounts them like the price match tooltips.
-function setReviewTip(element: HTMLElement, parts: string[]): void {
-  element.dataset.reviewTip = JSON.stringify(parts);
-}
 
 function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipController): void {
   for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section [data-review-hover-tip]")) {
@@ -15398,10 +15404,12 @@ function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipCo
     element.addEventListener("mouseenter", () => showChipTooltipRightOfPanel(tooltip, element, shadowRoot));
     element.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
   }
-  for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section [data-review-tip]")) {
+  for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section .reviews-row")) {
+    const tip = reviewTooltips.get(element);
+    if (tip === undefined) continue;
     const tooltip = document.createElement("div");
-    tooltip.className = element.classList.contains("price-match-card") ? "offer-tooltip price-match-tooltip" : "bonus-chip-tooltip";
-    setTooltipContent(tooltip, JSON.parse(element.dataset.reviewTip!) as string[]);
+    tooltip.className = "offer-tooltip price-match-tooltip";
+    buildReviewTooltipContent(tooltip, tip);
     shadowRoot.append(tooltip);
     const row = tooltipControls.addBeside(element, tooltip, "Vis kildene");
     if (element.classList.contains("price-match-card")) {
@@ -15413,7 +15421,23 @@ function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipCo
   }
 }
 
-function buildReviewRow(offer: PriceMatchOffer, name: string, detail: string, score: number, url: string, tip: string[]): HTMLAnchorElement {
+// Comparison sites first, in the price match's order, then shops.
+function reviewSourceRank(offer: PriceMatchOffer): number {
+  return ["prisjakt", "prisradar", "klarna", "godpris"].indexOf(offer.source ?? "") >>> 0;
+}
+
+type ReviewTooltip = { title: string; note: string; items: Array<{ name: string; score: number; chips: string[]; quote?: string }> };
+const reviewTooltips = new WeakMap<HTMLElement, ReviewTooltip>();
+
+function buildReviewScoreBox(score: number, className = "price-match-price"): HTMLElement {
+  const box = document.createElement("span");
+  const rounded = Math.round(score);
+  box.className = `${className} review-score review-score--${getReviewScoreLevel(rounded)}`;
+  box.textContent = String(rounded);
+  return box;
+}
+
+function buildReviewRow(name: string, chips: string[], score: number, url: string, tip: ReviewTooltip): HTMLAnchorElement {
   const row = document.createElement("a");
   row.className = "cbn-row price-match-card reviews-row";
   row.href = url;
@@ -15424,19 +15448,39 @@ function buildReviewRow(offer: PriceMatchOffer, name: string, detail: string, sc
   const product = document.createElement("span");
   product.className = "price-match-product";
   product.textContent = name;
-  const shop = document.createElement("span");
-  shop.className = "price-match-shop";
-  shop.textContent = detail;
-  title.append(product, shop);
-  const chip = document.createElement("span");
-  chip.className = `price-match-price review-score review-score--${getReviewScoreLevel(score)}`;
-  chip.textContent = String(score);
-  const badge = document.createElement("span");
-  badge.className = `cbn-chip provider-badge provider-${getPriceMatchProviderClass(offer)}`;
-  badge.textContent = getPriceMatchSourceName(offer);
-  row.append(title, chip, badge);
-  setReviewTip(row, tip);
+  title.append(product, buildPriceMatchInfoChips(chips));
+  row.append(title, buildReviewScoreBox(score));
+  reviewTooltips.set(row, tip);
   return row;
+}
+
+// Rows like the flight tooltip: source and score, then its chips and an optional quote.
+function buildReviewTooltipContent(tooltip: HTMLElement, tip: ReviewTooltip): void {
+  tooltip.classList.add("cbn-tooltip-details");
+  const section = document.createElement("div");
+  section.className = "offer-tooltip-section";
+  const heading = document.createElement("span");
+  heading.className = "offer-tooltip-title";
+  heading.textContent = tip.title;
+  const note = document.createElement("span");
+  note.className = "tooltip-content-note";
+  note.textContent = tip.note;
+  section.append(heading, note);
+  for (const item of tip.items) {
+    const row = document.createElement("div");
+    row.className = "cbn-row cbn-row--details comparison-tooltip-option review-tooltip-option";
+    const name = document.createElement("span");
+    name.textContent = item.name;
+    row.append(name, buildReviewScoreBox(item.score, "review-tooltip-score"), buildPriceMatchInfoChips(item.chips));
+    if (item.quote) {
+      const quote = document.createElement("span");
+      quote.className = "tooltip-content-note review-tooltip-quote";
+      quote.textContent = `«${item.quote}»`;
+      row.append(quote);
+    }
+    section.append(row);
+  }
+  tooltip.append(section);
 }
 
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {

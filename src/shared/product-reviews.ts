@@ -169,8 +169,9 @@ export function summarizeProductReviews(all: Array<ProductReviews | undefined>):
   return { critics: criticList, users: userList, userCount, ...(criticScore !== undefined ? { criticScore } : {}), ...(userScore !== undefined ? { userScore } : {}) };
 }
 
+// Metacritic's bands: 75+ favourable (green), 50–74 mixed (yellow), under 50 unfavourable (red).
 export function getReviewScoreLevel(score: number): "high" | "good" | "mixed" | "low" {
-  return score >= 85 ? "high" : score >= 75 ? "good" : score >= 60 ? "mixed" : "low";
+  return score >= 85 ? "high" : score >= 75 ? "good" : score >= 50 ? "mixed" : "low";
 }
 
 const formatScore = (score: number) => String(Number(score.toFixed(2))).replace(".", ",");

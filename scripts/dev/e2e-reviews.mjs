@@ -34,7 +34,7 @@ try {
       }, null, { timeout: 60000, polling: 1000 });
       const result = await handle.jsonValue();
       console.log(JSON.stringify(result, null, 1));
-      assert.ok(result.rows.every((row) => /^(Tester|Kjøpere) /.test(row.text) || / Butikken · /.test(row.text)), "rows: shop, tests, buyers");
+      assert.ok(result.rows.every((row) => /^(Butikk|Kjøpere|Anmeldelser) /.test(row.text)), "rows: Butikk, Kjøpere, Anmeldelser");
       assert.ok(result.rows.length > 0, "at least one review row");
       for (const row of result.rows) assert.ok(/^https:\/\/(www\.)?(godpris\.no|prisjakt\.no|klarna\.com\/no)\//.test(row.href), `comparison-site link: ${row.href}`);
       await page.evaluate(() => document.getElementById("cashback-varsler-notice").shadowRoot.querySelector(".reviews-copy").click());
@@ -48,7 +48,7 @@ try {
       await page.waitForTimeout(700);
       const tip = await page.evaluate(() => [...document.getElementById("cashback-varsler-notice").shadowRoot.querySelectorAll(".price-match-tooltip.visible, .offer-tooltip.visible")].map((t) => t.innerText.replace(/\s+/g, " ")).join(" | "));
       console.log(`tooltip: ${tip}`);
-      assert.match(tip, /Kilde:/, "row tooltip names the source");
+      assert.match(tip, /Prisjakt|Godpris|Klarna|Tek|techradar|Komputer/, "row tooltip names the sources");
       await page.screenshot({ path: join(out, `reviews-${index}.png`) });
       console.log(`OK, screenshot ${join(out, `reviews-${index}.png`)}`);
     } catch (error) {
