@@ -68,6 +68,10 @@ function productItem(deal) {
   const label = PROVIDER_NAMES[source] || source;
   const shipping = deal.shippingAmount === undefined ? "Frakt ukjent" : deal.shippingAmount === 0 ? "Gratis frakt" : `Frakt ${formatKr(deal.shippingAmount)} kr`;
   const storeUrl = source === "prisjakt" && deal.storeId ? `https://www.prisjakt.no/shop.php?f=${encodeURIComponent(deal.storeId)}` : deal.storeUrl;
+  const shopPrePrice = deal.originalPrice > deal.price ? deal.originalPrice : undefined;
+  const dropFrom = (before) => Math.round((1 - deal.price / before) * 100);
+  const prePrice = deal.referencePrice > deal.price ? deal.referencePrice
+    : shopPrePrice && (!deal.priceDrop || Math.abs(dropFrom(shopPrePrice) - deal.priceDrop) <= 1) ? shopPrePrice : undefined;
   return {
     id: `${source === "prisjakt" ? "pj" : source}${deal.id}`, source, updatedAt: deal.updatedAt,
     title: deal.name,
@@ -79,8 +83,12 @@ function productItem(deal) {
     },
     amount: deal.price, rank: deal.rank,
     lowestPriceEver: deal.lowestPriceEver, historyScope: deal.historyScope, historyRange: deal.historyRange, historyUpdatedAt: deal.historyUpdatedAt, historyStartedAt: deal.historyStartedAt,
-    ...(deal.originalPrice > deal.price ? { prePrice: deal.originalPrice } : {}),
-    ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `${label}: ${deal.priceDrop} % prisfall. ${deal.referenceLabel || "Mot vanlig pris hos Prisjakt"}${deal.referencePrice ? ` (${formatKr(deal.referencePrice)} kr)` : ""}. Frakt er ikke med.` } : {}),
+    // The struck price is the basis of the percent beside it: Klarna's and Prisradar's reference
+    // price, or the shop's own pre-price only when Prisjakt's drop is measured from it. Prisjakt
+    // usually measures against its 3-month normal price instead; the shop's pre-price then goes
+    // in the tooltip, so 2 899 → 1 299 kr never stands next to "−12 %".
+    ...(prePrice ? { prePrice } : {}),
+    ...(deal.priceDrop ? { saving: deal.priceDrop, savingTitle: `${label}: ${deal.priceDrop} % prisfall. ${deal.referenceLabel || "Mot vanlig pris hos Prisjakt"}${deal.referencePrice ? ` (${formatKr(deal.referencePrice)} kr)` : ""}.${shopPrePrice && !prePrice ? ` Butikkens egen førpris: ${formatKr(shopPrePrice)} kr.` : ""} Frakt er ikke med.` } : {}),
     ...(deal.imageUrl?.startsWith("/offer-images/") ? { imageUrl: deal.imageUrl, copyImageUrl: deal.imageUrl } : {}),
     link: { url: deal.productUrl, label: `Se butikker og prishistorikk hos ${label}` },
     ...(deal.validTo ? { validTo: deal.validTo } : {}),
