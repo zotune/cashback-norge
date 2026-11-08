@@ -1,0 +1,108 @@
+{
+  "comment": "Public Komplett response shapes captured 2026-11-08; reviewer identities and text replaced with examples.",
+  "search": {
+    "totalHits": 1,
+    "totalPages": 1,
+    "businessUnits": [
+      {
+        "businessUnitId": "46d28d4a0000640005009702",
+        "displayName": "Komplett",
+        "identifyingName": "www.komplett.no",
+        "websiteUrl": "https://www.komplett.no",
+        "score": {
+          "trustScore": 2.4,
+          "stars": 2.5
+        },
+        "numberOfReviews": 1661
+      }
+    ]
+  },
+  "page": {
+    "props": {
+      "pageProps": {
+        "businessUnit": {
+          "id": "46d28d4a0000640005009702",
+          "displayName": "Komplett",
+          "identifyingName": "www.komplett.no",
+          "websiteUrl": "https://www.komplett.no",
+          "numberOfReviews": 1661,
+          "trustScore": 2.4,
+          "stars": 2.5,
+          "consumerAlert": null
+        },
+        "reviews": [
+          {
+            "id": "000000000000000000000001",
+            "filtered": false,
+            "isPending": false,
+            "isCurrentlyUnderModeration": false,
+            "title": "Rask hjelp",
+            "text": "Kort eksempel på en kundeanmeldelse.",
+            "rating": 5,
+            "dates": {
+              "experiencedDate": "2026-11-02T00:00:00.000Z",
+              "publishedDate": "2026-11-08T16:40:15.000Z",
+              "updatedDate": null,
+              "submittedDate": null
+            },
+            "labels": {
+              "verification": {
+                "isVerified": true
+              }
+            },
+            "language": "no",
+            "reply": null
+          },
+          {
+            "id": "000000000000000000000002",
+            "filtered": false,
+            "isPending": false,
+            "isCurrentlyUnderModeration": false,
+            "title": "God oppfølging",
+            "text": "Kort eksempel på en kundeanmeldelse.",
+            "rating": 5,
+            "dates": {
+              "experiencedDate": "2026-11-07T00:00:00.000Z",
+              "publishedDate": "2026-11-07T06:02:06.000Z",
+              "updatedDate": null,
+              "submittedDate": null
+            },
+            "labels": {
+              "verification": {
+                "isVerified": false
+              }
+            },
+            "language": "no",
+            "reply": {
+              "message": "Takk for tilbakemeldingen."
+            }
+          },
+          {
+            "id": "000000000000000000000003",
+            "filtered": false,
+            "isPending": false,
+            "isCurrentlyUnderModeration": false,
+            "title": "Fikk svar",
+            "text": "Kort eksempel på en kundeanmeldelse.",
+            "rating": 5,
+            "dates": {
+              "experiencedDate": "2026-11-06T00:00:00.000Z",
+              "publishedDate": "2026-11-07T00:01:06.000Z",
+              "updatedDate": null,
+              "submittedDate": null
+            },
+            "labels": {
+              "verification": {
+                "isVerified": false
+              }
+            },
+            "language": "no",
+            "reply": {
+              "message": "Takk for tilbakemeldingen."
+            }
+          }
+        ]
+      }
+    }
+  }
+}

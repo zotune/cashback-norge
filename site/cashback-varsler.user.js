@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794161861
+// @version      1794162582
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -15,7 +15,10 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
+// @connect      no.trustpilot.com
+// @connect      www.trustpilot.com
 // @connect      www.prisjakt.no
+// @connect      www.power.no
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -250,16 +253,6 @@
       }
     };
   }
-  const version$1 = 1;
-  const source$1 = "https://www.tek.no/mobilabonnement/api";
-  const generatedAt$1 = "2026-11-04T22:32:00.717078+00:00";
-  const suppliers$1 = [{ "id": 5, "name": "Chilimobil", "hostname": "chilimobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://chilimobil.no/" }, { "id": 6, "name": "Fjordkraft Mobil", "hostname": "fjordkraft.no", "path": "/mobil", "evidence": "tek-destination", "supplierUrl": "https://fjordkraft.no/mobil" }, { "id": 1, "name": "Happybytes", "hostname": "happybytes.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://happybytes.no/" }, { "id": 7, "name": "Ice", "hostname": "ice.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://ice.no/" }, { "id": 28, "name": "Lyca Mobile", "hostname": "lyca-mobile.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://lyca-mobile.no/" }, { "id": 9, "name": "MyCall", "hostname": "mycall.no", "path": "/", "evidence": "verified-site", "supplierUrl": "https://mycall.no/" }, { "id": 10, "name": "OneCall", "hostname": "onecall.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://onecall.no/" }, { "id": 24, "name": "PlussMobil", "hostname": "plussmobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://plussmobil.no/" }, { "id": 12, "name": "Saga Mobil", "hostname": "sagamobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://sagamobil.no/" }, { "id": 14, "name": "Talkmore", "hostname": "talkmore.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://talkmore.no/" }, { "id": 15, "name": "Telenor", "hostname": "telenor.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://telenor.no/" }, { "id": 4, "name": "Telia", "hostname": "telia.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://telia.no/" }, { "id": 27, "name": "Verimo", "hostname": "verimo.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://verimo.no/" }, { "id": 26, "name": "Trøndermobil", "hostname": "xn--trndermobil-hgb.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://xn--trndermobil-hgb.no/" }, { "id": 11, "name": "Xplora", "hostname": "xplora.com", "path": "/", "evidence": "verified-site", "supplierUrl": "https://xplora.com/" }, { "id": 11, "name": "Xplora", "hostname": "xplora.no", "path": "/", "evidence": "verified-site", "supplierUrl": "https://xplora.no/" }];
-  const bundled$1 = {
-    version: version$1,
-    source: source$1,
-    generatedAt: generatedAt$1,
-    suppliers: suppliers$1
-  };
   const UNO_CAMPAIGNS = {
     "451581": { label: "Gjeldsoversikt", paths: ["/gjeldfri", "/gjeldsoversikt", "/statistikk/gjeldsoversikt"] },
     "451327": { label: "Kredittscore", paths: ["/kredittscore"] }
@@ -466,6 +459,1058 @@
   function stripHtml$2(html) {
     return decodeHtmlEntities(html.replace(/<!--[\s\S]*?-->/g, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/li>/gi, "\n").replace(/<li>/gi, "- ").replace(/<[^>]+>/g, "")).replace(/\n{2,}/g, "\n\n").trim();
   }
+  function readTcgProductKind(text2) {
+    const normalized = normalizeTcgProductTitle(text2.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
+    if (/\b(?:case|kartong)\b/.test(normalized)) return "case";
+    if (/\bpokemon center\b/.test(normalizeTcgText(text2)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
+    if (/\b(?:elite trainer box|etb)\b/.test(normalized)) return "etb";
+    if (/\bbooster (?:box|display)\b/.test(normalized)) return "booster-box";
+    if (/\bblister\b/.test(normalized)) return "blister";
+    if (/\bpremium deck (?:set|sett)\b/.test(normalized)) return "premium-deck-set";
+    if (/\bbuild (?:and )?battle stadium\b/.test(normalized)) return "build-battle-stadium";
+    if (/\bbuild (?:and )?battle\b/.test(normalized)) return "build-battle";
+    if (/\bsurprise box\b/.test(normalized)) return "surprise-box";
+    if (/\bbinder\b/.test(normalized)) return "binder";
+    if (/\b(?:collection box|box samling)\b/.test(normalized)) return "collection-box";
+    if (/\bultra premium collection\b/.test(normalized)) return "ultra-premium-collection";
+    if (/\bpremium collection\b/.test(normalized)) return "premium-collection";
+    if (/\b(?:booster )?bundle\b/.test(normalized)) return "bundle";
+    if (/\bmini tin\b/.test(normalized) && /\bdisplay\b/.test(normalized)) return "mini-tin-display";
+    if (/\bmini tin\b/.test(normalized)) return "mini-tin";
+    if (/\btin\b/.test(normalized)) return "tin";
+    if (/\bbooster (?:packs?|pakker?)\b/.test(normalized)) return "booster-pack";
+    if (/\bcollection\b/.test(normalized)) return "collection";
+    return void 0;
+  }
+  function readTcgLanguage(text2) {
+    const languages = readTcgLanguages(text2);
+    return languages.length === 1 ? languages[0] : void 0;
+  }
+  function readTcgLanguages(text2) {
+    const normalized = normalizeTcgText(text2);
+    const languages = [];
+    for (const [code, label, pattern] of [
+      ["en", "Engelsk", /\b(?:engelsk|english|en)\b/],
+      ["jp", "Japansk", /\b(?:japansk|japanese|jpn|jp|ja)\b/],
+      ["ko", "Koreansk", /\b(?:koreansk|korean|kor|ko)\b/],
+      ["zh", "Kinesisk", /\b(?:kinesisk|chinese|zh|cn)\b/],
+      ["es", "Spansk", /\b(?:spansk|spanish|espanol|es)\b/],
+      ["de", "Tysk", /\b(?:tysk|german|deutsch|de)\b/],
+      ["fr", "Fransk", /\b(?:fransk|french|francais|fr)\b/],
+      ["it", "Italiensk", /\b(?:italiensk|italian|italiano|it)\b/]
+    ]) if (pattern.test(normalized)) languages.push({ code, label });
+    return languages;
+  }
+  function readTcgSealedOfferIssue(productName, offerName, language) {
+    const normalized = normalizeTcgText(offerName);
+    if (/\b(?:used|brukt|opened|apnet|graded|gradert|psa|bgs|cgc)\b/.test(normalized)) return "condition-mismatch";
+    const expectedKind = readTcgProductKind(productName);
+    const offerKind = readTcgProductKind(offerName);
+    if (offerKind === void 0) return "unknown-product-form";
+    if (expectedKind !== offerKind) return "product-form-mismatch";
+    const languages = readTcgLanguages(offerName);
+    if (languages.length > 1) return "ambiguous-language";
+    if (languages[0] !== void 0 && languages[0].code !== language) return "language-mismatch";
+    if (offerName.split("+").filter((part) => readTcgProductKind(part) !== void 0).length > 1) return "combined-products";
+    const unitCount = (text2) => {
+      const title = normalizeTcgProductTitle(text2);
+      return Number(title.match(/\b(\d+)\s*x\b/)?.[1] ?? title.match(/^(\d+)\s+(?:elite trainer box|booster box|mini tins?|tins?)\b/)?.[1] ?? "1");
+    };
+    if (["etb", "pokemon-center-etb", "booster-box", "mini-tin", "tin"].includes(offerKind) && unitCount(productName) !== unitCount(offerName)) return "quantity-mismatch";
+    const packCount = (text2) => normalizeTcgText(text2).match(/\b(\d+)\s*(?:booster packs?|boosters?|packs?|pakker)\b/)?.[1];
+    const expectedPacks = packCount(productName) ?? (expectedKind === "booster-pack" ? "1" : void 0);
+    const offeredPacks = packCount(offerName);
+    if (expectedPacks !== void 0 && offeredPacks !== void 0 && Number(expectedPacks) !== Number(offeredPacks)) return "quantity-mismatch";
+    return void 0;
+  }
+  function normalizeTcgText(text2) {
+    return text2.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function normalizeTcgProductTitle(text2) {
+    return normalizeTcgText(text2).replace(/\bpokemon(?:\s+tcg)?\b|\btrading card game\b/g, " ").replace(/\b(?:engelsk|english|en|japansk|japanese|jpn|jp|ja|koreansk|korean|kor|ko|kinesisk|chinese|zh|cn|spansk|spanish|espanol|es|tysk|german|deutsch|de|fransk|french|francais|fr|italiensk|italian|italiano|it)\b/g, " ").replace(/\bbooster\s*(?:box|boks)\s+display\b|\bbooster\s+display\s+(?:box|boks)\b|\bbooster\s*(?:box|boks|display)\b/g, "booster box").replace(/\bbooster\s*(?:pack|pakke)\b/g, "booster pack").replace(/\bbooster bundle\b/g, "bundle").replace(/\betb\b/g, "elite trainer box").replace(/\belite trainer boks\b/g, "elite trainer box").replace(/\bpremium samleboks\b/g, "premium collection").replace(/\bex (?:box|boks|samleboks)\b/g, "ex collection box").replace(/\bsamlekortspill\b|\bkortspill fra outland\b/g, " ").replace(/\bcelebration collection 30th(?: anniversary)?\b/g, "30th celebration").replace(/\b30th anniversary first partner illustration\b/g, "first partner illustration").replace(/\bserie\b/g, "series").replace(/\bbinder collection\b/g, "binder").replace(/\bcollection box surprise box\b/g, "surprise box").replace(/\s+/g, " ").trim();
+  }
+  function isSameTcgProductTitle(first, second) {
+    if (hasTcgProductVariantConflict(first, second)) return false;
+    const canonical = (text2) => normalizeTcgProductTitle(text2).replace(/\b(?:scarlet violet|sword shield)\s+/g, "").replace(/^mega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/, "");
+    return canonical(first) === canonical(second);
+  }
+  function hasTcgSetNameConflict(first, second) {
+    const signature = (text2) => [...readTcgSetWords(text2)].sort().join(" ");
+    return signature(first) !== signature(second);
+  }
+  function readTcgSetWords(text2) {
+    return new Set(normalizeTcgProductTitle(text2).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean));
+  }
+  function hasTcgProductVariantConflict(first, second) {
+    if (!/pok[eé]mon|\btcg\b/i.test(`${first} ${second}`)) return false;
+    const a = readTcgProductKind(first);
+    const b = readTcgProductKind(second);
+    if (a !== void 0 && b !== void 0 && a !== b) return true;
+    if (a !== void 0 && b !== void 0) {
+      const firstSet = readTcgSetWords(first);
+      const secondSet = readTcgSetWords(second);
+      const within = (inner, outer) => [...inner].every((word) => outer.has(word));
+      if (firstSet.size > 0 && secondSet.size > 0 && !within(firstSet, secondSet) && !within(secondSet, firstSet)) return true;
+    }
+    const firstLanguage = readTcgLanguage(first);
+    const secondLanguage = readTcgLanguage(second);
+    return firstLanguage !== void 0 && secondLanguage !== void 0 && firstLanguage.code !== secondLanguage.code;
+  }
+  const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
+    /\s+\|\s+/,
+    /\s+[-\u2013\u2014]\s+/,
+    /\s+\u2022\s+/
+  ];
+  const CANONICAL_MATCH_TOKENS$1 = /* @__PURE__ */ new Map([
+    ["black", "svart"],
+    ["blue", "bla"],
+    ["brown", "brun"],
+    ["carbon", "svart"],
+    ["controller", "kontroller"],
+    ["controllers", "kontroller"],
+    ["gamepad", "kontroller"],
+    ["gamepads", "kontroller"],
+    ["gold", "gull"],
+    ["gray", "gra"],
+    ["green", "gronn"],
+    ["grey", "gra"],
+    ["joypad", "kontroller"],
+    ["orange", "oransje"],
+    ["pink", "rosa"],
+    ["purple", "lilla"],
+    ["red", "rod"],
+    ["silver", "solv"],
+    ["wireless", "tradlos"],
+    ["sort", "svart"],
+    ["white", "hvit"],
+    ["yellow", "gul"]
+  ]);
+  const CONDITION_VARIANT_TOKENS$1 = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
+  const GENERIC_PRODUCT_SIGNAL_TOKENS = /* @__PURE__ */ new Set([
+    "antibacterial",
+    "ansiktskrem",
+    "cleansing",
+    "hydrating",
+    "intensive",
+    "moisturising",
+    "moisturizing",
+    "protective",
+    "repairing",
+    "sensitive",
+    "soothing"
+  ]);
+  function scoreProductTitleAgainstSearchTerm(searchTerm, title) {
+    return Math.max(
+      0,
+      ...buildProductTitleBaseCandidates(searchTerm).map((candidate) => scoreProductTitleMatch(candidate, title))
+    );
+  }
+  function isLikelySameProductTitle(searchTerm, title, minimumScore = 0.45) {
+    return buildProductTitleBaseCandidates(searchTerm).some((candidate) => {
+      return scoreProductTitleMatch(candidate, title) >= minimumScore && hasProductTitleSignalOverlap(candidate, title);
+    });
+  }
+  function scoreProductTitleMatch(query, title) {
+    const queryTokens = tokenizeMatchText$1(query);
+    const titleTokens = new Set(tokenizeMatchText$1(title));
+    if (queryTokens.length === 0 || titleTokens.size === 0) return 0;
+    let matchedWeight = 0;
+    let totalWeight = 0;
+    for (const token of queryTokens) {
+      const weight = isModelNumberLikeToken(token) ? 3 : token.length >= 6 ? 2 : token.length >= 4 ? 1.5 : 1;
+      totalWeight += weight;
+      if (titleTokens.has(token)) {
+        matchedWeight += weight;
+        continue;
+      }
+      if ([...titleTokens].some((titleToken) => titleToken.length >= 4 && (titleToken.startsWith(token) || token.startsWith(titleToken)))) {
+        matchedWeight += weight * 0.5;
+      }
+    }
+    const score = totalWeight > 0 ? matchedWeight / totalWeight : 0;
+    return hasUnrequestedConditionVariant$1(queryTokens, titleTokens) ? score * 0.2 : score;
+  }
+  function hasProductTitleSignalOverlap(query, title) {
+    const querySignals = tokenizeMatchText$1(query).filter(isProductSignalToken);
+    if (querySignals.length === 0) return true;
+    const titleTokens = tokenizeMatchText$1(title);
+    if (titleTokens.length === 0) return false;
+    return querySignals.some((queryToken) => {
+      return titleTokens.some((titleToken) => {
+        return titleToken === queryToken || titleToken.length >= 4 && (titleToken.startsWith(queryToken) || queryToken.startsWith(titleToken));
+      });
+    });
+  }
+  function isProductSignalToken(token) {
+    if (isModelNumberLikeToken(token)) return true;
+    return token.length >= 6 && /[a-z]/.test(token) && !/\d/.test(token) && !GENERIC_PRODUCT_SIGNAL_TOKENS.has(token);
+  }
+  function isModelNumberLikeToken(token) {
+    return token.length >= 4 && /[a-z]/.test(token) && /\d/.test(token) && !isMeasurementUnitLikeToken(token);
+  }
+  function isMeasurementUnitLikeToken(token) {
+    return /^\d+(?:[.,]\d+)?(?:ml|cl|dl|l|g|gr|kg|mg|gb|tb|mb|mm|cm|m|km|w|kw|wh|kwh|mah|hz|khz|ghz|v|a|ah|stk|pk|pcs|fps|tommer|tum|in)$/.test(token);
+  }
+  function buildProductTitleBaseCandidates(searchTerm) {
+    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
+    const separatorPrefixCandidates = PRODUCT_TITLE_BASE_MATCH_SEPARATORS.map((separator) => normalizedSearchTerm.split(separator)[0]);
+    const buyTitleMatch = normalizedSearchTerm.match(/^(?:kj\u00f8p|kjop|buy)\s+(.+?)\s+(?:hos|at)\s+.+$/i);
+    return uniqueStrings$e([
+      normalizedSearchTerm,
+      ...separatorPrefixCandidates,
+      buyTitleMatch?.[1]
+    ]).filter((candidate) => candidate.length >= 4);
+  }
+  function tokenizeMatchText$1(value) {
+    const normalizedValue = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    return uniqueStrings$e(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
+  }
+  function normalizeMatchToken$1(value) {
+    const normalized = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    return normalized.length > 0 ? normalized : void 0;
+  }
+  function canonicalizeMatchToken$1(token) {
+    return CANONICAL_MATCH_TOKENS$1.get(token) ?? token;
+  }
+  function hasUnrequestedConditionVariant$1(queryTokens, titleTokens) {
+    return CONDITION_VARIANT_TOKENS$1.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
+  }
+  function transliterateNorwegianCharacters$5(value) {
+    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
+  }
+  function uniqueStrings$e(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  const PACKAGE_QUANTITY_PATTERN = /\b(\d+(?:[,.]\d+)?)\s*(kg|kgm|kilo|kilogram|g|gr|grm|gram|grams|l|ltr|liter|litre|dl|dlt|cl|clt|ml|mlt|stk|stykk|stykke|pcs|pc|pk|pakke|pack)(?=$|[^A-Za-z0-9])/gi;
+  const GROCERY_CONTEXT_HOSTS = [
+    "oda.com",
+    "kolonial.no",
+    "meny.no",
+    "spar.no",
+    "kiwi.no",
+    "joker.no",
+    "rema.no",
+    "rema1000.no",
+    "coop.no",
+    "bunnpris.no",
+    "holdbart.no",
+    "europris.no",
+    "matkroken.no",
+    "naerbutikken.no",
+    "kassal.app",
+    "sesum.no",
+    "enhver.no"
+  ];
+  function readPackageQuantityFromText(text2) {
+    if (text2 === void 0) return void 0;
+    const quantities = [];
+    for (const match of text2.matchAll(PACKAGE_QUANTITY_PATTERN)) {
+      const amount = parseLocalizedNumber$2(match[1] ?? "");
+      const unit = normalizePackageUnit(match[2] ?? "");
+      if (unit === void 0 || !Number.isFinite(amount) || amount <= 0) continue;
+      const normalizedAmount = normalizePackageAmount(amount * unit.multiplier);
+      if (!isReasonablePackageQuantity(normalizedAmount, unit.unit)) continue;
+      quantities.push({ amount: normalizedAmount, unit: unit.unit });
+    }
+    return quantities.find((quantity) => quantity.unit !== "pcs") ?? quantities[0];
+  }
+  function readPackageQuantityFromValue(value) {
+    if (typeof value === "string" || typeof value === "number") {
+      return readPackageQuantityFromText(String(value));
+    }
+    if (!isPlainRecord$7(value)) return void 0;
+    const rawAmount = readNumberLike$5(value.value) ?? readNumberLike$5(value.amount) ?? readNumberLike$5(value.weight) ?? readNumberLike$5(value.volume);
+    const rawUnit = readStringLike$6(value.unitText) ?? readStringLike$6(value.unitCode) ?? readStringLike$6(value.unit) ?? readStringLike$6(value.measurementTechnique);
+    if (rawAmount === void 0 || rawUnit === void 0) {
+      return readPackageQuantityFromText(Object.values(value).map((item) => String(item)).join(" "));
+    }
+    const unit = normalizePackageUnit(rawUnit);
+    if (unit === void 0) return void 0;
+    const amount = normalizePackageAmount(rawAmount * unit.multiplier);
+    return isReasonablePackageQuantity(amount, unit.unit) ? { amount, unit: unit.unit } : void 0;
+  }
+  function isSamePackageQuantity(first, second) {
+    if (first === void 0 || second === void 0 || first.unit !== second.unit) return false;
+    return Math.abs(first.amount - second.amount) <= Math.max(0.5, first.amount * 0.01);
+  }
+  function buildPackageQuantityLabels(quantity) {
+    if (quantity === void 0) return [];
+    if (quantity.unit === "g") {
+      const grams = formatPackageAmount(quantity.amount);
+      const labels = [`${grams}g`, `${grams} g`];
+      if (quantity.amount >= 1e3 && quantity.amount % 1e3 === 0) {
+        const kilos = formatPackageAmount(quantity.amount / 1e3);
+        labels.push(`${kilos}kg`, `${kilos} kg`);
+      }
+      return uniqueStrings$d(labels);
+    }
+    if (quantity.unit === "ml") {
+      const milliliters = formatPackageAmount(quantity.amount);
+      const labels = [`${milliliters}ml`, `${milliliters} ml`];
+      if (quantity.amount >= 100 && quantity.amount % 10 === 0) {
+        const liters = formatPackageAmount(quantity.amount / 1e3);
+        labels.push(`${liters}l`, `${liters} l`);
+      }
+      if (quantity.amount % 10 === 0) {
+        const centiliters = formatPackageAmount(quantity.amount / 10);
+        labels.push(`${centiliters}cl`, `${centiliters} cl`);
+      }
+      return uniqueStrings$d(labels);
+    }
+    const pieces = formatPackageAmount(quantity.amount);
+    return uniqueStrings$d([`${pieces}stk`, `${pieces} stk`, `${pieces}pk`, `${pieces} pk`]);
+  }
+  function isLikelyGroceryPriceMatchContext(...rawUrls) {
+    return rawUrls.some((rawUrl) => {
+      if (rawUrl === void 0) return false;
+      try {
+        const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
+        return GROCERY_CONTEXT_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+      } catch {
+        return false;
+      }
+    });
+  }
+  function normalizePackageUnit(rawUnit) {
+    const unit = transliterateNorwegianCharacters$4(rawUnit).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-zA-Z]/g, "").toLowerCase();
+    if (unit === "kg" || unit === "kgm" || unit === "kilo" || unit === "kilogram") return { unit: "g", multiplier: 1e3 };
+    if (unit === "g" || unit === "gr" || unit === "grm" || unit === "gram" || unit === "grams") return { unit: "g", multiplier: 1 };
+    if (unit === "l" || unit === "ltr" || unit === "liter" || unit === "litre") return { unit: "ml", multiplier: 1e3 };
+    if (unit === "dl" || unit === "dlt") return { unit: "ml", multiplier: 100 };
+    if (unit === "cl" || unit === "clt") return { unit: "ml", multiplier: 10 };
+    if (unit === "ml" || unit === "mlt") return { unit: "ml", multiplier: 1 };
+    if (unit === "stk" || unit === "stykk" || unit === "stykke" || unit === "pcs" || unit === "pc") {
+      return { unit: "pcs", multiplier: 1 };
+    }
+    if (unit === "pk" || unit === "pakke" || unit === "pack") return { unit: "pcs", multiplier: 1 };
+    return void 0;
+  }
+  function isReasonablePackageQuantity(amount, unit) {
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    if (unit === "pcs") return amount <= 200;
+    return amount <= 1e5;
+  }
+  function normalizePackageAmount(amount) {
+    return Number.isInteger(amount) ? amount : Number(amount.toFixed(2));
+  }
+  function formatPackageAmount(amount) {
+    return Number.isInteger(amount) ? String(amount) : String(Number(amount.toFixed(2))).replace(".", ",");
+  }
+  function parseLocalizedNumber$2(value) {
+    const compact = value.replace(/\s/g, "").replace(",", ".");
+    const parsed = Number.parseFloat(compact);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+  function readStringLike$6(value) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : void 0;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    return void 0;
+  }
+  function readNumberLike$5(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return void 0;
+    const parsed = parseLocalizedNumber$2(value);
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  function transliterateNorwegianCharacters$4(value) {
+    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
+  }
+  function uniqueStrings$d(values) {
+    return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
+  }
+  function isPlainRecord$7(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function getGroceryPackageQuantity(message) {
+    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
+  }
+  function cleanGroceryTitleCandidate(value) {
+    return value.replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "").replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "").replace(/\s+[-|]\s+(?:Oda|MENY|SPAR|KIWI|REMA\s*1000|Coop(?:\s+Extra)?|Joker|Bunnpris)\s*$/i, "").replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "").replace(/[.]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function isLikelySameGroceryTitle$1(message, title, minimumScore = 0.4) {
+    return uniqueStrings$d([message.searchTerm, ...message.productTitleCandidates ?? []]).some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate(candidate), title, minimumScore));
+  }
+  function normalizeGroceryBrandText(value) {
+    return transliterateNorwegianCharacters$4(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
+  }
+  function hasGroceryBrandSignal(message, text2) {
+    if (message.productBrand === void 0) return true;
+    const brand = normalizeGroceryBrandText(message.productBrand);
+    if (brand.length < 3) return true;
+    return normalizeGroceryBrandText(text2).includes(brand);
+  }
+  const MIN_PRODUCT_MATCH_SCORE = 0.45;
+  function isSameProductUrl(first, second) {
+    const a = first === void 0 ? void 0 : normalizeProductUrlKey(first);
+    return a !== void 0 && a === (second === void 0 ? void 0 : normalizeProductUrlKey(second));
+  }
+  function normalizeProductUrlKey(rawUrl) {
+    const url = parseUrl$1(rawUrl);
+    if (url === void 0) return void 0;
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
+    }
+    url.searchParams.sort();
+    return `${url.hostname.replace(/^www\./, "")}${url.pathname.replace(/\/$/, "")}${url.search}`;
+  }
+  function readProductCodesFromUrl(rawUrl) {
+    const url = parseUrl$1(rawUrl);
+    return url === void 0 ? [] : [...new Set(`${url.pathname} ${url.search}`.match(/\b\d{12,14}\b/g) ?? [])];
+  }
+  function isValidGtin(value) {
+    if (!/^(?:\d{8}|\d{12,14})$/.test(value)) return false;
+    const digits = [...value].map(Number);
+    const check = digits.pop();
+    const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+    return (10 - sum % 10) % 10 === check;
+  }
+  function normalizePriceMatchShopName(value) {
+    return value.toLowerCase().replace(/\.(?:no|com)$/g, "").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]/g, "");
+  }
+  const STORAGE_SIZE_PATTERN = /\b(\d+(?:[.,]\d+)?)\s*(tb|gb)\b/gi;
+  const BRAND_MATCH_GROUPS = [
+    ["apple"],
+    ["google", "pixel"],
+    ["microsoft", "xbox"],
+    ["nintendo"],
+    ["samsung"],
+    ["sony", "playstation"]
+  ];
+  function buildProductMatchAnchor(message) {
+    const packageQuantity = message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
+    const variantText = readPercentages(message.searchTerm).size === 0 ? message.productTitleCandidates?.find((candidate) => readPercentages(candidate).size > 0) : void 0;
+    return {
+      searchTerm: message.searchTerm,
+      ...message.productLanguage !== void 0 ? { productLanguage: message.productLanguage } : {},
+      ...packageQuantity !== void 0 ? { packageQuantity } : {},
+      ...variantText !== void 0 ? { variantText } : {}
+    };
+  }
+  function scoreProductCandidateMatch(anchor, candidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
+    const candidateTitles = uniqueStrings$c([
+      candidate.brand !== void 0 && !candidate.title.toLowerCase().includes(candidate.brand.toLowerCase()) ? `${candidate.brand} ${candidate.title}` : void 0,
+      candidate.title
+    ]);
+    let bestScore = 0;
+    for (const title of candidateTitles) {
+      if (hasProductVariantConflict(anchor, title)) continue;
+      if (!isLikelySameProductTitle(anchor.searchTerm, title, minimumScore)) continue;
+      const score = scoreProductTitleAgainstSearchTerm(anchor.searchTerm, title);
+      bestScore = Math.max(bestScore, hasBrandConflict(anchor.searchTerm, candidate.brand) ? score * 0.3 : score);
+    }
+    return bestScore;
+  }
+  function pickBestProductCandidate(anchor, candidates, readCandidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
+    let best;
+    for (const candidate of candidates) {
+      const info = readCandidate(candidate);
+      if (info === void 0) continue;
+      const score = scoreProductCandidateMatch(anchor, info, minimumScore);
+      if (score >= minimumScore && (best === void 0 || score > best.score)) {
+        best = { candidate, score };
+      }
+    }
+    return best?.candidate;
+  }
+  function hasProductVariantConflict(anchor, candidateTitle) {
+    return hasTcgProductVariantConflict(`${anchor.searchTerm} ${anchor.productLanguage ?? ""}`, candidateTitle) || hasPackageQuantityConflict(anchor, candidateTitle) || hasStorageSizeConflict(anchor.searchTerm, candidateTitle) || hasModelNumberConflict(anchor.searchTerm, candidateTitle) || hasNumericModelConflict(anchor.searchTerm, candidateTitle) || hasModelTierConflict(anchor.searchTerm, candidateTitle) || hasColorVariantConflict(anchor.searchTerm, candidateTitle) || hasPercentageVariantConflict(anchor.variantText ?? anchor.searchTerm, candidateTitle);
+  }
+  function hasPercentageVariantConflict(anchorText, candidateTitle) {
+    const anchorPercentages = readPercentages(anchorText);
+    const candidatePercentages = readPercentages(candidateTitle);
+    if (anchorPercentages.size === 0 || candidatePercentages.size === 0) return false;
+    return ![...anchorPercentages].some((value) => candidatePercentages.has(value));
+  }
+  function readPercentages(text2) {
+    const values = /* @__PURE__ */ new Set();
+    for (const match of text2.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|prosent\b)/gi)) {
+      const value = Number(match[1].replace(",", "."));
+      if (Number.isFinite(value)) values.add(value);
+    }
+    return values;
+  }
+  const NUMERIC_MODEL_UNIT_WORDS = /* @__PURE__ */ new Set([
+    "a",
+    "ah",
+    "ar",
+    "cl",
+    "cm",
+    "dl",
+    "fps",
+    "g",
+    "gb",
+    "ghz",
+    "gr",
+    "h",
+    "hz",
+    "in",
+    "kg",
+    "khz",
+    "km",
+    "kw",
+    "kwh",
+    "l",
+    "m",
+    "mah",
+    "mb",
+    "mg",
+    "ml",
+    "mm",
+    "pack",
+    "pakke",
+    "pakning",
+    "pakninger",
+    "pcs",
+    "pk",
+    "prosent",
+    "stk",
+    "t",
+    "tb",
+    "timer",
+    "tommer",
+    "tum",
+    "v",
+    "w",
+    "wh",
+    "x",
+    "år"
+  ]);
+  const NUMERIC_MODEL_SPEC_TOKENS = /* @__PURE__ */ new Set(["2k", "4k", "8k", "3g", "4g", "5g"]);
+  function hasNumericModelConflict(anchorText, candidateTitle) {
+    const anchorTokens = readNumericModelTokens(anchorText);
+    const candidateTokens = readNumericModelTokens(candidateTitle);
+    if (hasUnitSuffixModelConflict(anchorTokens, candidateTokens) || hasUnitSuffixModelConflict(candidateTokens, anchorTokens)) {
+      return true;
+    }
+    if (anchorTokens.numbers.size === 0 || candidateTokens.numbers.size === 0) return false;
+    return ![...anchorTokens.numbers].some((number) => candidateTokens.numbers.has(number));
+  }
+  function hasUnitSuffixModelConflict(first, second) {
+    return [...first.unitSuffixed.entries()].some(([token, base]) => {
+      return !first.numbers.has(base) && second.numbers.has(base) && !second.unitSuffixed.has(token);
+    });
+  }
+  function readNumericModelTokens(text2) {
+    const normalized = text2.toLowerCase().replace(/\d+[.,]\d+/g, " ").replace(/\b\d+\s*x\s*\d+/g, " ").replace(/\d+\s*%/g, " ");
+    const tokens = normalized.split(/[^a-z0-9æøå]+/).filter((token) => token.length > 0);
+    const numbers = /* @__PURE__ */ new Set();
+    const unitSuffixed = /* @__PURE__ */ new Map();
+    for (const [index, token] of tokens.entries()) {
+      if (/^\d{1,3}$/.test(token)) {
+        const nextToken = tokens[index + 1];
+        if (nextToken === void 0 || !NUMERIC_MODEL_UNIT_WORDS.has(nextToken)) {
+          numbers.add(token);
+        }
+        continue;
+      }
+      if (NUMERIC_MODEL_SPEC_TOKENS.has(token)) continue;
+      if (/^\d{1,3}[a-z]{1,2}$/.test(token) && !isUnitLikeToken(token)) {
+        numbers.add(token);
+        continue;
+      }
+      const unitSuffixMatch = /^(\d{1,3})[a-z]$/.exec(token);
+      if (unitSuffixMatch?.[1] !== void 0 && isUnitLikeToken(token)) {
+        unitSuffixed.set(token, unitSuffixMatch[1]);
+      }
+    }
+    return { numbers, unitSuffixed };
+  }
+  const COLOR_VARIANT_TOKEN_GROUPS = /* @__PURE__ */ new Map([
+    ["beige", "beige"],
+    ["bla", "bla"],
+    ["black", "svart"],
+    ["blue", "bla"],
+    ["brown", "brun"],
+    ["brun", "brun"],
+    ["carbon", "svart"],
+    ["gold", "gull"],
+    ["gra", "gra"],
+    ["graphite", "gra"],
+    ["gray", "gra"],
+    ["green", "gronn"],
+    ["grey", "gra"],
+    ["gronn", "gronn"],
+    ["gul", "gul"],
+    ["gull", "gull"],
+    ["hvit", "hvit"],
+    ["lilla", "lilla"],
+    ["navy", "bla"],
+    ["orange", "oransje"],
+    ["oransje", "oransje"],
+    ["pink", "rosa"],
+    ["purple", "lilla"],
+    ["red", "rod"],
+    ["rod", "rod"],
+    ["rosa", "rosa"],
+    ["sandstone", "sandstone"],
+    ["silver", "solv"],
+    ["solv", "solv"],
+    ["sort", "svart"],
+    ["svart", "svart"],
+    ["violet", "lilla"],
+    ["white", "hvit"],
+    ["yellow", "gul"]
+  ]);
+  function hasColorVariantConflict(anchorText, candidateTitle) {
+    const anchorColors = readColorVariantTokens(anchorText);
+    if (anchorColors.size === 0) return false;
+    const candidateColors = readColorVariantTokens(candidateTitle);
+    if (candidateColors.size === 0) return false;
+    return ![...anchorColors].some((color) => candidateColors.has(color));
+  }
+  function readColorVariantTokens(text2) {
+    const colors = /* @__PURE__ */ new Set();
+    for (const token of tokenizeBrandText(text2)) {
+      const color = COLOR_VARIANT_TOKEN_GROUPS.get(token);
+      if (color !== void 0) colors.add(color);
+    }
+    return colors;
+  }
+  const MODEL_TIER_TOKENS = /* @__PURE__ */ new Set(["ultra", "pro", "plus", "max", "mini", "lite", "air", "xl", "fe", "fold", "flip"]);
+  function hasModelTierConflict(anchorText, candidateTitle) {
+    const anchorTiers = readModelTierTokens(anchorText);
+    const candidateTiers = readModelTierTokens(candidateTitle);
+    return anchorTiers.size !== candidateTiers.size || ![...anchorTiers].every((tier) => candidateTiers.has(tier));
+  }
+  function readModelTierTokens(text2) {
+    return new Set(tokenizeBrandText(text2).filter((token) => MODEL_TIER_TOKENS.has(token)));
+  }
+  function hasModelNumberConflict(anchorText, candidateTitle) {
+    const anchorModels = readModelNumberTokens(anchorText);
+    if (anchorModels.length === 0) return false;
+    const candidateModels = readModelNumberTokens(candidateTitle);
+    if (candidateModels.length === 0) return anchorModels.some(isStrongModelNumberToken);
+    const anchorPrefixedModels = anchorModels.filter(isLetterPrefixedModelToken);
+    const candidatePrefixedModels = candidateModels.filter(isLetterPrefixedModelToken);
+    if (anchorPrefixedModels.length > 0 && candidatePrefixedModels.length > 0 && !hasCompatibleModelNumberPair(anchorPrefixedModels, candidatePrefixedModels)) {
+      return true;
+    }
+    return !hasCompatibleModelNumberPair(anchorModels, candidateModels);
+  }
+  function hasMatchingModelNumberToken(anchorText, candidateTitle) {
+    const anchorModels = readModelNumberTokens(anchorText);
+    const candidateModels = readModelNumberTokens(candidateTitle);
+    return anchorModels.length > 0 && candidateModels.length > 0 && hasCompatibleModelNumberPair(anchorModels, candidateModels);
+  }
+  function hasCompatibleModelNumberPair(anchorModels, candidateModels) {
+    return anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
+      return anchorModel === candidateModel || anchorModel.length >= 3 && candidateModel.includes(anchorModel) || candidateModel.length >= 3 && anchorModel.includes(candidateModel);
+    }));
+  }
+  function isStrongModelNumberToken(token) {
+    return token.length >= 4 && !GENERIC_SPEC_TOKENS.has(token);
+  }
+  function isLetterPrefixedModelToken(token) {
+    return /^[a-z]/.test(token) && isStrongModelNumberToken(token);
+  }
+  const GENERIC_SPEC_TOKENS = /* @__PURE__ */ new Set(["wifi5", "wifi6", "wifi7", "usb2", "usb3", "usb4", "hdmi2", "bt50"]);
+  function readModelNumberTokens(text2) {
+    const bareTokens = text2.split(/[^A-Za-z0-9]+/).map((token) => token.toLowerCase()).filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token));
+    const joinedTokens = [...text2.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)].filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase())).map((match) => `${match[1]}${match[2]}`.toLowerCase()).filter((token) => !isUnitLikeToken(token));
+    return uniqueStrings$c([...bareTokens, ...joinedTokens]);
+  }
+  function isUnitLikeToken(token) {
+    return /^\d+(?:[.,]\d+)?(?:ml|cl|dl|l|g|gr|kg|mg|gb|tb|mb|mm|cm|m|km|w|kw|wh|kwh|mah|hz|khz|ghz|v|a|ah|stk|pk|pcs|fps|tommer|tum|in)$/.test(token);
+  }
+  function hasPackageQuantityConflict(anchor, candidateTitle) {
+    const expectedQuantity = anchor.packageQuantity ?? readPackageQuantityFromText(anchor.searchTerm);
+    if (expectedQuantity === void 0) return false;
+    const candidateQuantity = readPackageQuantityFromText(candidateTitle);
+    return candidateQuantity !== void 0 && !isSamePackageQuantity(expectedQuantity, candidateQuantity);
+  }
+  function hasStorageSizeConflict(anchorText, candidateTitle) {
+    const anchorSizes = readStorageSizesGb(anchorText);
+    if (anchorSizes.length === 0) return false;
+    const candidateSizes = readStorageSizesGb(candidateTitle);
+    if (candidateSizes.length === 0) return false;
+    return !anchorSizes.some((size) => candidateSizes.includes(size));
+  }
+  function readStorageSizesGb(text2) {
+    const sizes = /* @__PURE__ */ new Set();
+    for (const match of text2.matchAll(STORAGE_SIZE_PATTERN)) {
+      const amount = Number.parseFloat((match[1] ?? "").replace(",", "."));
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      sizes.add((match[2] ?? "").toLowerCase() === "tb" ? amount * 1024 : amount);
+    }
+    return [...sizes];
+  }
+  function hasBrandConflict(anchorText, candidateBrand) {
+    if (candidateBrand === void 0) return false;
+    const anchorTokens = new Set(tokenizeBrandText(anchorText));
+    const brandTokens = new Set(tokenizeBrandText(candidateBrand));
+    if (anchorTokens.size === 0 || brandTokens.size === 0) return false;
+    const anchorBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => anchorTokens.has(token)));
+    if (anchorBrandGroups.length === 0) return false;
+    return !anchorBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
+  }
+  function isLikelyGtin$5(value) {
+    return /^(?:\d{8}|\d{12,14})$/.test(value.trim());
+  }
+  function isLikelyMpn(value) {
+    const normalized = value.trim();
+    if (normalized.length < 5 || normalized.length > 40 || isLikelyGtin$5(normalized)) return false;
+    return /^[A-Za-z0-9][A-Za-z0-9._/ -]*$/.test(normalized) && /[A-Za-z]/.test(normalized) && /\d/.test(normalized);
+  }
+  function tokenizeBrandText(value) {
+    return uniqueStrings$c(value.split(/[^A-Za-z0-9ÆØÅæøå]+/).map(normalizeBrandToken).filter((token) => token !== void 0 && token.length >= 2));
+  }
+  function normalizeBrandToken(value) {
+    const normalized = value.replace(/[Ææ]/g, "ae").replace(/[Øø]/g, "o").replace(/[Åå]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    return normalized.length > 0 ? normalized : void 0;
+  }
+  function uniqueStrings$c(values) {
+    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
+  }
+  function parseLdJson(text2) {
+    return decodeLdJsonStrings(JSON.parse(text2));
+  }
+  function readNextPageData(html) {
+    const script = html.match(/<script\b[^>]*\bid\s*=\s*["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script\s*>/i);
+    if (script === null) return void 0;
+    try {
+      return JSON.parse(script[1]);
+    } catch {
+      return void 0;
+    }
+  }
+  function readLdJsonScripts(html) {
+    const entries = [];
+    for (const match of html.matchAll(/<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+      try {
+        entries.push(parseLdJson(match[1] ?? ""));
+      } catch {
+      }
+    }
+    for (const match of html.matchAll(/<script\b[^>]*>\s*\(self\.__next_s=self\.__next_s\|\|\[\]\)\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
+      try {
+        const row = JSON.parse(match[1]);
+        const props = Array.isArray(row) && isRecord$7(row[1]) ? row[1] : void 0;
+        if (props?.type === "application/ld+json" && typeof props.children === "string") entries.push(parseLdJson(props.children));
+      } catch {
+      }
+    }
+    return entries;
+  }
+  function readNextFlightPayloads(html) {
+    const payloads = [];
+    for (const match of html.matchAll(/<script\b[^>]*>\s*self\.__next_f\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
+      try {
+        const row = JSON.parse(match[1] ?? "");
+        if (Array.isArray(row) && row[0] === 1 && typeof row[1] === "string") payloads.push(row[1]);
+      } catch {
+      }
+    }
+    return payloads;
+  }
+  function readNextFlightValues(html) {
+    const values = [];
+    const data = readNextFlightPayloads(html).join("");
+    for (let index = 0; index < data.length; ) {
+      const separator = data.indexOf(":", index);
+      if (separator < 0) break;
+      const text2 = /^T([0-9a-f]+),/.exec(data.slice(separator + 1, separator + 12));
+      if (text2 !== null) {
+        let end2 = separator + 1 + text2[0].length;
+        for (let bytes = 0, length = parseInt(text2[1], 16); end2 < data.length && bytes < length; ) {
+          const code = data.codePointAt(end2);
+          bytes += code < 128 ? 1 : code < 2048 ? 2 : code < 65536 ? 3 : 4;
+          end2 += code > 65535 ? 2 : 1;
+        }
+        index = end2;
+        continue;
+      }
+      const newline = data.indexOf("\n", separator);
+      const end = newline < 0 ? data.length : newline;
+      try {
+        values.push(JSON.parse(data.slice(separator + 1, end)));
+      } catch {
+      }
+      index = end + 1;
+    }
+    return values;
+  }
+  function readNextProductData(html, productUrl) {
+    const pending = [...readNextFlightValues(html)];
+    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
+      const item = pending[visited];
+      if (Array.isArray(item)) pending.push(...item);
+      else if (isRecord$7(item)) {
+        if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
+        pending.push(...Object.values(item));
+      }
+    }
+    return void 0;
+  }
+  function readStructuredProductCodes(product) {
+    if (product === void 0) return [];
+    return [...new Set(Object.entries(product).flatMap(([key, raw]) => {
+      if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) return [];
+      return (Array.isArray(raw) ? raw : [raw]).flatMap((value) => typeof value === "string" || typeof value === "number" ? [String(value).trim()] : []).filter(Boolean);
+    }))];
+  }
+  function readComparisonProductLdJson(html, rawUrl) {
+    const schema = selectProductLdJson(readLdJsonScripts(html));
+    const url = parseUrl$1(rawUrl);
+    if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return schema;
+    const product = readNextProductData(html, rawUrl);
+    if (product === void 0) return schema;
+    const brand = isRecord$7(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
+    const attributes = isRecord$7(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$7).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$7) : []) : [];
+    const fallback = {
+      "@type": "Product",
+      name: product.title,
+      url: product.url,
+      ...brand !== void 0 ? { brand } : {},
+      ...typeof product.ean === "string" && product.ean !== "$undefined" ? { gtin: product.ean } : {},
+      additionalProperty: attributes.filter((attribute) => /^(?:språk|language)$/i.test(String(attribute.title))).map((attribute) => ({ name: attribute.title, value: attribute.value }))
+    };
+    if (!schema || typeof schema.url === "string" && !isSameProductUrl(schema.url, rawUrl)) return fallback;
+    return { ...fallback, ...schema, additionalProperty: [...fallback.additionalProperty, ...Array.isArray(schema.additionalProperty) ? schema.additionalProperty : []] };
+  }
+  function findStructuredProperty(value, name) {
+    const pending = [value];
+    for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
+      const item = pending.pop();
+      if (Array.isArray(item)) pending.push(...item);
+      else if (isRecord$7(item)) {
+        if (Object.hasOwn(item, name)) return item[name];
+        pending.push(...Object.values(item));
+      }
+    }
+    return void 0;
+  }
+  function readProductLanguage(product, titles) {
+    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$7) : [];
+    const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
+    const languages = new Set(values.filter((value) => typeof value === "string").flatMap((value) => readTcgLanguages(value).map((language) => language.code)));
+    return languages.size === 1 ? [...languages][0] : void 0;
+  }
+  function readProductOfferLanguage(html, productId) {
+    const rows = findStructuredProperty(readNextFlightValues(html), "offerRows");
+    if (!Array.isArray(rows)) return void 0;
+    const names = rows.filter(isRecord$7).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
+    return readProductLanguage(void 0, names);
+  }
+  function findTypedLdJson(value, type) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found2 = findTypedLdJson(item, type);
+        if (found2 !== void 0) return found2;
+      }
+      return void 0;
+    }
+    if (!isRecord$7(value)) return void 0;
+    const found = Array.isArray(value["@graph"]) ? findTypedLdJson(value["@graph"], type) : void 0;
+    if (found !== void 0) return found;
+    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+    return types.includes(type) ? value : void 0;
+  }
+  function selectProductLdJson(value) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const product = selectProductLdJson(item);
+        if (product !== void 0) return product;
+      }
+      return void 0;
+    }
+    if (!isRecord$7(value)) return void 0;
+    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+    if (types.includes("Product") && typeof value.name === "string" && value.name.trim().length > 0) return value;
+    return Array.isArray(value["@graph"]) ? selectProductLdJson(value["@graph"]) : void 0;
+  }
+  function decodeLdJsonStrings(value) {
+    if (typeof value === "string") return decodeHtmlEntities(value);
+    if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
+    if (isRecord$7(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
+    return value;
+  }
+  const TRUSTPILOT_CACHE_PREFIX = "trustpilot-store-v1:";
+  const TRUSTPILOT_MAX_AGE_MS = 24 * 60 * 60 * 1e3;
+  const FAILURE_MAX_AGE_MS = 5 * 60 * 1e3;
+  const MAX_REVIEWS = 3;
+  function trustpilotDomain(raw) {
+    const url = parseUrl$1(raw.includes("://") ? raw : `https://${raw}`);
+    if (!url || !["https:", "http:"].includes(url.protocol) || url.username || url.password || url.port) return void 0;
+    const domain = normalizeHostname$1(url.hostname);
+    return domain.length <= 253 && /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain) ? domain : void 0;
+  }
+  function trustpilotProfileUrl(domain) {
+    return `https://no.trustpilot.com/review/${encodeURIComponent(domain)}`;
+  }
+  function trustpilotPageDomain(rawUrl) {
+    const url = parseUrl$1(rawUrl);
+    if (url?.protocol !== "https:" || !["no.trustpilot.com", "www.trustpilot.com"].includes(url.hostname) || url.port) return void 0;
+    const match = /^\/review\/([^/]+)\/?$/.exec(url.pathname);
+    return match && !/%/.test(match[1]) ? trustpilotDomain(match[1]) : void 0;
+  }
+  function trustpilotSearchUrl(domain) {
+    return `https://no.trustpilot.com/api/consumersitesearch-api/businessunits/search?${new URLSearchParams({ country: "NO", locale: "nb-NO", page: "1", pageSize: "5", query: domain })}`;
+  }
+  const validScore = (value) => typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= 5;
+  const validCount = (value) => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+  const shortText = (value, max) => typeof value === "string" ? value.trim().slice(0, max) : "";
+  function readBusiness(value, domain, search) {
+    if (!isRecord$7(value) || typeof value.identifyingName !== "string" || normalizeHostname$1(value.identifyingName) !== domain || typeof value.websiteUrl !== "string" || trustpilotDomain(value.websiteUrl) !== domain) return void 0;
+    const id = search ? value.businessUnitId : value.id;
+    const score = search && isRecord$7(value.score) ? value.score.trustScore : value.trustScore;
+    const name = shortText(value.displayName, 160);
+    if (typeof id !== "string" || !/^[a-f\d]{24}$/.test(id) || !name || !validScore(score) || !validCount(value.numberOfReviews)) return void 0;
+    const alert = isRecord$7(value.consumerAlert) ? value.consumerAlert : void 0;
+    const warning = alert ? shortText(alert.title, 250) || "Trustpilot viser et varsel på denne profilen. Les det hos Trustpilot." : "";
+    return {
+      source: "trustpilot",
+      maxScore: 5,
+      shopName: name,
+      domain,
+      businessUnitId: id,
+      score,
+      count: value.numberOfReviews,
+      url: trustpilotProfileUrl(value.identifyingName),
+      reviews: [],
+      ...warning ? { warning } : {}
+    };
+  }
+  function readTrustpilotSearch(value, domain) {
+    if (!isRecord$7(value) || !Array.isArray(value.businessUnits)) throw new Error("Trustpilot: ukjent format i virksomhetssøket");
+    return value.businessUnits.slice(0, 5).map((business) => readBusiness(business, domain, true)).find(Boolean);
+  }
+  function readTrustpilotPage(html, domain) {
+    const data = readNextPageData(html);
+    const props = isRecord$7(data) && isRecord$7(data.props) && isRecord$7(data.props.pageProps) ? data.props.pageProps : void 0;
+    if (!props) return void 0;
+    const profile = readBusiness(props.businessUnit, domain, false);
+    if (!profile) return void 0;
+    const reviews = Array.isArray(props.reviews) ? props.reviews.slice(0, 20) : [];
+    profile.reviews = reviews.filter(isRecord$7).flatMap((review) => {
+      const date = isRecord$7(review.dates) ? review.dates.publishedDate : void 0;
+      const verification = isRecord$7(review.labels) && isRecord$7(review.labels.verification) ? review.labels.verification : void 0;
+      if (review.filtered !== false || review.isPending !== false || review.isCurrentlyUnderModeration === true || typeof review.id !== "string" || !/^[a-f\d]{24}$/.test(review.id) || !validScore(review.rating) || !Number.isInteger(review.rating) || typeof date !== "string" || !Number.isFinite(Date.parse(date)) || !shortText(review.text, 500)) return [];
+      const reply = isRecord$7(review.reply) ? shortText(review.reply.message, 500) : "";
+      return [{
+        id: review.id,
+        title: shortText(review.title, 160),
+        text: shortText(review.text, 500),
+        rating: review.rating,
+        date,
+        verified: verification?.isVerified === true,
+        ...reply ? { reply } : {}
+      }];
+    }).slice(0, MAX_REVIEWS);
+    return profile;
+  }
+  function isTrustpilotProfile(value) {
+    if (!isRecord$7(value) || value.source !== "trustpilot" || value.maxScore !== 5 || typeof value.domain !== "string" || trustpilotDomain(value.domain) !== value.domain || typeof value.businessUnitId !== "string" || !/^[a-f\d]{24}$/.test(value.businessUnitId) || typeof value.shopName !== "string" || !value.shopName.trim() || value.shopName.length > 160 || !validScore(value.score) || !validCount(value.count) || typeof value.url !== "string" || trustpilotPageDomain(value.url) !== value.domain || value.warning !== void 0 && (typeof value.warning !== "string" || value.warning.length > 250) || !Array.isArray(value.reviews) || value.reviews.length > MAX_REVIEWS) return false;
+    return value.reviews.every((review) => isRecord$7(review) && typeof review.id === "string" && /^[a-f\d]{24}$/.test(review.id) && typeof review.title === "string" && review.title.length <= 160 && typeof review.text === "string" && review.text.length <= 500 && validScore(review.rating) && Number.isInteger(review.rating) && typeof review.date === "string" && Number.isFinite(Date.parse(review.date)) && typeof review.verified === "boolean" && (review.reply === void 0 || typeof review.reply === "string" && review.reply.length <= 500));
+  }
+  function isTrustpilotResult(value) {
+    return isRecord$7(value) && typeof value.domain === "string" && trustpilotDomain(value.domain) === value.domain && typeof value.profileUrl === "string" && trustpilotPageDomain(value.profileUrl) === value.domain && typeof value.checkedAt === "number" && Number.isFinite(value.checkedAt) && (value.status === "ok" ? isTrustpilotProfile(value.profile) && value.profile.domain === value.domain : ["blocked", "unavailable", "not-found"].includes(String(value.status)) && typeof value.reason === "string" && value.reason.length <= 1e3);
+  }
+  function isFreshTrustpilotResult(value, domain, now = Date.now()) {
+    return isTrustpilotResult(value) && value.domain === domain && value.checkedAt <= now && now - value.checkedAt < (value.status === "ok" ? TRUSTPILOT_MAX_AGE_MS : FAILURE_MAX_AGE_MS);
+  }
+  async function requestTrustpilot(url) {
+    const response = await fetch(url, { credentials: "include", headers: { Accept: "application/json,text/html" }, signal: AbortSignal.timeout(8e3) });
+    return { status: response.status, text: await response.text() };
+  }
+  function createTrustpilotClient(options) {
+    const now = options.now ?? Date.now;
+    const inFlight = /* @__PURE__ */ new Map();
+    async function request(url) {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const response = await (options.request ?? requestTrustpilot)(url);
+          if (response.status >= 500 && attempt === 0) continue;
+          return response;
+        } catch (error) {
+          if (attempt === 0) continue;
+          throw new Error(`Trustpilot: ${new URL(url).pathname}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
+    async function save(result) {
+      await options.write(TRUSTPILOT_CACHE_PREFIX + result.domain, result).catch(() => {
+      });
+      return result;
+    }
+    return {
+      async get(rawDomain) {
+        const domain = trustpilotDomain(rawDomain);
+        if (!domain) return void 0;
+        const cached = await options.read(TRUSTPILOT_CACHE_PREFIX + domain).catch(() => void 0);
+        if (isFreshTrustpilotResult(cached, domain, now())) return cached;
+        if (inFlight.has(domain)) return inFlight.get(domain);
+        const promise = (async () => {
+          const base = { domain, profileUrl: trustpilotProfileUrl(domain), checkedAt: now() };
+          let profile;
+          let reason = "Trustpilot: ingen vurderinger funnet";
+          let status = "not-found";
+          let rateLimited = false;
+          try {
+            const response = await request(trustpilotSearchUrl(domain));
+            if (response.status === 200) profile = readTrustpilotSearch(JSON.parse(response.text), domain);
+            else {
+              rateLimited = response.status === 429;
+              status = response.status === 403 || response.status === 429 ? "blocked" : "unavailable";
+              reason = `Trustpilot: virksomhetssøk: HTTP ${response.status}`;
+            }
+          } catch (error) {
+            status = "unavailable";
+            reason = `Trustpilot: virksomhetssøk: ${error instanceof Error ? error.message : String(error)}`;
+          }
+          try {
+            if (!rateLimited) {
+              const response = await request(profile?.url ?? base.profileUrl);
+              if (response.status === 200) {
+                const page = readTrustpilotPage(response.text, domain);
+                if (page && (!profile || page.businessUnitId === profile.businessUnitId)) profile = page;
+                else if (!profile) {
+                  status = "unavailable";
+                  reason = "Trustpilot: profilsiden mangler gyldige data for dette domenet";
+                }
+              } else if (!profile) {
+                status = response.status === 403 || response.status === 429 ? "blocked" : response.status === 404 ? "not-found" : "unavailable";
+                reason = `Trustpilot: profilsiden: HTTP ${response.status}`;
+              }
+            }
+          } catch (error) {
+            if (!profile) {
+              status = "unavailable";
+              reason = `Trustpilot: profilsiden: ${error instanceof Error ? error.message : String(error)}`;
+            }
+          }
+          const captured = await options.read(TRUSTPILOT_CACHE_PREFIX + domain).catch(() => void 0);
+          if (isFreshTrustpilotResult(captured, domain, now()) && captured.status === "ok" && captured.checkedAt >= base.checkedAt) return captured;
+          return save(profile ? { ...base, status: "ok", profile } : { ...base, status, reason: reason.slice(0, 1e3) });
+        })().finally(() => inFlight.delete(domain));
+        inFlight.set(domain, promise);
+        return promise;
+      },
+      async capture(profile, pageUrl) {
+        if (!isTrustpilotProfile(profile) || trustpilotPageDomain(pageUrl) !== profile.domain) return void 0;
+        return save({ domain: profile.domain, profileUrl: profile.url, checkedAt: now(), status: "ok", profile });
+      }
+    };
+  }
+  function createStoredTrustpilotClient(request) {
+    return createTrustpilotClient({
+      read: (key) => new Promise((resolve) => chrome.storage.local.get(key, (values) => resolve(values[key]))),
+      write: (key, value) => new Promise((resolve) => chrome.storage.local.set({ [key]: value }, resolve)),
+      ...request ? { request } : {}
+    });
+  }
+  const version$1 = 1;
+  const source$1 = "https://www.tek.no/mobilabonnement/api";
+  const generatedAt$1 = "2026-11-04T22:32:00.717078+00:00";
+  const suppliers$1 = [{ "id": 5, "name": "Chilimobil", "hostname": "chilimobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://chilimobil.no/" }, { "id": 6, "name": "Fjordkraft Mobil", "hostname": "fjordkraft.no", "path": "/mobil", "evidence": "tek-destination", "supplierUrl": "https://fjordkraft.no/mobil" }, { "id": 1, "name": "Happybytes", "hostname": "happybytes.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://happybytes.no/" }, { "id": 7, "name": "Ice", "hostname": "ice.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://ice.no/" }, { "id": 28, "name": "Lyca Mobile", "hostname": "lyca-mobile.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://lyca-mobile.no/" }, { "id": 9, "name": "MyCall", "hostname": "mycall.no", "path": "/", "evidence": "verified-site", "supplierUrl": "https://mycall.no/" }, { "id": 10, "name": "OneCall", "hostname": "onecall.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://onecall.no/" }, { "id": 24, "name": "PlussMobil", "hostname": "plussmobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://plussmobil.no/" }, { "id": 12, "name": "Saga Mobil", "hostname": "sagamobil.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://sagamobil.no/" }, { "id": 14, "name": "Talkmore", "hostname": "talkmore.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://talkmore.no/" }, { "id": 15, "name": "Telenor", "hostname": "telenor.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://telenor.no/" }, { "id": 4, "name": "Telia", "hostname": "telia.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://telia.no/" }, { "id": 27, "name": "Verimo", "hostname": "verimo.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://verimo.no/" }, { "id": 26, "name": "Trøndermobil", "hostname": "xn--trndermobil-hgb.no", "path": "/", "evidence": "tek-destination", "supplierUrl": "https://xn--trndermobil-hgb.no/" }, { "id": 11, "name": "Xplora", "hostname": "xplora.com", "path": "/", "evidence": "verified-site", "supplierUrl": "https://xplora.com/" }, { "id": 11, "name": "Xplora", "hostname": "xplora.no", "path": "/", "evidence": "verified-site", "supplierUrl": "https://xplora.no/" }];
+  const bundled$1 = {
+    version: version$1,
+    source: source$1,
+    generatedAt: generatedAt$1,
+    suppliers: suppliers$1
+  };
   function isFreshPublicCatalog(value, now = Date.now()) {
     const age = now - Date.parse(value.generatedAt);
     return age >= -864e5 && age <= 14 * 864e5;
@@ -1532,131 +2577,6 @@
     const details = (card?.tip ?? getSupportAdvertisementDetail(ad, now)).replace(/^Instabank kredittkort\.\n/m, "");
     return ["# Instabank kredittkort", details, INSTABANK_AD.example];
   }
-  const PRODUCT_TITLE_BASE_MATCH_SEPARATORS = [
-    /\s+\|\s+/,
-    /\s+[-\u2013\u2014]\s+/,
-    /\s+\u2022\s+/
-  ];
-  const CANONICAL_MATCH_TOKENS$1 = /* @__PURE__ */ new Map([
-    ["black", "svart"],
-    ["blue", "bla"],
-    ["brown", "brun"],
-    ["carbon", "svart"],
-    ["controller", "kontroller"],
-    ["controllers", "kontroller"],
-    ["gamepad", "kontroller"],
-    ["gamepads", "kontroller"],
-    ["gold", "gull"],
-    ["gray", "gra"],
-    ["green", "gronn"],
-    ["grey", "gra"],
-    ["joypad", "kontroller"],
-    ["orange", "oransje"],
-    ["pink", "rosa"],
-    ["purple", "lilla"],
-    ["red", "rod"],
-    ["silver", "solv"],
-    ["wireless", "tradlos"],
-    ["sort", "svart"],
-    ["white", "hvit"],
-    ["yellow", "gul"]
-  ]);
-  const CONDITION_VARIANT_TOKENS$1 = ["fornyet", "refurbished", "renewed", "brukt", "used", "preowned"];
-  const GENERIC_PRODUCT_SIGNAL_TOKENS = /* @__PURE__ */ new Set([
-    "antibacterial",
-    "ansiktskrem",
-    "cleansing",
-    "hydrating",
-    "intensive",
-    "moisturising",
-    "moisturizing",
-    "protective",
-    "repairing",
-    "sensitive",
-    "soothing"
-  ]);
-  function scoreProductTitleAgainstSearchTerm(searchTerm, title) {
-    return Math.max(
-      0,
-      ...buildProductTitleBaseCandidates(searchTerm).map((candidate) => scoreProductTitleMatch(candidate, title))
-    );
-  }
-  function isLikelySameProductTitle(searchTerm, title, minimumScore = 0.45) {
-    return buildProductTitleBaseCandidates(searchTerm).some((candidate) => {
-      return scoreProductTitleMatch(candidate, title) >= minimumScore && hasProductTitleSignalOverlap(candidate, title);
-    });
-  }
-  function scoreProductTitleMatch(query, title) {
-    const queryTokens = tokenizeMatchText$1(query);
-    const titleTokens = new Set(tokenizeMatchText$1(title));
-    if (queryTokens.length === 0 || titleTokens.size === 0) return 0;
-    let matchedWeight = 0;
-    let totalWeight = 0;
-    for (const token of queryTokens) {
-      const weight = isModelNumberLikeToken(token) ? 3 : token.length >= 6 ? 2 : token.length >= 4 ? 1.5 : 1;
-      totalWeight += weight;
-      if (titleTokens.has(token)) {
-        matchedWeight += weight;
-        continue;
-      }
-      if ([...titleTokens].some((titleToken) => titleToken.length >= 4 && (titleToken.startsWith(token) || token.startsWith(titleToken)))) {
-        matchedWeight += weight * 0.5;
-      }
-    }
-    const score = totalWeight > 0 ? matchedWeight / totalWeight : 0;
-    return hasUnrequestedConditionVariant$1(queryTokens, titleTokens) ? score * 0.2 : score;
-  }
-  function hasProductTitleSignalOverlap(query, title) {
-    const querySignals = tokenizeMatchText$1(query).filter(isProductSignalToken);
-    if (querySignals.length === 0) return true;
-    const titleTokens = tokenizeMatchText$1(title);
-    if (titleTokens.length === 0) return false;
-    return querySignals.some((queryToken) => {
-      return titleTokens.some((titleToken) => {
-        return titleToken === queryToken || titleToken.length >= 4 && (titleToken.startsWith(queryToken) || queryToken.startsWith(titleToken));
-      });
-    });
-  }
-  function isProductSignalToken(token) {
-    if (isModelNumberLikeToken(token)) return true;
-    return token.length >= 6 && /[a-z]/.test(token) && !/\d/.test(token) && !GENERIC_PRODUCT_SIGNAL_TOKENS.has(token);
-  }
-  function isModelNumberLikeToken(token) {
-    return token.length >= 4 && /[a-z]/.test(token) && /\d/.test(token) && !isMeasurementUnitLikeToken(token);
-  }
-  function isMeasurementUnitLikeToken(token) {
-    return /^\d+(?:[.,]\d+)?(?:ml|cl|dl|l|g|gr|kg|mg|gb|tb|mb|mm|cm|m|km|w|kw|wh|kwh|mah|hz|khz|ghz|v|a|ah|stk|pk|pcs|fps|tommer|tum|in)$/.test(token);
-  }
-  function buildProductTitleBaseCandidates(searchTerm) {
-    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, " ");
-    const separatorPrefixCandidates = PRODUCT_TITLE_BASE_MATCH_SEPARATORS.map((separator) => normalizedSearchTerm.split(separator)[0]);
-    const buyTitleMatch = normalizedSearchTerm.match(/^(?:kj\u00f8p|kjop|buy)\s+(.+?)\s+(?:hos|at)\s+.+$/i);
-    return uniqueStrings$e([
-      normalizedSearchTerm,
-      ...separatorPrefixCandidates,
-      buyTitleMatch?.[1]
-    ]).filter((candidate) => candidate.length >= 4);
-  }
-  function tokenizeMatchText$1(value) {
-    const normalizedValue = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "");
-    return uniqueStrings$e(normalizedValue.split(/[^A-Za-z0-9]+/).map(normalizeMatchToken$1).filter((token) => token !== void 0 && token.length >= 2).map(canonicalizeMatchToken$1));
-  }
-  function normalizeMatchToken$1(value) {
-    const normalized = transliterateNorwegianCharacters$5(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-    return normalized.length > 0 ? normalized : void 0;
-  }
-  function canonicalizeMatchToken$1(token) {
-    return CANONICAL_MATCH_TOKENS$1.get(token) ?? token;
-  }
-  function hasUnrequestedConditionVariant$1(queryTokens, titleTokens) {
-    return CONDITION_VARIANT_TOKENS$1.some((token) => titleTokens.has(token) && !queryTokens.includes(token));
-  }
-  function transliterateNorwegianCharacters$5(value) {
-    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
-  }
-  function uniqueStrings$e(values) {
-    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
-  }
   const AUGMENTED_STEAM_PRICES_URL = "https://api.augmentedsteam.com/prices/v2";
   const ISTHEREANYDEAL_ORIGIN = "https://isthereanydeal.com";
   const ISTHEREANYDEAL_GEO_URL = `${ISTHEREANYDEAL_ORIGIN}/api/geo/`;
@@ -2007,7 +2927,7 @@
     });
   }
   function readGameTitleCandidates$2(message, slug) {
-    return uniqueStrings$d([
+    return uniqueStrings$b([
       ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants$2),
       ...readGameTitleCandidateVariants$2(message.searchTerm),
       readSteamProductName$1(message),
@@ -2020,7 +2940,7 @@
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$d([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$b([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function itadGameInfoUrl(slug) {
     return `${ISTHEREANYDEAL_ORIGIN}/game/${encodeURIComponent(normalizeSlug(slug))}/info/`;
@@ -2172,7 +3092,7 @@
   }
   function readItadDealPlatform(value) {
     const platformNames = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-    const names = uniqueStrings$d(platformNames.filter((item) => typeof item === "string").map((item) => item.trim()).filter((item) => item.length > 0));
+    const names = uniqueStrings$b(platformNames.filter((item) => typeof item === "string").map((item) => item.trim()).filter((item) => item.length > 0));
     return names.length > 0 ? names.join(", ") : void 0;
   }
   function readItadPrice(value) {
@@ -2270,7 +3190,7 @@
   function isRecord$5(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  function uniqueStrings$d(values) {
+  function uniqueStrings$b(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   const ALLKEYSHOP_ORIGIN = "https://www.allkeyshop.com";
@@ -2341,11 +3261,11 @@
   function buildAllKeyShopPageUrlCandidates(message, titleCandidates) {
     const directUrls = [message.url, message.productUrl].filter((url) => url !== void 0 && isAllKeyShopProductUrl(url));
     const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
-    const slugUrls = uniqueStrings$c([
+    const slugUrls = uniqueStrings$a([
       epicSlug,
       ...titleCandidates.map(toAllKeyShopSlug)
     ]).map((slug) => `${ALLKEYSHOP_BLOG_ORIGIN}/buy-${encodeURIComponent(slug)}-cd-key-compare-prices/`);
-    return uniqueStrings$c([...directUrls, ...slugUrls]);
+    return uniqueStrings$a([...directUrls, ...slugUrls]);
   }
   function readAllKeyShopData(html) {
     const gamePageTrans = readAssignedJsonObject(html, "gamePageTrans");
@@ -2536,7 +3456,7 @@
     return titleCandidates.some((candidate) => scoreProductTitleAgainstSearchTerm(candidate, title) >= 0.72);
   }
   function readGameTitleCandidates$1(message) {
-    return uniqueStrings$c([
+    return uniqueStrings$a([
       ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants$1),
       ...readGameTitleCandidateVariants$1(message.searchTerm),
       readSteamProductName(message),
@@ -2550,7 +3470,7 @@
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:on|i|p\u00e5)\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store)$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$c([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$a([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function humanizeSlug(value) {
     return value.replace(/[-_]+/g, " ");
@@ -2624,7 +3544,7 @@
     const amount = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value.replace(",", ".")) : Number.NaN;
     return Number.isFinite(amount) && amount >= 0 ? amount : void 0;
   }
-  function uniqueStrings$c(values) {
+  function uniqueStrings$a(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function stripTags$1(value) {
@@ -3001,14 +3921,14 @@
       urls.push(`${GG_DEALS_ORIGIN}/steam/app/${steamAppId}/`);
     }
     const epicSlug = parseEpicGamesProductSlug(message.url) ?? parseEpicGamesProductSlug(message.productUrl);
-    const slugs = uniqueStrings$b([
+    const slugs = uniqueStrings$9([
       epicSlug,
       ...readGameTitleCandidates(message).map(toGgDealsSlug)
     ]);
     for (const slug of slugs) {
       if (slug.length > 0) urls.push(`${GG_DEALS_ORIGIN}/game/${encodeURIComponent(slug)}/`);
     }
-    return uniqueStrings$b(urls);
+    return uniqueStrings$9(urls);
   }
   function buildGgDealsOffer(message, data, fallbackUrl) {
     const alternatives = readGgDealsPriceBuckets(data).sort((first, second) => first.amount - second.amount).map(toPriceMatchAlternative);
@@ -3134,7 +4054,7 @@
     return candidates.some((candidate) => scoreProductTitleAgainstSearchTerm(candidate, title) >= 0.72);
   }
   function readGameTitleCandidates(message) {
-    return uniqueStrings$b([
+    return uniqueStrings$9([
       ...(message.productTitleCandidates ?? []).flatMap(readGameTitleCandidateVariants),
       ...readGameTitleCandidateVariants(message.searchTerm)
     ]).filter((candidate) => candidate.length >= 2 && candidate.length <= 120);
@@ -3145,7 +4065,7 @@
     if (normalized.length === 0) return [];
     const withoutKnownSuffix = normalized.replace(/\s+\|\s+.*$/i, "").replace(/\s+[-\u2013\u2014]\s+(?:Epic Games Store|Steam Store|Steam|Microsoft Store|Xbox(?: Store)?|PlayStation Store).*$/i, "").replace(/\s+(?:hos|at)\s+(?:Epic Games Store|Steam Store|Steam)$/i, "");
     const withoutBuyPrefix = withoutKnownSuffix.replace(/^(?:kj\u00f8p|kjop|buy)\s+/i, "").trim();
-    return uniqueStrings$b([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
+    return uniqueStrings$9([withoutBuyPrefix, withoutKnownSuffix, normalized]).filter((candidate) => candidate.length > 0);
   }
   function readGameProductName(message) {
     return readGameTitleCandidates(message)[0];
@@ -3172,7 +4092,7 @@
   function toGgDealsSlug(value) {
     return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   }
-  function uniqueStrings$b(values) {
+  function uniqueStrings$9(values) {
     return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
   }
   function stripTags(value) {
@@ -3218,586 +4138,6 @@
       return void 0;
     }
   }
-  function readTcgProductKind(text2) {
-    const normalized = normalizeTcgProductTitle(text2.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
-    if (/\b(?:case|kartong)\b/.test(normalized)) return "case";
-    if (/\bpokemon center\b/.test(normalizeTcgText(text2)) && /\b(?:elite trainer box|etb)\b/.test(normalized)) return "pokemon-center-etb";
-    if (/\b(?:elite trainer box|etb)\b/.test(normalized)) return "etb";
-    if (/\bbooster (?:box|display)\b/.test(normalized)) return "booster-box";
-    if (/\bblister\b/.test(normalized)) return "blister";
-    if (/\bpremium deck (?:set|sett)\b/.test(normalized)) return "premium-deck-set";
-    if (/\bbuild (?:and )?battle stadium\b/.test(normalized)) return "build-battle-stadium";
-    if (/\bbuild (?:and )?battle\b/.test(normalized)) return "build-battle";
-    if (/\bsurprise box\b/.test(normalized)) return "surprise-box";
-    if (/\bbinder\b/.test(normalized)) return "binder";
-    if (/\b(?:collection box|box samling)\b/.test(normalized)) return "collection-box";
-    if (/\bultra premium collection\b/.test(normalized)) return "ultra-premium-collection";
-    if (/\bpremium collection\b/.test(normalized)) return "premium-collection";
-    if (/\b(?:booster )?bundle\b/.test(normalized)) return "bundle";
-    if (/\bmini tin\b/.test(normalized) && /\bdisplay\b/.test(normalized)) return "mini-tin-display";
-    if (/\bmini tin\b/.test(normalized)) return "mini-tin";
-    if (/\btin\b/.test(normalized)) return "tin";
-    if (/\bbooster (?:packs?|pakker?)\b/.test(normalized)) return "booster-pack";
-    if (/\bcollection\b/.test(normalized)) return "collection";
-    return void 0;
-  }
-  function readTcgLanguage(text2) {
-    const languages = readTcgLanguages(text2);
-    return languages.length === 1 ? languages[0] : void 0;
-  }
-  function readTcgLanguages(text2) {
-    const normalized = normalizeTcgText(text2);
-    const languages = [];
-    for (const [code, label, pattern] of [
-      ["en", "Engelsk", /\b(?:engelsk|english|en)\b/],
-      ["jp", "Japansk", /\b(?:japansk|japanese|jpn|jp|ja)\b/],
-      ["ko", "Koreansk", /\b(?:koreansk|korean|kor|ko)\b/],
-      ["zh", "Kinesisk", /\b(?:kinesisk|chinese|zh|cn)\b/],
-      ["es", "Spansk", /\b(?:spansk|spanish|espanol|es)\b/],
-      ["de", "Tysk", /\b(?:tysk|german|deutsch|de)\b/],
-      ["fr", "Fransk", /\b(?:fransk|french|francais|fr)\b/],
-      ["it", "Italiensk", /\b(?:italiensk|italian|italiano|it)\b/]
-    ]) if (pattern.test(normalized)) languages.push({ code, label });
-    return languages;
-  }
-  function readTcgSealedOfferIssue(productName, offerName, language) {
-    const normalized = normalizeTcgText(offerName);
-    if (/\b(?:used|brukt|opened|apnet|graded|gradert|psa|bgs|cgc)\b/.test(normalized)) return "condition-mismatch";
-    const expectedKind = readTcgProductKind(productName);
-    const offerKind = readTcgProductKind(offerName);
-    if (offerKind === void 0) return "unknown-product-form";
-    if (expectedKind !== offerKind) return "product-form-mismatch";
-    const languages = readTcgLanguages(offerName);
-    if (languages.length > 1) return "ambiguous-language";
-    if (languages[0] !== void 0 && languages[0].code !== language) return "language-mismatch";
-    if (offerName.split("+").filter((part) => readTcgProductKind(part) !== void 0).length > 1) return "combined-products";
-    const unitCount = (text2) => {
-      const title = normalizeTcgProductTitle(text2);
-      return Number(title.match(/\b(\d+)\s*x\b/)?.[1] ?? title.match(/^(\d+)\s+(?:elite trainer box|booster box|mini tins?|tins?)\b/)?.[1] ?? "1");
-    };
-    if (["etb", "pokemon-center-etb", "booster-box", "mini-tin", "tin"].includes(offerKind) && unitCount(productName) !== unitCount(offerName)) return "quantity-mismatch";
-    const packCount = (text2) => normalizeTcgText(text2).match(/\b(\d+)\s*(?:booster packs?|boosters?|packs?|pakker)\b/)?.[1];
-    const expectedPacks = packCount(productName) ?? (expectedKind === "booster-pack" ? "1" : void 0);
-    const offeredPacks = packCount(offerName);
-    if (expectedPacks !== void 0 && offeredPacks !== void 0 && Number(expectedPacks) !== Number(offeredPacks)) return "quantity-mismatch";
-    return void 0;
-  }
-  function normalizeTcgText(text2) {
-    return text2.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  }
-  function normalizeTcgProductTitle(text2) {
-    return normalizeTcgText(text2).replace(/\bpokemon(?:\s+tcg)?\b|\btrading card game\b/g, " ").replace(/\b(?:engelsk|english|en|japansk|japanese|jpn|jp|ja|koreansk|korean|kor|ko|kinesisk|chinese|zh|cn|spansk|spanish|espanol|es|tysk|german|deutsch|de|fransk|french|francais|fr|italiensk|italian|italiano|it)\b/g, " ").replace(/\bbooster\s*(?:box|boks)\s+display\b|\bbooster\s+display\s+(?:box|boks)\b|\bbooster\s*(?:box|boks|display)\b/g, "booster box").replace(/\bbooster\s*(?:pack|pakke)\b/g, "booster pack").replace(/\bbooster bundle\b/g, "bundle").replace(/\betb\b/g, "elite trainer box").replace(/\belite trainer boks\b/g, "elite trainer box").replace(/\bpremium samleboks\b/g, "premium collection").replace(/\bex (?:box|boks|samleboks)\b/g, "ex collection box").replace(/\bsamlekortspill\b|\bkortspill fra outland\b/g, " ").replace(/\bcelebration collection 30th(?: anniversary)?\b/g, "30th celebration").replace(/\b30th anniversary first partner illustration\b/g, "first partner illustration").replace(/\bserie\b/g, "series").replace(/\bbinder collection\b/g, "binder").replace(/\bcollection box surprise box\b/g, "surprise box").replace(/\s+/g, " ").trim();
-  }
-  function isSameTcgProductTitle(first, second) {
-    if (hasTcgProductVariantConflict(first, second)) return false;
-    const canonical = (text2) => normalizeTcgProductTitle(text2).replace(/\b(?:scarlet violet|sword shield)\s+/g, "").replace(/^mega evolution\s+(?!(?:booster|elite trainer|mini tin|tin|build|bundle|collection|premium)\b)/, "");
-    return canonical(first) === canonical(second);
-  }
-  function hasTcgSetNameConflict(first, second) {
-    const signature = (text2) => [...readTcgSetWords(text2)].sort().join(" ");
-    return signature(first) !== signature(second);
-  }
-  function readTcgSetWords(text2) {
-    return new Set(normalizeTcgProductTitle(text2).replace(/\b(?:scarlet violet|sword shield|mega evolution)\b/g, " ").replace(/\b(?:elite trainer box|booster box|booster pack|premium collection|ultra premium collection|collection box|premium deck set|mini tin|build battle|build and battle)\b/g, " ").replace(/\b\d+ (?:packs?|pakker|boosters?|packages|kort)\b/g, " ").replace(/\b(?:tcg|poke|box|boks|kortboks|bundle|blister|collection|display|with|med|and|og|energi|samlerboks|boosterpakker|samlekortspill|samlekort|blå|bla|blue)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean));
-  }
-  function hasTcgProductVariantConflict(first, second) {
-    if (!/pok[eé]mon|\btcg\b/i.test(`${first} ${second}`)) return false;
-    const a = readTcgProductKind(first);
-    const b = readTcgProductKind(second);
-    if (a !== void 0 && b !== void 0 && a !== b) return true;
-    if (a !== void 0 && b !== void 0) {
-      const firstSet = readTcgSetWords(first);
-      const secondSet = readTcgSetWords(second);
-      const within = (inner, outer) => [...inner].every((word) => outer.has(word));
-      if (firstSet.size > 0 && secondSet.size > 0 && !within(firstSet, secondSet) && !within(secondSet, firstSet)) return true;
-    }
-    const firstLanguage = readTcgLanguage(first);
-    const secondLanguage = readTcgLanguage(second);
-    return firstLanguage !== void 0 && secondLanguage !== void 0 && firstLanguage.code !== secondLanguage.code;
-  }
-  const PACKAGE_QUANTITY_PATTERN = /\b(\d+(?:[,.]\d+)?)\s*(kg|kgm|kilo|kilogram|g|gr|grm|gram|grams|l|ltr|liter|litre|dl|dlt|cl|clt|ml|mlt|stk|stykk|stykke|pcs|pc|pk|pakke|pack)(?=$|[^A-Za-z0-9])/gi;
-  const GROCERY_CONTEXT_HOSTS = [
-    "oda.com",
-    "kolonial.no",
-    "meny.no",
-    "spar.no",
-    "kiwi.no",
-    "joker.no",
-    "rema.no",
-    "rema1000.no",
-    "coop.no",
-    "bunnpris.no",
-    "holdbart.no",
-    "europris.no",
-    "matkroken.no",
-    "naerbutikken.no",
-    "kassal.app",
-    "sesum.no",
-    "enhver.no"
-  ];
-  function readPackageQuantityFromText(text2) {
-    if (text2 === void 0) return void 0;
-    const quantities = [];
-    for (const match of text2.matchAll(PACKAGE_QUANTITY_PATTERN)) {
-      const amount = parseLocalizedNumber$2(match[1] ?? "");
-      const unit = normalizePackageUnit(match[2] ?? "");
-      if (unit === void 0 || !Number.isFinite(amount) || amount <= 0) continue;
-      const normalizedAmount = normalizePackageAmount(amount * unit.multiplier);
-      if (!isReasonablePackageQuantity(normalizedAmount, unit.unit)) continue;
-      quantities.push({ amount: normalizedAmount, unit: unit.unit });
-    }
-    return quantities.find((quantity) => quantity.unit !== "pcs") ?? quantities[0];
-  }
-  function readPackageQuantityFromValue(value) {
-    if (typeof value === "string" || typeof value === "number") {
-      return readPackageQuantityFromText(String(value));
-    }
-    if (!isPlainRecord$7(value)) return void 0;
-    const rawAmount = readNumberLike$5(value.value) ?? readNumberLike$5(value.amount) ?? readNumberLike$5(value.weight) ?? readNumberLike$5(value.volume);
-    const rawUnit = readStringLike$6(value.unitText) ?? readStringLike$6(value.unitCode) ?? readStringLike$6(value.unit) ?? readStringLike$6(value.measurementTechnique);
-    if (rawAmount === void 0 || rawUnit === void 0) {
-      return readPackageQuantityFromText(Object.values(value).map((item) => String(item)).join(" "));
-    }
-    const unit = normalizePackageUnit(rawUnit);
-    if (unit === void 0) return void 0;
-    const amount = normalizePackageAmount(rawAmount * unit.multiplier);
-    return isReasonablePackageQuantity(amount, unit.unit) ? { amount, unit: unit.unit } : void 0;
-  }
-  function isSamePackageQuantity(first, second) {
-    if (first === void 0 || second === void 0 || first.unit !== second.unit) return false;
-    return Math.abs(first.amount - second.amount) <= Math.max(0.5, first.amount * 0.01);
-  }
-  function buildPackageQuantityLabels(quantity) {
-    if (quantity === void 0) return [];
-    if (quantity.unit === "g") {
-      const grams = formatPackageAmount(quantity.amount);
-      const labels = [`${grams}g`, `${grams} g`];
-      if (quantity.amount >= 1e3 && quantity.amount % 1e3 === 0) {
-        const kilos = formatPackageAmount(quantity.amount / 1e3);
-        labels.push(`${kilos}kg`, `${kilos} kg`);
-      }
-      return uniqueStrings$a(labels);
-    }
-    if (quantity.unit === "ml") {
-      const milliliters = formatPackageAmount(quantity.amount);
-      const labels = [`${milliliters}ml`, `${milliliters} ml`];
-      if (quantity.amount >= 100 && quantity.amount % 10 === 0) {
-        const liters = formatPackageAmount(quantity.amount / 1e3);
-        labels.push(`${liters}l`, `${liters} l`);
-      }
-      if (quantity.amount % 10 === 0) {
-        const centiliters = formatPackageAmount(quantity.amount / 10);
-        labels.push(`${centiliters}cl`, `${centiliters} cl`);
-      }
-      return uniqueStrings$a(labels);
-    }
-    const pieces = formatPackageAmount(quantity.amount);
-    return uniqueStrings$a([`${pieces}stk`, `${pieces} stk`, `${pieces}pk`, `${pieces} pk`]);
-  }
-  function isLikelyGroceryPriceMatchContext(...rawUrls) {
-    return rawUrls.some((rawUrl) => {
-      if (rawUrl === void 0) return false;
-      try {
-        const hostname = new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
-        return GROCERY_CONTEXT_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
-      } catch {
-        return false;
-      }
-    });
-  }
-  function normalizePackageUnit(rawUnit) {
-    const unit = transliterateNorwegianCharacters$4(rawUnit).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-zA-Z]/g, "").toLowerCase();
-    if (unit === "kg" || unit === "kgm" || unit === "kilo" || unit === "kilogram") return { unit: "g", multiplier: 1e3 };
-    if (unit === "g" || unit === "gr" || unit === "grm" || unit === "gram" || unit === "grams") return { unit: "g", multiplier: 1 };
-    if (unit === "l" || unit === "ltr" || unit === "liter" || unit === "litre") return { unit: "ml", multiplier: 1e3 };
-    if (unit === "dl" || unit === "dlt") return { unit: "ml", multiplier: 100 };
-    if (unit === "cl" || unit === "clt") return { unit: "ml", multiplier: 10 };
-    if (unit === "ml" || unit === "mlt") return { unit: "ml", multiplier: 1 };
-    if (unit === "stk" || unit === "stykk" || unit === "stykke" || unit === "pcs" || unit === "pc") {
-      return { unit: "pcs", multiplier: 1 };
-    }
-    if (unit === "pk" || unit === "pakke" || unit === "pack") return { unit: "pcs", multiplier: 1 };
-    return void 0;
-  }
-  function isReasonablePackageQuantity(amount, unit) {
-    if (!Number.isFinite(amount) || amount <= 0) return false;
-    if (unit === "pcs") return amount <= 200;
-    return amount <= 1e5;
-  }
-  function normalizePackageAmount(amount) {
-    return Number.isInteger(amount) ? amount : Number(amount.toFixed(2));
-  }
-  function formatPackageAmount(amount) {
-    return Number.isInteger(amount) ? String(amount) : String(Number(amount.toFixed(2))).replace(".", ",");
-  }
-  function parseLocalizedNumber$2(value) {
-    const compact = value.replace(/\s/g, "").replace(",", ".");
-    const parsed = Number.parseFloat(compact);
-    return Number.isFinite(parsed) ? parsed : Number.NaN;
-  }
-  function readStringLike$6(value) {
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : void 0;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-    return void 0;
-  }
-  function readNumberLike$5(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value !== "string") return void 0;
-    const parsed = parseLocalizedNumber$2(value);
-    return Number.isFinite(parsed) ? parsed : void 0;
-  }
-  function transliterateNorwegianCharacters$4(value) {
-    return value.replace(/[\u00C6\u00E6]/g, "ae").replace(/[\u00D8\u00F8]/g, "o").replace(/[\u00C5\u00E5]/g, "a");
-  }
-  function uniqueStrings$a(values) {
-    return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
-  }
-  function isPlainRecord$7(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function getGroceryPackageQuantity(message) {
-    return message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
-  }
-  function cleanGroceryTitleCandidate(value) {
-    return value.replace(/^(?:kj\u00f8p|kjop|bestill|buy)\s+/i, "").replace(/\s+(?:hos|at)\s+[^|-]+(?:[-|].*)?$/i, "").replace(/\s+[-|]\s+(?:Oda|MENY|SPAR|KIWI|REMA\s*1000|Coop(?:\s+Extra)?|Joker|Bunnpris)\s*$/i, "").replace(/\s+[-|]\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/,\s*fra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr.*$/i, "").replace(/\bfra\s+\d[\d\s]*(?:,\d{1,2})?\s*kr\b.*$/i, "").replace(/[.]+/g, " ").replace(/\s+/g, " ").trim();
-  }
-  function isLikelySameGroceryTitle$1(message, title, minimumScore = 0.4) {
-    return uniqueStrings$a([message.searchTerm, ...message.productTitleCandidates ?? []]).some((candidate) => isLikelySameProductTitle(cleanGroceryTitleCandidate(candidate), title, minimumScore));
-  }
-  function normalizeGroceryBrandText(value) {
-    return transliterateNorwegianCharacters$4(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
-  }
-  function hasGroceryBrandSignal(message, text2) {
-    if (message.productBrand === void 0) return true;
-    const brand = normalizeGroceryBrandText(message.productBrand);
-    if (brand.length < 3) return true;
-    return normalizeGroceryBrandText(text2).includes(brand);
-  }
-  const MIN_PRODUCT_MATCH_SCORE = 0.45;
-  function isSameProductUrl(first, second) {
-    const a = first === void 0 ? void 0 : normalizeProductUrlKey(first);
-    return a !== void 0 && a === (second === void 0 ? void 0 : normalizeProductUrlKey(second));
-  }
-  function normalizeProductUrlKey(rawUrl) {
-    const url = parseUrl$1(rawUrl);
-    if (url === void 0) return void 0;
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^(?:utm_|gclid$|fbclid$|srsltid$)/i.test(key)) url.searchParams.delete(key);
-    }
-    url.searchParams.sort();
-    return `${url.hostname.replace(/^www\./, "")}${url.pathname.replace(/\/$/, "")}${url.search}`;
-  }
-  function readProductCodesFromUrl(rawUrl) {
-    const url = parseUrl$1(rawUrl);
-    return url === void 0 ? [] : [...new Set(`${url.pathname} ${url.search}`.match(/\b\d{12,14}\b/g) ?? [])];
-  }
-  function isValidGtin(value) {
-    if (!/^(?:\d{8}|\d{12,14})$/.test(value)) return false;
-    const digits = [...value].map(Number);
-    const check = digits.pop();
-    const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
-    return (10 - sum % 10) % 10 === check;
-  }
-  function normalizePriceMatchShopName(value) {
-    return value.toLowerCase().replace(/\.(?:no|com)$/g, "").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]/g, "");
-  }
-  const STORAGE_SIZE_PATTERN = /\b(\d+(?:[.,]\d+)?)\s*(tb|gb)\b/gi;
-  const BRAND_MATCH_GROUPS = [
-    ["apple"],
-    ["google", "pixel"],
-    ["microsoft", "xbox"],
-    ["nintendo"],
-    ["samsung"],
-    ["sony", "playstation"]
-  ];
-  function buildProductMatchAnchor(message) {
-    const packageQuantity = message.packageAmount !== void 0 && message.packageUnit !== void 0 ? { amount: message.packageAmount, unit: message.packageUnit } : void 0;
-    const variantText = readPercentages(message.searchTerm).size === 0 ? message.productTitleCandidates?.find((candidate) => readPercentages(candidate).size > 0) : void 0;
-    return {
-      searchTerm: message.searchTerm,
-      ...message.productLanguage !== void 0 ? { productLanguage: message.productLanguage } : {},
-      ...packageQuantity !== void 0 ? { packageQuantity } : {},
-      ...variantText !== void 0 ? { variantText } : {}
-    };
-  }
-  function scoreProductCandidateMatch(anchor, candidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
-    const candidateTitles = uniqueStrings$9([
-      candidate.brand !== void 0 && !candidate.title.toLowerCase().includes(candidate.brand.toLowerCase()) ? `${candidate.brand} ${candidate.title}` : void 0,
-      candidate.title
-    ]);
-    let bestScore = 0;
-    for (const title of candidateTitles) {
-      if (hasProductVariantConflict(anchor, title)) continue;
-      if (!isLikelySameProductTitle(anchor.searchTerm, title, minimumScore)) continue;
-      const score = scoreProductTitleAgainstSearchTerm(anchor.searchTerm, title);
-      bestScore = Math.max(bestScore, hasBrandConflict(anchor.searchTerm, candidate.brand) ? score * 0.3 : score);
-    }
-    return bestScore;
-  }
-  function pickBestProductCandidate(anchor, candidates, readCandidate, minimumScore = MIN_PRODUCT_MATCH_SCORE) {
-    let best;
-    for (const candidate of candidates) {
-      const info = readCandidate(candidate);
-      if (info === void 0) continue;
-      const score = scoreProductCandidateMatch(anchor, info, minimumScore);
-      if (score >= minimumScore && (best === void 0 || score > best.score)) {
-        best = { candidate, score };
-      }
-    }
-    return best?.candidate;
-  }
-  function hasProductVariantConflict(anchor, candidateTitle) {
-    return hasTcgProductVariantConflict(`${anchor.searchTerm} ${anchor.productLanguage ?? ""}`, candidateTitle) || hasPackageQuantityConflict(anchor, candidateTitle) || hasStorageSizeConflict(anchor.searchTerm, candidateTitle) || hasModelNumberConflict(anchor.searchTerm, candidateTitle) || hasNumericModelConflict(anchor.searchTerm, candidateTitle) || hasModelTierConflict(anchor.searchTerm, candidateTitle) || hasColorVariantConflict(anchor.searchTerm, candidateTitle) || hasPercentageVariantConflict(anchor.variantText ?? anchor.searchTerm, candidateTitle);
-  }
-  function hasPercentageVariantConflict(anchorText, candidateTitle) {
-    const anchorPercentages = readPercentages(anchorText);
-    const candidatePercentages = readPercentages(candidateTitle);
-    if (anchorPercentages.size === 0 || candidatePercentages.size === 0) return false;
-    return ![...anchorPercentages].some((value) => candidatePercentages.has(value));
-  }
-  function readPercentages(text2) {
-    const values = /* @__PURE__ */ new Set();
-    for (const match of text2.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|prosent\b)/gi)) {
-      const value = Number(match[1].replace(",", "."));
-      if (Number.isFinite(value)) values.add(value);
-    }
-    return values;
-  }
-  const NUMERIC_MODEL_UNIT_WORDS = /* @__PURE__ */ new Set([
-    "a",
-    "ah",
-    "ar",
-    "cl",
-    "cm",
-    "dl",
-    "fps",
-    "g",
-    "gb",
-    "ghz",
-    "gr",
-    "h",
-    "hz",
-    "in",
-    "kg",
-    "khz",
-    "km",
-    "kw",
-    "kwh",
-    "l",
-    "m",
-    "mah",
-    "mb",
-    "mg",
-    "ml",
-    "mm",
-    "pack",
-    "pakke",
-    "pakning",
-    "pakninger",
-    "pcs",
-    "pk",
-    "prosent",
-    "stk",
-    "t",
-    "tb",
-    "timer",
-    "tommer",
-    "tum",
-    "v",
-    "w",
-    "wh",
-    "x",
-    "år"
-  ]);
-  const NUMERIC_MODEL_SPEC_TOKENS = /* @__PURE__ */ new Set(["2k", "4k", "8k", "3g", "4g", "5g"]);
-  function hasNumericModelConflict(anchorText, candidateTitle) {
-    const anchorTokens = readNumericModelTokens(anchorText);
-    const candidateTokens = readNumericModelTokens(candidateTitle);
-    if (hasUnitSuffixModelConflict(anchorTokens, candidateTokens) || hasUnitSuffixModelConflict(candidateTokens, anchorTokens)) {
-      return true;
-    }
-    if (anchorTokens.numbers.size === 0 || candidateTokens.numbers.size === 0) return false;
-    return ![...anchorTokens.numbers].some((number) => candidateTokens.numbers.has(number));
-  }
-  function hasUnitSuffixModelConflict(first, second) {
-    return [...first.unitSuffixed.entries()].some(([token, base]) => {
-      return !first.numbers.has(base) && second.numbers.has(base) && !second.unitSuffixed.has(token);
-    });
-  }
-  function readNumericModelTokens(text2) {
-    const normalized = text2.toLowerCase().replace(/\d+[.,]\d+/g, " ").replace(/\b\d+\s*x\s*\d+/g, " ").replace(/\d+\s*%/g, " ");
-    const tokens = normalized.split(/[^a-z0-9æøå]+/).filter((token) => token.length > 0);
-    const numbers = /* @__PURE__ */ new Set();
-    const unitSuffixed = /* @__PURE__ */ new Map();
-    for (const [index, token] of tokens.entries()) {
-      if (/^\d{1,3}$/.test(token)) {
-        const nextToken = tokens[index + 1];
-        if (nextToken === void 0 || !NUMERIC_MODEL_UNIT_WORDS.has(nextToken)) {
-          numbers.add(token);
-        }
-        continue;
-      }
-      if (NUMERIC_MODEL_SPEC_TOKENS.has(token)) continue;
-      if (/^\d{1,3}[a-z]{1,2}$/.test(token) && !isUnitLikeToken(token)) {
-        numbers.add(token);
-        continue;
-      }
-      const unitSuffixMatch = /^(\d{1,3})[a-z]$/.exec(token);
-      if (unitSuffixMatch?.[1] !== void 0 && isUnitLikeToken(token)) {
-        unitSuffixed.set(token, unitSuffixMatch[1]);
-      }
-    }
-    return { numbers, unitSuffixed };
-  }
-  const COLOR_VARIANT_TOKEN_GROUPS = /* @__PURE__ */ new Map([
-    ["beige", "beige"],
-    ["bla", "bla"],
-    ["black", "svart"],
-    ["blue", "bla"],
-    ["brown", "brun"],
-    ["brun", "brun"],
-    ["carbon", "svart"],
-    ["gold", "gull"],
-    ["gra", "gra"],
-    ["graphite", "gra"],
-    ["gray", "gra"],
-    ["green", "gronn"],
-    ["grey", "gra"],
-    ["gronn", "gronn"],
-    ["gul", "gul"],
-    ["gull", "gull"],
-    ["hvit", "hvit"],
-    ["lilla", "lilla"],
-    ["navy", "bla"],
-    ["orange", "oransje"],
-    ["oransje", "oransje"],
-    ["pink", "rosa"],
-    ["purple", "lilla"],
-    ["red", "rod"],
-    ["rod", "rod"],
-    ["rosa", "rosa"],
-    ["sandstone", "sandstone"],
-    ["silver", "solv"],
-    ["solv", "solv"],
-    ["sort", "svart"],
-    ["svart", "svart"],
-    ["violet", "lilla"],
-    ["white", "hvit"],
-    ["yellow", "gul"]
-  ]);
-  function hasColorVariantConflict(anchorText, candidateTitle) {
-    const anchorColors = readColorVariantTokens(anchorText);
-    if (anchorColors.size === 0) return false;
-    const candidateColors = readColorVariantTokens(candidateTitle);
-    if (candidateColors.size === 0) return false;
-    return ![...anchorColors].some((color) => candidateColors.has(color));
-  }
-  function readColorVariantTokens(text2) {
-    const colors = /* @__PURE__ */ new Set();
-    for (const token of tokenizeBrandText(text2)) {
-      const color = COLOR_VARIANT_TOKEN_GROUPS.get(token);
-      if (color !== void 0) colors.add(color);
-    }
-    return colors;
-  }
-  const MODEL_TIER_TOKENS = /* @__PURE__ */ new Set(["ultra", "pro", "plus", "max", "mini", "lite", "air", "xl", "fe", "fold", "flip"]);
-  function hasModelTierConflict(anchorText, candidateTitle) {
-    const anchorTiers = readModelTierTokens(anchorText);
-    const candidateTiers = readModelTierTokens(candidateTitle);
-    return anchorTiers.size !== candidateTiers.size || ![...anchorTiers].every((tier) => candidateTiers.has(tier));
-  }
-  function readModelTierTokens(text2) {
-    return new Set(tokenizeBrandText(text2).filter((token) => MODEL_TIER_TOKENS.has(token)));
-  }
-  function hasModelNumberConflict(anchorText, candidateTitle) {
-    const anchorModels = readModelNumberTokens(anchorText);
-    if (anchorModels.length === 0) return false;
-    const candidateModels = readModelNumberTokens(candidateTitle);
-    if (candidateModels.length === 0) return anchorModels.some(isStrongModelNumberToken);
-    const anchorPrefixedModels = anchorModels.filter(isLetterPrefixedModelToken);
-    const candidatePrefixedModels = candidateModels.filter(isLetterPrefixedModelToken);
-    if (anchorPrefixedModels.length > 0 && candidatePrefixedModels.length > 0 && !hasCompatibleModelNumberPair(anchorPrefixedModels, candidatePrefixedModels)) {
-      return true;
-    }
-    return !hasCompatibleModelNumberPair(anchorModels, candidateModels);
-  }
-  function hasMatchingModelNumberToken(anchorText, candidateTitle) {
-    const anchorModels = readModelNumberTokens(anchorText);
-    const candidateModels = readModelNumberTokens(candidateTitle);
-    return anchorModels.length > 0 && candidateModels.length > 0 && hasCompatibleModelNumberPair(anchorModels, candidateModels);
-  }
-  function hasCompatibleModelNumberPair(anchorModels, candidateModels) {
-    return anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
-      return anchorModel === candidateModel || anchorModel.length >= 3 && candidateModel.includes(anchorModel) || candidateModel.length >= 3 && anchorModel.includes(candidateModel);
-    }));
-  }
-  function isStrongModelNumberToken(token) {
-    return token.length >= 4 && !GENERIC_SPEC_TOKENS.has(token);
-  }
-  function isLetterPrefixedModelToken(token) {
-    return /^[a-z]/.test(token) && isStrongModelNumberToken(token);
-  }
-  const GENERIC_SPEC_TOKENS = /* @__PURE__ */ new Set(["wifi5", "wifi6", "wifi7", "usb2", "usb3", "usb4", "hdmi2", "bt50"]);
-  function readModelNumberTokens(text2) {
-    const bareTokens = text2.split(/[^A-Za-z0-9]+/).map((token) => token.toLowerCase()).filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token));
-    const joinedTokens = [...text2.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)].filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase())).map((match) => `${match[1]}${match[2]}`.toLowerCase()).filter((token) => !isUnitLikeToken(token));
-    return uniqueStrings$9([...bareTokens, ...joinedTokens]);
-  }
-  function isUnitLikeToken(token) {
-    return /^\d+(?:[.,]\d+)?(?:ml|cl|dl|l|g|gr|kg|mg|gb|tb|mb|mm|cm|m|km|w|kw|wh|kwh|mah|hz|khz|ghz|v|a|ah|stk|pk|pcs|fps|tommer|tum|in)$/.test(token);
-  }
-  function hasPackageQuantityConflict(anchor, candidateTitle) {
-    const expectedQuantity = anchor.packageQuantity ?? readPackageQuantityFromText(anchor.searchTerm);
-    if (expectedQuantity === void 0) return false;
-    const candidateQuantity = readPackageQuantityFromText(candidateTitle);
-    return candidateQuantity !== void 0 && !isSamePackageQuantity(expectedQuantity, candidateQuantity);
-  }
-  function hasStorageSizeConflict(anchorText, candidateTitle) {
-    const anchorSizes = readStorageSizesGb(anchorText);
-    if (anchorSizes.length === 0) return false;
-    const candidateSizes = readStorageSizesGb(candidateTitle);
-    if (candidateSizes.length === 0) return false;
-    return !anchorSizes.some((size) => candidateSizes.includes(size));
-  }
-  function readStorageSizesGb(text2) {
-    const sizes = /* @__PURE__ */ new Set();
-    for (const match of text2.matchAll(STORAGE_SIZE_PATTERN)) {
-      const amount = Number.parseFloat((match[1] ?? "").replace(",", "."));
-      if (!Number.isFinite(amount) || amount <= 0) continue;
-      sizes.add((match[2] ?? "").toLowerCase() === "tb" ? amount * 1024 : amount);
-    }
-    return [...sizes];
-  }
-  function hasBrandConflict(anchorText, candidateBrand) {
-    if (candidateBrand === void 0) return false;
-    const anchorTokens = new Set(tokenizeBrandText(anchorText));
-    const brandTokens = new Set(tokenizeBrandText(candidateBrand));
-    if (anchorTokens.size === 0 || brandTokens.size === 0) return false;
-    const anchorBrandGroups = BRAND_MATCH_GROUPS.filter((group) => group.some((token) => anchorTokens.has(token)));
-    if (anchorBrandGroups.length === 0) return false;
-    return !anchorBrandGroups.some((group) => group.some((token) => brandTokens.has(token)));
-  }
-  function isLikelyGtin$5(value) {
-    return /^(?:\d{8}|\d{12,14})$/.test(value.trim());
-  }
-  function isLikelyMpn(value) {
-    const normalized = value.trim();
-    if (normalized.length < 5 || normalized.length > 40 || isLikelyGtin$5(normalized)) return false;
-    return /^[A-Za-z0-9][A-Za-z0-9._/ -]*$/.test(normalized) && /[A-Za-z]/.test(normalized) && /\d/.test(normalized);
-  }
-  function tokenizeBrandText(value) {
-    return uniqueStrings$9(value.split(/[^A-Za-z0-9ÆØÅæøå]+/).map(normalizeBrandToken).filter((token) => token !== void 0 && token.length >= 2));
-  }
-  function normalizeBrandToken(value) {
-    const normalized = value.replace(/[Ææ]/g, "ae").replace(/[Øø]/g, "o").replace(/[Åå]/g, "a").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-    return normalized.length > 0 ? normalized : void 0;
-  }
-  function uniqueStrings$9(values) {
-    return [...new Set(values.map((value) => value?.trim()).filter((value) => value !== void 0 && value.length > 0))];
-  }
   function readPriceAmount(value) {
     if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : void 0;
     if (typeof value !== "string") return void 0;
@@ -3813,160 +4153,6 @@
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     }).format(amount);
-  }
-  function parseLdJson(text2) {
-    return decodeLdJsonStrings(JSON.parse(text2));
-  }
-  function readLdJsonScripts(html) {
-    const entries = [];
-    for (const match of html.matchAll(/<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
-      try {
-        entries.push(parseLdJson(match[1] ?? ""));
-      } catch {
-      }
-    }
-    for (const match of html.matchAll(/<script\b[^>]*>\s*\(self\.__next_s=self\.__next_s\|\|\[\]\)\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
-      try {
-        const row = JSON.parse(match[1]);
-        const props = Array.isArray(row) && isRecord$7(row[1]) ? row[1] : void 0;
-        if (props?.type === "application/ld+json" && typeof props.children === "string") entries.push(parseLdJson(props.children));
-      } catch {
-      }
-    }
-    return entries;
-  }
-  function readNextFlightPayloads(html) {
-    const payloads = [];
-    for (const match of html.matchAll(/<script\b[^>]*>\s*self\.__next_f\.push\((\[[\s\S]*?\])\)\s*;?\s*<\/script\s*>/g)) {
-      try {
-        const row = JSON.parse(match[1] ?? "");
-        if (Array.isArray(row) && row[0] === 1 && typeof row[1] === "string") payloads.push(row[1]);
-      } catch {
-      }
-    }
-    return payloads;
-  }
-  function readNextFlightValues(html) {
-    const values = [];
-    const data = readNextFlightPayloads(html).join("");
-    for (let index = 0; index < data.length; ) {
-      const separator = data.indexOf(":", index);
-      if (separator < 0) break;
-      const text2 = /^T([0-9a-f]+),/.exec(data.slice(separator + 1, separator + 12));
-      if (text2 !== null) {
-        let end2 = separator + 1 + text2[0].length;
-        for (let bytes = 0, length = parseInt(text2[1], 16); end2 < data.length && bytes < length; ) {
-          const code = data.codePointAt(end2);
-          bytes += code < 128 ? 1 : code < 2048 ? 2 : code < 65536 ? 3 : 4;
-          end2 += code > 65535 ? 2 : 1;
-        }
-        index = end2;
-        continue;
-      }
-      const newline = data.indexOf("\n", separator);
-      const end = newline < 0 ? data.length : newline;
-      try {
-        values.push(JSON.parse(data.slice(separator + 1, end)));
-      } catch {
-      }
-      index = end + 1;
-    }
-    return values;
-  }
-  function readNextProductData(html, productUrl) {
-    const pending = [...readNextFlightValues(html)];
-    for (let visited = 0; visited < pending.length && visited < 5e4; visited += 1) {
-      const item = pending[visited];
-      if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$7(item)) {
-        if (typeof item.url === "string" && isSameProductUrl(item.url, productUrl) && typeof item.title === "string" && Array.isArray(item.offers)) return item;
-        pending.push(...Object.values(item));
-      }
-    }
-    return void 0;
-  }
-  function readStructuredProductCodes(product) {
-    if (product === void 0) return [];
-    return [...new Set(Object.entries(product).flatMap(([key, raw]) => {
-      if (!/^(gtin|ean|barcode|sku|mpn)/i.test(key)) return [];
-      return (Array.isArray(raw) ? raw : [raw]).flatMap((value) => typeof value === "string" || typeof value === "number" ? [String(value).trim()] : []).filter(Boolean);
-    }))];
-  }
-  function readComparisonProductLdJson(html, rawUrl) {
-    const schema = selectProductLdJson(readLdJsonScripts(html));
-    const url = parseUrl$1(rawUrl);
-    if (url?.hostname.replace(/^www\./, "") !== "prisradar.no" || !/^\/produkter\/[^/]+\/?$/.test(url.pathname)) return schema;
-    const product = readNextProductData(html, rawUrl);
-    if (product === void 0) return schema;
-    const brand = isRecord$7(product.brand) && typeof product.brand.title === "string" ? { name: product.brand.title } : void 0;
-    const attributes = isRecord$7(product.attributes) && Array.isArray(product.attributes.grouped) ? product.attributes.grouped.filter(isRecord$7).flatMap((group) => Array.isArray(group.values) ? group.values.filter(isRecord$7) : []) : [];
-    const fallback = {
-      "@type": "Product",
-      name: product.title,
-      url: product.url,
-      ...brand !== void 0 ? { brand } : {},
-      ...typeof product.ean === "string" && product.ean !== "$undefined" ? { gtin: product.ean } : {},
-      additionalProperty: attributes.filter((attribute) => /^(?:språk|language)$/i.test(String(attribute.title))).map((attribute) => ({ name: attribute.title, value: attribute.value }))
-    };
-    if (!schema || typeof schema.url === "string" && !isSameProductUrl(schema.url, rawUrl)) return fallback;
-    return { ...fallback, ...schema, additionalProperty: [...fallback.additionalProperty, ...Array.isArray(schema.additionalProperty) ? schema.additionalProperty : []] };
-  }
-  function findStructuredProperty(value, name) {
-    const pending = [value];
-    for (let visited = 0; pending.length > 0 && visited < 5e4; visited += 1) {
-      const item = pending.pop();
-      if (Array.isArray(item)) pending.push(...item);
-      else if (isRecord$7(item)) {
-        if (Object.hasOwn(item, name)) return item[name];
-        pending.push(...Object.values(item));
-      }
-    }
-    return void 0;
-  }
-  function readProductLanguage(product, titles) {
-    const properties = Array.isArray(product?.additionalProperty) ? product.additionalProperty.filter(isRecord$7) : [];
-    const values = [product?.inLanguage, ...properties.filter((property) => /^(?:språk|language)$/i.test(String(property.name))).map((property) => property.value), ...titles];
-    const languages = new Set(values.filter((value) => typeof value === "string").flatMap((value) => readTcgLanguages(value).map((language) => language.code)));
-    return languages.size === 1 ? [...languages][0] : void 0;
-  }
-  function readProductOfferLanguage(html, productId) {
-    const rows = findStructuredProperty(readNextFlightValues(html), "offerRows");
-    if (!Array.isArray(rows)) return void 0;
-    const names = rows.filter(isRecord$7).filter((row) => String(row.productId) === productId && typeof row.name === "string").map((row) => row.name);
-    return readProductLanguage(void 0, names);
-  }
-  function findTypedLdJson(value, type) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const found2 = findTypedLdJson(item, type);
-        if (found2 !== void 0) return found2;
-      }
-      return void 0;
-    }
-    if (!isRecord$7(value)) return void 0;
-    const found = Array.isArray(value["@graph"]) ? findTypedLdJson(value["@graph"], type) : void 0;
-    if (found !== void 0) return found;
-    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
-    return types.includes(type) ? value : void 0;
-  }
-  function selectProductLdJson(value) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const product = selectProductLdJson(item);
-        if (product !== void 0) return product;
-      }
-      return void 0;
-    }
-    if (!isRecord$7(value)) return void 0;
-    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
-    if (types.includes("Product") && typeof value.name === "string" && value.name.trim().length > 0) return value;
-    return Array.isArray(value["@graph"]) ? selectProductLdJson(value["@graph"]) : void 0;
-  }
-  function decodeLdJsonStrings(value) {
-    if (typeof value === "string") return decodeHtmlEntities(value);
-    if (Array.isArray(value)) return value.map(decodeLdJsonStrings);
-    if (isRecord$7(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeLdJsonStrings(item)]));
-    return value;
   }
   function isExplicitPreorder(...values) {
     return values.some((value) => value === true || typeof value === "string" && /^(?:pre[\s_-]?order(?:ed|able)?|forh[aå]ndsbestilling)$/i.test(value.trim()));
@@ -4102,6 +4288,24 @@
       return [{ site, score, maxScore, url: withoutTracking(link), ...title ? { title } : {}, ...quote ? { quote } : {} }];
     });
   }
+  const STORE_REVIEW_HOSTS = ["www.power.no"];
+  const merchantKey = (value) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a").replace(/[^a-z0-9]+/g, "");
+  function readGodprisStoreLinks(html) {
+    const product = selectProductLdJson(readLdJsonScripts(html));
+    const aggregate = product !== void 0 && isRecord$7(product.offers) ? product.offers : void 0;
+    const offers = Array.isArray(aggregate?.offers) ? aggregate.offers.filter(isRecord$7) : [];
+    const links = /* @__PURE__ */ new Map();
+    for (const offer of offers) {
+      const shopName = isRecord$7(offer.seller) && typeof offer.seller.name === "string" ? offer.seller.name.trim() : "";
+      const click = typeof offer.url === "string" ? parseUrl$1(offer.url) : void 0;
+      const target = click?.hostname === "godpris.no" ? parseUrl$1(click.searchParams.get("u") ?? "") : void 0;
+      if (!shopName || target === void 0 || target.protocol !== "https:") continue;
+      const host = target.hostname.replace(/^www\./, "");
+      if (!merchantKey(host.split(".")[0]).includes(merchantKey(shopName)) && !merchantKey(shopName).includes(merchantKey(host.split(".")[0]))) continue;
+      if (!links.has(target.hostname)) links.set(target.hostname, { shopName, url: withoutTracking(target.href) });
+    }
+    return [...links.values()];
+  }
   function summarizeProductReviews(all) {
     const critics = /* @__PURE__ */ new Map();
     const users = /* @__PURE__ */ new Map();
@@ -4156,9 +4360,9 @@
       "",
       `KJØPERE${summary.userScore !== void 0 ? ` – snitt ${summary.userScore}/100` : ""} (${summary.userCount} vurderinger)`,
       ...users.length ? users : ["- Ingen kjøpervurderinger funnet."],
-      ...input.store ? ["", "BUTIKKEN JEG SER PÅ (vurdering av butikken, ikke produktet)", `- ${input.store.shopName}: ${formatScore(input.store.score)} av ${formatScore(input.store.maxScore)} fra ${input.store.count} vurderinger hos Prisjakt. ${input.store.url}`] : [],
+      ...input.store ? ["", "BUTIKKEN JEG SER PÅ (vurdering av butikken, ikke produktet)", `- ${input.store.shopName}: ${formatScore(input.store.score)} av ${formatScore(input.store.maxScore)} fra ${input.store.count} vurderinger hos ${input.store.source === "trustpilot" ? "Trustpilot (TrustScore, ikke et vanlig karaktersnitt)" : "Prisjakt"}. ${input.store.url}`] : [],
       "",
-      "Hentet av Cashback Norge. Poengsummene er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger."
+      "Hentet av Cashback Norge. Produkttestenes og kjøpernes poengsummer er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger. Butikkens vurdering holdes separat."
     ].join("\n");
   }
   const isHttpsUrl = (value) => typeof value === "string" && value.length <= 2048 && parseUrl$1(value)?.protocol === "https:";
@@ -4194,7 +4398,7 @@
       const id = directUrl.pathname.split("/")[2];
       const html = await requestText(`${GODPRIS_PRODUCT_URL}${id}`);
       const offer = html === void 0 ? void 0 : readGodprisProductPage(html, id, anchor);
-      return offer === void 0 ? void 0 : { ...offer, matchedExactProduct: true };
+      return offer === void 0 ? void 0 : withStoreRatings({ ...offer, matchedExactProduct: true }, html, requestText);
     }
     const visitedProductIds = /* @__PURE__ */ new Set();
     for (const query of searchQueries) {
@@ -4206,10 +4410,14 @@
           headers: { "Accept": "text/html,application/xhtml+xml" }
         });
         const offer = html !== void 0 ? readGodprisProductPage(html, productId, anchor) : void 0;
-        if (offer !== void 0) return offer.reviews !== void 0 ? offer : await withDuplicateListingReviews(offer, [...productIds, ...query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => [])], visitedProductIds, anchor, requestText);
+        if (offer !== void 0) return withStoreRatings(offer.reviews !== void 0 ? offer : await withDuplicateListingReviews(offer, [...productIds, ...query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => [])], visitedProductIds, anchor, requestText), html, requestText);
       }
     }
     return void 0;
+  }
+  async function withStoreRatings(offer, html, requestText) {
+    const users = await readGodprisStoreRatings(html, requestText).catch(() => []);
+    return users.length > 0 ? { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], ...users] } } : offer;
   }
   async function withDuplicateListingReviews(offer, productIds, visited, anchor, requestText) {
     const critics = [];
@@ -4271,6 +4479,14 @@
     if (offer === void 0) return void 0;
     const critics = readGodprisReviewCards(html);
     return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
+  }
+  async function readGodprisStoreRatings(html, requestText) {
+    const links = readGodprisStoreLinks(html).filter((link) => STORE_REVIEW_HOSTS.includes(new URL(link.url).hostname)).slice(0, 3);
+    const ratings = await Promise.all(links.map(async (link) => {
+      const page = await requestText(link.url, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => void 0);
+      return page === void 0 ? void 0 : readJsonLdUserRating(page, `store:${new URL(link.url).hostname}`, link.shopName, link.url);
+    }));
+    return ratings.filter((rating) => rating !== void 0);
   }
   function readGodprisProductOffer(html, fallbackProductId, anchor, requireStructured) {
     const structured = selectProductLdJson(readLdJsonScripts(html));
@@ -6270,8 +6486,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isCurrentMerchantName$1(shopName, merchantKeys) {
     const normalizedShopName = normalizeMerchantKey$1(shopName);
     if (normalizedShopName.length < 3) return false;
-    return merchantKeys.some((merchantKey) => {
-      return normalizedShopName.includes(merchantKey) || merchantKey.includes(normalizedShopName);
+    return merchantKeys.some((merchantKey2) => {
+      return normalizedShopName.includes(merchantKey2) || merchantKey2.includes(normalizedShopName);
     });
   }
   function getCurrentMerchantKeys$1(message) {
@@ -7078,6 +7294,31 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   function isPlainRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  const POWER_SEARCH_URL = "https://www.power.no/api/v2/productlists";
+  const MAX_QUERIES = 2;
+  const codeKey = (value) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  async function findPowerUserRating(message, requestJson) {
+    const codes = [...new Set((message.codes ?? []).map((code) => code.trim()).filter((code) => isValidGtin(code) || isLikelyMpn(code) && !isLikelyGtin$5(code)))];
+    const anchor = buildProductMatchAnchor(message);
+    for (const code of codes.slice(0, MAX_QUERIES)) {
+      const value = await requestJson(`${POWER_SEARCH_URL}?${new URLSearchParams({ q: code, size: "5" })}`, { headers: { Accept: "application/json" } });
+      const products = isRecord$7(value) && Array.isArray(value.products) ? value.products.filter(isRecord$7) : [];
+      const byGtin = isValidGtin(code);
+      for (const product of products) {
+        const title = typeof product.title === "string" ? product.title : "";
+        const mpn = typeof product.productManufactorIdentity === "string" ? product.productManufactorIdentity : "";
+        const sameProduct = byGtin ? products.length === 1 : codeKey(mpn) === codeKey(code);
+        if (!title || !sameProduct || hasProductVariantConflict(anchor, title)) continue;
+        const review = isRecord$7(product.productReview) ? product.productReview : void 0;
+        const score = typeof review?.overallAverageRating === "number" ? review.overallAverageRating : void 0;
+        const count = typeof review?.overallTotalReviewCount === "number" ? review.overallTotalReviewCount : void 0;
+        const path = typeof product.url === "string" && product.url.startsWith("/") ? product.url : void 0;
+        if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, 5) === void 0 || path === void 0) return void 0;
+        return { source: "store:www.power.no", sourceName: "Power", score: Number(score.toFixed(2)), maxScore: 5, count, url: `https://www.power.no${path}` };
+      }
+    }
+    return void 0;
   }
   const TAXFREE_ORIGIN = "https://www.tax-free.no";
   const TAXFREE_ALGOLIA_URL = "https://namx6ho175-dsn.algolia.net/1/indexes/*/queries";
@@ -7907,7 +8148,12 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    return sortPriceMatchOffers(await withUserRatings(allowedOffers, message, requestText, requestJson));
+    const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
+    const power = rated.length === 0 ? void 0 : await findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => void 0);
+    if (power !== void 0 && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
+      rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], power] } };
+    }
+    return sortPriceMatchOffers(rated);
   }
   const PRISJAKT_PRODUCT_PAGE = /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/;
   const KLARNA_PRODUCT_ID = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
@@ -8075,7 +8321,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   function isCurrentMerchantName(shopName, merchantKeys) {
     const normalizedShopName = normalizeMerchantKey(shopName);
     if (normalizedShopName.length < 3) return false;
-    return merchantKeys.some((merchantKey) => normalizedShopName.includes(merchantKey) || merchantKey.includes(normalizedShopName));
+    return merchantKeys.some((merchantKey2) => normalizedShopName.includes(merchantKey2) || merchantKey2.includes(normalizedShopName));
   }
   function getCurrentMerchantKeys(message) {
     const hostKey = readMerchantKeyFromUrl(message.url);
@@ -12007,6 +12253,10 @@ ${darkProviderCss}
     "kassal.app"
   ]);
   function startContentScript() {
+    if (["no.trustpilot.com", "www.trustpilot.com"].includes(window.location.hostname)) {
+      installTrustpilotProfileCapture();
+      return;
+    }
     installSpennActivationReceiptListener();
     installSpennExtensionDetection();
     if (isNoticeBlockedHost(CURRENT_HOST)) return;
@@ -12015,6 +12265,10 @@ ${darkProviderCss}
     chrome.runtime.onMessage.addListener((message) => {
       if (isNoticeBlockedHost(CURRENT_HOST)) {
         clearNotice();
+        return;
+      }
+      if (isRecord(message) && message.type === "store-reviews-updated" && isFreshTrustpilotResult(message.result, CURRENT_HOST)) {
+        updateTrustpilotResult(message.result);
         return;
       }
       if (isCashbackFoundMessage(message) || isCashbackNoneMessage(message)) {
@@ -12037,6 +12291,15 @@ ${darkProviderCss}
       }
     });
     requestCurrentOffers();
+    const refreshStoreOnReturn = () => {
+      if (document.visibilityState === "visible" && storeReviewsStarted) void loadCurrentStoreReviews();
+    };
+    document.addEventListener("visibilitychange", refreshStoreOnReturn);
+    window.addEventListener("focus", refreshStoreOnReturn);
+    disposeContentWatchers.push(() => {
+      document.removeEventListener("visibilitychange", refreshStoreOnReturn);
+      window.removeEventListener("focus", refreshStoreOnReturn);
+    });
     installDynamicProductPageRefresh();
     installPanFlightsAutoSearch();
     installTripComLinkFilters();
@@ -12463,6 +12726,72 @@ ${darkProviderCss}
     return [...blockedHosts].some((blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`));
   }
   let renderGeneration = 0;
+  let trustpilotResult;
+  let storeReviewsStarted = false;
+  let rerenderStoreReviews;
+  const userscriptStoreReviews = createStoredTrustpilotClient(userscriptTrustpilotRequest);
+  function visibleTrustpilotResult() {
+    return isFreshTrustpilotResult(trustpilotResult, CURRENT_HOST) && trustpilotResult.status !== "not-found" ? trustpilotResult : void 0;
+  }
+  function updateTrustpilotResult(result) {
+    if (!isContentScriptActive() || !isFreshTrustpilotResult(result, CURRENT_HOST)) return;
+    if (trustpilotResult?.checkedAt === result.checkedAt && trustpilotResult.status === result.status) return;
+    trustpilotResult = result;
+    if (rerenderStoreReviews) rerenderStoreReviews();
+    else requestCurrentOffers();
+  }
+  async function loadCurrentStoreReviews() {
+    if (!isContentScriptActive()) return;
+    {
+      const result = await userscriptStoreReviews.get(CURRENT_HOST);
+      if (result) updateTrustpilotResult(result);
+    }
+  }
+  function startStoreReviews(offers) {
+    if (storeReviewsStarted || PRICE_MATCH_SOURCE_HOSTS.has(CURRENT_HOST) || !trustpilotDomain(CURRENT_HOST) || offers.length === 0 && extractProductPageMeta() === void 0) return;
+    storeReviewsStarted = true;
+    void loadCurrentStoreReviews().catch((error) => console.warn("[Cashback Norge] Trustpilot:", error));
+  }
+  function installTrustpilotProfileCapture() {
+    if (!trustpilotPageDomain(location.href)) return;
+    let attempts = 0;
+    const capture = async () => {
+      const domain = trustpilotPageDomain(location.href);
+      const script = document.getElementById("__NEXT_DATA__");
+      const profile = domain && script ? readTrustpilotPage(script.outerHTML, domain) : void 0;
+      if (!profile) return false;
+      let captured = false;
+      captured = await userscriptStoreReviews.capture(profile, location.href) !== void 0;
+      if (captured) document.documentElement.dataset.cashbackTrustpilotCaptured = domain;
+      return captured;
+    };
+    const timer = window.setInterval(() => {
+      attempts++;
+      void capture().then((captured) => {
+        if (captured || attempts >= 20) window.clearInterval(timer);
+      }).catch(() => window.clearInterval(timer));
+    }, 500);
+  }
+  async function userscriptTrustpilotRequest(url) {
+    const request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : void 0;
+    if (!request) throw new Error("Trustpilot: userscriptets nettverkstransport er ikke tilgjengelig");
+    return new Promise((resolve, reject) => {
+      const onload = (response) => resolve({
+        status: response.status ?? 0,
+        text: typeof response.responseText === "string" ? response.responseText : typeof response.response === "string" ? response.response : ""
+      });
+      const pending = request({
+        url,
+        method: "GET",
+        timeout: 8e3,
+        headers: { Accept: "application/json,text/html" },
+        onload,
+        onerror: () => reject(new Error("Trustpilot: nettverksfeil")),
+        ontimeout: () => reject(new Error("Trustpilot: tidsavbrudd etter 8 sekunder"))
+      });
+      if (isPromiseLike(pending)) pending.then((response) => onload(response), reject);
+    });
+  }
   let runtimeCardOffers = [];
   const electricityComparison = createElectricityComparison({
     getUrl: () => window.location.href,
@@ -12506,6 +12835,7 @@ ${darkProviderCss}
   async function renderCurrentContext() {
     const generation = ++renderGeneration;
     const offersPromise = getCurrentOffers().catch(() => []);
+    void offersPromise.then(startStoreReviews);
     const regionPricesPromise = getRegionPricesForCurrentPage().catch(() => void 0);
     let priceMatchesSettled = false;
     const renderPartialPriceMatches = (partialMatches) => {
@@ -12521,7 +12851,7 @@ ${darkProviderCss}
     ]);
     priceMatchesSettled = true;
     if (generation !== renderGeneration) return;
-    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported()) {
+    if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported() || visibleTrustpilotResult() !== void 0) {
       renderNoticeWithStoredState(offers, priceMatches, regionPrices);
       scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
       return;
@@ -19894,6 +20224,7 @@ ${darkProviderCss}
   }
   function renderNotice(offers, initialCollapsed, initialChipsCollapsed, initialCodesCollapsed, initialPriceMatchCollapsed, initialRegionPricesCollapsed, activatedOffers, unsortedPriceMatches = [], regionPrices) {
     clearNotice();
+    rerenderStoreReviews = () => renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices);
     const noticeUrl = parseUrl(window.location.href);
     const flightSortMode = noticeUrl !== void 0 && extractFlightSearchMeta(noticeUrl) !== void 0 && unsortedPriceMatches.some((priceMatch2) => priceMatch2.travelKind !== "hotel") ? readActiveFlightSortMode() : void 0;
     const priceMatches = flightSortMode !== void 0 ? applyFlightSortMode(unsortedPriceMatches, flightSortMode) : unsortedPriceMatches;
@@ -20822,8 +21153,9 @@ ${darkProviderCss}
     }
     .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
     /* Only a title and the score: the score takes the badge column at the right edge. */
-    .reviews-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .reviews-row { grid-template-columns: minmax(0, 1fr) auto auto; }
     .price-match-tooltip-row .reviews-row .review-score { grid-column: -2; }
+    .reviews-row .reviews-count { color: var(--cbn-muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }
@@ -22264,9 +22596,11 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (mainOffers.length > 0) body.append(offerList);
     if (regionPrices !== void 0 && regionPrices.prices.length > 0) body.append(regionPricesSection);
     if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
+    addCurrentPageUserRating(priceMatches);
     const hasStoreRating = priceMatches.some((priceMatch2) => priceMatch2.reviews?.store !== void 0);
-    const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch2) => priceMatch2.reviews)) ?? (hasStoreRating ? { critics: [], users: [], userCount: 0 } : void 0);
-    if (reviewSummary !== void 0) body.append(buildReviewsSection(reviewSummary, priceMatches[0], priceMatches.filter((offer2) => offer2.reviews !== void 0)));
+    const storeReviews = visibleTrustpilotResult();
+    const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch2) => priceMatch2.reviews)) ?? (hasStoreRating || storeReviews !== void 0 ? { critics: [], users: [], userCount: 0 } : void 0);
+    if (reviewSummary !== void 0) body.append(buildReviewsSection(reviewSummary, priceMatches[0], priceMatches.filter((offer2) => offer2.reviews !== void 0), storeReviews));
     body.append(chipsSection);
     if (offers.length > 0) body.append(codesSection);
     let userHasVoted = false;
@@ -23142,8 +23476,33 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const e = priceMatch.electricity;
     return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
   }
+  function readCurrentPageUserRating() {
+    const host = window.location.hostname;
+    if (!/\.no$/.test(host)) return void 0;
+    const name = host.replace(/^www\./, "").split(".")[0];
+    const sourceName = name.charAt(0).toUpperCase() + name.slice(1);
+    const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.outerHTML).join("");
+    const fromLd = readJsonLdUserRating(scripts, `store:${host}`, sourceName, window.location.href.split("#")[0]);
+    if (fromLd !== void 0) return fromLd;
+    const block = document.querySelector('[itemprop="aggregateRating"]');
+    const read = (prop) => {
+      const element = block?.querySelector(`[itemprop="${prop}"]`);
+      return element === null || element === void 0 ? void 0 : Number((element.getAttribute("content") ?? element.textContent ?? "").trim().replace(",", "."));
+    };
+    const score = read("ratingValue");
+    const count = read("reviewCount") ?? read("ratingCount");
+    const maxScore = read("bestRating") ?? 5;
+    if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
+    return { source: `store:${host}`, sourceName, score, maxScore, count, url: window.location.href.split("#")[0] };
+  }
+  function addCurrentPageUserRating(priceMatches) {
+    const first = priceMatches[0];
+    const rating = first === void 0 ? void 0 : readCurrentPageUserRating();
+    if (first === void 0 || rating === void 0 || priceMatches.some((offer) => offer.reviews?.users?.some((user) => user.source === rating.source))) return;
+    priceMatches[0] = { ...first, reviews: { ...first.reviews, users: [...first.reviews?.users ?? [], rating] } };
+  }
   const REVIEWS_COLLAPSED_KEY = "cashback-varsler-reviews-collapsed";
-  function buildReviewsSection(summary, priceMatch, sources) {
+  function buildReviewsSection(summary, priceMatch, sources, trustpilot) {
     const section = document.createElement("div");
     section.className = "price-match-section reviews-section";
     const toggle = document.createElement("button");
@@ -23169,28 +23528,74 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     header.className = "price-match-header";
     const titleRow = document.createElement("span");
     titleRow.className = "reviews-title-row";
-    titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, sources.find((offer) => offer.reviews?.store)?.reviews?.store));
+    titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, trustpilot?.status === "ok" ? trustpilot.profile : sources.find((offer) => offer.reviews?.store)?.reviews?.store));
     header.append(titleRow);
     const rows = [];
     const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
-    if (stores.length > 0) {
-      const count = stores.reduce((sum, item) => sum + item.store.count, 0);
-      const score = Math.round(stores.reduce((sum, item) => sum + (toHundredScale(item.store.score, item.store.maxScore) ?? 0) * item.store.count, 0) / count);
-      rows.push(buildReviewRow("Butikken", [stores[0].store.shopName, formatRatingCount(count)], score, stores[0].store.url, {
-        title: `Butikken ${stores[0].store.shopName}`,
+    const store2 = stores[0]?.store ?? (trustpilot?.status === "ok" ? trustpilot.profile : void 0);
+    if (store2 || trustpilot) {
+      const tip = {
+        title: `Butikken${store2 ? ` ${store2.shopName}` : ""}`,
         note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
-        items: stores.map(({ offer, store: store2 }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store2.score, store2.maxScore) ?? 0, chips: [`${formatReviewScore(store2.score, store2.maxScore)} stjerner`, formatRatingCount(store2.count)] }))
-      }));
+        items: stores.map(({ offer, store: store22 }) => ({
+          name: getPriceMatchSourceName(offer),
+          score: toHundredScale(store22.score, store22.maxScore) ?? 0,
+          chips: [`${formatReviewScore(store22.score, store22.maxScore)} stjerner`, formatRatingCount(store22.count)],
+          url: store22.url
+        }))
+      };
+      const chips = [...store2 ? [store2.shopName, formatRatingCount(store2.count)] : [], ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer)))];
+      if (trustpilot?.status === "ok") {
+        const profile = trustpilot.profile;
+        const updated = new Date(trustpilot.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
+        chips.push("Trustpilot");
+        tip.note += ` Trustpilot viser TrustScore på sin egen skala og inngår ikke i Prisjakt-snittet. Oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}${profile.reviews.length ? " Et utvalg av de nyeste anmeldelsene følger under." : ""}`;
+        tip.items.push(
+          {
+            name: "Trustpilot · TrustScore",
+            score: profile.score * 20,
+            scoreLabel: `${String(profile.score).replace(".", ",")}/5`,
+            chips: [formatRatingCount(profile.count)],
+            url: profile.url
+          },
+          ...profile.reviews.map((review) => ({
+            name: review.title || "Kundeanmeldelse",
+            score: review.rating * 20,
+            scoreLabel: `${review.rating}/5`,
+            chips: [new Date(review.date).toLocaleDateString("nb-NO"), review.verified ? "Bekreftet av Trustpilot" : "Ikke merket bekreftet"],
+            url: `https://no.trustpilot.com/reviews/${review.id}`,
+            quote: `${review.text}${review.reply ? `
+Svar fra ${profile.shopName}: ${review.reply}` : ""}`
+          }))
+        );
+      } else if (trustpilot) {
+        chips.push("Trustpilot");
+        tip.note += " Åpne Trustpilot-profilen under for å hente vurderingen. Når siden er lastet, oppdateres den her. Gå tilbake til butikkfanen for å se den.";
+        tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
+      }
+      const score = store2 ? toHundredScale(store2.score, store2.maxScore) : void 0;
+      const row = buildReviewRow(
+        "Butikken",
+        chips,
+        score,
+        store2?.url ?? trustpilot.profileUrl,
+        tip,
+        store2?.source === "trustpilot" ? `${String(store2.score).replace(".", ",")}/5` : void 0
+      );
+      row.dataset.storeReviewSource = trustpilot ? "trustpilot" : store2?.source;
+      if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
+      rows.push(row);
     }
-    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).sort((a, b) => reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
+    const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
+    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).sort((a, b) => Number(a.user.source.startsWith("store:")) - Number(b.user.source.startsWith("store:")) || reviewSourceRank(a.offer) - reviewSourceRank(b.offer) || b.user.count - a.user.count);
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-      rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0].user.url, {
+      rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
         title: "Kjøpere av varen",
         note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
         items: buyers.map(({ offer, user }) => ({
-          name: getPriceMatchSourceName(offer),
+          name: buyerName(offer, user),
           score: toHundredScale(user.score, user.maxScore) ?? 0,
           chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...user.source === "klarna" ? ["Bare norske"] : []]
         }))
@@ -23294,14 +23699,14 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return ["prisjakt", "prisradar", "klarna", "godpris"].indexOf(offer.source ?? "") >>> 0;
   }
   const reviewTooltips = /* @__PURE__ */ new WeakMap();
-  function buildReviewScoreBox(score, className = "price-match-price") {
+  function buildReviewScoreBox(score, className = "price-match-price", label) {
     const box = document.createElement("span");
     const rounded = Math.round(score);
     box.className = `${className} review-score review-score--${getReviewScoreLevel(rounded)}`;
-    box.textContent = String(rounded);
+    box.textContent = label ?? String(rounded);
     return box;
   }
-  function buildReviewRow(name, chips, score, url, tip) {
+  function buildReviewRow(name, chips, score, url, tip, scoreLabel) {
     const row = document.createElement("a");
     row.className = "cbn-row price-match-card reviews-row";
     row.href = url;
@@ -23312,8 +23717,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const product = document.createElement("span");
     product.className = "price-match-product";
     product.textContent = name;
-    title.append(product, buildPriceMatchInfoChips(chips));
-    row.append(title, buildReviewScoreBox(score));
+    const isCount = (chip) => /^\d[\d\s\u00a0]* (vurderinger|vurdering|tester|test)$/.test(chip);
+    title.append(product, buildPriceMatchInfoChips(chips.filter((chip) => !isCount(chip))));
+    const count = document.createElement("span");
+    count.className = "price-match-price reviews-count";
+    count.textContent = chips.find(isCount) ?? "";
+    row.append(title, count);
+    if (score !== void 0) row.append(buildReviewScoreBox(score, "review-score-box", scoreLabel));
     reviewTooltips.set(row, tip);
     return row;
   }
@@ -23328,12 +23738,26 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     note.className = "tooltip-content-note";
     note.textContent = tip.note;
     section.append(heading, note);
+    if (tip.action) {
+      const link = document.createElement("a");
+      link.className = "cbn-button cbn-button--quiet";
+      link.href = tip.action.url;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.textContent = tip.action.label;
+      section.append(link);
+    }
     for (const item of tip.items) {
       const row = document.createElement("div");
       row.className = "cbn-row cbn-row--details comparison-tooltip-option review-tooltip-option";
-      const name = document.createElement("span");
+      const name = document.createElement(item.url ? "a" : "span");
+      if (name instanceof HTMLAnchorElement && item.url) {
+        name.href = item.url;
+        name.target = "_blank";
+        name.rel = "noreferrer";
+      }
       name.textContent = item.name;
-      row.append(name, buildReviewScoreBox(item.score, "review-tooltip-score"), buildPriceMatchInfoChips(item.chips));
+      row.append(name, buildReviewScoreBox(item.score, "review-tooltip-score", item.scoreLabel), buildPriceMatchInfoChips(item.chips));
       if (item.quote) {
         const quote = document.createElement("span");
         quote.className = "tooltip-content-note review-tooltip-quote";

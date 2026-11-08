@@ -1,5 +1,8 @@
 import { createTooltipSection, setTooltipContent } from "../shared/tooltip-content";
 import { createAutomaticComparison } from "./automatic-comparison";
+import { createStoredTrustpilotClient } from "./trustpilot-client";
+import { isFreshTrustpilotResult, readTrustpilotPage, trustpilotPageDomain, trustpilotDomain, type TrustpilotResult, type TrustpilotRequest } from "../shared/trustpilot";
+import type { StoreReviewsResponse } from "../shared/extension-messages";
 import { getMobileSupplier, loadMobileSuppliers, MOBILE_SUPPLIER_CACHE_KEY } from "../shared/mobile-suppliers";
 import { isMobilePriceDetails, mobileTierLabel, type MobilePriceDetails } from "../shared/mobile-price-match";
 import { EB_PER_TRUMF_KR, FREE_CARDS, getProviderPageUrl, PREMIUM_CARDS, PROVIDER_COLORS, PROVIDER_NAMES, PROVIDER_WELCOME_BONUSES, isMobileBrowser, requiresSpennExtension, REVOLUT_SUBSCRIPTIONS, SPENN_APP_URL, SPENN_EXTENSION_ELEMENT, SPENN_EXTENSION_TERMS, SPENN_MOBILE_TERMS } from "../shared/provider-data";
@@ -874,6 +877,10 @@ const PRICE_MATCH_SOURCE_HOSTS = new Set([
   "kassal.app",
 ]);
 function startContentScript(): void {
+  if (["no.trustpilot.com", "www.trustpilot.com"].includes(window.location.hostname)) {
+    installTrustpilotProfileCapture();
+    return;
+  }
   installSpennActivationReceiptListener();
   installSpennExtensionDetection();
   if (isNoticeBlockedHost(CURRENT_HOST)) return;
@@ -882,6 +889,11 @@ function startContentScript(): void {
   chrome.runtime.onMessage.addListener((message) => {
     if (isNoticeBlockedHost(CURRENT_HOST)) {
       clearNotice();
+      return;
+    }
+
+    if (isRecord(message) && message.type === "store-reviews-updated" && isFreshTrustpilotResult(message.result, CURRENT_HOST)) {
+      updateTrustpilotResult(message.result);
       return;
     }
 
@@ -906,6 +918,15 @@ function startContentScript(): void {
     }
   });
   requestCurrentOffers();
+  const refreshStoreOnReturn = (): void => {
+    if (document.visibilityState === "visible" && storeReviewsStarted) void loadCurrentStoreReviews();
+  };
+  document.addEventListener("visibilitychange", refreshStoreOnReturn);
+  window.addEventListener("focus", refreshStoreOnReturn);
+  disposeContentWatchers.push(() => {
+    document.removeEventListener("visibilitychange", refreshStoreOnReturn);
+    window.removeEventListener("focus", refreshStoreOnReturn);
+  });
   installDynamicProductPageRefresh();
   installPanFlightsAutoSearch();
   installTripComLinkFilters();
@@ -1449,6 +1470,79 @@ function hasBlockedHostname(blockedHosts: ReadonlySet<string>, hostname: string)
 }
 
 let renderGeneration = 0;
+let trustpilotResult: TrustpilotResult | undefined;
+let storeReviewsStarted = false;
+let rerenderStoreReviews: (() => void) | undefined;
+const userscriptStoreReviews = createStoredTrustpilotClient(userscriptTrustpilotRequest);
+
+function visibleTrustpilotResult(): TrustpilotResult | undefined {
+  return isFreshTrustpilotResult(trustpilotResult, CURRENT_HOST) && trustpilotResult.status !== "not-found" ? trustpilotResult : undefined;
+}
+
+function updateTrustpilotResult(result: TrustpilotResult): void {
+  if (!isContentScriptActive() || !isFreshTrustpilotResult(result, CURRENT_HOST)) return;
+  if (trustpilotResult?.checkedAt === result.checkedAt && trustpilotResult.status === result.status) return;
+  trustpilotResult = result;
+  if (rerenderStoreReviews) rerenderStoreReviews();
+  else requestCurrentOffers();
+}
+
+async function loadCurrentStoreReviews(): Promise<void> {
+  if (!isContentScriptActive()) return;
+  if (__USERSCRIPT_BUILD__) {
+    const result = await userscriptStoreReviews.get(CURRENT_HOST);
+    if (result) updateTrustpilotResult(result);
+  } else {
+    const response = await sendRuntimeMessage<StoreReviewsResponse>({ type: "get-store-reviews", url: location.origin });
+    if (response?.ok && response.result && isFreshTrustpilotResult(response.result, CURRENT_HOST)) updateTrustpilotResult(response.result);
+  }
+}
+
+function startStoreReviews(offers: CashbackOffer[]): void {
+  // Send only the merchant domain, never a product URL, account path or search history.
+  if (storeReviewsStarted || PRICE_MATCH_SOURCE_HOSTS.has(CURRENT_HOST) || !trustpilotDomain(CURRENT_HOST) ||
+    offers.length === 0 && extractProductPageMeta() === undefined) return;
+  storeReviewsStarted = true;
+  void loadCurrentStoreReviews().catch((error: unknown) => console.warn("[Cashback Norge] Trustpilot:", error));
+}
+
+function installTrustpilotProfileCapture(): void {
+  if (!trustpilotPageDomain(location.href)) return;
+  let attempts = 0;
+  const capture = async (): Promise<boolean> => {
+    const domain = trustpilotPageDomain(location.href);
+    const script = document.getElementById("__NEXT_DATA__");
+    const profile = domain && script ? readTrustpilotPage(script.outerHTML, domain) : undefined;
+    if (!profile) return false;
+    let captured = false;
+    if (__USERSCRIPT_BUILD__) captured = await userscriptStoreReviews.capture(profile, location.href) !== undefined;
+    else {
+      const response = await sendRuntimeMessage<StoreReviewsResponse>({ type: "capture-store-reviews", profile });
+      captured = response?.ok === true && response.result !== undefined;
+    }
+    if (captured) document.documentElement.dataset.cashbackTrustpilotCaptured = domain;
+    return captured;
+  };
+  const timer = window.setInterval(() => {
+    attempts++;
+    void capture().then((captured) => { if (captured || attempts >= 20) window.clearInterval(timer); }).catch(() => window.clearInterval(timer));
+  }, 500);
+}
+
+// Preserve HTTP errors from GM; other source transports intentionally return undefined.
+async function userscriptTrustpilotRequest(url: string): ReturnType<TrustpilotRequest> {
+  const request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest :
+    typeof GM !== "undefined" && typeof GM.xmlHttpRequest === "function" ? GM.xmlHttpRequest : undefined;
+  if (!request) throw new Error("Trustpilot: userscriptets nettverkstransport er ikke tilgjengelig");
+  return new Promise((resolve, reject) => {
+    const onload = (response: UserscriptHttpResponse): void => resolve({ status: response.status ?? 0,
+      text: typeof response.responseText === "string" ? response.responseText : typeof response.response === "string" ? response.response : "" });
+    const pending = request({ url, method: "GET", timeout: 8000, headers: { Accept: "application/json,text/html" }, onload,
+      onerror: () => reject(new Error("Trustpilot: nettverksfeil")), ontimeout: () => reject(new Error("Trustpilot: tidsavbrudd etter 8 sekunder")) });
+    if (isPromiseLike(pending)) pending.then((response) => onload(response as UserscriptHttpResponse), reject);
+  });
+}
+
 let runtimeCardOffers: CashbackOffer[] = [];
 const electricityComparison = createElectricityComparison({
   getUrl: () => window.location.href,
@@ -1487,6 +1581,7 @@ function isAutomaticComparisonSupported(): boolean { return electricityCompariso
 async function renderCurrentContext(): Promise<void> {
   const generation = ++renderGeneration;
   const offersPromise = getCurrentOffers().catch(() => []);
+  void offersPromise.then(startStoreReviews);
   const regionPricesPromise = getRegionPricesForCurrentPage().catch(() => undefined);
   let priceMatchesSettled = false;
   const renderPartialPriceMatches = (partialMatches: PriceMatchOffer[]): void => {
@@ -1502,7 +1597,7 @@ async function renderCurrentContext(): Promise<void> {
   ]);
   priceMatchesSettled = true;
   if (generation !== renderGeneration) return;
-  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported()) {
+  if (offers.length > 0 || priceMatches.length > 0 || (regionPrices?.prices.length ?? 0) > 0 || isAutomaticComparisonSupported() || visibleTrustpilotResult() !== undefined) {
     renderNoticeWithStoredState(offers, priceMatches, regionPrices);
     scheduleFlightPriceMatchMaturation(generation, offers, priceMatches, regionPrices);
     return;
@@ -11792,6 +11887,7 @@ function renderNotice(
   regionPrices?: PlayStationRegionPriceResult,
 ): void {
   clearNotice();
+  rerenderStoreReviews = () => renderNoticeWithStoredState(offers, unsortedPriceMatches, regionPrices);
   // Chipen avhenger av søket, ikke av hvilke kilder som har svart, så den forsvinner ikke underveis.
   // Rader fra datovinduet har ingen varianter og beholder billigste kombinasjon.
   const noticeUrl = parseUrl(window.location.href);
@@ -14179,9 +14275,10 @@ function renderNotice(
   if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
   addCurrentPageUserRating(priceMatches);
   const hasStoreRating = priceMatches.some((priceMatch) => priceMatch.reviews?.store !== undefined);
+  const storeReviews = visibleTrustpilotResult();
   const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch) => priceMatch.reviews)) ??
-    (hasStoreRating ? { critics: [], users: [], userCount: 0 } : undefined);
-  if (reviewSummary !== undefined) body.append(buildReviewsSection(reviewSummary, priceMatches[0], priceMatches.filter((offer) => offer.reviews !== undefined)));
+    (hasStoreRating || storeReviews !== undefined ? { critics: [], users: [], userCount: 0 } : undefined);
+  if (reviewSummary !== undefined) body.append(buildReviewsSection(reviewSummary, priceMatches[0], priceMatches.filter((offer) => offer.reviews !== undefined), storeReviews));
   body.append(chipsSection);
   if (offers.length > 0) body.append(codesSection);
 
@@ -15306,7 +15403,7 @@ const REVIEWS_COLLAPSED_KEY = "cashback-varsler-reviews-collapsed";
 
 // «Anmeldelser»: norske tester og kjøpervurderinger fra prismatch-kildene, med en knapp som
 // kopierer en ferdig ledetekst til brukerens egen AI-assistent. Vi sender ingenting selv.
-function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMatchOffer | undefined, sources: PriceMatchOffer[]): HTMLElement {
+function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMatchOffer | undefined, sources: PriceMatchOffer[], trustpilot?: TrustpilotResult): HTMLElement {
   const section = document.createElement("div");
   section.className = "price-match-section reviews-section";
   const toggle = document.createElement("button");
@@ -15334,7 +15431,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   header.className = "price-match-header";
   const titleRow = document.createElement("span");
   titleRow.className = "reviews-title-row";
-  titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, sources.find((offer) => offer.reviews?.store)?.reviews?.store));
+  titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, trustpilot?.status === "ok" ? trustpilot.profile : sources.find((offer) => offer.reviews?.store)?.reviews?.store));
   header.append(titleRow);
 
   // Three rows with the average on the row and every source in the tooltip, like a review
@@ -15342,14 +15439,37 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   // Chip lines on the rows and in the tooltips, like the flight price match.
   const rows: HTMLAnchorElement[] = [];
   const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
-  if (stores.length > 0) {
-    const count = stores.reduce((sum, item) => sum + item.store.count, 0);
-    const score = Math.round(stores.reduce((sum, item) => sum + (toHundredScale(item.store.score, item.store.maxScore) ?? 0) * item.store.count, 0) / count);
-    rows.push(buildReviewRow("Butikken", [stores[0]!.store.shopName, formatRatingCount(count)], score, stores[0]!.store.url, {
-      title: `Butikken ${stores[0]!.store.shopName}`,
+  const store = stores[0]?.store ?? (trustpilot?.status === "ok" ? trustpilot.profile : undefined);
+  if (store || trustpilot) {
+    const tip: ReviewTooltip = {
+      title: `Butikken${store ? ` ${store.shopName}` : ""}`,
       note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
-      items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0, chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)] })),
-    }));
+      items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0,
+        chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)], url: store.url })),
+    };
+    const chips = [...(store ? [store.shopName, formatRatingCount(store.count)] : []), ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer)))];
+    if (trustpilot?.status === "ok") {
+      const profile = trustpilot.profile;
+      const updated = new Date(trustpilot.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
+      chips.push("Trustpilot");
+      tip.note += ` Trustpilot viser TrustScore på sin egen skala og inngår ikke i Prisjakt-snittet. Oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}${profile.reviews.length ? " Et utvalg av de nyeste anmeldelsene følger under." : ""}`;
+      tip.items.push({ name: "Trustpilot · TrustScore", score: profile.score * 20, scoreLabel: `${String(profile.score).replace(".", ",")}/5`,
+        chips: [formatRatingCount(profile.count)], url: profile.url },
+        ...profile.reviews.map((review) => ({ name: review.title || "Kundeanmeldelse", score: review.rating * 20, scoreLabel: `${review.rating}/5`,
+          chips: [new Date(review.date).toLocaleDateString("nb-NO"), review.verified ? "Bekreftet av Trustpilot" : "Ikke merket bekreftet"],
+          url: `https://no.trustpilot.com/reviews/${review.id}`,
+          quote: `${review.text}${review.reply ? `\nSvar fra ${profile.shopName}: ${review.reply}` : ""}` })));
+    } else if (trustpilot) {
+      chips.push("Trustpilot");
+      tip.note += " Åpne Trustpilot-profilen under for å hente vurderingen. Når siden er lastet, oppdateres den her. Gå tilbake til butikkfanen for å se den.";
+      tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
+    }
+    const score = store ? toHundredScale(store.score, store.maxScore) : undefined;
+    const row = buildReviewRow("Butikken", chips, score, store?.url ?? trustpilot!.profileUrl, tip,
+      store?.source === "trustpilot" ? `${String(store.score).replace(".", ",")}/5` : undefined);
+    row.dataset.storeReviewSource = trustpilot ? "trustpilot" : store?.source;
+    if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
+    rows.push(row);
   }
   // Comparison sites first, then the shops' own ratings (source "store:<host>").
   const buyerName = (offer: PriceMatchOffer, user: { source: string; sourceName: string }) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
@@ -15462,18 +15582,18 @@ function reviewSourceRank(offer: PriceMatchOffer): number {
   return ["prisjakt", "prisradar", "klarna", "godpris"].indexOf(offer.source ?? "") >>> 0;
 }
 
-type ReviewTooltip = { title: string; note: string; items: Array<{ name: string; score: number; chips: string[]; quote?: string }> };
+type ReviewTooltip = { title: string; note: string; action?: { label: string; url: string }; items: Array<{ name: string; score: number; scoreLabel?: string; chips: string[]; quote?: string; url?: string }> };
 const reviewTooltips = new WeakMap<HTMLElement, ReviewTooltip>();
 
-function buildReviewScoreBox(score: number, className = "price-match-price"): HTMLElement {
+function buildReviewScoreBox(score: number, className = "price-match-price", label?: string): HTMLElement {
   const box = document.createElement("span");
   const rounded = Math.round(score);
   box.className = `${className} review-score review-score--${getReviewScoreLevel(rounded)}`;
-  box.textContent = String(rounded);
+  box.textContent = label ?? String(rounded);
   return box;
 }
 
-function buildReviewRow(name: string, chips: string[], score: number, url: string, tip: ReviewTooltip): HTMLAnchorElement {
+function buildReviewRow(name: string, chips: string[], score: number | undefined, url: string, tip: ReviewTooltip, scoreLabel?: string): HTMLAnchorElement {
   const row = document.createElement("a");
   row.className = "cbn-row price-match-card reviews-row";
   row.href = url;
@@ -15490,7 +15610,8 @@ function buildReviewRow(name: string, chips: string[], score: number, url: strin
   const count = document.createElement("span");
   count.className = "price-match-price reviews-count";
   count.textContent = chips.find(isCount) ?? "";
-  row.append(title, count, buildReviewScoreBox(score, "review-score-box"));
+  row.append(title, count);
+  if (score !== undefined) row.append(buildReviewScoreBox(score, "review-score-box", scoreLabel));
   reviewTooltips.set(row, tip);
   return row;
 }
@@ -15507,12 +15628,26 @@ function buildReviewTooltipContent(tooltip: HTMLElement, tip: ReviewTooltip): vo
   note.className = "tooltip-content-note";
   note.textContent = tip.note;
   section.append(heading, note);
+  if (tip.action) {
+    const link = document.createElement("a");
+    link.className = "cbn-button cbn-button--quiet";
+    link.href = tip.action.url;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = tip.action.label;
+    section.append(link);
+  }
   for (const item of tip.items) {
     const row = document.createElement("div");
     row.className = "cbn-row cbn-row--details comparison-tooltip-option review-tooltip-option";
-    const name = document.createElement("span");
+    const name = document.createElement(item.url ? "a" : "span");
+    if (name instanceof HTMLAnchorElement && item.url) {
+      name.href = item.url;
+      name.target = "_blank";
+      name.rel = "noreferrer";
+    }
     name.textContent = item.name;
-    row.append(name, buildReviewScoreBox(item.score, "review-tooltip-score"), buildPriceMatchInfoChips(item.chips));
+    row.append(name, buildReviewScoreBox(item.score, "review-tooltip-score", item.scoreLabel), buildPriceMatchInfoChips(item.chips));
     if (item.quote) {
       const quote = document.createElement("span");
       quote.className = "tooltip-content-note review-tooltip-quote";

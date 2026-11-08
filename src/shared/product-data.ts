@@ -6,6 +6,13 @@ export function parseLdJson(text: string): unknown {
   return decodeLdJsonStrings(JSON.parse(text));
 }
 
+/** The Pages Router payload is JSON data, never executable JavaScript. */
+export function readNextPageData(html: string): unknown {
+  const script = html.match(/<script\b[^>]*\bid\s*=\s*["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script\s*>/i);
+  if (script === null) return undefined;
+  try { return JSON.parse(script[1]!); } catch { return undefined; }
+}
+
 export function readLdJsonScripts(html: string): unknown[] {
   const entries: unknown[] = [];
   for (const match of html.matchAll(/<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {

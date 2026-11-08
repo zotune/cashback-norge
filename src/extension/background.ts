@@ -7,6 +7,8 @@ import {
 } from "../shared/cashback.js";
 import { ACTIVATED_OFFERS_STORAGE_KEY } from "./activation-state.js";
 import { createCashbackIndexCache, type CachedIndex } from "./cashback-index-cache.js";
+import { createStoredTrustpilotClient } from "./trustpilot-client.js";
+import { trustpilotDomain } from "../shared/trustpilot.js";
 import { getCardBenefitOffers } from "../shared/card-benefits.js";
 import { findPriceMatches } from "../shared/price-match.js";
 import { ELECTRICITY_SUPPLIER_CACHE_KEY, getElectricitySupplierCatalog, loadElectricitySuppliers } from "../shared/electricity-suppliers.js";
@@ -36,9 +38,13 @@ import {
   isGetPlayStationRegionPricesMessage,
   isGetOffersForUrlMessage,
   isGetPriceMatchForProductMessage,
+  isGetStoreReviewsMessage,
+  isCaptureStoreReviewsMessage,
+  type StoreReviewsResponse,
 } from "../shared/extension-messages.js";
 
 const STORAGE_KEY = "cashback-index";
+const storeReviewsClient = createStoredTrustpilotClient();
 const REMOTE_INDEX_URL = "https://zotune.github.io/cashback-norge/cashback-index.json";
 const PLAYSTATION_REGION_PRICE_CACHE_KEY = "playstation-region-price-cache-v3";
 const PLAYSTATION_REGION_PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -105,15 +111,38 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  void handleRuntimeMessage(message, sendResponse);
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  void handleRuntimeMessage(message, sendResponse, sender).catch((error: unknown) => {
+    sendResponse({ ok: false, reason: error instanceof Error ? error.message : "Forespørselen feilet" });
+  });
   return true;
 });
 
 async function handleRuntimeMessage(
   message: unknown,
-  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse | HttpRequestResponse) => void,
+  sendResponse: (response: OffersForUrlResponse | PriceMatchForProductResponse | PlayStationRegionPricesResponse | HttpRequestResponse | StoreReviewsResponse) => void,
+  sender: chrome.runtime.MessageSender,
 ): Promise<void> {
+  const senderUrl = sender.url ?? sender.tab?.url ?? "";
+  if (isGetStoreReviewsMessage(message)) {
+    if (!trustpilotDomain(senderUrl) || trustpilotDomain(senderUrl) !== trustpilotDomain(message.url)) {
+      sendResponse({ ok: false, reason: "Trustpilot: butikkdomenet stemmer ikke med fanen" });
+      return;
+    }
+    const result = await storeReviewsClient.get(message.url);
+    sendResponse({ ok: true, ...(result ? { result } : {}) });
+    return;
+  }
+  if (isCaptureStoreReviewsMessage(message)) {
+    const result = await storeReviewsClient.capture(message.profile, senderUrl);
+    sendResponse({ ok: true, ...(result ? { result } : {}) });
+    if (result) {
+      const tabs = await chrome.tabs.query({});
+      await Promise.all(tabs.filter((tab) => tab.id !== undefined && trustpilotDomain(tab.url ?? "") === result.domain)
+        .map((tab) => chrome.tabs.sendMessage(tab.id!, { type: "store-reviews-updated", result }).catch(() => {})));
+    }
+    return;
+  }
   if (isGetOffersForUrlMessage(message)) {
     const response = await findOffersForUrl(message);
     sendResponse(response);

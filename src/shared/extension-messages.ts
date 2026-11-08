@@ -1,4 +1,5 @@
 import type { ProductReviews } from "./product-reviews.js";
+import { isTrustpilotProfile, type TrustpilotProfile, type TrustpilotResult } from "./trustpilot.js";
 import {
   type CashbackOffer,
   type ProviderMeta,
@@ -31,6 +32,18 @@ export type GetOffersForUrlMessage = {
   type: "get-offers-for-url";
   url: string;
 };
+
+export type GetStoreReviewsMessage = { type: "get-store-reviews"; url: string };
+export type CaptureStoreReviewsMessage = { type: "capture-store-reviews"; profile: TrustpilotProfile };
+export type StoreReviewsResponse = { ok: true; result?: TrustpilotResult } | { ok: false; reason: string };
+
+export function isGetStoreReviewsMessage(value: unknown): value is GetStoreReviewsMessage {
+  return isRecord(value) && value.type === "get-store-reviews" && typeof value.url === "string" && value.url.length <= 2048;
+}
+
+export function isCaptureStoreReviewsMessage(value: unknown): value is CaptureStoreReviewsMessage {
+  return isRecord(value) && value.type === "capture-store-reviews" && isTrustpilotProfile(value.profile);
+}
 
 export type GetPriceMatchForProductMessage = {
   type: "get-price-match-for-product";

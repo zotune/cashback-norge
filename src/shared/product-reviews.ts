@@ -263,9 +263,9 @@ export function buildReviewAiPrompt(input: { productName: string; price?: string
     "",
     `KJØPERE${summary.userScore !== undefined ? ` – snitt ${summary.userScore}/100` : ""} (${summary.userCount} vurderinger)`,
     ...(users.length ? users : ["- Ingen kjøpervurderinger funnet."]),
-    ...(input.store ? ["", "BUTIKKEN JEG SER PÅ (vurdering av butikken, ikke produktet)", `- ${input.store.shopName}: ${formatScore(input.store.score)} av ${formatScore(input.store.maxScore)} fra ${input.store.count} vurderinger hos Prisjakt. ${input.store.url}`] : []),
+    ...(input.store ? ["", "BUTIKKEN JEG SER PÅ (vurdering av butikken, ikke produktet)", `- ${input.store.shopName}: ${formatScore(input.store.score)} av ${formatScore(input.store.maxScore)} fra ${input.store.count} vurderinger hos ${input.store.source === "trustpilot" ? "Trustpilot (TrustScore, ikke et vanlig karaktersnitt)" : "Prisjakt"}. ${input.store.url}`] : []),
     "",
-    "Hentet av Cashback Norge. Poengsummene er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger.",
+    "Hentet av Cashback Norge. Produkttestenes og kjøpernes poengsummer er omregnet til 0–100 (karakter / maks × 100); kjøpersnittet er vektet etter antall vurderinger. Butikkens vurdering holdes separat.",
   ].join("\n");
 }
 

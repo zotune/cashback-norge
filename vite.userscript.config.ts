@@ -35,6 +35,8 @@ const USERSCRIPT_BANNER = `\
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
+// @connect      no.trustpilot.com
+// @connect      www.trustpilot.com
 // @connect      www.prisjakt.no
 // @connect      www.power.no
 // @connect      cashbacknorge.no
