@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794164810
+// @version      1794165067
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -21356,11 +21356,10 @@ ${darkProviderCss}
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
-    .reviews-copy { flex-shrink: 0; }
-    .reviews-section .reviews-title-row .reviews-store-chip { align-items: center; display: inline-flex; font-size: 11px; font-weight: 700; gap: 6px; height: 24px; line-height: 20px; margin-left: auto; max-width: 60%; padding: 0 3px 0 8px; text-decoration: none; }
-    .reviews-store-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .reviews-section .reviews-store-score { border-radius: 5px; font-size: 11px; line-height: 18px; min-width: 26px; padding: 0 5px; }
-    .reviews-title-row .price-match-toggle + .reviews-copy { margin-left: auto; }
+    .reviews-row--store { margin-top: 6px; }
+    .reviews-footer { display: flex; justify-content: flex-end; }
+    .reviews-section .reviews-footer .reviews-copy { align-items: center; color: var(--cbn-muted); display: inline-flex; font-size: 11px; font-weight: 600; gap: 5px; padding: 4px 6px; }
+    .reviews-section.collapsed .reviews-footer { display: none; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
@@ -23737,10 +23736,13 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     header.className = "price-match-header";
     const titleRow = document.createElement("span");
     titleRow.className = "reviews-title-row";
-    titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, trustpilot?.status === "ok" ? trustpilot.profile : sources.find((offer) => offer.reviews?.store)?.reviews?.store));
+    titleRow.append(toggle);
+    const footer = document.createElement("div");
+    footer.className = "reviews-footer";
+    footer.append(buildReviewCopyButton(summary, priceMatch, trustpilot?.status === "ok" ? trustpilot.profile : sources.find((offer) => offer.reviews?.store)?.reviews?.store));
     header.append(titleRow);
     const rows = [];
-    const storeChips = [];
+    const storeRows = [];
     const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
     const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
     const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
@@ -23761,9 +23763,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           chips: [`${formatReviewScore(store2.score, store2.maxScore)}${store2.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store2.count)]
         }))
       };
-      ["Om butikken", ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...count > 0 ? [formatRatingCount(count)] : []];
+      const storeSources = stores.map(({ offer }) => getPriceMatchSourceName(offer));
       if (profile) {
         const updated = new Date(trustpilot.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
+        storeSources.push("Trustpilot");
         tip.note += ` Trustpilot oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}`;
         tip.items.push({
           name: "Trustpilot",
@@ -23775,20 +23778,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         tip.note += " Trustpilot svarte ikke automatisk. Åpne profilen under, så hentes vurderingen og vises her når du går tilbake til butikken.";
         tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
       }
-      const storeChip = document.createElement("a");
-      storeChip.className = "cbn-chip cbn-chip--muted reviews-store-chip";
-      storeChip.href = stores[0]?.store.url ?? profile?.url ?? trustpilot.profileUrl;
-      storeChip.target = "_blank";
-      storeChip.rel = "noreferrer";
-      storeChip.setAttribute("aria-label", `${storeTitle}: kundenes vurdering av butikken${score !== void 0 ? `, ${score} av 100` : ""}`);
-      const storeName = document.createElement("span");
-      storeName.textContent = storeTitle;
-      storeChip.append(storeName);
-      if (score !== void 0) storeChip.append(buildReviewScoreBox(score, "reviews-store-score"));
-      storeChip.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source ?? "";
-      if (trustpilot) storeChip.dataset.storeReviewStatus = trustpilot.status;
-      reviewTooltips.set(storeChip, tip);
-      storeChips.push(storeChip);
+      const chips = ["Om butikken", ...compactSourceChips(storeSources), ...count > 0 ? [formatRatingCount(count)] : []];
+      const storeRow = buildReviewRow(storeTitle, chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot.profileUrl, tip);
+      storeRow.classList.add("reviews-row--store");
+      storeRow.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source ?? "";
+      if (trustpilot) storeRow.dataset.storeReviewStatus = trustpilot.status;
+      storeRows.push(storeRow);
     }
     const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
     const seenBuyers = /* @__PURE__ */ new Set();
@@ -23840,15 +23835,17 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         }
       ));
     }
-    titleRow.insertBefore(storeChips[0] ?? document.createTextNode(""), titleRow.lastChild);
-    section.append(header, ...rows);
+    section.append(header, ...rows, ...storeRows, footer);
     return section;
   }
   function buildReviewCopyButton(summary, priceMatch, store2) {
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "cbn-button cbn-button--quiet copy-code-btn reviews-copy";
-    copy.innerHTML = COPY_ICON_SVG;
+    const copyLabel = () => {
+      copy.innerHTML = `${COPY_ICON_SVG}<span>Kopier til AI</span>`;
+    };
+    copyLabel();
     copy.setAttribute("aria-label", "Kopier til AI-oppsummering");
     copy.dataset.reviewHoverTip = JSON.stringify([
       "## Kopier til AI-oppsummering\nLim inn i Claude, ChatGPT eller en annen AI-assistent du bruker, og få en oppsummert side om produktet.",
@@ -23867,10 +23864,10 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         date: (/* @__PURE__ */ new Date()).toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" })
       });
       void navigator.clipboard.writeText(prompt).then(() => {
-        copy.innerHTML = CHECK_ICON_SVG;
+        copy.innerHTML = `${CHECK_ICON_SVG}<span>Kopiert</span>`;
         copy.setAttribute("aria-label", "Kopiert – lim inn i AI-assistenten");
         window.setTimeout(() => {
-          copy.innerHTML = COPY_ICON_SVG;
+          copyLabel();
           copy.setAttribute("aria-label", "Kopier til AI-oppsummering");
         }, 1500);
       });
