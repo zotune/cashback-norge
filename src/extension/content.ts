@@ -15439,35 +15439,34 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   // Chip lines on the rows and in the tooltips, like the flight price match.
   const rows: HTMLAnchorElement[] = [];
   const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
-  const store = stores[0]?.store ?? (trustpilot?.status === "ok" ? trustpilot.profile : undefined);
-  if (store || trustpilot) {
+  const profile = trustpilot?.status === "ok" ? trustpilot.profile : undefined;
+  // Every rating of the shop on one 0–100 scale; the row shows the average weighted by count.
+  const shopRatings = [...stores.map(({ store }) => store), ...(profile ? [profile] : [])];
+  if (shopRatings.length > 0 || trustpilot) {
+    const shopName = shopRatings[0]?.shopName;
+    const count = shopRatings.reduce((sum, rating) => sum + rating.count, 0);
+    const score = count > 0 ? Math.round(shopRatings.reduce((sum, rating) => sum + (toHundredScale(rating.score, rating.maxScore) ?? 0) * rating.count, 0) / count) : undefined;
     const tip: ReviewTooltip = {
-      title: `Butikken${store ? ` ${store.shopName}` : ""}`,
-      note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
+      title: `Butikk (kjøpere)${shopName ? ` · ${shopName}` : ""}`,
+      note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
       items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0,
-        chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)], url: store.url })),
+        chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)] })),
     };
-    const chips = [...(store ? [store.shopName, formatRatingCount(store.count)] : []), ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer)))];
-    if (trustpilot?.status === "ok") {
-      const profile = trustpilot.profile;
-      const updated = new Date(trustpilot.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
-      chips.push("Trustpilot");
-      tip.note += ` Trustpilot viser TrustScore på sin egen skala og inngår ikke i Prisjakt-snittet. Oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}${profile.reviews.length ? " Et utvalg av de nyeste anmeldelsene følger under." : ""}`;
-      tip.items.push({ name: "Trustpilot · TrustScore", score: profile.score * 20, scoreLabel: `${String(profile.score).replace(".", ",")}/5`,
-        chips: [formatRatingCount(profile.count)], url: profile.url },
-        ...profile.reviews.map((review) => ({ name: review.title || "Kundeanmeldelse", score: review.rating * 20, scoreLabel: `${review.rating}/5`,
-          chips: [new Date(review.date).toLocaleDateString("nb-NO"), review.verified ? "Bekreftet av Trustpilot" : "Ikke merket bekreftet"],
-          url: `https://no.trustpilot.com/reviews/${review.id}`,
-          quote: `${review.text}${review.reply ? `\nSvar fra ${profile.shopName}: ${review.reply}` : ""}` })));
+    const chips = [...(shopName ? [shopName] : []), ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
+    if (profile) {
+      const updated = new Date(trustpilot!.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
+      chips.splice(chips.length - (count > 0 ? 1 : 0), 0, "Trustpilot");
+      tip.note += ` Trustpilot oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}`;
+      // Same design as the other sources: name, 0–100 score and chips. No individual reviews.
+      tip.items.push({ name: "Trustpilot", score: toHundredScale(profile.score, 5) ?? 0,
+        chips: [`${formatReviewScore(profile.score, 5)} stjerner`, formatRatingCount(profile.count)] });
     } else if (trustpilot) {
-      chips.push("Trustpilot");
-      tip.note += " Åpne Trustpilot-profilen under for å hente vurderingen. Når siden er lastet, oppdateres den her. Gå tilbake til butikkfanen for å se den.";
+      chips.push("Hent fra Trustpilot");
+      tip.note += " Trustpilot svarte ikke automatisk. Åpne profilen under, så hentes vurderingen og vises her når du går tilbake til butikken.";
       tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
     }
-    const score = store ? toHundredScale(store.score, store.maxScore) : undefined;
-    const row = buildReviewRow("Butikk (kjøpere)", chips, score, store?.url ?? trustpilot!.profileUrl, tip,
-      store?.source === "trustpilot" ? `${String(store.score).replace(".", ",")}/5` : undefined);
-    row.dataset.storeReviewSource = trustpilot ? "trustpilot" : store?.source;
+    const row = buildReviewRow("Butikk (kjøpere)", chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot!.profileUrl, tip);
+    row.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source;
     if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
     rows.push(row);
   }
