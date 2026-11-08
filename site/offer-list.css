@@ -1,4 +1,4 @@
-/* Shared offer list for /dagligvarer and /dagens-tilbud (site/offer-list.js). */
+/* Shared offer list for /dagligvarer and /tilbud (site/offer-list.js). */
 .sticky-header { padding-top: 10px; }
 .offer-filter-bar { align-items: center; display: flex; gap: 8px; margin-bottom: 8px; color: var(--cbn-muted); font-size: 12px; }
 .offer-filter-picker { align-items: center; display: inline-flex; flex-shrink: 0; font: inherit; font-size: 13px; font-weight: 600; gap: 6px; min-height: 36px; padding: 4px 10px; }

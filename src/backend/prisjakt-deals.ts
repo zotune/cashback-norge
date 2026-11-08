@@ -1,4 +1,4 @@
-// Daily catalogue of Prisjakt's "Dagens tilbud" for cashbacknorge.no/dagens-tilbud.
+// Daily catalogue of Prisjakt's "Dagens tilbud" for cashbacknorge.no/tilbud.
 //
 // Source: the public pages prisjakt.no/tema/dagens-tilbud?page=N (popularity order). There is
 // no verified list endpoint in the existing product-search adapter or page; read the page's own
@@ -84,15 +84,18 @@ export async function enrichPrisjaktDeals(catalog: PrisjaktDealsCatalog, input: 
   let failed = 0;
   const crawler = createCrawler(input, async ({ request, body }) => {
     const index = request.userData.index as number;
+    // Prisjakt's newestHistoryItem is the time of the response, so validate against the fetch time:
+    // the catalogue's generatedAt is from the start of a crawl that can run for many minutes.
+    const fetchedAt = new Date().toISOString();
     if (request.userData.kind === "history") {
       let json: unknown;
       try { json = JSON.parse(body); } catch { throw new NoRetryError("Prisjakt history: invalid JSON"); }
-      Object.assign(deals[index]!, readPrisjaktAllTimeHistory(json, deals[index]!.historyVariantIds!, catalog.generatedAt));
+      Object.assign(deals[index]!, readPrisjaktAllTimeHistory(json, deals[index]!.historyVariantIds!, fetchedAt));
       const low = getDealLowPrice(deals[index]!.price, deals[index]!.lowestPriceEver);
       if (low) deals[index]!.lowestPriceEver = low.lowestPrice;
       return;
     }
-    Object.assign(deals[index]!, readPrisjaktDealDetails(body, deals[index]!, catalog.generatedAt));
+    Object.assign(deals[index]!, readPrisjaktDealDetails(body, deals[index]!, fetchedAt));
     const variantIds = deals[index]!.historyVariantIds;
     if (variantIds) await crawler.addRequests([new Request({
       url: input.historyUrl ?? "https://www.prisjakt.no/api/price-history", method: "POST",

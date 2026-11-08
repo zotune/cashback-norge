@@ -290,7 +290,7 @@ async function main(): Promise<void> {
   }));
   // Not a cashback source: this week's supermarket flyer offers for cashbacknorge.no/dagligvarer.
   const groceryOffersPromise = config.skipGroceryOffers ? undefined : startEarly(collectGroceryOffers({ generatedAt, logger }));
-  // Not a cashback source either: Prisjakt's "Dagens tilbud" for cashbacknorge.no/dagens-tilbud.
+  // Not a cashback source either: Prisjakt's "Dagens tilbud" for cashbacknorge.no/tilbud.
   const prisjaktDealsPromise = config.skipPrisjaktDeals ? undefined : startEarly(collectPrisjaktDeals({ generatedAt, logger,
     merchantDomain: createDealMerchantLookup({ offers: [...previousOffersByProvider.values()].flat() }),
   }));

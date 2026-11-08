@@ -113,7 +113,7 @@ try {
   await page.locator('#card-bonus-toggle').click();
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });
-    for (const href of ['/dagligvarer/', '/dagens-tilbud/']) {
+    for (const href of ['/dagligvarer/', '/tilbud/']) {
       const tab = page.locator(`.site-tabs a[href="${href}"]`);
       await tab.hover();
       assert.deepEqual(await rgb(tab), colorScheme === 'dark' ? [25, 53, 38] : [234, 247, 239]);
@@ -177,7 +177,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await goto('/dagens-tilbud/');
+  await goto('/tilbud/');
   assert.equal(await page.locator('h1').innerText(), 'Tilbud');
   assert.ok(await page.locator('.deal-facts').first().innerText().then(text => text.includes('Frakt ukjent')));
   assert.ok(await page.locator('th').filter({ hasText: 'Mot lavpris' }).count() === 1);

@@ -82,7 +82,8 @@ test("detail crawler stops at its product bound and a failed detail does not dis
   const address = server.address();
   assert.ok(address && typeof address === "object");
   try {
-    const result = await enrichPrisjaktDeals({ version: 1, generatedAt: now, source: "Prisjakt", deals: [deal, { ...deal, id: "124" }, { ...deal, id: "125" }].map((d, i) => ({ ...d, rank: i + 1 })) }, {
+    // The crawl started an hour before Prisjakt stamped newestHistoryItem; the response must still count.
+    const result = await enrichPrisjaktDeals({ version: 1, generatedAt: "2026-11-07T13:00:00Z", source: "Prisjakt", deals: [deal, { ...deal, id: "124" }, { ...deal, id: "125" }].map((d, i) => ({ ...d, rank: i + 1 })) }, {
       generatedAt: now, logger: { info() {}, error() {}, warn: message => warnings.push(message) },
       historyUrl: `http://127.0.0.1:${address.port}/history.json`, maxDetailProducts: 2, productPageUrl: d => `http://127.0.0.1:${address.port}/${d.id}`,
     });

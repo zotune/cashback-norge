@@ -1,4 +1,4 @@
-// Shared offer list for /dagligvarer and /dagens-tilbud: filter buttons per group (shop or
+// Shared offer list for /dagligvarer and /tilbud: filter buttons per group (shop or
 // category), search, sorting, filters, list/grid/table views, lazy batches, image preview,
 // copy and votes. Each page passes a config that turns its catalogue into items:
 //

@@ -15,7 +15,7 @@ page.on('request', request => { if (/(?:prisjakt\.no|etilbudsavis\.no|klarna\.co
 await page.addInitScript(time => { Date.now = () => time; }, Date.parse(catalog.generatedAt));
 await page.route('**/*.supabase.co/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: route.request().url().includes('my-votes') ? '{"votes":[]}' : '[]' }));
 try {
-  await page.goto('http://localhost:8765/dagens-tilbud/');
+  await page.goto('http://localhost:8765/tilbud/');
   await page.locator('.deal-rank-cell').first().waitFor();
   assert.equal(await page.locator('thead th').first().innerText(), '#');
   assert.ok(await page.getByRole('columnheader', { name: 'Kilde', exact: true }).count());
