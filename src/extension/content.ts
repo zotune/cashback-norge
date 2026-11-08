@@ -15311,7 +15311,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (stores.length > 0) {
     const count = stores.reduce((sum, item) => sum + item.store.count, 0);
     const score = Math.round(stores.reduce((sum, item) => sum + (toHundredScale(item.store.score, item.store.maxScore) ?? 0) * item.store.count, 0) / count);
-    rows.push(buildReviewRow("Butikk", [stores[0]!.store.shopName, formatRatingCount(count)], score, stores[0]!.store.url, {
+    rows.push(buildReviewRow("Butikken", [stores[0]!.store.shopName, formatRatingCount(count)], score, stores[0]!.store.url, {
       title: `Butikken ${stores[0]!.store.shopName}`,
       note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
       items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store.score, store.maxScore) ?? 0, chips: [`${formatReviewScore(store.score, store.maxScore)} stjerner`, formatRatingCount(store.count)] })),
@@ -15322,8 +15322,8 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
     const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-    rows.push(buildReviewRow("Kjøpere", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0]!.user.url, {
-      title: "Kjøpere",
+    rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0]!.user.url, {
+      title: "Kjøpere av varen",
       note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
       items: buyers.map(({ offer, user }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(user.score, user.maxScore) ?? 0,
         chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
@@ -15339,9 +15339,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (tests.length > 0) {
     const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
     const via = tests[0]!.offer;
-    rows.push(buildReviewRow("Anmeldelser", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
+    rows.push(buildReviewRow("Tester av varen", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
-        title: "Anmeldelser",
+        title: "Tester av varen",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
         items: tests.map(({ critic }) => ({ name: critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [formatReviewScore(critic.score, critic.maxScore), ...(critic.title ? [critic.title] : [])], ...(critic.quote ? { quote: critic.quote } : {}) })),

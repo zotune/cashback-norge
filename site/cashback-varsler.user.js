@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794161077
+// @version      1794161132
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -23141,7 +23141,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (stores.length > 0) {
       const count = stores.reduce((sum, item) => sum + item.store.count, 0);
       const score = Math.round(stores.reduce((sum, item) => sum + (toHundredScale(item.store.score, item.store.maxScore) ?? 0) * item.store.count, 0) / count);
-      rows.push(buildReviewRow("Butikk", [stores[0].store.shopName, formatRatingCount(count)], score, stores[0].store.url, {
+      rows.push(buildReviewRow("Butikken", [stores[0].store.shopName, formatRatingCount(count)], score, stores[0].store.url, {
         title: `Butikken ${stores[0].store.shopName}`,
         note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet.",
         items: stores.map(({ offer, store: store2 }) => ({ name: getPriceMatchSourceName(offer), score: toHundredScale(store2.score, store2.maxScore) ?? 0, chips: [`${formatReviewScore(store2.score, store2.maxScore)} stjerner`, formatRatingCount(store2.count)] }))
@@ -23151,8 +23151,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-      rows.push(buildReviewRow("Kjøpere", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0].user.url, {
-        title: "Kjøpere",
+      rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer }) => getPriceMatchSourceName(offer)))], score, buyers[0].user.url, {
+        title: "Kjøpere av varen",
         note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
         items: buyers.map(({ offer, user }) => ({
           name: getPriceMatchSourceName(offer),
@@ -23172,12 +23172,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
       const via = tests[0].offer;
       rows.push(buildReviewRow(
-        "Anmeldelser",
+        "Tester av varen",
         [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)],
         score,
         via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
         {
-          title: "Anmeldelser",
+          title: "Tester av varen",
           note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
           items: tests.map(({ critic }) => ({
             name: critic.site,
