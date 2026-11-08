@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794164536
+// @version      1794164810
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -21356,7 +21356,11 @@ ${darkProviderCss}
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
-    .reviews-copy { flex-shrink: 0; margin-left: auto; }
+    .reviews-copy { flex-shrink: 0; }
+    .reviews-section .reviews-title-row .reviews-store-chip { align-items: center; display: inline-flex; font-size: 11px; font-weight: 700; gap: 6px; height: 24px; line-height: 20px; margin-left: auto; max-width: 60%; padding: 0 3px 0 8px; text-decoration: none; }
+    .reviews-store-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reviews-section .reviews-store-score { border-radius: 5px; font-size: 11px; line-height: 18px; min-width: 26px; padding: 0 5px; }
+    .reviews-title-row .price-match-toggle + .reviews-copy { margin-left: auto; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
@@ -23736,7 +23740,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     titleRow.append(toggle, buildReviewCopyButton(summary, priceMatch, trustpilot?.status === "ok" ? trustpilot.profile : sources.find((offer) => offer.reviews?.store)?.reviews?.store));
     header.append(titleRow);
     const rows = [];
-    const storeRows = [];
+    const storeChips = [];
     const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
     const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
     const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
@@ -23748,7 +23752,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const count = shopRatings.reduce((sum, rating) => sum + rating.count, 0);
       const score = count > 0 ? Math.round(shopRatings.reduce((sum, rating) => sum + (toHundredScale(rating.score, rating.maxScore) ?? 0) * rating.count, 0) / count) : void 0;
       const tip = {
-        title: storeTitle,
+        title: `${storeTitle}: om butikken`,
         note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
         items: stores.map(({ offer, store: store2 }) => ({
           name: getPriceMatchSourceName(offer),
@@ -23757,10 +23761,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           chips: [`${formatReviewScore(store2.score, store2.maxScore)}${store2.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store2.count)]
         }))
       };
-      const chips = [...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...count > 0 ? [formatRatingCount(count)] : []];
+      ["Om butikken", ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...count > 0 ? [formatRatingCount(count)] : []];
       if (profile) {
         const updated = new Date(trustpilot.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
-        chips.splice(chips.length - (count > 0 ? 1 : 0), 0, "Trustpilot");
         tip.note += ` Trustpilot oppdatert ${updated}.${profile.warning ? ` ${profile.warning}` : ""}`;
         tip.items.push({
           name: "Trustpilot",
@@ -23769,14 +23772,23 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
           chips: [`${formatReviewScore(profile.score, 5)} stjerner`, formatRatingCount(profile.count)]
         });
       } else if (trustpilot) {
-        chips.push("Hent fra Trustpilot");
         tip.note += " Trustpilot svarte ikke automatisk. Åpne profilen under, så hentes vurderingen og vises her når du går tilbake til butikken.";
         tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
       }
-      const row = buildReviewRow(storeTitle, chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot.profileUrl, tip);
-      row.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source;
-      if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
-      storeRows.push(row);
+      const storeChip = document.createElement("a");
+      storeChip.className = "cbn-chip cbn-chip--muted reviews-store-chip";
+      storeChip.href = stores[0]?.store.url ?? profile?.url ?? trustpilot.profileUrl;
+      storeChip.target = "_blank";
+      storeChip.rel = "noreferrer";
+      storeChip.setAttribute("aria-label", `${storeTitle}: kundenes vurdering av butikken${score !== void 0 ? `, ${score} av 100` : ""}`);
+      const storeName = document.createElement("span");
+      storeName.textContent = storeTitle;
+      storeChip.append(storeName);
+      if (score !== void 0) storeChip.append(buildReviewScoreBox(score, "reviews-store-score"));
+      storeChip.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source ?? "";
+      if (trustpilot) storeChip.dataset.storeReviewStatus = trustpilot.status;
+      reviewTooltips.set(storeChip, tip);
+      storeChips.push(storeChip);
     }
     const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
     const seenBuyers = /* @__PURE__ */ new Set();
@@ -23788,8 +23800,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-      rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...compactSourceChips(buyers.map(({ offer, user }) => buyerName(offer, user).split(",")[0]))], score, buyers[0].user.url, {
-        title: productTitle,
+      rows.push(buildReviewRow(productTitle, ["Kjøpere", formatRatingCount(count), ...compactSourceChips(buyers.map(({ offer, user }) => buyerName(offer, user).split(",")[0]))], score, buyers[0].user.url, {
+        title: `${productTitle}: kjøpere`,
         note: "Hva norske kjøpere mener om produktet. Snittet er vektet etter antall vurderinger.",
         // Like the price match: the product found at the source on top, the source as the first chip.
         items: buyers.map(({ offer, user }) => ({
@@ -23811,12 +23823,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
       const via = tests[0].offer;
       rows.push(buildReviewRow(
-        "Eksperttester",
-        [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))],
+        productTitle,
+        ["Eksperter", `${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))],
         score,
         via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
         {
-          title: "Eksperttester",
+          title: `${productTitle}: eksperttester`,
           note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
           items: tests.map(({ critic }) => ({
             name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site,
@@ -23828,7 +23840,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         }
       ));
     }
-    section.append(header, ...rows, ...storeRows);
+    titleRow.insertBefore(storeChips[0] ?? document.createTextNode(""), titleRow.lastChild);
+    section.append(header, ...rows);
     return section;
   }
   function buildReviewCopyButton(summary, priceMatch, store2) {
@@ -23878,6 +23891,15 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       shadowRoot.append(tooltip);
       element.addEventListener("mouseenter", () => showChipTooltipRightOfPanel(tooltip, element, shadowRoot));
       element.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
+    }
+    for (const element of shadowRoot.querySelectorAll(".reviews-section .reviews-store-chip")) {
+      const tip = reviewTooltips.get(element);
+      if (tip === void 0) continue;
+      const tooltip = document.createElement("div");
+      tooltip.className = "offer-tooltip price-match-tooltip";
+      buildReviewTooltipContent(tooltip, tip);
+      shadowRoot.append(tooltip);
+      bindPanelTooltipHover(element, tooltip, shadowRoot);
     }
     for (const element of shadowRoot.querySelectorAll(".reviews-section .reviews-row")) {
       const tip = reviewTooltips.get(element);

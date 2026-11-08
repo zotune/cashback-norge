@@ -12854,7 +12854,11 @@ function renderNotice(
     .reviews-row .price-match-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
-    .reviews-copy { flex-shrink: 0; margin-left: auto; }
+    .reviews-copy { flex-shrink: 0; }
+    .reviews-section .reviews-title-row .reviews-store-chip { align-items: center; display: inline-flex; font-size: 11px; font-weight: 700; gap: 6px; height: 24px; line-height: 20px; margin-left: auto; max-width: 60%; padding: 0 3px 0 8px; text-decoration: none; }
+    .reviews-store-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reviews-section .reviews-store-score { border-radius: 5px; font-size: 11px; line-height: 18px; min-width: 26px; padding: 0 5px; }
+    .reviews-title-row .price-match-toggle + .reviews-copy { margin-left: auto; }
     .price-match-section.collapsed .price-match-card,
     .price-match-section.collapsed .electricity-error,
     .price-match-section.collapsed .cbn-tooltip-row {
@@ -15468,7 +15472,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   // Rows: the product (its buyers), expert tests, then the shop. The product and shop rows are
   // titled by name; the sources are chips.
   const rows: HTMLAnchorElement[] = [];
-  const storeRows: HTMLAnchorElement[] = [];
+  const storeChips: HTMLAnchorElement[] = [];
   const productTitle = (priceMatch?.productName ?? document.title).trim().slice(0, 160);
   const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
   const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ??
@@ -15482,12 +15486,12 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     const count = shopRatings.reduce((sum, rating) => sum + rating.count, 0);
     const score = count > 0 ? Math.round(shopRatings.reduce((sum, rating) => sum + (toHundredScale(rating.score, rating.maxScore) ?? 0) * rating.count, 0) / count) : undefined;
     const tip: ReviewTooltip = {
-      title: storeTitle,
+      title: `${storeTitle}: om butikken`,
       note: "Hva kundene mener om butikken: service, levering og retur. Ikke produktet. Snittet er vektet etter antall vurderinger.",
       items: stores.map(({ offer, store }) => ({ name: getPriceMatchSourceName(offer), url: store.url, score: toHundredScale(store.score, store.maxScore) ?? 0,
         chips: [`${formatReviewScore(store.score, store.maxScore)}${store.maxScore === 5 ? " stjerner" : ""}`, formatRatingCount(store.count)] })),
     };
-    const chips = [...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
+    const chips = ["Om butikken", ...new Set(stores.map(({ offer }) => getPriceMatchSourceName(offer))), ...(count > 0 ? [formatRatingCount(count)] : [])];
     if (profile) {
       const updated = new Date(trustpilot!.checkedAt).toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" });
       chips.splice(chips.length - (count > 0 ? 1 : 0), 0, "Trustpilot");
@@ -15496,14 +15500,27 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       tip.items.push({ name: "Trustpilot", url: profile.url, score: toHundredScale(profile.score, 5) ?? 0,
         chips: [`${formatReviewScore(profile.score, 5)} stjerner`, formatRatingCount(profile.count)] });
     } else if (trustpilot) {
-      chips.push("Hent fra Trustpilot");
+      chips.push("Hent Trustpilot");
       tip.note += " Trustpilot svarte ikke automatisk. Åpne profilen under, så hentes vurderingen og vises her når du går tilbake til butikken.";
       tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
     }
-    const row = buildReviewRow(storeTitle, chips, score, stores[0]?.store.url ?? profile?.url ?? trustpilot!.profileUrl, tip);
-    row.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source;
-    if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
-    storeRows.push(row);
+    // The shop is a different kind of rating than the product rows: a chip in the heading
+    // («Komplett 94») with the sources in its tooltip.
+    void chips;
+    const storeChip = document.createElement("a");
+    storeChip.className = "cbn-chip cbn-chip--muted reviews-store-chip";
+    storeChip.href = stores[0]?.store.url ?? profile?.url ?? trustpilot!.profileUrl;
+    storeChip.target = "_blank";
+    storeChip.rel = "noreferrer";
+    storeChip.setAttribute("aria-label", `${storeTitle}: kundenes vurdering av butikken${score !== undefined ? `, ${score} av 100` : ""}`);
+    const storeName = document.createElement("span");
+    storeName.textContent = storeTitle;
+    storeChip.append(storeName);
+    if (score !== undefined) storeChip.append(buildReviewScoreBox(score, "reviews-store-score"));
+    storeChip.dataset.storeReviewSource = trustpilot ? "trustpilot" : stores[0]?.store.source ?? "";
+    if (trustpilot) storeChip.dataset.storeReviewStatus = trustpilot.status;
+    reviewTooltips.set(storeChip, tip);
+    storeChips.push(storeChip);
   }
   // Comparison sites first, then the shops' own ratings (source "store:<host>").
   const buyerName = (offer: PriceMatchOffer, user: { source: string; sourceName: string }) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
@@ -15518,8 +15535,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
     const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-    rows.push(buildReviewRow(productTitle, [formatRatingCount(count), ...compactSourceChips(buyers.map(({ offer, user }) => buyerName(offer, user).split(",")[0]!))], score, buyers[0]!.user.url, {
-      title: productTitle,
+    // The title says what is rated, the first chip who rates it.
+    rows.push(buildReviewRow(productTitle, ["Kjøpere", formatRatingCount(count), ...compactSourceChips(buyers.map(({ offer, user }) => buyerName(offer, user).split(",")[0]!))], score, buyers[0]!.user.url, {
+      title: `${productTitle}: kjøpere`,
       note: "Hva norske kjøpere mener om produktet. Snittet er vektet etter antall vurderinger.",
       // Like the price match: the product found at the source on top, the source as the first chip.
       items: buyers.map(({ offer, user }) => ({ name: user.productName ?? buyerName(offer, user), url: user.url, score: toHundredScale(user.score, user.maxScore) ?? 0,
@@ -15536,15 +15554,16 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (tests.length > 0) {
     const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
     const via = tests[0]!.offer;
-    rows.push(buildReviewRow("Eksperttester", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))], score,
+    rows.push(buildReviewRow(productTitle, ["Eksperter", `${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...compactSourceChips(tests.map(({ critic }) => critic.site))], score,
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
-        title: "Eksperttester",
+        title: `${productTitle}: eksperttester`,
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
         items: tests.map(({ critic }) => ({ name: critic.title ? critic.title.replace(/^[<\s]+/, "") : critic.site, url: critic.url, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
-  section.append(header, ...rows, ...storeRows);
+  titleRow.insertBefore(storeChips[0] ?? document.createTextNode(""), titleRow.lastChild);
+  section.append(header, ...rows);
   return section;
 }
 
@@ -15600,6 +15619,15 @@ function attachReviewTooltips(shadowRoot: ShadowRoot, tooltipControls: TooltipCo
     shadowRoot.append(tooltip);
     element.addEventListener("mouseenter", () => showChipTooltipRightOfPanel(tooltip, element, shadowRoot));
     element.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
+  }
+  for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section .reviews-store-chip")) {
+    const tip = reviewTooltips.get(element);
+    if (tip === undefined) continue;
+    const tooltip = document.createElement("div");
+    tooltip.className = "offer-tooltip price-match-tooltip";
+    buildReviewTooltipContent(tooltip, tip);
+    shadowRoot.append(tooltip);
+    bindPanelTooltipHover(element, tooltip, shadowRoot);
   }
   for (const element of shadowRoot.querySelectorAll<HTMLElement>(".reviews-section .reviews-row")) {
     const tip = reviewTooltips.get(element);

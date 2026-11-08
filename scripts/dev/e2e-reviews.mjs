@@ -29,6 +29,7 @@ try {
         const root = document.getElementById("cashback-varsler-notice")?.shadowRoot;
         const section = root?.querySelector(".reviews-section");
         return section ? {
+          store: section.querySelector(".reviews-store-chip")?.innerText.replace(/\s+/g, " ") ?? null,
           rows: [...section.querySelectorAll(".reviews-row")].map((row) => ({ text: row.innerText.replace(/\s+/g, " "), href: row.href })),
         } : false;
       }, null, { timeout: 60000, polling: 1000 });
