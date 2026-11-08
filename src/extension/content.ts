@@ -14,7 +14,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
-import { buildReviewAiPrompt, getReviewScoreLevel, isProductReviews, summarizeProductReviews, toHundredScale, type ProductReviews, type ProductReviewSummary, type StoreRating } from "../shared/product-reviews";
+import { buildReviewAiPrompt, getReviewScoreLevel, isProductReviews, summarizeProductReviews, toHundredScale, type ProductReviews, type ProductReviewSummary, type StoreRating, type UserRating, readJsonLdUserRating } from "../shared/product-reviews";
 import {
   buildKiwiAirportId,
   buildKiwiItinerariesRequest,
@@ -12727,8 +12727,9 @@ function renderNotice(
     }
     .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
     /* Only a title and the score: the score takes the badge column at the right edge. */
-    .reviews-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .reviews-row { grid-template-columns: minmax(0, 1fr) auto auto; }
     .price-match-tooltip-row .reviews-row .review-score { grid-column: -2; }
+    .reviews-row .reviews-count { color: var(--cbn-muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }
@@ -14176,6 +14177,7 @@ function renderNotice(
   if (mainOffers.length > 0) body.append(offerList);
   if (regionPrices !== undefined && regionPrices.prices.length > 0) body.append(regionPricesSection);
   if (priceMatches.length > 0 || isAutomaticComparisonSupported()) body.append(priceMatchSection);
+  addCurrentPageUserRating(priceMatches);
   const hasStoreRating = priceMatches.some((priceMatch) => priceMatch.reviews?.store !== undefined);
   const reviewSummary = summarizeProductReviews(priceMatches.map((priceMatch) => priceMatch.reviews)) ??
     (hasStoreRating ? { critics: [], users: [], userCount: 0 } : undefined);
@@ -15271,6 +15273,35 @@ function buildElectricityPriceMatchChips(priceMatch: Pick<PriceMatchOffer, "elec
   return buildPriceMatchInfoChips([e.areaCode, e.municipality, `${formatKr(e.monthlyFeeNok)} kr/mnd gebyr`, `${formatKr(e.addonOrePerKwh)} øre/kWh påslag`, priceMatch.productName]);
 }
 
+// The shop's own product rating on the page the reader is on (JSON-LD aggregateRating, or
+// schema.org microdata), shown with the other buyers. Read from the page, no request.
+function readCurrentPageUserRating(): UserRating | undefined {
+  const host = window.location.hostname;
+  if (!/\.no$/.test(host)) return undefined;
+  const name = host.replace(/^www\./, "").split(".")[0]!;
+  const sourceName = name.charAt(0).toUpperCase() + name.slice(1);
+  const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.outerHTML).join("");
+  const fromLd = readJsonLdUserRating(scripts, `store:${host}`, sourceName, window.location.href.split("#")[0]!);
+  if (fromLd !== undefined) return fromLd;
+  const block = document.querySelector('[itemprop="aggregateRating"]');
+  const read = (prop: string) => {
+    const element = block?.querySelector(`[itemprop="${prop}"]`);
+    return element === null || element === undefined ? undefined : Number((element.getAttribute("content") ?? element.textContent ?? "").trim().replace(",", "."));
+  };
+  const score = read("ratingValue");
+  const count = read("reviewCount") ?? read("ratingCount");
+  const maxScore = read("bestRating") ?? 5;
+  if (score === undefined || count === undefined || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === undefined) return undefined;
+  return { source: `store:${host}`, sourceName, score, maxScore, count, url: window.location.href.split("#")[0]! };
+}
+
+function addCurrentPageUserRating(priceMatches: PriceMatchOffer[]): void {
+  const first = priceMatches[0];
+  const rating = first === undefined ? undefined : readCurrentPageUserRating();
+  if (first === undefined || rating === undefined || priceMatches.some((offer) => offer.reviews?.users?.some((user) => user.source === rating.source))) return;
+  priceMatches[0] = { ...first, reviews: { ...first.reviews, users: [...(first.reviews?.users ?? []), rating] } };
+}
+
 const REVIEWS_COLLAPSED_KEY = "cashback-varsler-reviews-collapsed";
 
 // «Anmeldelser»: norske tester og kjøpervurderinger fra prismatch-kildene, med en knapp som
@@ -15330,7 +15361,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
       title: "Kjøpere av varen",
       note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
-      items: buyers.map(({ offer, user }) => ({ name: user.source.startsWith("store:") ? `${user.sourceName} (butikken)` : buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
+      items: buyers.map(({ offer, user }) => ({ name: buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
         chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
     }));
   }
@@ -15453,8 +15484,13 @@ function buildReviewRow(name: string, chips: string[], score: number, url: strin
   const product = document.createElement("span");
   product.className = "price-match-product";
   product.textContent = name;
-  title.append(product, buildPriceMatchInfoChips(chips));
-  row.append(title, buildReviewScoreBox(score));
+  // The count always sits just left of the score (the price column), the sources as chips.
+  const isCount = (chip: string) => /^\d[\d\s\u00a0]* (vurderinger|vurdering|tester|test)$/.test(chip);
+  title.append(product, buildPriceMatchInfoChips(chips.filter((chip) => !isCount(chip))));
+  const count = document.createElement("span");
+  count.className = "price-match-price reviews-count";
+  count.textContent = chips.find(isCount) ?? "";
+  row.append(title, count, buildReviewScoreBox(score, "review-score-box"));
   reviewTooltips.set(row, tip);
   return row;
 }

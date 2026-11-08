@@ -162,3 +162,18 @@ test("Godpris store links: the shop's own page from the click link's u parameter
     { shopName: "Elkjøp", url: "https://www.elkjop.no/product/pc-mus/logitech-g-pro-x2-superstrike-tradlos-gamingmus/101908" },
   ]);
 });
+
+test("Power: buyer rating from its product search, only for the page's own part number", async () => {
+  const { findPowerUserRating } = await import("../src/shared/power-reviews.js");
+  // power.no/api/v2/productlists?q=MXP63DN/A (2026-11-08), shortened.
+  const product = (title: string, mpn: string, rating: unknown) => ({ title, url: "/tv-og-lyd/hodetelefoner/apple-airpods-4/p-3614399/", productId: 3614399, productManufactorIdentity: mpn, productReview: rating });
+  const urls: string[] = [];
+  const respond = (products: unknown[]) => async (url: string) => { urls.push(url); return { products }; };
+  const message = { type: "get-price-match-for-product", url: "https://www.komplett.no/product/1313146", searchTerm: "Apple AirPods 4 trådløse ørepropper, In-Ear (hvit)", codes: ["MXP63DN/A"] } as never;
+  assert.deepEqual(await findPowerUserRating(message, respond([product("Apple AirPods 4", "MXP63DN/A", { overallAverageRating: 4.2727, overallTotalReviewCount: 3190 })]) as never),
+    { source: "store:www.power.no", sourceName: "Power", score: 4.27, maxScore: 5, count: 3190, url: "https://www.power.no/tv-og-lyd/hodetelefoner/apple-airpods-4/p-3614399/" });
+  assert.match(urls[0]!, /productlists\?q=MXP63DN%2FA/);
+  assert.equal(await findPowerUserRating(message, respond([product("Apple AirPods 4 med aktiv støyreduksjon", "MXP93DN/A", { overallAverageRating: 4.5, overallTotalReviewCount: 900 })]) as never), undefined);
+  assert.equal(await findPowerUserRating(message, respond([product("Apple AirPods 4", "MXP63DN/A", { overallAverageRating: 0, overallTotalReviewCount: 0 })]) as never), undefined);
+  assert.equal(await findPowerUserRating({ ...(message as object), codes: [] } as never, respond([]) as never), undefined);
+});

@@ -35,6 +35,7 @@ import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
 import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-match.js";
 import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
+import { findPowerUserRating } from "./power-reviews.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
@@ -158,7 +159,13 @@ export async function findPriceMatches(
     return [];
   }
 
-  return sortPriceMatchOffers(await withUserRatings(allowedOffers, message, requestText, requestJson));
+  const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
+  // Shops' own buyer ratings ride on the first offer; content shows them under «Kjøpere av varen».
+  const power = rated.length === 0 ? undefined : await findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => undefined);
+  if (power !== undefined && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
+    rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, users: [...(rated[0]!.reviews?.users ?? []), power] } };
+  }
+  return sortPriceMatchOffers(rated);
 }
 
 // Reviews are not in the APIs the price match uses. Prisjakt: the ProductGroup JSON-LD on the
