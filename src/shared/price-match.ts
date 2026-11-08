@@ -35,7 +35,7 @@ import { findPrisradarPriceMatch } from "./prisradar-price-match.js";
 import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-match.js";
 import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
-import { readJsonLdUserRating } from "./product-reviews.js";
+import { klarnaReviewsUrl, readJsonLdUserRating, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
   findVinmonopoletPriceMatch,
@@ -158,27 +158,42 @@ export async function findPriceMatches(
     return [];
   }
 
-  return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText));
+  return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText, requestJson));
 }
 
-// Buyer ratings sit in each comparison site's Product JSON-LD, not in the APIs the price match
-// uses. One bounded page read per matched product; a failure only drops that rating.
-const USER_RATING_PAGES: Array<{ source: "klarna" | "prisjakt"; name: string; page: RegExp }> = [
-  { source: "klarna", name: "Kjøpere hos Klarna", page: /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\// },
-  { source: "prisjakt", name: "Brukere hos Prisjakt", page: /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/ },
-];
-async function withUserRatings(offers: PriceMatchOffer[], requestText: TextRequest | undefined): Promise<PriceMatchOffer[]> {
+// Reviews are not in the APIs the price match uses. Prisjakt: the ProductGroup JSON-LD on the
+// product page (Norwegian users). Klarna: its review service, keeping only Norwegian reviews;
+// Klarna's page total mixes in reviews from other countries and is not used.
+// Bounded: one page or two JSON reads per matched product; a failure only drops the reviews.
+const PRISJAKT_PRODUCT_PAGE = /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/;
+const KLARNA_PRODUCT_ID = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
+async function withUserRatings(offers: PriceMatchOffer[], requestText: TextRequest | undefined, requestJson: JsonRequest | undefined): Promise<PriceMatchOffer[]> {
   return Promise.all(offers.map(async (offer) => {
-    const site = USER_RATING_PAGES.find((candidate) => candidate.source === offer.source && candidate.page.test(offer.productUrl));
-    if (site === undefined) return offer;
     try {
-      const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
-      const user = html === undefined ? undefined : readJsonLdUserRating(html, site.source, site.name, offer.productUrl);
-      return user === undefined ? offer : { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), user] } };
+      if (offer.source === "prisjakt" && PRISJAKT_PRODUCT_PAGE.test(offer.productUrl)) {
+        const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
+        const user = html === undefined ? undefined : readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
+        return user === undefined ? offer : { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), user] } };
+      }
+      const klarnaId = offer.source === "klarna" ? offer.productUrl.match(KLARNA_PRODUCT_ID)?.[1] : undefined;
+      if (klarnaId !== undefined) {
+        const read = (url: string) => (requestJson ?? fetchReviewJson)(url, { headers: { Accept: "application/json" } }).catch(() => undefined);
+        const [users, pros] = await Promise.all([read(klarnaReviewsUrl(klarnaId, "user")), read(klarnaReviewsUrl(klarnaId, "pro"))]);
+        const user = readKlarnaUserReviews(users, offer.productUrl);
+        const critics = readKlarnaProReviews(pros);
+        if (user === undefined && critics.length === 0) return offer;
+        return { ...offer, reviews: { ...offer.reviews, ...(critics.length ? { critics: [...(offer.reviews?.critics ?? []), ...critics] } : {}), ...(user ? { users: [...(offer.reviews?.users ?? []), user] } : {}) } };
+      }
     } catch {
       return offer;
     }
+    return offer;
   }));
+}
+
+async function fetchReviewJson(url: string, init?: { headers?: Record<string, string> }): Promise<unknown> {
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+  return response.ok ? response.json() : undefined;
 }
 
 async function fetchReviewPage(url: string, init?: { headers?: Record<string, string> }): Promise<string | undefined> {

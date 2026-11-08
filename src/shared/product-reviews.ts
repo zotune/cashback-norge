@@ -2,7 +2,8 @@
 // - Professional tests: Godpris' product page lists them as `review-card` links (site, score,
 //   scale, title, short quote, link to the test). Only one of them is in its JSON-LD, so the
 //   HTML is read; tests from non-Norwegian publications are left out.
-// - Buyer ratings: the comparison site's own Product JSON-LD `aggregateRating` (Klarna).
+// - Buyer ratings: Prisjakt's own ProductGroup JSON-LD `aggregateRating` (Norwegian users),
+//   and the Norwegian reviews in Klarna's review service.
 // Scores are kept with their own scale and only converted to 0–100 for the summary.
 import { decodeHtmlEntities, isRecord, parseUrl } from "./cashback.js";
 import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
@@ -87,13 +88,49 @@ export function readJsonLdUserRating(html: string, source: string, sourceName: s
   return { source, sourceName, score, maxScore, count, url: pageUrl };
 }
 
+// Klarna's review service (review-edge-rest, sourced from TestFreaks) mixes reviews from many
+// countries; for the mouse and PS5 Pro on 2026-11-08 every one was from the US, GB, CA or ZA.
+// Only reviews marked Norwegian (country NO or a Norwegian language) are kept.
+export const klarnaReviewsUrl = (productId: string, kind: "user" | "pro") =>
+  `https://www.klarna.com/no/api/review-edge-rest/public/v2/products/reviews/NO/${encodeURIComponent(productId)}/${kind}?limit=50`;
+const isNorwegianReview = (review: Record<string, unknown>) =>
+  review.country === "NO" || review.lang === "no" || review.lang === "nb" || review.lang === "nn";
+
+export function readKlarnaProReviews(value: unknown): CriticReview[] {
+  const reviews = isRecord(value) && Array.isArray(value.reviews) ? value.reviews.filter(isRecord) : [];
+  return reviews.filter(isNorwegianReview).flatMap((review): CriticReview[] => {
+    const score = finite(review.score);
+    const maxScore = finite(review.scoreMax);
+    const site = typeof review.source === "string" ? review.source.trim() : "";
+    const link = typeof review.link === "string" && parseUrl(review.link)?.protocol === "https:" ? review.link : undefined;
+    if (!site || score === undefined || maxScore === undefined || toHundredScale(score, maxScore) === undefined || link === undefined) return [];
+    const quote = typeof review.extract === "string" ? review.extract.trim() : "";
+    const title = typeof review.title === "string" ? review.title.trim() : "";
+    return [{ site, score, maxScore, url: link, ...(title ? { title } : {}), ...(quote ? { quote } : {}) }];
+  });
+}
+
+/** Norwegian buyer reviews in Klarna's review service, as one rating; none gives undefined. */
+export function readKlarnaUserReviews(value: unknown, pageUrl: string): UserRating | undefined {
+  const reviews = isRecord(value) && Array.isArray(value.reviews) ? value.reviews.filter(isRecord) : [];
+  const scores = reviews.filter(isNorwegianReview).flatMap((review) => {
+    const score = finite(review.score);
+    const maxScore = finite(review.scoreMax);
+    const hundred = score === undefined || maxScore === undefined ? undefined : toHundredScale(score, maxScore);
+    return hundred === undefined ? [] : [hundred];
+  });
+  if (scores.length === 0) return undefined;
+  return { source: "klarna", sourceName: "Norske kjøpere hos Klarna", score: Number((scores.reduce((sum, score) => sum + score, 0) / scores.length / 20).toFixed(2)), maxScore: 5, count: scores.length, url: pageUrl };
+}
+
 /** Combines every source's reviews: one entry per test, buyer ratings weighted by count. */
 export function summarizeProductReviews(all: Array<ProductReviews | undefined>): ProductReviewSummary | undefined {
   const critics = new Map<string, CriticReview>();
   const users = new Map<string, UserRating>();
   for (const reviews of all) {
     for (const critic of reviews?.critics ?? []) {
-      const key = parseUrl(critic.url)?.href ?? `${critic.site}|${critic.score}`;
+      // The same test can arrive from two sources with different links (direct or a redirect).
+      const key = `${critic.site.toLowerCase().replace(/[^a-z0-9æøå]/g, "")}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
       if (!critics.has(key)) critics.set(key, critic);
     }
     for (const user of reviews?.users ?? []) if (!users.has(user.source)) users.set(user.source, user);

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794159504
+// @version      1794159848
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4049,12 +4049,38 @@
     if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
     return { source: source2, sourceName, score, maxScore, count, url: pageUrl };
   }
+  const klarnaReviewsUrl = (productId, kind) => `https://www.klarna.com/no/api/review-edge-rest/public/v2/products/reviews/NO/${encodeURIComponent(productId)}/${kind}?limit=50`;
+  const isNorwegianReview = (review) => review.country === "NO" || review.lang === "no" || review.lang === "nb" || review.lang === "nn";
+  function readKlarnaProReviews(value) {
+    const reviews = isRecord$7(value) && Array.isArray(value.reviews) ? value.reviews.filter(isRecord$7) : [];
+    return reviews.filter(isNorwegianReview).flatMap((review) => {
+      const score = finite(review.score);
+      const maxScore = finite(review.scoreMax);
+      const site = typeof review.source === "string" ? review.source.trim() : "";
+      const link = typeof review.link === "string" && parseUrl$1(review.link)?.protocol === "https:" ? review.link : void 0;
+      if (!site || score === void 0 || maxScore === void 0 || toHundredScale(score, maxScore) === void 0 || link === void 0) return [];
+      const quote = typeof review.extract === "string" ? review.extract.trim() : "";
+      const title = typeof review.title === "string" ? review.title.trim() : "";
+      return [{ site, score, maxScore, url: link, ...title ? { title } : {}, ...quote ? { quote } : {} }];
+    });
+  }
+  function readKlarnaUserReviews(value, pageUrl) {
+    const reviews = isRecord$7(value) && Array.isArray(value.reviews) ? value.reviews.filter(isRecord$7) : [];
+    const scores = reviews.filter(isNorwegianReview).flatMap((review) => {
+      const score = finite(review.score);
+      const maxScore = finite(review.scoreMax);
+      const hundred = score === void 0 || maxScore === void 0 ? void 0 : toHundredScale(score, maxScore);
+      return hundred === void 0 ? [] : [hundred];
+    });
+    if (scores.length === 0) return void 0;
+    return { source: "klarna", sourceName: "Norske kjøpere hos Klarna", score: Number((scores.reduce((sum, score) => sum + score, 0) / scores.length / 20).toFixed(2)), maxScore: 5, count: scores.length, url: pageUrl };
+  }
   function summarizeProductReviews(all) {
     const critics = /* @__PURE__ */ new Map();
     const users = /* @__PURE__ */ new Map();
     for (const reviews of all) {
       for (const critic of reviews?.critics ?? []) {
-        const key = parseUrl$1(critic.url)?.href ?? `${critic.site}|${critic.score}`;
+        const key = `${critic.site.toLowerCase().replace(/[^a-z0-9æøå]/g, "")}|${Math.round(toHundredScale(critic.score, critic.maxScore) ?? -1)}`;
         if (!critics.has(key)) critics.set(key, critic);
       }
       for (const user of reviews?.users ?? []) if (!users.has(user.source)) users.set(user.source, user);
@@ -7835,24 +7861,36 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText));
+    return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText, requestJson));
   }
-  const USER_RATING_PAGES = [
-    { source: "klarna", name: "Kjøpere hos Klarna", page: /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\// },
-    { source: "prisjakt", name: "Brukere hos Prisjakt", page: /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/ }
-  ];
-  async function withUserRatings(offers, requestText) {
+  const PRISJAKT_PRODUCT_PAGE = /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/;
+  const KLARNA_PRODUCT_ID = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
+  async function withUserRatings(offers, requestText, requestJson) {
     return Promise.all(offers.map(async (offer) => {
-      const site = USER_RATING_PAGES.find((candidate) => candidate.source === offer.source && candidate.page.test(offer.productUrl));
-      if (site === void 0) return offer;
       try {
-        const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
-        const user = html === void 0 ? void 0 : readJsonLdUserRating(html, site.source, site.name, offer.productUrl);
-        return user === void 0 ? offer : { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], user] } };
+        if (offer.source === "prisjakt" && PRISJAKT_PRODUCT_PAGE.test(offer.productUrl)) {
+          const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
+          const user = html === void 0 ? void 0 : readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
+          return user === void 0 ? offer : { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], user] } };
+        }
+        const klarnaId = offer.source === "klarna" ? offer.productUrl.match(KLARNA_PRODUCT_ID)?.[1] : void 0;
+        if (klarnaId !== void 0) {
+          const read = (url) => (requestJson ?? fetchReviewJson)(url, { headers: { Accept: "application/json" } }).catch(() => void 0);
+          const [users, pros] = await Promise.all([read(klarnaReviewsUrl(klarnaId, "user")), read(klarnaReviewsUrl(klarnaId, "pro"))]);
+          const user = readKlarnaUserReviews(users, offer.productUrl);
+          const critics = readKlarnaProReviews(pros);
+          if (user === void 0 && critics.length === 0) return offer;
+          return { ...offer, reviews: { ...offer.reviews, ...critics.length ? { critics: [...offer.reviews?.critics ?? [], ...critics] } : {}, ...user ? { users: [...offer.reviews?.users ?? [], user] } : {} } };
+        }
       } catch {
         return offer;
       }
+      return offer;
     }));
+  }
+  async function fetchReviewJson(url, init) {
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8e3) });
+    return response.ok ? response.json() : void 0;
   }
   async function fetchReviewPage(url, init) {
     const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8e3) });
@@ -22345,7 +22383,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       tooltipControls.add(adAnchor, adTooltip, "Vis fordeler og vilkår for annonsen");
       bindPanelTooltipHover(adAnchor, adTooltip, shadowRoot);
       const disclosure = document.createElement("p");
-      disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
+      disclosure.textContent = "Annonse er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
       disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
       const quokkaLove = document.createElement("span");
       quokkaLove.className = "quokka-love quokka-love--couple";

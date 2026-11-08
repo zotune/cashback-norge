@@ -14383,7 +14383,7 @@ function renderNotice(
     tooltipControls.add(adAnchor, adTooltip, "Vis fordeler og vilkår for annonsen");
     bindPanelTooltipHover(adAnchor, adTooltip, shadowRoot);
     const disclosure = document.createElement("p");
-    disclosure.textContent = "Ad er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
+    disclosure.textContent = "Annonse er affiliatelenker. ♥ støtter oss. 10% til veldedighet.";
     disclosure.style.cssText = "color:var(--cbn-muted);font-size:10px;margin:0;padding:2px 14px 6px;";
     const quokkaLove = document.createElement("span");
     quokkaLove.className = "quokka-love quokka-love--couple";

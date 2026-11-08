@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReviewAiPrompt, isNorwegianReviewUrl, isProductReviews, readGodprisReviewCards, readJsonLdUserRating, summarizeProductReviews, toHundredScale } from "../src/shared/product-reviews.js";
+import { readKlarnaProReviews, readKlarnaUserReviews, buildReviewAiPrompt, isNorwegianReviewUrl, isProductReviews, readGodprisReviewCards, readJsonLdUserRating, summarizeProductReviews, toHundredScale } from "../src/shared/product-reviews.js";
 
 // Godpris' "Tester" section for Logitech G PRO X2 Superstrike (godpris.no/produkt/15346856, 2026-11-08), shortened.
 const card = (href: string, site: string, score: string, max: string, title: string, quote: string) =>
@@ -78,4 +78,22 @@ test("runtime validation rejects unsafe or malformed review data", () => {
   assert.equal(isProductReviews({ critics: [{ site: "X", score: 4, maxScore: 5, url: "javascript:alert(1)" }] }), false);
   assert.equal(isProductReviews({ users: [{ source: "k", sourceName: "K", score: 4, maxScore: 5, count: 1.5, url: "https://x.no/" }] }), false);
   assert.equal(isProductReviews("nope"), false);
+});
+
+// Klarna review-edge-rest (shape from /v2/products/reviews/NO/3334077607/user and /pro, 2026-11-08).
+const klarnaReview = (over: Record<string, unknown>) => ({ date: "2024-11-30", lang: "en", country: "GB", source: "John Lewis", domain: "johnlewis.com", score: 3, scoreMax: 5, extract: "Overpriced.", author: "TheGamer", type: "user", link: "https://b2b.testfreaks.com/click/out/?url=x", ...over });
+
+test("Klarna reviews: only Norwegian ones count, foreign totals are ignored", () => {
+  const users = { reviews: [klarnaReview({}), klarnaReview({ country: "US", score: 5 }), klarnaReview({ country: "NO", lang: "no", score: 4 }), klarnaReview({ country: "NO", lang: "no", score: 5 })], pageRequest: { hasNext: true } };
+  assert.deepEqual(readKlarnaUserReviews(users, "https://www.klarna.com/no/shopping/pl/cl52/1/"), { source: "klarna", sourceName: "Norske kjøpere hos Klarna", score: 4.5, maxScore: 5, count: 2, url: "https://www.klarna.com/no/shopping/pl/cl52/1/" });
+  assert.equal(readKlarnaUserReviews({ reviews: [klarnaReview({}), klarnaReview({ country: "US" })] }, "https://www.klarna.com/no/"), undefined);
+  const pros = { reviews: [klarnaReview({ type: "pro", source: "Wired", score: 4 }), klarnaReview({ type: "pro", source: "Tek.no", domain: "tek.no", country: "NO", lang: "no", score: 5, scoreMax: 6, title: "PS5 Pro" }), klarnaReview({ type: "pro", country: "NO", source: "Bad", link: "http://x.no/" })] };
+  assert.deepEqual(readKlarnaProReviews(pros).map((critic) => [critic.site, critic.score, critic.maxScore]), [["Tek.no", 5, 6]]);
+  assert.deepEqual(readKlarnaProReviews("x"), []);
+});
+
+test("the same test from Godpris and Klarna counts once", () => {
+  const godpris = readGodprisReviewCards(godprisHtml);
+  const klarna = [{ site: "Tek.no", score: 9.5, maxScore: 10, url: "https://b2b.testfreaks.com/click/out/?url=tek" }];
+  assert.equal(summarizeProductReviews([{ critics: godpris }, { critics: klarna }])!.critics.length, 3);
 });
