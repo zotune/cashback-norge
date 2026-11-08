@@ -15306,7 +15306,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     ].join("\n")),
     buildReviewScoreChip("Kjøpere", summary.userScore, summary.userCount, [
       `## Kjøpere ${summary.userScore ?? "–"}/100`,
-      ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${user.count.toLocaleString("nb-NO")} vurderinger`),
+      ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${formatRatingCount(user.count)}`),
       "Snitt vektet etter antall vurderinger. Krever minst 20 vurderinger.",
       "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet.",
     ].join("\n")),
@@ -15318,8 +15318,8 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       [`## ${critic.site}: ${formatReviewScore(critic.score, critic.maxScore)}`, ...(critic.title ? [critic.title] : []), ...(critic.quote ? [`«${critic.quote}»`] : [])].join("\n"),
       `Profesjonell test, ${new URL(critic.url).hostname.replace(/^www\./, "")}\nFunnet via Godpris' testliste\nÅpner testen hos utgiveren`,
     ])),
-    ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${user.count.toLocaleString("nb-NO")} vurderinger`, user.url, [
-      `## ${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)}\n${user.count.toLocaleString("nb-NO")} vurderinger`,
+    ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${formatRatingCount(user.count)}`, user.url, [
+      `## ${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)}\n${formatRatingCount(user.count)}`,
       `Fra kildens produktside (strukturerte data)\nAntallet er kildens eget, og kan omfatte andre varianter av produktet\nVi ser ikke de enkelte vurderingene`,
     ])),
   ];
@@ -15345,6 +15345,10 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
 
   section.append(header, ...rows, copy);
   return section;
+}
+
+function formatRatingCount(count: number): string {
+  return `${count.toLocaleString("nb-NO")} ${count === 1 ? "vurdering" : "vurderinger"}`;
 }
 
 function formatReviewScore(score: number, maxScore: number): string {

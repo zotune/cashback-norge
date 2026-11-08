@@ -74,7 +74,10 @@ export function readGodprisReviewCards(html: string): CriticReview[] {
 
 /** Buyer rating from the page's named Product JSON-LD. */
 export function readJsonLdUserRating(html: string, source: string, sourceName: string, pageUrl: string): UserRating | undefined {
-  const product = selectProductLdJson(readLdJsonScripts(html));
+  // Prisjakt publishes a ProductGroup (the product with its colour variants) instead of a Product.
+  const scripts = readLdJsonScripts(html);
+  const product = selectProductLdJson(scripts) ?? scripts.flatMap((item) => Array.isArray(item) ? item : [item]).find((item): item is Record<string, unknown> =>
+    isRecord(item) && item["@type"] === "ProductGroup" && typeof item.name === "string" && item.name.trim().length > 0);
   const rating = product !== undefined && isRecord(product.aggregateRating) ? product.aggregateRating : undefined;
   if (rating === undefined) return undefined;
   const score = finite(rating.ratingValue);
@@ -124,7 +127,7 @@ export function buildReviewAiPrompt(input: { productName: string; price?: string
   const { summary } = input;
   const critics = summary.critics.map((critic) =>
     `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
-  const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} vurderinger. ${user.url}`);
+  const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} ${user.count === 1 ? "vurdering" : "vurderinger"}. ${user.url}`);
   return [
     "Du er en nøytral norsk produktrådgiver. Lag en oversiktlig oppsummering av hva norske testere og kjøpere mener om produktet under.",
     "",

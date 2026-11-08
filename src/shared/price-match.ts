@@ -158,18 +158,22 @@ export async function findPriceMatches(
     return [];
   }
 
-  return sortPriceMatchOffers(await withKlarnaUserRating(allowedOffers, requestText));
+  return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText));
 }
 
-// Klarna's product page carries the buyers' rating in its Product JSON-LD; the offers API
-// does not. One bounded page read for the matched product, and a failure only drops the rating.
-const KLARNA_PRODUCT_PAGE = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\//;
-async function withKlarnaUserRating(offers: PriceMatchOffer[], requestText: TextRequest | undefined): Promise<PriceMatchOffer[]> {
+// Buyer ratings sit in each comparison site's Product JSON-LD, not in the APIs the price match
+// uses. One bounded page read per matched product; a failure only drops that rating.
+const USER_RATING_PAGES: Array<{ source: "klarna" | "prisjakt"; name: string; page: RegExp }> = [
+  { source: "klarna", name: "Kjøpere hos Klarna", page: /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\// },
+  { source: "prisjakt", name: "Brukere hos Prisjakt", page: /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/ },
+];
+async function withUserRatings(offers: PriceMatchOffer[], requestText: TextRequest | undefined): Promise<PriceMatchOffer[]> {
   return Promise.all(offers.map(async (offer) => {
-    if (offer.source !== "klarna" || !KLARNA_PRODUCT_PAGE.test(offer.productUrl)) return offer;
+    const site = USER_RATING_PAGES.find((candidate) => candidate.source === offer.source && candidate.page.test(offer.productUrl));
+    if (site === undefined) return offer;
     try {
       const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
-      const user = html === undefined ? undefined : readJsonLdUserRating(html, "klarna", "Kjøpere hos Klarna", offer.productUrl);
+      const user = html === undefined ? undefined : readJsonLdUserRating(html, site.source, site.name, offer.productUrl);
       return user === undefined ? offer : { ...offer, reviews: { ...offer.reviews, users: [...(offer.reviews?.users ?? []), user] } };
     } catch {
       return offer;

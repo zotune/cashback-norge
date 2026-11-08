@@ -37,6 +37,8 @@ test("buyer rating from the named Product JSON-LD; missing or invalid ratings gi
     { source: "klarna", sourceName: "Kjøpere hos Klarna", score: 4.7, maxScore: 5, count: 613, url: "https://www.klarna.com/no/shopping/pl/cl110/3447588155/" });
   assert.equal(readJsonLdUserRating(klarnaHtml.replace('"ratingCount":"613"', '"ratingCount":"0"'), "klarna", "K", "https://x.no/"), undefined);
   assert.equal(readJsonLdUserRating(klarnaHtml.replace('"ratingValue":4.7', '"ratingValue":7'), "klarna", "K", "https://x.no/"), undefined);
+  // Prisjakt: a ProductGroup with its variants (prisjakt.no/product.php?p=16029953, 2026-11-08).
+  assert.deepEqual(readJsonLdUserRating(`<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Prisjakt"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"ProductGroup","name":"Logitech G PRO X2 SUPERSTRIKE","aggregateRating":{"@type":"AggregateRating","ratingValue":5,"ratingCount":1,"worstRating":0,"bestRating":5}}</script>`, "prisjakt", "Brukere hos Prisjakt", "https://www.prisjakt.no/product.php?p=16029953")?.count, 1);
   assert.equal(readJsonLdUserRating(`<script type="application/ld+json">{"@type":"Product","aggregateRating":{"ratingValue":5,"ratingCount":9}}</script>`, "klarna", "K", "https://x.no/"), undefined);
 });
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794159159
+// @version      1794159422
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -15,6 +15,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @connect      native-backend.cloud.pji.nu
+// @connect      www.prisjakt.no
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -4038,7 +4039,8 @@
     return reviews;
   }
   function readJsonLdUserRating(html, source2, sourceName, pageUrl) {
-    const product = selectProductLdJson(readLdJsonScripts(html));
+    const scripts = readLdJsonScripts(html);
+    const product = selectProductLdJson(scripts) ?? scripts.flatMap((item) => Array.isArray(item) ? item : [item]).find((item) => isRecord$7(item) && item["@type"] === "ProductGroup" && typeof item.name === "string" && item.name.trim().length > 0);
     const rating = product !== void 0 && isRecord$7(product.aggregateRating) ? product.aggregateRating : void 0;
     if (rating === void 0) return void 0;
     const score = finite(rating.ratingValue);
@@ -4072,7 +4074,7 @@
   function buildReviewAiPrompt(input) {
     const { summary } = input;
     const critics = summary.critics.map((critic) => `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
-    const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} vurderinger. ${user.url}`);
+    const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} ${user.count === 1 ? "vurdering" : "vurderinger"}. ${user.url}`);
     return [
       "Du er en nøytral norsk produktrådgiver. Lag en oversiktlig oppsummering av hva norske testere og kjøpere mener om produktet under.",
       "",
@@ -7833,15 +7835,19 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    return sortPriceMatchOffers(await withKlarnaUserRating(allowedOffers, requestText));
+    return sortPriceMatchOffers(await withUserRatings(allowedOffers, requestText));
   }
-  const KLARNA_PRODUCT_PAGE = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\//;
-  async function withKlarnaUserRating(offers, requestText) {
+  const USER_RATING_PAGES = [
+    { source: "klarna", name: "Kjøpere hos Klarna", page: /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/cl\d+\/\d+\// },
+    { source: "prisjakt", name: "Brukere hos Prisjakt", page: /^https:\/\/www\.prisjakt\.no\/product\.php\?p=\d+(?:&|$)/ }
+  ];
+  async function withUserRatings(offers, requestText) {
     return Promise.all(offers.map(async (offer) => {
-      if (offer.source !== "klarna" || !KLARNA_PRODUCT_PAGE.test(offer.productUrl)) return offer;
+      const site = USER_RATING_PAGES.find((candidate) => candidate.source === offer.source && candidate.page.test(offer.productUrl));
+      if (site === void 0) return offer;
       try {
         const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
-        const user = html === void 0 ? void 0 : readJsonLdUserRating(html, "klarna", "Kjøpere hos Klarna", offer.productUrl);
+        const user = html === void 0 ? void 0 : readJsonLdUserRating(html, site.source, site.name, offer.productUrl);
         return user === void 0 ? offer : { ...offer, reviews: { ...offer.reviews, users: [...offer.reviews?.users ?? [], user] } };
       } catch {
         return offer;
@@ -23079,7 +23085,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       ].join("\n")),
       buildReviewScoreChip("Kjøpere", summary.userScore, summary.userCount, [
         `## Kjøpere ${summary.userScore ?? "–"}/100`,
-        ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${user.count.toLocaleString("nb-NO")} vurderinger`),
+        ...summary.users.map((user) => `${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)} · ${formatRatingCount(user.count)}`),
         "Snitt vektet etter antall vurderinger. Krever minst 20 vurderinger.",
         "Antallet er kildens eget. Vi ser ikke de enkelte vurderingene, og kilden kan telle med andre varianter av produktet."
       ].join("\n"))
@@ -23092,9 +23098,9 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
 Funnet via Godpris' testliste
 Åpner testen hos utgiveren`
       ])),
-      ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${user.count.toLocaleString("nb-NO")} vurderinger`, user.url, [
+      ...summary.users.map((user) => buildReviewRow(user.sourceName, user.score, user.maxScore, `${formatRatingCount(user.count)}`, user.url, [
         `## ${user.sourceName}: ${formatReviewScore(user.score, user.maxScore)}
-${user.count.toLocaleString("nb-NO")} vurderinger`,
+${formatRatingCount(user.count)}`,
         `Fra kildens produktside (strukturerte data)
 Antallet er kildens eget, og kan omfatte andre varianter av produktet
 Vi ser ikke de enkelte vurderingene`
@@ -23123,6 +23129,9 @@ Vi ser ikke de enkelte vurderingene`
     });
     section.append(header, ...rows, copy);
     return section;
+  }
+  function formatRatingCount(count) {
+    return `${count.toLocaleString("nb-NO")} ${count === 1 ? "vurdering" : "vurderinger"}`;
   }
   function formatReviewScore(score, maxScore) {
     return `${String(Number(score.toFixed(2))).replace(".", ",")} av ${String(maxScore).replace(".", ",")}`;
