@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-07T19:18:20.884Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-08T11:31:10.398Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -3027,6 +3027,7 @@
 "kortbakeren.no/products/crown-zenith-booster-pakke":3331,
 "kortbakeren.no/products/crown-zenith-elite-trainer-box":3431,
 "kortbakeren.no/products/delta-reign-booster-boks-skip-the-line":22032,
+"kortbakeren.no/products/delta-reign-booster-bundle":22034,
 "kortbakeren.no/products/delta-reign-booster-pack":22035,
 "kortbakeren.no/products/delta-reign-elite-trainer-box":22033,
 "kortbakeren.no/products/destined-rivals-booster-bundle":4822,
@@ -3052,6 +3053,7 @@
 "kortbakeren.no/products/paldean-fates-booster-pakke":3317,
 "kortbakeren.no/products/pitch-black-booster-boks-skip-the-line":11730,
 "kortbakeren.no/products/pitch-black-booster-pakke":11731,
+"kortbakeren.no/products/pitch-black-elite-trainer-box":6501,
 "kortbakeren.no/products/pokemon-30th-celebration-ditto-premium-collection":13007,
 "kortbakeren.no/products/pokemon-30th-celebration-figure-collection-mew":13008,
 "kortbakeren.no/products/pokemon-vstar-universe-japansk-booster-boks":3586,
@@ -3235,7 +3237,6 @@
 "lirumlarumleg.no/products/pokemon-tcg-30th-celebration-ultra-premium-collection":13005,
 "lirumlarumleg.no/products/pokemon-tcg-30th-celebration-ultra-premium-collection-copy":13006,
 "lirumlarumleg.no/products/pokemon-tcg-delta-reign-booster":22035,
-"lirumlarumleg.no/products/pokemon-tcg-delta-reign-booster-bundle":22034,
 "lirumlarumleg.no/products/pokemon-tcg-delta-reign-elite-trainer-box":22033,
 "lirumlarumleg.no/products/pokemon-tcg-first-partner-collection-box":12629,
 "lirumlarumleg.no/products/pokemon-tcg-me02-5-oppstadte-helter-forbedret-2-pack":11267,
@@ -3369,7 +3370,6 @@
 "maeddiiss.no/products/phantasmal-flames":3314,
 "maeddiiss.no/products/phantasmal-flames-elite-trainer-box":3343,
 "maeddiiss.no/products/pitch-black-booster-bundle":12617,
-"maeddiiss.no/products/pitch-black-elite-trainer-box":6501,
 "maeddiiss.no/products/pitch-black-premium-blister-pack":12815,
 "maeddiiss.no/products/pokeball-tin-2025":3451,
 "maeddiiss.no/products/prismatic-evolution-premium-figure-collection":5360,
