@@ -303,3 +303,14 @@ span.category-crumb { background: var(--cbn-highlight); color: var(--cbn-accent)
 .source-row .source-toggles { margin: 0; min-width: 0; }
 .source-row .offer-filter-bar { align-items: center; display: inline-flex; flex-shrink: 0; gap: 8px; margin: 0; }
 @media (max-width: 520px) { .source-row { flex-direction: column-reverse; align-items: stretch; } .source-row .offer-filter-bar { justify-content: flex-end; } }
+/* Wide screens: search shares the line with Ekstra cashback, count and sorting, so the sticky
+   header stays low while scrolling. Phones keep the search on its own line. */
+@media (min-width: 900px) {
+  .sticky-header[data-ol="sticky"] { align-items: center; column-gap: 12px; display: flex; flex-wrap: wrap; }
+  .sticky-header[data-ol="sticky"] > * { flex: 0 0 100%; min-width: 0; order: 0; }
+  .sticky-header[data-ol="sticky"] > .search-wrap { flex: 0 0 340px; margin-bottom: 6px; order: 1; }
+  .sticky-header[data-ol="sticky"] > .search-wrap .search { height: 38px; font-size: 14px; }
+  .sticky-header[data-ol="sticky"] > .list-bar { flex: 1 1 0; order: 2; }
+  .sticky-header[data-ol="sticky"] > .filters { order: 3; }
+  .sticky-header[data-ol="sticky"] > .bonus-chips-portal { order: 4; }
+}
