@@ -36,6 +36,7 @@ import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-m
 import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
 import { findPowerUserRating } from "./power-reviews.js";
+import { findTekReview } from "./tek-reviews.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
@@ -161,7 +162,11 @@ export async function findPriceMatches(
 
   const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
   // Shops' own buyer ratings ride on the first offer; content shows them under «Kjøpere av varen».
-  const power = rated.length === 0 ? undefined : await findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => undefined);
+  const [power, tek] = rated.length === 0 ? [undefined, undefined] : await Promise.all([
+    findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => undefined),
+    findTekReview(message, requestJson ?? fetchReviewJson).catch(() => undefined),
+  ]);
+  if (tek !== undefined) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, critics: [...(rated[0]!.reviews?.critics ?? []), tek] } };
   if (power !== undefined && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
     rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, users: [...(rated[0]!.reviews?.users ?? []), power] } };
   }

@@ -177,3 +177,21 @@ test("Power: buyer rating from its product search, only for the page's own part 
   assert.equal(await findPowerUserRating(message, respond([product("Apple AirPods 4", "MXP63DN/A", { overallAverageRating: 0, overallTotalReviewCount: 0 })]) as never), undefined);
   assert.equal(await findPowerUserRating({ ...(message as object), codes: [] } as never, respond([]) as never), undefined);
 });
+
+test("Tek.no review platform: the most specific product name in the page title wins", async () => {
+  const { readTekReview, findTekReview } = await import("../src/shared/tek-reviews.js");
+  // reviewedProducts(query: "Roborock Saros") from www.tek.no/api/review-platform/graphql (2026-11-08), shortened.
+  const item = (id: string, name: string, value: number, conclusion: string) => ({ id, name, slug: name.toLowerCase().replace(/ /g, "-"),
+    latestReview: { rating: { value, conclusion, pros: ["Roborock-appen er uslåelig"], cons: ["Dyr"] }, articleId: "y3GLPJ", sectionName: "samletest", articleSlug: "beste-robotstoevsuger", title: "Samletest av robotstøvsugere toppmodeller" } });
+  const response = { data: { reviewedProducts: { items: [item("1", "Roborock Saros 10", 8, "God."), item("40563", "Roborock Saros 20", 7, "Gjør mye av det storebror kan."), item("40596", "Roborock Saros 20 Sonic", 9, "En svært gjennomarbeidet og knallgod robotstøvsuger.")] } } };
+  const sonic = readTekReview(response, "Roborock Saros 20 Sonic robotstøvsuger (sort)");
+  assert.deepEqual([sonic?.score, sonic?.maxScore, sonic?.url, sonic?.pros, sonic?.cons], [9, 10, "https://www.tek.no/samletest/i/y3GLPJ/beste-robotstoevsuger", ["Roborock-appen er uslåelig"], ["Dyr"]]);
+  assert.match(sonic!.title!, /Roborock Saros 20 Sonic/);
+  assert.equal(readTekReview(response, "Roborock Saros 20 robotstøvsuger")?.score, 7);
+  assert.equal(readTekReview(response, "Roborock Qrevo Edge 2 Pro"), undefined);
+  assert.equal(readTekReview({ errors: [{ message: "x" }] }, "Roborock Saros 20"), undefined);
+  const queries: string[] = [];
+  const requestJson = async (_url: string, init?: { body?: string }) => { const query = JSON.parse(init!.body!).variables.query as string; queries.push(query); return query === "Roborock Saros" ? response : { data: { reviewedProducts: { items: [] } } }; };
+  assert.equal((await findTekReview({ type: "get-price-match-for-product", url: "https://www.komplett.no/x", searchTerm: "Roborock Saros 20 Sonic robotstøvsuger (sort)" } as never, requestJson as never))?.score, 9);
+  assert.deepEqual(queries, ["Roborock Saros 20", "Roborock Saros"]);
+});

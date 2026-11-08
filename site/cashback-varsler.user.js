@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794162582
+// @version      1794162895
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4330,7 +4330,7 @@
   const formatScore = (score) => String(Number(score.toFixed(2))).replace(".", ",");
   function buildReviewAiPrompt(input) {
     const { summary } = input;
-    const critics = summary.critics.map((critic) => `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
+    const critics = summary.critics.map((critic) => `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""}${critic.pros?.length ? ` Pluss: ${critic.pros.join("; ")}.` : ""}${critic.cons?.length ? ` Minus: ${critic.cons.join("; ")}.` : ""} ${critic.url}`);
     const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} ${user.count === 1 ? "vurdering" : "vurderinger"}. ${user.url}`);
     return [
       "Du er en nøytral norsk produktrådgiver. Lag en oversiktlig oppsummering av hva norske testere og kjøpere mener om produktet under.",
@@ -4372,7 +4372,7 @@
     const critics = value.critics;
     const users = value.users;
     const store2 = value.store;
-    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string"))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url)));
+    return (store2 === void 0 || isRecord$7(store2) && typeof store2.source === "string" && typeof store2.shopName === "string" && isScore(store2.score, store2.maxScore) && typeof store2.count === "number" && Number.isInteger(store2.count) && store2.count > 0 && isHttpsUrl(store2.url)) && (critics === void 0 || Array.isArray(critics) && critics.length <= 50 && critics.every((critic) => isRecord$7(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) && (critic.title === void 0 || typeof critic.title === "string") && (critic.quote === void 0 || typeof critic.quote === "string") && [critic.pros, critic.cons].every((list) => list === void 0 || Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))) && (users === void 0 || Array.isArray(users) && users.length <= 10 && users.every((user) => isRecord$7(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) && typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url)));
   }
   const GODPRIS_PRODUCT_URL = "https://godpris.no/produkt/";
   const BAD_AVAILABILITY_STATUSES$3 = /* @__PURE__ */ new Set([
@@ -5178,9 +5178,9 @@
     const title = cleanGroceryTitleCandidate(message.searchTerm).replace(/\b\d+(?:[.,]\d+)?\s*(?:x\s*\d+(?:[.,]\d+)?\s*)?(?:kg|g|gr|gram|l|ltr|liter|dl|cl|ml|stk|pk|pakning)\b/gi, " ").replace(/[()[\],/|-]+/g, " ").replace(/\s+/g, " ").trim();
     const brand = message.productBrand?.trim();
     const brandWords = brand !== void 0 ? brand.toLowerCase().split(/\s+/) : [];
-    const words = title.split(" ").filter((word) => /\p{L}/u.test(word) && word.length >= 3);
-    const productWords = words.filter((word) => !brandWords.includes(word.toLowerCase()));
-    const queries = brand !== void 0 && brand.length >= 2 ? [[brand, productWords[0]].filter(Boolean).join(" "), brand] : [words.slice(0, 2).join(" ")];
+    const words2 = title.split(" ").filter((word) => /\p{L}/u.test(word) && word.length >= 3);
+    const productWords = words2.filter((word) => !brandWords.includes(word.toLowerCase()));
+    const queries = brand !== void 0 && brand.length >= 2 ? [[brand, productWords[0]].filter(Boolean).join(" "), brand] : [words2.slice(0, 2).join(" ")];
     return [...new Set(queries.filter((query) => query.length >= 3))];
   }
   function readEtilbudsavisOffers(value) {
@@ -6808,8 +6808,8 @@ query SearchSuggestions($query: String!, $category: Int) {
     return catalog.products.filter((product) => language === void 0 || product.language === void 0 || product.language === language).filter((product) => readTcgProductKind(product.name) === kind && isNameWithinSearchTerm(product.name, message.searchTerm)).map(({ id, name }) => ({ id, name }));
   }
   function isNameWithinSearchTerm(name, searchTerm) {
-    const words = new Set(normalizeTcgProductTitle(buildSearchTerm(searchTerm)).split(" "));
-    return normalizeTcgProductTitle(buildSearchTerm(name)).split(" ").every((word) => words.has(word));
+    const words2 = new Set(normalizeTcgProductTitle(buildSearchTerm(searchTerm)).split(" "));
+    return normalizeTcgProductTitle(buildSearchTerm(name)).split(" ").every((word) => words2.has(word));
   }
   async function searchApi(message, requestText) {
     const action = await discoverSearchAction(requestText);
@@ -7317,6 +7317,53 @@ query SearchSuggestions($query: String!, $category: Int) {
         if (score === void 0 || count === void 0 || !Number.isInteger(count) || count <= 0 || toHundredScale(score, 5) === void 0 || path === void 0) return void 0;
         return { source: "store:www.power.no", sourceName: "Power", score: Number(score.toFixed(2)), maxScore: 5, count, url: `https://www.power.no${path}` };
       }
+    }
+    return void 0;
+  }
+  const TEK_REVIEW_GRAPHQL_URL = "https://www.tek.no/api/review-platform/graphql";
+  const QUERY = "query ReviewedProducts($query: String, $limit: Int) { reviewedProducts(query: $query, limit: $limit) { items { id name slug latestReview { rating { value conclusion pros cons } articleId sectionName articleSlug title } } } }";
+  const words = (value) => value.toLowerCase().normalize("NFKC").split(/[^\p{L}\p{N}+]+/u).filter((word) => word.length > 0);
+  function readTekReview(value, pageTitle, anchor = buildProductMatchAnchor({ searchTerm: pageTitle })) {
+    const items = isRecord$7(value) && isRecord$7(value.data) && isRecord$7(value.data.reviewedProducts) && Array.isArray(value.data.reviewedProducts.items) ? value.data.reviewedProducts.items.filter(isRecord$7) : [];
+    const titleWords = new Set(words(pageTitle));
+    const candidates = items.flatMap((item) => {
+      const name = typeof item.name === "string" ? item.name.trim() : "";
+      const review = isRecord$7(item.latestReview) ? item.latestReview : void 0;
+      const rating = review && isRecord$7(review.rating) ? review.rating : void 0;
+      const score = typeof rating?.value === "number" ? rating.value : void 0;
+      const nameWords = words(name);
+      if (!name || !review || score === void 0 || toHundredScale(score, 10) === void 0 || nameWords.length < 2 || !nameWords.every((word) => titleWords.has(word)) || hasProductVariantConflict(anchor, name)) return [];
+      const section = typeof review.sectionName === "string" ? review.sectionName : "";
+      const article = typeof review.articleId === "string" ? review.articleId : "";
+      const slug = typeof review.articleSlug === "string" ? review.articleSlug : "";
+      if (!/^[a-z-]+$/.test(section) || !/^[A-Za-z0-9]+$/.test(article) || !/^[a-z0-9-]*$/.test(slug)) return [];
+      const strings = (list) => Array.isArray(list) ? list.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim()).slice(0, 10) : [];
+      const conclusion = typeof rating?.conclusion === "string" ? rating.conclusion.trim() : "";
+      const title = typeof review.title === "string" ? review.title.trim() : "";
+      return [{ length: nameWords.length, review: {
+        site: "Tek.no",
+        score,
+        maxScore: 10,
+        url: `https://www.tek.no/${section}/i/${article}/${slug}`,
+        ...title ? { title: `${title} (${name})` } : { title: name },
+        ...conclusion ? { quote: conclusion } : {},
+        ...strings(rating?.pros).length ? { pros: strings(rating?.pros) } : {},
+        ...strings(rating?.cons).length ? { cons: strings(rating?.cons) } : {}
+      } }];
+    });
+    return candidates.sort((a, b) => b.length - a.length)[0]?.review;
+  }
+  async function findTekReview(message, requestJson) {
+    const titleWords = message.searchTerm.replace(/[()[\],]/g, " ").trim().split(/\s+/).filter(Boolean);
+    for (const size of [3, 2]) {
+      if (titleWords.length < size) continue;
+      const value = await requestJson(TEK_REVIEW_GRAPHQL_URL, {
+        method: "POST",
+        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ operationName: "ReviewedProducts", query: QUERY, variables: { query: titleWords.slice(0, size).join(" "), limit: 30 } })
+      });
+      const review = readTekReview(value, message.searchTerm, buildProductMatchAnchor(message));
+      if (review !== void 0) return review;
     }
     return void 0;
   }
@@ -8149,7 +8196,11 @@ query SearchSuggestions($query: String!, $category: Int) {
       return [];
     }
     const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
-    const power = rated.length === 0 ? void 0 : await findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => void 0);
+    const [power, tek] = rated.length === 0 ? [void 0, void 0] : await Promise.all([
+      findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => void 0),
+      findTekReview(message, requestJson ?? fetchReviewJson).catch(() => void 0)
+    ]);
+    if (tek !== void 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, critics: [...rated[0].reviews?.critics ?? [], tek] } };
     if (power !== void 0 && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
       rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], power] } };
     }
@@ -13301,8 +13352,8 @@ ${darkProviderCss}
     };
   }
   function readFlightStopCountWord(value) {
-    const words = { en: 1, ett: 1, one: 1, to: 2, two: 2, tre: 3, three: 3 };
-    return value === void 0 ? void 0 : words[value.toLowerCase()] ?? readNonNegativeIntegerValue(value);
+    const words2 = { en: 1, ett: 1, one: 1, to: 2, two: 2, tre: 3, three: 3 };
+    return value === void 0 ? void 0 : words2[value.toLowerCase()] ?? readNonNegativeIntegerValue(value);
   }
   function readFlightFilterInputLabel(input) {
     const label = input.labels?.[0]?.innerText ?? input.getAttribute("aria-label") ?? input.closest("label")?.innerText;
@@ -18085,11 +18136,11 @@ ${darkProviderCss}
     if (name === void 0 || destination === null) return name;
     const destinationTokens = new Set(normalizeHotelNameText(destination).split(" ").filter((token) => token.length > 0));
     if (destinationTokens.size === 0) return name;
-    const words = name.split(" ");
-    while (words.length > 1 && destinationTokens.has(normalizeHotelNameText(words[words.length - 1] ?? ""))) {
-      words.pop();
+    const words2 = name.split(" ");
+    while (words2.length > 1 && destinationTokens.has(normalizeHotelNameText(words2[words2.length - 1] ?? ""))) {
+      words2.pop();
     }
-    return words.join(" ");
+    return words2.join(" ");
   }
   function readVisibleHotelHeadingName() {
     const heading = document.querySelector("h1")?.innerText.replace(/\s+/g, " ").trim();
@@ -23575,7 +23626,7 @@ Svar fra ${profile.shopName}: ${review.reply}` : ""}`
       }
       const score = store2 ? toHundredScale(store2.score, store2.maxScore) : void 0;
       const row = buildReviewRow(
-        "Butikken",
+        "Butikk (kjøpere)",
         chips,
         score,
         store2?.url ?? trustpilot.profileUrl,
@@ -23591,8 +23642,8 @@ Svar fra ${profile.shopName}: ${review.reply}` : ""}`
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-      rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
-        title: "Kjøpere av varen",
+      rows.push(buildReviewRow("Produkt (kjøpere)", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0].user.url, {
+        title: "Produkt (kjøpere)",
         note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
         items: buyers.map(({ offer, user }) => ({
           name: buyerName(offer, user),
@@ -23612,12 +23663,12 @@ Svar fra ${profile.shopName}: ${review.reply}` : ""}`
       const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
       const via = tests[0].offer;
       rows.push(buildReviewRow(
-        "Tester av varen",
+        "Produkt (anmeldere)",
         [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)],
         score,
         via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl,
         {
-          title: "Tester av varen",
+          title: "Produkt (anmeldere)",
           note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
           items: tests.map(({ critic }) => ({
             name: critic.site,

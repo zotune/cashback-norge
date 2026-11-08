@@ -15465,7 +15465,7 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
       tip.action = { label: "Hent vurdering fra Trustpilot", url: trustpilot.profileUrl };
     }
     const score = store ? toHundredScale(store.score, store.maxScore) : undefined;
-    const row = buildReviewRow("Butikken", chips, score, store?.url ?? trustpilot!.profileUrl, tip,
+    const row = buildReviewRow("Butikk (kjøpere)", chips, score, store?.url ?? trustpilot!.profileUrl, tip,
       store?.source === "trustpilot" ? `${String(store.score).replace(".", ",")}/5` : undefined);
     row.dataset.storeReviewSource = trustpilot ? "trustpilot" : store?.source;
     if (trustpilot) row.dataset.storeReviewStatus = trustpilot.status;
@@ -15478,8 +15478,8 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (buyers.length > 0) {
     const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
     const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
-    rows.push(buildReviewRow("Kjøpere av varen", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
-      title: "Kjøpere av varen",
+    rows.push(buildReviewRow("Produkt (kjøpere)", [formatRatingCount(count), ...new Set(buyers.map(({ offer, user }) => buyerName(offer, user)))], score, buyers[0]!.user.url, {
+      title: "Produkt (kjøpere)",
       note: "Norske kjøpere av produktet. Snittet er vektet etter antall vurderinger.",
       items: buyers.map(({ offer, user }) => ({ name: buyerName(offer, user), score: toHundredScale(user.score, user.maxScore) ?? 0,
         chips: [`${formatReviewScore(user.score, user.maxScore)} stjerner`, formatRatingCount(user.count), ...(user.source === "klarna" ? ["Bare norske"] : [])] })),
@@ -15495,9 +15495,9 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
   if (tests.length > 0) {
     const score = Math.round(tests.reduce((sum, { critic }) => sum + (toHundredScale(critic.score, critic.maxScore) ?? 0), 0) / tests.length);
     const via = tests[0]!.offer;
-    rows.push(buildReviewRow("Tester av varen", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
+    rows.push(buildReviewRow("Produkt (anmeldere)", [`${tests.length} ${tests.length === 1 ? "test" : "tester"}`, ...tests.slice(0, 2).map(({ critic }) => critic.site)], score,
       via.source === "godpris" ? `${via.productUrl}#tester` : via.productUrl, {
-        title: "Tester av varen",
+        title: "Produkt (anmeldere)",
         note: `Norske tester, omregnet til 0–100. Funnet via ${[...new Set(tests.map(({ offer }) => getPriceMatchSourceName(offer)))].join(", ")}.`,
         items: tests.map(({ critic }) => ({ name: critic.site, score: toHundredScale(critic.score, critic.maxScore) ?? 0,
           chips: [formatReviewScore(critic.score, critic.maxScore), ...(critic.title ? [critic.title.replace(/^[<\s]+/, "")] : [])], ...(critic.quote ? { quote: critic.quote } : {}) })),

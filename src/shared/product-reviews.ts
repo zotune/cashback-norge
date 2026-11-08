@@ -8,7 +8,7 @@
 import { decodeHtmlEntities, isRecord, parseUrl } from "./cashback.js";
 import { readLdJsonScripts, readNextFlightPayloads, selectProductLdJson } from "./product-data.js";
 
-export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string };
+export type CriticReview = { site: string; score: number; maxScore: number; url: string; title?: string; quote?: string; pros?: string[]; cons?: string[] };
 export type UserRating = { source: string; sourceName: string; score: number; maxScore: number; count: number; url: string };
 // A rating of the shop itself (service, delivery), not of the product.
 export type StoreRating = { source: string; shopName: string; score: number; maxScore: number; count: number; url: string };
@@ -233,7 +233,7 @@ const formatScore = (score: number) => String(Number(score.toFixed(2))).replace(
 export function buildReviewAiPrompt(input: { productName: string; price?: string; shopName?: string; pageUrl?: string; summary: ProductReviewSummary; store?: StoreRating; date: string }): string {
   const { summary } = input;
   const critics = summary.critics.map((critic) =>
-    `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""} ${critic.url}`);
+    `- ${critic.site}: ${formatScore(critic.score)} av ${formatScore(critic.maxScore)}.${critic.title ? ` «${critic.title}».` : ""}${critic.quote ? ` Sitat: «${critic.quote}»` : ""}${critic.pros?.length ? ` Pluss: ${critic.pros.join("; ")}.` : ""}${critic.cons?.length ? ` Minus: ${critic.cons.join("; ")}.` : ""} ${critic.url}`);
   const users = summary.users.map((user) => `- ${user.sourceName}: ${formatScore(user.score)} av ${formatScore(user.maxScore)} fra ${user.count} ${user.count === 1 ? "vurdering" : "vurderinger"}. ${user.url}`);
   return [
     "Du er en nøytral norsk produktrådgiver. Lag en oversiktlig oppsummering av hva norske testere og kjøpere mener om produktet under.",
@@ -281,7 +281,8 @@ export function isProductReviews(value: unknown): value is ProductReviews {
   return (store === undefined || (isRecord(store) && typeof store.source === "string" && typeof store.shopName === "string" &&
     isScore(store.score, store.maxScore) && typeof store.count === "number" && Number.isInteger(store.count) && store.count > 0 && isHttpsUrl(store.url))) && (critics === undefined || (Array.isArray(critics) && critics.length <= 50 && critics.every((critic) =>
     isRecord(critic) && typeof critic.site === "string" && isScore(critic.score, critic.maxScore) && isHttpsUrl(critic.url) &&
-    (critic.title === undefined || typeof critic.title === "string") && (critic.quote === undefined || typeof critic.quote === "string")))) &&
+    (critic.title === undefined || typeof critic.title === "string") && (critic.quote === undefined || typeof critic.quote === "string") &&
+    [critic.pros, critic.cons].every((list) => list === undefined || (Array.isArray(list) && list.length <= 10 && list.every((entry) => typeof entry === "string" && entry.length <= 300)))))) &&
     (users === undefined || (Array.isArray(users) && users.length <= 10 && users.every((user) =>
       isRecord(user) && typeof user.source === "string" && typeof user.sourceName === "string" && isScore(user.score, user.maxScore) &&
       typeof user.count === "number" && Number.isInteger(user.count) && user.count > 0 && isHttpsUrl(user.url))));

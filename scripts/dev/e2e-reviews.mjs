@@ -34,7 +34,7 @@ try {
       }, null, { timeout: 60000, polling: 1000 });
       const result = await handle.jsonValue();
       console.log(JSON.stringify(result, null, 1));
-      assert.ok(result.rows.every((row) => /^(Butikken|Kjøpere av varen|Tester av varen) /.test(row.text)), "rows: Butikken, Kjøpere av varen, Tester av varen");
+      assert.ok(result.rows.every((row) => /^(Butikk \(kjøpere\)|Produkt \(kjøpere\)|Produkt \(anmeldere\)) /.test(row.text)), "rows: Butikken, Kjøpere av varen, Tester av varen");
       assert.ok(result.rows.length > 0, "at least one review row");
       for (const row of result.rows) assert.ok(/^https:\/\/(www\.)?(godpris\.no|prisjakt\.no|prisradar\.no|no\.trustpilot\.com|klarna\.com\/no)\//.test(row.href), `comparison-site link: ${row.href}`);
       await page.evaluate(() => document.getElementById("cashback-varsler-notice").shadowRoot.querySelector(".reviews-copy").click());
