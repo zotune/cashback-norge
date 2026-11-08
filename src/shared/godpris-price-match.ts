@@ -18,7 +18,7 @@ import { readPriceAmount as readNumberLike, formatPrice } from "./price.js";
 import { readLdJsonScripts, selectProductLdJson } from "./product-data.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
 import { parseUrl, isRecord } from "./cashback.js";
-import { readGodprisReviewCards } from "./product-reviews.js";
+import { readGodprisReviewCards, type CriticReview } from "./product-reviews.js";
 
 type TextRequest = (
   url: string,
@@ -81,11 +81,31 @@ export async function findGodprisPriceMatch(
         headers: { "Accept": "text/html,application/xhtml+xml" },
       });
       const offer = html !== undefined ? readGodprisProductPage(html, productId, anchor) : undefined;
-      if (offer !== undefined) return offer;
+      if (offer !== undefined) return offer.reviews !== undefined ? offer : await withDuplicateListingReviews(offer, [...productIds, ...(query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => []))], visitedProductIds, anchor, requestText);
     }
   }
 
   return undefined;
+}
+
+// Godpris sometimes lists the same product twice (e.g. "PlayStation 5 Pro 2TB" 5186542 with
+// Tek.no and Lyd & bilde, and "… 2TB (PS5)" 19156434 without tests). When the matched page has
+// no tests, at most three further candidates from the same or the title search are read; their tests are used
+// only if that page's product name passes the same product and variant checks.
+async function withDuplicateListingReviews(offer: PriceMatchOffer, productIds: string[], visited: Set<string>, anchor: ProductMatchAnchor, requestText: TextRequest): Promise<PriceMatchOffer> {
+  const critics: CriticReview[] = [];
+  for (const productId of [...new Set(productIds)].filter((id) => !visited.has(id)).slice(0, 3)) {
+    visited.add(productId);
+    const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => undefined);
+    if (html === undefined) continue;
+    // The duplicate may have no offers in stock; its name must still pass the product checks.
+    const structured = selectProductLdJson(readLdJsonScripts(html));
+    const name = structured === undefined ? undefined : withLeadingBrand(readStringLike(structured.name),
+      readStringLike(isRecord(structured.brand) ? structured.brand.name : structured.brand));
+    if (name === undefined || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE) continue;
+    critics.push(...readGodprisReviewCards(html));
+  }
+  return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
 }
 
 export async function isGodprisProductForOfferUrls(message: GetPriceMatchForProductMessage, offerUrls: string[], requestJson: JsonRequest = fetchJson): Promise<boolean> {

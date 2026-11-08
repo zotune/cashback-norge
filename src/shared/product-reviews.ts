@@ -51,6 +51,8 @@ export function isNorwegianReviewUrl(rawUrl: string): boolean {
 const withoutTracking = (rawUrl: string): string => {
   const url = new URL(rawUrl);
   for (const key of [...url.searchParams.keys()]) if (/^utm_/i.test(key)) url.searchParams.delete(key);
+  // Godpris appends its tracking after an anchor too ("…#anchor-2?utm_source=godpris.no").
+  url.hash = url.hash.replace(/[?&]utm_[^#]*$/i, "");
   return url.href;
 };
 

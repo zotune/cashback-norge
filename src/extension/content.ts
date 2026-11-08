@@ -12726,6 +12726,8 @@ function renderNotice(
       transition: transform 0.15s;
     }
     .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
+    /* Only a title and the score: the score takes the badge column at the right edge. */
+    .reviews-row { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }

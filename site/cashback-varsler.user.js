@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794161132
+// @version      1794161480
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4018,6 +4018,7 @@
   const withoutTracking = (rawUrl) => {
     const url = new URL(rawUrl);
     for (const key of [...url.searchParams.keys()]) if (/^utm_/i.test(key)) url.searchParams.delete(key);
+    url.hash = url.hash.replace(/[?&]utm_[^#]*$/i, "");
     return url.href;
   };
   function readGodprisReviewCards(html) {
@@ -4191,10 +4192,26 @@
           headers: { "Accept": "text/html,application/xhtml+xml" }
         });
         const offer = html !== void 0 ? readGodprisProductPage(html, productId, anchor) : void 0;
-        if (offer !== void 0) return offer;
+        if (offer !== void 0) return offer.reviews !== void 0 ? offer : await withDuplicateListingReviews(offer, [...productIds, ...query === message.searchTerm ? [] : await fetchGodprisProductIds(message.searchTerm, requestJson, anchor).catch(() => [])], visitedProductIds, anchor, requestText);
       }
     }
     return void 0;
+  }
+  async function withDuplicateListingReviews(offer, productIds, visited, anchor, requestText) {
+    const critics = [];
+    for (const productId of [...new Set(productIds)].filter((id) => !visited.has(id)).slice(0, 3)) {
+      visited.add(productId);
+      const html = await requestText(`${GODPRIS_PRODUCT_URL}${encodeURIComponent(productId)}`, { headers: { "Accept": "text/html,application/xhtml+xml" } }).catch(() => void 0);
+      if (html === void 0) continue;
+      const structured = selectProductLdJson(readLdJsonScripts(html));
+      const name = structured === void 0 ? void 0 : withLeadingBrand$1(
+        readStringLike$5(structured.name),
+        readStringLike$5(isRecord$7(structured.brand) ? structured.brand.name : structured.brand)
+      );
+      if (name === void 0 || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE) continue;
+      critics.push(...readGodprisReviewCards(html));
+    }
+    return critics.length > 0 ? { ...offer, reviews: { critics } } : offer;
   }
   async function isGodprisProductForOfferUrls(message, offerUrls, requestJson = fetchJson$5) {
     const current = parseUrl$1(message.url);
@@ -20789,6 +20806,8 @@ ${darkProviderCss}
       transition: transform 0.15s;
     }
     .review-score { border-radius: 6px; color: #fff !important; font-variant-numeric: tabular-nums; font-weight: 800; justify-self: end; line-height: 22px; min-width: 30px; padding: 0 5px; text-align: center; }
+    /* Only a title and the score: the score takes the badge column at the right edge. */
+    .reviews-row { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option { grid-template-columns: minmax(0, 1fr) auto; }
     .review-tooltip-option .price-match-chip-line, .review-tooltip-quote { grid-column: 1 / -1; }
     .review-tooltip-score { font-size: 12px; line-height: 20px; }

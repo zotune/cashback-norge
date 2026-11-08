@@ -109,3 +109,25 @@ test("Prisjakt shop ratings: shop name and its own users' score from each offer 
   assert.equal(isProductReviews({ store: { source: "prisjakt", shopName: "Komplett", score: 4.5, maxScore: 5, count: 33793, url: "https://www.prisjakt.no/product.php?p=1" } }), true);
   assert.equal(isProductReviews({ store: { source: "prisjakt", shopName: "Komplett", score: 4.5, maxScore: 5, count: 0, url: "https://www.prisjakt.no/" } }), false);
 });
+
+test("Godpris: tests from duplicate listings of the same product, never from another variant", async () => {
+  const { findGodprisPriceMatch } = await import("../src/shared/godpris-price-match.js");
+  const ld = (name: string, offers: unknown[]) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org/", "@type": "Product", name, brand: { "@type": "Brand", name: "Sony" }, offers: { "@type": "AggregateOffer", offers } })}</script>`;
+  const inStock = [{ "@type": "Offer", url: "https://godpris.no/api/services/click?i=1", price: 17990, priceCurrency: "NOK", availability: "InStock", seller: { "@type": "Organization", name: "Komplett" } }];
+  const pages: Record<string, string> = {
+    "19156434": ld("PlayStation 5 Pro 2TB (PS5)", inStock),
+    "5186542": ld("PlayStation 5 Pro 2TB", []) + card("https://www.tek.no/test/i/Jbp1j4/vi-har-testet-playstation-5-pro?utm_source=godpris.no", "Tek.no", "6", "10", "PS5 Pro", "Dyr."),
+    "15019822": ld("PS5-konsoll PRO DIGITAL 2TB", []) + card("https://www.lydogbilde.no/test/feil", "Lyd &amp; bilde", "2", "6", "Feil variant", "Skal ikke telle."),
+  };
+  const requested: string[] = [];
+  const requestJson = async () => ({ results: [
+    { id: "19156434", title: "PlayStation 5 Pro 2TB (PS5)", brand: "Sony" },
+    { id: "15019822", title: "Sony PS5-konsoll PRO DIGITAL 2TB", brand: "Sony" },
+    { id: "5186542", title: "PlayStation 5 Pro 2TB", brand: "Sony" },
+  ] });
+  const requestText = async (url: string) => { requested.push(url); return pages[url.split("/").at(-1)!]; };
+  const offer = await findGodprisPriceMatch({ type: "get-price-match-for-product", url: "https://www.komplett.no/product/1346176", searchTerm: "PlayStation 5 Pro 2TB", price: 17990, productPageClue: true } as never, requestJson as never, requestText);
+  assert.equal(offer?.productUrl, "https://godpris.no/produkt/19156434");
+  assert.deepEqual(offer?.reviews?.critics?.map((critic) => critic.site), ["Tek.no"]);
+  assert.ok(requested.length <= 4, `bounded page reads: ${requested.length}`);
+});
