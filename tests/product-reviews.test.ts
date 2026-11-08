@@ -195,3 +195,20 @@ test("Tek.no review platform: the most specific product name in the page title w
   assert.equal((await findTekReview({ type: "get-price-match-for-product", url: "https://www.komplett.no/x", searchTerm: "Roborock Saros 20 Sonic robotstøvsuger (sort)" } as never, requestJson as never))?.score, 9);
   assert.deepEqual(queries, ["Roborock Saros 20", "Roborock Saros"]);
 });
+
+test("GTIN search shops: the landing page's own GTIN must match before its rating counts", async () => {
+  const { readGtinPageRating, findGtinStoreRatings, GTIN_SEARCH_STORES } = await import("../src/shared/store-reviews.js");
+  const lyko = GTIN_SEARCH_STORES.find((store) => store.host === "lyko.com")!;
+  // Product JSON-LD from lyko.com (2026-11-08), shortened.
+  const page = (gtin: string) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: "SAWE Skin Science Derm-Alert Barrier Repair Cream 75 ml", gtin13: gtin, aggregateRating: { "@type": "AggregateRating", ratingCount: 70, ratingValue: 3.6, worstRating: 1, bestRating: 5 } })}</script>`;
+  assert.deepEqual(readGtinPageRating(page("7046110321911"), "7046110321911", lyko, "https://lyko.com/no/sok?q=7046110321911"),
+    { source: "store:lyko.com", sourceName: "Lyko", score: 3.6, maxScore: 5, count: 70, url: "https://lyko.com/no/sok?q=7046110321911" });
+  assert.equal(readGtinPageRating(page("7046110321928"), "7046110321911", lyko, "https://lyko.com/"), undefined);
+  assert.equal(readGtinPageRating("<html>Søkeresultater</html>", "7046110321911", lyko, "https://lyko.com/"), undefined);
+  const requested: string[] = [];
+  const requestText = async (url: string) => { requested.push(url); return page("7046110321911"); };
+  assert.equal((await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://www.blivakker.no/p/1", searchTerm: "x", codes: ["SKU-1", "7046110321911"] } as never, requestText)).length, 1);
+  assert.deepEqual(requested, ["https://lyko.com/no/sok?q=7046110321911"]);
+  assert.deepEqual(await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://lyko.com/no/x", searchTerm: "x", codes: ["7046110321911"] } as never, requestText), []);
+  assert.deepEqual(await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://x.no/", searchTerm: "x", codes: [] } as never, requestText), []);
+});

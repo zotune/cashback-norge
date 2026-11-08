@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794162895
+// @version      1794163098
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -19,6 +19,7 @@
 // @connect      www.trustpilot.com
 // @connect      www.prisjakt.no
 // @connect      www.power.no
+// @connect      lyko.com
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -7367,6 +7368,35 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return void 0;
   }
+  const GTIN_SEARCH_STORES = [
+    { host: "lyko.com", name: "Lyko", searchUrl: (gtin) => `https://lyko.com/no/sok?q=${encodeURIComponent(gtin)}` }
+  ];
+  const gtin14 = (value) => value.replace(/\D/g, "").padStart(14, "0");
+  function readGtinPageRating(html, gtin, store2, url) {
+    const product = selectProductLdJson(readLdJsonScripts(html));
+    if (product === void 0) return void 0;
+    const codes = ["gtin", "gtin8", "gtin12", "gtin13", "gtin14"].map((key) => product[key]).filter((value) => typeof value === "string" || typeof value === "number").map(String);
+    if (!codes.some((code) => isValidGtin(code) && gtin14(code) === gtin14(gtin))) return void 0;
+    const pageUrl = typeof product.url === "string" && product.url.startsWith(`https://${store2.host}/`) ? product.url : isRecord$7(product.offers) && typeof product.offers.url === "string" && product.offers.url.startsWith(`https://${store2.host}/`) ? product.offers.url : url;
+    return readJsonLdUserRating(html, `store:${store2.host}`, store2.name, pageUrl);
+  }
+  async function findGtinStoreRatings(message, requestText) {
+    const gtin = (message.codes ?? []).map((code) => code.trim()).find(isValidGtin);
+    if (gtin === void 0) return [];
+    const currentHost = (() => {
+      try {
+        return new URL(message.url).hostname.replace(/^www\./, "");
+      } catch {
+        return "";
+      }
+    })();
+    const ratings = await Promise.all(GTIN_SEARCH_STORES.filter((store2) => store2.host !== currentHost).map(async (store2) => {
+      const url = store2.searchUrl(gtin);
+      const html = await requestText(url, { headers: { Accept: "text/html" } }).catch(() => void 0);
+      return html === void 0 ? void 0 : readGtinPageRating(html, gtin, store2, url);
+    }));
+    return ratings.filter((rating) => rating !== void 0);
+  }
   const TAXFREE_ORIGIN = "https://www.tax-free.no";
   const TAXFREE_ALGOLIA_URL = "https://namx6ho175-dsn.algolia.net/1/indexes/*/queries";
   const TAXFREE_ALGOLIA_APP_ID = "NAMX6HO175";
@@ -8196,10 +8226,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       return [];
     }
     const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
-    const [power, tek] = rated.length === 0 ? [void 0, void 0] : await Promise.all([
+    const [power, tek, gtinStores] = rated.length === 0 ? [void 0, void 0, []] : await Promise.all([
       findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => void 0),
-      findTekReview(message, requestJson ?? fetchReviewJson).catch(() => void 0)
+      findTekReview(message, requestJson ?? fetchReviewJson).catch(() => void 0),
+      findGtinStoreRatings(message, requestText ?? fetchReviewPage).catch(() => [])
     ]);
+    if (gtinStores.length > 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], ...gtinStores] } };
     if (tek !== void 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, critics: [...rated[0].reviews?.critics ?? [], tek] } };
     if (power !== void 0 && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
       rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], power] } };
