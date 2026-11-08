@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794165067
+// @version      1794165216
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -12235,6 +12235,7 @@ ${darkProviderCss}
   const CHIPS_COLLAPSED_KEY = "cashback-varsler-chips-collapsed";
   const CODES_COLLAPSED_KEY = "cashback-varsler-codes-collapsed";
   const PRICE_MATCH_COLLAPSED_KEY = "cashback-varsler-price-match-collapsed";
+  const OFFERS_COLLAPSED_KEY = "cashback-varsler-offers-collapsed";
   const REGION_PRICES_COLLAPSED_KEY = "cashback-varsler-region-prices-collapsed";
   const HIDDEN_HOSTS_KEY = "cashback-varsler-hidden-hosts";
   const FLIGHT_DATE_FLEX_TOOLTIP_MAX_ROWS = 12;
@@ -20608,6 +20609,11 @@ ${darkProviderCss}
       padding: 3px;
       width: 24px;
     }
+    .title--toggle { cursor: pointer; user-select: none; }
+    .title--toggle:focus-visible { outline: 2px solid var(--cbn-accent); outline-offset: 2px; border-radius: 4px; }
+    .offers-toggle-arrow { display: inline-block; font-size: 10px; margin-right: 5px; transition: transform 0.15s; vertical-align: 1px; }
+    .offer-list.offers-collapsed .offer-link-wrapper:not(:first-child) { display: none; }
+    .header:has(+ * .offers-collapsed) .offers-toggle-arrow, .panel:has(.offers-collapsed) .offers-toggle-arrow { transform: rotate(-90deg); }
     .title {
       font-size: 14px;
       font-weight: 700;
@@ -21357,6 +21363,10 @@ ${darkProviderCss}
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
     .reviews-row--store { margin-top: 6px; }
+    .reviews-collapsed-summary { display: none; gap: 4px; margin-left: auto; }
+    .reviews-section.collapsed .reviews-collapsed-summary { display: inline-flex; }
+    .reviews-section .reviews-summary-chip { align-items: center; display: inline-flex; font-size: 11px; font-weight: 700; gap: 5px; line-height: 20px; padding: 0 3px 0 7px; }
+    .reviews-section .reviews-summary-score { border-radius: 5px; font-size: 11px; line-height: 16px; min-width: 24px; padding: 0 4px; }
     .reviews-footer { display: flex; justify-content: flex-end; }
     .reviews-section .reviews-footer .reviews-copy { align-items: center; color: var(--cbn-muted); display: inline-flex; font-size: 11px; font-weight: 600; gap: 5px; padding: 4px 6px; }
     .reviews-section.collapsed .reviews-footer { display: none; }
@@ -21950,6 +21960,38 @@ ${darkProviderCss}
     const tooltipElements = [];
     const offerList = document.createElement("div");
     offerList.className = "offer-list";
+    if (mainOffers.length > 1) {
+      const arrow = document.createElement("span");
+      arrow.className = "offers-toggle-arrow";
+      arrow.textContent = "▼";
+      title.prepend(arrow);
+      title.classList.add("title--toggle");
+      title.setAttribute("role", "button");
+      title.tabIndex = 0;
+      const setCollapsed2 = (collapsed) => {
+        offerList.classList.toggle("offers-collapsed", collapsed);
+        title.setAttribute("aria-expanded", String(!collapsed));
+      };
+      const toggleOffers = () => {
+        const collapsed = !offerList.classList.contains("offers-collapsed");
+        setCollapsed2(collapsed);
+        chrome.storage.local.set({ [OFFERS_COLLAPSED_KEY]: collapsed });
+      };
+      title.addEventListener("click", toggleOffers);
+      title.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleOffers();
+        }
+      });
+      setCollapsed2(false);
+      try {
+        chrome.storage.local.get(OFFERS_COLLAPSED_KEY, (stored) => {
+          if (stored?.[OFFERS_COLLAPSED_KEY] === true) setCollapsed2(true);
+        });
+      } catch {
+      }
+    }
     for (const [offerIdx, currentOffer] of mainOffers.entries()) {
       const wrapper = document.createElement("div");
       wrapper.className = "offer-link-wrapper";
@@ -23787,11 +23829,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     const buyerName = (offer, user) => user.source.startsWith("store:") ? user.sourceName : getPriceMatchSourceName(offer);
     const seenBuyers = /* @__PURE__ */ new Set();
-    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source))).sort((a, b) => {
-      const aStore = a.user.source.startsWith("store:");
-      const bStore = b.user.source.startsWith("store:");
-      return Number(aStore) - Number(bStore) || (aStore ? b.user.count - a.user.count : reviewSourceRank(a.offer) - reviewSourceRank(b.offer));
-    });
+    const buyers = sources.flatMap((offer) => (offer.reviews?.users ?? []).map((user) => ({ offer, user }))).filter(({ user }) => !seenBuyers.has(user.source) && Boolean(seenBuyers.add(user.source))).sort((a, b) => (toHundredScale(b.user.score, b.user.maxScore) ?? 0) - (toHundredScale(a.user.score, a.user.maxScore) ?? 0) || b.user.count - a.user.count);
     if (buyers.length > 0) {
       const count = buyers.reduce((sum, item) => sum + item.user.count, 0);
       const score = Math.round(buyers.reduce((sum, item) => sum + (toHundredScale(item.user.score, item.user.maxScore) ?? 0) * item.user.count, 0) / count);
@@ -23835,6 +23873,22 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         }
       ));
     }
+    const scoreOf = (row) => Number(row?.querySelector(".review-score")?.textContent ?? NaN);
+    const productScores = rows.map(scoreOf).filter(Number.isFinite);
+    const summaryChips = document.createElement("span");
+    summaryChips.className = "reviews-collapsed-summary";
+    const summaryChip = (label2, score) => {
+      const chip = document.createElement("span");
+      chip.className = "cbn-chip cbn-chip--muted reviews-summary-chip";
+      const name = document.createElement("span");
+      name.textContent = label2;
+      chip.append(name, buildReviewScoreBox(score, "reviews-summary-score"));
+      return chip;
+    };
+    if (productScores.length > 0) summaryChips.append(summaryChip("Produkt", Math.round(productScores.reduce((sum, value) => sum + value, 0) / productScores.length)));
+    const storeScore = scoreOf(storeRows[0]);
+    if (Number.isFinite(storeScore)) summaryChips.append(summaryChip(storeTitle, storeScore));
+    titleRow.append(summaryChips);
     section.append(header, ...rows, ...storeRows, footer);
     return section;
   }
@@ -23917,9 +23971,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
   function compactSourceChips(names) {
     const unique = [...new Set(names)];
     return unique.length === 0 ? [] : [unique[0], ...unique.length > 1 ? [`+${unique.length - 1}`] : []];
-  }
-  function reviewSourceRank(offer) {
-    return ["prisjakt", "prisradar", "klarna", "godpris"].indexOf(offer.source ?? "") >>> 0;
   }
   const reviewTooltips = /* @__PURE__ */ new WeakMap();
   function buildReviewScoreBox(score, className = "price-match-price", label) {
