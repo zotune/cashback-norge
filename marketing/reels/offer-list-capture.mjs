@@ -1,4 +1,4 @@
-// /dagligvarer og /dagens-tilbud på iPhone for video 59–62: node offer-list-capture.mjs [video-name ...]
+// /dagligvarer og /tilbud på iPhone for video 59–62: node offer-list-capture.mjs [video-name ...]
 // Utfører trinnene i PLANS, lagrer videos/<navn>/assets/<shot>.png og capture.json (kilde, tidspunkt, tekst og
 // DOM-bokser i skjermbilde-px). Annonselinjen og annonsekortet er skjult; ingen stemmer eller lagring.
 import { chromium } from 'playwright';
@@ -20,11 +20,11 @@ const PLANS = {
     { click: '[data-ol="bonus-toggle"]' },
     { sort: 'unit', search: 'kaffe', top: '.deal-row', shot: 'kilopris', boxes: { first: '.deal-row', second: '.deal-row >> nth=1', third: '.deal-row >> nth=2' } },
   ] },
-  '61-tilbud-kupp': { path: '/dagens-tilbud/', steps: [
+  '61-tilbud-kupp': { path: '/tilbud/', steps: [
     { search: 'torrentshell 3l jacket', top: '.deal-row', shot: 'kupp', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
     { search: 'qrevo edge 2 pro', top: '.deal-row', shot: 'laveste', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
   ] },
-  '62-tilbud-fire-topplister': { path: '/dagens-tilbud/', steps: [
+  '62-tilbud-fire-topplister': { path: '/tilbud/', steps: [
     { top: '.source-toggles', shot: 'kilder', boxes: { sources: '.source-row', first: '.deal-row' } },
     { click: '[data-group-pick="Data og gaming"]', top: '.source-toggles', shot: 'kategori', boxes: { chip: '[data-group-pick="Data og gaming"]', count: '[data-ol="count"]' } },
     { click: '[data-toplist="saving"]', top: '.deal-row', shot: 'prisfall', boxes: { first: '.deal-row', pricing: '.deal-row .deal-pricing', second: '.deal-row >> nth=1' } },

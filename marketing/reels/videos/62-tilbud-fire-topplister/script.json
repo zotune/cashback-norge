@@ -6,7 +6,7 @@
  "tail": 1.6,
  "sources": {
   "checked": "2026-11-08",
-  "page": "https://cashbacknorge.no/dagens-tilbud/",
+  "page": "https://cashbacknorge.no/tilbud/",
   "capture": "assets/capture.json"
  },
  "segments": [
