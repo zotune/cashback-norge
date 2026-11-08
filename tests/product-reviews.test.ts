@@ -206,9 +206,12 @@ test("GTIN search shops: the landing page's own GTIN must match before its ratin
   assert.equal(readGtinPageRating(page("7046110321928"), "7046110321911", lyko, "https://lyko.com/"), undefined);
   assert.equal(readGtinPageRating("<html>Søkeresultater</html>", "7046110321911", lyko, "https://lyko.com/"), undefined);
   const requested: string[] = [];
-  const requestText = async (url: string) => { requested.push(url); return page("7046110321911"); };
-  assert.equal((await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://www.blivakker.no/p/1", searchTerm: "x", codes: ["SKU-1", "7046110321911"] } as never, requestText)).length, 1);
-  assert.deepEqual(requested, ["https://lyko.com/no/sok?q=7046110321911"]);
+  const requestText = async (url: string) => { requested.push(url); return url.startsWith("https://lyko.com/") ? page("7046110321911") : undefined; };
+  const title = "SAWE Skin Science Derm-Alert Barrier Repair Cream 75 ml";
+  assert.equal((await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://www.blivakker.no/p/1", searchTerm: title, codes: ["SKU-1", "7046110321911"] } as never, requestText)).length, 1);
+  assert.deepEqual(requested.filter((url) => url.startsWith("https://lyko.com/")), ["https://lyko.com/no/sok?q=7046110321911"]);
+  // The GTIN alone is not enough when the landing page names another product.
+  assert.equal((await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://www.blivakker.no/p/1", searchTerm: "Roborock Saros 20 Sonic", codes: ["7046110321911"] } as never, requestText)).length, 0);
   assert.deepEqual(await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://lyko.com/no/x", searchTerm: "x", codes: ["7046110321911"] } as never, requestText), []);
   assert.deepEqual(await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://x.no/", searchTerm: "x", codes: [] } as never, requestText), []);
 });
@@ -227,4 +230,25 @@ test("Prisjakt shop rating: found by the page's domain, only when the shop's hom
   assert.equal((await findPrisjaktShopRating("https://www.skousen.no/produkt/1", requestJson as never))?.count, 18360);
   assert.equal(JSON.parse(bodies[0]!).variables.query, "skousen");
   assert.deepEqual(JSON.parse(bodies[1]!).variables.ids, [99, 22884]);
+});
+
+test("Boozt: title search links, GTIN on one JSON-LD entry and the rating on another", async () => {
+  const { findGtinStoreRatings } = await import("../src/shared/store-reviews.js");
+  // boozt.com/no/no/loreal-professionnel/metal-dx-oil_31794190/225734112 (2026-11-08), shortened.
+  const link = "https://www.boozt.com/no/no/loreal-professionnel/metal-dx-oil_31794190/225734112";
+  const productPage = `<script type="application/ld+json">${JSON.stringify([
+    { "@type": "Product", name: "L'Oréal Professionnel Metal DX Anti-Deposit Protector Concentrated Oil 50 ml", aggregateRating: { "@type": "AggregateRating", ratingValue: 5, ratingCount: 1, worstRating: 1, bestRating: 5 } },
+    { "@type": "Product", name: "L'Oréal Professionnel Metal DX Anti-Deposit Protector Concentrated Oil 50 ml (50 ml)", gtin13: "3474637090616", sku: "LPLE38492_225734112" },
+  ])}</script>`;
+  const requested: string[] = [];
+  const requestText = async (url: string) => {
+    requested.push(url);
+    if (url.startsWith("https://lyko.com/")) return "<html>ingen treff</html>";
+    if (url.includes("search/result?q=3474637090616")) return "<html>0 treff</html>";
+    if (url.includes("search/result?q=")) return `<a href="${link}">Metal DX oil</a><a href="https://www.boozt.com/no/no/loreal-professionnel/metal-dx-oil_31794190/225734112">dup</a>`;
+    return url === link ? productPage : undefined;
+  };
+  const ratings = await findGtinStoreRatings({ type: "get-price-match-for-product", url: "https://www.blivakker.no/p/1", searchTerm: "L'Oréal Professionnel Metal DX Anti-Deposit Protector Concentrated Oil 50 ml", codes: ["3474637090616"] } as never, requestText);
+  assert.deepEqual(ratings, [{ source: "store:www.boozt.com", sourceName: "Boozt", score: 5, maxScore: 5, count: 1, url: link }]);
+  assert.equal(requested.filter((url) => url === link).length, 1);
 });

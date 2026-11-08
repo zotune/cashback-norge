@@ -40,6 +40,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      www.prisjakt.no
 // @connect      www.power.no
 // @connect      lyko.com
+// @connect      www.boozt.com
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no

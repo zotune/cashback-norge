@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794163600
+// @version      1794163763
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -20,6 +20,7 @@
 // @connect      www.prisjakt.no
 // @connect      www.power.no
 // @connect      lyko.com
+// @connect      www.boozt.com
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -7401,31 +7402,70 @@ query SearchSuggestions($query: String!, $category: Int) {
     return void 0;
   }
   const GTIN_SEARCH_STORES = [
-    { host: "lyko.com", name: "Lyko", searchUrl: (gtin) => `https://lyko.com/no/sok?q=${encodeURIComponent(gtin)}` }
+    { host: "lyko.com", name: "Lyko", searchUrl: (gtin) => `https://lyko.com/no/sok?q=${encodeURIComponent(gtin)}` },
+    // Boozt: the search lists product links; each product page has its GTIN and rating in JSON-LD.
+    {
+      host: "www.boozt.com",
+      name: "Boozt",
+      searchUrl: (gtin) => `https://www.boozt.com/no/no/search/result?q=${encodeURIComponent(gtin)}`,
+      titleSearch: { url: (query) => `https://www.boozt.com/no/no/search/result?q=${encodeURIComponent(query)}`, link: /https:\/\/www\.boozt\.com\/no\/no\/[a-z0-9-]+\/[a-z0-9-]+_\d+\/\d+/g }
+    }
   ];
+  const MAX_TITLE_LINKS = 3;
   const gtin14 = (value) => value.replace(/\D/g, "").padStart(14, "0");
-  function readGtinPageRating(html, gtin, store2, url) {
-    const product = selectProductLdJson(readLdJsonScripts(html));
-    if (product === void 0) return void 0;
-    const codes = ["gtin", "gtin8", "gtin12", "gtin13", "gtin14"].map((key) => product[key]).filter((value) => typeof value === "string" || typeof value === "number").map(String);
-    if (!codes.some((code) => isValidGtin(code) && gtin14(code) === gtin14(gtin))) return void 0;
-    const pageUrl = typeof product.url === "string" && product.url.startsWith(`https://${store2.host}/`) ? product.url : isRecord$7(product.offers) && typeof product.offers.url === "string" && product.offers.url.startsWith(`https://${store2.host}/`) ? product.offers.url : url;
-    return readJsonLdUserRating(html, `store:${store2.host}`, store2.name, pageUrl);
+  function ldProducts(html) {
+    const flat = (value) => Array.isArray(value) ? value.flatMap(flat) : isRecord$7(value) && Array.isArray(value["@graph"]) ? value["@graph"].flatMap(flat) : [value];
+    return readLdJsonScripts(html).flatMap(flat).filter(isRecord$7).filter((item) => {
+      const types = Array.isArray(item["@type"]) ? item["@type"] : [item["@type"]];
+      return types.includes("Product") || types.includes("ProductGroup");
+    });
+  }
+  function readGtinPageRating(html, gtin, store2, url, anchor) {
+    const products = ldProducts(html);
+    const matching = products.find((product) => ["gtin", "gtin8", "gtin12", "gtin13", "gtin14"].some((key) => {
+      const code = product[key];
+      return (typeof code === "string" || typeof code === "number") && isValidGtin(String(code)) && gtin14(String(code)) === gtin14(gtin);
+    }));
+    if (matching === void 0) return void 0;
+    const name = typeof matching.name === "string" ? matching.name : "";
+    if (anchor !== void 0 && (!name || hasProductVariantConflict(anchor, name) || scoreProductCandidateMatch(anchor, { title: name }) < MIN_PRODUCT_MATCH_SCORE)) return void 0;
+    const rated = [matching, ...products].find((product) => isRecord$7(product.aggregateRating));
+    const rating = rated !== void 0 && isRecord$7(rated.aggregateRating) ? rated.aggregateRating : void 0;
+    const number = (value) => typeof value === "number" ? value : typeof value === "string" ? Number(value.replace(",", ".")) : NaN;
+    const score = number(rating?.ratingValue);
+    const maxScore = Number.isFinite(number(rating?.bestRating)) ? number(rating?.bestRating) : 5;
+    const count = Number.isFinite(number(rating?.ratingCount)) ? number(rating?.ratingCount) : number(rating?.reviewCount);
+    if (!Number.isFinite(score) || !Number.isInteger(count) || count <= 0 || toHundredScale(score, maxScore) === void 0) return void 0;
+    const own = (value) => typeof value === "string" && value.startsWith(`https://${store2.host}/`) ? value : void 0;
+    const pageUrl = own(matching.url) ?? (isRecord$7(matching.offers) ? own(matching.offers.url) : void 0) ?? url;
+    return { source: `store:${store2.host}`, sourceName: store2.name, score, maxScore, count, url: pageUrl };
   }
   async function findGtinStoreRatings(message, requestText) {
     const gtin = (message.codes ?? []).map((code) => code.trim()).find(isValidGtin);
     if (gtin === void 0) return [];
+    const anchor = buildProductMatchAnchor(message);
     const currentHost = (() => {
       try {
-        return new URL(message.url).hostname.replace(/^www\./, "");
+        return new URL(message.url).hostname;
       } catch {
         return "";
       }
     })();
-    const ratings = await Promise.all(GTIN_SEARCH_STORES.filter((store2) => store2.host !== currentHost).map(async (store2) => {
+    const read = (url) => requestText(url, { headers: { Accept: "text/html" } }).catch(() => void 0);
+    const query = message.searchTerm.replace(/[()[\],]/g, " ").trim().split(/\s+/).slice(0, 6).join(" ");
+    const ratings = await Promise.all(GTIN_SEARCH_STORES.filter((store2) => store2.host.replace(/^www\./, "") !== currentHost.replace(/^www\./, "")).map(async (store2) => {
       const url = store2.searchUrl(gtin);
-      const html = await requestText(url, { headers: { Accept: "text/html" } }).catch(() => void 0);
-      return html === void 0 ? void 0 : readGtinPageRating(html, gtin, store2, url);
+      const landing = await read(url);
+      const direct = landing === void 0 ? void 0 : readGtinPageRating(landing, gtin, store2, url, anchor);
+      if (direct !== void 0 || store2.titleSearch === void 0 || query.length < 4) return direct;
+      const list = await read(store2.titleSearch.url(query));
+      const links = [...new Set(list?.match(store2.titleSearch.link) ?? [])].slice(0, MAX_TITLE_LINKS);
+      for (const link of links) {
+        const page = await read(link);
+        const rating = page === void 0 ? void 0 : readGtinPageRating(page, gtin, store2, link, anchor);
+        if (rating !== void 0) return rating;
+      }
+      return void 0;
     }));
     return ratings.filter((rating) => rating !== void 0);
   }
