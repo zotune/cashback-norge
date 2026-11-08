@@ -15,6 +15,8 @@ type GtinSearchStore = { host: string; name: string; searchUrl: (gtin: string) =
 // Lyko: /no/sok?q=<GTIN> redirects to the product (checked 2026-11-08 with 7046110321911).
 export const GTIN_SEARCH_STORES: GtinSearchStore[] = [
   { host: "lyko.com", name: "Lyko", searchUrl: (gtin) => `https://lyko.com/no/sok?q=${encodeURIComponent(gtin)}` },
+  // NetOnNet: /search?query=<GTIN> redirects to the product (checked 2026-11-08, Switch 2).
+  { host: "www.netonnet.no", name: "NetOnNet", searchUrl: (gtin) => `https://www.netonnet.no/search?query=${encodeURIComponent(gtin)}` },
   // Boozt: the search lists product links; each product page has its GTIN and rating in JSON-LD.
   { host: "www.boozt.com", name: "Boozt", searchUrl: (gtin) => `https://www.boozt.com/no/no/search/result?q=${encodeURIComponent(gtin)}`,
     titleSearch: { url: (query) => `https://www.boozt.com/no/no/search/result?q=${encodeURIComponent(query)}`, link: /https:\/\/www\.boozt\.com\/no\/no\/[a-z0-9-]+\/[a-z0-9-]+_\d+\/\d+/g } },

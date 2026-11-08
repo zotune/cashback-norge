@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794165888
+// @version      1794166058
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -24,6 +24,7 @@
 // @connect      www.kicks.no
 // @connect      www.blivakker.no
 // @connect      www.nordicfeel.com
+// @connect      www.netonnet.no
 // @connect      cashbacknorge.no
 // @connect      www.tek.no
 // @connect      strom-api.forbrukerradet.no
@@ -7430,6 +7431,8 @@ query SearchSuggestions($query: String!, $category: Int) {
   }
   const GTIN_SEARCH_STORES = [
     { host: "lyko.com", name: "Lyko", searchUrl: (gtin) => `https://lyko.com/no/sok?q=${encodeURIComponent(gtin)}` },
+    // NetOnNet: /search?query=<GTIN> redirects to the product (checked 2026-11-08, Switch 2).
+    { host: "www.netonnet.no", name: "NetOnNet", searchUrl: (gtin) => `https://www.netonnet.no/search?query=${encodeURIComponent(gtin)}` },
     // Boozt: the search lists product links; each product page has its GTIN and rating in JSON-LD.
     {
       host: "www.boozt.com",
