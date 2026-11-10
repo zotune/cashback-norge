@@ -6,6 +6,7 @@
 //   REVIEWS=1                    fold the price match, open «Vurderinger», click «Kopier til AI»
 //   TIP=<n>                      open the info tooltip of price-match card n (0-based)
 //   SCROLLBY=<css px>            scroll the page further after its heading
+//   WAIT=cards                   wait for any price-match row, not a lowest-price note (strøm, mobil)
 // Assets, capture.json and capture.js (window.CAPTURES[prefix]) go to videos/<name>/assets.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -63,6 +64,9 @@ try {
   assert.equal(response.status(), 200, `Page must load successfully (HTTP ${response.status()})`);
   await page.waitForTimeout(3500);
   const dismissals = [];
+  // Two passes: some consent banners (fjordkraft.no) appear a few seconds after load.
+  for (let pass = 0; pass < 2; pass++) {
+  if (pass === 1) await page.waitForTimeout(2500);
   for (let attempt = 0; attempt < 3; attempt++) {
     let clicked = false;
     for (const label of [/^(avvis alle|avslå alle|avvis|avslå|kun nødvendige|bare nødvendige|tillat nødvendige|reject all|reject|decline|deny|continue without accepting|fortsett uten)/i, /^(nei,?\s*takk!?|no,?\s*thanks!?|lukk)$/i]) {
@@ -76,7 +80,17 @@ try {
         break;
       }
     }
-    if (!clicked) break;
+    if (!clicked) {
+      // Some banners use links or divs, not buttons («AVVIS ALLE COOKIES» on fjordkraft.no).
+      const text = page.getByText(/^\s*(avvis alle( cookies)?|kun nødvendige( cookies)?)\s*$/i).first();
+      if (await text.isVisible().catch(() => false) && await text.click({ timeout: 2000 }).then(() => true, () => false)) {
+        dismissals.push(await text.innerText().catch(() => ''));
+        await page.waitForTimeout(700);
+        continue;
+      }
+      break;
+    }
+  }
   }
   const heading = page.locator('h1').first();
   if (await heading.count()) { await heading.scrollIntoViewIfNeeded(); await page.evaluate(() => scrollBy(0, -110)); await page.waitForTimeout(700); }
@@ -86,7 +100,9 @@ try {
   await page.addScriptTag({ content: await readFile(resolve(ROOT, '../../site/cashback-varsler.user.js'), 'utf8') });
   const root = '#cashback-varsler-notice';
   // Wait until the price match has its lowest-price notes (or the reviews their rows) and stops changing.
-  const ready = reviews ? `${root} .reviews-section .price-match-card` : `${root} .price-match-card .price-match-history`;
+  // WAIT=cards: any price-match row (electricity and mobile comparisons have no lowest-price note).
+  const ready = reviews ? `${root} .reviews-section .price-match-card`
+    : process.env.WAIT === 'cards' ? `${root} .price-match-section:not(.reviews-section) .price-match-card` : `${root} .price-match-card .price-match-history`;
   await page.locator(ready).first().waitFor({ state: 'attached', timeout: 90000 });
   let last = '';
   for (let i = 0; i < 20; i++) {

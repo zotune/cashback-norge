@@ -1,0 +1,24 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook", "line": "Betaler du for mye for strømmen? Sjekk på *fem sekunder.*", "gap": 0.25 },
+    { "id": "page", "line": "Gå inn på strømselskapets egen side. Her: Fjordkraft.", "gap": 0.2 },
+    { "id": "panel", "line": "Cashback Norge viser de billigste avtalene fra Forbrukerrådet.", "gap": 0.2 },
+    { "id": "cheap", "line": "Billigst i Oslo: {Agva Light,|Agva lait,} cirka *{729 kr|sju hundre og tjueni kroner}* i måneden.", "gap": 0.2 },
+    { "id": "info", "line": "Trykk info: Fjordkraft {Spotpris Nord,|spotpris nord,} cirka {862 kr.|åtte hundre og sekstito kroner.}", "gap": 0.2 },
+    { "id": "sum", "line": "Cirka *{133 kr|hundre og trettitre kroner}* forskjell i november.", "gap": 0.2 },
+    { "id": "terms", "line": "Med Norgespris. Nettleie kommer i tillegg.", "gap": 0.25 },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ],
+  "verifiedAt": "2026-11-10",
+  "comparison": {
+    "example": "Forbrukerrådet, november 2026, Oslo NO1, 14 400 kWh/år (1 427 kWh i november), Norgespris 50 øre/kWh, inkl. påslag, månedsgebyr og mva; nettleie ikke med",
+    "cheapest": "Agva Light (Agva Kraft) ~729 kr/mnd, 15 kr/mnd gebyr, 0 øre/kWh påslag, 12 mnd påslagsgaranti",
+    "fjordkraft": "Spotpris Nord ~862 kr/mnd, 61,25 kr/mnd gebyr, 6,13 øre/kWh påslag, 1 mnd påslagsgaranti",
+    "differenceNokNovember": 133,
+    "basis": "Spot agreements without binding or membership; campaigns excluded. A monthly estimate, not a yearly saving."
+  },
+  "sources": ["https://www.fjordkraft.no/strom/", "https://www.forbrukerradet.no/strompris/"]
+}
