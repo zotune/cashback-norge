@@ -1,0 +1,31 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook", "line": "{Black Week-quiz:|Black Week kviss:} *kupp* eller ikke? Gjett før svaret!", "gap": 0.25 },
+    { "id": "r1", "line": "Samsung {85 tommer,|åttifem tommer,} *spar {6 000 kr.|seks tusen kroner.}*", "gap": 0.15 },
+    { "id": "r1count", "line": "Tre, to, en…", "gap": 0.15 },
+    { "id": "r1reveal", "line": "Kupp! *Laveste pris* hos Prisjakt, Klarna og Godpris.", "gap": 0.3 },
+    { "id": "r2", "line": "Robotstøvsuger, *spar {1 500 kr.|femten hundre kroner.}*", "gap": 0.15 },
+    { "id": "r2count", "line": "Tre, to, en…", "gap": 0.15 },
+    { "id": "r2reveal", "line": "Ikke laveste pris her: *{15,5 %|femten komma fem prosent}* over.", "gap": 0.2 },
+    { "id": "r2best", "line": "Power: *{111 kr|hundre og elleve kroner}* billigere med frakt.", "gap": 0.25 },
+    { "id": "comment", "line": "Fikk du begge riktig? Skriv i kommentarene!", "gap": 0.25 },
+    { "id": "cta", "line": "Sjekk selv, gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ],
+  "verifiedAt": "2026-11-10",
+  "rounds": [
+    { "product": "Samsung 85\" U7005F UHD 4K smart-TV (2025)", "komplettNok": 8990, "badge": "SPAR 6 000,-", "beforePrice": 14990,
+      "lowest": "8 990 kr = laveste registrerte varepris hos Prisjakt (hele historikken), Klarna (2 år) og Godpris (3 mnd)" },
+    { "product": "Dreame D20 Robotstøvsuger (sort)", "komplettNok": 1490, "badge": "SPAR 1 500,-", "beforePrice": 2990,
+      "klarnaAboveLowPercent": 15.5, "klarnaLowestTwoYearsNok": 1290, "powerTotalNok": 1379, "savingTotalNok": 111 }
+  ],
+  "note": "No claim that a «SPAR»/førpris is false; only whether today's price is each source's lowest registered price, and a cheaper total elsewhere.",
+  "sources": [
+    "https://www.komplett.no/product/1321568/tv-lyd-bilde/tv-er/over-80-tommer-tv/samsung-85-u7005f-uhd-4k-smart-tv-2025",
+    "https://www.prisjakt.no/product.php?p=14585974",
+    "https://www.komplett.no/product/1326886/hjem-fritid/stoevsugere-rengjoering/robotstoevsugere/dreame-d20-robotstoevsuger-sort",
+    "https://www.prisjakt.no/product.php?p=15011839"
+  ]
+}

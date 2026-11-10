@@ -1,0 +1,29 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook", "line": "Ikke les *{308|tre hundre og åtte}* anmeldelser selv.", "gap": 0.25 },
+    { "id": "panel", "line": "Cashback Norge samler norske tester og kjøpere, rett i nettbutikken.", "gap": 0.2 },
+    { "id": "scores", "line": "{Tek.no:|Tekk punktum no:} *8 av 10*. Kjøpere: *{4,6|fire komma seks}* av fem.", "gap": 0.2 },
+    { "id": "store", "line": "Butikken vurderes for seg.", "gap": 0.2 },
+    { "id": "copy", "line": "Trykk *Kopier til AI*.", "gap": 0.2 },
+    { "id": "paste", "line": "Lim inn i Claude eller {ChatGPT.|tsjætt dji pi ti.}", "gap": 0.2 },
+    { "id": "result", "line": "Du får fordeler, klager og hva du bør sjekke. Med kilder.", "gap": 0.25 },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ],
+  "verifiedAt": "2026-11-10",
+  "reviews": {
+    "product": "Roborock QR 798 Robotstøvsuger (sort)",
+    "tek": "8/10, Tek.no samletest mellomklasse (re-graded from 9/10)",
+    "buyers": "Power 4,59/5 (274), Komplett 4,62/5 (34): 308, weighted 92/100",
+    "store": "Komplett 2,4/5 TrustScore (1 663) on Trustpilot, Prisjakt 9,44/10",
+    "aiAnswer": "videos/64-kopier-til-ai/ai-answer.html: Claude's answer to the copied prompt, only from its sources; shown as an example"
+  },
+  "sources": [
+    "https://www.komplett.no/product/1324310/hjem-fritid/stoevsugere-rengjoering/robotstoevsugere/roborock-qr-798-robotstoevsuger-sort",
+    "https://www.tek.no/samletest/i/k0WQBX/robotstoevsuger-samletest-midrange",
+    "https://www.power.no/hjem-og-hage/rengjoering-og-stoevsuging/robotstoevsuger/roborock-qr-798-robotstoevsuger-svart/p-3985973/",
+    "https://no.trustpilot.com/review/www.komplett.no"
+  ]
+}
