@@ -402,9 +402,9 @@ async function fetchKlarnaAppOffers(
   logger: Logger,
   proxyUrls: string[] = [],
 ): Promise<CashbackOffer[]> {
-  // The public API returns sections without deals to some non-Norwegian
-  // datacenter IPs, so retry through the Norway-pinned proxies when the
-  // direct response has no deals.
+  // The public API returns sections without deals to GitHub Actions IPs
+  // (verified 2026-11-10), so retry through the proxies when the direct
+  // response has no deals.
   const attempts: Array<{ label: string; proxyUrl?: string }> = [
     { label: "direct" },
     ...proxyUrls.map((proxyUrl, index) => ({ label: `proxy ${index + 1}/${proxyUrls.length}`, proxyUrl })),

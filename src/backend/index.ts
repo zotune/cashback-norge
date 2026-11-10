@@ -1473,9 +1473,7 @@ function buildScraperApiProxyUrls(): string[] {
       return [];
     }
 
-    // Pin the exit IP to Norway: Klarna's NO store directory and app API
-    // return no stores/deals to some foreign proxy exits.
-    return [`http://scraperapi.country_code=no:${encodeURIComponent(trimmedKey)}@proxy-server.scraperapi.com:8001`];
+    return [`http://scraperapi:${encodeURIComponent(trimmedKey)}@proxy-server.scraperapi.com:8001`];
   });
 }
 
