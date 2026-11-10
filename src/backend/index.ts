@@ -1467,6 +1467,7 @@ function buildScraperApiProxyUrls(): string[] {
     process.env.SCRAPERAPI_KEY,
     process.env.SCRAPERAPI_KEY2,
     process.env.SCRAPERAPI_KEY3,
+    process.env.SCRAPERAPI_KEY4,
   ].flatMap((key) => {
     const trimmedKey = key?.trim();
     if (!trimmedKey) {
