@@ -39,6 +39,7 @@ import { findPowerUserRating } from "./power-reviews.js";
 import { findTekReview } from "./tek-reviews.js";
 import { findGtinStoreRatings } from "./store-reviews.js";
 import { isAccessoryMismatch } from "./product-reviews.js";
+import { findPriceMatchHistory } from "./deal-price-history.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
@@ -164,7 +165,7 @@ export async function findPriceMatches(
     return [];
   }
 
-  const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
+  const rated = await withPriceHistory(await withUserRatings(allowedOffers, message, requestText, requestJson), requestText, requestJson);
   // Shops' own buyer ratings ride on the first offer; content shows them under «Kjøpere av varen».
   const [power, tek, gtinStores] = rated.length === 0 ? [undefined, undefined, []] : await Promise.all([
     findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => undefined),
@@ -219,6 +220,19 @@ async function withUserRatings(offers: PriceMatchOffer[], message: GetPriceMatch
       return offer;
     }
     return offer;
+  }));
+}
+
+// Lowest registered price from each source's own history (Klarna two years, Godpris three
+// months, Prisradar all). One request per Klarna/Godpris/Prisradar offer; a failure only drops it.
+async function withPriceHistory(offers: PriceMatchOffer[], requestText: TextRequest | undefined, requestJson: JsonRequest | undefined): Promise<PriceMatchOffer[]> {
+  return Promise.all(offers.map(async (offer) => {
+    try {
+      const history = await findPriceMatchHistory(offer, requestJson ?? fetchReviewJson, requestText ?? fetchReviewPage);
+      return history === undefined ? offer : { ...offer, priceHistory: history };
+    } catch {
+      return offer;
+    }
   }));
 }
 

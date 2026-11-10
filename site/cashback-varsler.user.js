@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794166179
+// @version      1794345265
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -4260,7 +4260,7 @@ query OfferList($productId: Int!) {
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-08T13:54:45.652Z";
+  const generatedAt = "2026-11-10T20:51:47.013Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -5760,9 +5760,9 @@ query OfferList($productId: Int!) {
   function formatValidity(offer) {
     return `${formatDate(offer.validFrom)}–${formatDate(offer.validTo)}`;
   }
-  function formatDate(iso) {
-    const date = new Date(iso);
-    return Number.isNaN(date.getTime()) ? iso : new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", timeZone: "Europe/Oslo" }).format(date).replace(/\.$/, "");
+  function formatDate(iso2) {
+    const date = new Date(iso2);
+    return Number.isNaN(date.getTime()) ? iso2 : new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", timeZone: "Europe/Oslo" }).format(date).replace(/\.$/, "");
   }
   function formatNok(amount) {
     return `${formatKr(amount)} kr`;
@@ -5997,7 +5997,7 @@ query OfferList($productId: Int!) {
   function isPlainRecord$2(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  const PRISRADAR_GRAPHQL_URL = "https://gql.prisradar.no";
+  const PRISRADAR_GRAPHQL_URL$1 = "https://gql.prisradar.no";
   const PRISRADAR_PRODUCT_URL = "https://prisradar.no/produkter/";
   const PRISRADAR_PRODUCT_PATH_PATTERN = /^\/produkter\/[^/?#]+\/?$/;
   const BAD_AVAILABILITY_STATUSES = /* @__PURE__ */ new Set([
@@ -6148,7 +6148,7 @@ query SearchSuggestions($query: String!, $category: Int) {
   async function fetchPrisradarProducts(query, requestJson) {
     const normalizedQuery = query.trim();
     if (normalizedQuery.length < 4 || normalizedQuery.length > 120) return [];
-    const value = await requestJson(PRISRADAR_GRAPHQL_URL, {
+    const value = await requestJson(PRISRADAR_GRAPHQL_URL$1, {
       method: "POST",
       headers: {
         "Accept": "application/json",
@@ -7499,6 +7499,105 @@ query SearchSuggestions($query: String!, $category: Int) {
     }));
     return ratings.filter((rating) => rating !== void 0);
   }
+  function getDealLowPrice(current, historical) {
+    if (!Number.isFinite(current) || current <= 0 || historical === void 0 || !Number.isFinite(historical) || historical <= 0) return void 0;
+    const lowestPrice = Math.min(current, historical);
+    return { lowestPrice, dropToLowPercent: Math.round((current - lowestPrice) / current * 1e3) / 10 };
+  }
+  const DEAL_GROUPS = [
+    ["Jul", /julekalender|julelys/i],
+    ["Data og gaming", /tastatur|^pc-|^data$|datamus|grafikkort|skjermkort|bærbar|stasjonær|hovedkort|\(cpu\)|ram-minne|\bssd\b|\bmus\b|musematt|gaming|ratt & pedal|joystick|håndkontroll|playstation|nintendo|xbox|router|skriver|3d-printer|nettbrett/i],
+    ["Lyd, bilde og mobil", /^tv$|hodetelefon|høyttaler|lydplanke|radio|projektor|forsterker|mikrofon|mobiltelefon|smartklokke|aktivitetsmåler|kamera|objektiv|drone|portable batteri/i],
+    ["Hvitevarer", /vaskemaskin|tørketromle|oppvaskmaskin|innbyggingsovn|platetopp|kombiskap|kjøleskap|komfyr|mikrobølge|fryser/i],
+    ["Sport og friluft", /\bski\b|ski |alpinski|langrenn|sykkel|hodelykt|vannflask|stormkjøkken/i],
+    ["Kjøkken", /espresso|kaffe|foodprosessor|kjøkken|mikser|blender|vaffel|airfryer|frityr|iskrem|smørbrød|kniv|gryte|stekepanne|bestikk|^glass$|skål|krus|kanne|karaf|termos|kvern/i],
+    ["Klær og sko", /klær|jakke|sko\b|sko |støvle|bukse|boxer|undertøy|^vester$|parkdress|jeans|votter|hansker|tøfler|sneakers|ryggsekk|koffert|solbriller|^klokker|armbåndsur/i],
+    ["Skjønnhet og helse", /hudpleie|helse|parfyme|deodorant|bodylotion|ansikt|hår|barbermaskin|trimmer|solkrem|øyne|diabetes/i],
+    ["Barn og leker", /lego|dukke|leke|brettspill|barnevogn|vognpose|bilstol/i],
+    ["Verktøy", /verktøy|sag\b|sager|boremaskin|skrumaskin|slipemaskin|nøkkel|laser|kompressor|motorsag/i],
+    ["Hjem og hage", /støvsuger|gressklipper|luftfukter|avfukter|luftrenser|vifte|varmeovn|peis|vedovn|lys|lampe|dørklokke|smarte låser|dampvask|ladestasjon|platemateriale/i]
+  ];
+  const PRISJAKT_OTHER_GROUP = "Annet";
+  [...DEAL_GROUPS.map(([name]) => name), PRISJAKT_OTHER_GROUP];
+  const klarnaPriceHistoryUrl = (productId) => `https://www.klarna.com/no/api/product-information-edge-rest/public/pricehistory/product/${encodeURIComponent(productId)}/NO/DAY?merchantId=&selectedInterval=TWO_YEARS&filter=NATIONAL`;
+  const godprisHistoryUrl = (productId, price, store2) => `https://godpris.no/api/product/history-section?id=i_${encodeURIComponent(productId)}&price=${encodeURIComponent(String(price))}&shop=${encodeURIComponent(store2)}`;
+  const PRISRADAR_GRAPHQL_URL = "https://gql.prisradar.no/";
+  function prisradarHistoryRequest(productUrl) {
+    const slug = new URL(productUrl).pathname.match(/^\/produkter\/([^/]+)\/?$/)?.[1];
+    if (!slug) return void 0;
+    return {
+      url: PRISRADAR_GRAPHQL_URL,
+      body: JSON.stringify({ operationName: "Product", variables: { slug, interval: 120 }, query: "query Product($slug: String!, $interval: Int!) { ProductPriceHistory(interval: $interval, slug: $slug) { price date { iso } } }" })
+    };
+  }
+  const finitePrice = (value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : void 0;
+  const iso = (value) => typeof value === "string" && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : void 0;
+  function readKlarnaPriceHistory(value, productId) {
+    if (!isRecord$7(value) || String(value.productId) !== productId || value.currencyCode !== "NOK" || !Array.isArray(value.history)) return void 0;
+    const points = value.history.filter(isRecord$7).map((point) => ({ price: finitePrice(point.price), at: iso(point.timestamp) })).filter((point) => point.price !== void 0 && point.at !== void 0);
+    const lowest = finitePrice(value.lowest) ?? (points.length ? Math.min(...points.map((point) => point.price)) : void 0);
+    if (lowest === void 0 || points.length === 0) return void 0;
+    const times = points.map((point) => point.at).sort();
+    return { lowestPriceEver: lowest, historyRange: "2y", historyScope: "product", historyStartedAt: times[0], historyUpdatedAt: times.at(-1) };
+  }
+  function readGodprisHistorySection(html) {
+    const match = html.match(/Billigste pris de siste tre månedene er kr\s*<span[^>]*>\s*([\d\s .]+(?:,\d{1,2})?)\s*<\/span>/i);
+    if (!match) return void 0;
+    const lowest = Number(match[1].replace(/[\s .]/g, "").replace(",", "."));
+    return Number.isFinite(lowest) && lowest > 0 ? { lowestPriceEver: lowest, historyRange: "3m", historyScope: "product" } : void 0;
+  }
+  function readPrisradarPriceHistory(value) {
+    const rows = isRecord$7(value) && isRecord$7(value.data) && Array.isArray(value.data.ProductPriceHistory) ? value.data.ProductPriceHistory : void 0;
+    if (!rows) return void 0;
+    const points = rows.filter(isRecord$7).map((row) => ({ price: finitePrice(row.price), at: isRecord$7(row.date) ? iso(row.date.iso) : void 0 })).filter((point) => point.price !== void 0 && point.at !== void 0);
+    if (points.length === 0) return void 0;
+    const times = points.map((point) => point.at).sort();
+    return { lowestPriceEver: Math.min(...points.map((point) => point.price)), historyRange: "all", historyScope: "product", historyStartedAt: times[0], historyUpdatedAt: times.at(-1) };
+  }
+  function isDealPriceHistory(value) {
+    return isRecord$7(value) && finitePrice(value.lowestPriceEver) !== void 0 && (value.historyRange === "all" || value.historyRange === "2y" || value.historyRange === "3m") && value.historyScope === "product" && (value.historyStartedAt === void 0 || iso(value.historyStartedAt) !== void 0) && (value.historyUpdatedAt === void 0 || iso(value.historyUpdatedAt) !== void 0);
+  }
+  const KLARNA_PRODUCT_ID$1 = /^https:\/\/www\.klarna\.com\/no\/shopping\/pl\/(?:cl\d+\/)?(\d+)\//;
+  const GODPRIS_PRODUCT_ID = /^https:\/\/godpris\.no\/produkt\/([^/?#]+)/;
+  async function findPriceMatchHistory(offer, requestJson, requestText) {
+    if (offer.currency !== "NOK" || finitePrice(offer.amount) === void 0) return void 0;
+    let history2;
+    if (offer.source === "klarna") {
+      const id = offer.productUrl.match(KLARNA_PRODUCT_ID$1)?.[1];
+      if (id === void 0) return void 0;
+      history2 = readKlarnaPriceHistory(await requestJson(klarnaPriceHistoryUrl(id), { headers: { Accept: "application/json" } }), id);
+    } else if (offer.source === "godpris") {
+      const id = offer.productUrl.match(GODPRIS_PRODUCT_ID)?.[1];
+      if (id === void 0) return void 0;
+      const html = await requestText(godprisHistoryUrl(decodeURIComponent(id), offer.amount, offer.shopName), { headers: { Accept: "text/html" } });
+      history2 = html === void 0 ? void 0 : readGodprisHistorySection(html);
+    } else if (offer.source === "prisradar") {
+      const request = prisradarHistoryRequest(offer.productUrl);
+      if (request === void 0) return void 0;
+      history2 = readPrisradarPriceHistory(await requestJson(request.url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: request.body }));
+    }
+    return history2 === void 0 ? void 0 : { ...history2, lowestPriceEver: Math.min(offer.amount, history2.lowestPriceEver) };
+  }
+  const RANGE_TEXT = {
+    "3m": { short: "3 mnd", long: "de siste tre månedene" },
+    "2y": { short: "2 år", long: "de siste to årene" },
+    all: { short: "all historikk", long: "gjennom hele historikken" }
+  };
+  function describePriceHistory(amount, history2, sourceName) {
+    const low = getDealLowPrice(amount, history2.lowestPriceEver);
+    if (low === void 0) return void 0;
+    const range = RANGE_TEXT[history2.historyRange];
+    const atLow = amount <= low.lowestPrice;
+    const percent = low.dropToLowPercent > 0 ? `${new Intl.NumberFormat("nb-NO").format(low.dropToLowPercent)} %` : void 0;
+    const value = atLow ? "Laveste" : percent ? `−${percent}` : "<0,1 %";
+    const title = [
+      `Laveste registrerte varepris hos ${sourceName} ${range.long}: ${formatPrice(low.lowestPrice, "NOK")}, inkludert dagens pris.`,
+      atLow ? "Dagens pris er på laveste registrerte nivå." : `Dagens pris må falle ${percent ?? "mindre enn 0,1 %"} for å nå den.`,
+      history2.historyStartedAt ? `Registrert siden ${new Date(history2.historyStartedAt).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })}.` : "",
+      "Alle varianter av produktet. Frakt er ikke med."
+    ].filter(Boolean).join(" ");
+    return { atLow, value, label: atLow ? range.short : "til lavpris", title };
+  }
   const TAXFREE_ORIGIN = "https://www.tax-free.no";
   const TAXFREE_ALGOLIA_URL = "https://namx6ho175-dsn.algolia.net/1/indexes/*/queries";
   const TAXFREE_ALGOLIA_APP_ID = "NAMX6HO175";
@@ -8327,7 +8426,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (!isPriceMatchAllowedForCurrentPage(allowedOffers, message)) {
       return [];
     }
-    const rated = await withUserRatings(allowedOffers, message, requestText, requestJson);
+    const rated = await withPriceHistory(await withUserRatings(allowedOffers, message, requestText, requestJson), requestText, requestJson);
     const [power, tek, gtinStores] = rated.length === 0 ? [void 0, void 0, []] : await Promise.all([
       findPowerUserRating(message, requestJson ?? fetchReviewJson).catch(() => void 0),
       findTekReview(message, requestJson ?? fetchReviewJson).catch(() => void 0),
@@ -8374,6 +8473,16 @@ query SearchSuggestions($query: String!, $category: Int) {
         return offer;
       }
       return offer;
+    }));
+  }
+  async function withPriceHistory(offers, requestText, requestJson) {
+    return Promise.all(offers.map(async (offer) => {
+      try {
+        const history2 = await findPriceMatchHistory(offer, requestJson ?? fetchReviewJson, requestText ?? fetchReviewPage);
+        return history2 === void 0 ? offer : { ...offer, priceHistory: history2 };
+      } catch {
+        return offer;
+      }
     }));
   }
   async function fetchReviewJson(url, init) {
@@ -21378,10 +21487,6 @@ ${darkProviderCss}
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
     .reviews-row--store { margin-top: 6px; }
-    .reviews-collapsed-summary { display: none; gap: 4px; margin-left: auto; }
-    .reviews-section.collapsed .reviews-collapsed-summary { display: inline-flex; }
-    .reviews-section .reviews-summary-chip { align-items: center; display: inline-flex; font-size: 11px; font-weight: 700; gap: 5px; line-height: 20px; padding: 0 3px 0 7px; }
-    .reviews-section .reviews-summary-score { border-radius: 5px; font-size: 11px; line-height: 16px; min-width: 24px; padding: 0 4px; }
     .reviews-footer { display: flex; justify-content: flex-end; }
     .reviews-section .reviews-footer .reviews-copy { align-items: center; color: var(--cbn-muted); display: inline-flex; font-size: 11px; font-weight: 600; gap: 5px; padding: 4px 6px; }
     .reviews-section.collapsed .reviews-footer { display: none; }
@@ -21432,6 +21537,17 @@ ${darkProviderCss}
       flex-direction: column;
       gap: 3px;
       grid-column: -2;
+    }
+    .price-match-history {
+      align-items: flex-end;
+      color: var(--cbn-muted);
+      display: flex;
+      flex-direction: column;
+      font-size: 10px;
+      gap: 2px;
+      grid-column: 2;
+      line-height: 1.15;
+      white-space: nowrap;
     }
     .price-match-card--chips .price-match-side--inline {
       align-items: center;
@@ -23489,7 +23605,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     return isRecord(value) && typeof value.planName === "string" && (value.formattedPrice === void 0 || typeof value.formattedPrice === "string") && (value.formattedNok === void 0 || typeof value.formattedNok === "string") && (value.unavailableReason === void 0 || typeof value.unavailableReason === "string");
   }
   function isPriceMatchOffer(value) {
-    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "etilbudsavis" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && isOptionalHttpsImageUrl(value.imageUrl) && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)) && (value.reviews === void 0 || isProductReviews(value.reviews));
+    return isRecord(value) && (value.electricity === void 0 || isElectricityPriceDetails(value.electricity)) && (value.mobile === void 0 || isMobilePriceDetails(value.mobile)) && (value.mobileBroadband === void 0 || isPriceMatchAlternative(value.mobileBroadband) && value.mobileBroadband.mobile?.category === "broadband") && (value.source === void 0 || value.source === "tek" || value.source === "forbrukerradet" || value.source === "prisjakt" || value.source === "godpris" || value.source === "pokepris" || value.source === "klarna" || value.source === "prisradar" || value.source === "isthereanydeal" || value.source === "ggdeals" || value.source === "allkeyshop" || value.source === "taxfree" || value.source === "vinmonopolet" || value.source === "sesum" || value.source === "enhver" || value.source === "kassal" || value.source === "etilbudsavis" || value.source === "finnreise" || value.source === "panflights" || value.source === "momondo" || value.source === "skyscanner" || value.source === "travellink" || value.source === "tripcom") && (value.sourceName === void 0 || typeof value.sourceName === "string") && (value.details === void 0 || typeof value.details === "string") && (value.matchedCurrentMerchant === void 0 || typeof value.matchedCurrentMerchant === "boolean") && (value.matchedExactProduct === void 0 || typeof value.matchedExactProduct === "boolean") && typeof value.shopName === "string" && typeof value.price === "string" && typeof value.amount === "number" && (value.sortAmount === void 0 || typeof value.sortAmount === "number") && typeof value.currency === "string" && typeof value.productName === "string" && typeof value.productUrl === "string" && (value.offerUrl === void 0 || typeof value.offerUrl === "string") && isOptionalHttpsImageUrl(value.imageUrl) && (value.durationText === void 0 || typeof value.durationText === "string") && (value.flightLegs === void 0 || Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails)) && (value.alternatives === void 0 || Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative)) && (value.reviews === void 0 || isProductReviews(value.reviews)) && (value.priceHistory === void 0 || isDealPriceHistory(value.priceHistory));
   }
   function isOptionalHttpsImageUrl(value) {
     return value === void 0 || typeof value === "string" && value.startsWith("https://") && value.length <= 2048;
@@ -23889,22 +24005,6 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
         }
       ));
     }
-    const scoreOf = (row) => Number(row?.querySelector(".review-score")?.textContent ?? NaN);
-    const productScores = rows.map(scoreOf).filter(Number.isFinite);
-    const summaryChips = document.createElement("span");
-    summaryChips.className = "reviews-collapsed-summary";
-    const summaryChip = (label2, score) => {
-      const chip = document.createElement("span");
-      chip.className = "cbn-chip cbn-chip--muted reviews-summary-chip";
-      const name = document.createElement("span");
-      name.textContent = label2;
-      chip.append(name, buildReviewScoreBox(score, "reviews-summary-score"));
-      return chip;
-    };
-    if (productScores.length > 0) summaryChips.append(summaryChip("Produkt", Math.round(productScores.reduce((sum, value) => sum + value, 0) / productScores.length)));
-    const storeScore = scoreOf(storeRows[0]);
-    if (Number.isFinite(storeScore)) summaryChips.append(summaryChip(storeTitle, storeScore));
-    titleRow.append(summaryChips);
     section.append(header, ...rows, ...storeRows, footer);
     return section;
   }
@@ -24058,6 +24158,21 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     }
     tooltip.append(section);
   }
+  function buildPriceMatchHistoryNote(priceMatch) {
+    if (priceMatch.priceHistory === void 0) return void 0;
+    const note = describePriceHistory(priceMatch.amount, priceMatch.priceHistory, getPriceMatchSourceName(priceMatch));
+    if (note === void 0) return void 0;
+    const element = document.createElement("span");
+    element.className = "price-match-history";
+    element.title = note.title;
+    const value = document.createElement("span");
+    value.className = `cbn-chip cbn-chip--highlight${note.atLow ? "" : " cbn-chip--warning"}`;
+    value.textContent = note.value;
+    const label = document.createElement("span");
+    label.textContent = note.label;
+    element.append(value, label);
+    return element;
+  }
   function buildPriceMatchCard(priceMatch, isBest = false) {
     const priceMatchCard = document.createElement("a");
     priceMatchCard.className = "cbn-row price-match-card";
@@ -24109,7 +24224,8 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       const side = document.createElement("span");
       side.className = "price-match-side";
       side.append(priceMatchPrice, priceMatchBadge);
-      priceMatchCard.append(main, side);
+      const history2 = buildPriceMatchHistoryNote(priceMatch);
+      priceMatchCard.append(main, ...history2 ? [history2] : [], side);
       return priceMatchCard;
     }
     const hasDuration = priceMatch.durationText !== void 0 && priceMatch.durationText.length > 0;

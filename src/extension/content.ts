@@ -18,6 +18,7 @@ import {
   getMaxRewardPercent,
 } from "../shared/reward-calculation";
 import { findPriceMatches } from "../shared/price-match";
+import { describePriceHistory, isDealPriceHistory, type DealPriceHistory } from "../shared/deal-price-history";
 import { buildReviewAiPrompt, getReviewScoreLevel, isProductReviews, summarizeProductReviews, toHundredScale, type ProductReviews, type ProductReviewSummary, type StoreRating, type UserRating, readJsonLdUserRating } from "../shared/product-reviews";
 import {
   buildKiwiAirportId,
@@ -414,6 +415,8 @@ type PriceMatchOffer = {
   alternatives?: PriceMatchAlternative[];
   // Norske tester og kjøpervurderinger (src/shared/product-reviews.ts).
   reviews?: ProductReviews;
+  // Laveste registrerte varepris hos kilden (src/shared/deal-price-history.ts).
+  priceHistory?: DealPriceHistory;
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
   // Hotelltreff gjenbruker fly-kildene (finnreise/skyscanner/momondo) men trenger egen tooltip-tekst.
@@ -12861,10 +12864,6 @@ function renderNotice(
     .reviews-title-row { align-items: center; display: flex; flex: 1 0 100%; gap: 6px; }
     .reviews-title-row .price-match-toggle { flex: 0 1 auto; width: auto; }
     .reviews-row--store { margin-top: 6px; }
-    .reviews-collapsed-summary { display: none; gap: 4px; margin-left: auto; }
-    .reviews-section.collapsed .reviews-collapsed-summary { display: inline-flex; }
-    .reviews-section .reviews-summary-chip { align-items: center; display: inline-flex; font-size: 11px; font-weight: 700; gap: 5px; line-height: 20px; padding: 0 3px 0 7px; }
-    .reviews-section .reviews-summary-score { border-radius: 5px; font-size: 11px; line-height: 16px; min-width: 24px; padding: 0 4px; }
     .reviews-footer { display: flex; justify-content: flex-end; }
     .reviews-section .reviews-footer .reviews-copy { align-items: center; color: var(--cbn-muted); display: inline-flex; font-size: 11px; font-weight: 600; gap: 5px; padding: 4px 6px; }
     .reviews-section.collapsed .reviews-footer { display: none; }
@@ -12915,6 +12914,17 @@ function renderNotice(
       flex-direction: column;
       gap: 3px;
       grid-column: -2;
+    }
+    .price-match-history {
+      align-items: flex-end;
+      color: var(--cbn-muted);
+      display: flex;
+      flex-direction: column;
+      font-size: 10px;
+      gap: 2px;
+      grid-column: 2;
+      line-height: 1.15;
+      white-space: nowrap;
     }
     .price-match-card--chips .price-match-side--inline {
       align-items: center;
@@ -15098,7 +15108,8 @@ function isPriceMatchOffer(value: unknown): value is PriceMatchOffer {
     (value.durationText === undefined || typeof value.durationText === "string") &&
     (value.flightLegs === undefined || (Array.isArray(value.flightLegs) && value.flightLegs.every(isFlightLegDetails))) &&
     (value.alternatives === undefined || (Array.isArray(value.alternatives) && value.alternatives.every(isPriceMatchAlternative))) &&
-    (value.reviews === undefined || isProductReviews(value.reviews))
+    (value.reviews === undefined || isProductReviews(value.reviews)) &&
+    (value.priceHistory === undefined || isDealPriceHistory(value.priceHistory))
   );
 }
 function isOptionalHttpsImageUrl(value: unknown): boolean {
@@ -15592,23 +15603,6 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
           chips: [...(critic.title ? [critic.site] : []), formatReviewScore(critic.score, critic.maxScore)], ...(critic.quote ? { quote: critic.quote } : {}) })),
       }));
   }
-  // Folded, the heading keeps the numbers: the product (buyers and experts together) and the shop.
-  const scoreOf = (row: HTMLElement | undefined) => Number(row?.querySelector(".review-score")?.textContent ?? NaN);
-  const productScores = rows.map(scoreOf).filter(Number.isFinite);
-  const summaryChips = document.createElement("span");
-  summaryChips.className = "reviews-collapsed-summary";
-  const summaryChip = (label: string, score: number) => {
-    const chip = document.createElement("span");
-    chip.className = "cbn-chip cbn-chip--muted reviews-summary-chip";
-    const name = document.createElement("span");
-    name.textContent = label;
-    chip.append(name, buildReviewScoreBox(score, "reviews-summary-score"));
-    return chip;
-  };
-  if (productScores.length > 0) summaryChips.append(summaryChip("Produkt", Math.round(productScores.reduce((sum, value) => sum + value, 0) / productScores.length)));
-  const storeScore = scoreOf(storeRows[0]);
-  if (Number.isFinite(storeScore)) summaryChips.append(summaryChip(storeTitle, storeScore));
-  titleRow.append(summaryChips);
   section.append(header, ...rows, ...storeRows, footer);
   return section;
 }
@@ -15781,6 +15775,24 @@ function buildReviewTooltipContent(tooltip: HTMLElement, tip: ReviewTooltip): vo
   tooltip.append(section);
 }
 
+// Lowest registered price at the source, as two short lines left of the price and chip.
+function buildPriceMatchHistoryNote(priceMatch: PriceMatchOffer): HTMLElement | undefined {
+  if (priceMatch.priceHistory === undefined) return undefined;
+  const note = describePriceHistory(priceMatch.amount, priceMatch.priceHistory, getPriceMatchSourceName(priceMatch));
+  if (note === undefined) return undefined;
+  // Same chips as /tilbud (src/shared/UI.md): green at the low, amber above it.
+  const element = document.createElement("span");
+  element.className = "price-match-history";
+  element.title = note.title;
+  const value = document.createElement("span");
+  value.className = `cbn-chip cbn-chip--highlight${note.atLow ? "" : " cbn-chip--warning"}`;
+  value.textContent = note.value;
+  const label = document.createElement("span");
+  label.textContent = note.label;
+  element.append(value, label);
+  return element;
+}
+
 function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLAnchorElement {
   const priceMatchCard = document.createElement("a");
   priceMatchCard.className = "cbn-row price-match-card";
@@ -15844,7 +15856,8 @@ function buildPriceMatchCard(priceMatch: PriceMatchOffer, isBest = false): HTMLA
     const side = document.createElement("span");
     side.className = "price-match-side";
     side.append(priceMatchPrice, priceMatchBadge);
-    priceMatchCard.append(main, side);
+    const history = buildPriceMatchHistoryNote(priceMatch);
+    priceMatchCard.append(main, ...(history ? [history] : []), side);
     return priceMatchCard;
   }
 

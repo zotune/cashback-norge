@@ -1,4 +1,5 @@
 import type { ProductReviews, StoreRating } from "./product-reviews.js";
+import type { DealPriceHistory } from "./deal-price-history.js";
 import { isTrustpilotProfile, type TrustpilotProfile, type TrustpilotResult } from "./trustpilot.js";
 import {
   type CashbackOffer,
@@ -119,6 +120,8 @@ export type PriceMatchOffer = {
   alternatives?: PriceMatchAlternative[];
   // Norske tester og kjøpervurderinger fra kilden (src/shared/product-reviews.ts).
   reviews?: ProductReviews;
+  // Laveste registrerte varepris hos kilden (src/shared/deal-price-history.ts), inkludert dagens pris.
+  priceHistory?: DealPriceHistory;
   // Kildens søk var ikke ferdig modnet da tilbudet ble hentet; prisen kan fortsatt bli bedre.
   searchIncomplete?: boolean;
 };
