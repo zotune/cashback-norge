@@ -13,7 +13,9 @@ test("grocery chains have a unique slug, a label and hex colours for their chip"
   }
   assert.equal(getGroceryChain("KIWI")?.bg, "#50b848");
   assert.equal(getGroceryChain("oda")?.label, "Oda");
-  assert.equal(getGroceryChain("Gigaboks")?.bg, "#8746df");
+  assert.equal(getGroceryChain("Gigaboks")?.bg, "#e4143b");
+  assert.equal(getGroceryOfferLink("Holdbart", "Rustica Pizza").url, "https://www.holdbart.no/search?q=Rustica%20Pizza");
+  assert.match(getGroceryOfferLink("Afood Market", "Ramen").url, /^https:\/\/etilbudsavis\.no\/soek\//);
   assert.equal(getGroceryCardBonus("Gigaboks"), undefined);
   assert.equal(getGroceryChain("Biltema"), undefined);
 });

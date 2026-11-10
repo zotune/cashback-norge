@@ -5,13 +5,16 @@
 // November 2026): REMA 1000 blue, KIWI green with black lettering, MENY and SPAR red,
 // Joker green with white text for legibility, Extra's yellow with red, Coop Prix yellow with blue, Coop Mega
 // dark green, Obs blue, Coop Marked and Matkroken red, Bunnpris yellow with black,
-// Nærbutikken silver with the red heart, Europris green and Oda orange. Gigaboks' logo is
-// white on a multicoloured gradient; its site's red (#e4143b) is MENY's, so the chip uses its
-// purple (#8746df, gigaboks.no stylesheet) with white text.
-// `search` is the chain's own product search ({q} = the product), checked November 2026.
+// Nærbutikken silver with the red heart, Europris green and Oda orange; Gigaboks red
+// (#e4143b, its logo and gigaboks.no stylesheet), Holdbart's dark green lettering and Afood
+// Market's navy logo tile, each with white text. Swedish border stores in Tjek (Hypermat,
+// MaxiMat, Nordby, eurocash) are left out: their flyers are priced in SEK.
+// `search` is the chain's own product search ({q} = the product), checked November 2026
+// (Holdbart: /search?q= lists matching products).
 // Obs searches its online assortment (verified LEGO results; groceries such as kaviar
 // are not in that assortment). KIWI, REMA 1000, the other Coop chains, Bunnpris, Gigaboks, Nærbutikken and Matkroken have no product
-// search on the web; their offers link to the flyer offer on eTilbudsavis instead.
+// search on the web, and Afood Market's search jumps to unrelated single products; their offers
+// link to the flyer offer on eTilbudsavis instead.
 export type GroceryChain = { name: string; label: string; slug: string; bg: string; fg: string; search?: string };
 
 export const GROCERY_CHAIN_LIST: GroceryChain[] = [
@@ -26,11 +29,13 @@ export const GROCERY_CHAIN_LIST: GroceryChain[] = [
   { name: "Obs", label: "Obs", slug: "obs", bg: "#004993", fg: "#ffffff", search: "https://www.obs.no/sok?q={q}" },
   { name: "Coop Marked", label: "Coop Marked", slug: "coop-marked", bg: "#da0b16", fg: "#ffffff" },
   { name: "Bunnpris", label: "Bunnpris", slug: "bunnpris", bg: "#fff200", fg: "#111111" },
-  { name: "Gigaboks", label: "Gigaboks", slug: "gigaboks", bg: "#8746df", fg: "#ffffff" },
+  { name: "Gigaboks", label: "Gigaboks", slug: "gigaboks", bg: "#e4143b", fg: "#ffffff" },
   { name: "Nærbutikken", label: "Nærbutikken", slug: "naerbutikken", bg: "#e9e9ed", fg: "#c8102e" },
   { name: "Matkroken", label: "Matkroken", slug: "matkroken", bg: "#c8102e", fg: "#ffffff" },
   { name: "Europris", label: "Europris", slug: "europris", bg: "#00693e", fg: "#ffffff", search: "https://www.europris.no/sok?q={q}" },
   { name: "oda", label: "Oda", slug: "oda", bg: "#f4511e", fg: "#ffffff", search: "https://oda.com/no/search/products/?q={q}" },
+  { name: "Holdbart", label: "Holdbart", slug: "holdbart", bg: "#364e27", fg: "#ffffff", search: "https://www.holdbart.no/search?q={q}" },
+  { name: "Afood Market", label: "Afood Market", slug: "afood-market", bg: "#18277d", fg: "#ffffff" },
 ];
 
 export const GROCERY_CHAINS = GROCERY_CHAIN_LIST.map((chain) => chain.name);
