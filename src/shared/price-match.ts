@@ -36,7 +36,7 @@ import { findPokeprisPriceMatch, isPokeprisProductUrl } from "./pokepris-price-m
 import { excludeVerifiedPreorders, type VerifiedPriceMatchAvailability } from "./price-match-availability.js";
 import { findSesumPriceMatch } from "./sesum-price-match.js";
 import { findPowerUserRating } from "./power-reviews.js";
-import { findTekReview } from "./tek-reviews.js";
+import { findTekReview, refreshTekCritic } from "./tek-reviews.js";
 import { findGtinStoreRatings } from "./store-reviews.js";
 import { isAccessoryMismatch } from "./product-reviews.js";
 import { findPriceMatchHistory, plausiblePriceHistory, type DealPriceHistory } from "./deal-price-history.js";
@@ -190,6 +190,13 @@ export async function findPriceMatches(
   }
   if (gtinStores.length > 0) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, users: [...(rated[0]!.reviews?.users ?? []), ...gtinStores] } };
   if (tek !== undefined) rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, critics: [...(rated[0]!.reviews?.critics ?? []), tek] } };
+  // Copies of Tek.no tests from other sources take Tek's current grade (bounded: one search per copy).
+  for (const [index, offer] of rated.entries()) {
+    if (!offer.reviews?.critics?.some((critic) => critic.site === "Tek.no")) continue;
+    const critics = await Promise.all(offer.reviews.critics.map((critic) => critic.site === "Tek.no" && critic !== tek
+      ? refreshTekCritic(critic, requestJson ?? fetchReviewJson).catch(() => critic) : critic));
+    rated[index] = { ...offer, reviews: { ...offer.reviews, critics } };
+  }
   if (power !== undefined && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
     rated[0] = { ...rated[0]!, reviews: { ...rated[0]!.reviews, users: [...(rated[0]!.reviews?.users ?? []), power] } };
   }

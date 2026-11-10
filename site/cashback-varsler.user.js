@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794346460
+// @version      1794347114
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -7481,6 +7481,34 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return void 0;
   }
+  const TEK_ARTICLE_ID = /^https:\/\/www\.tek\.no\/[a-z-]+\/i\/([A-Za-z0-9]+)(?:\/|$)/;
+  async function refreshTekCritic(critic, requestJson) {
+    const article = critic.url.match(TEK_ARTICLE_ID)?.[1];
+    const name = critic.title?.replace(/^.*\((.+)\)$/, "$1").trim();
+    if (critic.site !== "Tek.no" || article === void 0 || !name) return critic;
+    const nameWords = name.replace(/[()[\],]/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (nameWords.length < 2) return critic;
+    const value = await requestJson(TEK_REVIEW_GRAPHQL_URL, {
+      method: "POST",
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ operationName: "ReviewedProducts", query: QUERY, variables: { query: nameWords.slice(0, 2).join(" "), limit: 30 } })
+    });
+    const items = isRecord$7(value) && isRecord$7(value.data) && isRecord$7(value.data.reviewedProducts) && Array.isArray(value.data.reviewedProducts.items) ? value.data.reviewedProducts.items.filter(isRecord$7) : [];
+    const matches = items.filter((item) => {
+      const review = isRecord$7(item.latestReview) ? item.latestReview : void 0;
+      const itemName = typeof item.name === "string" ? item.name : "";
+      return review?.articleId === article && itemName && sameBrand(name, itemName) && hasSameNumericModel(name, itemName) && !hasNumericModelConflict(name, itemName) && !hasModelTierConflict(name, itemName);
+    });
+    if (matches.length !== 1) return critic;
+    const current = readTekReview({ data: { reviewedProducts: { items: matches } } }, `${matches[0].name}`);
+    return current === void 0 ? critic : { ...critic, ...current, ...critic.foundAt ? { foundAt: critic.foundAt } : {} };
+  }
+  const sameBrand = (first, second) => words(first)[0] !== void 0 && words(first)[0] === words(second)[0];
+  function hasSameNumericModel(first, second) {
+    const numbers = (text2) => new Set(text2.match(/\b\d{2,5}\b/g) ?? []);
+    const firstNumbers = numbers(first);
+    return [...numbers(second)].some((number) => firstNumbers.has(number));
+  }
   const GTIN_SEARCH_STORES = [
     { host: "lyko.com", name: "Lyko", searchUrl: (gtin) => `https://lyko.com/no/sok?q=${encodeURIComponent(gtin)}` },
     // NetOnNet: /search?query=<GTIN> redirects to the product (checked 2026-11-08, Switch 2).
@@ -8534,6 +8562,11 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     if (gtinStores.length > 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], ...gtinStores] } };
     if (tek !== void 0) rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, critics: [...rated[0].reviews?.critics ?? [], tek] } };
+    for (const [index, offer] of rated.entries()) {
+      if (!offer.reviews?.critics?.some((critic) => critic.site === "Tek.no")) continue;
+      const critics = await Promise.all(offer.reviews.critics.map((critic) => critic.site === "Tek.no" && critic !== tek ? refreshTekCritic(critic, requestJson ?? fetchReviewJson).catch(() => critic) : critic));
+      rated[index] = { ...offer, reviews: { ...offer.reviews, critics } };
+    }
     if (power !== void 0 && !rated.some((offer) => offer.reviews?.users?.some((user) => user.source === power.source))) {
       rated[0] = { ...rated[0], reviews: { ...rated[0].reviews, users: [...rated[0].reviews?.users ?? [], power] } };
     }

@@ -49,3 +49,20 @@ test("Klarna: another source's verified name finds a short-titled product by its
   await findKlarnaPriceMatch(message, requestJson);
   assert.ok(!urls.some((url) => url.includes("/offers/")), "the page title alone matches neither other model");
 });
+
+test("a Tek.no test copied by another source takes Tek's current grade for the same article and model", async () => {
+  const { refreshTekCritic } = await import("../src/shared/tek-reviews.js");
+  const copy = { site: "Tek.no", score: 9, maxScore: 10, url: "https://www.tek.no/samletest/i/k0WQBX/robotstoevsuger-samletest-midrange", title: "Roborock QR 798" };
+  const item = (id: string, name: string, value: number, articleId = "k0WQBX") => ({ id, name, slug: name.toLowerCase().replace(/\s+/g, "-"),
+    latestReview: { rating: { value, conclusion: `${name} er stadig et godt produkt.`, pros: ["Lett å sette opp"], cons: ["Små vanntanker"] }, articleId, sectionName: "samletest", articleSlug: "robotstoevsuger-samletest-midrange", title: "Samletest av mellomklasse robotstøvsugere" } });
+  const respond = (items: unknown[]) => async () => ({ data: { reviewedProducts: { items } } });
+  const refreshed = await refreshTekCritic(copy, respond([item("1", "Roborock Qrevo 798", 8), item("2", "Roborock Qrevo Curv 2", 9)]));
+  assert.deepEqual([refreshed.score, refreshed.pros, refreshed.cons], [8, ["Lett å sette opp"], ["Små vanntanker"]]);
+  // Another article, another model number, or two candidates: the copy stays as it is.
+  assert.equal((await refreshTekCritic(copy, respond([item("1", "Roborock Qrevo 798", 8, "OTHER")]))).score, 9);
+  assert.equal((await refreshTekCritic(copy, respond([item("1", "Roborock Qrevo 598", 7)]))).score, 9);
+  assert.equal((await refreshTekCritic(copy, respond([item("1", "Roborock Qrevo 798", 8), item("2", "Roborock QR 798", 6)]))).score, 9);
+  // «Pro» is another product: the Qrevo 798 stays the only match.
+  assert.equal((await refreshTekCritic(copy, respond([item("1", "Roborock Qrevo 798", 8), item("2", "Roborock QR 798 Pro", 6)]))).score, 8);
+  assert.equal((await refreshTekCritic({ ...copy, site: "Elkjøp" }, async () => { throw new Error("no request"); })).score, 9);
+});
