@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794345265
+// @version      1794345498
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -7598,6 +7598,44 @@ query SearchSuggestions($query: String!, $category: Int) {
     ].filter(Boolean).join(" ");
     return { atLow, value, label: atLow ? range.short : "til lavpris", title };
   }
+  function readPrisjaktAllTimeHistory(value, variantIds, now) {
+    if (!isRecord$7(value) || !isRecord$7(value.priceHistory) || !Array.isArray(value.priceHistory.historyItems)) throw new Error("Prisjakt history: missing priceHistory.historyItems");
+    const history2 = value.priceHistory;
+    const oldest = typeof history2.oldestHistoryItem === "string" ? Date.parse(history2.oldestHistoryItem) : NaN;
+    const updated = typeof history2.newestHistoryItem === "string" ? Date.parse(history2.newestHistoryItem) : NaN;
+    const nowMs = Date.parse(now);
+    if (!Number.isFinite(oldest) || !Number.isFinite(updated) || updated < oldest || updated > nowMs + 5 * 6e4) return {};
+    const events = history2.historyItems.filter(isRecord$7).filter((item) => typeof item.date === "string" && Date.parse(item.date) <= nowMs + 5 * 6e4);
+    const first = Math.min(...events.map((item) => Date.parse(String(item.date))).filter(Number.isFinite));
+    if (!Number.isFinite(first) || first > oldest + 864e5) return {};
+    const prices = events.filter((item) => item.active === true && item.isMembershipPrice === false && item.isPaidMembership === false && typeof item.price === "number" && Number.isFinite(item.price) && item.price > 0).map((item) => item.price / 100);
+    if (!prices.length) return {};
+    return { lowestPriceEver: Math.min(...prices), historyStartedAt: new Date(oldest).toISOString(), historyUpdatedAt: new Date(updated).toISOString(), historyScope: variantIds.length ? "variant" : "product", historyRange: "all" };
+  }
+  function readPrisjaktHistoryVariantIds(html, productUrl) {
+    let url;
+    try {
+      url = new URL(productUrl);
+    } catch {
+      return void 0;
+    }
+    const productId = url.searchParams.get("p");
+    if (productId === null || [...url.searchParams.keys()].some((key) => key.startsWith("a-"))) return void 0;
+    const queue = [...readNextFlightValues(html)];
+    for (let index = 0; index < queue.length && index < 5e4; index += 1) {
+      const value = queue[index];
+      if (Array.isArray(value)) {
+        queue.push(...value);
+        continue;
+      }
+      if (!isRecord$7(value)) continue;
+      if (String(value.productId) === productId && isRecord$7(value.initialData) && isRecord$7(value.initialData.priceHistory) && isRecord$7(value.marketConfig) && value.marketConfig.currency === "NOK" && Array.isArray(value.variantIds) && value.variantIds.every((id) => typeof id === "number")) return value.variantIds;
+      queue.push(...Object.values(value));
+    }
+    return void 0;
+  }
+  const PRISJAKT_PRICE_HISTORY_URL = "https://www.prisjakt.no/api/price-history";
+  const prisjaktPriceHistoryBody = (productId, variantIds) => JSON.stringify({ productId: Number(productId), timeRange: "ALL", shopIds: [], variantIds });
   const TAXFREE_ORIGIN = "https://www.tax-free.no";
   const TAXFREE_ALGOLIA_URL = "https://namx6ho175-dsn.algolia.net/1/indexes/*/queries";
   const TAXFREE_ALGOLIA_APP_ID = "NAMX6HO175";
@@ -8453,6 +8491,8 @@ query SearchSuggestions($query: String!, $category: Int) {
         if (offer.source === "prisjakt" && PRISJAKT_PRODUCT_PAGE.test(offer.productUrl)) {
           const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
           if (html === void 0) return offer;
+          const priceHistory = await findPrisjaktPriceHistory(html, offer, requestJson ?? fetchReviewJson).catch(() => void 0);
+          if (priceHistory !== void 0) offer = { ...offer, priceHistory };
           const user = readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
           const merchantKeys = getCurrentMerchantKeys(message);
           const shop = merchantKeys.length === 0 ? void 0 : [...readPrisjaktShopRatings(html)].find(([name]) => isCurrentMerchantName(name, merchantKeys));
@@ -8474,6 +8514,26 @@ query SearchSuggestions($query: String!, $category: Int) {
       }
       return offer;
     }));
+  }
+  async function findPrisjaktPriceHistory(html, offer, requestJson) {
+    if (offer.currency !== "NOK" || !Number.isFinite(offer.amount) || offer.amount <= 0) return void 0;
+    const variantIds = readPrisjaktHistoryVariantIds(html, offer.productUrl);
+    const productId = new URL(offer.productUrl).searchParams.get("p");
+    if (variantIds === void 0 || productId === null) return void 0;
+    const response = await requestJson(PRISJAKT_PRICE_HISTORY_URL, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: prisjaktPriceHistoryBody(productId, variantIds)
+    });
+    const history2 = readPrisjaktAllTimeHistory(response, variantIds, (/* @__PURE__ */ new Date()).toISOString());
+    if (history2.lowestPriceEver === void 0) return void 0;
+    return {
+      lowestPriceEver: Math.min(offer.amount, history2.lowestPriceEver),
+      historyRange: "all",
+      historyScope: "product",
+      ...history2.historyStartedAt ? { historyStartedAt: history2.historyStartedAt } : {},
+      ...history2.historyUpdatedAt ? { historyUpdatedAt: history2.historyUpdatedAt } : {}
+    };
   }
   async function withPriceHistory(offers, requestText, requestJson) {
     return Promise.all(offers.map(async (offer) => {

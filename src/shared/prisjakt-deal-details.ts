@@ -90,3 +90,29 @@ export function readPrisjaktAllTimeHistory(value: unknown, variantIds: number[],
   if (!prices.length) return {};
   return { lowestPriceEver: Math.min(...prices), historyStartedAt: new Date(oldest).toISOString(), historyUpdatedAt: new Date(updated).toISOString(), historyScope: variantIds.length ? "variant" : "product", historyRange: "all" };
 }
+
+/** The variant IDs of this product's own price-history chart, for the all-time history
+ * request, from a product page without a selected variant (`a-…` parameters). A page for
+ * one variant, or one whose chart is missing or not bound to the product ID, gives none:
+ * the product-wide chart would not describe the selected variant. */
+export function readPrisjaktHistoryVariantIds(html: string, productUrl: string): number[] | undefined {
+  let url: URL;
+  try { url = new URL(productUrl); } catch { return undefined; }
+  const productId = url.searchParams.get("p");
+  if (productId === null || [...url.searchParams.keys()].some((key) => key.startsWith("a-"))) return undefined;
+  const queue = [...readNextFlightValues(html)];
+  for (let index = 0; index < queue.length && index < 50000; index += 1) {
+    const value = queue[index];
+    if (Array.isArray(value)) { queue.push(...value); continue; }
+    if (!isRecord(value)) continue;
+    if (String(value.productId) === productId && isRecord(value.initialData) && isRecord(value.initialData.priceHistory) &&
+      isRecord(value.marketConfig) && value.marketConfig.currency === "NOK" &&
+      Array.isArray(value.variantIds) && value.variantIds.every((id) => typeof id === "number")) return value.variantIds as number[];
+    queue.push(...Object.values(value));
+  }
+  return undefined;
+}
+
+export const PRISJAKT_PRICE_HISTORY_URL = "https://www.prisjakt.no/api/price-history";
+export const prisjaktPriceHistoryBody = (productId: string, variantIds: number[]) =>
+  JSON.stringify({ productId: Number(productId), timeRange: "ALL", shopIds: [], variantIds });

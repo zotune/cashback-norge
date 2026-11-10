@@ -39,7 +39,8 @@ import { findPowerUserRating } from "./power-reviews.js";
 import { findTekReview } from "./tek-reviews.js";
 import { findGtinStoreRatings } from "./store-reviews.js";
 import { isAccessoryMismatch } from "./product-reviews.js";
-import { findPriceMatchHistory } from "./deal-price-history.js";
+import { findPriceMatchHistory, type DealPriceHistory } from "./deal-price-history.js";
+import { PRISJAKT_PRICE_HISTORY_URL, prisjaktPriceHistoryBody, readPrisjaktAllTimeHistory, readPrisjaktHistoryVariantIds } from "./prisjakt-deal-details.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
   findTaxfreePriceMatch,
@@ -199,6 +200,9 @@ async function withUserRatings(offers: PriceMatchOffer[], message: GetPriceMatch
       if (offer.source === "prisjakt" && PRISJAKT_PRODUCT_PAGE.test(offer.productUrl)) {
         const html = await (requestText ?? fetchReviewPage)(offer.productUrl, { headers: { Accept: "text/html" } });
         if (html === undefined) return offer;
+        // The same page gives the variant IDs for Prisjakt's all-time price history.
+        const priceHistory = await findPrisjaktPriceHistory(html, offer, requestJson ?? fetchReviewJson).catch(() => undefined);
+        if (priceHistory !== undefined) offer = { ...offer, priceHistory };
         const user = readJsonLdUserRating(html, "prisjakt", "Brukere hos Prisjakt", offer.productUrl);
         // Prisjakt users' rating of the shop the reader is on, when it sells the product.
         const merchantKeys = getCurrentMerchantKeys(message);
@@ -221,6 +225,27 @@ async function withUserRatings(offers: PriceMatchOffer[], message: GetPriceMatch
     }
     return offer;
   }));
+}
+
+// Prisjakt: all registered history for the product page's own chart variants (the page's
+// public POST /api/price-history, as on /tilbud). Pages for one selected variant get none.
+async function findPrisjaktPriceHistory(html: string, offer: PriceMatchOffer, requestJson: JsonRequest): Promise<DealPriceHistory | undefined> {
+  if (offer.currency !== "NOK" || !Number.isFinite(offer.amount) || offer.amount <= 0) return undefined;
+  const variantIds = readPrisjaktHistoryVariantIds(html, offer.productUrl);
+  const productId = new URL(offer.productUrl).searchParams.get("p");
+  if (variantIds === undefined || productId === null) return undefined;
+  const response = await requestJson(PRISJAKT_PRICE_HISTORY_URL, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: prisjaktPriceHistoryBody(productId, variantIds),
+  });
+  const history = readPrisjaktAllTimeHistory(response, variantIds, new Date().toISOString());
+  if (history.lowestPriceEver === undefined) return undefined;
+  return {
+    lowestPriceEver: Math.min(offer.amount, history.lowestPriceEver), historyRange: "all", historyScope: "product",
+    ...(history.historyStartedAt ? { historyStartedAt: history.historyStartedAt } : {}),
+    ...(history.historyUpdatedAt ? { historyUpdatedAt: history.historyUpdatedAt } : {}),
+  };
 }
 
 // Lowest registered price from each source's own history (Klarna two years, Godpris three

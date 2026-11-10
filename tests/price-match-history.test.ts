@@ -65,3 +65,17 @@ test("price-match history: runtime validation rejects unknown ranges and non-fin
   assert.equal(isDealPriceHistory({ lowestPriceEver: 100, historyRange: "1w", historyScope: "product" }), false);
   assert.equal(isDealPriceHistory({ lowestPriceEver: 100, historyRange: "all", historyScope: "product", historyStartedAt: "not a date" }), false);
 });
+
+const prisjaktPage = (...values: unknown[]) => `<script>self.__next_f.push([1,${JSON.stringify(values.map((v, i) => `${i}:${JSON.stringify(v)}\n`).join(""))}])</script>`;
+const prisjaktChart = (productId: number, variantIds: number[], currency = "NOK") => ({ productId, variantIds, marketConfig: { currency }, initialData: { priceHistory: { historyItems: [] } } });
+
+test("price-match history: Prisjakt reads its own product's chart variants; a selected variant, another product or currency gives none", async () => {
+  const { readPrisjaktHistoryVariantIds, prisjaktPriceHistoryBody } = await import("../src/shared/prisjakt-deal-details.js");
+  const url = "https://www.prisjakt.no/product.php?p=16373878";
+  assert.deepEqual(readPrisjaktHistoryVariantIds(prisjaktPage(prisjaktChart(999, [1]), prisjaktChart(16373878, [11, 12])), url), [11, 12]);
+  assert.deepEqual(readPrisjaktHistoryVariantIds(prisjaktPage(prisjaktChart(16373878, [])), url), []);
+  assert.equal(readPrisjaktHistoryVariantIds(prisjaktPage(prisjaktChart(16373878, [11])), `${url}&a-12=34`), undefined);
+  assert.equal(readPrisjaktHistoryVariantIds(prisjaktPage(prisjaktChart(999, [11])), url), undefined);
+  assert.equal(readPrisjaktHistoryVariantIds(prisjaktPage(prisjaktChart(16373878, [11], "SEK")), url), undefined);
+  assert.deepEqual(JSON.parse(prisjaktPriceHistoryBody("16373878", [11, 12])), { productId: 16373878, timeRange: "ALL", shopIds: [], variantIds: [11, 12] });
+});
