@@ -11,6 +11,7 @@
   "host_permissions": [
     "https://no.trustpilot.com/*",
     "https://www.trustpilot.com/*",
+    "https://widget.trustpilot.com/*",
     "https://strom-api.forbrukerradet.no/*",
     "https://www.pokepris.no/*",
     "https://pokepris.no/*",

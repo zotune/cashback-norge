@@ -15787,9 +15787,12 @@ function buildPriceMatchHistoryNote(priceMatch: PriceMatchOffer): HTMLElement | 
   const value = document.createElement("span");
   value.className = `cbn-chip cbn-chip--highlight${note.atLow ? "" : " cbn-chip--warning"}`;
   value.textContent = note.value;
-  const label = document.createElement("span");
-  label.textContent = note.label;
-  element.append(value, label);
+  element.append(value);
+  if (note.label !== undefined) {
+    const label = document.createElement("span");
+    label.textContent = note.label;
+    element.append(label);
+  }
   return element;
 }
 

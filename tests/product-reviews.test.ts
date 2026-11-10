@@ -286,6 +286,17 @@ test("accessory pages never take the device's reviews", async () => {
   assert.equal(isAccessoryMismatch("Apple AirPods Pro 3 trådløse ørepropper", "Apple AirPods Pro 3"), false);
   assert.equal(isAccessoryMismatch("Spigen deksel til iPhone 17", "Apple iPhone 17 256GB"), true);
   assert.equal(isAccessoryMismatch("Spigen deksel til iPhone 17", "Spigen Ultra Hybrid deksel iPhone 17"), false);
+  // Spare-part kits for a robot vacuum (Godpris, November 2026) are no match for the robot itself.
+  const robot = "Roborock QR 798 Robotstøvsuger (sort)";
+  for (const kit of ["For Roborock Qrevo L / QR 798 / QV 35A / QR 598 Støvsugerdeler Hovedbørste Sidebørste Hepa Filter Moppeklut Støvposer",
+    "Reservedeler for Roborock QR 798 / QR 598 / QV 35A Hovedbørste Sidebørste Hepa Filter Støvpose Moppeklut",
+    "29-dels støvsugerreservedelssett kompatibel med Roborock Qrevo Pro/QX Revo Plus/QV 35S/QR 598/QR 798",
+    "12-pakning støvposer for Roborock QV 35A / QR 798 / QR 598 robotstøvsuger",
+    "34 deler til Roborock QR 798 / QR 598 / QV 35A støvsugerdeler Hovedbørste"]) {
+    assert.equal(isAccessoryMismatch(kit, robot), true, kit);
+  }
+  assert.equal(isAccessoryMismatch("QR 798 rengjøringsrobot QVRRS52-00 (sort)", robot), false);
+  assert.equal(isAccessoryMismatch("Roborock QR 798 Robotstøvsuger med HEPA-filter, moppeklut og 2 støvposer", robot), false);
   const { readTekReview } = await import("../src/shared/tek-reviews.js");
   const response = { data: { reviewedProducts: { items: [{ id: "1", name: "Apple AirPods Pro 3", latestReview: { rating: { value: 9 }, articleId: "abc", sectionName: "test", articleSlug: "airpods" } }] } } };
   assert.equal(readTekReview(response, "Fixed Silky silikonetui for Apple AirPods Pro 3"), undefined);

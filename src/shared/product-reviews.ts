@@ -223,7 +223,14 @@ export function readGodprisStoreLinks(html: string): Array<{ shopName: string; u
 // ratings of the AirPods themselves.
 // Norwegian compounds count too ("silikonetui", "mobildeksel"); short words need a word start.
 const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
-const accessoryWord = (text: string) => text.toLowerCase().match(ACCESSORY_WORDS)?.[0];
+// Spare-part kits named after the device they fit («For Roborock Qrevo L / QR 798 … Hovedbørste»,
+// «Reservedeler for …», «… kompatibel med …», «støvposer for …»). A bare «filter», «støvpose» or
+// «moppeklut» is not enough: device titles list them as included features.
+const SPARE_PART_WORDS = /^(?:for|til)\s|reservedel|støvsugerdeler|\b(?:deler|støvposer?|moppekluter?|børster?|filtre|filter) (?:for|til)\s|\bkompatibel med\s|\berstatning for\s/iu;
+const accessoryWord = (text: string) => {
+  const lower = text.toLowerCase().trim();
+  return lower.match(ACCESSORY_WORDS)?.[0] ?? lower.match(SPARE_PART_WORDS)?.[0];
+};
 /** The page is an accessory of the candidate (or the reverse): its accessory word is missing there. */
 export function isAccessoryMismatch(pageTitle: string, candidateName: string): boolean {
   // Only when the other side is no accessory at all ("deksel" and "case" may name the same thing).

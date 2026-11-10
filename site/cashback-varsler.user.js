@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794345498
+// @version      1794345814
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -17,6 +17,7 @@
 // @connect      native-backend.cloud.pji.nu
 // @connect      no.trustpilot.com
 // @connect      www.trustpilot.com
+// @connect      widget.trustpilot.com
 // @connect      www.prisjakt.no
 // @connect      www.power.no
 // @connect      lyko.com
@@ -1379,6 +1380,25 @@
       ...warning ? { warning } : {}
     };
   }
+  const TRUSTPILOT_REVIEW_COLLECTOR_TRUSTBOX = "56278e9abfbbba0bdcd568bc";
+  function trustpilotEvaluateUrl(domain) {
+    return `https://no.trustpilot.com/evaluate/${encodeURIComponent(domain)}`;
+  }
+  function trustpilotTrustboxUrl(businessUnitId) {
+    return `https://widget.trustpilot.com/trustbox-data/${TRUSTPILOT_REVIEW_COLLECTOR_TRUSTBOX}?${new URLSearchParams({ businessUnitId, locale: "nb-NO" })}`;
+  }
+  function readTrustpilotEvaluatePage(html, domain) {
+    const data = readNextPageData(html);
+    const business = isRecord$7(data) && isRecord$7(data.props) && isRecord$7(data.props.pageProps) ? data.props.pageProps.business : void 0;
+    if (!isRecord$7(business) || typeof business.identifyingName !== "string" || normalizeHostname$1(business.identifyingName) !== domain || typeof business.websiteUrl !== "string" || trustpilotDomain(business.websiteUrl) !== domain) return void 0;
+    return typeof business.businessId === "string" && /^[a-f\d]{24}$/.test(business.businessId) ? business.businessId : void 0;
+  }
+  function readTrustpilotTrustbox(value, domain, businessUnitId) {
+    const unit = isRecord$7(value) ? value.businessUnit : void 0;
+    if (!isRecord$7(unit)) return void 0;
+    const count = isRecord$7(unit.numberOfReviews) ? unit.numberOfReviews.total : void 0;
+    return readBusiness({ ...unit, id: businessUnitId, numberOfReviews: count }, domain, false);
+  }
   function readTrustpilotSearch(value, domain) {
     if (!isRecord$7(value) || !Array.isArray(value.businessUnits)) throw new Error("Trustpilot: ukjent format i virksomhetssøket");
     return value.businessUnits.slice(0, 5).map((business) => readBusiness(business, domain, true)).find(Boolean);
@@ -1487,6 +1507,19 @@
               status = "unavailable";
               reason = `Trustpilot: profilsiden: ${error instanceof Error ? error.message : String(error)}`;
             }
+          }
+          try {
+            if (!profile && !rateLimited) {
+              const evaluate = await request(trustpilotEvaluateUrl(domain));
+              const businessUnitId = evaluate.status === 200 ? readTrustpilotEvaluatePage(evaluate.text, domain) : void 0;
+              if (businessUnitId) {
+                const trustbox = await request(trustpilotTrustboxUrl(businessUnitId));
+                if (trustbox.status === 200) profile = readTrustpilotTrustbox(JSON.parse(trustbox.text), domain, businessUnitId);
+                if (!profile) reason = `${reason}; TrustBox: HTTP ${trustbox.status}${trustbox.status === 200 ? ", ukjent format" : ""}`;
+              } else reason = `${reason}; vurderingssiden: HTTP ${evaluate.status}${evaluate.status === 200 ? ", fant ikke virksomheten for domenet" : ""}`;
+            }
+          } catch (error) {
+            if (!profile) reason = `${reason}; reserveoppslag: ${error instanceof Error ? error.message : String(error)}`;
           }
           const captured = await options.read(TRUSTPILOT_CACHE_PREFIX + domain).catch(() => void 0);
           if (isFreshTrustpilotResult(captured, domain, now()) && captured.status === "ok" && captured.checkedAt >= base.checkedAt) return captured;
@@ -2063,7 +2096,11 @@ query OfferList($productId: Int!) {
     return [...links.values()];
   }
   const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
-  const accessoryWord = (text2) => text2.toLowerCase().match(ACCESSORY_WORDS)?.[0];
+  const SPARE_PART_WORDS = /^(?:for|til)\s|reservedel|støvsugerdeler|\b(?:deler|støvposer?|moppekluter?|børster?|filtre|filter) (?:for|til)\s|\bkompatibel med\s|\berstatning for\s/iu;
+  const accessoryWord = (text2) => {
+    const lower = text2.toLowerCase().trim();
+    return lower.match(ACCESSORY_WORDS)?.[0] ?? lower.match(SPARE_PART_WORDS)?.[0];
+  };
   function isAccessoryMismatch(pageTitle, candidateName) {
     return accessoryWord(pageTitle) !== void 0 && accessoryWord(candidateName) === void 0;
   }
@@ -4260,7 +4297,7 @@ query OfferList($productId: Int!) {
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-10T20:51:47.013Z";
+  const generatedAt = "2026-11-10T21:02:42.641Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -7578,25 +7615,21 @@ query SearchSuggestions($query: String!, $category: Int) {
     }
     return history2 === void 0 ? void 0 : { ...history2, lowestPriceEver: Math.min(offer.amount, history2.lowestPriceEver) };
   }
-  const RANGE_TEXT = {
-    "3m": { short: "3 mnd", long: "de siste tre månedene" },
-    "2y": { short: "2 år", long: "de siste to årene" },
-    all: { short: "all historikk", long: "gjennom hele historikken" }
-  };
+  const RANGE_TEXT = { "3m": "de siste tre månedene", "2y": "de siste to årene", all: "gjennom hele historikken" };
   function describePriceHistory(amount, history2, sourceName) {
     const low = getDealLowPrice(amount, history2.lowestPriceEver);
     if (low === void 0) return void 0;
-    const range = RANGE_TEXT[history2.historyRange];
+    const lowText = formatPrice(low.lowestPrice, "NOK");
     const atLow = amount <= low.lowestPrice;
-    const percent = low.dropToLowPercent > 0 ? `${new Intl.NumberFormat("nb-NO").format(low.dropToLowPercent)} %` : void 0;
-    const value = atLow ? "Laveste" : percent ? `−${percent}` : "<0,1 %";
+    const above = Math.round((amount - low.lowestPrice) / low.lowestPrice * 1e3) / 10;
+    const percent = above > 0 ? `${new Intl.NumberFormat("nb-NO").format(above)} %` : "<0,1 %";
     const title = [
-      `Laveste registrerte varepris hos ${sourceName} ${range.long}: ${formatPrice(low.lowestPrice, "NOK")}, inkludert dagens pris.`,
-      atLow ? "Dagens pris er på laveste registrerte nivå." : `Dagens pris må falle ${percent ?? "mindre enn 0,1 %"} for å nå den.`,
+      `Laveste registrerte varepris hos ${sourceName} ${RANGE_TEXT[history2.historyRange]}: ${lowText}, inkludert dagens pris.`,
+      atLow ? "Dagens pris er på laveste registrerte nivå." : `Dagens pris er ${percent} over den.`,
       history2.historyStartedAt ? `Registrert siden ${new Date(history2.historyStartedAt).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })}.` : "",
       "Alle varianter av produktet. Frakt er ikke med."
     ].filter(Boolean).join(" ");
-    return { atLow, value, label: atLow ? range.short : "til lavpris", title };
+    return atLow ? { atLow, value: "Lavpris", title } : { atLow, value: above > 0 ? `+${percent}` : percent, label: `lavpris ${lowText}`, title };
   }
   function readPrisjaktAllTimeHistory(value, variantIds, now) {
     if (!isRecord$7(value) || !isRecord$7(value.priceHistory) || !Array.isArray(value.priceHistory.historyItems)) throw new Error("Prisjakt history: missing priceHistory.historyItems");
@@ -24228,9 +24261,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const value = document.createElement("span");
     value.className = `cbn-chip cbn-chip--highlight${note.atLow ? "" : " cbn-chip--warning"}`;
     value.textContent = note.value;
-    const label = document.createElement("span");
-    label.textContent = note.label;
-    element.append(value, label);
+    element.append(value);
+    if (note.label !== void 0) {
+      const label = document.createElement("span");
+      label.textContent = note.label;
+      element.append(label);
+    }
     return element;
   }
   function buildPriceMatchCard(priceMatch, isBest = false) {

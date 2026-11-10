@@ -37,6 +37,7 @@ const USERSCRIPT_BANNER = `\
 // @connect      native-backend.cloud.pji.nu
 // @connect      no.trustpilot.com
 // @connect      www.trustpilot.com
+// @connect      widget.trustpilot.com
 // @connect      www.prisjakt.no
 // @connect      www.power.no
 // @connect      lyko.com

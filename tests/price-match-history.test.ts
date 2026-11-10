@@ -20,7 +20,7 @@ test("price-match history: the lowest includes today's price, so a fresh low rea
   const history = await findPriceMatchHistory({ ...klarnaOffer, amount: 8990 }, async () => klarnaHistory("5869423", 9490), async () => undefined);
   assert.equal(history?.lowestPriceEver, 8990);
   const note = describePriceHistory(8990, history!, "Klarna");
-  assert.deepEqual(note && [note.atLow, note.value, note.label], [true, "Laveste", "2 år"]);
+  assert.deepEqual(note && [note.atLow, note.value, note.label], [true, "Lavpris", undefined]);
   assert.match(note!.title, /^Laveste registrerte varepris hos Klarna de siste to årene: 8\s990\skr, inkludert dagens pris\. Dagens pris er på laveste registrerte nivå\. Registrert siden 2\. januar 2025\. .*Frakt er ikke med\.$/);
 });
 
@@ -33,8 +33,8 @@ test("price-match history: Godpris asks for the offer's own shop and price; Pris
   );
   assert.equal(godprisUrl, "https://godpris.no/api/product/history-section?id=i_123456&price=8990&shop=Power");
   assert.deepEqual(godpris && [godpris.lowestPriceEver, godpris.historyRange], [8490, "3m"]);
-  assert.equal(describePriceHistory(8990, godpris!, "Godpris")?.value, "−5,6 %");
-  assert.equal(describePriceHistory(8990, godpris!, "Godpris")?.label, "til lavpris");
+  assert.equal(describePriceHistory(8990, godpris!, "Godpris")?.value, "+5,9 %");
+  assert.match(describePriceHistory(8990, godpris!, "Godpris")?.label ?? "", /^lavpris 8\s490\skr$/);
 
   let init: { method?: string; body?: string } | undefined;
   const prisradar = await findPriceMatchHistory(
@@ -45,7 +45,7 @@ test("price-match history: Godpris asks for the offer's own shop and price; Pris
   assert.equal(init?.method, "POST");
   assert.match(init?.body ?? "", /"slug":"apple-iphone-16-128gb"/);
   assert.deepEqual(prisradar && [prisradar.lowestPriceEver, prisradar.historyRange], [8100, "all"]);
-  assert.equal(describePriceHistory(9000, prisradar!, "Prisradar")?.value, "−10 %");
+  assert.equal(describePriceHistory(9000, prisradar!, "Prisradar")?.value, "+11,1 %");
 });
 
 test("price-match history: other sources, other currencies, missing IDs and changed formats give no history", async () => {

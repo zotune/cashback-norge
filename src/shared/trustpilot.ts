@@ -1,4 +1,5 @@
-// Keyless consumer-site search + the profile's public Next JSON, inspected 2026-11-08.
+// Keyless consumer-site search + the profile's public Next JSON, inspected 2026-11-08; the
+// review-collection page + Review Collector TrustBox as fallback (2026-11-10).
 // These are website endpoints, not the API-key Business API. They can return a WAF
 // challenge (403); never execute it or treat it as an empty list/zero rating.
 import { isRecord, normalizeHostname, parseUrl } from "./cashback.js";
@@ -55,6 +56,31 @@ function readBusiness(value: unknown, domain: string, search: boolean): Trustpil
   const warning = alert ? shortText(alert.title, 250) || "Trustpilot viser et varsel på denne profilen. Les det hos Trustpilot." : "";
   return { source: "trustpilot", maxScore: 5, shopName: name, domain, businessUnitId: id, score, count: value.numberOfReviews,
     url: trustpilotProfileUrl(value.identifyingName), reviews: [], ...(warning ? { warning } : {}) };
+}
+
+// Fallback while the profile and search sit behind Trustpilot's AWS WAF challenge (November 2026):
+// the public review-collection page names the business unit, and the free «Review Collector»
+// TrustBox, which every business unit has, returns its TrustScore and review count. Both are
+// bound to the domain through identifyingName and websiteUrl; no reviews come with it.
+export const TRUSTPILOT_REVIEW_COLLECTOR_TRUSTBOX = "56278e9abfbbba0bdcd568bc";
+export function trustpilotEvaluateUrl(domain: string): string {
+  return `https://no.trustpilot.com/evaluate/${encodeURIComponent(domain)}`;
+}
+export function trustpilotTrustboxUrl(businessUnitId: string): string {
+  return `https://widget.trustpilot.com/trustbox-data/${TRUSTPILOT_REVIEW_COLLECTOR_TRUSTBOX}?${new URLSearchParams({ businessUnitId, locale: "nb-NO" })}`;
+}
+export function readTrustpilotEvaluatePage(html: string, domain: string): string | undefined {
+  const data = readNextPageData(html);
+  const business = isRecord(data) && isRecord(data.props) && isRecord(data.props.pageProps) ? data.props.pageProps.business : undefined;
+  if (!isRecord(business) || typeof business.identifyingName !== "string" || normalizeHostname(business.identifyingName) !== domain ||
+    typeof business.websiteUrl !== "string" || trustpilotDomain(business.websiteUrl) !== domain) return undefined;
+  return typeof business.businessId === "string" && /^[a-f\d]{24}$/.test(business.businessId) ? business.businessId : undefined;
+}
+export function readTrustpilotTrustbox(value: unknown, domain: string, businessUnitId: string): TrustpilotProfile | undefined {
+  const unit = isRecord(value) ? value.businessUnit : undefined;
+  if (!isRecord(unit)) return undefined;
+  const count = isRecord(unit.numberOfReviews) ? unit.numberOfReviews.total : undefined;
+  return readBusiness({ ...unit, id: businessUnitId, numberOfReviews: count }, domain, false);
 }
 
 export function readTrustpilotSearch(value: unknown, domain: string): TrustpilotProfile | undefined {
@@ -157,6 +183,16 @@ export function createTrustpilotClient(options: ClientOptions) {
             else if (!profile) { status = "unavailable"; reason = "Trustpilot: profilsiden mangler gyldige data for dette domenet"; }
           } else if (!profile) { status = response.status === 403 || response.status === 429 ? "blocked" : response.status === 404 ? "not-found" : "unavailable"; reason = `Trustpilot: profilsiden: HTTP ${response.status}`; }
         } } catch (error) { if (!profile) { status = "unavailable"; reason = `Trustpilot: profilsiden: ${error instanceof Error ? error.message : String(error)}`; } }
+        // Blocked or missing profile page: the collection page and TrustBox give the score and count.
+        try { if (!profile && !rateLimited) {
+          const evaluate = await request(trustpilotEvaluateUrl(domain));
+          const businessUnitId = evaluate.status === 200 ? readTrustpilotEvaluatePage(evaluate.text, domain) : undefined;
+          if (businessUnitId) {
+            const trustbox = await request(trustpilotTrustboxUrl(businessUnitId));
+            if (trustbox.status === 200) profile = readTrustpilotTrustbox(JSON.parse(trustbox.text), domain, businessUnitId);
+            if (!profile) reason = `${reason}; TrustBox: HTTP ${trustbox.status}${trustbox.status === 200 ? ", ukjent format" : ""}`;
+          } else reason = `${reason}; vurderingssiden: HTTP ${evaluate.status}${evaluate.status === 200 ? ", fant ikke virksomheten for domenet" : ""}`;
+        } } catch (error) { if (!profile) reason = `${reason}; reserveoppslag: ${error instanceof Error ? error.message : String(error)}`; }
         // A profile opened by the user may have been captured while the request was running.
         const captured = await options.read(TRUSTPILOT_CACHE_PREFIX + domain).catch(() => undefined);
         if (isFreshTrustpilotResult(captured, domain, now()) && captured.status === "ok" && captured.checkedAt >= base.checkedAt) return captured;
