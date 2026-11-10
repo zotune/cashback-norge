@@ -198,7 +198,11 @@ test("electricity: guarded public-page pipeline and runtime message validation",
 
 test("electricity: Fjordkraft and Norwegian Fortum pages show the same cheapest market shortlist", async () => {
   for (const url of ["https://www.fjordkraft.no/strom/", "https://www.fjordkraft.no/strom/stromavtale/strom-til-spotpris/",
-    "https://www.fortum.com/no/strom", "https://www.fortum.com/no/strom/stromavtale/spotpris", "https://cheapenergy.no/privat/cheap-spot-12/", "https://www.agva.no/", "https://hurumkraft.no/billig-strom/"]) {
+    "https://www.fortum.com/no/strom", "https://www.fortum.com/no/strom/stromavtale/spotpris", "https://cheapenergy.no/privat/cheap-spot-12/", "https://www.agva.no/"]) {
+    // Uses the bundled, daily-crawled supplier catalogue: only list suppliers
+    // that are stable there (Hurum Kraft left Forbrukerrådet's list 2026-11-10).
+    // Catalogue lookups themselves are covered with a fixture in
+    // electricity-supplier-catalog.test.ts.
     assert.equal(isElectricityPriceMatchUrl(url), true);
     const offers = await findElectricityPriceMatches({ ...message, url }, async () => [...fixture(), ...suppliersFixture()], NOW);
     assert.equal(offers[0]!.amount, 729);
