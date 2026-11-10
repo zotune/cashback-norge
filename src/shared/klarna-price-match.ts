@@ -12,7 +12,7 @@ import {
 } from "./product-match.js";
 import type { JsonRequest } from "./prisjakt-price-match.js";
 import { isExplicitPreorder } from "./price-match-availability.js";
-import { hasProductVariantConflict } from "./product-match.js";
+import { hasProductVariantConflict, hasSameManufacturerCode } from "./product-match.js";
 import { readPriceAmount as readNumberLike } from "./price.js";
 
 const KLARNA_PRODUCT_URL = "https://www.klarna.com/no/shopping";
@@ -41,6 +41,9 @@ export async function isKlarnaProductForOfferUrls(
 export async function findKlarnaPriceMatch(
   message: GetPriceMatchForProductMessage,
   requestJson: JsonRequest = fetchJson,
+  // Another source's verified product name («… - TU85U7005F»), searched after the page's own
+  // title; candidates are still checked against the page (buildProductMatchAnchor).
+  options: { anchorSearchTerms?: string[] } = {},
 ): Promise<PriceMatchOffer | undefined> {
   if (!message.productPageClue && message.searchTerm.trim().length < 8) {
     return undefined;
@@ -59,11 +62,13 @@ export async function findKlarnaPriceMatch(
   const searchQueries = uniqueStrings([
     ...(message.codes ?? []).filter(isLikelyGtin),
     message.searchTerm,
+    ...(options.anchorSearchTerms ?? []),
   ]);
   const anchor = buildProductMatchAnchor(message);
 
+  const anchorTerms = new Set(options.anchorSearchTerms ?? []);
   for (const query of searchQueries) {
-    const product = await fetchKlarnaProduct(query, requestJson, anchor, isLikelyGtin(query));
+    const product = await fetchKlarnaProduct(query, requestJson, anchor, isLikelyGtin(query), anchorTerms.has(query) ? query : undefined);
     if (product === undefined) continue;
 
     const offer = await fetchKlarnaOfferForProduct(product, requestJson);
@@ -96,6 +101,7 @@ async function fetchKlarnaProduct(
   requestJson: JsonRequest,
   anchor: ProductMatchAnchor,
   isCodeQuery: boolean,
+  verifiedName?: string,
 ): Promise<KlarnaProduct | undefined> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 4 || normalizedQuery.length > 100) return undefined;
@@ -129,6 +135,14 @@ async function fetchKlarnaProduct(
   // siden GTIN-treff kan ha annet språk/kortform).
   if (isCodeQuery) {
     return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }), CODE_QUERY_MIN_MATCH_SCORE);
+  }
+
+  // Another source's verified name: Klarna's short titles («Samsung TU85U7005F») score low
+  // against the page, so the same full manufacturer code counts, without a variant conflict
+  // against the page itself.
+  if (verifiedName !== undefined) {
+    const byCode = candidates.filter((candidate) => hasSameManufacturerCode(verifiedName, candidate.name) && !hasProductVariantConflict(anchor, candidate.name));
+    if (byCode.length === 1) return byCode[0];
   }
 
   return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }));

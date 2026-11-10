@@ -95,7 +95,17 @@ export async function findPriceMatchHistory(offer: HistoryOffer, requestJson: Hi
     if (request === undefined) return undefined;
     history = readPrisradarPriceHistory(await requestJson(request.url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: request.body }));
   }
-  return history === undefined ? undefined : { ...history, lowestPriceEver: Math.min(offer.amount, history.lowestPriceEver) };
+  return history === undefined ? undefined : plausiblePriceHistory(offer.amount, history);
+}
+
+// A «low» far below today's price is a bad history point (an accessory or a mispriced listing
+// once filed under the product: Sony WH-1000XM5 at 140 kr on Prisjakt), not a price to wait for.
+const MIN_PLAUSIBLE_LOW_RATIO = 0.35;
+
+/** The history with today's price folded into the low, or none when that low is implausible. */
+export function plausiblePriceHistory(amount: number, history: DealPriceHistory): DealPriceHistory | undefined {
+  const lowestPriceEver = Math.min(amount, history.lowestPriceEver);
+  return lowestPriceEver < amount * MIN_PLAUSIBLE_LOW_RATIO ? undefined : { ...history, lowestPriceEver };
 }
 
 export type PriceHistoryNote = { atLow: boolean; value: string; label?: string; title: string };

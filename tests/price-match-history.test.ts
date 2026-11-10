@@ -79,3 +79,10 @@ test("price-match history: Prisjakt reads its own product's chart variants; a se
   assert.equal(readPrisjaktHistoryVariantIds(prisjaktPage(prisjaktChart(16373878, [11], "SEK")), url), undefined);
   assert.deepEqual(JSON.parse(prisjaktPriceHistoryBody("16373878", [11, 12])), { productId: 16373878, timeRange: "ALL", shopIds: [], variantIds: [11, 12] });
 });
+
+test("price-match history: a low far below today's price is a bad history point and shows nothing", async () => {
+  const { plausiblePriceHistory } = await import("../src/shared/deal-price-history.js");
+  assert.equal(plausiblePriceHistory(2564, { lowestPriceEver: 140, historyRange: "all", historyScope: "product" }), undefined);
+  assert.equal(plausiblePriceHistory(2564, { lowestPriceEver: 1290, historyRange: "all", historyScope: "product" })?.lowestPriceEver, 1290);
+  assert.equal(plausiblePriceHistory(1290, { lowestPriceEver: 1490, historyRange: "2y", historyScope: "product" })?.lowestPriceEver, 1290);
+});

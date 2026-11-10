@@ -39,7 +39,7 @@ import { findPowerUserRating } from "./power-reviews.js";
 import { findTekReview } from "./tek-reviews.js";
 import { findGtinStoreRatings } from "./store-reviews.js";
 import { isAccessoryMismatch } from "./product-reviews.js";
-import { findPriceMatchHistory, type DealPriceHistory } from "./deal-price-history.js";
+import { findPriceMatchHistory, plausiblePriceHistory, type DealPriceHistory } from "./deal-price-history.js";
 import { PRISJAKT_PRICE_HISTORY_URL, prisjaktPriceHistoryBody, readPrisjaktAllTimeHistory, readPrisjaktHistoryVariantIds } from "./prisjakt-deal-details.js";
 import { klarnaReviewsUrl, readJsonLdUserRating, readPrisjaktShopRatings, readKlarnaProReviews, readKlarnaUserReviews } from "./product-reviews.js";
 import {
@@ -110,7 +110,15 @@ export async function findPriceMatches(
     ignorePriceMatchFailure(findEtilbudsavisPriceMatch(message, requestJson)),
   ]);
 
-  const anchorOffers = [prisjaktOffer, klarnaOffer]
+  // The page's own title can miss the product in Klarna's search («Samsung 85" U7005F UHD 4K
+  // smart-TV» lists other models); Prisjakt's verified name for it («… - TU85U7005F») finds it.
+  const firstVariantAnchor = buildProductMatchAnchor(message);
+  const validPrisjaktOffer = withoutProductVariantConflict(prisjaktOffer, firstVariantAnchor);
+  const klarnaAnchorOffer = withoutProductVariantConflict(klarnaOffer, firstVariantAnchor) ??
+    (validPrisjaktOffer !== undefined
+      ? await ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson, { anchorSearchTerms: [validPrisjaktOffer.productName] }))
+      : klarnaOffer);
+  const anchorOffers = [prisjaktOffer, klarnaAnchorOffer]
     .filter((offer): offer is PriceMatchOffer => offer !== undefined)
     .map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability))
     .filter((offer): offer is PriceMatchOffer => offer !== undefined);
@@ -241,11 +249,11 @@ async function findPrisjaktPriceHistory(html: string, offer: PriceMatchOffer, re
   });
   const history = readPrisjaktAllTimeHistory(response, variantIds, new Date().toISOString());
   if (history.lowestPriceEver === undefined) return undefined;
-  return {
-    lowestPriceEver: Math.min(offer.amount, history.lowestPriceEver), historyRange: "all", historyScope: "product",
+  return plausiblePriceHistory(offer.amount, {
+    lowestPriceEver: history.lowestPriceEver, historyRange: "all", historyScope: "product",
     ...(history.historyStartedAt ? { historyStartedAt: history.historyStartedAt } : {}),
     ...(history.historyUpdatedAt ? { historyUpdatedAt: history.historyUpdatedAt } : {}),
-  };
+  });
 }
 
 // Lowest registered price from each source's own history (Klarna two years, Godpris three

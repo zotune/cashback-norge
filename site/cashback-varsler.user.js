@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794345814
+// @version      1794346375
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1083,7 +1083,8 @@
     return anchorTiers.size !== candidateTiers.size || ![...anchorTiers].every((tier) => candidateTiers.has(tier));
   }
   function readModelTierTokens(text2) {
-    return new Set(tokenizeBrandText(text2).filter((token) => MODEL_TIER_TOKENS.has(token)));
+    const withoutResolution = text2.replace(/\bultra[\s-]*(?:hd|high[\s-]+definition)\b/gi, " ");
+    return new Set(tokenizeBrandText(withoutResolution).filter((token) => MODEL_TIER_TOKENS.has(token)));
   }
   function hasModelNumberConflict(anchorText, candidateTitle) {
     const anchorModels = readModelNumberTokens(anchorText);
@@ -1102,7 +1103,15 @@
     const candidateModels = readModelNumberTokens(candidateTitle);
     return anchorModels.length > 0 && candidateModels.length > 0 && hasCompatibleModelNumberPair(anchorModels, candidateModels);
   }
-  function hasCompatibleModelNumberPair(anchorModels, candidateModels) {
+  function hasSameManufacturerCode(first, second) {
+    const codes = (text2) => readModelNumberTokens(text2).filter((token) => token.length >= 8 && /^[a-z]/.test(token) && isStrongModelNumberToken(token));
+    const firstCodes = new Set(codes(first));
+    return codes(second).some((code) => firstCodes.has(code));
+  }
+  function hasCompatibleModelNumberPair(allAnchorModels, allCandidateModels) {
+    const real = (models) => models.filter((model) => !NUMERIC_MODEL_SPEC_TOKENS.has(model));
+    const anchorModels = real(allAnchorModels).length > 0 && real(allCandidateModels).length > 0 ? real(allAnchorModels) : allAnchorModels;
+    const candidateModels = anchorModels === allAnchorModels ? allCandidateModels : real(allCandidateModels);
     return anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
       return anchorModel === candidateModel || anchorModel.length >= 3 && candidateModel.includes(anchorModel) || candidateModel.length >= 3 && anchorModel.includes(candidateModel);
     }));
@@ -2095,7 +2104,7 @@ query OfferList($productId: Int!) {
     }
     return [...links.values()];
   }
-  const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
+  const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader|trekk|øreputer)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
   const SPARE_PART_WORDS = /^(?:for|til)\s|reservedel|støvsugerdeler|\b(?:deler|støvposer?|moppekluter?|børster?|filtre|filter) (?:for|til)\s|\bkompatibel med\s|\berstatning for\s/iu;
   const accessoryWord = (text2) => {
     const lower = text2.toLowerCase().trim();
@@ -5824,7 +5833,7 @@ query OfferList($productId: Int!) {
     }
     return false;
   }
-  async function findKlarnaPriceMatch(message, requestJson = fetchJson$2) {
+  async function findKlarnaPriceMatch(message, requestJson = fetchJson$2, options = {}) {
     if (!message.productPageClue && message.searchTerm.trim().length < 8) {
       return void 0;
     }
@@ -5839,18 +5848,20 @@ query OfferList($productId: Int!) {
     }
     const searchQueries = uniqueStrings$4([
       ...(message.codes ?? []).filter(isLikelyGtin$5),
-      message.searchTerm
+      message.searchTerm,
+      ...options.anchorSearchTerms ?? []
     ]);
     const anchor = buildProductMatchAnchor(message);
+    const anchorTerms = new Set(options.anchorSearchTerms ?? []);
     for (const query of searchQueries) {
-      const product = await fetchKlarnaProduct(query, requestJson, anchor, isLikelyGtin$5(query));
+      const product = await fetchKlarnaProduct(query, requestJson, anchor, isLikelyGtin$5(query), anchorTerms.has(query) ? query : void 0);
       if (product === void 0) continue;
       const offer = await fetchKlarnaOfferForProduct(product, requestJson);
       if (offer !== void 0) return offer;
     }
     return void 0;
   }
-  async function fetchKlarnaProduct(query, requestJson, anchor, isCodeQuery) {
+  async function fetchKlarnaProduct(query, requestJson, anchor, isCodeQuery, verifiedName) {
     const normalizedQuery = query.trim();
     if (normalizedQuery.length < 4 || normalizedQuery.length > 100) return void 0;
     const params = new URLSearchParams({ q: normalizedQuery });
@@ -5877,6 +5888,10 @@ query OfferList($productId: Int!) {
     }
     if (isCodeQuery) {
       return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }), CODE_QUERY_MIN_MATCH_SCORE);
+    }
+    if (verifiedName !== void 0) {
+      const byCode = candidates.filter((candidate) => hasSameManufacturerCode(verifiedName, candidate.name) && !hasProductVariantConflict(anchor, candidate.name));
+      if (byCode.length === 1) return byCode[0];
     }
     return pickBestProductCandidate(anchor, candidates, (candidate) => ({ title: candidate.name }));
   }
@@ -7613,7 +7628,12 @@ query SearchSuggestions($query: String!, $category: Int) {
       if (request === void 0) return void 0;
       history2 = readPrisradarPriceHistory(await requestJson(request.url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: request.body }));
     }
-    return history2 === void 0 ? void 0 : { ...history2, lowestPriceEver: Math.min(offer.amount, history2.lowestPriceEver) };
+    return history2 === void 0 ? void 0 : plausiblePriceHistory(offer.amount, history2);
+  }
+  const MIN_PLAUSIBLE_LOW_RATIO = 0.35;
+  function plausiblePriceHistory(amount, history2) {
+    const lowestPriceEver = Math.min(amount, history2.lowestPriceEver);
+    return lowestPriceEver < amount * MIN_PLAUSIBLE_LOW_RATIO ? void 0 : { ...history2, lowestPriceEver };
   }
   const RANGE_TEXT = { "3m": "de siste tre månedene", "2y": "de siste to årene", all: "gjennom hele historikken" };
   function describePriceHistory(amount, history2, sourceName) {
@@ -8462,7 +8482,10 @@ query SearchSuggestions($query: String!, $category: Int) {
       ignorePriceMatchFailure(findPokeprisPriceMatch(message, requestText, { requestJson, useCatalog: true, onVerifiedAvailability: (fact) => verifiedAvailability.push(fact) })),
       ignorePriceMatchFailure(findEtilbudsavisPriceMatch(message, requestJson))
     ]);
-    const anchorOffers = [prisjaktOffer, klarnaOffer].filter((offer) => offer !== void 0).map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability)).filter((offer) => offer !== void 0);
+    const firstVariantAnchor = buildProductMatchAnchor(message);
+    const validPrisjaktOffer = withoutProductVariantConflict(prisjaktOffer, firstVariantAnchor);
+    const klarnaAnchorOffer = withoutProductVariantConflict(klarnaOffer, firstVariantAnchor) ?? (validPrisjaktOffer !== void 0 ? await ignorePriceMatchFailure(findKlarnaPriceMatch(message, requestJson, { anchorSearchTerms: [validPrisjaktOffer.productName] })) : klarnaOffer);
+    const anchorOffers = [prisjaktOffer, klarnaAnchorOffer].filter((offer) => offer !== void 0).map((offer) => excludeVerifiedPreorders(offer, verifiedAvailability)).filter((offer) => offer !== void 0);
     const anchorOffersMatchCurrentPage = isPriceMatchAllowedForCurrentPage(anchorOffers, message);
     const canUsePrisradarOffer = anchorOffersMatchCurrentPage || isKnownPriceMatchSourceProductUrl(message.url) || isKnownPriceMatchSourceProductUrl(message.productUrl);
     const variantAnchor = buildProductMatchAnchor(message);
@@ -8560,13 +8583,13 @@ query SearchSuggestions($query: String!, $category: Int) {
     });
     const history2 = readPrisjaktAllTimeHistory(response, variantIds, (/* @__PURE__ */ new Date()).toISOString());
     if (history2.lowestPriceEver === void 0) return void 0;
-    return {
-      lowestPriceEver: Math.min(offer.amount, history2.lowestPriceEver),
+    return plausiblePriceHistory(offer.amount, {
+      lowestPriceEver: history2.lowestPriceEver,
       historyRange: "all",
       historyScope: "product",
       ...history2.historyStartedAt ? { historyStartedAt: history2.historyStartedAt } : {},
       ...history2.historyUpdatedAt ? { historyUpdatedAt: history2.historyUpdatedAt } : {}
-    };
+    });
   }
   async function withPriceHistory(offers, requestText, requestJson) {
     return Promise.all(offers.map(async (offer) => {

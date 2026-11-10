@@ -296,6 +296,7 @@ test("accessory pages never take the device's reviews", async () => {
     assert.equal(isAccessoryMismatch(kit, robot), true, kit);
   }
   assert.equal(isAccessoryMismatch("QR 798 rengjøringsrobot QVRRS52-00 (sort)", robot), false);
+  assert.equal(isAccessoryMismatch("Hodebøyletrekk til Sony WH-1000XM5 hodetelefoner Black", "Sony WH-1000XM5 trådløse støydempende hodetelefoner (sort)"), true);
   assert.equal(isAccessoryMismatch("Roborock QR 798 Robotstøvsuger med HEPA-filter, moppeklut og 2 støvposer", robot), false);
   const { readTekReview } = await import("../src/shared/tek-reviews.js");
   const response = { data: { reviewedProducts: { items: [{ id: "1", name: "Apple AirPods Pro 3", latestReview: { rating: { value: 9 }, articleId: "abc", sectionName: "test", articleSlug: "airpods" } }] } } };

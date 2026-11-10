@@ -301,7 +301,9 @@ export function hasModelTierConflict(anchorText: string, candidateTitle: string)
 }
 
 function readModelTierTokens(text: string): Set<string> {
-  return new Set(tokenizeBrandText(text).filter((token) => MODEL_TIER_TOKENS.has(token)));
+  // «4K Ultra HD» is a resolution, not a model tier like «Galaxy S25 Ultra».
+  const withoutResolution = text.replace(/\bultra[\s-]*(?:hd|high[\s-]+definition)\b/gi, " ");
+  return new Set(tokenizeBrandText(withoutResolution).filter((token) => MODEL_TIER_TOKENS.has(token)));
 }
 
 // Modellnumre (tokens med både bokstaver og siffer, f.eks. "D20", "R2563H") er det
@@ -337,7 +339,21 @@ export function hasMatchingModelNumberToken(anchorText: string, candidateTitle: 
     hasCompatibleModelNumberPair(anchorModels, candidateModels);
 }
 
-function hasCompatibleModelNumberPair(anchorModels: string[], candidateModels: string[]): boolean {
+/** Both titles carry the same full manufacturer code («TU85U7005F»: letters and digits, at least
+ * eight characters), exactly; a longer or shorter code («TU85U7005HUXNA», «U7005») is another
+ * product or only a series. */
+export function hasSameManufacturerCode(first: string, second: string): boolean {
+  const codes = (text: string) => readModelNumberTokens(text).filter((token) => token.length >= 8 && /^[a-z]/.test(token) && isStrongModelNumberToken(token));
+  const firstCodes = new Set(codes(first));
+  return codes(second).some((code) => firstCodes.has(code));
+}
+
+function hasCompatibleModelNumberPair(allAnchorModels: string[], allCandidateModels: string[]): boolean {
+  // A shared «4k» or «5g» says nothing about the model («U7005F 4K» vs «Q8F 4K»): when either
+  // side names a real model, only those count.
+  const real = (models: string[]) => models.filter((model) => !NUMERIC_MODEL_SPEC_TOKENS.has(model));
+  const anchorModels = real(allAnchorModels).length > 0 && real(allCandidateModels).length > 0 ? real(allAnchorModels) : allAnchorModels;
+  const candidateModels = anchorModels === allAnchorModels ? allCandidateModels : real(allCandidateModels);
   return anchorModels.some((anchorModel) => candidateModels.some((candidateModel) => {
     return anchorModel === candidateModel ||
       (anchorModel.length >= 3 && candidateModel.includes(anchorModel)) ||

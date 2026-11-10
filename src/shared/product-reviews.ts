@@ -222,7 +222,7 @@ export function readGodprisStoreLinks(html: string): Array<{ shopName: string; u
 // Accessory words: a page for "Silikonetui for Apple AirPods Pro 3" must not take the tests or
 // ratings of the AirPods themselves.
 // Norwegian compounds count too ("silikonetui", "mobildeksel"); short words need a word start.
-const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
+const ACCESSORY_WORDS = /(?:etui|deksel|futteral|beskytter|beskyttelsesglass|panserglass|ladekabel|kabel|holder|stativ|veske|lader|trekk|øreputer)\b|\b(?:cover|case|reim|strap|refill)\b/iu;
 // Spare-part kits named after the device they fit («For Roborock Qrevo L / QR 798 … Hovedbørste»,
 // «Reservedeler for …», «… kompatibel med …», «støvposer for …»). A bare «filter», «støvpose» or
 // «moppeklut» is not enough: device titles list them as included features.
