@@ -13,6 +13,8 @@ test("grocery chains have a unique slug, a label and hex colours for their chip"
   }
   assert.equal(getGroceryChain("KIWI")?.bg, "#50b848");
   assert.equal(getGroceryChain("oda")?.label, "Oda");
+  assert.equal(getGroceryChain("Gigaboks")?.bg, "#8746df");
+  assert.equal(getGroceryCardBonus("Gigaboks"), undefined);
   assert.equal(getGroceryChain("Biltema"), undefined);
 });
 
