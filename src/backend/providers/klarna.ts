@@ -1,6 +1,6 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
-import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage, ProxyConfiguration } from "crawlee";
+import { CheerioCrawler, type CheerioCrawlingContext, Configuration, gotScraping, MemoryStorage, ProxyConfiguration } from "crawlee";
 import {
   type CashbackOffer,
   normalizeDomainInput,
@@ -24,9 +24,11 @@ export type CrawlKlarnaInput = {
 
 async function runKlarnaCrawl(
   input: CrawlKlarnaInput,
+  label: string,
   proxyUrl?: string,
 ): Promise<CashbackOffer[]> {
   const rawOffers: CashbackOffer[] = [];
+  const pageResults: string[] = [];
 
   const storage = new MemoryStorage({ persistStorage: false });
   const config = new Configuration();
@@ -42,25 +44,51 @@ async function runKlarnaCrawl(
     useSessionPool: false,
     maxRequestsPerCrawl: input.maxPages,
     ...(proxyConfiguration ? { proxyConfiguration } : {}),
-    requestHandler: async ({ $, request }) => {
+    requestHandler: async ({ $, request, response }) => {
       const pageOffers = parseKlarnaStoreListing(
         $,
         request.url,
         input.generatedAt,
       );
       rawOffers.push(...pageOffers);
+      pageResults.push(describeKlarnaPage(request.url, response.statusCode, pageOffers.length, $));
+    },
+    failedRequestHandler: async ({ request }, error) => {
+      pageResults.push(`${pageNumber(request.url)}: failed (${error.message})`);
     },
   }, config);
 
   const pageUrls = buildPageUrls(input.startUrl, input.maxPages);
   await crawler.run(pageUrls);
+
+  if (rawOffers.length === 0) {
+    // A block page, exhausted proxy credits or a changed page format all end
+    // as zero stores; log what each page actually returned so they differ.
+    input.logger.warn(`Klarna ${label}: 0 offers; ${pageResults.join("; ") || "no pages handled"}`);
+  }
+
   return rawOffers;
+}
+
+function pageNumber(url: string): string {
+  return `page ${new URL(url).searchParams.get("page") ?? "?"}`;
+}
+
+function describeKlarnaPage(
+  url: string,
+  statusCode: number | undefined,
+  offerCount: number,
+  $: KlarnaCheerio,
+): string {
+  const title = $("title").first().text().replace(/\s+/g, " ").trim().slice(0, 80);
+  const hasStoreState = $("script").toArray().some((el) => ($(el).html() ?? "").includes("storeDirectUrl"));
+  return `${pageNumber(url)}: HTTP ${statusCode ?? "?"}, ${offerCount} offers, store data ${hasStoreState ? "present" : "missing"}${title ? `, title «${title}»` : ""}`;
 }
 
 export async function crawlKlarna(
   input: CrawlKlarnaInput,
 ): Promise<CashbackOffer[]> {
-  let rawOffers = await runKlarnaCrawl(input);
+  let rawOffers = await runKlarnaCrawl(input, "direct");
   const proxyUrls = [
     ...(input.proxyUrls ?? []),
     ...(input.proxyUrl ? [input.proxyUrl] : []),
@@ -70,7 +98,7 @@ export async function crawlKlarna(
     input.logger.info("Klarna: direct crawl returned 0 offers, retrying via proxy");
     for (const [index, proxyUrl] of proxyUrls.entries()) {
       try {
-        rawOffers = await runKlarnaCrawl(input, proxyUrl);
+        rawOffers = await runKlarnaCrawl(input, `proxy ${index + 1}/${proxyUrls.length}`, proxyUrl);
       } catch (error) {
         input.logger.warn(`Klarna proxy ${index + 1}/${proxyUrls.length} failed: ${error}`);
         rawOffers = [];
@@ -88,7 +116,7 @@ export async function crawlKlarna(
   );
 
   // Supplement with app API data (public, no auth required)
-  const appOffers = await fetchKlarnaAppOffers(input.generatedAt, input.logger);
+  const appOffers = await fetchKlarnaAppOffers(input.generatedAt, input.logger, proxyUrls);
   const webMerchants = new Set(rawOffers.map((o) => o.merchantName.toLowerCase()));
   let appOnlyCount = 0;
   for (const appOffer of appOffers) {
@@ -337,7 +365,7 @@ type KlarnaAppDeal = {
   endedAt: string | null;
 };
 
-type KlarnaAppSection = {
+export type KlarnaAppSection = {
   title: string;
   deals: KlarnaAppDeal[];
 };
@@ -372,9 +400,37 @@ const KLARNA_APP_QUERY = `query getCashbackLandingPage($market: Market!) {
 async function fetchKlarnaAppOffers(
   generatedAt: string,
   logger: Logger,
+  proxyUrls: string[] = [],
 ): Promise<CashbackOffer[]> {
+  // The public API returns sections without deals to some non-Norwegian
+  // datacenter IPs, so retry through the Norway-pinned proxies when the
+  // direct response has no deals.
+  const attempts: Array<{ label: string; proxyUrl?: string }> = [
+    { label: "direct" },
+    ...proxyUrls.map((proxyUrl, index) => ({ label: `proxy ${index + 1}/${proxyUrls.length}`, proxyUrl })),
+  ];
+
+  for (const attempt of attempts) {
+    const sections = await requestKlarnaAppSections(attempt.label, attempt.proxyUrl, logger);
+    if (sections === undefined) continue;
+    const dealCount = sections.reduce((sum, section) => sum + (section.deals?.length ?? 0), 0);
+    if (dealCount === 0) {
+      logger.warn(`Klarna app API ${attempt.label}: ${sections.length} sections without deals`);
+      continue;
+    }
+    return parseKlarnaAppSections(sections, generatedAt, logger);
+  }
+
+  return [];
+}
+
+async function requestKlarnaAppSections(
+  label: string,
+  proxyUrl: string | undefined,
+  logger: Logger,
+): Promise<KlarnaAppSection[] | undefined> {
   try {
-    const res = await fetch(KLARNA_APP_GRAPHQL_URL, {
+    const res = await gotScraping(KLARNA_APP_GRAPHQL_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -382,59 +438,72 @@ async function fetchKlarnaAppOffers(
         query: KLARNA_APP_QUERY,
         variables: { market: "NO" },
       }),
+      responseType: "json",
+      throwHttpErrors: false,
+      retry: { limit: 1 },
+      timeout: { request: 30_000 },
+      ...(proxyUrl ? { proxyUrl } : {}),
     });
 
-    if (!res.ok) {
-      logger.warn(`Klarna app API returned ${res.status}`);
-      return [];
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      logger.warn(`Klarna app API ${label} returned HTTP ${res.statusCode} for ${KLARNA_APP_GRAPHQL_URL}`);
+      return undefined;
     }
 
-    const json = (await res.json()) as KlarnaAppResponse;
-    const sections = json.data?.cashbackLandingPage?.sections;
-    if (!sections) {
-      logger.warn("Klarna app API returned no sections");
-      return [];
+    const sections = (res.body as KlarnaAppResponse | undefined)?.data?.cashbackLandingPage?.sections;
+    if (!Array.isArray(sections)) {
+      logger.warn(`Klarna app API ${label} returned no sections`);
+      return undefined;
     }
-
-    const seen = new Set<string>();
-    const offers: CashbackOffer[] = [];
-
-    for (const section of sections) {
-      for (const deal of section.deals) {
-        const key = deal.merchantName.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        const pct = deal.cashbackAmount / 100;
-        const pctStr = Number.isInteger(pct) ? `${pct}` : `${pct}`.replace(".", ",");
-        const reward = deal.isUpTo ? `1-${pctStr} %` : `${pctStr} %`;
-
-        let domain: string | undefined;
-        try {
-          const url = new URL(deal.dealUrl);
-          domain = url.hostname.replace(/^www\./, "");
-        } catch {
-          // skip
-        }
-
-        const searchQuery = encodeURIComponent(deal.merchantName);
-        offers.push({
-          provider: "klarna",
-          merchantName: deal.merchantName,
-          domains: domain ? [domain] : [],
-          reward,
-          sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
-          activationUrl: deal.dealUrl,
-          terms: "Cashback i appen Klarna i kassen",
-          updatedAt: generatedAt,
-        });
-      }
-    }
-
-    logger.info(`Klarna app API yielded ${offers.length} unique offers`);
-    return offers;
+    return sections;
   } catch (err) {
-    logger.warn(`Klarna app API failed: ${err}`);
-    return [];
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn(`Klarna app API ${label} failed for ${KLARNA_APP_GRAPHQL_URL}: ${message}`);
+    return undefined;
   }
+}
+
+export function parseKlarnaAppSections(
+  sections: KlarnaAppSection[],
+  generatedAt: string,
+  logger: Logger,
+): CashbackOffer[] {
+  const seen = new Set<string>();
+  const offers: CashbackOffer[] = [];
+
+  for (const section of sections) {
+    for (const deal of section.deals ?? []) {
+      const key = deal.merchantName.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      if (typeof deal.cashbackAmount !== "number" || !Number.isFinite(deal.cashbackAmount) || deal.cashbackAmount <= 0) continue;
+      const pct = deal.cashbackAmount / 100;
+      const pctStr = Number.isInteger(pct) ? `${pct}` : `${pct}`.replace(".", ",");
+      const reward = deal.isUpTo ? `1-${pctStr} %` : `${pctStr} %`;
+
+      let domain: string | undefined;
+      try {
+        const url = new URL(deal.dealUrl);
+        domain = url.hostname.replace(/^www\./, "");
+      } catch {
+        // skip
+      }
+
+      const searchQuery = encodeURIComponent(deal.merchantName);
+      offers.push({
+        provider: "klarna",
+        merchantName: deal.merchantName,
+        domains: domain ? [domain] : [],
+        reward,
+        sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
+        activationUrl: deal.dealUrl,
+        terms: "Cashback i appen Klarna i kassen",
+        updatedAt: generatedAt,
+      });
+    }
+  }
+
+  logger.info(`Klarna app API yielded ${offers.length} unique offers`);
+  return offers;
 }

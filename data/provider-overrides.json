@@ -2255,7 +2255,9 @@
       "parkvia.com"
     ]
   },
-  "vestbo": {},
+  "vestbo": {
+    "kampanje.kongeparken.no": ["kongeparken.no"]
+  },
   "bbl": {},
   "elbilforeningen": {},
   "ys": {},

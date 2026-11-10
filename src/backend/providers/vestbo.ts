@@ -2,7 +2,7 @@
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
 import { gotScraping } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
-import { normalizeDomainInput, parseUrl, stripHtml } from "../../shared/cashback.js";
+import { decodeHtmlEntities, normalizeDomainInput, parseUrl, stripHtml } from "../../shared/cashback.js";
 import { extractBenefitReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -100,12 +100,15 @@ type BenefitCard = { link: string; text: string };
 // [vc_single_image ... link=»partner-url»] followed by a
 // [vc_column_text]description[/vc_column_text] block. Quotes render as
 // &raquo; entities in the REST payload.
-function parseBenefitCards(content: string): BenefitCard[] {
+export function parseBenefitCards(content: string): BenefitCard[] {
   const cards: BenefitCard[] = [];
-  const imagePattern = /\[vc_single_image[^\]]*?link=&raquo;([^&\]]+?)&raquo;[^\]]*\]/g;
+  // WordPress may texturize a straight quote inside an attribute into
+  // &#8243; (″), e.g. a campaign URL ending in "…cbispid%3D2726520″" — it
+  // ends the link the same way &raquo; does.
+  const imagePattern = /\[vc_single_image[^\]]*?link=&raquo;([^\]]+?)(?:&raquo;|&#8243;)[^\]]*\]/g;
 
   for (const imageMatch of content.matchAll(imagePattern)) {
-    const link = (imageMatch[1] ?? "").trim();
+    const link = decodeHtmlEntities(imageMatch[1] ?? "").trim();
 
     if (link === "") {
       continue;
@@ -157,6 +160,7 @@ function buildTerms(text: string): string {
     .split(/\n+/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter((line) => line.length >= 12 && line.length <= 220)
+    .filter((line) => !/^klikk\s+her\b/i.test(line))
     .slice(0, 5);
 
   return [...lines, DEFAULT_TERMS].join("\n");
