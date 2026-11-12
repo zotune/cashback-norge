@@ -11,7 +11,7 @@ import { normalizeDomainInput, parseUrl, stripHtml } from "../shared/cashback.js
 import {
   extractKrReward,
   extractOreLitreReward,
-  extractPercentageReward,
+  extractUpToPercentageReward,
 } from "../shared/reward.js";
 
 export type BenefitListOffer = {
@@ -19,6 +19,7 @@ export type BenefitListOffer = {
   domain: string;
   reward: string;
   text: string;
+  discountCode?: string;
 };
 
 export type BlockStrategy =
@@ -32,12 +33,27 @@ const GENERIC_LINK_TEXT =
 const DEFAULT_EXCLUDE =
   /facebook\.com|instagram\.com|youtube\.com|linkedin\.com|twitter\.com|(^|\.)x\.com|tiktok\.com|google\.|gstatic|googleapis|vimeo\.com|cookieinformation|cookielaw|schema\.org|w3\.org|apple\.com|play\.google|itunes|wp\.com|gravatar/;
 
+/**
+ * "medlemskap i Kinoklubben til kun 125 kr … filmer til HALV PRIS": the member
+ * buys a club membership at a member price, and the half price is the club's
+ * own ticket benefit — not a 50 % discount from the organisation.
+ */
+export function halfPriceIsClubBenefit(text: string): boolean {
+  return /\bhalv\s+pris\b/i.test(text) &&
+    /\b(?:til|for)\s+(?:kun|bare)\s+(?:kr\.?\s*)?\d[\d\s.]*\s*(?:kr\b|kroner|,-)?/i.test(text) &&
+    // "medlemskap", "årsmedlemskap", "klubbmedlemskap"
+    /medlemskap/i.test(text);
+}
+
 /** Reads the reward from a single offer block's text. */
 export function rewardFromText(text: string): string {
-  if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
-
-  const percentage = extractPercentageReward(text);
+  // An explicit member discount wins over "halv pris": on Kinoklubben the
+  // half price is what its own members pay for tickets, the partner discount
+  // is on the membership ("40 % rabatt på medlemskapet").
+  // "Opptil 30 %" keeps its qualifier.
+  const percentage = extractUpToPercentageReward(text);
   if (percentage) return percentage;
+  if (/\bhalv\s+pris\b/i.test(text)) return halfPriceIsClubBenefit(text) ? "Medlemspris" : "50 %";
 
   const oreLitre = extractOreLitreReward(text);
   if (oreLitre) return oreLitre;
@@ -48,7 +64,11 @@ export function rewardFromText(text: string): string {
   // "Kroner 1000 i avslag" — amount after the currency word, which the
   // structured extractor doesn't cover.
   const krEitherOrder = text.match(/(?:kr|kroner)\s*(\d[\d\s]{0,7}\d|\d)\b/i);
-  if (krEitherOrder) return `${(krEitherOrder[1] ?? "").replace(/\s/g, "")} kr`;
+  if (krEitherOrder) {
+    const amount = Number.parseInt((krEitherOrder[1] ?? "").replace(/\s/g, ""), 10);
+    // Same "1 000 kr" format as the shared extractors.
+    if (Number.isFinite(amount) && amount > 0) return `${amount.toLocaleString("nb-NO").replace(/[\u00a0\u202f]/g, " ")} kr`;
+  }
 
   // Deliberately no "gratis" → "0 kr totalsum" branch: incidental words like
   // "gratis frakt/befaring" produce false 0-kr rewards. Member-price offers
@@ -56,6 +76,32 @@ export function rewardFromText(text: string): string {
   if (/\bmedlemspris(?:er)?\b|\bmedlemstilbud\b|\brabatt\b/i.test(text)) return "Medlemspris";
 
   return "";
+}
+
+const MAX_TERMS_LENGTH = 500;
+
+/**
+ * A code written in the block ("Legg inn rabattkoden RSMEDLEM", "Avtalekode:
+ * D000004481"). Instructions ("bruk rabattkoden i kassen") are not codes: a
+ * code is written in capitals/digits.
+ */
+export function discountCodeFromText(text: string): string | undefined {
+  const match = text.match(/\b(?:[Rr]abatt|[Aa]vtale|[Kk]ampanje)?[Kk]oden?\s*:?\s*([A-Z0-9][A-Z0-9-]{2,29})\b/);
+  return match?.[1];
+}
+
+/** Tooltip terms: the offer block's own text, then the provider's default. */
+export function benefitTerms(text: string, defaultTerms: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized === "") return defaultTerms;
+  let terms = normalized;
+  if (terms.length > MAX_TERMS_LENGTH) {
+    // Cut at a sentence (or at least a word) boundary, never mid-word.
+    const cut = terms.slice(0, MAX_TERMS_LENGTH);
+    const sentenceEnd = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "));
+    terms = sentenceEnd > 100 ? cut.slice(0, sentenceEnd + 1) : `${cut.slice(0, cut.lastIndexOf(" "))} …`;
+  }
+  return `${terms}\n${defaultTerms}`;
 }
 
 export function parseBenefitListPage(
@@ -79,11 +125,13 @@ export function parseBenefitListPage(
     if (reward === "") continue;
 
     seenDomains.add(link.domain);
+    const discountCode = discountCodeFromText(text);
     offers.push({
       merchantName: cleanMerchantName(link.text, link.domain),
       domain: link.domain,
       reward,
       text,
+      ...(discountCode !== undefined ? { discountCode } : {}),
     });
   }
 

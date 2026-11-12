@@ -71,7 +71,8 @@ export async function fetchAgrol(input: FetchAgrolInput): Promise<CashbackOffer[
     // rabatt"), not structured amounts. Only trust an explicit percentage;
     // otherwise label it "Medlemspris". (The generic benefit extractor would
     // mis-read stray words like "gratis frakt" as a 0 kr total.)
-    const reward = extractPercentageReward(item.text) || "Medlemspris";
+    // Agreements described as "Agrol-rabatt" are discounts without a rate.
+    const reward = extractPercentageReward(item.text) || (/rabatt/i.test(item.text) ? "Rabatt" : "Medlemspris");
 
     offers.push({
       provider: "agrol",
@@ -80,7 +81,7 @@ export async function fetchAgrol(input: FetchAgrolInput): Promise<CashbackOffer[
       reward,
       sourceUrl: LIST_URL,
       activationUrl: LIST_URL,
-      terms: DEFAULT_TERMS,
+      terms: buildTerms(item.text),
       updatedAt: input.generatedAt,
     });
   }
@@ -176,4 +177,20 @@ function isOfficialApiUrl(url: string): boolean {
   return parsed !== undefined &&
     parsed.origin === SITE_ORIGIN &&
     parsed.pathname === "/wp-json/wp/v2/agreement";
+}
+
+// The agreement's own description ("Rabatten gjelder hotellrom i helg og
+// ferieperioder", "medlemmer med eget organisasjonsnummer …") without the
+// «Om avtalen» heading, cut at a sentence boundary.
+function buildTerms(text: string): string {
+  const description = text.replace(/\s+/g, " ").replace(/^Om (?:avtalen|fordelen)\s+/i, "").trim();
+  const sentences = description.split(/(?<=[.!?])\s+(?=[A-ZÆØÅ])/);
+  const lines: string[] = [];
+  let length = 0;
+  for (const sentence of sentences) {
+    if (length + sentence.length > 400) break;
+    lines.push(sentence);
+    length += sentence.length + 1;
+  }
+  return [lines.join(" "), DEFAULT_TERMS].filter(Boolean).join("\n");
 }

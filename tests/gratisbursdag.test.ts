@@ -75,7 +75,7 @@ test("discovers the current bundle safely and carries useful birthday terms thro
     assert.deepEqual(requests, ["/", "/assets/index-new-hash.js"]);
     assert.equal(offers.length, 1);
     assert.equal(offer.reward, "0 kr totalsum");
-    assert.equal(formatCompactRewardLabel(offer), "0 kr totalsum");
+    assert.equal(formatCompactRewardLabel(offer), "Gratis");
     assert.equal(calculateCashback(offer, 1000), "");
     assert.equal(offer.discountCode, undefined);
     for (const detail of ["Gratis kaffe", "Hent gaven i appen", "Kundeklubb", "Registrert fødselsdato", "5 dager", "Fysiske butikker", "ubekreftet", "ikke cashback"]) {

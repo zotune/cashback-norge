@@ -159,7 +159,8 @@ test("student prices stated in the detail text are read as totals", () => {
 
 test("discounts, maximums and unit prices are not misread as a student price", () => {
   assert.equal(parseStudentTorgetReward("OPPTIL -30%", ""), "opptil 30 %");
-  assert.equal(parseStudentTorgetReward("", "Spar opp til 40 % + 10 % ekstra med StudentTorgets rabattkode!"), "opptil 10-40 %");
+  // Hotels.com's own sale is up to 40 %; the student code adds 10 % on top.
+  assert.equal(parseStudentTorgetReward("", "Spar opp til 40 % + 10 % ekstra med StudentTorgets rabattkode!"), "10 %");
   assert.equal(parseStudentTorgetReward("", "Du får 200 kr i rabatt på første time."), "200 kr");
   // A maximum is not a price.
   assert.equal(parseStudentTorgetReward("", "Gavekort på inntil 300,- per student"), "");
@@ -170,4 +171,76 @@ test("discounts, maximums and unit prices are not misread as a student price", (
   assert.equal(parseStudentTorgetReward("", "", "Dameklipp student fra 620,-"), "");
   // The source states no amount: keep it unknown.
   assert.equal(parseStudentTorgetReward("", "Apple Music har studentrabatt.", "Besøk Apple Music for mer informasjon."), "");
+});
+
+test("free-text rewards: only this merchant's discount, bundles, prefixed prices and per-unit prices", () => {
+  // Live texts (studenttorget.no, 2026-11-12), trimmed.
+  // Emirates: "inntil 100 % bonus-Miles" is a loyalty perk, not the discount.
+  assert.equal(parseStudentTorgetReward("", "", "Bruk tilbudskoden STUDENT for å få opptil 10 % rabatt på Economy Class-priser og 5 % rabatt på Premium Economy- og Business Class-priser.\nEtter hvert som du går opp i medlemsnivå, vil du opptjene inntil 100 % bonus-Miles på hver flygning."), "opptil 5-10 %");
+  // Min Kiropraktor: the student association's refund is not the clinic's discount.
+  assert.equal(parseStudentTorgetReward("", "", "Kiropraktor første gang 550kr.\nSIA refunderer i tillegg til studentrabatten opp til 40 % av behandlingen."), "");
+  assert.equal(parseStudentTorgetReward("-15 %", ""), "15 %");
+  // A bare "45,-" badge is the student price; "-1000 kr" is money off.
+  assert.equal(parseStudentTorgetReward("45,-", ""), "45 kr totalsum");
+  assert.equal(parseStudentTorgetReward("-1000 kr", ""), "1 000 kr");
+  assert.equal(parseStudentTorgetReward("", "", "Bli medlem i Norsk Folkehjelp for kroner 100, og støtt deres humanitære arbeid. Ordinærpris er 200,-"), "100 kr totalsum");
+  assert.equal(parseStudentTorgetReward("", "", "Kjøp for 4 personer i samme aktivitet, og få den femte personen gratis!"), "5 for 4");
+  // Per-person and starting prices stay unknown rather than become a total.
+  assert.equal(parseStudentTorgetReward("", "", "Megazone: 80,- per person (Normalpris 120,-)\nBowling: 60,- per person per serie inkludert sko"), "");
+  assert.equal(parseStudentTorgetReward("", "", "STUDENTPRIS\nStudentbilletter fra kun kr. 120,- !"), "");
+});
+
+test("a free trial period is a promotion, not a permanent free price", async () => {
+  const bookbeat = { slug: "bookbeat", id: 939942, name: "BookBeat" };
+  const server = createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    if (request.url === "/studentrabatter") {
+      response.end(profiledCard(bookbeat, "STUDENTRABATT!"));
+    } else {
+      response.end(detailPage("Få 90 dager gratis med BookBeat. Nyt over 1 million lydbøker og e-bøker.", "Fyll livet med historier.", "https://www.bookbeat.com/no"));
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    const baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+    const offers = await crawlStudentTorget({ baseUrl, domainLookup: buildDomainLookup([]), generatedAt, logger, overrides: overrides() });
+    assert.equal(offers.length, 1);
+    assert.equal(offers[0]?.reward, "0 kr totalsum");
+    assert.deepEqual(offers[0]?.promotion, { label: "90 dager gratis", priceNok: 0 });
+    assert.deepEqual(offers[0]?.domains, ["bookbeat.com"]);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("shuffled listing pages are re-read until every advertised offer is seen", async () => {
+  // Live behaviour: every page request returns a new random order.
+  const all = Array.from({ length: 6 }, (_v, i) => ({ slug: `butikk-${i}`, id: 1000 + i, name: `Butikk ${i}` }));
+  let call = 0;
+  const pageRequests: string[] = [];
+  const server = createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    const url = request.url ?? "";
+    if (url.startsWith("/studentrabatter")) {
+      pageRequests.push(url);
+      // Two cards per page, two pages; the order rotates per request.
+      const offset = (call++ * 2) % all.length;
+      const cards = [all[offset]!, all[(offset + 1) % all.length]!];
+      response.end(`<p>Viser ${all.length} studentrabatter</p>${cards.map((o) => profiledCard(o, "10%")).join("")}<a href="/studentrabatter?page=2">2</a>`);
+    } else {
+      response.end(detailPage("", "10 % studentrabatt", `https://${url.split("/")[2]}.example/`));
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    const baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+    const offers = await crawlStudentTorget({ baseUrl, domainLookup: buildDomainLookup([]), generatedAt, logger, overrides: overrides() });
+    assert.equal(offers.length, 6);
+    // Bounded: stops as soon as all advertised offers are seen.
+    assert.ok(pageRequests.length <= 1 + 6 * 3, `requests: ${pageRequests.length}`);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });

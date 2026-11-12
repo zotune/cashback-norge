@@ -332,7 +332,7 @@ function removeMemberCtas(html: string): string {
   }
 }
 
-function extractKnaReward(
+export function extractKnaReward(
   text: string,
   mode: BenefitConfig["rewardMode"],
 ): string {
@@ -364,8 +364,18 @@ function extractKnaReward(
     return [perLitre, wash].filter(Boolean).join(" + ");
   }
 
-  if (mode === "all-percentages") return extractPercentageReward(text);
-  return extractBenefitReward(text);
+  if (mode === "all-percentages") return withUpToMaximum(extractPercentageReward(text), text);
+  return withUpToMaximum(extractBenefitReward(text), text);
+}
+
+// "inntil 40% rabatt på frontruteskift" / "rabatter på opptil 45%. For
+// eksempel … 31% … 30% … 40%" state a maximum: the examples are not a
+// guaranteed minimum, so the reward is "opptil <max> %".
+function withUpToMaximum(reward: string, text: string): string {
+  const max = reward.match(/^(?:\d+(?:,\d+)?-)?(\d+(?:,\d+)?) %$/)?.[1];
+  if (max === undefined) return reward;
+  const upTo = new RegExp(`\\b(?:opptil|opp\\s+til|inntil)\\s+${max.replace(",", "[,.]")}\\s*(?:%|prosent)`, "i");
+  return upTo.test(text) ? `opptil ${max} %` : reward;
 }
 
 function buildTerms(text: string): string {
@@ -375,7 +385,9 @@ function buildTerms(text: string): string {
     .filter((line) => line.length >= 8 && line.length <= 320)
     .filter((line) => !containsPrivateInstructions(line))
     .filter((line) => {
-      return /\b(?:rabatt|medlemspris|gratis|uten kostnad|gjelder|unntatt|kan ikke|ordinær|veiledende pris|per døgn|per uke|utvalgte)\b/i.test(line);
+      // "rabatter på opptil 45%", "20% på alt av racingtelt" state the benefit too.
+      return /\d\s*%/.test(line) ||
+        /\b(?:rabatt\w*|medlemspris|gratis|uten kostnad|gjelder|unntatt|kan ikke|ordinær|veiledende pris|per døgn|per uke|utvalgte)\b/i.test(line);
     });
   return uniqueTextLines([...lines.slice(0, 7), DEFAULT_TERMS]).join("\n");
 }

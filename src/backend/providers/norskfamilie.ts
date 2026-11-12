@@ -39,6 +39,7 @@ const SLUG_TO_DOMAIN: Record<string, string> = {
   newport: "newport.se",
   "nly-man": "nlyman.com",
   "nordic-choice-hotels": "strawberry.no",
+  "pierre-robert": "pierrerobert.no",
   "polarn-o-pyret": "polarnopyret.no",
   "skogstad-sport": "skogstadsport.no",
   slikkepott: "slikkepott.no",
@@ -70,7 +71,11 @@ export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
         const offer = offersBySlug.get(slug);
         if (offer === undefined) return;
 
-        const detailText = $(".shopping-content").first().text().replace(/\s+/g, " ").trim();
+        const content = $(".shopping-content").first();
+        const detailText = content.text().replace(/\s+/g, " ").trim();
+        offer.terms = buildTerms(content.find("p, li, h2, h3, h4, span, div").toArray()
+          .filter((element) => $(element).children("p, li, div").length === 0)
+          .map((element) => $(element).text()));
         const detailReward = extractPercentageReward(detailText) || extractKrReward(detailText);
         if (detailReward !== "") {
           offer.reward = detailReward;
@@ -123,4 +128,19 @@ export async function crawlNorskfamilie(): Promise<CashbackOffer[]> {
 function readSlug(url: string): string {
   const match = url.match(/\/partner\/([^/]+)\//);
   return match?.[1] ?? "";
+}
+
+// Rate statements ("Mellom 7% og 12%.") and the exclusions note ("du ikke får
+// penger tilbake for moms, frakt …"); buttons and login prompts are left out.
+export function buildTerms(texts: string[]): string {
+  const lines: string[] = [];
+  for (const raw of texts) {
+    const line = raw.replace(/\s+/g, " ").trim();
+    if (line.length < 6 || line.length > 300 || lines.includes(line)) continue;
+    if (/^(?:gå til butikk|bli medlem|allerede medlem|logg inn)/i.test(line)) continue;
+    // Product descriptions ("100 % bomull") are not terms.
+    if (!/\d\s*%\s*tilbake|\bmellom\s+\d|\bopptil\b|\b(?:moms|mva|merverdiavgift|frakt|gjelder|unntatt)\b/i.test(line)) continue;
+    lines.push(line);
+  }
+  return lines.slice(0, 4).join("\n");
 }

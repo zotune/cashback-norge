@@ -14,7 +14,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractBenefitReward } from "../../shared/reward.js";
+import { extractBenefitReward, extractUpToPercentageReward, relevantBenefitRewardText } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -87,6 +87,8 @@ const SKIP_HOSTNAMES = new Set([
   "google.com",
   "google.no",
   "schema.org",
+  // Public authorities linked for background (NAV hearing aid support).
+  "nav.no",
 ]);
 
 export type FetchHorselsforbundetInput = {
@@ -131,7 +133,7 @@ export async function fetchHorselsforbundet(
     if (domains.length > 0) fromOverride++;
 
     if (domains.length === 0) {
-      domains = DOMAINS_BY_SLUG[page.slug] ?? page.domains;
+      domains = DOMAINS_BY_SLUG[page.slug] ?? selectMerchantDomains(page.domains, merchantName, page.slug);
       if (domains.length > 0) fromPage++;
     }
 
@@ -147,8 +149,10 @@ export async function fetchHorselsforbundet(
       continue;
     }
 
+    const benefitText = `${page.title}\n${page.text}`;
+    // "Gode forsikringer - med opptil 25 % rabatt" states a maximum.
     const reward = REWARD_BY_SLUG[page.slug] ??
-      extractBenefitReward(`${page.title}\n${page.text}`);
+      (extractUpToPercentageReward(relevantBenefitRewardText(benefitText)) || extractBenefitReward(benefitText));
     if (reward === "") {
       input.logger.warn(
         `Hørselsforbundet benefit has no public reward: ${merchantName} (${page.slug})`,
@@ -334,9 +338,11 @@ function isSkippedHostname(hostname: string): boolean {
   });
 }
 
-function buildTerms(text: string): string {
+export function buildTerms(text: string): string {
   const lines = text
-    .split(/(?<=[.!?])\s+|[\r\n]+/)
+    // Split sentences only before a capital letter, so "brille nr. 2" and
+    // "kr. 4 990" stay whole.
+    .split(/(?<=(?<!\b(?:inkl|ekskl|kr|nr|ca|evt|ord|veil|tlf|pr))[.!?])\s+(?=[A-ZÆØÅ«"])|[\r\n]+/)
     .map(normalizeText)
     .filter((line) => line.length >= 12 && line.length <= 360)
     .filter((line) => !/betaler\s+kun\s+kr\.?$/i.test(line))
@@ -348,11 +354,38 @@ function buildTerms(text: string): string {
   return uniqueStrings(lines).slice(0, 5).concat(DEFAULT_TERMS).join("\n");
 }
 
-function cleanMerchantName(title: string): string {
+export function cleanMerchantName(title: string): string {
   return title
+    // "Smartbriller som tekster samtalen – rabatt hos Optiker G Krogh"
+    .replace(/^.*\s[–—-]\s+(?:medlemsfordel|medlemsrabatt|rabatt)\s+(?:hos|på|fra)\s+/i, "")
+    // "Vindux: 40 % på vinduer og dører"
+    .replace(/\s*:\s+.*\d\s*%.*$/, "")
     .replace(/^\d+(?:[,.]\d+)?\s*%\s+(?:rabatt\s+)?(?:hos|på)\s+/i, "")
     .replace(/^(?:medlemsfordel|medlemsrabatt|rabatt)\s+(?:hos|på|fra)\s+/i, "")
     .trim();
+}
+
+// Pages also link the product brand or background sources (Even Realities
+// on the Optiker G Krogh page): when a link matches the merchant, keep those.
+export function selectMerchantDomains(domains: string[], merchantName: string, slug: string): string[] {
+  const nameKey = normalizeKey(merchantName);
+  const slugKey = normalizeKey(slug);
+  const matching = domains.filter((domain) => {
+    const label = normalizeKey(domain.split(".").at(-2) ?? domain);
+    return label.length >= 3 && (nameKey.includes(label) || label.includes(nameKey) || slugKey.includes(label));
+  });
+  return matching.length > 0 ? matching : domains;
+}
+
+function normalizeKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function normalizeText(value: string): string {

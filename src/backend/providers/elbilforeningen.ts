@@ -18,7 +18,7 @@ export type FetchElbilInput = {
 const DEFAULT_TERMS = "Krever medlemskap i Norsk elbilforening.";
 
 const EXCLUDED_LINK_HOSTS =
-  /elbil\.no|facebook\.com|instagram\.com|youtube\.com|linkedin\.com|(^|\.)x\.com|twitter\.com|apple\.com|google\.com|vimeo\.com|brreg\.no|dsb\.no|lovdata\.no|regjeringen\.no|vegvesen\.no|tuv\.at|forbrukertilsynet\.no/;
+  /elbil\.no|facebook\.com|instagram\.com|youtube\.com|linkedin\.com|(^|\.)x\.com|twitter\.com|apple\.com|google\.com|vimeo\.com|brreg\.no|dsb\.no|lovdata\.no|regjeringen\.no|vegvesen\.no|tuv\.at|forbrukertilsynet\.no|outlook\.com|powerappsportals\.com/;
 
 type WpBenefit = {
   slug?: string;
@@ -83,7 +83,7 @@ export async function fetchElbil(input: FetchElbilInput): Promise<CashbackOffer[
       continue;
     }
 
-    const reward = extractBenefitReward(text);
+    const reward = extractElbilReward(text);
 
     if (reward === "") {
       input.logger.info(`Elbilforeningen: no parseable reward for ${merchantName}, skipping`);
@@ -124,7 +124,7 @@ function findPartnerDomains(contentHtml: string): string[] {
 
   for (const match of contentHtml.matchAll(/href="(https?:\/\/[^"]+)"/g)) {
     const href = (match[1] ?? "").replace(/&amp;/g, "&");
-    const parsed = parseUrl(href);
+    const parsed = unwrapSafeLink(parseUrl(href));
 
     if (parsed === undefined || EXCLUDED_LINK_HOSTS.test(parsed.hostname)) {
       continue;
@@ -136,6 +136,34 @@ function findPartnerDomains(contentHtml: string): string[] {
 
   const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
   return best !== undefined ? [best[0]] : [];
+}
+
+// Outlook "safelinks" (eur02.safelinks.protection.outlook.com/?url=…) wrap the
+// partner's real link; outlook.com is never the merchant (Storytel).
+function unwrapSafeLink(url: URL | undefined): URL | undefined {
+  if (url === undefined || !/(?:^|\.)safelinks\.protection\.outlook\.com$/i.test(url.hostname)) return url;
+  const inner = url.searchParams.get("url");
+  return inner === null ? undefined : parseUrl(inner);
+}
+
+// Loan and financing pages state equity and interest rates ("20 %
+// egenkapital", "nominell rente fra 6,40 %"); those are not discounts.
+const FINANCING_RATE_LINE = /\b(?:egenkapital|rente|belåning\w*|nedbetaling\w*)\b/i;
+// A bundle extra ("I tillegg til dine allerede reduserte medlemspriser får du
+// kr. 400 i rabatt" when bought with another test) is not the benefit itself.
+const BUNDLE_EXTRA_LINE = /\bi\s+tillegg\s+til\s+dine\s+allerede\s+reduserte\b|\bpakkepris\w*\b/i;
+
+export function extractElbilReward(text: string): string {
+  const rewardText = text
+    .split(/\n/)
+    .filter((line) => !FINANCING_RATE_LINE.test(line) && !BUNDLE_EXTRA_LINE.test(line))
+    // A list dash ("- 20 % rabatt") after a line ending in a date or number
+    // must not read as a range ("29.06\n- 20 %" -> "29-20 %").
+    .map((line) => line.replace(/^(\s*)[-–]\s+/, "$1• "))
+    .join("\n");
+  const reward = extractBenefitReward(rewardText);
+  // "100% rabatt og gratis frakt på alle skilt" is a free item.
+  return reward === "100 %" ? "0 kr totalsum" : reward;
 }
 
 function buildTerms(text: string): string {

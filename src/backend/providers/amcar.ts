@@ -24,7 +24,10 @@ import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
-const LIST_URL = "https://www.amcar.no/rabattavtaler/rabattavtaler";
+// amcar.no is the canonical host: www.amcar.no answers with an empty 301
+// (no Content-Type), which Crawlee rejects as application/octet-stream
+// because redirects are not followed off the allowlisted page.
+const LIST_URL = "https://amcar.no/rabattavtaler/rabattavtaler";
 const DEFAULT_TERMS = "Krever gyldig AMCAR-medlemskap.";
 
 const MERCHANT_NAME_BY_SLUG: Record<string, string> = {
@@ -112,6 +115,13 @@ export async function fetchAmcar(
   input.logger.info(`AMCAR: fetching public discount agreements from ${LIST_URL}`);
 
   const html = await fetchPage(LIST_URL);
+  return buildAmcarOffers(html, input);
+}
+
+export function buildAmcarOffers(
+  html: string,
+  input: FetchAmcarInput,
+): CashbackOffer[] {
   const sections = extractSections(html);
   if (sections.length === 0) {
     throw new Error("AMCAR: official discount page contained no merchant sections");
@@ -203,6 +213,7 @@ async function fetchPage(url: string): Promise<string> {
   const crawlerConfig = new Configuration();
   crawlerConfig.useStorageClient(storage);
   let html: string | undefined;
+  let failure: string | undefined;
 
   const crawler = new HttpCrawler({
     maxConcurrency: 1,
@@ -229,6 +240,9 @@ async function fetchPage(url: string): Promise<string> {
 
       html = Buffer.isBuffer(body) ? body.toString("utf8") : body;
     },
+    failedRequestHandler: ({ request }, error) => {
+      failure = `${request.url}: ${error.message}`;
+    },
   }, crawlerConfig);
 
   await crawler.run([new Request({
@@ -240,7 +254,7 @@ async function fetchPage(url: string): Promise<string> {
   })]);
 
   if (html === undefined) {
-    throw new Error(`AMCAR crawler received no page from ${url}`);
+    throw new Error(`AMCAR crawler received no page from ${url}${failure ? ` (${failure})` : ""}`);
   }
   return html;
 }
@@ -263,7 +277,10 @@ function extractSections(html: string): AmcarSection[] {
   const headings: Array<{ start: number; end: number; heading: string }> = [];
   const headingPattern = /<h3\b[^>]*>([\s\S]*?)<\/h3>/gi;
   for (const match of bodyHtml.matchAll(headingPattern)) {
-    const heading = normalizeText(stripHtml(match[1] ?? ""));
+    // "Offisielle samarbeidspartnere: IF FORSIKRING" introduces a partner; the
+    // label is not part of the merchant's name.
+    const heading = normalizeText(stripHtml(match[1] ?? ""))
+      .replace(/^offisiel(?:le|t)\s+samarbeidspartnere?\s*:\s*/i, "");
     if (!heading) continue;
 
     const start = match.index ?? 0;
@@ -377,24 +394,39 @@ function extractTextDomains(text: string): string[] {
 }
 
 function buildTerms(text: string): string {
-  const lines = uniqueTextLines(text.split(/\n+/))
+  const lines = uniqueTextLines(text.split(/\n+/).map(withoutMemberCodeSentences))
     .filter(isUsefulTermsLine)
-    .slice(0, 8);
+    .slice(0, 16);
 
   return uniqueTextLines([...lines, DEFAULT_TERMS]).join("\n");
 }
 
+// The public page points to login-only codes ("Rabattkoden finner du her")
+// inside the same paragraph that states the discount; drop only that sentence.
+function withoutMemberCodeSentences(line: string): string {
+  const sentences = normalizeText(line)
+    .replace(/\s*\(\s*denne\s+finner\s+du\s+her\s*\)/gi, "")
+    .split(/(?<=[.!?)])\s+/);
+  return sentences.filter((sentence) => !containsMemberCode(sentence)).join(" ");
+}
+
 function isUsefulTermsLine(line: string): boolean {
   const normalized = normalizeText(line);
-  if (normalized.length < 8 || normalized.length > 300) return false;
+  if (normalized.length < 8 || normalized.length > 600) return false;
   if (containsMemberCode(normalized) || isPageNoise(normalized)) return false;
 
-  return /\b(?:amcar[- ]?medlem(?:mer)?|rabatt(?:er|en|sats)?|medlemskort|medlemspris|fordel(?:er)?|betingelser|gjelder|unntatt|gratis|uten|fremvisning|tilbudspris|butikkpris|forhandlerpris|ordinære?|kan (?:ikke|kun)|opptil)\b/i
+  // Rate lists ("-Frontruter 42%", "Felger – 8%*") carry the actual terms.
+  if (/\d\s*%|\bkr\.?\s*\d|\d\s*,-/i.test(normalized)) return true;
+
+  return /\b(?:amcar[- ]?medlem(?:mer)?|rabatt(?:er|en|sats)?|medlemskort|medlemspris|fordel(?:er)?|betingelser|vilkår|som medlem|gjelder|unntatt|gratis|uten|fremvisning|tilbudspris|butikkpris|forhandlerpris|ordinære?|kan (?:ikke|kun)|opptil)\b/i
     .test(normalized);
 }
 
+// Pointers to the login-only code page ("Rabattkoden finner du her",
+// "logg inn på Min side"). "15% rabatt ved bruk av deres rabattkode" states
+// the benefit and how to redeem it, so it stays.
 function containsMemberCode(line: string): boolean {
-  return /\b(?:rabatt|kupong|medlems)kod(?:e|en|er)\b|\/rabattkoder\b|\b(?:logg inn|min side|mine sider)\b/i.test(line);
+  return /\b(?:rabatt|kupong|medlems)kod(?:e|en|er)\b[^.]*\bfinner\s+du\b|\(\s*denne\s+finner\s+du\s+her\s*\)|\/rabattkoder\b|\b(?:logg inn|min side|mine sider)\b/i.test(line);
 }
 
 function isPageNoise(line: string): boolean {

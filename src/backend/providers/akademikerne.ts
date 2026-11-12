@@ -14,7 +14,7 @@ import {
   extractGratisReward,
   extractKrReward,
   extractOreLitreReward,
-  extractPercentageReward,
+  extractUpToPercentageReward,
 } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
@@ -298,7 +298,8 @@ function extractAkademikerneReward(
   if (oreLitre) return oreLitre;
 
   const rewardText = relevantRewardText(text, isInsurancePage);
-  const percentage = extractPercentageReward(rewardText);
+  // "Få opptil 50 prosent rabatt" states a maximum, not a guaranteed rate.
+  const percentage = extractUpToPercentageReward(rewardText);
   if (percentage) return percentage;
 
   const explicitTotalPrice =
@@ -329,7 +330,9 @@ function relevantRewardText(text: string, isInsurancePage: boolean): string {
       // Discount tables render as bare value lines ("4 prosent", "25 prosent").
       if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)$/i.test(line)) return true;
 
-      return /\b(?:rabatt(?:er)?|medlemsrabatt|besparelse|avslag|spar|tilbud|medlemspris(?:er)?|cashpoints|bonus)\b/i.test(line) ||
+      // "besparelse" is left out: energy-saving examples ("reduserer dette
+      // med 15 %, … årlig besparelse på ca. 7 500 kroner") are not discounts.
+      return /\b(?:rabatt(?:er)?|medlemsrabatt|avslag|spar|tilbud|medlemspris(?:er)?|cashpoints|bonus)\b/i.test(line) ||
         /\bhalv\s+pris\b/i.test(line);
     })
     .join("\n");

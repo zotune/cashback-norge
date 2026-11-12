@@ -34,6 +34,9 @@ const SKIP_HOSTNAMES = new Set([
   "instagram.com",
   "linkedin.com",
   "adtraction.com",
+  // Ticket sellers serve many organisers; they are not the merchant's domain.
+  "ticketmaster.no",
+  "ticketmaster.com",
   "policy.app.cookieinformation.com",
   "iplookup.services.relatude.com",
   "magicwidget.socialboards.com",
@@ -71,10 +74,14 @@ type BenefitEntry = {
   sourceUrl: string;
   summary: string;
   terms: string;
+  // The page title can carry the benefit ("TusenFryd - Opptil 25 % rabatt")
+  // that is stripped from the merchant name.
+  title: string;
 };
 
 type ListItem = {
   name: string;
+  title: string;
   slug: string;
   sourceUrl: string;
   summary: string;
@@ -92,11 +99,12 @@ export async function crawlUsbl(input: CrawlUsblInput): Promise<CashbackOffer[]>
     domains: [],
     externalUrls: [],
     name: item.name,
-    reward: extractUsblReward(`${item.name}\n${item.summary}`),
+    reward: extractUsblReward(`${item.title}\n${item.summary}`),
     slug: item.slug,
     sourceUrl: item.sourceUrl,
     summary: item.summary,
     terms: buildTerms(item.summary, [item.summary]),
+    title: item.title,
   }));
 
   await enrichDetails(entries, input.logger);
@@ -167,7 +175,8 @@ async function enrichDetails(entries: BenefitEntry[], logger: Logger): Promise<v
       const text = isRecord(props?.text) ? props.text : undefined;
       const textHtml = readString(text?.html);
       const ingress = readString(header?.ingress) || entry.summary;
-      const title = normalizeBenefitName(readString(header?.title) || entry.name);
+      const rawTitle = normalizeText(readString(header?.title)) || entry.title;
+      const title = normalizeBenefitName(rawTitle);
       const textLines = uniqueTextLines([
         ...htmlToLines(textHtml),
         ...extractRenderedArticleLines(html),
@@ -183,7 +192,8 @@ async function enrichDetails(entries: BenefitEntry[], logger: Logger): Promise<v
       entry.externalUrls = uniqueStrings([...entry.externalUrls, ...externalUrls]);
       entry.domains = uniqueStrings([...entry.domains, ...domains]);
       entry.terms = buildTerms(entry.summary, textLines);
-      entry.reward = bestReward(entry.reward, extractUsblReward(`${entry.name}\n${entry.summary}\n${entry.terms}`));
+      entry.title = rawTitle;
+      entry.reward = bestReward(entry.reward, extractUsblReward(`${entry.title}\n${entry.summary}\n${entry.terms}`));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       logger.warn(`USBL detail failed for ${entry.sourceUrl}: ${message}`);
@@ -214,18 +224,44 @@ async function fetchHtml(url: string): Promise<string> {
   return response.body;
 }
 
-function extractHydrationProps(html: string): Record<string, unknown> | undefined {
-  const match = html.match(
-    /ReactDOMClient\.hydrateRoot\([^,]+,\s*React\.createElement\(UsblComponents\.[A-Za-z]+,([\s\S]*?)\)\)\s*<\/script>/,
-  );
-  if (match?.[1] === undefined) return undefined;
+// The page hydrates a React component with its props as a JSON literal:
+// `hydrateRoot(el, React.createElement(UsblComponents.PerkListPage, {...}))`.
+// The call has been wrapped in an event listener (`});` before </script>),
+// so read the balanced JSON object instead of anchoring on the script end.
+export function extractHydrationProps(html: string): Record<string, unknown> | undefined {
+  const marker = /React\.createElement\(UsblComponents\.[A-Za-z]+,\s*/.exec(html);
+  if (marker === null) return undefined;
+
+  const json = readBalancedJsonObject(html, marker.index + marker[0].length);
+  if (json === undefined) return undefined;
 
   try {
-    const parsed = JSON.parse(match[1]);
+    const parsed = JSON.parse(json);
     return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }
+}
+
+function readBalancedJsonObject(text: string, start: number): string | undefined {
+  if (text[start] !== "{") return undefined;
+  let depth = 0;
+  let inString = false;
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
+    if (inString) {
+      if (char === "\\") index++;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === "{") depth++;
+    else if (char === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, index + 1);
+    }
+  }
+  return undefined;
 }
 
 function extractListItems(props: Record<string, unknown> | undefined, startUrl: string): ListItem[] {
@@ -242,7 +278,8 @@ function extractListItems(props: Record<string, unknown> | undefined, startUrl: 
   for (const item of rawItems) {
     if (!isRecord(item)) continue;
 
-    const name = normalizeBenefitName(readString(item.title));
+    const title = normalizeText(readString(item.title));
+    const name = normalizeBenefitName(title);
     const rawUrl = readString(item.url);
     const path = contentPathFromUrl(rawUrl);
     if (!name || path === undefined || !isUsblBenefitPath(path)) continue;
@@ -253,6 +290,7 @@ function extractListItems(props: Record<string, unknown> | undefined, startUrl: 
     const summary = normalizeText(readString(item.text));
     bySlug.set(slug, {
       name,
+      title,
       slug,
       sourceUrl: absoluteUsblUrl(path, startUrl),
       summary,
@@ -278,7 +316,9 @@ function trimBenefitLines(lines: string[]): string[] {
   });
   const scopedLines = startIndex === -1 ? normalizedLines : normalizedLines.slice(startIndex);
   const stopIndex = scopedLines.findIndex((line) => {
-    return /^(relaterte artikler|et medlemskap som gir tilbake)$/i.test(line);
+    // "Se alle medlemsfordeler" opens the carousel of other benefits
+    // ("TusenFryd - Opptil 25 % rabatt"), whose rates are not this offer's.
+    return /^(relaterte artikler|et medlemskap som gir tilbake|se alle medlemsfordeler)$/i.test(line);
   });
   const benefitLines = stopIndex === -1 ? scopedLines : scopedLines.slice(0, stopIndex);
 
@@ -288,16 +328,38 @@ function trimBenefitLines(lines: string[]): string[] {
   });
 }
 
-function extractUsblReward(text: string): string {
+export function extractUsblReward(text: string): string {
   if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
 
   const percentage = extractUsblPercentageReward(text);
-  if (percentage) return percentage;
+  if (percentage) {
+    // "Opptil 25 % rabatt" with no other rate states a maximum.
+    const upTo = text.match(/\b(?:opptil|inntil)\s+(\d{1,3}(?:[,.]\d+)?)\s*(?:%|prosent)/i);
+    return upTo !== null && percentage === `${upTo[1]?.replace(".", ",")} %`
+      ? `opptil ${percentage}`
+      : percentage;
+  }
 
-  const kr = extractKrReward(text) || extractUsblKrReward(text);
-  if (kr) return kr;
+  // "Spar 59,- i månedsabonnement" is a monthly saving, not the one-off amount.
+  const krText = text.replace(
+    /\bspar\s+(?:kr\.?\s*)?\d[\d\s.]*(?:,-|kr|kroner)?\s*(?:i\s+månedsabonnement\w*|(?:i|per|pr\.?|\/)\s*(?:mnd|måned(?:en)?)\b)/gi,
+    " ",
+  );
+  const kr = extractKrReward(krText, { totalsum: false }) || extractUsblKrReward(krText);
+  if (kr) {
+    // "spar opptil 1299 kr" / "Spar opptil 1309,-" state a maximum saving.
+    const upToKr = /\b(?:spar\s+)?(?:opptil|inntil)\s+(?:kr\.?\s*)?\d/i.test(krText);
+    const max = kr.match(/(?:^|-)([\d ]+) kr$/)?.[1];
+    return upToKr && max !== undefined ? `opptil ${max} kr` : kr;
+  }
 
-  if (/\bgratis\b/i.test(text)) return "Gratis";
+  // A waived fee with a stated value ("Gratis tinglysningsgebyr, til en verdi
+  // av 545 kr") is a saving of that amount; the product itself is not free.
+  const waivedValue = text.match(/\bgratis\b[^.\n]{0,80}?\bverdi\s+(?:av|på)\s+(?:kr\.?\s*)?(\d[\d\s.]*\d|\d)\s*(?:kr|kroner|,-)/i);
+  if (waivedValue !== null) {
+    const amount = Number.parseInt((waivedValue[1] ?? "").replace(/[\s.]/g, ""), 10);
+    if (Number.isFinite(amount) && amount > 0) return `${formatKrNumber(amount)} kr`;
+  }
 
   return "";
 }
@@ -374,9 +436,10 @@ function extractUsblKrReward(text: string): string {
   if (values.length === 0) return "";
   const min = Math.min(...values);
   const max = Math.max(...values);
+  // "Spar 2990,-" / "kr 500 i rabatt" are savings, never a price paid.
   return min === max
-    ? `${formatKrNumber(max)} kr totalsum`
-    : `${formatKrNumber(min)}-${formatKrNumber(max)} kr totalsum`;
+    ? `${formatKrNumber(max)} kr`
+    : `${formatKrNumber(min)}-${formatKrNumber(max)} kr`;
 }
 
 function collectExternalUrls(props: unknown, html: string, renderedHtml: string): string[] {
@@ -434,9 +497,11 @@ function normalizeExternalUrl(input: string): string | undefined {
   return parsed.toString();
 }
 
-function extractDomainsFromText(text: string): string[] {
+export function extractDomainsFromText(text: string): string[] {
   const domains: string[] = [];
-  for (const match of text.matchAll(/\b(?:[a-z0-9-]+\.)+(?:com|events|net|no|org)\b/gi)) {
+  // "Kärcher.no" is not the hostname "rcher.no": a domain must not start
+  // inside a word with non-ASCII letters.
+  for (const match of text.matchAll(/(?<![\p{L}\d.-])(?:[a-z0-9-]+\.)+(?:com|events|net|no|org)\b/giu)) {
     const domain = extractDomainFromUrl(match[0] ?? "");
     if (domain !== undefined) domains.push(domain);
   }
@@ -570,6 +635,10 @@ function normalizeBenefitName(value: string): string {
   return normalizeText(value)
     .replace(/^nyhet!\s*/i, "")
     .replace(/^\d+[\s]*%\s*rabatt\s+(?:på|hos)\s+/i, "")
+    // "The Well Spa og Hotell - Få opptil 20 % rabatt" -> merchant name only.
+    .replace(/\s+[-–]\s+(?:få\s+)?(?:opptil\s+|inntil\s+)?\d.*$/i, "")
+    // "Nextory: strømmetjeneste for lyd- og e-bøker" -> "Nextory".
+    .replace(/:\s+\p{Ll}.*$/u, "")
     .trim();
 }
 

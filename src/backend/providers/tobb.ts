@@ -16,6 +16,7 @@ import {
   extractKrReward,
   extractOreLitreReward,
   extractPercentageReward,
+  extractPercentageValues,
   formatPercentageReward,
 } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
@@ -47,6 +48,12 @@ const SKIP_HOSTNAMES = new Set([
   "use.typekit.net",
   "apps.apple.com",
   "play.google.com",
+  // Ticket sellers serve many organisers, and Enova is the state energy
+  // agency linked for grants; neither is the merchant's shop.
+  "tickster.com",
+  "secure.tickster.com",
+  "ticketmaster.no",
+  "enova.no",
 ]);
 
 const DOMAIN_NAME_OVERRIDES: Record<string, string> = {
@@ -325,7 +332,8 @@ function buildTerms(summary: string, lines: string[]): string {
   ]).join("\n");
 }
 
-function extractTobbReward(text: string): string {
+export function extractTobbReward(rawText: string): string {
+  const text = normalizeTobbRewardText(rawText);
   const structuredPercentage = extractStructuredPercentageReward(text);
   if (structuredPercentage) return structuredPercentage;
 
@@ -338,7 +346,23 @@ function extractTobbReward(text: string): string {
   const kr = extractKrReward(text);
   if (kr) return kr;
 
+  // "2 for 1 på billetter", "2 billetter for prisen av 1"
+  if (/\b(?:2|to)\s+for\s+(?:1|en|én)\b|\b(?:2|to)\s+billetter\s+for\s+prisen\s+av\s+(?:1|en|én)\b/i.test(text)) {
+    return "2 for 1";
+  }
+
   return extractGratisReward(text);
+}
+
+// TOBB writes "Kr 10.000,- i rabatt", "Kr 25 i TOBB-rabatt" and "kr 11 i
+// bonus hver måned". Thousand separators must not split the clause, and the
+// TOBB prefix or a bonus amount must still read as the benefit amount rather
+// than a price the customer pays ("10 000 kr totalsum").
+function normalizeTobbRewardText(text: string): string {
+  return text
+    .replace(/(\d)\.(\d{3})(?!\d)/g, "$1$2")
+    .replace(/\bi\s+tobb-(rabatt|bonus)\b/gi, "i $1")
+    .replace(/\b(kr\.?\s*\d[\d\s]*(?:,-)?\s*)i\s+bonus\b/gi, "$1i rabatt");
 }
 
 function extractStructuredPercentageReward(text: string): string {
@@ -346,9 +370,8 @@ function extractStructuredPercentageReward(text: string): string {
 
   for (const line of text.split(/\n+/).map(normalizeText)) {
     if (!/\b(?:rabatt|bonus|avslag|spar|fordel|medlemspris)\b/i.test(line)) continue;
-    const lineReward = extractPercentageReward(line);
-    for (const match of lineReward.matchAll(/(\d{1,3}(?:[,.]\d+)?)\s*%/g)) {
-      const value = Number.parseFloat((match[1] ?? "").replace(",", "."));
+    // "10 - 20% TOBB-rabatt" and "5 % bonus og 10 % rabatt" contribute every rate.
+    for (const value of extractPercentageValues(line)) {
       if (Number.isFinite(value) && !values.includes(value)) values.push(value);
     }
   }

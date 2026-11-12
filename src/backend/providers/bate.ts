@@ -13,6 +13,7 @@ import {
   extractGratisReward,
   extractKrReward,
   extractPercentageReward,
+  extractPercentageValues,
   formatPercentageReward,
 } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
@@ -38,6 +39,10 @@ const SKIP_HOSTNAMES = new Set([
   "policy.app.cookieinformation.com",
   "apps.apple.com",
   "play.google.com",
+  // Booking engines and ticket sellers host many merchants.
+  "mews.com",
+  "app.mews.com",
+  "ticketmaster.no",
 ]);
 
 const DOMAIN_NAME_OVERRIDES: Record<string, string> = {
@@ -171,6 +176,9 @@ function entryFromBenefit(value: unknown, startUrl: string): BateEntry | undefin
   const name = normalizeBenefitName(readString(value.title));
   const slug = readSlug(value.slug);
   if (!name || !slug) return undefined;
+  // Forkjøpsrett is Bate's own housing-queue feature (forkjop.bbl.no), not a
+  // merchant benefit; OBOS and USBL leave it out for the same reason.
+  if (/\bforkjøpsrett\b/i.test(name) || /^forkjopsrett\b/i.test(slug)) return undefined;
 
   const summary = normalizeText(readString(value.description));
   const sourceUrl = absoluteBateUrl(`/fordeler/${slug}`, startUrl);
@@ -205,7 +213,9 @@ function enrichEntry(entry: BateEntry, benefit: Record<string, unknown>): void {
   entry.externalUrls = uniqueStrings([...entry.externalUrls, ...externalUrls]);
   entry.domains = uniqueStrings([...entry.domains, ...domains]);
   entry.terms = buildTerms(entry.summary, lines);
-  entry.reward = bestReward(entry.reward, nextReward);
+  // The detail text includes the list summary, so its reward is the more
+  // complete reading (e.g. a "gratis" summary qualified by "ved inngåelse av").
+  entry.reward = nextReward || entry.reward;
 }
 
 function extractPageProps($: BateCheerio): Record<string, unknown> | undefined {
@@ -306,48 +316,53 @@ function buildTerms(summary: string, lines: string[]): string {
   ]).join("\n");
 }
 
-function extractBateReward(text: string): string {
+export function extractBateReward(text: string): string {
   const structuredPercentage = extractStructuredPercentageReward(text);
   if (structuredPercentage) return structuredPercentage;
 
-  const percentage = extractPercentageReward(text);
+  // Loan products are named by their loan-to-value ratio ("Bate boliglån
+  // 55 %"); that percentage is not a discount.
+  const percentage = extractPercentageReward(
+    text.split(/\n+/).filter((line) => !LOAN_PRODUCT_LINE.test(line)).join("\n"),
+  );
   if (percentage) return percentage;
 
   const kr = extractKrReward(text);
   if (kr) return kr;
 
-  return extractGratisReward(text);
+  // A free extra tied to a purchase ("gratis fotograf ved inngåelse av
+  // megleroppdrag (verdi 4 960 kr)") is not a free product. Use the value the
+  // source states, otherwise a generic member benefit.
+  if (/\bgratis\b[^\n]*\bved\s+(?:inngåelse|kjøp|bestilling|signering)\b/i.test(text)) {
+    const value = text.match(/\bgratis\b[^\n]*?\(?\bverdi\s+(?:på\s+|av\s+)?(?:kr\.?\s*)?(\d[\d\s.]*\d|\d)\s*(?:kr|kroner|,-)/i)?.[1];
+    const amount = value === undefined ? Number.NaN : Number.parseInt(value.replace(/[\s.]/g, ""), 10);
+    return Number.isFinite(amount) && amount > 0
+      ? `${amount.toLocaleString("nb-NO").replace(/[\u00a0\u202f]/g, " ")} kr`
+      : "Medlemsfordel";
+  }
+
+  const gratis = extractGratisReward(text);
+  if (gratis) return gratis;
+
+  // "betingelsene for Bate-medlemmer er alltid bedre enn bankens ordinære
+  // betingelser" states a benefit without an amount.
+  return /\bbetingelse(?:r|ne)?\b/i.test(text) ? "Medlemsfordel" : "";
 }
+
+const LOAN_PRODUCT_LINE = /\b(?:bolig|første|grønt|flexi|bsu)?lån\w*\b|\bbelåning\w*\b/i;
 
 function extractStructuredPercentageReward(text: string): string {
   const values: number[] = [];
 
   for (const line of text.split(/\n+/).map(normalizeText)) {
     if (!/\b(?:rabatt|bonus|avslag|spar|fordel|medlemspris)\b/i.test(line)) continue;
-    const lineReward = extractPercentageReward(line);
-    for (const match of lineReward.matchAll(/(\d{1,3}(?:[,.]\d+)?)\s*%/g)) {
-      const value = Number.parseFloat((match[1] ?? "").replace(",", "."));
+    // "15 % rabatt i lavsesong, 10 % rabatt i høysesong" contributes both rates.
+    for (const value of extractPercentageValues(line)) {
       if (Number.isFinite(value) && !values.includes(value)) values.push(value);
     }
   }
 
   return formatPercentageReward(values);
-}
-
-function bestReward(currentReward: string, nextReward: string): string {
-  if (!currentReward) return nextReward;
-  if (!nextReward) return currentReward;
-  return rewardSpecificity(nextReward) >= rewardSpecificity(currentReward)
-    ? nextReward
-    : currentReward;
-}
-
-function rewardSpecificity(reward: string): number {
-  if (/\d/.test(reward) && /%/.test(reward)) return 4;
-  if (/\d/.test(reward) && /\bkr\b/i.test(reward)) return 3;
-  if (/\bgratis\b/i.test(reward)) return 2;
-  if (/\d/.test(reward)) return 1;
-  return 0;
 }
 
 function collectExternalUrls(value: unknown): string[] {
@@ -495,7 +510,7 @@ function isSkippedHostname(hostname: string): boolean {
 function normalizeBenefitName(value: string): string {
   return normalizeText(value)
     .replace(/^[^\p{L}\p{N}]+/u, "")
-    .replace(/^\s*(?:kampanje|nyhet)\s*\|\s*/i, "")
+    .replace(/^\s*(?:kampanje|nyhet|medlemsdager)\s*\|\s*/i, "")
     .replace(/^nyhet!\s*/i, "")
     .trim();
 }

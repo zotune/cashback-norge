@@ -416,7 +416,7 @@ function isAllowedMerchantHostname(hostname: string): boolean {
   });
 }
 
-function extractKnbfReward(text: string): string {
+export function extractKnbfReward(text: string): string {
   const normalized = normalizeRewardText(text);
   const lines = normalized.split(/\n+/);
   const selectedLines: string[] = [];
@@ -435,6 +435,12 @@ function extractKnbfReward(text: string): string {
   if (percentage !== "") return percentage;
 
   const reward = extractBenefitReward(rewardText);
+  // "1 ggr/år gratis … For kun kr 290,- kan du få alle seks utgaver": the free
+  // issue comes with the membership; the offer is the member price.
+  if (reward === "0 kr totalsum") {
+    const memberPriceReward = extractMemberPriceReward(rewardText);
+    if (memberPriceReward !== "") return memberPriceReward;
+  }
   if (reward !== "" && reward !== "Rabatt") return reward;
 
   const monthlyPrice = normalized.match(
@@ -445,15 +451,8 @@ function extractKnbfReward(text: string): string {
     if (amount !== undefined) return `${formatNok(amount)} kr/mnd`;
   }
 
-  const memberPrice = rewardText.match(
-    /\b(?:medlem|medlemmer)[^.\n]{0,140}?\bfor\s+(?:kun\s+)?(?:kr\s*)?(\d[\d ]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/i,
-  ) ?? rewardText.match(
-    /\bfor\s+kun\s+(?:kr\s*)?(\d[\d ]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/i,
-  );
-  if (memberPrice !== null) {
-    const amount = parsePositiveInteger(memberPrice[1] ?? "");
-    if (amount !== undefined) return `${formatNok(amount)} kr totalsum`;
-  }
+  const memberPriceReward = extractMemberPriceReward(rewardText);
+  if (memberPriceReward !== "") return memberPriceReward;
 
   const discountAmounts: number[] = [];
   for (const line of rewardText.split(/\n+/)) {
@@ -476,6 +475,17 @@ function extractKnbfReward(text: string): string {
   return reward || "Medlemsfordel";
 }
 
+function extractMemberPriceReward(rewardText: string): string {
+  const memberPrice = rewardText.match(
+    /\b(?:medlem|medlemmer)[^.\n]{0,140}?\bfor\s+(?:kun\s+)?(?:kr\s*)?(\d[\d ]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/i,
+  ) ?? rewardText.match(
+    /\bfor\s+kun\s+(?:kr\s*)?(\d[\d ]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/i,
+  );
+  if (memberPrice === null) return "";
+  const amount = parsePositiveInteger(memberPrice[1] ?? "");
+  return amount === undefined ? "" : `${formatNok(amount)} kr totalsum`;
+}
+
 function normalizeRewardText(value: string): string {
   return value
     .replace(/(\d)\.(?=\d{3}\b)/g, "$1")
@@ -483,9 +493,11 @@ function normalizeRewardText(value: string): string {
     .replace(/\brabbatt\b/gi, "rabatt");
 }
 
-function buildTerms(text: string): string {
+export function buildTerms(text: string): string {
   const candidates = text
-    .split(/\n+|(?<=[.!?])\s+/)
+    // Split sentences only before a capital letter: "henholdsvis kr. 1 500"
+    // must stay whole.
+    .split(/\n+|(?<=(?<!\b(?:inkl|ekskl|kr|nr|ca|evt|ord|veil|tlf|pr))[.!?])\s+(?=[A-ZÆØÅ«"])/)
     .map(sanitizePublicLine)
     .filter(isUsefulTermsLine);
   return uniqueTextLines([...candidates.slice(0, 6), DEFAULT_TERMS]).join("\n");
@@ -494,6 +506,9 @@ function buildTerms(text: string): string {
 function isUsefulTermsLine(line: string): boolean {
   if (line.length < 8 || line.length > 280 || isForbiddenPublicLine(line)) return false;
   const hasUsefulContent = /\b(?:rabatt(?:er|en)?|medlemspris(?:er)?|gratis|fast\s+lavpris|avslag|gjelder|unntatt|minus\s+produkter|kun\s+kr|frakt(?:fri|kostnad)|forhandlerpris|nettopris|medlemsbevis|kan\s+ikke|første\s+år|ordinær\s+pris|ved\s+kjøp|medlem(?:mer)?\b[^.]{0,100}\bfår\b)\b/i.test(line);
+  // Bare rate/price lines: "• 10% på alt i nettbutikk", "kr. 19,- … per
+  // måned. Veiledende pris er kr. 29,-".
+  if (/\d\s*%\s+på\s/i.test(line) || /\bper\s+måned\b|\bveiledende\s+pris\b/i.test(line)) return true;
   return hasUsefulContent && (/\d/.test(line) || /\b(?:rabatt|gratis|lavpris|forhandlerpris|nettopris|medlemsbevis)\b/i.test(line));
 }
 

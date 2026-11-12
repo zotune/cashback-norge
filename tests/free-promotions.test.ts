@@ -6,7 +6,7 @@ import { buildCashbackIndex, findOffersForHostname, isCashbackOffer, isCashbackI
 import { readFreePromotion } from "../src/shared/free-promotions.js";
 import { matchesOfferQuickFilter, matchesOfferQuickFilters } from "../src/shared/offer-filters.js";
 import { getVisibleOfferKey } from "../src/shared/offer-context.js";
-import { calculateCashback, calculateCashbackMaxKr, formatCompactRewardLabel, getMaxRewardPercent } from "../src/shared/reward-calculation.js";
+import { calculateCashback, calculateCashbackMaxKr, formatCompactRewardLabel, formatRewardLabel, getMaxRewardPercent } from "../src/shared/reward-calculation.js";
 import { buildProviderMeta } from "../src/shared/provider-data.js";
 import { fetchGratis, fetchGjerrigknark, readFreeOffers, type FreeOffersInput } from "../src/backend/providers/free-offers.js";
 import { fetchSparelosen, readSparelosenPlans } from "../src/backend/providers/sparelosen.js";
@@ -46,7 +46,15 @@ test("real Gratis JSON carries free periods, paid postage and full conditions th
   const offers = readFreeOffers(gratis, "gratis", input);
   const fabel = offers.find((offer) => offer.merchantName === "Fabel")!;
   assert.equal(fabel.reward, "0 kr totalsum");
-  assert.equal(formatCompactRewardLabel(fabel), "0 kr totalsum");
+  // Data keeps the shared "0 kr totalsum" standard; clients show "Gratis",
+  // and a free trial keeps its period.
+  assert.equal(formatCompactRewardLabel(fabel), "6 uker gratis");
+  assert.equal(formatCompactRewardLabel({ ...fabel, promotion: { label: "Gratis", priceNok: 0 } }), "Gratis");
+  assert.equal(formatRewardLabel(fabel.reward, fabel.provider), "Gratis");
+  assert.equal(formatCompactRewardLabel({ ...fabel, promotion: undefined }), "Gratis");
+  // A paid fixed price is not free.
+  assert.equal(formatCompactRewardLabel({ ...fabel, promotion: undefined, reward: "45 kr totalsum" }), "45 kr totalsum");
+  assert.equal(formatRewardLabel("10 kr totalsum", "studenttorget"), "10 kr totalsum");
   assert.match(fabel.terms, /betalt periode|betalt abonnement/);
   assert.match(fabel.terms, /ikke kontrollert av Cashback Norge/);
   assert.equal(fabel.activationUrl, fabel.sourceUrl);

@@ -3,10 +3,12 @@
 import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
+  type OfferPromotion,
   normalizeDomainInput,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { readFreePromotion } from "../../shared/free-promotions.js";
 import {
   extractExplicitTotalPriceReward,
   extractKrReward,
@@ -18,7 +20,12 @@ import type { ProviderOverrides } from "../provider-overrides.js";
 
 const BASE_URL = "https://studenttorget.no";
 const DEFAULT_TERMS = "Krever registrering på studenttorget.no (gratis).";
-const DETAIL_CONCURRENCY = 30;
+const DETAIL_CONCURRENCY = 10;
+// The listing is shuffled on every page request, so one pass over the pages
+// sees roughly two thirds of the offers (2026-11-12: 1000 of 1544 unique, 138
+// of 212 profiled cards). Pages are re-read until every advertised offer is
+// seen, a round finds nothing new, or this bound is reached.
+const MAX_LISTING_ROUNDS = 6;
 
 const SKIP_HOSTNAMES = new Set([
   "studenttorget.no",
@@ -96,7 +103,9 @@ export async function crawlStudentTorget(
   let directCount = 0;
 
   for (const raw of rawOffers) {
-    let reward = parseStudentTorgetReward(raw.badgeText, raw.description, raw.richDescription);
+    // "Få 90 dager gratis med BookBeat": a free trial period, not a price.
+    const promotion = readTrialPromotion(raw.badgeText, [raw.description, raw.subtitle].filter(Boolean).join("\n"));
+    let reward = promotion ? "0 kr totalsum" : parseStudentTorgetReward(raw.badgeText, raw.description, raw.richDescription);
     // If no specific reward could be parsed, show "?"
     if (!reward) {
       reward = "?";
@@ -150,6 +159,7 @@ export async function crawlStudentTorget(
       merchantName: raw.name,
       domains: uniqueStrings(domains),
       reward,
+      ...(promotion ? { promotion } : {}),
       sourceUrl: raw.sourceUrl,
       activationUrl: raw.sourceUrl,
       terms,
@@ -169,30 +179,68 @@ async function fetchAllListingOffers(baseUrl: string, logger: Logger): Promise<R
   // Fetch first page to determine total pages
   const firstHtml = await fetchHtml(listUrl);
   const totalPages = extractTotalPages(firstHtml);
-  logger.info(`StudentTorget: ${totalPages} listing pages`);
+  const advertised = Number(firstHtml.match(/Viser\s+(\d{2,5})/i)?.[1] ?? 0);
+  logger.info(`StudentTorget: ${totalPages} listing pages, ${advertised || "unknown number of"} offers advertised`);
 
-  const allOffers = extractListingOffers(firstHtml, baseUrl);
-
-  // Fetch remaining pages in parallel batches
-  const PAGE_CONCURRENCY = 10;
-  for (let page = 2; page <= totalPages; page += PAGE_CONCURRENCY) {
-    const batch = [];
-    for (let p = page; p < page + PAGE_CONCURRENCY && p <= totalPages; p++) {
-      batch.push(fetchHtml(`${listUrl}?page=${p}`));
-    }
-    const htmlPages = await Promise.all(batch);
-    for (const html of htmlPages) {
-      allOffers.push(...extractListingOffers(html, baseUrl));
-    }
-  }
-
+  const PAGE_CONCURRENCY = 5;
   // Deduplicate by slug+id
   const byKey = new Map<string, RawOffer>();
-  for (const offer of allOffers) {
-    const key = `${offer.slug}/${offer.id}`;
-    if (!byKey.has(key)) {
-      byKey.set(key, offer);
+  const add = (offers: RawOffer[]): number => {
+    let added = 0;
+    for (const offer of offers) {
+      const key = `${offer.slug}/${offer.id}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, offer);
+        added++;
+      }
     }
+    return added;
+  };
+  const profiledCount = () => [...byKey.values()].filter((offer) => offer.profiled).length;
+
+  // Profiled cards fill the first pages in every order, so the number of
+  // cards on those pages is the size of the profiled tier.
+  let expectedProfiled = 0;
+  const profiledPages = new Set<number>();
+  const readPages = async (pages: number[], firstRound: boolean): Promise<number> => {
+    let added = 0;
+    for (let i = 0; i < pages.length; i += PAGE_CONCURRENCY) {
+      const batch = pages.slice(i, i + PAGE_CONCURRENCY);
+      const htmlPages = await Promise.all(batch.map((p) => fetchHtml(p === 1 ? listUrl : `${listUrl}?page=${p}`)));
+      htmlPages.forEach((html, index) => {
+        const offers = extractListingOffers(html, baseUrl);
+        const profiled = offers.filter((offer) => offer.profiled).length;
+        if (firstRound && profiled > 0) {
+          expectedProfiled += profiled;
+          profiledPages.add(batch[index]!);
+        }
+        added += add(offers);
+      });
+    }
+    return added;
+  };
+
+  const firstOffers = extractListingOffers(firstHtml, baseUrl);
+  expectedProfiled += firstOffers.filter((offer) => offer.profiled).length;
+  if (expectedProfiled > 0) profiledPages.add(1);
+  add(firstOffers);
+  const allPages = Array.from({ length: totalPages }, (_v, i) => i + 1);
+  await readPages(allPages.slice(1), true);
+
+  // Profiled offers (the ones with a website link) are re-read until all are
+  // seen; the long unprofiled tail gets one extra full round.
+  let rounds = 1;
+  for (let round = 2; round <= MAX_LISTING_ROUNDS; round++) {
+    const complete = advertised > 0 && byKey.size >= advertised;
+    if (complete || (profiledCount() >= expectedProfiled && round > 2)) break;
+    rounds = round;
+    const pages = round === 2 ? allPages : [...profiledPages];
+    const added = await readPages(pages, false);
+    logger.info(`StudentTorget: listing round ${round}: +${added}, ${profiledCount()}/${expectedProfiled} profiled, ${byKey.size}/${advertised || "?"} offers`);
+    if (added === 0) break;
+  }
+  if (profiledCount() < expectedProfiled) {
+    logger.warn(`StudentTorget: saw ${profiledCount()} of ${expectedProfiled} profiled offers after ${rounds} shuffled listing rounds of ${listUrl}`);
   }
 
   return [...byKey.values()];
@@ -482,9 +530,12 @@ export function parseStudentTorgetReward(
     const pct = extractUpToPercentageReward(badge);
     if (pct) return pct;
 
-    // kr-discount from badge (e.g. "Spar 200 kr" style)
-    const krDiscount = extractKrReward(`${badge} rabatt`);
-    if (krDiscount) return krDiscount;
+    // kr-discount from badge ("-1000 kr", "Spar 200 kr"); a bare "45,-" is
+    // the student price, not money off.
+    if (/^(?:-|spar\b)/i.test(badge)) {
+      const krDiscount = extractKrReward(`${badge.replace(/^-\s*/, "")} rabatt`);
+      if (krDiscount) return krDiscount;
+    }
 
     // Fixed price patterns: "45,-", "499,-", "499 kr", "170 kr", "430,-"
     const fixedMatch = badge.match(/(\d[\d\s]*)(?:,[-–]|,-|kr)\s*$/i);
@@ -504,7 +555,7 @@ export function parseStudentTorgetReward(
   for (const text of [description, richDescription]) {
     if (!text) continue;
 
-    const pct = extractUpToPercentageReward(text);
+    const pct = extractUpToPercentageReward(discountPercentText(text));
     if (pct) return pct;
 
     // kr discount (e.g. "200 kr i rabatt")
@@ -514,9 +565,53 @@ export function parseStudentTorgetReward(
     // Fixed student price: "Studentpris: 499,-", "Kun 110 kr", "for kr 149,-"
     const fixedPrice = extractExplicitTotalPriceReward(text) || extractStatedPrice(text);
     if (fixedPrice) return fixedPrice;
+
+    const bundle = extractBundleReward(text);
+    if (bundle) return bundle;
   }
 
   return "";
+}
+
+// Percentages stated as this merchant's discount ("20 % studentrabatt",
+// "-10% på alle mobilreparasjoner", "opptil 10 % rabatt på Economy"), not
+// other figures in the description ("inntil 100 % bonus-Miles", "SIA
+// refunderer opp til 40 %"). "Spar opp til 40 % + 10 % ekstra med
+// StudentTorgets rabattkode" is the merchant's own sale plus 10 % for
+// students: the extra is the student discount.
+function discountPercentText(text: string): string {
+  const extra = text.match(/\+\s*(\d{1,3}(?:[,.]\d+)?)\s*%\s*ekstra\b/i);
+  if (extra) return `${extra[1]} %`;
+  return text
+    .split(/[\n;]+|[.!?](?!\d)/)
+    .filter((clause) => !/\b(?:refunder\w*|bonus\S*|poeng|miles|cashback|moms|mva)\b/i.test(clause))
+    .filter((clause) => /(?:^|[\s(])-\s*\d{1,3}(?:[,.]\d+)?\s*%|\d\s*(?:%|prosent)\s*(?:student)?(?:rabatt|avslag|på|av|off)(?![\p{L}\d])|\b(?:spar|rabatt|avslag)\b[^.]*\d\s*(?:%|prosent)/iu.test(clause))
+    .join("\n");
+}
+
+const ORDINALS: Record<string, number> = { andre: 2, tredje: 3, fjerde: 4, femte: 5, sjette: 6 };
+const NUMBER_WORDS: Record<string, number> = { en: 1, ett: 1, to: 2, tre: 3, fire: 4, fem: 5 };
+
+// "2 for 1", "Kjøp for 4 personer …, og få den femte personen gratis".
+function extractBundleReward(text: string): string {
+  const literal = text.match(/\b([2-6])\s+for\s+([1-5])\b/);
+  if (literal && Number(literal[1]) > Number(literal[2])) return `${literal[1]} for ${literal[2]}`;
+  const ordinal = text.match(/\bkjøp\s+(?:for\s+)?(\d|en|ett|to|tre|fire|fem)\s+(?:personer|stk|billetter)\b[^.]{0,80}?\bfå\s+den\s+(andre|tredje|fjerde|femte|sjette)\b[^.]{0,30}?\bgratis\b/i);
+  if (ordinal) {
+    const paid = Number(ordinal[1]) || NUMBER_WORDS[ordinal[1]!.toLowerCase()] || 0;
+    const total = ORDINALS[ordinal[2]!.toLowerCase()] ?? 0;
+    if (paid > 0 && total === paid + 1) return `${total} for ${paid}`;
+  }
+  return "";
+}
+
+// "Få 90 dager gratis med BookBeat", "2 mnd gratis trening": a free period.
+function readTrialPromotion(badge: string, description: string): OfferPromotion | undefined {
+  const text = `${badge} ${description}`;
+  const period = text.match(/\b\d+\s*(?:dager?|uker?|måneder?|mnd)\s+gratis\b[^.!\n]*/i)?.[0];
+  if (!period) return undefined;
+  const promotion = readFreePromotion(period, description);
+  return promotion?.priceNok === 0 ? promotion : undefined;
 }
 
 // "For kun 1250,- får du …", "enkel rens til kr 740,-", "se film for 99,-",
@@ -524,15 +619,18 @@ export function parseStudentTorgetReward(
 // The keyword must be a word of its own ("inntil"/"opptil" are maximum
 // discounts, not prices) and the amount must carry an explicit kr or ",-".
 const STATED_PRICE_PATTERN =
-  /(?<![\p{L}\d])(?<!\bopp\s)(?:kun|bare|til|for|betaler)\s+(?:kun\s+|bare\s+)?(?:kr\.?\s*)?(\d{1,3}(?:[ .]\d{3})+|\d+)\s*(?:,[-–]|kr\b|kroner\b)/giu;
+  /(?<![\p{L}\d])(?<!\bopp\s)(?:kun|bare|til|for|betaler)\s+(?:kun\s+|bare\s+)?(?:(?:kr\.?|kroner)\s*(\d{1,3}(?:[ .]\d{3})+|\d+)\b|(?:kr\.?\s*)?(\d{1,3}(?:[ .]\d{3})+|\d+)\s*(?:,[-–]|kr\b|kroner\b))/giu;
 
 function extractStatedPrice(text: string): string {
   for (const match of text.matchAll(STATED_PRICE_PATTERN)) {
-    const afterMatch = text.slice((match.index ?? 0) + match[0].length);
-    // Unit prices ("250,- per time", "300,- per måned") are not a total.
-    if (/^\s*(?:\/|per\s+|pr\.?\s+)\s*(?:time|timen|t|mnd|måned|semester|år)\b/iu.test(afterMatch)) continue;
+    const afterMatch = text.slice((match.index ?? 0) + match[0].length).replace(/^\s*(?:,[-–]|kr\b\.?)/i, "");
+    // Unit prices ("250,- per time", "300,- per måned", "80,- per person")
+    // are not a total.
+    if (/^\s*(?:\/|per\s+|pr\.?\s+)\s*(?:time|timen|t|mnd|måned|semester|år|person|pers|serie)\b/iu.test(afterMatch)) continue;
+    // A starting price ("Studentbilletter fra kun kr. 120,-") is not the total.
+    if (/\bfra\s*$/i.test(text.slice(Math.max(0, (match.index ?? 0) - 6), match.index ?? 0))) continue;
 
-    const value = Number.parseInt((match[1] ?? "").replace(/[ .]/g, ""), 10);
+    const value = Number.parseInt((match[1] ?? match[2] ?? "").replace(/[ .]/g, ""), 10);
     if (Number.isFinite(value) && value > 0) return `${value} kr totalsum`;
   }
   return "";

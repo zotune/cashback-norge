@@ -15,6 +15,7 @@ import {
   uniqueStrings,
 } from "../../shared/cashback.js";
 import { extractBenefitReward } from "../../shared/reward.js";
+import { halfPriceIsClubBenefit } from "../benefit-list-page.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
@@ -181,6 +182,7 @@ export async function fetchPensjonistforbundet(
     const reward = extractPublicReward(
       highlight,
       [summary, ingress, content].join("\n"),
+      publicStrings.join("\n"),
     );
 
     offers.push({
@@ -363,7 +365,12 @@ function extractMerchantDomains(strings: string[]): string[] {
   return uniqueStrings(domains);
 }
 
-function extractPublicReward(highlight: string, text: string): string {
+export function extractPublicReward(highlight: string, text: string, moduleText = ""): string {
+  // Kinoklubben membership "til kun 75 kroner" (stated in the page modules)
+  // gives half-price tickets; the member benefit is the membership price,
+  // not 50 %.
+  if (halfPriceIsClubBenefit(`${highlight}\n${text}\n${moduleText}`)) return "Medlemspris";
+
   const normalizedHighlight = normalizeThousands(highlight);
   const highlightedReward = extractBenefitReward(normalizedHighlight);
   if (highlightedReward !== "" && highlightedReward !== "Rabatt") {

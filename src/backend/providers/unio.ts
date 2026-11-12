@@ -5,7 +5,13 @@ import {
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import {
+  extractBenefitReward,
+  extractKrReward,
+  extractOreLitreReward,
+  extractUpToPercentageReward,
+  relevantBenefitRewardText,
+} from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 const API_URL = "https://www.unio.no/wp-json/wp/v2/pages?parent=22&per_page=100";
@@ -19,6 +25,8 @@ const BLOCKED_DOMAINS = new Set([
   "linkedin.com",
   "youtube.com",
   "norskpensjon.no",
+  // Shared hotel booking engine (De Historiske's reservation links), not a shop.
+  "be.synxis.com",
 ]);
 
 type WpPage = {
@@ -62,7 +70,7 @@ export async function fetchUnio(
   const offers: CashbackOffer[] = [];
 
   for (const page of pages) {
-    const text = stripHtml(page.content.rendered);
+    const text = benefitBodyText(stripHtml(page.content.rendered));
     const offer = parsePageOffer(page, text, input.generatedAt);
     if (offer) {
       offers.push(offer);
@@ -84,7 +92,11 @@ function parsePageOffer(
   text: string,
   generatedAt: string,
 ): CashbackOffer | null {
-  const domains = extractDomainsFromHtml(page.content.rendered);
+  const domains = selectMerchantDomains(
+    extractDomainsFromHtml(page.content.rendered),
+    decodeHtmlEntities(page.title.rendered),
+    page.slug,
+  );
   if (domains.length === 0) return null;
 
   const reward = extractReward(text);
@@ -107,35 +119,76 @@ function parsePageOffer(
   };
 }
 
-function extractReward(text: string): string {
-  // Try percentage first (e.g. "20 prosent rabatt", "30%")
-  const pct = extractPercentageReward(text);
-  if (pct) return pct;
-
-  // Try kr reward (e.g. "1000 kroner i rabatt", "500 kr rabatt")
-  const kr = extractKrReward(text);
-  if (kr) return kr;
-
-  return "";
+// Every page ends with the same «Unios medlemsprodukter: Avis Bertel O. Steen
+// …» navigation list, which is not part of the benefit.
+function benefitBodyText(text: string): string {
+  return text.replace(/\s*Unios medlemsprodukter:[\s\S]*$/i, "").trim();
 }
 
-function extractDiscountCode(text: string): string | undefined {
-  // Match patterns like:  koden «UNIO1000», kode "samhold20", kode W330405
-  const patterns = [
-    /(?:kode|rabattkode|kampanjekode|oppgi)\s+[«""']([^»""']+)[»""']/i,
-    /(?:kode|rabattkode|kampanjekode)\s+(\S+)/i,
-    /AWD-nummer\)\s+(\S+)/i,
-  ];
+function extractReward(text: string): string {
+  // Fuel discounts are per litre ("52 øre* per liter"; the asterisk marks a
+  // footnote). The credit card's "effektiv rente … 31,13 prosent" and side
+  // perks must not become the percentage reward.
+  const oreLitre = extractOreLitreReward(text.replace(/(\d\s*øre)\*+/gi, "$1"));
+  if (oreLitre) return oreLitre;
 
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match?.[1]) {
-      const code = match[1].replace(/[.,;:!?]+$/, "");
-      if (code.length >= 3 && code.length <= 30) return code;
+  const rewardText = relevantBenefitRewardText(text);
+  // "Inntil 30 prosent rabatt" is a maximum, not a guaranteed rate.
+  const percentage = extractUpToPercentageReward(rewardText);
+  if (percentage) return percentage;
+
+  const kr = extractKrReward(rewardText, { totalsum: false });
+  if (kr) return kr;
+
+  // Benefits without a stated rate ("medlemspriser på boliglån", "rabatt på
+  // elbiler … varierer fra merke til merke").
+  return extractBenefitReward(text);
+}
+
+const CODE_PATTERNS = [
+  // "Oppgi rabattnummer W330405 ved bestilling"
+  /\brabattnummer\s+([A-Za-z0-9-]+)/gi,
+  // "koden «UNIO1000»", "Anvend koden samhold20", "kode W330405"
+  /\b(?:rabatt|kampanje)?koden?\s+[«"“']?([A-Za-z0-9-]+)[»"”']?/gi,
+];
+
+function extractDiscountCode(text: string): string | undefined {
+  for (const pattern of CODE_PATTERNS) {
+    for (const match of text.matchAll(pattern)) {
+      const code = (match[1] ?? "").replace(/[.,;:!?]+$/, "");
+      // Instructions ("rabattkode i kassen", "rabattkode (AWD-nummer)",
+      // "Rabattkoden gjelder …") are not codes; real codes carry a digit or
+      // are written in capitals.
+      if (code.length < 3 || code.length > 30) continue;
+      if (!/\d/.test(code) && !/^[A-Z0-9-]+$/.test(code)) continue;
+      return code;
     }
   }
 
   return undefined;
+}
+
+// Pages also link to unrelated organisations ("Initiativ for Etisk Handel" on
+// the Stormberg page): when some link matches the merchant, keep only those.
+function selectMerchantDomains(domains: string[], merchantName: string, slug: string): string[] {
+  const nameKey = normalizeKey(merchantName);
+  const slugKey = normalizeKey(slug);
+  const matching = domains.filter((domain) => {
+    const label = normalizeKey(domain.split(".").at(-2) ?? domain);
+    return label.length >= 3 && (nameKey.includes(label) || label.includes(nameKey) || slugKey.includes(label));
+  });
+  return matching.length > 0 ? matching : domains;
+}
+
+function normalizeKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function extractDomainsFromHtml(html: string): string[] {
@@ -164,12 +217,19 @@ function extractDomainsFromHtml(html: string): string[] {
 }
 
 function buildTerms(text: string): string {
-  // Take a relevant excerpt — first 2 sentences that mention rabatt/fordel/prosent
   const sentences = text.split(/(?<=[.!?])\s+/);
   const relevant = sentences.filter((s) =>
-    /\b(?:rabatt|fordel|prosent|%|kr|kode|tilbud)\b/i.test(s),
+    /rabatt|medlemspris|fordel|prosent|kode|tilbud|gjelder|øre|kroner|%/i.test(s) &&
+    !/\beffektiv rente\b/i.test(s),
   );
-  return relevant.slice(0, 3).join(" ").slice(0, 500);
+  const lines: string[] = [];
+  let length = 0;
+  for (const sentence of relevant) {
+    if (length + sentence.length > 600) break;
+    lines.push(sentence);
+    length += sentence.length + 1;
+  }
+  return lines.join(" ");
 }
 
 function stripHtml(html: string): string {

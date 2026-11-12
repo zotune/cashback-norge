@@ -121,7 +121,9 @@ const BENEFITS: BenefitConfig[] = [
     key: "pedalen-bodo",
     matches: /Pedalen sykkelverksted i Bodø/i,
     merchantName: "Pedalen sykkelverksted Bodø",
-    domains: ["kirkensbymisjon.no"],
+    // Pedalen has no shop domain of its own: kirkensbymisjon.no is the whole
+    // charity's site and would show this workshop discount on every page.
+    domains: [],
   },
   {
     key: "sport-1-cc-hamar",
@@ -157,6 +159,7 @@ const BENEFITS: BenefitConfig[] = [
 ];
 
 const SKIP_HOSTNAMES = new Set([
+  "kirkensbymisjon.no",
   OFFICIAL_HOSTNAME,
   "blimed.syklistforeningen.no",
   "blimedlem.syklistforeningen.no",

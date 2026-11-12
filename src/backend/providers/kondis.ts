@@ -15,7 +15,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { parseBenefitListPage } from "../benefit-list-page.js";
+import { benefitTerms, parseBenefitListPage } from "../benefit-list-page.js";
 import { merchantDomainsFromHostname } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -60,7 +60,8 @@ export async function fetchKondis(input: FetchKondisInput): Promise<CashbackOffe
       reward: item.reward,
       sourceUrl: LIST_URL,
       activationUrl: LIST_URL,
-      terms: DEFAULT_TERMS,
+      terms: benefitTerms(item.text, DEFAULT_TERMS),
+      ...(item.discountCode !== undefined ? { discountCode: item.discountCode } : {}),
       updatedAt: input.generatedAt,
     });
   }

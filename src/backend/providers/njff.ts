@@ -323,9 +323,15 @@ function merchantName(slug: string, title: string): string {
     .trim();
 }
 
-function buildTerms(text: string): string {
+export function buildTerms(text: string): string {
   const lines = text
-    .split(/(?<=[.!?])\s+|[\r\n]+/)
+    // The article byline ("Publisert: 15. juli 2025 kl. 11.28 Sist oppdatert:
+    // … TEKST NJFF FOTO Jaktia DEL") is page chrome.
+    .replace(/(?:Publisert:[^\n]*?)?(?:\b\d{1,2}[.:]\d{2}\s+)?\bTEKST\b[^\n]{0,80}?\bDEL\b\s*/g, "\n")
+    .replace(/Publisert:[^\n]*?(?:Sist oppdatert:[^\n]*?kl\.\s*\d{1,2}[.:]\d{2})?\s*/g, "\n")
+    // Split sentences only before a capital letter ("Ordinær pris er kr.
+    // 3 990" stays whole).
+    .split(/(?<=(?<!\b(?:inkl|ekskl|kr|nr|ca|evt|ord|veil|tlf|pr))[.!?])\s+(?=[A-ZÆØÅ«"])|[\r\n]+/)
     .map(normalizeText)
     .filter((line) => line.length >= 12 && line.length <= 360)
     .filter((line) => /\b(?:rabatt|medlemspris|tilbud|gjelder|unntak|ordinær|utvalgte)\b/i.test(line))

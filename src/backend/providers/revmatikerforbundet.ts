@@ -324,13 +324,16 @@ function extractHttpHostnames(html: string): string[] {
   return uniqueStrings(hostnames);
 }
 
-function buildTerms(text: string): string {
+export function buildTerms(text: string): string {
   const lines = text
-    .split(/\n+|(?<=[.!?])\s+/)
+    // Split sentences only before a capital letter ("kr. 500" stays whole).
+    .split(/\n+|(?<=(?<!\b(?:inkl|ekskl|kr|nr|ca|evt|ord|veil|tlf|pr))[.!?])\s+(?=[A-ZÆØÅ«"])/)
     .map(sanitizePublicLine)
     .filter((line) => line.length >= 8 && line.length <= 320)
     .filter((line) => !containsPrivateInstructions(line))
     .filter((line) => {
+      // Bare rate lines ("15 % på alle produkter") carry the benefit too.
+      if (/\d\s*(?:%|prosent)/i.test(line)) return true;
       return /\b(?:rabatt|avslag|medlemspris|gratis|kostnadsfri|gjelder|unntatt|ordinære|første konsultasjon|opphold|produkter|medlemskap)\b/i.test(line);
     });
   return uniqueTextLines([...lines.slice(0, 6), DEFAULT_TERMS]).join("\n");

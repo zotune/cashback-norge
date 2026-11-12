@@ -92,6 +92,10 @@ const DOMAIN_NAME_OVERRIDES: Record<string, string> = {
   "flipzonefoods.no": "FoodZone",
   "fyllingsdalenteater.no": "Fyllingsdalen Teater",
   "gjensidige.no": "Gjensidige",
+  // BOB lists these under category headings ("Advokattjenester",
+  // "Flyttetjenester"); the merchant is named in the benefit text.
+  "kyrre-bergen.no": "Advokatfirmaet Kyrre",
+  "petterdahlas.no": "Petter Dahl Flyttebyrå",
   "monter.no": "Montér",
   "nki.no": "NKI Nettstudier",
   "power.no": "Power",
@@ -527,7 +531,7 @@ function buildTerms(lines: string[]): string {
   return uniqueTextLines([...lines, DEFAULT_TERMS]).join("\n");
 }
 
-function extractBobReward(text: string): string {
+export function extractBobReward(text: string): string {
   const normalized = normalizeNumberWords(text);
   const percentage = extractRelevantPercentageReward(normalized);
   if (percentage) return percentage;
@@ -537,6 +541,12 @@ function extractBobReward(text: string): string {
 
   if (/\b(?:to\s+for\s+(?:en|én|1)|2\s*(?:for|:)\s*1|to\s+billetter\s+til\s+prisen\s+av\s+(?:en|én|1))\b/i.test(normalized)) {
     return "2 for 1";
+  }
+
+  // "Garantert laveste pris … Du får også gratis befaring": the benefit is a
+  // price guarantee; the free inspection is an extra, not a free product.
+  if (/\b(?:garantert|garanti\s+for)\s+(?:laveste|beste)\s+pris\b/i.test(normalized)) {
+    return "Medlemspris";
   }
 
   return extractGratisReward(normalized);

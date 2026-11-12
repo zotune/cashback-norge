@@ -1,5 +1,6 @@
 import type { CashbackOffer } from "./cashback.js";
 import { PROVIDER_WELCOME_BONUSES } from "./provider-data.js";
+import { isFreeTotalReward } from "./reward-calculation.js";
 
 export const QUICK_FILTERS = [
   { id: "strom", label: "Strøm" },
@@ -70,7 +71,7 @@ function explicitTopics(text: string, isMerchantName = false): Topic[] {
 
 export function matchesOfferQuickFilter(offer: CashbackOffer, filter: QuickFilterId | ""): boolean {
   if (filter === "") return true;
-  if (filter === "gratis") return offer.promotion ? offer.promotion.priceNok === 0 : /^0\s*kr\s+totalsum$/i.test(offer.reward.trim());
+  if (filter === "gratis") return offer.promotion ? offer.promotion.priceNok === 0 : isFreeTotalReward(offer.reward);
   if (filter === "rabattkode") return typeof offer.discountCode === "string" && offer.discountCode.trim() !== "";
   // A bonus for new members through our invitation (see PROVIDER_WELCOME_BONUSES).
   if (filter === "velkomst") return Object.hasOwn(PROVIDER_WELCOME_BONUSES, offer.provider);

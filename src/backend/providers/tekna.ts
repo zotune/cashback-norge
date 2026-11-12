@@ -9,7 +9,7 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractBenefitReward, extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractBenefitReward, extractKrReward, extractOreLitreReward, extractUpToPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
@@ -185,10 +185,14 @@ export async function crawlTekna(input: CrawlTeknaInput): Promise<CashbackOffer[
 }
 
 function extractMainText($: TeknaCheerio): string {
+  // Benefit pages state the main offer in the landing hero ("30 % rabatt på
+  // veiledende pris …"), which sits outside the content area blocks.
+  const hero = $(".landing-hero__content").first().clone();
+  hero.find(".landing-hero__actions, script, style, noscript, form, iframe, svg").remove();
   const article = $("main, article, .article-page, .contentareablock").first();
   article.find("script, style, noscript, form, iframe, svg").remove();
   const html = article.length > 0 ? article.html() ?? "" : $("body").html() ?? "";
-  return stripHtml(html)
+  return [stripHtml(hero.html() ?? ""), stripHtml(html)].join("\n")
     .split(/\n+/)
     .map(normalizeText)
     .filter(Boolean)
@@ -294,27 +298,35 @@ function isUsefulCarAgreementLine(line: string): boolean {
   return /\b(?:rabatt|medlemsfordel|medlemspris|bilforsikring|bil kasko|veihjelp|leiebil|kundeutbytte|gjelder|vilkår|medlemsbevis|binding|service|verksted|dekk|felg|bruktbil|innbytte|salg|kjøp|leasing)\b/i.test(normalizedLine);
 }
 
-function extractTeknaReward(text: string): string {
+export function extractTeknaReward(text: string): string {
   if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
 
   const oreLitre = extractOreLitreReward(text);
   if (oreLitre) return oreLitre;
 
-  const percentage = extractPercentageReward(relevantRewardText(text));
+  // "Opptil 20 %" states a maximum.
+  const percentage = extractUpToPercentageReward(relevantRewardText(text));
   if (percentage) return percentage;
 
   const kr = extractKrReward(text);
   if (kr) return kr;
 
-  if (/\bgratis\b/i.test(text)) return "Gratis";
-  if (/\bmedlemspris\b/i.test(text)) return "Medlemspris";
+  // "Tekna-medlemmer betaler 199,- i året" is the member price.
+  const memberPrice = text.match(/\bmedlem\w*\s+betaler\s+(?:kr\.?\s*)?(\d[\d\s.]*\d|\d)\s*(?:,-|kr\b|kroner)/i);
+  if (memberPrice !== null) {
+    const amount = Number.parseInt((memberPrice[1] ?? "").replace(/[\s.]/g, ""), 10);
+    if (Number.isFinite(amount) && amount > 0) return `${amount.toLocaleString("nb-NO").replace(/[\u00a0\u202f]/g, " ")} kr totalsum`;
+  }
 
-  // Last resort before "?": the shared extractor knows more patterns
-  // (gift-card values, "verdi på X kroner", generic labels).
+  // Last resort: the shared extractor knows more patterns (gift-card values,
+  // "verdi på X kroner", generic labels).
   const shared = extractBenefitReward(text);
+  // A free trial ("gratis bruk av Slipper i 12 måneder") is not a free service.
+  if (shared === "0 kr totalsum" && isTimeLimitedFreeTrial(text)) return "Medlemsfordel";
   if (shared) return shared;
 
-  if (hasDiscountWord(text)) return "?";
+  // "ekstra medlemsrabatt på allerede lave priser": a discount without a rate.
+  if (hasDiscountWord(text)) return "Rabatt";
 
   return "";
 }
@@ -330,6 +342,11 @@ function relevantRewardText(text: string): string {
     .join("\n");
 }
 
+function isTimeLimitedFreeTrial(text: string): boolean {
+  return /\bgratis\b[^.\n]{0,60}\b(?:i|de første)\s+\d+\s+(?:dager|uker|måneder|mnd)\b/i.test(text) ||
+    /\b\d+\s+(?:dager|uker|måneder|mnd)\s+gratis\b/i.test(text);
+}
+
 function hasDiscountWord(text: string): boolean {
   return text.toLowerCase().includes("rabatt");
 }
@@ -341,6 +358,8 @@ function bestReward(currentReward: string, nextReward: string): string {
 }
 
 function rewardSpecificity(reward: string): number {
+  // "?" means unknown and must not replace a stated "Rabatt"/"Medlemspris".
+  if (reward.trim() === "?") return -1;
   if (/\d/.test(reward) && /%/.test(reward)) return 5;
   if (/\d/.test(reward) && /\bkr\//i.test(reward)) return 4;
   if (/\d/.test(reward) && /\bkr\b/i.test(reward)) return 3;

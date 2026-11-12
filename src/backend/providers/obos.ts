@@ -9,17 +9,25 @@ import {
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractOreLitreReward, extractPercentageReward } from "../../shared/reward.js";
+import {
+  extractKrReward,
+  extractOreLitreReward,
+  extractPercentageReward,
+  extractUpToPercentageReward,
+} from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
 type ObosCheerio = CheerioCrawlingContext["$"];
 
-const LIST_URL = "https://www.obos.no/medlem/medlemsfordeler";
 const LABEL_LIST = "list";
 const LABEL_DETAIL = "detail";
 const DEFAULT_TERMS = "Krever OBOS-medlemskap.";
-const TERMS_HEADING_LABELS = new Set(["medlemsfordel", "medlemstilbud"]);
+// "Medlemsfordel", "Medlemstilbud", "Medlemsfordeler" and Tryg's "Generell
+// medlemsfordel" introduce the benefit; "Relaterte medlemsfordeler" does not.
+function isMemberBenefitHeading(label: string): boolean {
+  return /^(?:generelle?\s+)?medlems(?:fordel|tilbud)/.test(label);
+}
 
 const SKIP_HOSTNAMES = new Set([
   "obos.no",
@@ -92,6 +100,38 @@ function extractCtaUrl($: ObosCheerio): string | undefined {
   return ctaUrl ?? firstUrl;
 }
 
+// Pages can link a partner's sister business first (Hadeland Glassverk links
+// Thorbjørnrud Hotell; Høyt & Lavt links its Swedish site). A link whose
+// domain carries the merchant's name is the merchant's own shop.
+function extractNameMatchedUrl($: ObosCheerio, name: string): string | undefined {
+  const nameKey = nameMatchKey(name);
+  if (nameKey.length < 4) return undefined;
+
+  let matched: string | undefined;
+  $('a[href^="http"]').each((_, el): false | void => {
+    const externalUrl = normalizeExternalUrl($(el).attr("href") ?? "");
+    const hostname = externalUrl === undefined ? undefined : parseUrl(externalUrl)?.hostname;
+    if (hostname === undefined) return;
+    const labels = normalizeDomainInput(hostname).split(".").slice(0, -1).map(nameMatchKey);
+    if (labels.some((label) => label.length >= 4 && (nameKey.includes(label) || label.includes(nameKey)))) {
+      matched = externalUrl;
+      return false;
+    }
+  });
+  return matched;
+}
+
+function nameMatchKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/æ/g, "ae")
+    .replace(/[øö]/g, "o")
+    .replace(/[åä]/g, "a")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function normalizeExternalUrl(value: string): string | undefined {
   const parsed = parseUrl(value) ?? parseUrl(`https://${value}`);
   if (parsed === undefined) return undefined;
@@ -120,14 +160,45 @@ function extractTerms($: ObosCheerio): string {
 
   const contentEl = $("main, article").first();
   const fullText = contentEl.length ? contentEl.text() : $("body").text();
-  return extractTermsFromText(fullText);
+  const sectionTerms = extractTermsFromText(fullText);
+  if (sectionTerms) return sectionTerms;
+
+  // Pages without a benefit heading (Eeffy) state it in the lead paragraph.
+  const lead = normalizeTextLine($("h1").first().nextAll("p").first().text());
+  return /\b(?:medlem|rabatt|spar)/i.test(lead) ? lead : "";
+}
+
+// The lines directly under the "Medlemsfordel" heading, before the next
+// heading, state the benefit itself. Later sections are marketing copy ("Mange
+// av kundene forteller at de sparer så mye som 50 prosent") whose numbers are
+// not the member discount.
+function extractMemberBenefitBlock($: ObosCheerio): string {
+  const heading = findMemberBenefitHeading($);
+  if (!heading.length) return "";
+
+  const lines: string[] = [];
+  let node = heading.next();
+  while (node.length && !node.is("h1, h2, h3")) {
+    lines.push(...extractTextLines($, node));
+    node = node.next();
+  }
+  return lines.filter((line) => !/bonus-nivå/i.test(line)).join("\n");
+}
+
+function findMemberBenefitHeading($: ObosCheerio) {
+  return $("h2, h3")
+    .filter((_, el) => {
+      const label = normalizeHeadingLabel($(el).text());
+      return isMemberBenefitHeading(label);
+    })
+    .first();
 }
 
 function extractMemberBenefitTerms($: ObosCheerio): string {
   const heading = $("h2, h3")
     .filter((_, el) => {
       const label = normalizeHeadingLabel($(el).text());
-      return [...TERMS_HEADING_LABELS].some((h) => label === h || label.startsWith(h));
+      return isMemberBenefitHeading(label);
     })
     .first();
 
@@ -228,8 +299,20 @@ function uniqueTextLines(lines: string[]): string[] {
   return uniqueLines;
 }
 
-function extractDiscountFromText(text: string): string {
-  return extractPercentageReward(text) || extractOreLitreReward(text) || extractKrReward(text);
+function extractDiscountFromText(rawText: string): string {
+  // "Som OBOS-medlem sparer du 6000 kroner på energirådgivning" states the
+  // saving like "spar 6000 kroner".
+  const text = rawText.replace(/\bsparer\s+du\s+(?=(?:opptil\s+|inntil\s+)?(?:kr\.?\s*)?\d)/gi, "spar ");
+  const percentage = extractPercentageReward(text);
+  // "Opptil 20 % rabatt" is a maximum; a range already shows that it varies.
+  if (percentage) return percentage.includes("-") ? percentage : extractUpToPercentageReward(text);
+  // Hourly rates ("2110 kr per time (ordinær pris fra 2750 kr)") are prices,
+  // and mixed with fixed prices they made a "999-2 110 kr" discount range.
+  const withoutHourlyRates = text
+    .split("\n")
+    .filter((line) => !/\b(?:per\s+time|\/\s*time|timepris)\b/i.test(line))
+    .join("\n");
+  return extractOreLitreReward(text) || extractKrReward(withoutHourlyRates);
 }
 
 function trimRelatedBenefits(text: string): string {
@@ -263,6 +346,8 @@ export type CrawlObosInput = {
 };
 
 export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]> {
+  // Detail pages live under the list URL (https://www.obos.no/medlem/medlemsfordeler/<slug>).
+  const listUrl = input.startUrl.replace(/[?#].*$/, "").replace(/\/+$/, "");
   const slugToName = new Map<string, string>();
   const slugToDiscount = new Map<string, string>();
   const slugToDomain = new Map<string, string>();
@@ -325,7 +410,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
 
         // Enqueue detail pages for found slugs
         const detailUrls = [...slugToName.keys()].map(
-          (slug) => `${LIST_URL}/${encodeURIComponent(slug)}`
+          (slug) => `${listUrl}/${encodeURIComponent(slug)}`
         );
         for (const url of detailUrls) {
           await crawler.addRequests([{ url, label: LABEL_DETAIL }]);
@@ -362,9 +447,8 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
           }
         }
 
-        if (!ctaUrl) {
-          ctaUrl = extractCtaUrl($);
-        }
+        const pageName = slugToName.get(slug) ?? $("h1").first().text().trim();
+        ctaUrl = extractNameMatchedUrl($, pageName) ?? ctaUrl ?? extractCtaUrl($);
 
         if (!ctaUrl && !slugToName.has(slug)) {
           const name = $("h1").first().text().trim();
@@ -378,7 +462,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
           if (name && !isExcluded(slug, name)) slugToName.set(slug, name);
         }
 
-        const discount = extractDiscount($);
+        const discount = extractDiscountFromText(extractMemberBenefitBlock($)) || extractDiscount($);
         if (discount) slugToDiscount.set(slug, discount);
         const terms = extractTerms($);
         if (terms) slugToTerms.set(slug, terms);
@@ -421,7 +505,7 @@ export async function crawlObos(input: CrawlObosInput): Promise<CashbackOffer[]>
       continue;
     }
 
-    const sourceUrl = `${LIST_URL}/${encodeURIComponent(slug)}`;
+    const sourceUrl = `${listUrl}/${encodeURIComponent(slug)}`;
     const terms = slugToTerms.get(slug) ?? DEFAULT_TERMS;
     const reward = slugToDiscount.get(slug) ?? extractDiscountFromText(terms);
 

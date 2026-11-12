@@ -16,10 +16,19 @@ type RewardOffer = {
   promotion?: OfferPromotion;
 };
 
+// Free items keep the shared data standard "0 kr totalsum" (filters, sorting
+// and older cached indexes rely on it); people read it as "Gratis".
+const FREE_TOTAL_REWARD = /^0\s*kr\s+totalsum$/i;
+
+export function isFreeTotalReward(reward: string): boolean {
+  return FREE_TOTAL_REWARD.test(reward.trim());
+}
+
 export function formatRewardLabel(reward: string, provider: string): string {
   const trimmedReward = reward.trim();
 
   if (trimmedReward.length === 0) return "?";
+  if (isFreeTotalReward(trimmedReward)) return "Gratis";
   // Generic labels ("Medlemspris") carry more information than "?"
   if (isGenericMembershipReward(trimmedReward)) return "Medlemspris";
 
@@ -41,7 +50,8 @@ function isGenericMembershipReward(reward: string): boolean {
 }
 
 export function formatCompactRewardLabel(offer: RewardOffer): string | undefined {
-  if (offer.promotion?.priceNok === 0) return "0 kr totalsum";
+  // Free promotions are labelled "Gratis" or "6 uker gratis": a free trial
+  // period must not read as free forever.
   if (offer.promotion) return offer.promotion.label;
   const label = formatRewardLabel(offer.reward, offer.provider);
   const fixedReward = readFixedRewardMax(label);

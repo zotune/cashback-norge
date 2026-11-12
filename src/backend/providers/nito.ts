@@ -14,6 +14,7 @@ import {
   extractKrReward,
   extractOreLitreReward,
   extractPercentageReward,
+  extractUpToPercentageReward,
 } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
 import type { Logger } from "../logger.js";
@@ -36,6 +37,8 @@ const SKIP_HOSTNAMES = new Set([
   "microsoft.com",
   "visualstudio.com",
   "tiqcdn.com",
+  // Shared hotel booking engine (De Historiske's reservation links), not a shop.
+  "be.synxis.com",
 ]);
 
 const NOISY_DETAIL_SELECTORS = [
@@ -210,7 +213,9 @@ export async function crawlNito(input: CrawlNitoInput): Promise<CashbackOffer[]>
 
     if (domains.length === 0) {
       for (const lookupName of lookupNamesForEntry(entry)) {
-        domains = lookupDomains(input.domainLookup, lookupName);
+        // Other providers' links can carry booking engines (be.synxis.com).
+        domains = lookupDomains(input.domainLookup, lookupName)
+          .filter((domain) => !isSkippedHostname(normalizeDomainInput(domain)));
         if (domains.length > 0) {
           lookedUp++;
           break;
@@ -379,11 +384,13 @@ function extractDiscountTableRows($: NitoCheerio, table: NitoSelection): TableTe
   return rows;
 }
 
-function extractStrictTableReward(value: string): string | undefined {
+export function extractStrictTableReward(value: string): string | undefined {
   const text = normalizeText(value);
   if (!text || /rabatt\s+gjelder\s+ikke/i.test(text)) return undefined;
 
-  if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s*[-\u2013\u2014]\s*\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)?)?$/i.test(text)) {
+  // Value cells may qualify the rate: "2 % på veil. pris", "2 % i tillegg
+  // på eksisterende kampanje".
+  if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s*[-\u2013\u2014]\s*\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)?)?(?:\s+(?:på|i tillegg)\s[^\d%]*)?$/i.test(text)) {
     const reward = extractPercentageReward(text);
     return reward || undefined;
   }
@@ -400,8 +407,11 @@ function extractStrictTableReward(value: string): string | undefined {
   return undefined;
 }
 
-function cleanTableLabel(value: string): string | undefined {
+export function cleanTableLabel(value: string): string | undefined {
   const label = normalizeText(value)
+    // Financing terms in a model label ("Kampanje på #5 (2,99% rente eller
+    // prisavslag)") are not a discount rate.
+    .replace(/\s*\([^()]*\brente\b[^()]*\)/gi, "")
     .replace(/\s*\*+$/, "")
     .replace(/:$/, "")
     .trim();
@@ -470,12 +480,13 @@ function collectExternalUrls($: NitoCheerio): string[] {
   return uniqueStrings(urls);
 }
 
-function extractNitoReward(text: string): string {
+export function extractNitoReward(text: string): string {
   const relevant = relevantRewardText(text);
   const ore = extractOreLitreReward(relevant);
   if (ore) return ore;
 
-  const percentage = extractPercentageReward(relevant);
+  // "Opptil 18% rabatt" states a maximum, not a guaranteed rate.
+  const percentage = extractUpToPercentageReward(relevant);
   if (percentage) return percentage;
 
   const explicitTotalPrice = extractExplicitTotalPriceReward(relevant);
@@ -487,7 +498,9 @@ function extractNitoReward(text: string): string {
   if (/\bhalv\s+pris\b/i.test(relevant)) return "50 %";
   if (isFreeAdmissionOrLiftPass(relevant)) return "0 kr totalsum";
   if (/\bmedlemspris\b/i.test(relevant)) return "Medlemspris";
-  if (/\b(?:rabatt|cashpoint|fordel|tilbud)\b/i.test(relevant)) return "?";
+  // "Rabatt på hotellovernatting" states a discount without a rate.
+  if (/rabatt/i.test(relevant)) return "Rabatt";
+  if (/\b(?:cashpoint|fordel|tilbud)\b/i.test(relevant)) return "?";
   return "";
 }
 

@@ -429,16 +429,24 @@ function extractCampaigns(value: unknown): NafCampaign[] {
   return result;
 }
 
-function extractDetailReward(value: unknown): string {
+// Key-information lines about a different service ("50 % rabatt på
+// gravering") or a campaign add-on ("5 % rabatt i tillegg ved
+// prosentkampanjer") are not the product discount.
+const SIDE_BENEFIT_ITEM_PATTERN = /\b(?:laser)?gravering\b|\bi\s+tillegg\s+ved\b[^.]*kampanj/i;
+
+export function extractDetailReward(value: unknown): string {
   if (!isRecord(value)) return "";
 
   const keyInformationItems = isRecord(value.keyInformation) &&
     Array.isArray(value.keyInformation.items)
     ? value.keyInformation.items.map(readString).filter(Boolean)
     : [];
+  const badge = INSURANCE_NOISE_PATTERN.test(readString(value.discountBadge)) ? "" : readString(value.discountBadge);
 
-  const fromItems = extractRewardFromItems(keyInformationItems);
-  if (fromItems) return fromItems;
+  const fromItems = extractRewardFromItems(
+    keyInformationItems.filter((item) => !SIDE_BENEFIT_ITEM_PATTERN.test(item)),
+  );
+  if (fromItems) return withUpToQualifier(fromItems, [...keyInformationItems, badge]);
 
   // Collect rewards from top-level discountBadge and all campaign labels/text
   const badges: string[] = [];
@@ -469,10 +477,31 @@ function extractDetailReward(value: unknown): string {
     const min = Math.min(...percents);
     const max = Math.max(...percents);
     const fmt = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(1).replace(".", ","));
-    return min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`;
+    return withUpToQualifier(min < max ? `${fmt(min)}-${fmt(max)} %` : `${fmt(max)} %`, badges);
   }
 
+  // "Spar opptil kr 1500,–" is the headline saving; the body's prices and
+  // percentages describe other things.
+  // NAF writes amounts as "kr 1500,–" (en dash); read it like "1500,-".
+  const badgeKr = extractKrReward(badge.replace(/,\s*[–—]/g, ",-"), { totalsum: false });
+  if (badgeKr) return withUpToQualifier(badgeKr, [badge]);
+  // A partner service NAF members get for free ("Gratis").
+  if (/^\s*gratis\b/i.test(badge)) return "0 kr totalsum";
+
   return extractRewardFromText(collectText(value.body).join(" "));
+}
+
+// "Opptil 24 % rabatt" with a single stated rate is a maximum, not a
+// guaranteed rate. Ranges already show that the rate varies.
+function withUpToQualifier(reward: string, texts: string[]): string {
+  const single = reward.match(/^(\d[\d ]*(?:,\d+)?) (%|kr)$/);
+  if (single === null) return reward;
+  const value = (single[1] ?? "").replace(/\s/g, "").replace(",", "[,.]");
+  const unit = single[2] === "%" ? "\\s*(?:%|prosent)" : "(?!\\d)";
+  const upTo = new RegExp(`\\b(?:opptil|inntil)\\s+(?:kr\\.?\\s*)?${value}${unit}`, "i");
+  return texts.some((text) => upTo.test(text.replace(/(\d)[\s.](?=\d{3}\b)/g, "$1")))
+    ? `opptil ${reward}`
+    : reward;
 }
 
 function extractDetailTerms(value: unknown): string {
@@ -589,7 +618,10 @@ function collectValues(value: unknown, visit: (value: unknown) => void): void {
 // Insurance-specific terms that contain % values irrelevant to the member discount
 const INSURANCE_NOISE_PATTERN = /\b(?:startbonus|bonustap|bonus(?:nivå|level))\b/i;
 
-function extractRewardFromText(text: string): string {
+function extractRewardFromText(rawText: string): string {
+  // Link targets in the body ("…?url=https%3A%2F%2Fwww.zaptec.com…&data=05%7C02…")
+  // are not prose; their URL escapes read as percentages ("2-22 %").
+  const text = rawText.replace(/\bhttps?:\/\/\S+/gi, " ");
   const oreLitre = extractOreLitreReward(text);
   if (oreLitre !== "") return oreLitre;
 
