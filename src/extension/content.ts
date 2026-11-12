@@ -119,6 +119,8 @@ import {
   buildKiwiFlightSearchUrl,
   readTripComJourneyLeg,
   buildPanFlightsFlightSearchUrl,
+  buildPanFlightsCabinClass,
+  readPanFlightsCabinClass,
   buildGoogleFlightsSearchUrl,
   buildTripComFlightSearchUrl,
   buildMomondoFlightSearchUrl,
@@ -2367,6 +2369,7 @@ function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
   const inboundDate = readCompactIsoDateValue(parts[3]);
   if (origin === undefined || destination === undefined || outboundDate === undefined) return undefined;
   const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== undefined ? 4 : 3), outboundDate, inboundDate);
+  const cabinClass = readPanFlightsCabinClass(parsedUrl.searchParams.get("cl"));
 
   return normalizeFlightSearchMeta({
     origin,
@@ -2374,6 +2377,7 @@ function extractPanFlightsFlightSearchMeta(parsedUrl: URL): FlightSearchMeta | u
     outboundDate,
     ...(inboundDate !== undefined ? { inboundDate } : {}),
     ...(dateFlex !== undefined ? { dateFlex } : {}),
+    ...(cabinClass !== undefined ? { cabinClass } : {}),
     adults: readPositiveIntegerValue(parsedUrl.searchParams.get("pad")) ??
       readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ??
       readPositiveIntegerValue(parsedUrl.searchParams.get("ad")) ??
@@ -4463,15 +4467,6 @@ function buildPanFlightsFlightSearchPayload(
     user_ip: "",
     version: variant.version,
   };
-}
-
-function buildPanFlightsCabinClass(flightMeta: FlightSearchMeta): string {
-  switch (flightMeta.cabinClass) {
-    case "premium": return "S";
-    case "business": return "C";
-    case "first": return "F";
-    default: return "Y";
-  }
 }
 
 // Flyplassene som godtas i hver ende; et bysøk (SHA) gir byens flyplasser (PVG, SHA).

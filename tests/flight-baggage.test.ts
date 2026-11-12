@@ -22,6 +22,43 @@ const searches: FlightSearchMeta[] = [
 ];
 const candidate = (amount: number) => ({ shopName: "Reisebyrå", amount, price: `${amount} kr`, currency: "NOK", productUrl: "https://example.test/flight" });
 
+test("PanFlights preserves the selected cabin from the page URL through searches and outgoing links", async () => {
+  const extract = loadFunction("extractPanFlightsFlightSearchMeta", {
+    ...flightSearch,
+    isPanFlightsSearchPage: () => true,
+    readPanFlightsPlaceIataCode: (value: string) => ({ "2105": "PVG", "2642": "BGO" })[value],
+    readCompactIsoDateValue: (value: string) => /^\d{8}$/.test(value ?? "")
+      ? value.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3") : undefined,
+    readPositiveIntegerValue: (value: string) => Number(value) > 0 ? Number(value) : undefined,
+    readNonNegativeIntegerValue: (value: string | null) => value !== null && Number(value) >= 0 ? Number(value) : undefined,
+  });
+  const payload = loadFunction("buildPanFlightsFlightSearchPayload", {
+    ...flightSearch,
+    splitIsoDateParts: loadFunction("splitIsoDateParts", {}),
+    PANFLIGHTS_FLIGHT_HITS_LIMIT: 500,
+    navigator: { userAgent: "fixture" },
+  });
+  const variant = { sortOrder: "quality", sortRadio: "quality", version: 0, maxStops: 6, searchId: 1001 };
+  for (const [code, cabin] of [["Y", "economy"], ["S", "premium"], ["C", "business"], ["F", "first"]]) {
+    const url = new URL(`https://panflights.no/nb/oneway/?v2=2105_2642_20261119_ff:7,7&cl=${code}&x=d.1;b.1`);
+    const meta = await extract(url);
+    assert.ok(meta);
+    assert.equal(meta.cabinClass, cabin);
+    assert.equal(meta.origin, "PVG");
+    assert.equal(meta.destination, "BGO");
+    assert.equal(meta.outboundDate, "2026-11-19");
+    assert.equal(meta.dateFlex.outboundBefore, 7);
+    assert.equal((await payload(meta, variant)).class, code);
+    assert.equal(new URL(flightSearch.buildPanFlightsFlightSearchUrl(meta)).searchParams.get("cl"), code);
+    assert.equal(new URL(flightSearch.buildFinnFlightSearchUrl(meta)).searchParams.get("cabinType"), cabin);
+    assert.equal(new URL(flightSearch.buildSkyscannerFlightSearchUrl(meta)).searchParams.get("cabinclass"), cabin === "premium" ? "premiumeconomy" : cabin);
+    url.searchParams.delete("cl");
+    assert.equal((await extract(url)).cabinClass, undefined, "Missing cabin retains the default");
+    url.searchParams.set("cl", "invalid");
+    assert.equal((await extract(url)).cabinClass, undefined, "Unknown codes are not interpreted as Business");
+  }
+});
+
 test("momondo: missing selected baggage produces no fare, including in cheapest/fastest pools", async () => {
   for (const meta of searches) for (const hasValidFare of [false, true]) {
     const checked: FlightSearchMeta[] = [];
@@ -120,7 +157,6 @@ test("PanFlights sends the resolved city ID to the search API while retaining IA
   const payload = loadFunction("buildPanFlightsFlightSearchPayload", {
     ...flightSearch,
     splitIsoDateParts: loadFunction("splitIsoDateParts", {}),
-    buildPanFlightsCabinClass: loadFunction("buildPanFlightsCabinClass", {}),
     PANFLIGHTS_FLIGHT_HITS_LIMIT: 500,
     navigator: { userAgent: "fixture" },
   });

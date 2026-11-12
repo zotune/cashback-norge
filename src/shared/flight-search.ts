@@ -135,6 +135,26 @@ export function readFlightCabinClassValue(value: unknown): FlightCabinClass | un
   return undefined;
 }
 
+// PanFlights' offentlige CabinClassMap og cl-parameter (verifisert 2026-11-12).
+export function readPanFlightsCabinClass(value: string | null): FlightCabinClass | undefined {
+  switch (value) {
+    case "Y": return "economy";
+    case "S": return "premium";
+    case "C": return "business";
+    case "F": return "first";
+    default: return undefined;
+  }
+}
+
+export function buildPanFlightsCabinClass(flightMeta: FlightSearchMeta): string {
+  switch (flightMeta.cabinClass) {
+    case "premium": return "S";
+    case "business": return "C";
+    case "first": return "F";
+    default: return "Y";
+  }
+}
+
 export function exceedsFlightMaxStops(flightMeta: FlightSearchMeta, stopCounts: Array<number | undefined>): boolean {
   if (flightMeta.maxStops === undefined) return false;
   const maxStops = flightMeta.maxStops;
@@ -1266,6 +1286,7 @@ export function buildPanFlightsFlightSearchUrl(
   const params = new URLSearchParams({
     v2,
     order: buildFlightSortUrlValue("panflights", sortMode),
+    cl: buildPanFlightsCabinClass(flightMeta),
     pad: String(flightMeta.adults),
     ...(flightMeta.children > 0 ? { pch: String(flightMeta.children) } : {}),
     ...(flightMeta.infants > 0 ? { pin: String(flightMeta.infants) } : {}),

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794347114
+// @version      1794504758
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -8854,6 +8854,32 @@ query SearchSuggestions($query: String!, $category: Int) {
     if (/^first(?:class)?$|f[oø]rsteklasse/.test(normalized)) return "first";
     return void 0;
   }
+  function readPanFlightsCabinClass(value) {
+    switch (value) {
+      case "Y":
+        return "economy";
+      case "S":
+        return "premium";
+      case "C":
+        return "business";
+      case "F":
+        return "first";
+      default:
+        return void 0;
+    }
+  }
+  function buildPanFlightsCabinClass(flightMeta) {
+    switch (flightMeta.cabinClass) {
+      case "premium":
+        return "S";
+      case "business":
+        return "C";
+      case "first":
+        return "F";
+      default:
+        return "Y";
+    }
+  }
   function exceedsFlightMaxStops(flightMeta, stopCounts) {
     if (flightMeta.maxStops === void 0) return false;
     const maxStops = flightMeta.maxStops;
@@ -9631,6 +9657,7 @@ query SearchSuggestions($query: String!, $category: Int) {
     const params = new URLSearchParams({
       v2,
       order: buildFlightSortUrlValue("panflights", sortMode),
+      cl: buildPanFlightsCabinClass(flightMeta),
       pad: String(flightMeta.adults),
       ...flightMeta.children > 0 ? { pch: String(flightMeta.children) } : {},
       ...flightMeta.infants > 0 ? { pin: String(flightMeta.infants) } : {},
@@ -13869,12 +13896,14 @@ ${darkProviderCss}
     const inboundDate = readCompactIsoDateValue(parts[3]);
     if (origin === void 0 || destination === void 0 || outboundDate === void 0) return void 0;
     const dateFlex = readPanFlightsDateFlex(parts.slice(inboundDate !== void 0 ? 4 : 3), outboundDate, inboundDate);
+    const cabinClass = readPanFlightsCabinClass(parsedUrl.searchParams.get("cl"));
     return normalizeFlightSearchMeta({
       origin,
       destination,
       outboundDate,
       ...inboundDate !== void 0 ? { inboundDate } : {},
       ...dateFlex !== void 0 ? { dateFlex } : {},
+      ...cabinClass !== void 0 ? { cabinClass } : {},
       adults: readPositiveIntegerValue(parsedUrl.searchParams.get("pad")) ?? readPositiveIntegerValue(parsedUrl.searchParams.get("adults")) ?? readPositiveIntegerValue(parsedUrl.searchParams.get("ad")) ?? 1,
       youths: 0,
       children: readNonNegativeIntegerValue(parsedUrl.searchParams.get("pch")) ?? readNonNegativeIntegerValue(parsedUrl.searchParams.get("children")) ?? 0,
@@ -15529,18 +15558,6 @@ ${darkProviderCss}
       user_ip: "",
       version: variant.version
     };
-  }
-  function buildPanFlightsCabinClass(flightMeta) {
-    switch (flightMeta.cabinClass) {
-      case "premium":
-        return "S";
-      case "business":
-        return "C";
-      case "first":
-        return "F";
-      default:
-        return "Y";
-    }
   }
   function extractPanFlightsOfferCandidates(resultData, variant, flightMeta, resultUrl, airports, dateFlex) {
     const currency = readStringValue(resultData.currency) ?? "NOK";

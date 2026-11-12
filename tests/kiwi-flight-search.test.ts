@@ -19,7 +19,9 @@ const search: FlightSearchMeta = {
 };
 const airports = { origin: new Set(["BGO"]), destination: new Set(["SHA", "PVG"]) };
 
-test("Kiwi request mirrors the Kiwi link: places, dates, bags, stops, whole hours and sorting", () => {
+test("Kiwi request mirrors the Kiwi link: places, dates, bags, stops, whole hours and sorting", (t) => {
+  // Fixture-datoene skal ikke endre forventet datovindu når Daily crawl kjører senere.
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-11-05T12:00:00Z") });
   const request = buildKiwiItinerariesRequest(
     { ...search, adults: 2, children: 1, dateFlex: { outboundBefore: 1, outboundAfter: 2, inboundBefore: 0, inboundAfter: 0 } },
     { origin: "City:bergen_no", destination: "City:shanghai_cn" },
@@ -49,6 +51,26 @@ test("Kiwi request mirrors the Kiwi link: places, dates, bags, stops, whole hour
   assert.equal(oneWayBody.variables.search.cabinClass.cabinClass, "BUSINESS");
   assert.equal(oneWayBody.variables.filter.maxStopsCount, undefined);
   assert.equal(oneWayBody.variables.filter.allowReturnFromDifferentCity, undefined);
+});
+
+test("Kiwi date windows stop at today while preserving the selected departure date", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-11-05T12:00:00Z") });
+  for (const [today, expectedStart] of [
+    ["2026-11-05", "2026-11-10"],
+    ["2026-11-11", "2026-11-11"],
+    ["2026-11-12", "2026-11-11"],
+    ["2027-01-01", "2026-11-11"],
+  ]) {
+    t.mock.timers.setTime(new Date(`${today}T12:00:00Z`).getTime());
+    const request = buildKiwiItinerariesRequest(
+      { ...search, dateFlex: { outboundBefore: 1, outboundAfter: 2, inboundBefore: 0, inboundAfter: 0 } },
+      { origin: "City:bergen_no", destination: "City:shanghai_cn" },
+      "best",
+    );
+    assert.deepEqual(JSON.parse(request.body).variables.search.itinerary.outboundDepartureDate, {
+      start: `${expectedStart}T00:00:00`, end: "2026-11-13T23:59:59",
+    }, today);
+  }
 });
 
 test("Kiwi itineraries give price, legs with airports, times and carriers, and the sort winners", () => {
