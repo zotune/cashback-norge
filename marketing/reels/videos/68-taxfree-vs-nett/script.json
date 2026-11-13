@@ -1,0 +1,21 @@
+{
+  "voice": "nb-NO-PernilleNeural",
+  "rate": "+12%",
+  "maxPause": 0.22,
+  "segments": [
+    { "id": "hook", "line": "Tax free med *ti prosent* rabatt. Billigst, ikke sant?", "gap": 0.25 },
+    { "id": "receipt", "line": "Her er kvitteringen. Lumene-masken: *{211,50|to hundre og elleve femti}*, etter rabatten.", "gap": 0.2 },
+    { "id": "lyko", "line": "Samme maske på Lyko: *{179,25.|hundre og syttini tjuefem.}*", "gap": 0.2 },
+    { "id": "pihl", "line": "Camilla Pihl-sprayen: {188,10|hundre og åttiåtte ti} på tax free, *{174,30|hundre og syttifire tretti}* på nett.", "gap": 0.2 },
+    { "id": "total", "line": "Til sammen *{46 kr|førtiseks kroner}* billigere. Begge med Lykos Combo Deal.", "gap": 0.25 },
+    { "id": "rule", "line": "Sjekk nettet før du handler på flyplassen.", "gap": 0.25 },
+    { "id": "cta", "line": "Gratis på *{cashbacknorge.no.|Cashback Norge punktum no.}*" }
+  ],
+  "verifiedAt": "2026-11-13",
+  "comparison": {
+    "taxfree": "Receipt (tax-free.no Klikk & hent): Lumene MSK 235,00 − 10 % = 211,50; Camilla Pihl PRI 209,00 − 10 % = 188,10",
+    "lyko": "lyko.com 13 Nov 2026: Lumene Nordic Hydra Hydrating Gel Mask 100 ml 179,25 kr (Combo Deal 25 %, without 239); Camilla Pihl Long-Lasting Setting Spray 120 ml 174,30 kr (Combo Deal 30 %, without 249). Combo Deal: 2 valgfrie produkter for totalt 490 kr, t.o.m. 6 Dec. Free shipping from 300 kr",
+    "differenceNok": 46.05
+  },
+  "sources": ["https://lyko.com/no/lumene/lumene-nordic-hydra-hydrating-gel-mask-100-ml", "https://lyko.com/no/camilla-pihl-cosmetics/camilla-pihl-beauty-setting-spray-120-ml", "https://www.prisjakt.no/product.php?p=15103695"]
+}

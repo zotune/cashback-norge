@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-67 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 og video 63–67 10. nov. 2026.
+68 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 og video 68 13. nov. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -77,6 +77,7 @@
 | `out/65-kupp-eller-ikke.mp4` | Black Week-quiz i to runder med nedtelling: Samsung 85" (🟢 laveste pris hos alle tre kildene) og Dreame D20 (🟠 ikke laveste). Ber om svar i kommentarene | «Black Week-quiz 🛒 Kupp eller ikke?» |
 | `out/66-strom-sammenlign.mp4` | Strømsammenligning på fjordkraft.no: Forbrukerrådets billigste spotavtaler per strømområde. Oslo i november: Agva Light ~729 kr/mnd mot Fjordkraft Spotpris Nord ~862 kr/mnd (~133 kr). Nettleie i tillegg, et månedsestimat | «Strømavtale? ⚡ Sjekk på 5 sek» |
 | `out/67-mobil-sammenlign.mp4` | Mobilsammenligning på ice.no: Teks billigste per datamengde. Fri data: iceMax 399 kr (100 Mbit/s) mot Trøndermobil 297 kr (15 Mbit/s). «Billigst ≠ likt» | «Ubegrenset data? 📱 Sjekk farten» |
+| `out/68-taxfree-vs-nett.mp4` | Tax free-kvittering mot Lyko: Lumene-maske 211,50 (−10 %) mot 179,25 kr og Camilla Pihl-spray 188,10 mot 174,30 kr, 46 kr for de to. Lyko-prisene er Combo Deal (2 valgfrie for totalt 490 kr), sagt i lyd og småtekst | «Tax free −10 % ✈️ = billigst? 🤔» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 

@@ -7,6 +7,7 @@
 //   TIP=<n>                      open the info tooltip of price-match card n (0-based)
 //   SCROLLBY=<css px>            scroll the page further after its heading
 //   WAIT=cards                   wait for any price-match row, not a lowest-price note (strøm, mobil)
+//   HIDE=<css>                   hide banners without a reject button (display only)
 // Assets, capture.json and capture.js (window.CAPTURES[prefix]) go to videos/<name>/assets.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -92,6 +93,8 @@ try {
     }
   }
   }
+  // HIDE=<css> hides banners that offer no reject button (Cookiebot on lyko.com); display only, no consent given.
+  if (process.env.HIDE) { await page.addStyleTag({ content: `${process.env.HIDE}{display:none!important}` }); await page.waitForTimeout(300); }
   const heading = page.locator('h1').first();
   if (await heading.count()) { await heading.scrollIntoViewIfNeeded(); await page.evaluate(() => scrollBy(0, -110)); await page.waitForTimeout(700); }
   // SCROLLBY=<css px> moves the page further, e.g. to put the price and «førpris» mid-screen.
