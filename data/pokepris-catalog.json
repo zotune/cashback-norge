@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-13T18:07:37.762Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-13T22:50:14.854Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1117,7 +1117,8 @@
 {"id":26398,"canonicalId":"en_celebration_collection_30th_collection_box_ditto","name":"Celebration Collection 30Th Collection Box (Ditto)","category":"booster_box","setName":"Celebration Collection (30th Anniversary)","language":"en"},
 {"id":26474,"canonicalId":"en_character_meowth_collection_box","name":"Deck Crafter’s Collection – Meowth ex","category":"collection","language":"en"},
 {"id":26482,"canonicalId":"en_mega_evolution_tin_dragonite","name":"Mega Evolution Tin (Dragonite)","category":"tin","setName":"Mega Evolution","language":"en"},
-{"id":26484,"canonicalId":"en_mega_evolution_tin_darkrai","name":"Mega Evolution Tin (Darkrai)","category":"tin","setName":"Mega Evolution","language":"en"}
+{"id":26484,"canonicalId":"en_mega_evolution_tin_darkrai","name":"Mega Evolution Tin (Darkrai)","category":"tin","setName":"Mega Evolution","language":"en"},
+{"id":26590,"canonicalId":"en_character_mega_rayquaza_tournament_collection","name":"Mega Rayquaza ex Premium Tournament Collection","category":"collection","language":"en"}
 ],"urls":{
 "24collectcards.no/products/pokemon-prismatic-evolutions-elite-trainer-box":3594,
 "24collectcards.no/products/pokemon-prismatic-evolutions-poster-collection":5364,
@@ -5230,6 +5231,7 @@
 "pokestore.no/products/pokemon-mega-forces-mega-darkrai-ex-tin":13543,
 "pokestore.no/products/pokemon-mega-forces-mega-dragonite-ex-tin":13545,
 "pokestore.no/products/pokemon-mega-lucario-ex-figure-collection":5388,
+"pokestore.no/products/pokemon-mega-rayquaza-ex-premium-tournament-collection":26590,
 "pokestore.no/products/pokemon-mega-symphonia-booster-box":5267,
 "pokestore.no/products/pokemon-mega-symphonia-booster-pakke":5251,
 "pokestore.no/products/pokemon-mega-venusaur-ex-premium-collection":3346,
