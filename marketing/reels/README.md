@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-88 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 og video 68–88 13. nov. 2026.
+93 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 video 68–88 13. nov. 2026 og video 89–93 14. nov. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -98,6 +98,11 @@
 | `out/86-spareborsen-kampanje.mp4` | Annonse (Sparebørsen): forhøyede satser – Adidas 5,7 %, Lindex 7,6 %, Daniel Wellington 9,5 %, NordVPN 38 % | «Satsene øker 📈» |
 | `out/87-unio-medlem.mp4` | Unio: Norgesbooking 1 000 kr (UNIO1000), Cutters 20 % (samhold20), Stormberg 30 %, Avis opptil 30 % | «Unio-medlem? Bruk kodene» |
 | `out/88-akademikerne.mp4` | Akademikerne Pluss: Narvesen 50 % på kaffe, Oluf Lorentzen 20 %, Samsung opptil 50 %, Sumo 20–25 % | «Akademiker? Halv pris på kaffe» |
+| `out/89-lo-favor.mp4` | LOfavør: Apollo 350 kr per person, Eiendomsmegler 1 5 000 kr (under 36), Hertz opptil 20 %, LEGOLAND 20 % | «LO-medlem? LOfavør-rabatter» |
+| `out/90-nito-medlem.mp4` | NITO: gratis heiskort for to (Tromsø Alpinpark m.fl.), Fjellsport 25 %, XL-BYGG opptil 30 %, TU og Digi 50 % | «Ingeniør? Gratis heiskort» |
+| `out/91-njff-medlem.mp4` | NJFF: Fishbuddy 25 %, Helle 20 %, Janus-ull 20 %, Thorbjørnrud Hotell 15 % | «Jakt eller fiske? NJFF-rabatter» |
+| `out/92-stormberg.mp4` | Søk «Stormberg»: Unio 30 %, YS 25 %, bursdagskode 15 %, Trumf 6,2 % – ti alternativer på ett kort | «Stormberg-jakke? 6 eller 30 %?» |
+| `out/93-gaming-black-week.mp4` | Tilbud, Data og gaming: Odyssey OLED G8 6 490 kr og Superlight 2C 799 kr på laveste pris; «se på lavprisen, ikke bare prosenten» | «Gaming i Black Week? Laveste pris?» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 

@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-14",
+  "page": "https://cashbacknorge.no/?provider=lofavor (15 fordeler)",
+  "offers": "lofavor.no: Apollo 350 kr per person; Eiendomsmegler 1 5 000 kr for deg under 36 år; Hertz opptil 20 %; LEGOLAND 20 % på online pris"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Er du LO-medlem? Da har du rabatter i *LOfavør.*",
+   "gap": 0.3
+  },
+  {
+   "id": "apollo",
+   "line": "Apollo: alltid *{350 kr|tre hundre og femti kroner}* rabatt per person på charterreiser."
+  },
+  {
+   "id": "megler",
+   "line": "Under {36?|trettiseks?} *{5 000 kr|fem tusen kroner}* rabatt på megler hos Eiendomsmegler 1."
+  },
+  {
+   "id": "hertz",
+   "line": "Leiebil hos Hertz: *opptil* {20 %.|tjue prosent.}"
+  },
+  {
+   "id": "lego",
+   "line": "Og LEGOLAND: *{20 %|tjue prosent}* på billetten."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

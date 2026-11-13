@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-14",
+  "page": "https://cashbacknorge.no/?provider=njff (22 fordeler)",
+  "offers": "njff.no: Fishbuddy 25 % på årsabonnement; Helle 20 % på standardsortiment; Janus 20 % på merinoull; Thorbjørnrud Hotell 15 %"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Jakter eller fisker du? NJFF-medlemskapet gir *rabatt* på utstyret.",
+   "gap": 0.3
+  },
+  {
+   "id": "fishbuddy",
+   "line": "Fishbuddy-appen: *{25 %|tjuefem prosent}* på årsabonnementet."
+  },
+  {
+   "id": "helle",
+   "line": "Helle-kniver: *{20 %|tjue prosent}* på standardsortimentet."
+  },
+  {
+   "id": "janus",
+   "line": "Janus: *{20 %|tjue prosent}* på merinoull. Perfekt til vinteren."
+  },
+  {
+   "id": "hotell",
+   "line": "Og Thorbjørnrud Hotell ved Randsfjorden: *{15 %.|femten prosent.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

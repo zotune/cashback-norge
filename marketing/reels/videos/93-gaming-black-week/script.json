@@ -1,0 +1,41 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-14",
+  "page": "https://cashbacknorge.no/tilbud/ (kategori Data og gaming, 83 tilbud; toppliste Størst prisfall)",
+  "capture": "assets/capture.json",
+  "offers": "Samsung Odyssey OLED G8 S32FG812 6 490 kr (Proshop via Prisjakt), −57 %, Laveste nå; Logitech G Pro X Superlight 2C 799 kr (Komplett via Prisjakt), −53 %, Laveste nå; Samsung Odyssey G6 4 990 kr (Elkjøp), −55 %"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Gaming i Black Week? Sjekk *laveste* pris først.",
+   "gap": 0.3
+  },
+  {
+   "id": "kat",
+   "line": "Kategorien Data og *gaming:* {83|åttitre} tilbud."
+  },
+  {
+   "id": "g8",
+   "line": "Samsung Odyssey OLED G8: {6 490 kr,|seks tusen fire hundre og nitti,} *laveste* pris registrert."
+  },
+  {
+   "id": "mus",
+   "line": "Logitech Superlight-musa: {799 kr,|sju hundre og nittini,} også *laveste.*"
+  },
+  {
+   "id": "rule",
+   "line": "Stor rabatt er fint. Men se på lavprisen, ikke bare *prosenten.*",
+   "gap": 0.25
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

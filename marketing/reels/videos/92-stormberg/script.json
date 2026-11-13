@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-14",
+  "page": "https://cashbacknorge.no/?q=stormberg (Stormberg-kortet, 10 fordeler)",
+  "offers": "Unio 30 % ordinære priser; YS 25 %; Gratis bursdag 15 % engangskode (unntatt Lavpris-varer); Norsk Familie 8 %; re:member 8 % (krever re:member-kortet); Trumf 6,2 % hele nettbutikken; NettBonus 5 % (annonse); Dreams 4,5 %; Spenn 3,1 %; SAS 25 poeng per 100 kr"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Ny vinterjakke fra Stormberg? Sjekk *alle* rabattene først.",
+   "gap": 0.3
+  },
+  {
+   "id": "unio",
+   "line": "Unio-medlem: *{30 %.|tretti prosent.}* YS-medlem: {25.|tjuefem.}"
+  },
+  {
+   "id": "bursdag",
+   "line": "Bursdag? En kode på *{15 %.|femten prosent.}*"
+  },
+  {
+   "id": "trumf",
+   "line": "Ingen medlemskap? Trumf gir *{6,2 %|seks komma to prosent}* tilbake."
+  },
+  {
+   "id": "alle",
+   "line": "Alt på *ett* kort, sortert fra høyest."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}
