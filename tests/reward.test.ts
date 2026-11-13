@@ -138,3 +138,10 @@ test("compact labels keep per-litre rates and the approximate sign", async () =>
   assert.equal(formatCompactRewardLabel({ provider: "sas", reward: "2 000 poeng" }), "~148 kr");
   assert.equal(formatCompactRewardLabel({ provider: "nettbonus", reward: "120-300 kr" }), "120-300 kr");
 });
+
+test("compact labels keep «opptil» on a maximum rate", async () => {
+  const { formatCompactRewardLabel } = await import("../src/shared/reward-calculation.js");
+  assert.equal(formatCompactRewardLabel({ provider: "nito", reward: "opptil 20-37 %" }), "opptil 20-37 %");
+  assert.equal(formatCompactRewardLabel({ provider: "lhl", reward: "opptil 18 %" }), "opptil 18 %");
+  assert.equal(formatCompactRewardLabel({ provider: "klarna", reward: "2-6,5 %" }), "2-6,5 %");
+});

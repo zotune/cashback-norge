@@ -1,0 +1,40 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/dagligvarer/ (søk «pinnekjøtt» og «tynnribbe», sortert på «Lavest kilo-/literpris»)",
+  "capture": "assets/capture.json",
+  "offers": "Obs Coop Pinnekjøtt av lam 1 kg 239 kr (t.o.m. 14. nov); KIWI Pinnekjøtt/Pinnebog Stranda 439 kr/kg (t.o.m. 15. nov); Joker Familie-/Tynnribbe 99 kr/kg (t.o.m. 14. nov); Coop Marked Coop Tynnribbe 109 kr/kg (t.o.m. 20. des)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Pinnekjøtt: {239|to hundre og trettini} eller *{439 kr|fire hundre og trettini kroner}* kiloen?",
+   "gap": 0.3
+  },
+  {
+   "id": "sok",
+   "line": "Søk i ukens kundeaviser, og sorter på *kilopris.*"
+  },
+  {
+   "id": "pinne",
+   "line": "Billigst nå: Obs, *{239 kr|to hundre og trettini kroner}* kiloen. Dyreste: {439.|fire hundre og trettini.}"
+  },
+  {
+   "id": "ribbe",
+   "line": "Tynnribbe? Joker har den til *{99 kr|nittini kroner}* kiloen."
+  },
+  {
+   "id": "lenge",
+   "line": "Og Coop Marked: {109 kr,|hundre og ni kroner,} helt til *{20. desember.|tjuende desember.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

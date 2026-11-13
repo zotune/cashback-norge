@@ -68,7 +68,9 @@ export function formatCompactRewardLabel(offer: RewardOffer): string | undefined
   const percentMatch = label.match(/(~)?(\d+(?:[,.]\d+)?\s*[-–]\s*\d+(?:[,.]\d+)?\s*%|\d+(?:[,.]\d+)?\s*%)/i);
   if (percentMatch !== null) {
     const prefix = percentMatch[1] ?? "";
-    return (prefix + percentMatch[2]).replace(/\s+/g, " ");
+    // "opptil 20-37 %" is a maximum; the chip must not show it as the rate.
+    const upTo = /^(?:opptil|inntil|opp til)\s/i.test(label) ? "opptil " : "";
+    return (upTo + prefix + percentMatch[2]).replace(/\s+/g, " ");
   }
 
   // Keep "Fra": "Fra 399 kr totalsum" is a starting price, not the price.
