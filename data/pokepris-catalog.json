@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-12T17:37:30.879Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-13T13:39:51.742Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1451,6 +1451,7 @@
 "boosterkongen.no/products/pre-order-pokemon-tcg-delta-reign-elite-trainer-box-etb":5993,
 "boosterkongen.no/products/pre-order-pokemon-tcg-silver-tempest-booster-pack":3339,
 "boosterkongen.no/products/scarlet-violet-base-set-3-pk-blister":3947,
+"braspill.no/products/30th-classic-collection-pakke":8098,
 "braspill.no/products/ascended-heroes-booster-bundle":4589,
 "braspill.no/products/ascended-heroes-etb":4592,
 "braspill.no/products/ascended-heroes-ex-tin":5720,
@@ -2066,6 +2067,7 @@
 "cardero.no/products/pokemon-evolving-skies-booster-pack":3318,
 "cardero.no/products/pokemon-first-partner-illustration-collection-series-1":5623,
 "cardero.no/products/pokemon-first-partner-illustration-collection-series-2":8351,
+"cardero.no/products/pokemon-fusion-strike-booster-pack":3327,
 "cardero.no/products/pokemon-journey-together-booster-pack":3350,
 "cardero.no/products/pokemon-mega-evolution-booster-box":3683,
 "cardero.no/products/pokemon-mega-evolutions-booster-pack":3494,
@@ -2383,6 +2385,7 @@
 "csmegastore.no/i/26171990/pokemon-pokemon-tcg-pitch-black-checklane-1-pack-blister-tcg":12815,
 "csmegastore.no/i/26171991/pokemon-pokemon-tcg-pitch-black-sleeved-booster-tcg":13074,
 "csmegastore.no/i/26171993/pokemon-tcg-pitch-black-boosterboks":11730,
+"csmegastore.no/i/26207799/pok%c3%a9mon-tcg-first-partner-illustration-collection-series-2-kortsett":6440,
 "csmegastore.no/i/7537537/pok%c3%a9mon-sword-shield-booster-1-pcs-assorted":5946,
 "csmegastore.no/i/7537538/pok%c3%a9mon-sword-shield-8-3-pak-blister-blandet":9044,
 "csmegastore.no/i/8075955/pok%c3%a9mon-poke-swsh9-elite-trainer-box":3410,
@@ -4474,6 +4477,7 @@
 "playlot.no/produkt/151-poster-collection":5553,
 "playlot.no/produkt/151-ultra-premium-collection":4828,
 "playlot.no/produkt/151-zapdos-ex-collection":4474,
+"playlot.no/produkt/30th-celebration-boosterpack":12614,
 "playlot.no/produkt/abyss-eye-boosterbox":10489,
 "playlot.no/produkt/abyss-eye-boosterpack-jpn":11962,
 "playlot.no/produkt/apnes-live-30th-celebration-elite-trainer-box-apnes-live":12985,
