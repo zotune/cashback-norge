@@ -1,4 +1,4 @@
-// /dagligvarer og /tilbud på iPhone for video 59–62: node offer-list-capture.mjs [video-name ...]
+// /dagligvarer og /tilbud på iPhone for video 59–62 og 69–72: node offer-list-capture.mjs [video-name ...]
 // Utfører trinnene i PLANS, lagrer videos/<navn>/assets/<shot>.png og capture.json (kilde, tidspunkt, tekst og
 // DOM-bokser i skjermbilde-px). Annonselinjen og annonsekortet er skjult; ingen stemmer eller lagring.
 import { chromium } from 'playwright';
@@ -29,6 +29,18 @@ const PLANS = {
     { click: '[data-group-pick="Data og gaming"]', top: '.source-toggles', shot: 'kategori', boxes: { chip: '[data-group-pick="Data og gaming"]', count: '[data-ol="count"]' } },
     { click: '[data-toplist="saving"]', top: '.deal-row', shot: 'prisfall', boxes: { first: '.deal-row', pricing: '.deal-row .deal-pricing', second: '.deal-row >> nth=1' } },
     { click: '[data-source="klarna"]', top: '.source-toggles', shot: 'velg-kilde', boxes: { chip: '[data-source="klarna"]', count: '[data-ol="count"]', sources: '.source-row' } },
+  ] },
+  '69-stable-rabatter': { path: '/tilbud/', steps: [
+    { search: 'saros 20 sonic', top: '.deal-row', shot: 'tilbud', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
+  ] },
+  '71-julemat-kundeaviser': { path: '/dagligvarer/', steps: [
+    { sort: 'unit', search: 'pinnekjøtt', top: '.deal-row', shot: 'pinne', boxes: { first: '.deal-row', second: '.deal-row >> nth=1', last: '.deal-row >> nth=-1', search: '.search-wrap' } },
+    { sort: 'unit', search: 'tynnribbe', top: '.deal-row', shot: 'ribbe', boxes: { first: '.deal-row', second: '.deal-row >> nth=1', days: '.deal-row .deal-validity' } },
+  ] },
+  '72-tilbud-laveste-na': { path: '/tilbud/', steps: [
+    { search: 'saros 20 sonic', top: '.deal-row', shot: 's1', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
+    { search: 'galaxy watch8 40mm', top: '.deal-row', shot: 's2', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
+    { search: 'wh-1000xm4', top: '.deal-row', shot: 's3', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
   ] },
 };
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(PLANS);

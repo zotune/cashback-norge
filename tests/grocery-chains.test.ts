@@ -56,3 +56,24 @@ test("grocery unit prices are read from the flyer text, and chain cards are foun
   assert.equal(getGroceryCardBonus("Obs")?.id, "coop");
   assert.equal(getGroceryCardBonus("REMA 1000"), undefined);
 });
+
+test("a flyer price per kilo or for one stated pack size is a unit price; multipacks and pieces are not", () => {
+  const kg = { unit: "g", from: 1000, to: 1000 };
+  assert.deepEqual(getGroceryUnitPrice("Ca. 1,2 kg, urøkt, lam, First Price, pr. kg", { amount: 279, quantity: kg }), { amount: 279, unit: "kg" });
+  assert.deepEqual(getGroceryUnitPrice("2 varianter. 1 kg", { amount: 239, quantity: kg }), { amount: 239, unit: "kg" });
+  assert.deepEqual(getGroceryUnitPrice("Fryst. 500 g", { amount: 50, quantity: { unit: "g", from: 500, to: 500 } }), { amount: 100, unit: "kg" });
+  // A printed unit price still wins.
+  assert.deepEqual(getGroceryUnitPrice("Nordfjord, 299,00 pr. kg", { amount: 299, quantity: kg }), { amount: 299, unit: "kg" });
+  // "6 x 47 g": the quantity is one bar, the price the pack.
+  assert.equal(getGroceryUnitPrice("6 x 47 g Freia pr. pk", { amount: 59, quantity: { unit: "g", from: 47, to: 47 } }), undefined);
+  assert.equal(getGroceryUnitPrice("20 stk. Unik, pr. stk. 0,99", { amount: 19.9, quantity: { unit: "pcs", from: 1, to: 1 } }), undefined);
+  // "Pr kg" with a 100 g quantity is ambiguous.
+  assert.equal(getGroceryUnitPrice("Krydret. Pr kg", { amount: 29.9, quantity: { unit: "g", from: 100, to: 100 } }), undefined);
+  assert.equal(getGroceryUnitPrice("ca 1.5 kg", { amount: 359, quantity: { unit: "g", from: 1000, to: 1000 } }), undefined);
+});
+
+test("multi-buys and «fra»-sizes give no unit price from the flyer price", () => {
+  assert.equal(getGroceryUnitPrice("TILBUD 3 FOR 100 STOR-PLATER Utvalget kan variere. Fra 150 g", { amount: 100, quantity: { unit: "g", from: 150, to: 150 } }), undefined);
+  assert.equal(getGroceryUnitPrice("COOP MEDLEMS-KUPP! 2 for 110 Ikke-medlem? 400 g", { amount: 110, quantity: { unit: "g", from: 400, to: 400 } }), undefined);
+  assert.equal(getGroceryUnitPrice("10-pk, 125 g", { amount: 39.9, quantity: { unit: "g", from: 125, to: 125 } }), undefined);
+});

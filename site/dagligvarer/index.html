@@ -89,7 +89,7 @@ function toItem(offer) {
   const title = formatHeading(offer.heading);
   const chain = getGroceryChain(offer.chain);
   const card = getGroceryCardBonus(offer.chain);
-  const unit = getGroceryUnitPrice(offer.description || "");
+  const unit = getGroceryUnitPrice(offer.description || "", offer);
   return {
     id: offer.id, title,
     description: offer.description ? formatDescription(offer.description) : "",

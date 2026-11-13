@@ -66,8 +66,46 @@ export function getGroceryChain(name: string): GroceryChain | undefined {
   return GROCERY_CHAIN_LIST.find((chain) => chain.name === name);
 }
 
-/** The unit price a flyer prints ("Pr kg 162,16", "193,33/KG", "Enh.pris 27,60 pr. l"), first value of a range. */
-export function getGroceryUnitPrice(description: string): { amount: number; unit: "kg" | "l" } | undefined {
+export type GroceryQuantity = { unit: string; from: number; to: number };
+
+/** The unit price a flyer prints ("Pr kg 162,16", "193,33/KG", "Enh.pris 27,60 pr. l"), first value of a range.
+ * Without a printed one, the offer's own price is a unit price when the flyer says so ("Pr kg", quantity 1 kg)
+ * or when it is one pack of a stated weight/volume ("1 kg", "500 g"). Multipacks ("6 x 47 g": the quantity is
+ * one piece) and per-piece prices stay unknown rather than guessed. */
+export function getGroceryUnitPrice(
+  description: string,
+  offer?: { amount?: number; quantity?: GroceryQuantity },
+): { amount: number; unit: "kg" | "l" } | undefined {
+  return getPrintedGroceryUnitPrice(description) ?? getQuantityUnitPrice(description, offer);
+}
+
+function getQuantityUnitPrice(
+  description: string,
+  offer: { amount?: number; quantity?: GroceryQuantity } | undefined,
+): { amount: number; unit: "kg" | "l" } | undefined {
+  const amount = offer?.amount;
+  const quantity = offer?.quantity;
+  if (amount === undefined || !Number.isFinite(amount) || amount <= 0 || quantity === undefined) return undefined;
+  if (quantity.from !== quantity.to || !(quantity.from > 0)) return undefined;
+  const unit = quantity.unit === "g" ? "kg" : quantity.unit === "ml" ? "l" : undefined;
+  if (unit === undefined) return undefined;
+  // Multipacks, multi-buys ("3 for 100", "2 for 110": the price is for several) and "fra"-sizes.
+  if (/\d\s*x\s*\d/i.test(description) || /\b\d+\s*-?\s*pk\b/i.test(description) || /\b\d+\s*for\s*\d/i.test(description) ||
+    /\bfra\s+\d/i.test(description) || /\bpr\.?\s*(?:pk|pakke|stk|boks|brett|flaske|beger|pose)\b/i.test(description)) return undefined;
+  // "Pr kg" with no number: the flyer price itself is per kilo.
+  const perUnit = new RegExp(String.raw`\bpr\.?\s*${unit === "kg" ? "kg" : "l(?:iter)?"}\b(?!\s*(?:fra\s*)?\d)`, "i");
+  if (perUnit.test(description)) return quantity.from === 1000 ? { amount, unit } : undefined;
+  // One pack of the stated size: "1 kg", "500 g", "1,5 l".
+  const sizes = [...description.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|dl|cl|ml)\b/gi)].map((match) => {
+    const value = Number(match[1]!.replace(",", "."));
+    const factor = { kg: 1000, g: 1, l: 1000, dl: 100, cl: 10, ml: 1 }[match[2]!.toLowerCase() as "kg"];
+    return value * factor;
+  });
+  if (sizes.length !== 1 || Math.abs(sizes[0]! - quantity.from) > 0.5) return undefined;
+  return { amount: Math.round((amount / (quantity.from / 1000)) * 100) / 100, unit };
+}
+
+function getPrintedGroceryUnitPrice(description: string): { amount: number; unit: "kg" | "l" } | undefined {
   const number = String.raw`(\d{1,5}(?:[.,]\d{1,2})?)`;
   const unit = String.raw`(kg|l(?:iter)?)\b`;
   const patterns: Array<[RegExp, number, number]> = [
