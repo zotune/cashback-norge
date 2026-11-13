@@ -13133,7 +13133,9 @@ function renderNotice(
       padding: 5px 9px;
     }
     .code-reward {
-      color: inherit;
+      /* Not "inherit": the code row's ancestor can carry the page's dark text
+         colour, which made the rate unreadable in dark mode. */
+      color: var(--cbn-text, #172026);
       text-decoration: none;
       font-weight: 700;
       white-space: nowrap;
