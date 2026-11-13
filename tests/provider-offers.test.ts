@@ -162,3 +162,11 @@ test("a rejected Awin token reuses only Awin's own cbn offers instead of failing
   assert.equal(offers[0]!.updatedAt, awin.updatedAt);
   assert.equal(isAwinOffer({ activationUrl: "not a url" }), false);
 });
+
+test("a fallback drops individual offers older than the limit, keeping the fresh ones", async (t) => {
+  const fresh = offer(1);
+  const old = { ...offer(195), merchantName: "Farmasiet" };
+  const { options, warnings } = fixture(t, [fresh, old]);
+  assert.deepEqual(await collectProviderOffers(options), [fresh]);
+  assert.match(warnings[0]!, /keeping 1 offers/);
+});

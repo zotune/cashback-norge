@@ -74,14 +74,14 @@ function getReusablePreviousOffers(
   const providerOffers =
     options.previousOffersByProvider.get(options.provider) ?? [];
   const offerFilter = options.previousOfferFilter;
-  const previousOffers = offerFilter === undefined
+  const candidateOffers = offerFilter === undefined
     ? providerOffers
     : providerOffers.filter((offer) => offerFilter(offer));
-  if (previousOffers.length === 0) {
+  if (candidateOffers.length === 0) {
     return omitProvider("no previous offers available for fallback");
   }
 
-  const newestUpdatedAt = readNewestUpdatedAt(previousOffers);
+  const newestUpdatedAt = readNewestUpdatedAt(candidateOffers);
   if (newestUpdatedAt === undefined) {
     return omitProvider("previous offers have no valid updatedAt for fallback");
   }
@@ -96,6 +96,12 @@ function getReusablePreviousOffers(
       `previous offers are ${formatAge(ageMs)} old, above the ${maxAgeDays} day fallback limit`,
     );
   }
+
+  // Each reused offer must itself be within the limit: a hand-written entry
+  // from May must not ride along with yesterday's crawl.
+  const previousOffers = maxAgeDays === undefined
+    ? candidateOffers
+    : candidateOffers.filter((offer) => Date.now() - Date.parse(offer.updatedAt) <= maxAgeDays * 24 * 60 * 60 * 1000);
 
   options.logger.warn(
     `${options.label}: ${reason}; keeping ${previousOffers.length} offers from previous index (${formatAge(ageMs)} old)`,
