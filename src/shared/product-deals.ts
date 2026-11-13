@@ -1,6 +1,7 @@
 import { isRecord } from "./cashback.js";
 import { hasProductVariantConflict, isValidGtin, scoreProductCandidateMatch } from "./product-match.js";
 import { getPrisjaktDealGroup, type PrisjaktDeal } from "./prisjakt-deals.js";
+import { isPlausibleDealLow } from "./deal-price-history.js";
 import { getProductTitleMatchTokens } from "./product-title-match.js";
 
 export const DEAL_SOURCES = ["prisjakt", "klarna", "prisradar", "godpris"] as const;
@@ -68,13 +69,17 @@ export function rankProductDeals(deals: ProductDeal[], generatedAt: string): Ran
     const best = sorted[0]!;
     const canonical = [...group].sort((a, b) => DEAL_SOURCES.indexOf(a.source) - DEAL_SOURCES.indexOf(b.source) || a.id.localeCompare(b.id))[0]!;
     const key = `${canonical.source === "prisjakt" ? "pj" : canonical.source}${canonical.id}`;
-    const history = sorted.find(item => item.lowestPriceEver !== undefined);
+    // A low far below today's price (Samsung products «at 949 kr» on Prisjakt, LEGO at 99 kr)
+    // is a bad history point, not a price to wait for: the shared plausibility rule drops it.
+    const history = sorted.find(item => item.lowestPriceEver !== undefined && isPlausibleDealLow(best.price, item.lowestPriceEver));
     // All comparisons use item price; known shipping is retained separately.
     const historyFields = history ? { lowestPriceEver: Math.min(best.price, history.lowestPriceEver!),
       ...(history.historyScope ? { historyScope: history.historyScope } : {}), ...(history.historyRange ? { historyRange: history.historyRange } : {}), ...(history.historyStartedAt ? { historyStartedAt: history.historyStartedAt } : {}), ...(history.historyUpdatedAt ? { historyUpdatedAt: history.historyUpdatedAt } : {}) } : {};
     const sources = sorted;
     const score = group.reduce((sum, item) => sum + weight[item.source] / (60 + Math.max(1, item.sourceRank)), 0) + Math.min(best.priceDrop ?? 0, 80) / 100_000;
-    return { ...best, ...historyFields, key, sources, rank: 0, score };
+    // The best offer's own history fields are replaced by the chosen (plausible) history, or dropped.
+    const { lowestPriceEver: _low, historyScope: _scope, historyRange: _range, historyStartedAt: _start, historyUpdatedAt: _updated, ...bestOffer } = best;
+    return { ...bestOffer, ...historyFields, key, sources, rank: 0, score };
   }).sort((a, b) => b.score - a.score || a.source.localeCompare(b.source) || a.id.localeCompare(b.id)).map(({ score: _score, ...deal }, index) => ({ ...deal, rank: index + 1 }));
 }
 

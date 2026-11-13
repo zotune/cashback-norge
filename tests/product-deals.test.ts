@@ -155,3 +155,10 @@ test("lowest prices come from each source's own history: Klarna two years, Godpr
   assert.match(prisradarHistoryRequest("https://prisradar.no/produkter/sony-wh-1000xm6-black")!.body, /"slug":"sony-wh-1000xm6-black"/);
   assert.equal(prisradarHistoryRequest("https://prisradar.no/kategori/x"), undefined);
 });
+
+test("an implausible all-time low (949 kr for a 4 990 kr monitor) is dropped, a plausible one kept", () => {
+  const deal = { ...base, price: 4990, lowestPriceEver: 949, historyRange: "all" as const, historyScope: "product" as const };
+  const ranked = rankProductDeals([deal], now);
+  assert.equal(ranked[0]?.lowestPriceEver, undefined);
+  assert.equal(rankProductDeals([{ ...deal, lowestPriceEver: 3990 }], now)[0]?.lowestPriceEver, 3990);
+});

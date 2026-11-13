@@ -104,8 +104,11 @@ const MIN_PLAUSIBLE_LOW_RATIO = 0.35;
 
 /** The history with today's price folded into the low, or none when that low is implausible. */
 export function plausiblePriceHistory(amount: number, history: DealPriceHistory): DealPriceHistory | undefined {
-  const lowestPriceEver = Math.min(amount, history.lowestPriceEver);
-  return lowestPriceEver < amount * MIN_PLAUSIBLE_LOW_RATIO ? undefined : { ...history, lowestPriceEver };
+  return isPlausibleDealLow(amount, history.lowestPriceEver) ? { ...history, lowestPriceEver: Math.min(amount, history.lowestPriceEver) } : undefined;
+}
+
+export function isPlausibleDealLow(amount: number, lowestPriceEver: number): boolean {
+  return Math.min(amount, lowestPriceEver) >= amount * MIN_PLAUSIBLE_LOW_RATIO;
 }
 
 export type PriceHistoryNote = { atLow: boolean; value: string; label?: string; title: string };
