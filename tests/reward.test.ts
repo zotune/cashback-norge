@@ -130,3 +130,11 @@ test("rates keep two decimals and co.no is a public suffix", async () => {
   assert.equal(toBaseDomain("autodoc.co.no"), "autodoc.co.no");
   assert.equal(toBaseDomain("www.autodoc.co.no"), "autodoc.co.no");
 });
+
+test("compact labels keep per-litre rates and the approximate sign", async () => {
+  const { formatCompactRewardLabel } = await import("../src/shared/reward-calculation.js");
+  assert.equal(formatCompactRewardLabel({ provider: "coop", reward: "0,45 kr/l" }), "0,45 kr/l");
+  assert.equal(formatCompactRewardLabel({ provider: "coop", reward: "0,25-0,45 kr/l" }), "0,25-0,45 kr/l");
+  assert.equal(formatCompactRewardLabel({ provider: "sas", reward: "2 000 poeng" }), "~148 kr");
+  assert.equal(formatCompactRewardLabel({ provider: "nettbonus", reward: "120-300 kr" }), "120-300 kr");
+});

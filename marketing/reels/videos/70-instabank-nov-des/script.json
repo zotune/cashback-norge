@@ -1,0 +1,45 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "offer": "https://instabank.no/kredittkort/rabatter: «I november 2026 gir vi deg 3 % rabatt på netthandel … i tillegg til allerede rabatterte varer». Kalenderen på samme side sier «Desember 3 % på alle kjøp – også romjulstilbud!» (og motstridende «November 5 %»; vi bruker den daterte 3 %). Maks 500 kr/mnd, 3 000 kr/år",
+  "costs": "https://instabank.no/kredittkort: nominell rente 18,9 %, termingebyr 40 kr, ingen rentefri periode",
+  "example": "Representativt eksempel i annonsen på cashbacknorge.no: eff. rente 22,85 %, 45 000 kr/1 år, totalt 50 219 kr",
+  "capture": "assets/capture.json"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Black Week *og* jul? Samme kort, to måneder med rabatt.",
+   "gap": 0.3
+  },
+  {
+   "id": "site",
+   "line": "På Cashback Norge finner du *Instabank* kredittkort."
+  },
+  {
+   "id": "nov",
+   "line": "I november: *{3 %|tre prosent}* på all netthandel, også på salgsvarer."
+  },
+  {
+   "id": "des",
+   "line": "I desember: {3 %|tre prosent} på *alle* kjøp, også i butikken."
+  },
+  {
+   "id": "caps",
+   "line": "Maks *{500 kr|fem hundre kroner}* i måneden. Renter fra første dag, så betal hele fakturaen."
+  },
+  {
+   "id": "card",
+   "line": "Handler du for {10 000|ti tusen} hver måned, får du *{600 kr|seks hundre kroner}* tilbake."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

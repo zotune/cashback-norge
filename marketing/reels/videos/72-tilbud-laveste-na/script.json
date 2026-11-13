@@ -1,0 +1,41 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/tilbud/",
+  "capture": "assets/capture.json",
+  "note": "Komplett via Prisjakt: Saros 20 Sonic 7 490 (sammenligning 15 990), Galaxy Watch8 40mm 1 690 (3 590), WH-1000XM4C 1 990 (3 290); alle «Laveste nå» i Prisjakts historikk"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Black Week. Men er tilbudet *ekte?*",
+   "gap": 0.3
+  },
+  {
+   "id": "s1",
+   "line": "Roborock Saros: {7 490 kr,|sju tusen fire hundre og nitti,} og *laveste* pris som er registrert."
+  },
+  {
+   "id": "s2",
+   "line": "Galaxy Watch8: {1 690 kr.|seksten hundre og nitti.} Også *laveste.*"
+  },
+  {
+   "id": "s3",
+   "line": "Sony-headsettet: {1 990 kr.|nitten hundre og nitti.} *Laveste* nå."
+  },
+  {
+   "id": "rule",
+   "line": "Se etter grønt, ikke bare på *prosenten.*",
+   "gap": 0.25
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

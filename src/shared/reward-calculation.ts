@@ -77,12 +77,13 @@ export function formatCompactRewardLabel(offer: RewardOffer): string | undefined
     return totalSumMatch[0].replace(/\s+/g, " ");
   }
 
-  const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
+  // Keep "~" (approximate, converted from points) and per-unit rates ("0,45 kr/l").
+  const krRangeMatch = label.match(/~?\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd|l|kWt)|\s+per\s+(?:time|mnd))?/i);
   if (krRangeMatch !== null) {
     return krRangeMatch[0].replace(/\s+/g, " ");
   }
 
-  const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
+  const krMatch = label.match(/~?\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd|l|kWt)|\s+per\s+(?:time|mnd))?/i);
   if (krMatch !== null) {
     return krMatch[0].replace(/\s+/g, " ");
   }

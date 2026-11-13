@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794579328
+// @version      1794593149
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -2610,11 +2610,11 @@ query OfferList($productId: Int!) {
     if (totalSumMatch !== null) {
       return totalSumMatch[0].replace(/\s+/g, " ");
     }
-    const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
+    const krRangeMatch = label.match(/~?\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd|l|kWt)|\s+per\s+(?:time|mnd))?/i);
     if (krRangeMatch !== null) {
       return krRangeMatch[0].replace(/\s+/g, " ");
     }
-    const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
+    const krMatch = label.match(/~?\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd|l|kWt)|\s+per\s+(?:time|mnd))?/i);
     if (krMatch !== null) {
       return krMatch[0].replace(/\s+/g, " ");
     }

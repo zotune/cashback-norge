@@ -1,0 +1,51 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "deal": "https://cashbacknorge.no/tilbud/ (Roborock Saros 20 Sonic, Komplett 7 490 kr, «Laveste nå» i Prisjakts historikk)",
+  "page": "https://www.komplett.no/product/1335754 (7 490,-, «SPAR 8 500,-», førpris 15 990; panelet: Lavpris hos Klarna (Kjell 7 489), Prisradar og Prisjakt (Komplett 7 490); cashback re:member 2–3 %, Dreams 1,8 %, Spenn 0,7–1,4 %)",
+  "dreams": "Dreams 1,8 % (Teknologi og media); abonnement 29 kr/mnd, 30 dager gratis (getdreams.com/no/cashback FAQ)",
+  "instabank": "https://instabank.no/kredittkort/rabatter: 3 % på netthandel i november, også på rabatterte varer; maks 500 kr/mnd",
+  "math": "7490 × 1,8 % = 134,82; 7490 × 3 % = 224,70; sum 359,52; 7 130,48 kr",
+  "notCombined": "re:member krever betaling med re:member-kortet og er derfor ikke stablet med Instabank"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Black Week? Spar på *fire* nivåer.",
+   "gap": 0.3
+  },
+  {
+   "id": "tilbud",
+   "line": "Én: tilbudet. Roborock Saros til {7 490 kr,|sju tusen fire hundre og nitti,} *laveste* pris som er registrert."
+  },
+  {
+   "id": "side",
+   "line": "To: Komplett sier spar {8 500.|åtte tusen fem hundre.}"
+  },
+  {
+   "id": "lavpris",
+   "line": "Og prismatchen bekrefter: *Lavpris* hos alle tre kildene."
+  },
+  {
+   "id": "cashback",
+   "line": "Tre: cashback. {1,8 %|En komma åtte prosent} med Dreams, *{135 kr.|hundre og trettifem kroner.}*"
+  },
+  {
+   "id": "insta",
+   "line": "Fire: betal med Instabank, {3 %|tre prosent} på netthandel i november. *{225 kr.|To hundre og tjuefem kroner.}*"
+  },
+  {
+   "id": "card",
+   "line": "Totalt nesten *{360 kr|tre hundre og seksti kroner}* ekstra, oppå tilbudet."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}
