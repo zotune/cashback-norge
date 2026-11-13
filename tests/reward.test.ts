@@ -145,3 +145,10 @@ test("compact labels keep «opptil» on a maximum rate", async () => {
   assert.equal(formatCompactRewardLabel({ provider: "lhl", reward: "opptil 18 %" }), "opptil 18 %");
   assert.equal(formatCompactRewardLabel({ provider: "klarna", reward: "2-6,5 %" }), "2-6,5 %");
 });
+
+test("compact labels keep «opptil» on a maximum kr amount", async () => {
+  const { formatCompactRewardLabel } = await import("../src/shared/reward-calculation.js");
+  assert.equal(formatCompactRewardLabel({ provider: "huseierne", reward: "opptil 800 kr" }), "opptil 800 kr");
+  assert.equal(formatCompactRewardLabel({ provider: "elkjop", reward: "opptil 1 299 kr" }), "opptil 1 299 kr");
+  assert.equal(formatCompactRewardLabel({ provider: "huseierne", reward: "500-2 000 kr" }), "500-2 000 kr");
+});

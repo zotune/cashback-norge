@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=elbilforeningen",
+  "offers": "elbil.no: Tibber 750 kr gavekort (nye kunder); Domino's 20 % på all mat online/app, ikke med andre kampanjer; Storytel 15 %; Topcamp 10 % 29.06–09.08, 20 % resten av året"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Har du elbil? Medlemskapet i Elbilforeningen kan *betale seg.*",
+   "gap": 0.3
+  },
+  {
+   "id": "tibber",
+   "line": "Ny strømavtale hos Tibber: *{750 kr|sju hundre og femti kroner}* i gavekort."
+  },
+  {
+   "id": "domino",
+   "line": "Domino's: *{20 %|tjue prosent}* på all mat når du bestiller på nett."
+  },
+  {
+   "id": "storytel",
+   "line": "Storytel: *{15 %|femten prosent}* på abonnementet."
+  },
+  {
+   "id": "topcamp",
+   "line": "Og Topcamp: *{20 %|tjue prosent}* på overnatting, ti i fellesferien."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

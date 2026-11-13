@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=huseierne (18 fordeler)",
+  "offers": "huseierne.no: Skeidar 20 % møbler/interiør, 10 % Ekornes; Montér 40 % Opus, 25 % AUBO, inntil 20 % hvitevarer, inntil 15 % trelast; Krisesikker opptil 800 kr; Proffoppgjør spar 3 125 kr (medlemspris 10 625 kr)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Eier du bolig? Medlemskapet i *Huseierne* gir mer enn råd.",
+   "gap": 0.3
+  },
+  {
+   "id": "skeidar",
+   "line": "Skeidar: *{20 %|tjue prosent}* på møbler og interiør, også på nett."
+  },
+  {
+   "id": "monter",
+   "line": "Montér: blant annet {25 %|tjuefem prosent} på AUBO-kjøkken og *{40 %|førti prosent}* på Opus garderobe."
+  },
+  {
+   "id": "krise",
+   "line": "Beredskapspakke fra Krisesikker: *opptil* {800 kr|åtte hundre kroner} rabatt."
+  },
+  {
+   "id": "proff",
+   "line": "Selger du uten megler? Spar *{3 125 kr|tre tusen hundre og tjuefem kroner}* hos Proffoppgjør."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

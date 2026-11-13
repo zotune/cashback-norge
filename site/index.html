@@ -1138,6 +1138,10 @@ function groupByMerchant(offers) {
     if (o.provider === "curve") continue;
 
     const usableDomains = (o.domains || []).map(canonicalDomain).filter(d => !sharedDomains.has(d));
+    // An offer for several chains ("FFO hotellavtaler": Thon, Scandic, Strawberry) joins one
+    // group but must not bridge the chains into one card.
+    const brandLabels = new Set(usableDomains.map(d => d.split(".").slice(-2)[0]));
+    const bridgesBrands = brandLabels.size >= 3;
     let group = null;
 
     // Find existing group via domain overlap
@@ -1173,13 +1177,23 @@ function groupByMerchant(offers) {
     group.offers.push(o);
 
     // Register all usable domains and name to point to this group
-    for (const d of usableDomains) {
-      domainToGroup.set(d, group);
+    if (!bridgesBrands) {
+      for (const d of usableDomains) {
+        domainToGroup.set(d, group);
+      }
     }
     domainToGroup.set("name:" + nameKey, group);
+    (group.nameCounts ??= new Map()).set(name, (group.nameCounts.get(name) ?? 0) + 1);
   }
 
   for (const m of groups) {
+    // Name the card after the name most of its offers use ("Radisson", not one source's
+    // "Prize by Radisson, Solheimsviken Bergen"); ties go to the shorter name.
+    const named = [...(m.nameCounts ?? new Map())].filter(([n]) => n !== n.toLowerCase() && n !== n.toUpperCase());
+    if (named.length > 1) {
+      named.sort((a, b) => b[1] - a[1] || a[0].length - b[0].length);
+      m.name = named[0][0];
+    }
     // Keep all products until filtering; one provider may offer both electricity
     // and mobile at the same merchant. Deduplicate the visible offers in render.
     m.offers.sort(compareOffers);

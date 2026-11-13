@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?q=elon (Elon-kortet)",
+  "offers": "OBOS: «Benytt rabattkoden OBOS15 15 % rabatt på all elektronikk på Elon.no. Rabatten gjelder ikke på Apple-produkter … ordinære priser og kan ikke kombineres med andre rabatter eller kampanjer»; Trumf Elon 1,7 % (lyd, bilde, data), 2,9 % (hvitevarer), 3,9 % (hjem og hage, personlig pleie, belysning, inneklima, smarthjem)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Handler du på Elon? Rabattkode *eller* cashback?",
+   "gap": 0.3
+  },
+  {
+   "id": "kode",
+   "line": "OBOS-medlem? Koden gir *{15 %|femten prosent}* på elektronikk."
+  },
+  {
+   "id": "vilkar",
+   "line": "Men bare på *ordinære* priser, og ikke på Apple."
+  },
+  {
+   "id": "cashback",
+   "line": "På salgsvarer: cashback. Trumf gir {1,7 til 3,9 %|en komma sju til tre komma ni prosent} etter *kategori.*"
+  },
+  {
+   "id": "alle",
+   "line": "Kortet viser *alle* alternativene, sortert etter sats."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

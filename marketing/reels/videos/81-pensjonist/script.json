@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=pensjonistforbundet (28 fordeler)",
+  "offers": "pensjonistforbundet.no: Riksteatret 30 % på ordinær billettpris til utvalgte forestillinger; Apollo 500 kr per person; iSteady 30 %; Filmweb kinogavekort 10 %"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Er du pensjonist? Her er *rabatter* du kanskje ikke vet om.",
+   "gap": 0.3
+  },
+  {
+   "id": "teater",
+   "line": "Riksteatret: *{30 %|tretti prosent}* på utvalgte forestillinger."
+  },
+  {
+   "id": "apollo",
+   "line": "Apollo: *{500 kr|fem hundre kroner}* rabatt per person på pakkereiser."
+  },
+  {
+   "id": "trening",
+   "line": "Trening hjemme med iSteady: *{30 %|tretti prosent}* rabatt."
+  },
+  {
+   "id": "kino",
+   "line": "Og kinogavekort til jul: *{10 %|ti prosent}* billigere."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

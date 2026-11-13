@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=unio (11 fordeler)",
+  "offers": "unio.no: Norgesbooking 1 000 kr (1 uke+, UNIO1000) / 500 kr (2–6 netter, UNIO500); Cutters 20 % (samhold20, hele husstanden); Stormberg 30 % på ordinære priser; Avis inntil 30 % (W330405)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Sykepleier, lærer eller politi? Da er du kanskje i *Unio.*",
+   "gap": 0.3
+  },
+  {
+   "id": "hytte",
+   "line": "Hytte via Norgesbooking: *{1 000 kr|tusen kroner}* rabatt på en uke, med koden."
+  },
+  {
+   "id": "cutters",
+   "line": "Cutters: *{20 %|tjue prosent}* på hårklipp, for hele husstanden."
+  },
+  {
+   "id": "stormberg",
+   "line": "Stormberg: *{30 %|tretti prosent}* på ordinære priser."
+  },
+  {
+   "id": "avis",
+   "line": "Og leiebil hos Avis: *opptil* {30 %.|tretti prosent.}"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

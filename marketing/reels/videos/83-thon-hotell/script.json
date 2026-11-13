@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?q=thon (ett Thon Hotels-kort med 13 fordeler)",
+  "offers": "Utdanning i Bergen 30 % (utvalgte rom, Thon+); LHL inntil 18 %, ledsager bor gratis; YS 16 %; Elbilforeningen 16 %; NJFF 14 %; Pensjonistforbundet/TOBB/USBL/BBL/Bate 12 %; Santander/TF Bank 8 %"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Samme hotell: *{8|åtte}* eller {30 %|tretti prosent} rabatt? Det avhenger av medlemskapet.",
+   "gap": 0.3
+  },
+  {
+   "id": "student",
+   "line": "Student i Bergen: *{30 %|tretti prosent}* på utvalgte rom."
+  },
+  {
+   "id": "lhl",
+   "line": "LHL: *opptil* {18 %,|atten prosent,} og ledsager bor gratis."
+  },
+  {
+   "id": "ys",
+   "line": "YS og Elbilforeningen: *{16 %.|seksten prosent.}*"
+  },
+  {
+   "id": "tolv",
+   "line": "Pensjonistforbundet, TOBB og flere: *{12 %.|tolv prosent.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

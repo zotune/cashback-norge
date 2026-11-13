@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-78 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 og video 68–78 13. nov. 2026.
+88 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 og video 68–88 13. nov. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -88,6 +88,16 @@
 | `out/76-coop-medlem.mp4` | Coop-medlem: Circle K/YX opptil 45 øre/l, Hotellkupp 100 kr per natt, Mer opptil 10 % ladebonus, Ving minst 600 kr | «Coop-medlem? Mer enn kjøpeutbytte» |
 | `out/77-bredband-bytte.mp4` | Temafilter Bredbånd: NextGenTel minst 25 % (Huseierne) og opptil 37 % (NITO), Telia 300 kr via NettBonus (annonselenke) eller 2 000 EuroBonus-poeng | «Bytter du bredbånd? Sjekk medlemskapet» |
 | `out/78-medlemsfilter.mp4` | Filter på medlemskap (OBOS + NAF): Avis opptil 30 % med OBOS mot 10–20 % med NAF; dekkhotell hos Vianor 10–25 % med NAF mot 5–20 % med OBOS | «OBOS og NAF? Hvem gir mest?» |
+| `out/79-huseierne.mp4` | Huseierne: Skeidar 20 % på møbler, Montér (40 % Opus, 25 % AUBO), Krisesikker opptil 800 kr, Proffoppgjør spar 3 125 kr | «Eier du bolig? Huseierne gir rabatt» |
+| `out/80-elbilforeningen.mp4` | Elbilforeningen: Tibber 750 kr gavekort (nye kunder), Domino's 20 %, Storytel 15 %, Topcamp 10–20 % | «Elbil? Medlemsrabatter» |
+| `out/81-pensjonist.mp4` | Pensjonistforbundet: Riksteatret 30 % (utvalgte), Apollo 500 kr per person, iSteady 30 %, kinogavekort 10 % | «Pensjonist? Skjulte rabatter» |
+| `out/82-ys-medlem.mp4` | YS: Stormberg 25 %, Avis 25 % med kode (ukedager), Kinoklubben 40 %, Radisson 10–20 % med kode | «YS-forbund? Bruk kodene» |
+| `out/83-thon-hotell.mp4` | Søk «Thon»: samme hotell, 13 medlemsrabatter fra 8 til 30 % (student Bergen 30 %, LHL opptil 18 %, YS/Elbil 16 %, 12 % for flere) | «Thon Hotels: 8 eller 30 %?» |
+| `out/84-elon-kode-eller-cashback.mp4` | Elon: OBOS15 gir 15 % på ordinære priser (ikke Apple/kampanjer); på salgsvarer cashback, Trumf 1,7–3,9 % | «Elon: kode eller cashback?» |
+| `out/85-student-bergen.mp4` | Utdanning i Bergen: Bergen Kino −20 kr, DNS opptil 50 %, Bymuseet 50 %, BT gratis under 25, Akvariet årskort 700 kr | «Student i Bergen?» |
+| `out/86-spareborsen-kampanje.mp4` | Annonse (Sparebørsen): forhøyede satser – Adidas 5,7 %, Lindex 7,6 %, Daniel Wellington 9,5 %, NordVPN 38 % | «Satsene øker 📈» |
+| `out/87-unio-medlem.mp4` | Unio: Norgesbooking 1 000 kr (UNIO1000), Cutters 20 % (samhold20), Stormberg 30 %, Avis opptil 30 % | «Unio-medlem? Bruk kodene» |
+| `out/88-akademikerne.mp4` | Akademikerne Pluss: Narvesen 50 % på kaffe, Oluf Lorentzen 20 %, Samsung opptil 50 %, Sumo 20–25 % | «Akademiker? Halv pris på kaffe» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
@@ -128,6 +138,7 @@ node render.mjs <navn>                         # full mp4 til out/
   - `ps.mjs <url> <prefix> <Region,...>` fanger PlayStation Store med regionpriser.
   - `lyko-codes.mjs` fanger stemming og innsending av rabattkoder med Supabase-kallene stubbet, så ingenting lagres.
   - `bday-capture.mjs <url> <prefix> [sum]` setter inn userscriptet og tar bilde av siden, panelet alene, Sum-feltet og tooltipen for «Gratis bursdag». Sett `UA` for en annen nettleser, f.eks. Firefox på Android.
+  - `cards-capture.mjs "<query>" <assets-dir> "Butikk 1|Butikk 2"` tar bilde av enkeltkort på cashbacknorge.no med målte bokser for kort og tilbudsrader (`BASE=` for lokal server, `TOP=` for plassering). Bruk `?provider=…&q=<navn>` når kortet ligger langt ned i lista.
   - `site-capture.mjs "<query>" <prefix> [scrollY,...]` fanger cashbacknorge.no med URL-parametre (`?provider=gratisbursdag`, `?tema=strom`). `TAP=1` åpner tooltipen på første kort.
   - `member-capture.mjs <video-name> [...]` fanger tilbud, tooltip, eventuelt Sum-eksempel og offentlig kilde for video 26–30. Leser `capture` fra videoens `script.json`, avslår valgfrie samtykker og bruker maksimalt to nettleserfaner samtidig. `assets/capture.json` dokumenterer kilde, tidspunkt, vilkår og skjermkoordinater. Scenene deler `shared/member-reel.js`.
   - `android-guide.mjs <prefix>` fanger hvert steg i Android-guiden.

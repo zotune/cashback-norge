@@ -1,0 +1,43 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=utdanningibergen",
+  "offers": "utdanningibergen.no: Bergen Kino −20 kr man–ons; Den Nationale Scene opptil 50 % (18–30 år); Bymuseet 50 % ordinær billett; Bergens Tidende gratis til 25 år (50 % under 30); Akvariet årskort 700 kr for studenter/under 27"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Student i *Bergen?* Her er rabattene du bør bruke.",
+   "gap": 0.3
+  },
+  {
+   "id": "kino",
+   "line": "Bergen Kino: *{20 kr|tjue kroner}* av billetten mandag til onsdag."
+  },
+  {
+   "id": "dns",
+   "line": "Den Nationale Scene: *opptil* {50 %|femti prosent} på forestillinger."
+  },
+  {
+   "id": "museum",
+   "line": "Bymuseet, med Bryggens museum: *halv* pris."
+  },
+  {
+   "id": "bt",
+   "line": "Under {25?|tjuefem?} Bergens Tidende er *gratis.*"
+  },
+  {
+   "id": "akvariet",
+   "line": "Og årskort på Akvariet: *{700 kr.|sju hundre kroner.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

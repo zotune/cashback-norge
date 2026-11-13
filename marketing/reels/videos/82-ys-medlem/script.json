@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=ys (19 fordeler)",
+  "offers": "ys.no fordeler: Stormberg 25 %; AVIS 25 % kode X199101 (ukedager, Norge); Kinoklubben 40 % og 2 for 1; Radisson 10–20 % kode 090673"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Medlem i et YS-forbund? Da har du *koder* du bør bruke.",
+   "gap": 0.3
+  },
+  {
+   "id": "stormberg",
+   "line": "Stormberg: *{25 %|tjuefem prosent}* på klær til tur og vær."
+  },
+  {
+   "id": "avis",
+   "line": "Leiebil hos Avis: *{25 %|tjuefem prosent}* med koden i tooltipen, på ukedager."
+  },
+  {
+   "id": "kino",
+   "line": "Kinoklubben: *{40 %|førti prosent}* på medlemskapet, og halv pris på kino."
+  },
+  {
+   "id": "radisson",
+   "line": "Og Radisson: {10 til 20 %|ti til tjue prosent} med *hotellkoden.*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

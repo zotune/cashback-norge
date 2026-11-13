@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=spareborsen (368 forhøyede kampanjesatser)",
+  "offers": "spareborsen.no/api/partners: Adidas 5,7 % (vanlig 4,8 %), Lindex 7,6 % (5,6 %), Daniel Wellington 9,5 % (8 %), NordVPN 38 % (32 %)"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Black Week: cashback-satsene *øker* hos Sparebørsen.",
+   "gap": 0.3
+  },
+  {
+   "id": "adidas",
+   "line": "Adidas: *{5,7 %,|fem komma sju prosent,}* opp fra {4,8.|fire komma åtte.}"
+  },
+  {
+   "id": "lindex",
+   "line": "Lindex: *{7,6 %,|sju komma seks prosent,}* opp fra {5,6.|fem komma seks.}"
+  },
+  {
+   "id": "dw",
+   "line": "Daniel Wellington: *{9,5 %.|ni komma fem prosent.}*"
+  },
+  {
+   "id": "nordvpn",
+   "line": "Og NordVPN: hele *{38 %.|trettiåtte prosent.}*"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}
