@@ -7,8 +7,10 @@ import {
   stripHtml,
   uniqueOffers,
   uniqueStrings,
+  parseUrl,
 } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
+import { isAffiliateTrackingUrl } from "../merchant-domains.js";
 
 const API_URL = "https://ws.tradetracker.com/soap/affiliate";
 const SOAP_NAMESPACE = "https://ws.tradetracker.com/soap/affiliate";
@@ -669,6 +671,10 @@ function parseTradeTrackerDate(
 
 function extractMerchantDomain(url: string): string | undefined {
   if (!url) return undefined;
+  // Click hosts (nespresso.prf.hn, go.nordvpn.net/aff_c?offer_id=…,
+  // multitudebankplc.pxf.io) forward to the shop but are not its domain.
+  const parsedUrl = parseUrl(url.includes("://") ? url : `https://${url}`);
+  if (parsedUrl !== undefined && isAffiliateTrackingUrl(parsedUrl)) return undefined;
 
   const domain = normalizeDomainInput(url);
   if (
@@ -870,7 +876,10 @@ function cleanText(value: string): string {
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1).trim()}...`;
+  // Cut at a word boundary; never leave half a word in the tooltip.
+  const cut = value.slice(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
 function uniquePreserveOrder(values: string[]): string[] {

@@ -1,4 +1,5 @@
 import { type CashbackOffer } from "../shared/cashback.js";
+import { isNonMerchantHost } from "./merchant-domains.js";
 
 export type DomainLookup = ReadonlyMap<string, string[]>;
 
@@ -6,7 +7,10 @@ export function buildDomainLookup(offers: CashbackOffer[]): DomainLookup {
   const lookup = new Map<string, string[]>();
 
   for (const offer of offers) {
-    if (offer.domains.length === 0) {
+    // A tracking redirect or webmail host on one offer must not spread to
+    // every other provider that looks the merchant up by name.
+    const domains = offer.domains.filter((domain) => !isNonMerchantHost(domain));
+    if (domains.length === 0) {
       continue;
     }
 
@@ -20,9 +24,9 @@ export function buildDomainLookup(offers: CashbackOffer[]): DomainLookup {
       const existing = lookup.get(key);
 
       if (existing === undefined) {
-        lookup.set(key, [...offer.domains]);
+        lookup.set(key, [...domains]);
       } else {
-        for (const domain of offer.domains) {
+        for (const domain of domains) {
           if (!existing.includes(domain)) {
             existing.push(domain);
           }

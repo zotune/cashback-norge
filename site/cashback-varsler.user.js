@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794504758
+// @version      1794576257
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -153,6 +153,75 @@
       }
     }
   };
+  const BASE = 36;
+  const T_MIN = 1;
+  const T_MAX = 26;
+  const SKEW = 38;
+  const DAMP = 700;
+  const INITIAL_BIAS = 72;
+  const INITIAL_N = 128;
+  function adapt(delta, numPoints, firstTime) {
+    let d = firstTime ? Math.floor(delta / DAMP) : delta >> 1;
+    d += Math.floor(d / numPoints);
+    let k = 0;
+    while (d > (BASE - T_MIN) * T_MAX >> 1) {
+      d = Math.floor(d / (BASE - T_MIN));
+      k += BASE;
+    }
+    return k + Math.floor((BASE - T_MIN + 1) * d / (d + SKEW));
+  }
+  function digitValue(code) {
+    if (code >= 48 && code <= 57) return code - 22;
+    if (code >= 65 && code <= 90) return code - 65;
+    if (code >= 97 && code <= 122) return code - 97;
+    return BASE;
+  }
+  function decodePunycode(input) {
+    const output = [];
+    const basicEnd = input.lastIndexOf("-");
+    if (basicEnd > 0) {
+      for (let j = 0; j < basicEnd; j++) {
+        const code = input.charCodeAt(j);
+        if (code >= 128) return void 0;
+        output.push(code);
+      }
+    }
+    let n = INITIAL_N;
+    let bias = INITIAL_BIAS;
+    let i = 0;
+    for (let index = basicEnd > 0 ? basicEnd + 1 : 0; index < input.length; ) {
+      const oldi = i;
+      let w = 1;
+      for (let k = BASE; ; k += BASE) {
+        if (index >= input.length) return void 0;
+        const digit = digitValue(input.charCodeAt(index++));
+        if (digit >= BASE) return void 0;
+        i += digit * w;
+        if (!Number.isSafeInteger(i)) return void 0;
+        const t = k <= bias ? T_MIN : k >= bias + T_MAX ? T_MAX : k - bias;
+        if (digit < t) break;
+        w *= BASE - t;
+      }
+      const length = output.length + 1;
+      bias = adapt(i - oldi, length, oldi === 0);
+      n += Math.floor(i / length);
+      i %= length;
+      if (n > 1114111) return void 0;
+      output.splice(i, 0, n);
+      i++;
+    }
+    return String.fromCodePoint(...output);
+  }
+  function toUnicodeHostname(hostname) {
+    return hostname.split(".").map((label) => {
+      if (!/^xn--/i.test(label)) return label;
+      return decodePunycode(label.slice(4).toLowerCase()) ?? label;
+    }).join(".");
+  }
+  function hostnameDisplayLabel(hostname) {
+    const label = toUnicodeHostname(hostname.replace(/^www\./i, "")).split(".")[0] ?? hostname;
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
   const marker = /^[-•*]\s+/;
   const clean = (line) => line.replace(marker, "");
   function categoryRateSection(line) {
@@ -301,6 +370,7 @@
     };
     return [...offers.filter(relevant), ...offers.filter((offer) => !relevant(offer))];
   }
+  const EB_PER_TRUMF_KR$1 = 13.5;
   function isRecord$7(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
@@ -465,6 +535,88 @@
   }
   function stripHtml$2(html) {
     return decodeHtmlEntities(html.replace(/<!--[\s\S]*?-->/g, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/li>/gi, "\n").replace(/<li>/gi, "- ").replace(/<[^>]+>/g, "")).replace(/\n{2,}/g, "\n\n").trim();
+  }
+  function parseRewardValue(offerOrReward) {
+    if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
+    const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
+    const rewardSortValueNok = typeof offerOrReward === "string" ? void 0 : readRewardSortValueNok$2(offerOrReward);
+    const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d+(?:[,.]\d+)?)\s*%/);
+    const percentageMatch = rangeMatch ? [null, rangeMatch[1]] : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
+    if (percentageMatch !== null) {
+      return {
+        kind: "percentage",
+        amount: parseLocalizedNumber$3(percentageMatch[1] ?? "0")
+      };
+    }
+    const pointsRateMatch = reward.match(/(\d[\d\s]*)\s*poeng\s+per\s+100\s*kr/i);
+    if (pointsRateMatch !== null) {
+      return {
+        kind: "percentage",
+        amount: parseLocalizedNumber$3((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR$1
+      };
+    }
+    const priceMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr\s+totalsum\b/i);
+    if (priceMatch !== null) {
+      const price = parseLocalizedNumber$3((priceMatch[1] ?? "0").replace(/\s/g, ""));
+      if (price > 0) return { kind: "price", amount: -price };
+    }
+    const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
+    if (unitMatch !== null) {
+      return {
+        kind: "unit",
+        amount: parseLocalizedNumber$3(unitMatch[1] ?? "0")
+      };
+    }
+    const fixedRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-\u2013\u2014]\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
+    if (fixedRangeMatch !== null) {
+      return {
+        kind: "fixed",
+        amount: rewardSortValueNok ?? parseLocalizedNumber$3((fixedRangeMatch[1] ?? "0").replace(/\s/g, ""))
+      };
+    }
+    const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
+    if (fixedMatch !== null) {
+      return {
+        kind: "fixed",
+        amount: rewardSortValueNok ?? parseLocalizedNumber$3((fixedMatch[1] ?? "0").replace(/\s/g, ""))
+      };
+    }
+    const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
+    if (pointsMatch !== null) {
+      return {
+        kind: "points",
+        amount: parseLocalizedNumber$3((pointsMatch[1] ?? "0").replace(/\s/g, ""))
+      };
+    }
+    return {
+      kind: "unknown",
+      amount: 0
+    };
+  }
+  function parseLocalizedNumber$3(value) {
+    const parsedValue = Number.parseFloat(value.replace(",", "."));
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+  }
+  function readRewardSortValueNok$2(offer) {
+    return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok) ? offer.rewardSortValueNok : void 0;
+  }
+  function rewardKindRank(kind) {
+    if (kind === "percentage") {
+      return 4;
+    }
+    if (kind === "fixed") {
+      return 3;
+    }
+    if (kind === "unit") {
+      return 2;
+    }
+    if (kind === "price") {
+      return 1.5;
+    }
+    if (kind === "points") {
+      return 1;
+    }
+    return 0;
   }
   function readTcgProductKind(text2) {
     const normalized = normalizeTcgProductTitle(text2.replace(/\(\s*(?:case|kartong)\s+(?:tilgjengelig|available)\s*\)/gi, ""));
@@ -2415,10 +2567,15 @@ query OfferList($productId: Int!) {
   function isRecord$6(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
-  const EB_PER_TRUMF_KR$1 = 13.5;
+  const EB_PER_TRUMF_KR = 13.5;
+  const FREE_TOTAL_REWARD = /^0\s*kr\s+totalsum$/i;
+  function isFreeTotalReward(reward) {
+    return FREE_TOTAL_REWARD.test(reward.trim());
+  }
   function formatRewardLabel(reward, provider) {
     const trimmedReward = reward.trim();
     if (trimmedReward.length === 0) return "?";
+    if (isFreeTotalReward(trimmedReward)) return "Gratis";
     if (isGenericMembershipReward(trimmedReward)) return "Medlemspris";
     if (provider === "sas") {
       const converted = convertSasToPercent(trimmedReward);
@@ -2434,7 +2591,6 @@ query OfferList($productId: Int!) {
     return /^(?:medlemsfordel|medlemstilbud|medlemspris)$/i.test(reward.trim());
   }
   function formatCompactRewardLabel(offer) {
-    if (offer.promotion?.priceNok === 0) return "0 kr totalsum";
     if (offer.promotion) return offer.promotion.label;
     const label = formatRewardLabel(offer.reward, offer.provider);
     const fixedReward = readFixedRewardMax(label);
@@ -2450,15 +2606,15 @@ query OfferList($productId: Int!) {
       const prefix = percentMatch[1] ?? "";
       return (prefix + percentMatch[2]).replace(/\s+/g, " ");
     }
-    const totalSumMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
+    const totalSumMatch = label.match(/(?:\bfra\s+)?\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
     if (totalSumMatch !== null) {
       return totalSumMatch[0].replace(/\s+/g, " ");
     }
-    const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+    const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
     if (krRangeMatch !== null) {
       return krRangeMatch[0].replace(/\s+/g, " ");
     }
-    const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+    const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
     if (krMatch !== null) {
       return krMatch[0].replace(/\s+/g, " ");
     }
@@ -2505,13 +2661,13 @@ query OfferList($productId: Int!) {
     if (sasRateMatch !== null) {
       const points = Number.parseInt((sasRateMatch[1] ?? "0").replace(/\s/g, ""), 10);
       const eb = Math.round(amount * points / 100);
-      const kr = amount * points / 100 / EB_PER_TRUMF_KR$1;
+      const kr = amount * points / 100 / EB_PER_TRUMF_KR;
       return `~${formatKr(kr)} kr (~${eb} EB)`;
     }
     const sasFixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
     if (sasFixedMatch !== null) {
       const points = Number.parseInt((sasFixedMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const kr = points / EB_PER_TRUMF_KR$1;
+      const kr = points / EB_PER_TRUMF_KR;
       return `~${formatKr(kr)} kr (~${points} EB)`;
     }
     const klarnaMatch = reward.match(/^([\d.]+)%$/);
@@ -2543,7 +2699,7 @@ query OfferList($productId: Int!) {
     const sasRateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
     if (sasRateMatch !== null) {
       const points = Number.parseInt((sasRateMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      return points / EB_PER_TRUMF_KR$1;
+      return points / EB_PER_TRUMF_KR;
     }
     const krRangeMatch = reward.match(/^([\d.,]+)-([\d.,]+)\s*kr/i);
     if (krRangeMatch !== null) {
@@ -2616,14 +2772,14 @@ query OfferList($productId: Int!) {
   }
   function addEbSuffix(label, minPct, maxPct, amount, provider) {
     if (provider === "trumf") {
-      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR$1);
-      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR$1);
+      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
       const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
       return `${label} (${ebStr})`;
     }
     if (provider === "sas") {
-      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR$1);
-      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR$1);
+      const minEb = Math.round(amount * minPct / 100 * EB_PER_TRUMF_KR);
+      const maxEb = Math.round(amount * maxPct / 100 * EB_PER_TRUMF_KR);
       const ebStr = minEb === maxEb ? `~${minEb} EB` : `~${minEb}-${maxEb} EB`;
       return `~${label} (${ebStr})`;
     }
@@ -2633,13 +2789,13 @@ query OfferList($productId: Int!) {
     const fixedMatch = reward.match(/^([\d\s]+)\s*poeng$/i);
     if (fixedMatch !== null) {
       const points = Number.parseInt((fixedMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const kr = Math.round(points / EB_PER_TRUMF_KR$1);
+      const kr = Math.round(points / EB_PER_TRUMF_KR);
       return `~${kr} kr (~${points.toLocaleString("nb-NO")} EB)`;
     }
     const rateMatch = reward.match(/^([\d\s]+)\s*poeng\s+per\s+100\s*kr$/i);
     if (rateMatch !== null) {
       const points = Number.parseInt((rateMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const pct = points / EB_PER_TRUMF_KR$1;
+      const pct = points / EB_PER_TRUMF_KR;
       return `~${formatNo(pct)} % (~${points} EB/100kr)`;
     }
     return "";
@@ -2649,20 +2805,20 @@ query OfferList($productId: Int!) {
     if (rangeMatch !== null) {
       const minPct = Number.parseFloat((rangeMatch[1] ?? "0").replace(",", "."));
       const maxPct = Number.parseFloat((rangeMatch[2] ?? "0").replace(",", "."));
-      const minEb = Math.round(minPct * EB_PER_TRUMF_KR$1);
-      const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR$1);
+      const minEb = Math.round(minPct * EB_PER_TRUMF_KR);
+      const maxEb = Math.round(maxPct * EB_PER_TRUMF_KR);
       return `~${minEb}-${maxEb} EB/100kr`;
     }
     const pctMatch = reward.match(/^([\d,.]+)\s*%$/);
     if (pctMatch !== null) {
       const pct = Number.parseFloat((pctMatch[1] ?? "0").replace(",", "."));
-      const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR$1);
+      const ebPer100 = Math.round(pct * EB_PER_TRUMF_KR);
       return `~${ebPer100} EB/100kr`;
     }
     const krMatch = reward.match(/^([\d\s]+)\s*kr$/);
     if (krMatch !== null) {
       const kr = Number.parseInt((krMatch[1] ?? "0").replace(/\s/g, ""), 10);
-      const eb = Math.round(kr * EB_PER_TRUMF_KR$1);
+      const eb = Math.round(kr * EB_PER_TRUMF_KR);
       return `~${eb.toLocaleString("nb-NO")} EB`;
     }
     return "";
@@ -2880,7 +3036,6 @@ query OfferList($productId: Int!) {
     if (/Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent)) return true;
     return nav.platform === "MacIntel" && (nav.maxTouchPoints ?? 0) > 1;
   }
-  const EB_PER_TRUMF_KR = 13.5;
   const PROVIDER_NAMES = {
     prisjakt: "Prisjakt",
     prisradar: "Prisradar",
@@ -2977,7 +3132,7 @@ query OfferList($productId: Int!) {
     spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
     spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
     rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
-    dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
+    dreams: "Dreams.\nSpare-app med cashback (29 kr/mnd, 30 dager gratis for nye brukere).\nAktiver cashback via Dreams-appen.",
     utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
     unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
     gratisbursdag: "Bursdagsgaver og bursdagsrabatter fra gratisbursdag.no.\nKan kreve kundeklubb, app eller registrert fødselsdato.\nSe vilkår, gyldighet og bekreftelsesstatus for hvert tilbud.",
@@ -4306,7 +4461,7 @@ query OfferList($productId: Int!) {
     }
   }
   const version = 1;
-  const generatedAt = "2026-11-10T21:02:42.641Z";
+  const generatedAt = "2026-11-12T17:37:30.879Z";
   const source = "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35";
   const suppliers = [{ "id": 10060, "name": "Agva Kraft", "hostname": "agva.no", "supplierUrl": "https://www.agva.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10134, "name": "Austevoll Kraftlag SA", "hostname": "akkraft.no", "supplierUrl": "https://akkraft.no/Kundeservice/Prisliste/Utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10099, "name": "Bærum Energiomsetning AS", "hostname": "baerumenergi.no", "supplierUrl": "https://baerumenergi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10042, "name": "Bodø Energi Kraftsalg AS", "hostname": "bodoenergi.no", "supplierUrl": "https://bodoenergi.no/ac/prislister/", "evidence": "reported-pricelist" }, { "id": 10148, "name": "Cheap Energy Norge AS", "hostname": "cheapenergy.no", "supplierUrl": "https://cheapenergy.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10070, "name": "Dalane Energisalg AS", "hostname": "dalane-energi.no", "supplierUrl": "https://dalane-energi.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10064, "name": "Dragefossen AS", "hostname": "dragefossen.no", "supplierUrl": "https://dragefossen.no/strom/stromavtaler/prisliste-dr/", "evidence": "reported-pricelist" }, { "id": 10089, "name": "Drangedal Kraft AS", "hostname": "drangedalkraft.no", "supplierUrl": "https://www.drangedalkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10015, "name": "Eidefoss Strøm AS", "hostname": "eidefoss.no", "supplierUrl": "https://www.eidefoss.no/prisliste/category1226.html", "evidence": "reported-pricelist" }, { "id": 10100, "name": "Eiker Strøm AS", "hostname": "eikerenergi.no", "supplierUrl": "https://eikerenergi.no/wp-content/uploads/2026/06/Prisliste-Strom-17.06.26.pdf", "evidence": "reported-pricelist" }, { "id": 10143, "name": "Eletra Energy AS", "hostname": "eletra-energy.com", "supplierUrl": "https://www.eletra-energy.com/no/stroemavtaler/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10149, "name": "Energihuset Marked AS", "hostname": "energihuset.net", "supplierUrl": "https://energihuset.net/", "evidence": "reported-pricelist" }, { "id": 10058, "name": "Fitjar Kraftlag SA", "hostname": "fitjar-kraftlag.no", "supplierUrl": "https://www.fitjar-kraftlag.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10049, "name": "Fjordkraft AS", "hostname": "fjordkraft.no", "supplierUrl": "https://www.fjordkraft.no/strom/stromavtale/prisliste/", "evidence": "reported-pricelist" }, { "id": 10136, "name": "Folkekraft", "hostname": "folkekraft.no", "supplierUrl": "https://folkekraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10030, "name": "Fortum", "hostname": "fortum.com", "supplierUrl": "https://www.fortum.com/no/strom/stromavtale/prisliste", "evidence": "reported-pricelist" }, { "id": 10036, "name": "FosenKraft Energi", "hostname": "fosenenergi.no", "supplierUrl": "https://fosenenergi.no/prisoversikt/", "evidence": "reported-pricelist" }, { "id": 10044, "name": "Gudbrandsdal Energi AS", "hostname": "ge.no", "supplierUrl": "https://www.ge.no/kraftavtaler/priser-pa-aktive-kraftavtaler", "evidence": "reported-pricelist" }, { "id": 10151, "name": "GrasrotEnergi AS", "hostname": "grasrotenergi.no", "supplierUrl": "https://www.grasrotenergi.no/", "evidence": "reported-pricelist" }, { "id": 10120, "name": "Hardanger Energi AS", "hostname": "hardangerenergi.no", "supplierUrl": "https://hardangerenergi.no/privat/straumavtalar", "evidence": "verified-offer-page" }, { "id": 10025, "name": "Helgeland Kraft Strøm AS", "hostname": "helgelandkraft.no", "supplierUrl": "https://www.helgelandkraft.no/strom/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10047, "name": "Haugaland Kraft Energi AS", "hostname": "hkraft.no", "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10017, "name": "Hurum Kraft AS", "hostname": "hurumkraft.no", "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/", "evidence": "verified-offer-page" }, { "id": 10147, "name": "Husleiestrøm AS", "hostname": "husleiestrom.no", "supplierUrl": "https://www.husleiestrom.no/", "evidence": "reported-pricelist" }, { "id": 10063, "name": "Ishavskraft AS", "hostname": "ishavskraft.no", "supplierUrl": "https://www.ishavskraft.no/alle-avtaler", "evidence": "reported-pricelist" }, { "id": 10005, "name": "Istad Kraft AS", "hostname": "istadkraft.no", "supplierUrl": "https://www.istadkraft.no/prisliste-istad-kraft-privat", "evidence": "reported-pricelist" }, { "id": 10146, "name": "Jærkraft AS", "hostname": "jaerkraft.no", "supplierUrl": "https://jaerkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10096, "name": "Kilden Kraft AS", "hostname": "kildenkraft.no", "supplierUrl": "https://kildenkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10117, "name": "Klarkraft AS", "hostname": "klarkraft.no", "supplierUrl": "https://klarkraft.no/nyheter/alle-str%C3%B8mavtaler", "evidence": "reported-pricelist" }, { "id": 10072, "name": "Kraftriket AS", "hostname": "kraftriket.no", "supplierUrl": "https://www.kraftriket.no/privat/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10016, "name": "Kvam Kraftverk AS", "hostname": "kvam-kraftverk.no", "supplierUrl": "https://www.kvam-kraftverk.no/prisliste-aktive-avtalar", "evidence": "reported-pricelist" }, { "id": 10066, "name": "Luster Energi AS", "hostname": "lusterenergi.no", "supplierUrl": "https://www.lusterenergi.no/kunde", "evidence": "reported-pricelist" }, { "id": 10013, "name": "Lyse Energi AS", "hostname": "lyse.no", "supplierUrl": "https://www.lyse.no/kundeservice/artikler/10968664267665-utg%C3%A5tte-avtaler", "evidence": "reported-pricelist" }, { "id": 10075, "name": "Midt Energi AS", "hostname": "midtenergi.no", "supplierUrl": "https://midtenergi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10133, "name": "Motkraft AS", "hostname": "motkraft.no", "supplierUrl": "https://www.motkraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10043, "name": "NEAS AS", "hostname": "neas.mr.no", "supplierUrl": "https://www.neas.mr.no/stroem/historiske-priser/", "evidence": "reported-pricelist" }, { "id": 10124, "name": "Notodden Energi AS", "hostname": "notodden-energi.no", "supplierUrl": "https://notodden-energi.no/prisliste-stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10076, "name": "NTE Marked AS", "hostname": "nte.no", "supplierUrl": "https://nte.no/strom/prisliste/", "evidence": "reported-pricelist" }, { "id": 10123, "name": "Polar Kraft AS", "hostname": "polarkraft.no", "supplierUrl": "https://polarkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10037, "name": "Rauma Energi AS", "hostname": "rauma-energi.no", "supplierUrl": "https://www.rauma-energi.no/strom-privat", "evidence": "reported-pricelist" }, { "id": 10093, "name": "REN Røros Strøm AS", "hostname": "renroros.no", "supplierUrl": "https://renroros.no/bestill-strom/prisliste-strom/", "evidence": "reported-pricelist" }, { "id": 10129, "name": "RK Energi og Fiber As", "hostname": "rissakraftlag.no", "supplierUrl": "https://www.rissakraftlag.no/stromavtaler/", "evidence": "reported-pricelist" }, { "id": 10130, "name": "Saga Energi AS", "hostname": "sagaenergi.no", "supplierUrl": "https://sagaenergi.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10080, "name": "SkandiaEnergi", "hostname": "skandiaenergi.no", "supplierUrl": "https://skandiaenergi.no/prisoversiktalle-avtaler", "evidence": "reported-pricelist" }, { "id": 10112, "name": "Smart Energi", "hostname": "smartenergi.com", "supplierUrl": "https://www.smartenergi.com/stromavtaler-prisliste/", "evidence": "reported-pricelist" }, { "id": 10087, "name": "Sodvin AS", "hostname": "sodvin.no", "supplierUrl": "https://www.sodvin.no/hubfs/Prisliste%20str%C3%B8m_01.03.26-1.pdf", "evidence": "reported-pricelist" }, { "id": 10052, "name": "Strøyma AS", "hostname": "stroyma.no", "supplierUrl": "https://www.stroyma.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10008, "name": "Sunndal Energi AS", "hostname": "sunndalenergi.no", "supplierUrl": "https://www.sunndalenergi.no/stroem/prisliste/", "evidence": "reported-pricelist" }, { "id": 10040, "name": "Svorka AS", "hostname": "svorka.no", "supplierUrl": "https://svorka.no/artikler/prisliste-stroem/", "evidence": "reported-pricelist" }, { "id": 10141, "name": "Telemark Kraft AS", "hostname": "telemarkkraft.no", "supplierUrl": "https://telemarkkraft.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10095, "name": "Tibber", "hostname": "tibber.com", "supplierUrl": "https://tibber.com/no/smart-stromavtale", "evidence": "reported-pricelist" }, { "id": 10069, "name": "TrøndelagKraft AS", "hostname": "trondelagkraft.no", "supplierUrl": "https://www.trondelagkraft.no/strom/stromavtaler/prisliste/", "evidence": "reported-pricelist" }, { "id": 10039, "name": "Ustekveikja Energi AS", "hostname": "ustekveikja.no", "supplierUrl": "https://ustekveikja.no/prisliste/", "evidence": "reported-pricelist" }, { "id": 10046, "name": "Varanger KraftMarked AS", "hostname": "varanger-kraftmarked.no", "supplierUrl": "https://www.varanger-kraftmarked.no/stromavtaler/prisliste", "evidence": "reported-pricelist" }, { "id": 10150, "name": "VENI Metering AS", "hostname": "venimetering.no", "supplierUrl": "https://www.venimetering.no/leietakere/", "evidence": "reported-pricelist" }, { "id": 10118, "name": "VEV Romerike AS", "hostname": "vevromerike.no", "supplierUrl": "https://www.vevromerike.no/s/stromavtaleprivatkunder", "evidence": "reported-pricelist" }, { "id": 10115, "name": "Vibb AS", "hostname": "vibb.no", "supplierUrl": "https://vibb.no/strom/", "evidence": "reported-pricelist" }, { "id": 10137, "name": "Viddakraft AS", "hostname": "viddakraft.no", "supplierUrl": "https://www.viddakraft.no/prisliste", "evidence": "reported-pricelist" }, { "id": 10140, "name": "VOKKS Kraft AS", "hostname": "vokkskraft.no", "supplierUrl": "https://www.vokkskraft.no/prisliste-2", "evidence": "reported-pricelist" }, { "id": 10128, "name": "Voss Energi Kraft AS", "hostname": "vossenergi.no", "supplierUrl": "https://www.vossenergi.no/straumavtalar", "evidence": "reported-pricelist" }, { "id": 10127, "name": "Vest-Telemark Kraftlag AS", "hostname": "vtk.no", "supplierUrl": "https://www.vtk.no/getfile.php/134256-1768372292/vtk.no/Dokument/Kraftsalg/Prisliste%20hjemmeside%2020260113.pdf", "evidence": "reported-pricelist" }, { "id": 10131, "name": "Wattn AS", "hostname": "wattn.no", "supplierUrl": "https://wattn.no/privat/strom/prisliste", "evidence": "reported-pricelist" }];
   const bundled = {
@@ -15756,7 +15911,7 @@ ${darkProviderCss}
     if (hostname.includes("kiwi.com")) return "Kiwi.com";
     if (hostname.includes("travellink")) return "Travellink";
     if (hostname.includes("trip.com")) return "Trip.com";
-    const providerLabel = hostname.split(".").find((part) => part.length > 2 && !["com", "co", "no", "se", "dk", "net"].includes(part));
+    const providerLabel = toUnicodeHostname(hostname).split(".").find((part) => part.length > 2 && !["com", "co", "no", "se", "dk", "net"].includes(part));
     return providerLabel === void 0 ? void 0 : providerLabel.charAt(0).toUpperCase() + providerLabel.slice(1);
   }
   function readPanFlightsProductUrl(value, fallbackUrl) {
@@ -23890,71 +24045,12 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
       return firstOffer.provider.localeCompare(secondOffer.provider);
     });
   }
-  function parseRewardValue(offerOrReward) {
-    if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
-    const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
-    const rewardSortValueNok = typeof offerOrReward === "string" ? void 0 : readRewardSortValueNok(offerOrReward);
-    const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
-    const percentageMatch = rangeMatch ? [null, rangeMatch[1]] : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
-    if (percentageMatch !== null) {
-      return {
-        kind: "percentage",
-        amount: parseLocalizedNumber(percentageMatch[1] ?? "0")
-      };
-    }
-    const pointsRateMatch = reward.match(/(\d[\d\s]*)\s*poeng\s+per\s+100\s*kr/i);
-    if (pointsRateMatch !== null) {
-      return {
-        kind: "percentage",
-        amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR
-      };
-    }
-    const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
-    if (unitMatch !== null) {
-      return {
-        kind: "unit",
-        amount: parseLocalizedNumber(unitMatch[1] ?? "0")
-      };
-    }
-    const fixedRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
-    if (fixedRangeMatch !== null) {
-      return {
-        kind: "fixed",
-        amount: rewardSortValueNok ?? parseLocalizedNumber((fixedRangeMatch[1] ?? "0").replace(/\s/g, ""))
-      };
-    }
-    const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
-    if (fixedMatch !== null) {
-      return {
-        kind: "fixed",
-        amount: rewardSortValueNok ?? parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, ""))
-      };
-    }
-    const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
-    if (pointsMatch !== null) {
-      return {
-        kind: "points",
-        amount: parseLocalizedNumber((pointsMatch[1] ?? "0").replace(/\s/g, ""))
-      };
-    }
-    return {
-      kind: "unknown",
-      amount: 0
-    };
-  }
   function parseLocalizedNumber(value) {
     const parsedValue = Number.parseFloat(value.replace(",", "."));
     return Number.isFinite(parsedValue) ? parsedValue : 0;
   }
   function readRewardSortValueNok(offer) {
     return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok) ? offer.rewardSortValueNok : void 0;
-  }
-  function rewardKindRank(kind) {
-    if (kind === "percentage") return 4;
-    if (kind === "fixed") return 3;
-    if (kind === "unit") return 2;
-    if (kind === "points") return 1;
-    return 0;
   }
   function isFlightPanelRow(priceMatch) {
     return priceMatch.travelKind !== "hotel" && (isFlightSearchPriceMatch(priceMatch) || priceMatch.source === "googleflights");
@@ -24026,8 +24122,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const host2 = window.location.hostname;
     const norwegianPage = /\.no$/.test(host2) || /^(nb|nn|no)\b/i.test(document.documentElement.lang) || /^\/no(\/|$)/.test(window.location.pathname);
     if (!norwegianPage) return void 0;
-    const name = host2.replace(/^www\./, "").split(".")[0];
-    const sourceName = name.charAt(0).toUpperCase() + name.slice(1);
+    const sourceName = hostnameDisplayLabel(host2);
     const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.outerHTML).join("");
     const fromLd = readJsonLdUserRating(scripts, `store:${host2}`, sourceName, window.location.href.split("#")[0]);
     if (fromLd !== void 0) return fromLd;
@@ -24083,8 +24178,7 @@ Platin: 3 mnd gratis ${cryptoSub}`, shadowRoot, tooltipControls);
     const rows = [];
     const storeRows = [];
     const productTitle = (extractProductPageMeta()?.searchTerm ?? sources.find((offer) => offer.source === "prisjakt" || offer.source === "klarna")?.productName ?? priceMatch?.productName ?? readCurrentPageUserRating()?.productName ?? document.title).replace(/\s+[-|–]\s+[^-|–]*\.(?:no|com)\s*$/i, "").trim().slice(0, 160);
-    const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
-    const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
+    const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ?? (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostnameDisplayLabel(CURRENT_HOST));
     const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
     const profile = trustpilot?.status === "ok" ? trustpilot.profile : void 0;
     const shopRatings = [...stores.map(({ store: store2 }) => store2), ...profile ? [profile] : []];

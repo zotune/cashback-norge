@@ -117,6 +117,10 @@ tilbudsvisning.
 - Gratisvarer følger eksisterende standard `0 kr totalsum`. Ikke finn på en
   kroneverdi for en gave, regn «2 for 1» som rabatt på hele handlekurven eller
   presenter en bursdagsgave som cashback.
+  Klientene viser `0 kr totalsum` som «Gratis» (`formatRewardLabel`); behold
+  datastrengen. `N kr totalsum` er prisen kunden betaler, ikke en rabatt, og
+  rangeres under rabatter. En gratis ekstraytelse ved kjøp («gratis befaring»,
+  «gratis fotograf ved megleroppdrag») er ikke en gratisvare.
 - Bruk verifiserte domenekoblinger i `data/provider-overrides.json` og de delte
   funksjonene for domenenormalisering og oppslag. Eksplisitte koblinger går foran
   tvetydige treff. Logo-CDN-er, annonselenker og sporingsdomener er ikke bevis på

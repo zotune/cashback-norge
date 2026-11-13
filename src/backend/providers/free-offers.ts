@@ -18,7 +18,7 @@ const LIMIT = 250;
 const PUBLISHED = '!(_id in path("drafts.**"))';
 const SOURCE_FIELDS = '_id,title,short_description,content,link,active,visible,publish_time,valid_until_time,manualCheck,"slug":slug.current';
 export const GRATIS_QUERY = `*[_type=="brandOffer" && brand=="gratis" && status=="approved" && stale!=true && ${PUBLISHED}] | order(_id asc) [0...${LIMIT + 1}]{title,intro,facts,sections,faq,needsReview,"slug":slug.current,"source":offer->{${SOURCE_FIELDS}}}`;
-export const GJERRIGKNARK_QUERY = `*[_type=="content" && type=="story" && active==true && visible==true && publish_time<=now() && (!defined(valid_until_time)||valid_until_time>now()) && ${PUBLISHED} && references(*[_type=="category" && (gkid.current=="2" || "2" in parents[]->gkid.current)]._id)] | order(_id asc) [0...${LIMIT + 1}]{${SOURCE_FIELDS},"brandCopy":*[_type=="brandOffer" && brand=="gratis" && status=="approved" && stale!=true && offer._ref==^._id && ${PUBLISHED}][0]{facts}}`;
+export const GJERRIGKNARK_QUERY = `*[_type=="content" && type=="story" && active==true && visible==true && publish_time<=now() && (!defined(valid_until_time)||valid_until_time>now()) && ${PUBLISHED} && references(*[_type=="category" && (gkid.current=="2" || "2" in parents[]->gkid.current)]._id)] | order(_id asc) [0...${LIMIT + 1}]{${SOURCE_FIELDS},"brandCopy":*[_type=="brandOffer" && brand=="gratis" && status=="approved" && stale!=true && offer._ref==^._id && ${PUBLISHED}][0]{title,facts}}`;
 
 export function publicPromotionApi(query: string): string {
   return `https://6wpjub8n.api.sanity.io/v2025-02-19/data/query/production?query=${encodeURIComponent(query)}`;
@@ -67,7 +67,11 @@ export function readFreeOffers(value: unknown, provider: "gratis" | "gjerrigknar
     ].flatMap(([label, text]) => clean(text) && clean(text) !== "ukjent" ? [`${label}: ${clean(text)}`] : []) : [];
     const body = portableText(source.content);
     const description = [clean(row.intro), clean(source.short_description), ...factLines, body].filter(Boolean).join("\n");
-    const promotion = readFreePromotion(`${title}. ${clean(source.title)}`, description);
+    // Gjerrigknark stories share their offer with a Gratis.no brand page. Read
+    // its benefit headline too, so one promotion gets the same price and
+    // exclusions under both chips (EaseFormula "for 169 kr", Normal "samle poeng").
+    const brandTitle = provider === "gjerrigknark" && isRecord(row.brandCopy) ? clean(row.brandCopy.title) : "";
+    const promotion = readFreePromotion([brandTitle, title, clean(source.title)].filter(Boolean).join(". "), description);
     if (!promotion) continue;
     const sourceUrl = provider === "gratis" ? `https://gratis.no/tilbud/${slug}` : `https://gjerrigknark.com/${slug}`;
     const sections = Array.isArray(row.sections) ? row.sections.filter(isRecord).map((section) => `${clean(section.heading)}: ${clean(section.body)}`) : [];

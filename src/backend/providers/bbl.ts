@@ -6,7 +6,7 @@
 import { gotScraping } from "crawlee";
 import type { CashbackOffer } from "../../shared/cashback.js";
 import { normalizeDomainInput, parseUrl, stripHtml, toBaseDomain } from "../../shared/cashback.js";
-import { extractBenefitReward, formatPercentageReward } from "../../shared/reward.js";
+import { extractBenefitReward, extractPercentageValues, formatPercentageReward } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -63,9 +63,13 @@ export async function fetchBbl(input: FetchBblInput): Promise<CashbackOffer[]> {
     const discountText = (contract.discountText ?? "").trim();
     const benefitText = stripHtml(contract.benefit ?? "");
 
+    // The contract carries both the bonus rate and the member discount
+    // ("Bonus: 4 % bonus" + "Rabatt: 30 % på vinduer og dører"); both are
+    // benefits of the same agreement.
+    const discountRates = extractPercentageValues(discountText);
     let reward = "";
     if (Number.isFinite(bonusRate) && bonusRate > 0) {
-      reward = formatPercentageReward([bonusRate]);
+      reward = formatPercentageReward([bonusRate, ...discountRates]);
     } else {
       reward = extractBenefitReward(`${discountText}\n${benefitText}`);
     }

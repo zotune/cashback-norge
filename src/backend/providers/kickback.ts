@@ -8,14 +8,15 @@ import {
 } from "crawlee";
 import {
   type CashbackOffer,
+  type RewardCalculationRules,
   normalizeDomainInput,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
 import { isDomainLike, merchantDomainsFromUrl } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
+import { extractCouponMinimumPurchase, extractCouponReward } from "./rabattkode.js";
 
 type KickbackCheerio = CheerioCrawlingContext["$"];
 
@@ -34,6 +35,7 @@ type PendingKickbackOffer = {
   merchantName: string;
   partnerPageUrl: string;
   reward: string;
+  rewardCalculation?: RewardCalculationRules;
   sourceUrl: string;
   terms: string;
 };
@@ -59,8 +61,10 @@ export async function crawlKickback(
   config.useStorageClient(storage);
 
   const crawler = new CheerioCrawler({
-    maxRequestRetries: 0,
+    maxConcurrency: 1,
+    maxRequestRetries: 2,
     maxRequestsPerCrawl: input.maxRequestsPerCrawl,
+    requestHandlerTimeoutSecs: 30,
     requestHandler: async ({ $, enqueueLinks, request }) => {
       const loadedUrl = request.loadedUrl ?? request.url;
 
@@ -125,6 +129,7 @@ export async function crawlKickback(
         merchantName: offer.merchantName,
         domains,
         reward: offer.reward,
+        ...(offer.rewardCalculation === undefined ? {} : { rewardCalculation: offer.rewardCalculation }),
         sourceUrl: offer.sourceUrl,
         activationUrl: offer.activationUrl ?? offer.partnerPageUrl,
         discountCode: offer.discountCode,
@@ -187,6 +192,8 @@ function parseKickbackFrontPage(
       ...partnerSlugDomains,
     ]);
     const title = normalizeWhitespace(article.find(".node__title").first().text());
+    const terms = extractTerms(article, title);
+    const rewardCalculation = extractCouponMinimumPurchase(terms);
 
     offers.push({
       discountCode,
@@ -194,8 +201,9 @@ function parseKickbackFrontPage(
       merchantName,
       partnerPageUrl: pageUrls.partnerPageUrl,
       reward: extractReward(title),
+      ...(rewardCalculation === undefined ? {} : { rewardCalculation }),
       sourceUrl: pageUrls.sourceUrl,
-      terms: extractTerms(article, title),
+      terms,
     });
   });
 
@@ -355,11 +363,10 @@ function isReusableDiscountCode(code: string): boolean {
   return !/^(?:uniquecodes?|unique|personlig)$/i.test(code);
 }
 
+// A headline without an amount ("Gratis gave ved kjøp") is not a free
+// purchase; the headline stays in the terms.
 function extractReward(title: string): string {
-  const reward = extractPercentageReward(title) || extractKrReward(title, { totalsum: false });
-  if (reward !== "") return reward;
-  if (/gratis/i.test(title)) return "Gratis";
-  return title;
+  return extractCouponReward(title) || "Rabattkode";
 }
 
 function extractTerms(

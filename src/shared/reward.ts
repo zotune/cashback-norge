@@ -2,7 +2,16 @@ const MATERIAL_WORD_AFTER_PERCENT = /^\s+(?:bomull|polyester|lin|ull|nylon|akryl
 
 export function extractPercentageValues(text: string): number[] {
   const values: number[] = [];
-  const percentPattern = /(\d{1,3}(?:[,.]\d+)?)\s*(?:[-\u2013\u2014]\s*(\d{1,3}(?:[,.]\d+)?)\s*)?(?:%|prosent)(?![a-zA-ZæøåÆØÅ])/gi;
+  // URL escapes ("data=05%7C02") are no percentages.
+  text = text.replace(/\bhttps?:\/\/\S+/gi, " ");
+  // A range dash stays on one line: "- 10 % … 29.06–09.08\n\n- 20 %" is a list,
+  // not "8-20 %"; the first number is no tail of a date or decimal.
+  const percentPattern = /(?<![\d.,])(\d{1,3}(?:[,.]\d+)?)[ \t\u00a0]*(?:[-\u2013\u2014][ \t\u00a0]*(\d{1,3}(?:[,.]\d+)?)[ \t\u00a0]*)?(?:%(?![0-9A-F]{2})|prosent)(?![a-zA-ZæøåÆØÅ])/gi;
+
+  // "mellom 10 og 25 prosent"
+  for (const match of text.matchAll(/\bmellom\s+(\d{1,3}(?:[,.]\d+)?)\s*(?:%|prosent)?\s+og\s+(\d{1,3}(?:[,.]\d+)?)\s*(?:%|prosent)/gi)) {
+    values.push(parseRewardNumber(match[1]), parseRewardNumber(match[2]));
+  }
 
   for (const match of text.matchAll(percentPattern)) {
     const afterMatch = text.slice((match.index ?? 0) + match[0].length);
@@ -75,6 +84,9 @@ export function extractExplicitTotalPriceReward(text: string): string {
   const patterns = [
     /\b(?:fast\s+lav\s+)?(?:månedspris|medlemspris|studentpris|kampanjepris|tilbudspris)\s*(?:på|er|:)?\s*(?:kun\s+)?(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
     /\b(?:basis)?abonnement(?:et)?\s+til\s+kun\s+(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
+    // "medlemskap … til kun 125 kr (ordinær pris 179 kr)"; the parenthetical
+    // ordinary price is stripped before matching.
+    /\btil\s+(?:kun|bare)\s+(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])/gi,
     // "Kun 65 kr/mnd" is a monthly price, like "månedspris 65 kr".
     /\b(?:kun|bare)\s+(?:kr\.?\s*)?(\d[\d\s]*(?:[,.]\d+)?)\s*(?:kroner|kr|,[-–])(?=\s*(?:\/\s*mnd|\/\s*måned|per\s+(?:mnd|måned)|i\s+måneden)\b)/gi,
   ];
@@ -103,7 +115,8 @@ export function extractKrReward(text: string, options?: KrRewardOptions): string
   const cleanedText = stripOrdinaryPriceParentheticals(text);
 
   // Split into sentences/clauses and look for ones containing rabatt/avslag
-  const clauses = cleanedText.split(/[.;]/);
+  // "Kr 10.000,-": a thousands separator does not end the clause.
+  const clauses = cleanedText.split(/;|\.(?!\d)|(?<!\d)\./);
   const rabattValues: number[] = [];
 
   for (const clause of clauses) {
@@ -233,11 +246,11 @@ function formatKrNumber(value: number): string {
 export function extractOreLitreReward(text: string): string {
   const litreValues = extractOreValues(
     text,
-    /(?:opptil\s+|minst\s+)?(\d+)\s*øre(?:\s*\/\s*l|\s+(?:rabatt\s+)?per\s+liter)/gi,
+    /(?:opptil\s+|minst\s+)?(\d+)\s*øre\*?(?:\s*\/\s*l|\s+(?:rabatt\s+)?per\s+liter)/gi,
   );
   const chargeValues = extractOreValues(
     text,
-    /(?:opptil\s+|minst\s+)?(\d+)\s*øre\s*\/\s*k(?:w|v)t/gi,
+    /(?:opptil\s+|minst\s+)?(\d+)\s*øre\*?\s*\/\s*k(?:w|v)t/gi,
   );
   const parts = [
     formatOreUnitReward(litreValues, "kr/l"),
@@ -281,7 +294,8 @@ function parseKrNumber(value: string): number {
 }
 
 export function formatRewardNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
+  // Up to two decimals: 3,75 % is not 3,8 %.
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2))).replace(".", ",");
 }
 
 function formatLocalizedNumber(value: string): string {
@@ -296,14 +310,14 @@ function parseRewardNumber(value: string | undefined): number {
 // (boligbyggelag og medlemsforeninger): prosent foretrekkes, deretter kr,
 // medlemspris og gratis.
 export function extractBenefitReward(text: string): string {
-  if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
-
   const oreLitre = extractOreLitreReward(text);
   if (oreLitre) return oreLitre;
 
   const rewardText = relevantBenefitRewardText(text);
   const percentage = extractPercentageReward(rewardText);
+  // An explicit rate ("40 % rabatt") beats a "halv pris" headline elsewhere.
   if (percentage) return percentage;
+  if (/\bhalv\s+pris\b/i.test(text)) return "50 %";
 
   const kr = extractKrReward(rewardText);
   if (kr) return kr;
@@ -336,7 +350,8 @@ export function extractBenefitReward(text: string): string {
 
 export function relevantBenefitRewardText(text: string): string {
   return text
-    .split(/[\n.;]+/)
+    // Dates and decimals ("29.06", "2.5") don't end a line.
+    .split(/(?:[\n;]|(?<!\d)\.|\.(?!\d))+/)
     .map((line) => line.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim())
     .filter((line) => {
       // Price-list lines ("Medlemspris: 10 625 kroner") state prices, not discounts.
@@ -344,7 +359,7 @@ export function relevantBenefitRewardText(text: string): string {
 
       // "Hva får du?"-lists render as bare lines like "10 % på Ekornes"
       // or "AUBO-kjøkken: 25 % rabatt".
-      if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s+(?:på|hos|i)\b|$)/i.test(line)) return true;
+      if (/^\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)(?:\s+(?:på|hos|i)(?![\p{L}\d])|$)/iu.test(line)) return true;
 
       return /\b(?:rabatt(?:er)?|medlemsrabatt|besparelse|avslag|spar|tilbud|medlemspris(?:er)?|bonus|gavekort|kostnadsfritt|verdi)\b/i.test(line) ||
         /\bhalv\s+pris\b/i.test(line);

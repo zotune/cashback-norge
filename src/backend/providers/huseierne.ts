@@ -269,8 +269,8 @@ function extractCtaDomains(text: string): string[] {
   return uniqueStrings(domains);
 }
 
-function extractHuseierneReward(text: string): string {
-  return extractBenefitReward(text);
+export function extractHuseierneReward(text: string): string {
+  return withUpToQualifier(extractBenefitReward(text), text);
 }
 
 function buildTerms(teaser: string, text: string): string {
@@ -373,4 +373,15 @@ function uniqueTextLines(lines: string[]): string[] {
     result.push(normalized);
   }
   return result;
+}
+
+// "opptil 800 kr rabatt" / "inntil 25 %" with a single stated amount is a
+// maximum, not a guaranteed value; keep the qualifier.
+function withUpToQualifier(reward: string, text: string): string {
+  const single = reward.match(/^(\d[\d ]*(?:,\d+)?) (%|kr)$/);
+  if (single === null) return reward;
+  const value = (single[1] ?? "").replace(/\s/g, "").replace(",", "[,.]");
+  const unit = single[2] === "%" ? "\\s*(?:%|prosent)" : "\\s*(?:kr|kroner|,-)";
+  const upTo = new RegExp(`\\b(?:opptil|inntil)\\s+(?:kr\\.?\\s*)?${value}${unit}`, "i");
+  return upTo.test(text.replace(/(\d)[\s.](?=\d{3}\b)/g, "$1")) ? `opptil ${reward}` : reward;
 }

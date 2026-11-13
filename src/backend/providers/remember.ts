@@ -12,6 +12,7 @@ import {
 } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
+import { isAffiliateTrackingUrl } from "./spareborsen.js";
 
 type RememberCheerio = CheerioCrawlingContext["$"];
 
@@ -64,21 +65,25 @@ export async function crawlRemember(
         return;
       }
 
-      const offer = await parseRememberOffer(
-        $,
-        loadedUrl,
-        input.overrides,
-        input.generatedAt,
-        input.logger,
-      );
+      // The listing page embeds every store with the same data as its own
+      // page, so one request covers the whole catalogue. Following ~200
+      // store links instead ran into maxRequestsPerCrawl and dropped stores.
+      const listedStores = extractListedRememberStores($);
+
+      if (listedStores.length > 0) {
+        for (const store of listedStores) {
+          const offer = await buildRememberOffer(store, loadedUrl, input.overrides, input.generatedAt, input.logger);
+          if (offer !== undefined) offers.push(offer);
+        }
+        return;
+      }
+
+      const store = extractRememberStore($);
+      const offer = store === undefined
+        ? undefined
+        : await buildRememberOffer(store, loadedUrl, input.overrides, input.generatedAt, input.logger);
 
       if (offer !== undefined) {
-        if (offer.domains.length === 0) {
-          input.logger.warn(
-            `re:member offer has no domains and needs override: ${loadedUrl}`,
-          );
-        }
-
         offers.push(offer);
         return;
       }
@@ -93,24 +98,25 @@ export async function crawlRemember(
   return uniqueOffers(offers);
 }
 
-async function parseRememberOffer(
-  $: RememberCheerio,
+async function buildRememberOffer(
+  store: RememberStore,
   loadedUrl: string,
   overrides: ProviderOverrides,
   generatedAt: string,
   logger: Logger,
 ): Promise<CashbackOffer | undefined> {
-  const store = extractRememberStore($);
-
-  if (store === undefined) {
-    return undefined;
-  }
-
   const sourceUrl = parseUrlWithBase(store.shopUrl, loadedUrl)?.toString() ?? loadedUrl;
+  const directDeal = isDirectDeal(store);
   const overrideDomains = overrides.remember[store.slug] ?? [];
   let domains: string[];
 
-  if (overrideDomains.length > 0) {
+  if (directDeal) {
+    // Direct Deals are bought in Awardit's deal shop (the store's
+    // affiliateUrl, deals.awardit.com) with the re:member card. The brand's
+    // own web shop gives neither the price reduction nor a reward, so the
+    // offer must not be shown there.
+    domains = [];
+  } else if (overrideDomains.length > 0) {
     domains = overrideDomains;
   } else {
     const inferredDomains = inferStoreDomains(store);
@@ -121,14 +127,21 @@ async function parseRememberOffer(
     ]);
   }
 
-  const reward = extractReward(store);
+  // A Direct Deal without an amount is a price reduction on selected
+  // products ("rabatterte varer, ikke en reward-rabatt"): a discount of
+  // unstated size, not an unknown reward.
+  const reward = extractReward(store) || (directDeal ? "Rabatt" : "");
 
-  // "Direct Deals" entries without commission data have neither a reward nor
-  // usable domains; they only produce junk "?"-cards on the site.
   if (reward === "" && domains.length === 0) {
     logger.info(`re:member: skipping ${store.name} (no reward and no domains)`);
     return undefined;
   }
+
+  if (domains.length === 0 && !directDeal) {
+    logger.warn(`re:member offer has no domains and needs override: ${sourceUrl}`);
+  }
+
+  const terms = extractTerms(store);
 
   return {
     provider: "remember",
@@ -137,27 +150,42 @@ async function parseRememberOffer(
     reward,
     sourceUrl,
     activationUrl: sourceUrl,
-    terms: extractTerms(store),
+    terms: directDeal
+      ? [DIRECT_DEAL_NOTE, terms === DEFAULT_TERMS ? "" : terms].filter(Boolean).join("\n")
+      : terms,
     updatedAt: generatedAt,
   };
 }
 
-function extractRememberStore($: RememberCheerio): RememberStore | undefined {
+const DEFAULT_TERMS = "Krever innlogging i re:member reward og betaling med re:member-kortet.";
+const DIRECT_DEAL_NOTE =
+  "re:member Direct Deals: rabatterte utvalgte varer som kjøpes via re:member reward i Awardits tilbudsbutikk (deals.awardit.com) og betales med re:member-kortet. Gjelder ikke i merkets egen nettbutikk.";
+
+function isDirectDeal(store: RememberStore): boolean {
+  const host = parseUrl(store.affiliateUrl)?.hostname.toLowerCase() ?? "";
+  return host === "deals.awardit.com" || host.endsWith(".deals.awardit.com");
+}
+
+function extractListedRememberStores($: RememberCheerio): RememberStore[] {
+  const pageProps = readNextPageProps($);
+  if (!Array.isArray(pageProps?.stores)) return [];
+  return pageProps.stores.flatMap((value) => {
+    if (isRecord(value) && value.enabled === false) return [];
+    const store = parseRememberStore(value);
+    return store === undefined ? [] : [store];
+  });
+}
+
+function readNextPageProps($: RememberCheerio): Record<string, unknown> | undefined {
   const nextDataText = $("#__NEXT_DATA__").first().text();
-
-  if (nextDataText.length === 0) {
-    return undefined;
-  }
-
+  if (nextDataText.length === 0) return undefined;
   const nextData = parseJson(nextDataText);
+  if (!isRecord(nextData)) return undefined;
+  return asRecord(asRecord(nextData.props)?.pageProps);
+}
 
-  if (!isRecord(nextData)) {
-    return undefined;
-  }
-
-  const props = asRecord(nextData.props);
-  const pageProps = asRecord(props?.pageProps);
-  return parseRememberStore(pageProps?.store);
+function extractRememberStore($: RememberCheerio): RememberStore | undefined {
+  return parseRememberStore(readNextPageProps($)?.store);
 }
 
 function parseRememberStore(value: unknown): RememberStore | undefined {
@@ -234,7 +262,7 @@ function normalizeResolvedMerchantDomain(hostname: string): string {
   const normalizedDomain = normalizeDomainInput(hostname);
   const parts = normalizedDomain.split(".");
   const firstPart = parts[0] ?? "";
-  const affiliateSubdomainPrefixes = ["at", "go", "in", "ion", "pin", "dot", "do", "id", "on", "to", "track", "click", "link", "out", "no-pin"];
+  const affiliateSubdomainPrefixes = ["at", "go", "in", "ion", "pin", "dot", "do", "id", "on", "to", "track", "click", "link", "out", "no-pin", "visit"];
 
   if (
     parts.length > 2 &&
@@ -254,7 +282,11 @@ async function resolveAffiliateRedirectUrl(
 ): Promise<string | undefined> {
   const currentUrl = parseUrl(url);
 
-  if (currentUrl !== undefined && !isTrackingHostname(currentUrl.hostname)) {
+  if (
+    currentUrl !== undefined &&
+    !isTrackingHostname(currentUrl.hostname) &&
+    !isAffiliateTrackingUrl(currentUrl)
+  ) {
     return currentUrl.toString();
   }
 
@@ -492,7 +524,7 @@ function extractTerms(store: RememberStore): string {
 
   return (
     [...commissionLines, prose].filter((part) => part.length > 0).join("\n") ||
-    "Requires re:member reward login and payment with a re:member card."
+    DEFAULT_TERMS
   );
 }
 
@@ -576,6 +608,10 @@ function formatRewardNumber(value: number): string {
 
 function isTrackingHostname(hostname: string): boolean {
   const normalizedHostname = normalizeDomainInput(hostname);
+  const parsedHost = parseUrl(`https://${normalizedHostname}/`);
+  if (parsedHost !== undefined && isAffiliateTrackingUrl(parsedHost)) {
+    return true;
+  }
   const trackingDomains = [
     "adrecord.com",
     "adtraction.com",

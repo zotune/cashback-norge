@@ -29,6 +29,9 @@ const MAX_LISTING_ROUNDS = 6;
 
 const SKIP_HOSTNAMES = new Set([
   "studenttorget.no",
+  // Expired Squarespace site shared by three unrelated Hamar businesses
+  // (Café Grande, Kari Sofie, Klatrepark1); it identifies none of them.
+  "kompanibliss.no",
   "facebook.com",
   "instagram.com",
   "twitter.com",

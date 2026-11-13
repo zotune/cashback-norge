@@ -1,12 +1,1 @@
-[
-  {
-    "provider": "klarna",
-    "merchantName": "Farmasiet",
-    "domains": ["farmasiet.no"],
-    "reward": "4 %",
-    "sourceUrl": "https://www.klarna.com/no/store/",
-    "activationUrl": "https://www.klarna.com/no/store/",
-    "terms": "Cashback i Klarna-appen. Krever Klarna-saldo og følger Klarnas cashback-vilkår.",
-    "updatedAt": "2026-05-01T00:00:00.000Z"
-  }
-]
+[]

@@ -4,6 +4,7 @@
 // variants. The id used to live in the client bundle as a full shop map, but
 // rabatta.app moved that lookup server side in August 2026.
 import {
+  decodeHtmlEntities,
   isRecord,
   normalizeDomainInput,
   type CashbackOffer,
@@ -221,7 +222,32 @@ export function parseShopPageConfig(
     candidates.push(config);
   }
 
-  return candidates[0];
+  return candidates[0] ?? parseWebshopIdRoute(html, slug);
+}
+
+// Since November 2026 the shop route is /no/shops/$webshopId: the sitemap
+// slug is the numeric webshop id and the page links it as
+// r.rabatta.app/webshop/v1?webshopId=<id>. The id is only accepted when the
+// page's canonical URL and its shop link both name it.
+function parseWebshopIdRoute(
+  html: string,
+  slug: string,
+): NorwegianShopConfig | undefined {
+  if (!/^\d+$/.test(slug)) return undefined;
+  const webshopId = Number.parseInt(slug, 10);
+  if (!Number.isSafeInteger(webshopId) || webshopId <= 0) return undefined;
+
+  const canonical = html.match(/<link[^>]+rel="canonical"[^>]+href="([^"]+)"/i)?.[1] ?? "";
+  if (!new RegExp(`/no/shops/${slug}/?$`).test(canonical)) return undefined;
+  if (!new RegExp(`[?&](?:amp;)?webshopId=${slug}(?:[&"]|$)`).test(html)) return undefined;
+
+  const heading = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? "";
+  const displayName = decodeHtmlEntities(heading.replace(/<[^>]+>/g, ""))
+    .replace(/(?:\s+|-)rabatt(?:kode|koder)\b[\s\S]*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { displayName: displayName || formatMerchantName(slug), slug, webshopId };
 }
 
 function dedupeShopConfigs(

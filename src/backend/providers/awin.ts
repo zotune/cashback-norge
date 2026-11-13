@@ -7,8 +7,10 @@ import {
   stripHtml,
   uniqueOffers,
   uniqueStrings,
+  parseUrl,
 } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
+import { isAffiliateTrackingUrl } from "../merchant-domains.js";
 
 /**
  * Awin offers share the cbn provider with other networks. Their tracking links
@@ -305,7 +307,8 @@ function normalizeProgrammeDomain(value: string): string | undefined {
     !domain.includes(".") ||
     domain === "awin.com" ||
     domain === "awin1.com" ||
-    domain.endsWith(".awin1.com")
+    domain.endsWith(".awin1.com") ||
+    isNonShopProgrammeHost(domain)
   ) {
     return undefined;
   }
@@ -313,8 +316,22 @@ function normalizeProgrammeDomain(value: string): string | undefined {
   return domain;
 }
 
+// validDomains also lists tracking and app-link hosts (multitudebankplc.pxf.io,
+// voghion-affiliate.onelink.me) and Shopify's internal *.myshopify.com store
+// hosts. Shoppers never browse these as the shop, so they are not its domains.
+function isNonShopProgrammeHost(domain: string): boolean {
+  const url = parseUrl(`https://${domain}/`);
+  return (url !== undefined && isAffiliateTrackingUrl(url)) ||
+    domain === "onelink.me" || domain.endsWith(".onelink.me") ||
+    domain.endsWith(".myshopify.com");
+}
+
 function extractMerchantDomain(url: string): string | undefined {
   if (!url) return undefined;
+  // Click hosts (nespresso.prf.hn, go.nordvpn.net/aff_c?offer_id=…,
+  // multitudebankplc.pxf.io) forward to the shop but are not its domain.
+  const parsedUrl = parseUrl(url.includes("://") ? url : `https://${url}`);
+  if (parsedUrl !== undefined && isAffiliateTrackingUrl(parsedUrl)) return undefined;
 
   const domain = normalizeDomainInput(url);
   if (!domain.includes(".") || domain === "awin.com" || domain === "awin1.com") {
@@ -504,7 +521,10 @@ function cleanText(value: string): string {
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1).trim()}...`;
+  // Cut at a word boundary; never leave half a word in the tooltip.
+  const cut = value.slice(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
 function uniquePreserveOrder(values: string[]): string[] {

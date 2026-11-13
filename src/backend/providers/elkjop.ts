@@ -11,7 +11,7 @@ import {
 } from "../../shared/cashback.js";
 import {
   extractKrReward,
-  extractPercentageReward,
+  extractUpToPercentageReward,
   formatRewardNumber,
 } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
@@ -105,14 +105,17 @@ export async function crawlElkjop(input: CrawlElkjopInput): Promise<CashbackOffe
       ...raw.domains,
     ].map(normalizeDomainInput));
 
-    if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, raw.merchantName);
-      if (domains.length > 0) lookupCount++;
-    }
-
+    // The verified per-merchant domains go before the name lookup: a fuzzy
+    // name match can carry another source's wrong host (Storytel got
+    // outlook.com from a contact address elsewhere).
     if (domains.length === 0) {
       domains = FALLBACK_DOMAINS[raw.slug] ?? [];
       if (domains.length > 0) fallbackCount++;
+    }
+
+    if (domains.length === 0) {
+      domains = lookupDomains(input.domainLookup, raw.merchantName);
+      if (domains.length > 0) lookupCount++;
     }
 
     domains = uniqueStrings(domains.map(normalizeDomainInput));
@@ -205,18 +208,26 @@ function cleanImageMerchantLabel(value: string): string {
   return cleaned;
 }
 
-function extractElkjopReward(text: string): string {
-  const percentageReward = extractPercentageReward(text);
+export function extractElkjopReward(text: string): string {
+  const percentageReward = extractUpToPercentageReward(text);
   if (percentageReward) return percentageReward;
 
-  const krReward = extractKrReward(text);
-  if (krReward) return krReward;
+  // Partner savings are money off, never a price the member pays. "Spar
+  // opptil 1299,-" is a maximum: keep the qualifier on the highest amount
+  // instead of a range between the card's heading and description.
+  const krReward = extractKrReward(text, { totalsum: false });
+  if (krReward) {
+    const max = krReward.match(/^(?:[\d\s,]+-)?([\d\s,]+ kr)$/)?.[1];
+    return UP_TO_KR_PATTERN.test(text) && max !== undefined ? `opptil ${max.trim()}` : krReward;
+  }
 
   const offerPrice = extractOfferPriceReward(text);
   if (offerPrice) return offerPrice;
 
   return extractFreePeriodReward(text);
 }
+
+const UP_TO_KR_PATTERN = /\b(?:opptil|opp\s+til|inntil)\s+(?:kr\.?\s*)?\d[\d\s]*(?:[,.]\d+)?\s*(?:kroner|kr\b|,-|-)/i;
 
 function extractOfferPriceReward(text: string): string {
   const match = text.match(

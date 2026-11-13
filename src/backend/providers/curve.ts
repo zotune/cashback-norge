@@ -35,6 +35,8 @@ export function fetchCurve(input: FetchCurveInput): CashbackOffer[] {
   return offers;
 }
 
+// Checked against the help page's retailer logos on 2026-11-13; IKEA is no
+// longer listed there.
 const CURVE_RETAILERS: CurveRetailer[] = [
   // Bills / Telecom
   { name: "Telia", domains: ["telia.no", "telia.se"] },
@@ -93,7 +95,6 @@ const CURVE_RETAILERS: CurveRetailer[] = [
   { name: "Gap", domains: ["gap.com"] },
   { name: "H&M", domains: ["hm.com"] },
   { name: "HBO Max", domains: ["max.com"] },
-  { name: "IKEA", domains: ["ikea.com", "ikea.no"] },
   { name: "JD Sports", domains: ["jdsports.no", "jdsports.com"] },
   { name: "Media Markt", domains: ["mediamarkt.no", "mediamarkt.com"] },
   { name: "New Look", domains: ["newlook.com"] },

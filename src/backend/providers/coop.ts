@@ -89,12 +89,14 @@ const MANUAL_OFFERS: Record<string, CoopManualOffer> = {
   "coop-billetten": {
     merchantName: "Coop-billetten",
     domains: ["toppserien.no", "eliteserien.no"],
-    reward: "50-100 kr",
+    // The member pays at most 100 kr (adult) / 50 kr (child): a price, not
+    // money off.
+    reward: "50-100 kr totalsum",
     terms: [
       "Krever Coop-medlemskap.",
-      "Maks 100 kr voksenbillett og 50 kr barnebillett på Toppserien og Eliteserien.",
-      "Kjøpes i klubbens digitale billettløsning via Coop-fordelen.",
-      "Vis Coop-medlemskort ved inngang.",
+      "Kampbilletter til maks 100 kr (voksen) og 50 kr (barn) på Toppserien og Eliteserien.",
+      "Kjøpes i klubbens digitale billettløsning med Coops promokode ved bestilling på nett.",
+      "Vis Coop-medlemskort eller Coop-appen ved inngang.",
     ],
   },
   hotellkupp: {
@@ -181,13 +183,21 @@ export async function crawlCoop(input: CrawlCoopInput): Promise<CashbackOffer[]>
       continue;
     }
 
-    const reward = manual?.reward ?? buildReward(summary, text, slug);
+    // A maintained reward is only used while the live page still states its
+    // amounts; a changed campaign (Hotellkupp went from 50 kr per booking to
+    // 100 kr per night) falls back to the page's own text and terms.
+    const manualStillStated = manual?.reward === undefined || isCoopRewardStated(manual.reward, text);
+    if (!manualStillStated) {
+      input.logger.warn(`Coop: maintained reward "${manual?.reward}" for ${slug} no longer on ${summary.url}; using the page text`);
+    }
+    const reward = (manualStillStated ? manual?.reward : undefined) ?? buildReward(summary, text, slug);
     if (!reward) {
       skippedNoReward++;
       continue;
     }
 
     const sourceUrl = new URL(summary.url, BASE_URL).toString();
+    const discountCode = extractCoopDiscountCode(text);
 
     offers.push({
       provider: "coop",
@@ -196,7 +206,8 @@ export async function crawlCoop(input: CrawlCoopInput): Promise<CashbackOffer[]>
       reward,
       sourceUrl,
       activationUrl: sourceUrl,
-      terms: buildTerms(summary, textLines, manual),
+      terms: buildTerms(summary, textLines, manualStillStated ? manual : undefined),
+      ...(discountCode !== undefined ? { discountCode } : {}),
       updatedAt: input.generatedAt,
     });
   }
@@ -280,7 +291,9 @@ function buildReward(summary: CoopPageSummary, text: string, slug: string): stri
     if (ore) return ore;
   }
 
-  const kr = extractKrReward(rewardSource);
+  // Member savings are money off; a monthly price ("48 kr i månedspris")
+  // must not become the reward.
+  const kr = extractKrReward(rewardSource, { totalsum: false });
   if (kr) return kr;
 
   const pct = extractPercentageReward(rewardSource);
@@ -377,7 +390,7 @@ function buildTerms(
     .filter((line) => line.length > 0)
     .filter((line) => /(?:rabatt|bonus|kode|promokode|medlemskort|bestill|automatisk|gjelder|forutsetter|må|maks|avslag|kombineres|kjøpes)/i.test(line))
     .filter((line) => !containsExplicitDiscountCodeLine(line))
-    .filter((line) => !/^(bli medlem|allerede medlem|logg inn|meld deg inn|les mer|bestill her|les mer og bestill her|logg inn og bestill her)$/i.test(line))
+    .filter((line) => !/^(bli medlem|allerede medlem|logg inn|meld deg inn|les mer|bestill(?: [a-zæøå]+)? (?:her|nå)|les mer og bestill her|logg inn og bestill her)[.!]?$/i.test(line))
     .filter((line) => !/^coop medlem:?$/i.test(line));
 
   for (const line of relevantLines) {
@@ -402,10 +415,31 @@ function cleanTermLine(line: string): string {
 }
 
 function splitSentences(text: string): string[] {
+  // "innen 6. mars" is a date, not a sentence end.
   return text
-    .split(/(?<=[.!?])\s+|\n+/)
+    .split(/(?<!\b\d{1,2}\.)(?<=[.!?])\s+|\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+const COOP_DISCOUNT_CODE_PATTERN = /(?:rabattkode|promokode|promo-kode|kampanjekode)\s*[:«"“]\s*([a-z0-9æøå-]{3,30})/i;
+
+export function extractCoopDiscountCode(text: string): string | undefined {
+  return COOP_DISCOUNT_CODE_PATTERN.exec(text)?.[1];
+}
+
+// Every amount in a maintained reward must still appear on the page. Litre
+// rewards are written in øre on the page ("45 øre"), the reward in kr/l.
+export function isCoopRewardStated(reward: string, text: string): boolean {
+  const perLitre = /kr\/l\b/i.test(reward);
+  const amounts = [...reward.matchAll(/\d[\d\s]*(?:,\d+)?/g)]
+    .map((match) => Number.parseFloat(match[0].replace(/\s/g, "").replace(",", ".")))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .map((value) => Math.round(perLitre ? value * 100 : value));
+  if (amounts.length === 0) return true;
+  const pageNumbers = new Set([...text.matchAll(/\d[\d .]*\d|\d/g)]
+    .map((match) => Number.parseInt(match[0].replace(/[\s.]/g, ""), 10)));
+  return amounts.every((amount) => pageNumbers.has(amount));
 }
 
 function containsExplicitDiscountCodeLine(line: string): boolean {

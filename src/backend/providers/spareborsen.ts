@@ -7,7 +7,7 @@ import {
   normalizeDomainInput,
   uniqueOffers,
 } from "../../shared/cashback.js";
-import { formatPercentageReward } from "../../shared/reward.js";
+import { formatPercentageReward, formatRewardNumber } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 
 const API_URLS = [
@@ -31,6 +31,8 @@ type SpareborsenPartner = {
   cashbackPercent: number;
   cashbackType: "percentage" | "fixed";
   cashbackCurrency: string | null;
+  /** Sparebørsen's own conditions (new customers only, one-off bonus, …). */
+  customTerms?: string | null;
   active: boolean;
   segments: SpareborsenSegment[];
   /** The ordinary rate while a campaign raises cashbackPercent. */
@@ -43,6 +45,8 @@ export type FetchSpareborsenInput = {
   logger: Logger;
   /** Local verification only. */
   apiUrls?: string[];
+  /** Verified merchant domains by partner slug (data/provider-overrides.json). */
+  overrides?: Record<string, string[]>;
 };
 
 export async function fetchSpareborsen(
@@ -56,10 +60,16 @@ export async function fetchSpareborsen(
   const offers: CashbackOffer[] = [];
 
   for (const partner of partners) {
-    const domain = extractDomain(partner.websiteUrl);
-    if (!domain) {
+    const domains = partnerDomains(partner, input.overrides?.[partner.slug]);
+    if (domains === undefined) {
       input.logger.warn(`Sparebørsen: no domain for ${partner.name} (${partner.websiteUrl})`);
       continue;
+    }
+    if (domains.length === 0) {
+      // The partner's "websiteUrl" is sometimes an affiliate click URL
+      // (iherb.prf.hn, go.nordvpn.net/aff_c). Its host is not the shop, and
+      // other providers borrow these domains by merchant name.
+      input.logger.warn(`Sparebørsen: ${partner.name} links to a tracking URL (${partner.websiteUrl}); keeping the offer without domains`);
     }
 
     const reward = buildReward(partner);
@@ -73,8 +83,8 @@ export async function fetchSpareborsen(
 
     offers.push({
       provider: "spareborsen",
-      merchantName: partner.name,
-      domains: [domain],
+      merchantName: cleanMerchantName(partner.name),
+      domains,
       reward,
       sourceUrl,
       activationUrl: sourceUrl,
@@ -144,30 +154,55 @@ function readPartnersResponse(value: unknown): SpareborsenPartner[] {
   return data.partners as SpareborsenPartner[];
 }
 
-function extractDomain(websiteUrl: string): string | null {
+/** Undefined = unusable URL; [] = affiliate tracking URL without a shop domain. */
+function partnerDomains(partner: SpareborsenPartner, overrideDomains: string[] | undefined): string[] | undefined {
+  if (overrideDomains !== undefined && overrideDomains.length > 0) return overrideDomains;
+
+  let url: URL;
   try {
-    const url = new URL(websiteUrl);
-    return normalizeDomainInput(url.hostname);
+    url = new URL(partner.websiteUrl);
   } catch {
-    return null;
+    return undefined;
   }
+
+  if (isAffiliateTrackingUrl(url)) return [];
+  const domain = normalizeDomainInput(url.hostname);
+  return domain ? [domain] : undefined;
+}
+
+// Shared with the other adapters; re-exported for existing imports.
+import { isAffiliateTrackingUrl } from "../merchant-domains.js";
+export { isAffiliateTrackingUrl };
+
+// Some partner names carry a tagline ("Nordhost - Hosting på norsk siden
+// 1999"). A suffix with ordinary lowercase words is a description, while a
+// name part such as "Barnas Bokverden - Tanum Bokklubber" is kept.
+function cleanMerchantName(name: string): string {
+  const trimmed = name.replace(/\s+/g, " ").trim();
+  const match = trimmed.match(/^(.+?)\s+[-–]\s+(.+)$/);
+  if (match?.[1] && match[2] && /(?:^|\s)(?:og|på|for|med|til|siden|i|av)(?:\s|$)/.test(match[2])) {
+    return match[1].trim();
+  }
+  return trimmed;
 }
 
 function buildReward(partner: SpareborsenPartner): string {
-  if (partner.cashbackType === "fixed") {
-    const value = partner.cashbackPercent;
-    return value > 0 ? `${value} kr` : "";
-  }
-
-  // percentage type
+  // Segments are the rates Sparebørsen shows per purchase type ("Nye kunder
+  // 5,7 %", "1-8 GB 150 kr"); the partner-level value is only one of them.
   const values = partner.segments
-    .filter((s) => s.cashbackType === "percentage")
+    .filter((s) => s.cashbackType === partner.cashbackType && Number.isFinite(s.cashbackValue) && s.cashbackValue > 0)
     .map((s) => s.cashbackValue);
+  if (values.length === 0 && Number.isFinite(partner.cashbackPercent) && partner.cashbackPercent > 0) {
+    values.push(partner.cashbackPercent);
+  }
+  if (values.length === 0) return "";
 
-  if (values.length === 0) {
-    return partner.cashbackPercent > 0
-      ? `${partner.cashbackPercent} %`
-      : "";
+  if (partner.cashbackType === "fixed") {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return min < max
+      ? `${formatRewardNumber(min)}-${formatRewardNumber(max)} kr`
+      : `${formatRewardNumber(max)} kr`;
   }
 
   return formatPercentageReward(values);
@@ -176,7 +211,7 @@ function buildReward(partner: SpareborsenPartner): string {
 function buildTerms(partner: SpareborsenPartner): string {
   const lines = partner.segments.length <= 1 ? [] : partner.segments.map((s) => {
     if (s.cashbackType === "fixed") {
-      return `${s.cashbackValue} kr – ${s.name}`;
+      return `${formatRewardNumber(s.cashbackValue)} kr – ${s.name}`;
     }
     return `${formatPercentageReward([s.cashbackValue])} – ${s.name}`;
   });
@@ -186,12 +221,18 @@ function buildTerms(partner: SpareborsenPartner): string {
   const base = partner.baseCashbackPercent;
   const campaign = partner.cashbackType === "percentage" && partner.campaignApplies === true &&
     typeof base === "number" && Number.isFinite(base) && base >= 0 && base < partner.cashbackPercent;
-  // With several segments the API gives one base rate, not one per segment.
-  const campaignLine = !campaign ? "" : partner.segments.length > 1
+  // The API gives one base rate for the partner-level value. It only states
+  // the ordinary rate of the reward when that reward is the partner value;
+  // with several segments, or a segment rate that differs from it, the
+  // tooltip says that the rates are raised without naming a number.
+  const single = partner.segments.length === 0 ||
+    (partner.segments.length === 1 && partner.segments[0]?.cashbackValue === partner.cashbackPercent);
+  const campaignLine = !campaign ? "" : !single
     ? "Forhøyede kampanjesatser hos Sparebørsen. Kampanjen er tidsbegrenset."
     : `Forhøyet kampanjesats hos Sparebørsen: +${formatPercentageReward([Math.round((partner.cashbackPercent - base) * 100) / 100]).replace(" %", "")} prosentpoeng. Vanlig sats: ${formatPercentageReward([base])}. Kampanjen er tidsbegrenset.`;
+  const customTerms = typeof partner.customTerms === "string" ? partner.customTerms.replace(/\s+/g, " ").trim() : "";
 
-  return [lines.join("\n"), campaignLine].filter(Boolean).join("\n\n");
+  return [lines.join("\n"), customTerms, campaignLine].filter(Boolean).join("\n\n");
 }
 
 function sleep(ms: number): Promise<void> {

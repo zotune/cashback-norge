@@ -218,3 +218,11 @@ test("Spenn's extension is desktop-only; mobile browsers use the Spenn app", () 
   assert.equal(isMobileBrowser({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36", platform: "MacIntel", maxTouchPoints: 0 }), false);
   assert.ok(SPENN_EXTENSION_TERMS.includes("nettleserutvidelse"));
 });
+
+test("Spenn's catalogue host with a lost xn-- prefix is restored only for the merchant's own name", async () => {
+  const { repairPunycodeHost } = await import("../src/backend/providers/spenn.js");
+  assert.equal(repairPunycodeHost("smungene-b0a.no", "Småungene"), "xn--smungene-b0a.no");
+  assert.equal(repairPunycodeHost("smungene-b0a.no", "Babyshop"), "smungene-b0a.no");
+  assert.equal(repairPunycodeHost("ellos-shop.no", "Ellos"), "ellos-shop.no");
+  assert.equal(repairPunycodeHost("xn--smungene-b0a.no", "Småungene"), "xn--smungene-b0a.no");
+});

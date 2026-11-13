@@ -133,7 +133,7 @@ export const PROVIDER_TIPS: Record<string, string> = {
   spenn: "Spenn (Strawberry).\nGratis poeng-program.\n1 Spenn = 10 øre. Bruk på Norwegian, Strawberry, Uno-X m.fl.",
   spareborsen: "Sparebørsen.\nGratis cashback — få prosent av kjøpet tilbake.\nKlikk via spareborsen.no til butikken.",
   rabble: "Rabble.\nGratis cashback-app.\nKlikk via rabble.no til butikken for å tjene cashback.",
-  dreams: "Dreams.\nGratis spare-app med cashback.\nAktiver cashback via Dreams-appen.",
+  dreams: "Dreams.\nSpare-app med cashback (29 kr/mnd, 30 dager gratis for nye brukere).\nAktiver cashback via Dreams-appen.",
   utdanningibergen: "Utdanning i Bergen.\nStudentrabatter i Bergen.\nVis gyldig studentbevis for rabatt.",
   unidays: "UNiDAYS studentrabatter.\nGratis for studenter.\nLogg inn med UNiDAYS-konto for å aktivere.",
   gratisbursdag: "Bursdagsgaver og bursdagsrabatter fra gratisbursdag.no.\nKan kreve kundeklubb, app eller registrert fødselsdato.\nSe vilkår, gyldighet og bekreftelsesstatus for hvert tilbud.",

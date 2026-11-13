@@ -3,12 +3,14 @@
 import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
+  decodeHtmlEntities,
   normalizeDomainInput,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractUpToPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
+import { isNonMerchantHost } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -84,7 +86,10 @@ export async function crawlRabble(
 
     // 3. Fall back to domain lookup
     if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, brand.name);
+      // Name lookups can return other providers' tracking or contact
+      // hosts (Storytel → outlook.com); they never identify the shop.
+      domains = lookupDomains(input.domainLookup, brand.name)
+        .filter((domain) => !isNonMerchantHost(domain));
       if (domains.length > 0) fromLookup++;
     }
 
@@ -147,7 +152,7 @@ async function fetchBrandList(): Promise<RabbleBrand[]> {
 
   for (const match of html.matchAll(cardPattern)) {
     const detailPath = match[1] ?? "";
-    const name = (match[2] ?? "").trim();
+    const name = decodeHtmlEntities(match[2] ?? "").trim();
     const reward = (match[3] ?? "").trim();
 
     if (!detailPath || !name || seen.has(detailPath)) continue;
@@ -236,7 +241,8 @@ function buildReward(listReward: string, detail?: RabbleDetail): string {
     );
     if (positiveKcs.length > 0) {
       const allValues = positiveKcs.map((kc) => kc.value).join(" / ");
-      const pctReward = extractPercentageReward(allValues);
+      // "Generell: Opptil 8%" states a maximum, not a guaranteed rate.
+      const pctReward = extractUpToPercentageReward(allValues);
       if (pctReward) return pctReward;
 
       const krReward = extractKrReward(allValues, { totalsum: false });
@@ -251,7 +257,7 @@ function buildReward(listReward: string, detail?: RabbleDetail): string {
   // Fallback: parse from list reward text like "Opptil 3% cashback" or "10% / 50 kr cashback"
   const source = listReward.replace(/\s*cashback\s*/gi, " ").trim();
 
-  const pctReward = extractPercentageReward(source);
+  const pctReward = extractUpToPercentageReward(source);
   if (pctReward) return pctReward;
 
   const krReward = extractKrReward(source, { totalsum: false });

@@ -531,7 +531,7 @@ async function main(): Promise<void> {
       label: "Sparebørsen",
       provider: "spareborsen",
       run: () => fetchSpareborsen({
-        generatedAt, logger,
+        generatedAt, logger, overrides: providerOverrides.spareborsen ?? {},
       }),
     }),
     config.skipDreams ? Promise.resolve([]) : collectOffers({
@@ -541,7 +541,7 @@ async function main(): Promise<void> {
       provider: "dreams",
       reusePreviousOnFailure: true,
       run: () => fetchDreams({
-        generatedAt, logger,
+        generatedAt, logger, overrides: providerOverrides.dreams ?? {},
       }),
     }),
     config.skipUtdanningibergen ? Promise.resolve([]) : collectOffers({
@@ -551,12 +551,15 @@ async function main(): Promise<void> {
       maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       reusePreviousOnFailure: true,
       run: () => fetchUtdanningiBergen({
-        generatedAt, logger,
+        generatedAt, logger, overrides: providerOverrides.utdanningibergen ?? {},
       }),
     }),
     config.skipUnidays ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
       label: "UNiDAYS",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       provider: "unidays",
+      reusePreviousOnFailure: true,
       run: () => fetchUnidays({
         generatedAt, logger,
       }),
@@ -617,7 +620,7 @@ async function main(): Promise<void> {
       label: "Tradedoubler",
       provider: "cbn",
       run: () => fetchTradedoubler({
-        generatedAt, logger,
+        generatedAt, logger, overrides: providerOverrides.tradedoubler ?? {},
       }),
     }),
   ]);
@@ -720,7 +723,10 @@ async function main(): Promise<void> {
       label: "Rabattkode",
       provider: "rabattkode", reusePreviousOnFailure: true,
       maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
-      run: () => crawlRabattkode(),
+      // The "rabattkode" key is shared with CupoNation, TrustDeals, Kickback,
+      // Rabatta, FinnKupongkoder and BOB codes; only reuse Rabattkode's own.
+      previousOfferFilter: (offer) => !isOtherCodeSourceOffer(offer),
+      run: () => crawlRabattkode({ generatedAt, logger }),
     }),
     config.skipCuponation ? Promise.resolve([]) : collectOffers({
       label: "CupoNation",
@@ -811,8 +817,11 @@ async function main(): Promise<void> {
       }),
     }),
     config.skipStudentkortet ? Promise.resolve([]) : collectOffers({
+      fallbackWhenEmpty: true,
       label: "Studentkortet",
+      maxPreviousOfferAgeDays: STALE_PROVIDER_FALLBACK_MAX_AGE_DAYS,
       provider: "studentkortet",
+      reusePreviousOnFailure: true,
       run: () => crawlStudentkortet({
         domainLookup, generatedAt, logger,
         overrides: providerOverrides, startUrl: config.studentkortetStartUrl,
@@ -1526,4 +1535,11 @@ async function readPreviousOffersByProvider(
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+const OTHER_CODE_SOURCE_HOSTS = ["trustdeals.no", "cuponation.no", "kickback.no", "bob.no", "rabatta.app", "finnkupongkoder.no"];
+
+function isOtherCodeSourceOffer(offer: CashbackOffer): boolean {
+  const host = parseUrl(offer.sourceUrl)?.hostname.replace(/^www\./, "") ?? "";
+  return OTHER_CODE_SOURCE_HOSTS.some((source) => host === source || host.endsWith(`.${source}`));
 }

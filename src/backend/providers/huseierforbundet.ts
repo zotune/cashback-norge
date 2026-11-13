@@ -269,7 +269,9 @@ export async function fetchHuseierforbundet(
       ),
       // Detail pages are more specific and are maintained independently of
       // their card teasers, so prefer the detail value when the two disagree.
-      reward: detailReward || teaserReward || "Medlemsfordel",
+      reward: detailReward
+        ? withUpToQualifier(detailReward, text)
+        : teaserReward ? withUpToQualifier(teaserReward, entry.teaser) : "Medlemsfordel",
       sourceUrl: entry.sourceUrl,
       // The official detail page contains the member-specific activation route.
       // Linking there also avoids leaking tracking parameters or codes from partner links.
@@ -919,4 +921,15 @@ function uniqueTextLines(lines: string[]): string[] {
   }
 
   return result;
+}
+
+// "opptil 800 kr rabatt" / "inntil 25 %" with a single stated amount is a
+// maximum, not a guaranteed value; keep the qualifier.
+function withUpToQualifier(reward: string, text: string): string {
+  const single = reward.match(/^(\d[\d ]*(?:,\d+)?) (%|kr)$/);
+  if (single === null) return reward;
+  const value = (single[1] ?? "").replace(/\s/g, "").replace(",", "[,.]");
+  const unit = single[2] === "%" ? "\\s*(?:%|prosent)" : "\\s*(?:kr|kroner|,-)";
+  const upTo = new RegExp(`\\b(?:opptil|inntil)\\s+(?:kr\\.?\\s*)?${value}${unit}`, "i");
+  return upTo.test(text.replace(/(\d)[\s.](?=\d{3}\b)/g, "$1")) ? `opptil ${reward}` : reward;
 }

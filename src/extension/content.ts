@@ -1,3 +1,4 @@
+import { hostnameDisplayLabel, toUnicodeHostname } from "../shared/hostname-label.js";
 import { createTooltipSection, setTooltipContent } from "../shared/tooltip-content";
 import { createAutomaticComparison } from "./automatic-comparison";
 import { createStoredTrustpilotClient } from "./trustpilot-client";
@@ -70,7 +71,7 @@ import { createContentScriptContextGuard } from "./runtime-context";
 import { createMutedChip } from "../shared/ui";
 import { BRAND_LOGO_DATA_URL, BRAND_QUOKKA_DATA_URL, BRAND_QUOKKA_COUPLE_DATA_URL } from "../shared/brand";
 import { createTooltipController, DETAILS_TOOLTIP_WIDTH, type TooltipController } from "../shared/tooltips";
-import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex } from "../shared/cashback";
+import { type CashbackOffer, type CashbackIndex, isCashbackOffer, isCashbackIndex, parseRewardValue, rewardKindRank } from "../shared/cashback";
 import { getCardBenefitOffers, getFreeCards, watchCardBenefitDate } from "../shared/card-benefits";
 import { getOfferCampaignLabel, getVisibleOfferKey, prioritizeOffersForPage } from "../shared/offer-context";
 import {
@@ -4749,7 +4750,7 @@ function readPanFlightsProviderNameFromUrl(value: unknown): string | undefined {
   if (hostname.includes("travellink")) return "Travellink";
   if (hostname.includes("trip.com")) return "Trip.com";
 
-  const providerLabel = hostname
+  const providerLabel = toUnicodeHostname(hostname)
     .split(".")
     .find((part) => part.length > 2 && !["com", "co", "no", "se", "dk", "net"].includes(part));
   return providerLabel === undefined
@@ -15275,69 +15276,6 @@ function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
     return firstOffer.provider.localeCompare(secondOffer.provider);
   });
 }
-type RewardValue = {
-  kind: "percentage" | "fixed" | "unit" | "points" | "unknown";
-  amount: number;
-};
-function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
-  if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
-  const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
-  const rewardSortValueNok = typeof offerOrReward === "string"
-    ? undefined
-    : readRewardSortValueNok(offerOrReward);
-
-  const rangeMatch = reward.match(/\d+(?:[,.]\d+)?\s*-\s*(\d+(?:[,.]\d+)?)\s*%/);
-  const percentageMatch = rangeMatch
-    ? [null, rangeMatch[1]]
-    : reward.match(/(\d+(?:[,.]\d+)?)\s*%/);
-  if (percentageMatch !== null) {
-    return {
-      kind: "percentage",
-      amount: parseLocalizedNumber(percentageMatch[1] ?? "0"),
-    };
-  }
-  const pointsRateMatch = reward.match(/(\d[\d\s]*)\s*poeng\s+per\s+100\s*kr/i);
-  if (pointsRateMatch !== null) {
-    return {
-      kind: "percentage",
-      amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR,
-    };
-  }
-  const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
-  if (unitMatch !== null) {
-    return {
-      kind: "unit",
-      amount: parseLocalizedNumber(unitMatch[1] ?? "0"),
-    };
-  }
-  const fixedRangeMatch = reward.match(/\d[\d\s]*(?:[,.]\d+)?\s*-\s*(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
-  if (fixedRangeMatch !== null) {
-    return {
-      kind: "fixed",
-      amount: rewardSortValueNok ??
-        parseLocalizedNumber((fixedRangeMatch[1] ?? "0").replace(/\s/g, "")),
-    };
-  }
-  const fixedMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*(kr|NOK|SEK|DKK|EUR|USD|GBP)\b/i);
-  if (fixedMatch !== null) {
-    return {
-      kind: "fixed",
-      amount: rewardSortValueNok ??
-        parseLocalizedNumber((fixedMatch[1] ?? "0").replace(/\s/g, "")),
-    };
-  }
-  const pointsMatch = reward.match(/(\d[\d\s]*)\s*poeng/i);
-  if (pointsMatch !== null) {
-    return {
-      kind: "points",
-      amount: parseLocalizedNumber((pointsMatch[1] ?? "0").replace(/\s/g, "")),
-    };
-  }
-  return {
-    kind: "unknown",
-    amount: 0,
-  };
-}
 function parseLocalizedNumber(value: string): number {
   const parsedValue = Number.parseFloat(value.replace(",", "."));
   return Number.isFinite(parsedValue) ? parsedValue : 0;
@@ -15347,13 +15285,6 @@ function readRewardSortValueNok(offer: CashbackOffer): number | undefined {
   return typeof offer.rewardSortValueNok === "number" && Number.isFinite(offer.rewardSortValueNok)
     ? offer.rewardSortValueNok
     : undefined;
-}
-function rewardKindRank(kind: RewardValue["kind"]): number {
-  if (kind === "percentage") return 4;
-  if (kind === "fixed") return 3;
-  if (kind === "unit") return 2;
-  if (kind === "points") return 1;
-  return 0;
 }
 function isFlightPanelRow(priceMatch: PriceMatchOffer): boolean {
   return priceMatch.travelKind !== "hotel" &&
@@ -15447,8 +15378,7 @@ function readCurrentPageUserRating(): UserRating | undefined {
   // Norwegian shops: a .no host, or a Norwegian page on a .com shop (lyko.com/no, lang="nb").
   const norwegianPage = /\.no$/.test(host) || /^(nb|nn|no)\b/i.test(document.documentElement.lang) || /^\/no(\/|$)/.test(window.location.pathname);
   if (!norwegianPage) return undefined;
-  const name = host.replace(/^www\./, "").split(".")[0]!;
-  const sourceName = name.charAt(0).toUpperCase() + name.slice(1);
+  const sourceName = hostnameDisplayLabel(host);
   const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.outerHTML).join("");
   const fromLd = readJsonLdUserRating(scripts, `store:${host}`, sourceName, window.location.href.split("#")[0]!);
   if (fromLd !== undefined) return fromLd;
@@ -15522,9 +15452,8 @@ function buildReviewsSection(summary: ProductReviewSummary, priceMatch: PriceMat
     priceMatch?.productName ?? readCurrentPageUserRating()?.productName ?? document.title)
     // Drop a trailing site name ("PlayStation 5 Pro-konsoll - Power.no").
     .replace(/\s+[-|–]\s+[^-|–]*\.(?:no|com)\s*$/i, "").trim().slice(0, 160);
-  const hostLabel = CURRENT_HOST.replace(/^www\./, "").split(".")[0] ?? CURRENT_HOST;
   const storeTitle = sources.flatMap((offer) => offer.reviews?.store ? [offer.reviews.store.shopName] : [])[0] ??
-    (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostLabel.charAt(0).toUpperCase() + hostLabel.slice(1));
+    (trustpilot?.status === "ok" ? trustpilot.profile.shopName : hostnameDisplayLabel(CURRENT_HOST));
   const stores = sources.flatMap((offer) => offer.reviews?.store ? [{ offer, store: offer.reviews.store }] : []);
   const profile = trustpilot?.status === "ok" ? trustpilot.profile : undefined;
   // Every rating of the shop on one 0–100 scale; the row shows the average weighted by count.

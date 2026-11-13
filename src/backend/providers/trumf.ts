@@ -123,7 +123,7 @@ export async function crawlTrumf(
   return uniqueOffers([...resolved, ...benefitOffers]);
 }
 
-type TrumfBenefitSummary = {
+export type TrumfBenefitSummary = {
   slug: string;
   title: string;
   description: string;
@@ -259,7 +259,7 @@ function parseTrumfBenefitSummary(value: unknown): TrumfBenefitSummary | undefin
   };
 }
 
-function parseTrumfBenefitOffer(
+export function parseTrumfBenefitOffer(
   $: TrumfCheerio,
   sourceUrl: string,
   summary: TrumfBenefitSummary,
@@ -354,8 +354,15 @@ function extractTrumfBenefitReward(
 
   // Range over the whole benefit text, not just the headline: Joker's
   // headline says "6 % på mandager" but the base rate is 1 %, so the honest
-  // label is "1-6 %".
-  const pctReward = extractPercentageReward(focusedText);
+  // label is "1-6 %". Rates for single products or a first purchase (KIWI
+  // "50 % Trumf-bonus på bleier", SPAR "51 % avslag på Libero-bleier",
+  // Jacob's "Opptil 50 % på ukens bonusprodukter") cannot be earned on the
+  // basket, so when basket-wide rates are stated only those form the range;
+  // the product rates stay in the terms.
+  const basketClauses = [summary.description, ...textLines.slice(0, 10)]
+    .flatMap((line) => line.split(/[,;!?]|\.(?!\d)|\s+og\s+/))
+    .filter((clause) => TRUMF_BASKET_WIDE_RATE.test(clause));
+  const pctReward = extractPercentageReward(basketClauses.join("\n")) || extractPercentageReward(focusedText);
   if (pctReward !== "") return pctReward;
 
   const krReward = extractKrReward(focusedText, { totalsum: false });
@@ -363,6 +370,9 @@ function extractTrumfBenefitReward(
 
   return "Medlemsfordel";
 }
+
+const TRUMF_BASKET_WIDE_RATE =
+  /\b(?:(?:nesten\s+)?alle?\*?\s+(?:dagligvarer|produkter|varer|strømavtaler)|(?:nesten\s+)?alt\s+(?:du\s+handler|hos|i\s+butikk)|Trippel-Trumf|hver\s+(?:mandag|gang)|på\s+mandager|mobilregningen)/i;
 
 function extractTrumfFixedKrReward(text: string): string {
   const values: number[] = [];

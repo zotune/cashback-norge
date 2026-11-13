@@ -126,6 +126,33 @@ test("normalizes percentages, vouchers, points and free gifts without using purc
   });
 });
 
+test("item gifts labelled rabatt stay free, unvalued vouchers stay discounts, and rows naming another store are skipped", async () => {
+  const warnings: string[] = [];
+  const rows = [
+    { ...entry, brandName: "Meny", offerType: "rabatt", offer: "Is", value: "Is", description: "Er du MENY MER-kunde, får du valgfri is på bursdagen din.", locations: ["Alle Meny-butikker"] },
+    { ...entry, id: 2, brandName: "Carlings", offerType: "rabatt", offer: "Verdikupong", value: "Verdikupong", description: "Kundeklubb - få verdikupong på bursdagen din." },
+    { ...entry, id: 3, brandName: "Gnist", offer: "Siderett eller dessert", value: "Siderett eller dessert", description: "En valgfri premium glid eller rens 50ml", locations: ["Alle Glid-butikker"] },
+    { ...entry, id: 4, brandName: "DNA", offerType: "rabatt", offer: "Verdikupong 100 kr", value: "100 kr", locations: ["Alle Eurosko/DNA/Shoeday-butikker"] },
+    { ...entry, id: 5, brandName: "McDonalds", offer: "Softis", value: "Softis", locations: ["Alle McDonald's-restauranter"] },
+    { ...entry, id: 6, brandName: "Ukjent", offerType: "rabatt", offer: "Overraskelse", value: "Overraskelse", description: "Se e-posten din." },
+  ];
+  await withCatalogue(rows, async (startUrl) => {
+    const offers = await fetchGratisbursdag({ ...await input(startUrl), logger: { ...logger, warn: (message: string) => { warnings.push(message); } } });
+    const get = (name: string) => offers.find((offer) => offer.merchantName === name);
+    assert.equal(get("Meny")?.reward, "0 kr totalsum");
+    assert.equal(get("Meny")?.rewardCalculation, undefined, "a free gift has no purchase rules");
+    assert.equal(formatCompactRewardLabel(get("Meny")!), "Gratis");
+    assert.equal(get("Carlings")?.reward, "Rabatt");
+    assert.equal(calculateCashback(get("Carlings")!, 1000), "");
+    assert.equal(get("Ukjent")?.reward, "Rabatt", "an unexplained rabatt row is not presented as free");
+    assert.equal(get("Gnist"), undefined);
+    assert.ok(warnings.some((message) => /Gnist.*Alle Glid-butikker/.test(message)));
+    assert.equal(get("DNA")?.reward, "100 kr");
+    assert.equal(get("McDonalds")?.reward, "0 kr totalsum");
+    assert.ok(offers.every(isCashbackOffer));
+  });
+});
+
 test("explicit domains beat ambiguous cross-provider matches and unknown shops stay visible on the site", async () => {
   await withCatalogue([{ ...entry, brandName: "Talkmore" }, { ...entry, id: 2, brandName: "Unknown shop" }], async (startUrl) => {
     const options = await input(startUrl);

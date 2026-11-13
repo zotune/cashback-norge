@@ -9,11 +9,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import {
   type CashbackOffer,
   normalizeDomainInput,
+  parseUrl,
   stripHtml,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
+import { isAffiliateTrackingUrl } from "../merchant-domains.js";
 
 const API_URL = "https://services.daisycon.com";
 const LOGIN_URL = "https://login.daisycon.com";
@@ -395,6 +397,9 @@ function selectProgramDomains(program: DaisyconProgram): string[] {
 
 function extractMerchantDomain(url: string): string | undefined {
   if (!url) return undefined;
+  // A click/redirect host forwards to the shop but is not its domain.
+  const parsedUrl = parseUrl(url.includes("://") ? url : `https://${url}`);
+  if (parsedUrl !== undefined && isAffiliateTrackingUrl(parsedUrl)) return undefined;
 
   const domain = normalizeDomainInput(url);
   if (

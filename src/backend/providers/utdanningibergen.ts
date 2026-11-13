@@ -47,6 +47,8 @@ type Discount = {
 export type FetchUtdanningiBergenInput = {
   generatedAt: string;
   logger: Logger;
+  /** Verified merchant domains by discount slug (data/provider-overrides.json). */
+  overrides?: Record<string, string[]>;
 };
 
 export async function fetchUtdanningiBergen(
@@ -97,7 +99,8 @@ export async function fetchUtdanningiBergen(
       continue;
     }
 
-    const domain = extractDomain(d.link);
+    const overrideDomains = input.overrides?.[d.url.replace(/^\/+|\/+$/g, "")];
+    const domain = overrideDomains?.[0] ?? extractDomain(d.link);
     if (!domain) {
       input.logger.warn(
         `Utdanning i Bergen: no usable domain for ${d.business_name} (${d.link})`,
@@ -113,7 +116,7 @@ export async function fetchUtdanningiBergen(
     const offer: CashbackOffer = {
       provider: "utdanningibergen",
       merchantName,
-      domains: [domain],
+      domains: overrideDomains ?? [domain],
       reward,
       ...(reward.endsWith(" kr/mnd") ? { promotion: monthlyPricePromotion(reward) } : {}),
       sourceUrl,

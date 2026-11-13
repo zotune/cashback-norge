@@ -4,6 +4,7 @@ import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
   isRecord,
+  stripHtml,
   uniqueOffers,
 } from "../../shared/cashback.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
@@ -21,6 +22,7 @@ type SasShop = {
   has_campaign: number;
   points_campaign: number | null;
   campaign_ends_date: string | null;
+  description?: string | null;
 };
 
 type SasShopsResponse = {
@@ -140,7 +142,32 @@ function formatSasTerms(shop: SasShop): string {
     }
   }
 
+  const partnerTerms = extractSasPartnerTerms(shop.description);
+  if (partnerTerms !== "") parts.push(partnerTerms);
+
   return parts.join("\n");
+}
+
+// The shop description is mostly marketing, but SAS appends the partner's
+// earning rules after a fixed heading ("Vilkår for denne partneren",
+// "Vennligst merk:"): new customers only, no points on gift cards, app or
+// physical-store purchases, when points are paid out.
+const SAS_TERMS_MARKER =
+  /(?:Vilkår|Betingelser)\s+for\s+denne\s+partneren\s*:?|(?:Vennligst\s+merk|Merk\s+ven+ligst)\s*:?/i;
+const SAS_TERMS_MAX_LENGTH = 500;
+
+export function extractSasPartnerTerms(description: string | null | undefined): string {
+  if (typeof description !== "string" || description.trim() === "") return "";
+  // Block tags end sentences; keep a space where they are removed.
+  const text = stripHtml(description.replace(/</g, " <")).replace(/\s+/g, " ").trim();
+  const marker = SAS_TERMS_MARKER.exec(text);
+  if (marker === null) return "";
+  const terms = text.slice(marker.index + marker[0].length).trim();
+  if (terms.length <= SAS_TERMS_MAX_LENGTH) return terms;
+  // Cut at the last full sentence that fits, never mid-word.
+  const head = terms.slice(0, SAS_TERMS_MAX_LENGTH);
+  const sentenceEnd = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "));
+  return sentenceEnd > 0 ? head.slice(0, sentenceEnd + 1) : `${head.slice(0, head.lastIndexOf(" "))} …`;
 }
 
 function formatPoints(points: number): string {
@@ -170,6 +197,7 @@ function isSasShop(value: unknown): value is SasShop {
     typeof value.points_channel === "number" &&
     typeof value.has_campaign === "number" &&
     (value.points_campaign === null || typeof value.points_campaign === "number") &&
-    (value.campaign_ends_date === null || typeof value.campaign_ends_date === "string")
+    (value.campaign_ends_date === null || typeof value.campaign_ends_date === "string") &&
+    (value.description === undefined || value.description === null || typeof value.description === "string")
   );
 }

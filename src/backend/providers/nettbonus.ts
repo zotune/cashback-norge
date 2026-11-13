@@ -9,6 +9,7 @@ import {
 } from "../../shared/cashback.js";
 import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
+import { isNonMerchantHost } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -79,7 +80,10 @@ export async function crawlNettbonus(
 
     // 3. Fall back to domain lookup
     if (domains.length === 0) {
-      domains = lookupDomains(input.domainLookup, partner.name);
+      // Name lookups can return other providers' tracking or contact
+      // hosts (Storytel → outlook.com); they never identify the shop.
+      domains = lookupDomains(input.domainLookup, partner.name)
+        .filter((domain) => !isNonMerchantHost(domain));
       if (domains.length > 0) fromLookup++;
     }
 

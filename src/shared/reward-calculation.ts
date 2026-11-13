@@ -71,17 +71,18 @@ export function formatCompactRewardLabel(offer: RewardOffer): string | undefined
     return (prefix + percentMatch[2]).replace(/\s+/g, " ");
   }
 
-  const totalSumMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
+  // Keep "Fra": "Fra 399 kr totalsum" is a starting price, not the price.
+  const totalSumMatch = label.match(/(?:\bfra\s+)?\d[\d\s]*(?:[,.]\d+)?(?:\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?)?\s*kr\s+totalsum/i);
   if (totalSumMatch !== null) {
     return totalSumMatch[0].replace(/\s+/g, " ");
   }
 
-  const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+  const krRangeMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*[-–]\s*\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
   if (krRangeMatch !== null) {
     return krRangeMatch[0].replace(/\s+/g, " ");
   }
 
-  const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/time|\s+per\s+time)?/i);
+  const krMatch = label.match(/\d[\d\s]*(?:[,.]\d+)?\s*kr(?:\/(?:time|mnd)|\s+per\s+(?:time|mnd))?/i);
   if (krMatch !== null) {
     return krMatch[0].replace(/\s+/g, " ");
   }

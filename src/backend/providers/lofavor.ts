@@ -28,8 +28,10 @@ const BENEFIT_CATEGORIES = new Set([
   "juridisk",
 ]);
 
+// Ticket shops (accessoticketing.com for LEGOLAND) sell for the partner but
+// are not its domain.
 const EXCLUDED_LINK_HOSTS =
-  /lofavor\.no|fremtind\.no|sparebank1\.no|facebook\.com|instagram\.com|youtube\.com|linkedin\.com|twitter\.com|(^|\.)x\.com|google\.com|cookieinformation\.com|adobedtm\.com|weglot\.com|boost\.ai|compendia\.no|seenthis\.se/;
+  /lofavor\.no|(^|\.)lo\.no$|ticketing|ticketmaster|ticketco|tikkio|fremtind\.no|sparebank1\.no|facebook\.com|instagram\.com|youtube\.com|linkedin\.com|twitter\.com|(^|\.)x\.com|google\.com|cookieinformation\.com|adobedtm\.com|weglot\.com|boost\.ai|compendia\.no|seenthis\.se/;
 
 export async function fetchLofavor(input: FetchLofavorInput): Promise<CashbackOffer[]> {
   input.logger.info(`Fetching LO Favør benefits from ${input.startUrl}`);
@@ -104,9 +106,16 @@ async function buildBenefitOffer(
     return undefined;
   }
 
-  const mainPart = readMainContent(response.body);
+  const mainPart = readMainContent(response.body, url);
   const text = stripHtml(mainPart);
-  const reward = extractBenefitReward(text);
+  // "Parken er stengt for sesongen. Ny rabattkode kommer før parken åpner"
+  // means last season's code and rates no longer apply.
+  if (/\bstengt for sesongen\b|\bny rabattkode kommer\b/i.test(text)) {
+    input.logger.info(`LO Favør: ${url} has no active benefit this season, skipping`);
+    return undefined;
+  }
+
+  const reward = withUpToQualifier(extractBenefitReward(text), text);
 
   if (reward === "") {
     input.logger.info(`LO Favør: no parseable reward for ${url}, skipping`);
@@ -138,10 +147,25 @@ async function buildBenefitOffer(
   };
 }
 
-// The footer repeats category links and campaign banners on every page; only
-// the content before it belongs to this benefit.
-function readMainContent(body: string): string {
-  return body.split(/<footer/i)[0] ?? body;
+// The page chrome repeats category links, and "Andre fordeler" cards
+// (<article> teasers linking to other benefits) quote other partners' rates
+// ("10 % i rabatt på leiebil fra Hertz" on the Sørmarka page). Only the
+// benefit's own content may give the reward, terms and partner domain.
+export function readMainContent(body: string, url = ""): string {
+  const ownPath = parseUrl(url)?.pathname.replace(/\/+$/, "") ?? "";
+  const isOtherBenefitLink = (href: string): boolean => {
+    const parsed = parseUrl(href.startsWith("/") ? `https://www.lofavor.no${href}` : href);
+    return parsed !== undefined && /(?:^|\.)lofavor\.no$/.test(parsed.hostname) &&
+      /^\/[a-z-]+\/[^/]+/.test(parsed.pathname) &&
+      decodeURIComponent(parsed.pathname.replace(/\/+$/, "")) !== decodeURIComponent(ownPath);
+  };
+
+  return (body.split(/<footer/i)[0] ?? body)
+    .replace(/<(script|style|noscript|template|header|nav)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<article\b[\s\S]*?<\/article>/gi, (article) => {
+      const links = [...article.matchAll(/href=["']([^"']+)["']/g)].map((match) => match[1] ?? "");
+      return links.some(isOtherBenefitLink) ? " " : article;
+    });
 }
 
 // Category-style headings ("Leiebil", "Strøm") hide the actual merchant and
@@ -205,4 +229,14 @@ function buildTerms(text: string): string {
     .slice(0, 4);
 
   return [...lines, DEFAULT_TERMS].join("\n");
+}
+
+// Every rate on the page is a maximum ("Opptil 14 % rabatt på hotellrom",
+// "Opptil 25 % rabatt for deg som er under 25 år"): keep «opptil».
+export function withUpToQualifier(reward: string, text: string): string {
+  if (!/%$/.test(reward) || reward.startsWith("opptil")) return reward;
+  const rates = [...text.matchAll(/(\S+\s+)?\d{1,3}(?:[,.]\d+)?\s*(?:%|prosent)/gi)];
+  return rates.length > 0 && rates.every((match) => /^(?:opptil|inntil)\s+$/i.test(match[1] ?? ""))
+    ? `opptil ${reward}`
+    : reward;
 }

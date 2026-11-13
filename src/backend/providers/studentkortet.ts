@@ -1,5 +1,6 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
+import { isNonMerchantHost } from "../merchant-domains.js";
 import { gotScraping } from "crawlee";
 import {
   type CashbackOffer,
@@ -338,7 +339,7 @@ const DESTINATION_PARAMS = ["ued", "url", "u", "murl", "destination", "dest", "r
 
 export function isTrackingHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^www\./, "");
-  return TRACKING_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`)) ||
+  return isNonMerchantHost(host) || TRACKING_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`)) ||
     TRACKING_HOST_PATTERNS.some((pattern) => pattern.test(host) || pattern.test(host.split(".").slice(-2).join(".")));
 }
 

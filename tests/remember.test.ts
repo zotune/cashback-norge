@@ -145,10 +145,14 @@ test("re:member terms lead with the structured commission and drop stale rate cl
     assert.equal(soblingOffer.reward, "7 %");
     assert.match(soblingOffer.terms, /Merverdiavgift på 25%/);
 
-    // Direct Deals publish no reward amount; keep it unknown instead of inventing one.
+    // Direct Deals are reduced prices on selected products, bought through
+    // Awardit's deal shop: a discount of unstated size, never a made-up
+    // amount, and not shown on the brand's own shop despite the override.
     const directDealOffer = byName.get("Gant Direct Deals");
     assert.ok(directDealOffer);
-    assert.equal(directDealOffer.reward, "");
+    assert.equal(directDealOffer.reward, "Rabatt");
+    assert.deepEqual(directDealOffer.domains, []);
+    assert.match(directDealOffer.terms, /^re:member Direct Deals: .*deals\.awardit\.com.*Gjelder ikke i merkets egen nettbutikk\.\n/);
     assert.match(directDealOffer.terms, /Prisavslag skjer direkte/);
   });
 });
@@ -169,4 +173,35 @@ test("re:member fixed commissions keep every amount and their stated currency", 
     assert.equal(hellofreshOffer?.reward, "75-251 SEK");
     assert.match(hellofreshOffer?.terms ?? "", /^251 SEK – i reward-rabatt ved første bestilling/);
   });
+});
+
+test("re:member reads every store from the listing page in one request", async () => {
+  const listed = [babyshop, dustin, directDeal, { ...dentway, enabled: false }];
+  const requests: string[] = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url ?? "/");
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end(`<html><body>${listed.map((store) => `<a href="${store.shopUrl}">${store.name}</a>`).join("")}` +
+      `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { stores: listed } } })}</script></body></html>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const previousLevel = log.getLevel();
+  log.setLevel(LogLevel.OFF);
+  try {
+    // A request limit of 1 used to leave the store pages uncrawled.
+    const offers = await crawlRemember({
+      startUrl: `http://127.0.0.1:${address.port}/reward/rabatt`, maxRequestsPerCrawl: 1,
+      overrides: overrides(), generatedAt, logger,
+    });
+    assert.deepEqual(offers.map((offer) => offer.merchantName).sort(), ["Babyshop.no", "Dustin Home", "Gant Direct Deals"]);
+    assert.equal(offers.find((offer) => offer.merchantName === "Babyshop.no")?.sourceUrl,
+      `http://127.0.0.1:${address.port}/reward/rabatt/babyshop`);
+    assert.deepEqual(requests, ["/reward/rabatt"]);
+  } finally {
+    log.setLevel(previousLevel);
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });

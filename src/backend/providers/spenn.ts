@@ -1,5 +1,7 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
+import { isNonMerchantHost } from "../merchant-domains.js";
+import { decodePunycode } from "../../shared/hostname-label.js";
 import { Configuration, HttpCrawler, MemoryStorage, Request } from "crawlee";
 import { normalizeDomainInput, parseUrl, type CashbackOffer } from "../../shared/cashback.js";
 import { type DomainLookup, lookupDomains } from "../domain-lookup.js";
@@ -311,11 +313,28 @@ function isDirectBrand(value: unknown): value is SpennDirectBrand {
     Array.isArray(value.match_rules) && value.match_rules.every((rule) => isObject(rule) && typeof rule.host === "string" && typeof rule.path === "string");
 }
 
-function hostWideDomains(rules: SpennCatalogMatchRule[]): string[] {
+function hostWideDomains(rules: SpennCatalogMatchRule[], merchantName?: string): string[] {
   return [...new Set(rules
     .filter((rule) => rule.path === "" && Object.keys(rule.query ?? {}).length === 0)
-    .map((rule) => normalizeDomainInput(rule.host))
-    .filter((domain) => domain !== ""))];
+    .map((rule) => repairPunycodeHost(normalizeDomainInput(rule.host), merchantName))
+    // The catalogue also lists click hosts (nespresso.prf.hn); never the shop.
+    .filter((domain) => domain !== "" && !isNonMerchantHost(domain)))];
+}
+
+// Spenn's catalogue has IDN hosts with the "xn--" prefix lost
+// ("smungene-b0a.no" for småungene.no), which matches no real site. Restore it
+// only when the decoded label is the merchant's own name.
+export function repairPunycodeHost(host: string, merchantName: string | undefined): string {
+  if (merchantName === undefined || host.startsWith("xn--")) return host;
+  const [label, ...rest] = host.split(".");
+  if (label === undefined || rest.length === 0 || !/^[a-z0-9-]+-[a-z0-9]+$/.test(label)) return host;
+  const decoded = decodePunycode(label);
+  const letters = (value: string) => value.toLowerCase().replace(/[^\p{L}\d]/gu, "");
+  if (decoded === undefined) return host;
+  const decodedLetters = letters(decoded);
+  // The decoded name must gain a non-ASCII letter (å, ø) and equal the merchant name.
+  if (!/[^\x00-\x7f]/.test(decodedLetters) || decodedLetters !== letters(merchantName)) return host;
+  return [`xn--${label}`, ...rest].join(".");
 }
 
 function directBrandTerms(brand: SpennDirectBrand): string {
@@ -419,7 +438,7 @@ export function buildSpennOffers(options: {
     }
     // Path-limited rules (lindex.com/no) would match the whole host; the
     // extension's host-wide rules are the verified domains.
-    const domains = hostWideDomains(store.match_rules);
+    const domains = hostWideDomains(store.match_rules, merchantName);
     const existing = best.get(merchantName);
     if (!existing || parsed.maxVal > existing.maxVal) {
       best.set(merchantName, { rate: parsed.rate, maxVal: parsed.maxVal, link, terms: parsed.terms, domains });
@@ -507,7 +526,7 @@ export function buildSpennOffers(options: {
   const directBrands = new Map((source.catalog?.direct_brands ?? []).map((brand) => [normalizeMerchantName(brand.name), brand]));
   for (const [merchantName, { parsed, link }] of directBest) {
     const brand = directBrands.get(normalizeMerchantName(merchantName));
-    const brandDomains = brand !== undefined ? hostWideDomains(brand.match_rules) : [];
+    const brandDomains = brand !== undefined ? hostWideDomains(brand.match_rules, merchantName) : [];
     const linkDomain = extractLinkDomain(link);
     // The extension's hosts (norwegian.com) plus the offer's own site (norwegian.no).
     const ownDomains = linkDomain !== undefined && linkDomain !== "app.spenngroup.com" ? [linkDomain] : [];

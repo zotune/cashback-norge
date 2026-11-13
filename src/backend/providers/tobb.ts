@@ -333,7 +333,12 @@ function buildTerms(summary: string, lines: string[]): string {
 }
 
 export function extractTobbReward(rawText: string): string {
-  const text = normalizeTobbRewardText(rawText);
+  // "du er på 10 % bonus-nivå når du registrerer deg" describes a temporary
+  // registration tier, not the benefit (20 % bonus).
+  const text = normalizeTobbRewardText(rawText)
+    .split("\n")
+    .filter((line) => !/bonus-nivå/i.test(line))
+    .join("\n");
   const structuredPercentage = extractStructuredPercentageReward(text);
   if (structuredPercentage) return structuredPercentage;
 

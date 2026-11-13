@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import { parseKlarnaAppSections } from "../src/backend/providers/klarna.js";
 import { fetchVestbo, parseBenefitCards } from "../src/backend/providers/vestbo.js";
 import type { ProviderOverrides } from "../src/backend/provider-overrides.js";
 
@@ -83,27 +82,4 @@ test("Vestbo: HTTP errors and a changed payload fail with the source and status"
       /unexpected data format/,
     );
   });
-});
-
-test("Klarna app API: deals become percentage offers; missing or invalid amounts are skipped, not zero", () => {
-  const offers = parseKlarnaAppSections([
-    {
-      title: "Featured",
-      deals: [
-        { merchantName: "FLOYD", cashbackAmount: 550, oldCashbackAmount: null, dealUrl: "https://www.floyd.no", isUpTo: false, storeKrn: "", endedAt: null },
-        { merchantName: "Byttdekk", cashbackAmount: 350, oldCashbackAmount: null, dealUrl: "http://www.byttdekk.com", isUpTo: true, storeKrn: "", endedAt: null },
-        { merchantName: "Broken", cashbackAmount: Number.NaN, oldCashbackAmount: null, dealUrl: "https://broken.no", isUpTo: false, storeKrn: "", endedAt: null },
-      ],
-    },
-    { title: "Fashion", deals: [{ merchantName: "floyd", cashbackAmount: 100, oldCashbackAmount: null, dealUrl: "https://www.floyd.no", isUpTo: false, storeKrn: "", endedAt: null }] },
-  ], "2026-11-10T00:00:00.000Z", silentLogger);
-
-  assert.deepEqual(offers.map((offer) => [offer.merchantName, offer.reward, offer.domains]), [
-    ["FLOYD", "5,5 %", ["floyd.no"]],
-    ["Byttdekk", "1-3,5 %", ["byttdekk.com"]],
-  ]);
-});
-
-test("Klarna app API: sections without deals yield no offers", () => {
-  assert.deepEqual(parseKlarnaAppSections([{ title: "Featured", deals: [] }], "", silentLogger), []);
 });

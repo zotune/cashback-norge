@@ -86,3 +86,47 @@ test("explicit student and monthly prices are totals; hourly rates and ordinary 
   assert.equal(extractExplicitTotalPriceReward("Kun 65 kr"), "");
   assert.equal(extractExplicitTotalPriceReward("Ordinær medlemspris 500 kr"), "");
 });
+
+test("audit 2026-11: shared reward parsing regressions found across providers", async () => {
+  const { extractKrReward, extractOreLitreReward, extractPercentageReward, relevantBenefitRewardText } = await import("../src/shared/reward.js");
+  // "på" after a percentage: JS \b is ASCII-only, so "å" never ended the word.
+  assert.equal(relevantBenefitRewardText("10 % på Ekornes"), "10 % på Ekornes");
+  assert.equal(extractBenefitReward("20 % på timepris inntil saken er løst."), "20 %");
+  // An explicit discount beats a "halv pris" headline elsewhere in the text.
+  assert.equal(extractBenefitReward("Se gode filmer på kino til halv pris! Som medlem får du 40 % rabatt på medlemskapet."), "40 %");
+  assert.equal(extractBenefitReward("Halv pris på TU og Digi"), "50 %");
+  // Footnote asterisk after øre.
+  assert.equal(extractOreLitreReward("52 øre* per liter på drivstoff"), "0,52 kr/l");
+  // "til kun N kr (ordinær pris M kr)" is the price paid.
+  assert.equal(extractExplicitTotalPriceReward("Medlemskap i Kinoklubb til kun 125 kr (ordinær pris 179 kr)"), "125 kr totalsum");
+  // A list dash on the next line or a date range is no percentage range.
+  assert.equal(extractBenefitReward("- 10 % rabatt i perioden 29.06–09.08\n\n- 20 % rabatt resten av året"), "10-20 %");
+  // Thousands separator "10.000" does not end the clause; a discount stays a discount.
+  assert.equal(extractKrReward("Kr 10.000,- i rabatt på vederlaget"), "10 000 kr");
+  // URL escapes are not percentages.
+  assert.equal(extractPercentageReward("Les mer https://x.safelinks.protection.outlook.com/?data=05%7C02%7C0%7C1 og få 15 % rabatt"), "15 %");
+  // "mellom 10 og 25 prosent" is a range.
+  assert.equal(extractPercentageReward("Du får mellom 10 og 25 prosent rabatt"), "10-25 %");
+});
+
+test("a price paid ranks below a discount, the cheaper price first, and compact labels keep units", async () => {
+  const { uniqueOffers } = await import("../src/shared/cashback.js");
+  const { formatCompactRewardLabel } = await import("../src/shared/reward-calculation.js");
+  const base = { provider: "utdanningibergen", merchantName: "Bergen Kino", domains: ["bergenkino.no"], sourceUrl: "https://x", activationUrl: "https://x", terms: "", updatedAt: "2026-11-13T00:00:00.000Z" } as const;
+  assert.equal(uniqueOffers([{ ...base, reward: "120 kr totalsum" }, { ...base, reward: "20 kr" }])[0]?.reward, "20 kr");
+  assert.equal(uniqueOffers([{ ...base, reward: "120 kr totalsum" }, { ...base, reward: "90 kr totalsum" }])[0]?.reward, "90 kr totalsum");
+  assert.equal(formatCompactRewardLabel({ provider: "knbf", reward: "19 kr/mnd" }), "19 kr/mnd");
+  assert.equal(formatCompactRewardLabel({ provider: "utdanningibergen", reward: "Fra 399 kr totalsum" }), "Fra 399 kr totalsum");
+  assert.equal(formatCompactRewardLabel({ provider: "studenttorget", reward: "45 kr totalsum" }), "45 kr totalsum");
+  assert.equal(formatCompactRewardLabel({ provider: "akks", reward: "170 kr/time" }), "170 kr/time");
+});
+
+test("rates keep two decimals and co.no is a public suffix", async () => {
+  const { formatRewardNumber, extractPercentageReward } = await import("../src/shared/reward.js");
+  const { toBaseDomain } = await import("../src/shared/cashback.js");
+  assert.equal(formatRewardNumber(3.75), "3,75");
+  assert.equal(formatRewardNumber(2.5), "2,5");
+  assert.equal(extractPercentageReward("0,75 % cashback"), "0,75 %");
+  assert.equal(toBaseDomain("autodoc.co.no"), "autodoc.co.no");
+  assert.equal(toBaseDomain("www.autodoc.co.no"), "autodoc.co.no");
+});

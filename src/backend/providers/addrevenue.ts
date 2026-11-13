@@ -7,8 +7,10 @@ import {
   stripHtml,
   uniqueOffers,
   uniqueStrings,
+  parseUrl,
 } from "../../shared/cashback.js";
 import type { Logger } from "../logger.js";
+import { isAffiliateTrackingUrl } from "../merchant-domains.js";
 
 const API_URL = "https://addrevenue.io/api/v2";
 const CHARITY_SHARE_OF_COMMISSION = 0.1;
@@ -47,8 +49,11 @@ type AddrevenueChannel = {
   status?: string;
 };
 
+// The v2 API returns ids as strings ("988135"); older responses used numbers.
+type AddrevenueId = number | string;
+
 type AddrevenueRelation = {
-  advertiserId?: number;
+  advertiserId?: AddrevenueId;
   advertiserName?: string;
   channelId?: number;
   programs?: AddrevenueProgram[];
@@ -59,7 +64,7 @@ type AddrevenueRelation = {
 type AddrevenueAdvertiser = {
   categoryId?: string;
   displayName?: string;
-  id?: number;
+  id?: AddrevenueId;
   markets?: Record<string, AddrevenueMarket>;
   name?: string;
   policyCashbackReward?: string | null;
@@ -128,9 +133,10 @@ export async function fetchAddrevenue(
   ]);
 
   const advertisersById = new Map(
-    advertisers
-      .filter((advertiser) => typeof advertiser.id === "number")
-      .map((advertiser) => [advertiser.id!, advertiser]),
+    advertisers.flatMap((advertiser) => {
+      const id = readId(advertiser.id);
+      return id === undefined ? [] : [[id, advertiser] as const];
+    }),
   );
 
   const offers: CashbackOffer[] = [];
@@ -147,9 +153,10 @@ export async function fetchAddrevenue(
       continue;
     }
 
-    const advertiser = relation.advertiserId === undefined
+    const advertiserId = readId(relation.advertiserId);
+    const advertiser = advertiserId === undefined
       ? undefined
-      : advertisersById.get(relation.advertiserId);
+      : advertisersById.get(advertiserId);
     const market = selectAdvertiserMarket(advertiser);
     if (!hasNorwayMarket(relation, advertiser, market)) {
       skippedNotNorway++;
@@ -269,8 +276,10 @@ function selectAdvertiserMarket(
 ): AddrevenueMarket | undefined {
   const markets = advertiser?.markets ?? {};
   const norwayMarket = markets.NO;
-  if (norwayMarket !== undefined && isMarketUsable(norwayMarket)) {
-    return norwayMarket;
+  // A paused or ended Norwegian market must not be replaced by another
+  // country's market (and its domain and texts).
+  if (norwayMarket !== undefined) {
+    return isMarketUsable(norwayMarket) ? norwayMarket : undefined;
   }
 
   return Object.values(markets).find(isMarketUsable);
@@ -287,7 +296,7 @@ function hasNorwayMarket(
   market: AddrevenueMarket | undefined,
 ): boolean {
   if (market?.market === "NO") return true;
-  if (advertiser?.markets?.NO !== undefined) return true;
+  if (advertiser?.markets?.NO !== undefined) return false;
 
   return (relation.programs ?? []).some((program) => {
     return (program.markets ?? []).includes("NO");
@@ -298,20 +307,22 @@ function selectAdvertiserDomains(
   advertiser: AddrevenueAdvertiser | undefined,
   market: AddrevenueMarket | undefined,
 ): string[] {
-  const domains = [
-    market?.url,
-    market?.redirectUrl,
-    advertiser?.url,
-  ].flatMap((url) => {
+  // Only the selected market's shop. The advertiser URL belongs to another
+  // country's market, and redirect URLs can be tracking hosts
+  // (affise.novakidtracking.com, fclick.vitaliv.com); both are fallbacks.
+  for (const url of [market?.url, market?.redirectUrl, advertiser?.url]) {
     const domain = extractMerchantDomain(url ?? "");
-    return domain === undefined ? [] : [domain];
-  });
-
-  return uniqueStrings(domains);
+    if (domain !== undefined) return uniqueStrings([domain]);
+  }
+  return [];
 }
 
 function extractMerchantDomain(url: string): string | undefined {
   if (!url) return undefined;
+  // Click hosts (nespresso.prf.hn, go.nordvpn.net/aff_c?offer_id=…,
+  // multitudebankplc.pxf.io) forward to the shop but are not its domain.
+  const parsedUrl = parseUrl(url.includes("://") ? url : `https://${url}`);
+  if (parsedUrl !== undefined && isAffiliateTrackingUrl(parsedUrl)) return undefined;
   const domain = normalizeDomainInput(url);
   if (
     !domain.includes(".") ||
@@ -338,14 +349,16 @@ function normalizeUrl(url: string): string | undefined {
 }
 
 function selectActiveNorwayPrograms(programs: AddrevenueProgram[]): AddrevenueProgram[] {
-  const active = programs.filter((program) => {
+  // Commission for other markets is not what a Norwegian click earns.
+  return programs.filter((program) => {
     return isActiveStatus(program.status) &&
       ((program.markets ?? []).length === 0 || (program.markets ?? []).includes("NO"));
   });
+}
 
-  return active.length > 0
-    ? active
-    : programs.filter((program) => isActiveStatus(program.status));
+function readId(value: AddrevenueId | undefined): string | undefined {
+  const id = typeof value === "number" ? String(value) : value?.trim();
+  return id ? id : undefined;
 }
 
 function buildSupportReward(programs: AddrevenueProgram[]): string {
@@ -529,7 +542,10 @@ function cleanText(value: string): string {
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1).trim()}...`;
+  // Cut at a word boundary; never leave half a word in the tooltip.
+  const cut = value.slice(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
 function uniquePreserveOrder(values: string[]): string[] {

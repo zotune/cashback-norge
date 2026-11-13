@@ -98,6 +98,24 @@ test("Gjerrigknark reads structured descriptions without mistaking postage or di
   assert.equal(offers.some((offer) => offer.merchantName === "Foodora"), false);
 });
 
+test("Gjerrigknark judges a shared promotion by the Gratis.no headline too, so both chips agree", () => {
+  const story = (title: string, provider: string, brandTitle?: string, text = "") => ({
+    _id: `id-${provider}`, title, slug: `x/${provider}`, active: true, visible: true, publish_time: "2026-01-01T00:00:00.000Z",
+    short_description: text, link: { provider, url: "https://example.invalid/" }, ...(brandTitle ? { brandCopy: { title: brandTitle } } : {}),
+  });
+  const offers = readFreeOffers({ result: [
+    story("Få 30 dagers prøve på EaseFormula for rolige muskler", "EaseFormula", "EaseFormula i 30 dager for 169 kr med fri frakt"),
+    story("Slik fikser du deg gratis produkter fra Normal", "Normal", "Samle poeng i Normal-appen og få gratis produkter", "Gratis produkt når ballongen i appen sprekker."),
+    story("Få en rosebukett fra Plantasjen", "Plantasjen", "Gratis bukett med 10 roser fra Plantasjen på bursdagen", "Medlemmer i kundeklubben får en bukett."),
+    story("Prøv Fabel helt gratis i 6 uker", "Fabel"),
+  ] }, "gjerrigknark", input);
+  const get = (name: string) => offers.find((offer) => offer.merchantName === name);
+  assert.deepEqual([get("EaseFormula")?.promotion?.label, get("EaseFormula")?.promotion?.priceNok, get("EaseFormula")?.reward], ["169 kr prøvepris", 169, "Prøvetilbud"]);
+  assert.equal(get("Normal"), undefined, "a points/gamified gift is not a free item");
+  assert.equal(get("Plantasjen")?.reward, "0 kr totalsum");
+  assert.equal(get("Fabel")?.promotion?.label, "6 uker gratis", "stories without a Gratis.no page still use their own title");
+});
+
 test("Sparelosen includes only marked campaigns, keeps subscription prices and separate plan identities", () => {
   const offers = readSparelosenPlans(script(plans), input);
   assert.equal(offers.length, 3);

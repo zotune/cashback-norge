@@ -180,7 +180,9 @@ export function normalizeDomainInput(input: string): string {
   return normalizeHostname(hostPart);
 }
 
-const COMPOUND_TLDS = ["co.uk", "com.au", "co.jp", "com.br"];
+// Norwegian category domains (autodoc.co.no) are public suffixes too: "co.no"
+// itself is no shop.
+const COMPOUND_TLDS = ["co.uk", "com.au", "co.jp", "com.br", "co.no", "priv.no"];
 
 export function toBaseDomain(domain: string): string {
   for (const tld of COMPOUND_TLDS) {
@@ -503,12 +505,12 @@ export function sortOffersByReward(offers: CashbackOffer[]): CashbackOffer[] {
   });
 }
 
-type RewardValue = {
-  kind: "percentage" | "fixed" | "unit" | "points" | "unknown";
+export type RewardValue = {
+  kind: "percentage" | "fixed" | "unit" | "price" | "points" | "unknown";
   amount: number;
 };
 
-function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
+export function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
   if (typeof offerOrReward !== "string" && offerOrReward.promotion) return { kind: "unknown", amount: 0 };
   const reward = typeof offerOrReward === "string" ? offerOrReward : offerOrReward.reward;
   const rewardSortValueNok = typeof offerOrReward === "string"
@@ -534,6 +536,15 @@ function parseRewardValue(offerOrReward: CashbackOffer | string): RewardValue {
       kind: "percentage",
       amount: parseLocalizedNumber((pointsRateMatch[1] ?? "0").replace(/\s/g, "")) / EB_PER_TRUMF_KR,
     };
+  }
+
+  // "120 kr totalsum" is what the customer pays, not money off: it ranks
+  // below discounts, and the cheaper price wins (amount is the negated price).
+  // A free item ("0 kr totalsum") keeps its place as a fixed 0.
+  const priceMatch = reward.match(/(\d[\d\s]*(?:[,.]\d+)?)\s*kr\s+totalsum\b/i);
+  if (priceMatch !== null) {
+    const price = parseLocalizedNumber((priceMatch[1] ?? "0").replace(/\s/g, ""));
+    if (price > 0) return { kind: "price", amount: -price };
   }
 
   const unitMatch = reward.match(/(\d+(?:[,.]\d+)?)\s*kr\s*\//i);
@@ -591,7 +602,7 @@ function readRewardSortValueNok(offer: CashbackOffer): number | undefined {
     : undefined;
 }
 
-function rewardKindRank(kind: RewardValue["kind"]): number {
+export function rewardKindRank(kind: RewardValue["kind"]): number {
   if (kind === "percentage") {
     return 4;
   }
@@ -602,6 +613,10 @@ function rewardKindRank(kind: RewardValue["kind"]): number {
 
   if (kind === "unit") {
     return 2;
+  }
+
+  if (kind === "price") {
+    return 1.5;
   }
 
   if (kind === "points") {

@@ -1,12 +1,13 @@
 // This file contains code to extract publicly available offer data from third-party websites.
 // No proprietary or copyrighted content is included. Offers requiring authentication/login are not shown.
-import { CheerioCrawler, type CheerioCrawlingContext, Configuration, gotScraping, MemoryStorage, ProxyConfiguration } from "crawlee";
+import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage, ProxyConfiguration } from "crawlee";
 import {
   type CashbackOffer,
   normalizeDomainInput,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
+import { formatPercentageReward, formatRewardNumber, normalizeRewardLabel } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
 
@@ -115,20 +116,11 @@ export async function crawlKlarna(
     `Klarna listing pages yielded ${rawOffers.length} raw offers`,
   );
 
-  // Supplement with app API data (public, no auth required)
-  const appOffers = await fetchKlarnaAppOffers(input.generatedAt, input.logger, proxyUrls);
-  const webMerchants = new Set(rawOffers.map((o) => o.merchantName.toLowerCase()));
-  let appOnlyCount = 0;
-  for (const appOffer of appOffers) {
-    if (!webMerchants.has(appOffer.merchantName.toLowerCase())) {
-      rawOffers.push(appOffer);
-      appOnlyCount++;
-    }
-  }
-  if (appOnlyCount > 0) {
-    input.logger.info(`Klarna app API added ${appOnlyCount} offers not found on web`);
-  }
-
+  // The public app API (deals_directory_bff getCashbackLandingPage) is not
+  // used: on 2026-11-13 it listed only stores that the web listing also has
+  // (same storeKrn), and for 53 of 72 it reported about twice the rate shown
+  // on klarna.com and on the store's own page (AGV 7 % vs 3.5 %), matching
+  // Klarna's membership multiplier rather than the public base rate.
   const offers = uniqueOffers(rawOffers);
 
   const resolved = await resolveDomainsForOffers(
@@ -150,17 +142,26 @@ function buildPageUrls(startUrl: string, maxPages: number): string[] {
   return urls;
 }
 
-type KlarnaStore = {
+type KlarnaCashbackRate = { value?: unknown; type?: unknown; name?: unknown };
+
+export type KlarnaStore = {
   storeKrn: string;
   displayName: string;
   storeDirectUrl: string;
   cashbackDiscount: {
+    // Basis points: 350 = 3.5 %.
+    discountPercentage?: number;
     discountLabel: {
       prefix: string;
       body: string;
       suffix: string;
     };
     showUpToPrefix: boolean;
+    endedAt?: string | null;
+    conditions?: {
+      cashbackRates?: KlarnaCashbackRate[];
+      exclusionsStructured?: unknown[];
+    };
   } | null;
   otcUrl: string | null;
 };
@@ -174,24 +175,27 @@ function parseKlarnaStoreListing(
   if (stores.length === 0) {
     return parseKlarnaStoreListingFromHtml($, pageUrl, generatedAt);
   }
+  return parseKlarnaStores(stores, pageUrl, generatedAt);
+}
 
+const KLARNA_BASE_TERMS = "Cashback i appen Klarna i kassen";
+
+/** Translates the store directory's dehydrated store objects into offers. */
+export function parseKlarnaStores(
+  stores: KlarnaStore[],
+  pageUrl: string,
+  generatedAt: string,
+): CashbackOffer[] {
   const offers: CashbackOffer[] = [];
 
   for (const store of stores) {
-    const label = store.cashbackDiscount?.discountLabel;
-    const body = label?.body ?? "";
-    if (body === "") {
+    const discount = store.cashbackDiscount;
+    const reward = readKlarnaReward(discount);
+    if (reward === "") {
       continue;
     }
-    const showUpTo = store.cashbackDiscount?.showUpToPrefix === true;
-    // Fjern eventuelle mellomrom og % fra body for å unngå dobbel % og rare mellomrom
-    const cleanBody = body.replace(/\s*%\s*$/, "");
-    const reward = showUpTo ? `1-${cleanBody} %` : `${cleanBody} %`;
 
-    const uuidMatch = store.storeKrn.match(/([a-f0-9-]{36})$/);
-    const uuid = uuidMatch?.[1] ?? store.storeDirectUrl;
     const activationUrl = buildActivationUrl(store.storeDirectUrl, pageUrl);
-
     const merchantDomain = extractMerchantDomain(store);
     const searchQuery = encodeURIComponent(store.displayName);
 
@@ -202,12 +206,55 @@ function parseKlarnaStoreListing(
       reward,
       sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
       activationUrl,
-      terms: "Cashback i appen Klarna i kassen",
+      terms: buildKlarnaTerms(discount),
       updatedAt: generatedAt,
     });
   }
 
   return offers;
+}
+
+function readKlarnaRates(discount: KlarnaStore["cashbackDiscount"]): Array<{ name: string; percent: number }> {
+  return (discount?.conditions?.cashbackRates ?? []).flatMap((rate) => {
+    if (rate.type !== "percentage" || typeof rate.value !== "number" || !Number.isFinite(rate.value) || rate.value <= 0) return [];
+    return [{ name: typeof rate.name === "string" ? rate.name.trim() : "", percent: rate.value / 100 }];
+  });
+}
+
+function readKlarnaReward(discount: KlarnaStore["cashbackDiscount"]): string {
+  if (discount === null || discount === undefined) return "";
+  const headline = typeof discount.discountPercentage === "number" && Number.isFinite(discount.discountPercentage) && discount.discountPercentage > 0
+    ? discount.discountPercentage / 100
+    : Number.parseFloat((discount.discountLabel?.body ?? "").replace(",", ".").replace(/\s*%\s*$/, ""));
+  if (!Number.isFinite(headline) || headline <= 0) return "";
+  if (discount.showUpToPrefix !== true) return `${formatRewardNumber(headline)} %`;
+
+  // "Opp til N %" is the best of the store's rate table (new customer,
+  // full-price items, a category...). Show that table's real range; without
+  // one, keep the up-to qualifier instead of inventing a minimum.
+  const rates = readKlarnaRates(discount).map((rate) => rate.percent).filter((percent) => percent <= headline);
+  return rates.length > 1 && Math.min(...rates) < headline
+    ? formatPercentageReward([...rates, headline])
+    : `opptil ${formatRewardNumber(headline)} %`;
+}
+
+function buildKlarnaTerms(discount: KlarnaStore["cashbackDiscount"]): string {
+  const parts = [KLARNA_BASE_TERMS];
+  const rates = readKlarnaRates(discount).filter((rate) => rate.name !== "" && !/^default$/i.test(rate.name));
+  if (rates.length > 1) {
+    parts.push(`Satser: ${rates.map((rate) => `${rate.name} ${formatRewardNumber(rate.percent)} %`).join("; ")}`);
+  }
+  const exclusions = (discount?.conditions?.exclusionsStructured ?? [])
+    .filter((value): value is string => typeof value === "string" && value.trim() !== "")
+    .map((value) => value.trim());
+  if (exclusions.length > 0) {
+    parts.push(`Gjelder ikke: ${exclusions.join(", ")}`);
+  }
+  const endedAt = typeof discount?.endedAt === "string" ? new Date(discount.endedAt) : undefined;
+  if (endedAt !== undefined && Number.isFinite(endedAt.getTime())) {
+    parts.push(`Kampanjesats til ${endedAt.toLocaleDateString("nb-NO", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Oslo" })}`);
+  }
+  return parts.join(". ");
 }
 
 function extractStoresFromJson($: KlarnaCheerio): KlarnaStore[] {
@@ -264,8 +311,11 @@ function parseKlarnaStoreListingFromHtml(
 
     const uuid = uuidMatch[1];
     const text = $el.text().trim();
-    const cashbackMatch = text.match(/(\d+(?:,\d+)?)\s*%\s*cashback/i);
-    const reward = cashbackMatch?.[1] != null ? `${cashbackMatch[1]}%` : "";
+    const cashbackMatch = text.match(/(\d+(?:[,.]\d+)?)\s*%\s*cashback/i);
+    const upTo = /opp\s*til|opptil/i.test(text);
+    const reward = cashbackMatch?.[1] != null
+      ? normalizeRewardLabel(`${upTo ? "opptil " : ""}${cashbackMatch[1]}%`)
+      : "";
     const nameFromAlt = $el.find("img[alt]").first().attr("alt")?.replace(/\s*Logo$/i, "").trim() ?? "";
     const nameFromText = extractStoreNameFromText(text);
     const merchantName = nameFromAlt || nameFromText || "Unknown Klarna merchant";
@@ -351,159 +401,4 @@ function extractMerchantDomain(store: KlarnaStore): string | undefined {
     return match[1];
   }
   return undefined;
-}
-
-// --- Klarna App API (public GraphQL, no auth) ---
-
-type KlarnaAppDeal = {
-  merchantName: string;
-  cashbackAmount: number;
-  oldCashbackAmount: number | null;
-  dealUrl: string;
-  isUpTo: boolean;
-  storeKrn: string;
-  endedAt: string | null;
-};
-
-export type KlarnaAppSection = {
-  title: string;
-  deals: KlarnaAppDeal[];
-};
-
-type KlarnaAppResponse = {
-  data: {
-    cashbackLandingPage: {
-      sections: KlarnaAppSection[];
-    };
-  };
-};
-
-const KLARNA_APP_GRAPHQL_URL =
-  "https://app-api.klarna.com/api/deals_directory_bff/public/graphql";
-
-const KLARNA_APP_QUERY = `query getCashbackLandingPage($market: Market!) {
-  cashbackLandingPage: getCashbackLandingPage(market: $market) {
-    sections {
-      deals {
-        merchantName
-        cashbackAmount
-        oldCashbackAmount
-        dealUrl
-        isUpTo
-        storeKrn
-        endedAt
-      }
-    }
-  }
-}`;
-
-async function fetchKlarnaAppOffers(
-  generatedAt: string,
-  logger: Logger,
-  proxyUrls: string[] = [],
-): Promise<CashbackOffer[]> {
-  // The public API returns sections without deals to GitHub Actions IPs
-  // (verified 2026-11-10), so retry through the proxies when the direct
-  // response has no deals.
-  const attempts: Array<{ label: string; proxyUrl?: string }> = [
-    { label: "direct" },
-    ...proxyUrls.map((proxyUrl, index) => ({ label: `proxy ${index + 1}/${proxyUrls.length}`, proxyUrl })),
-  ];
-
-  for (const attempt of attempts) {
-    const sections = await requestKlarnaAppSections(attempt.label, attempt.proxyUrl, logger);
-    if (sections === undefined) continue;
-    const dealCount = sections.reduce((sum, section) => sum + (section.deals?.length ?? 0), 0);
-    if (dealCount === 0) {
-      logger.warn(`Klarna app API ${attempt.label}: ${sections.length} sections without deals`);
-      continue;
-    }
-    return parseKlarnaAppSections(sections, generatedAt, logger);
-  }
-
-  return [];
-}
-
-async function requestKlarnaAppSections(
-  label: string,
-  proxyUrl: string | undefined,
-  logger: Logger,
-): Promise<KlarnaAppSection[] | undefined> {
-  try {
-    const res = await gotScraping(KLARNA_APP_GRAPHQL_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        operationName: "getCashbackLandingPage",
-        query: KLARNA_APP_QUERY,
-        variables: { market: "NO" },
-      }),
-      responseType: "json",
-      throwHttpErrors: false,
-      retry: { limit: 1 },
-      timeout: { request: 30_000 },
-      ...(proxyUrl ? { proxyUrl } : {}),
-    });
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      logger.warn(`Klarna app API ${label} returned HTTP ${res.statusCode} for ${KLARNA_APP_GRAPHQL_URL}`);
-      return undefined;
-    }
-
-    const sections = (res.body as KlarnaAppResponse | undefined)?.data?.cashbackLandingPage?.sections;
-    if (!Array.isArray(sections)) {
-      logger.warn(`Klarna app API ${label} returned no sections`);
-      return undefined;
-    }
-    return sections;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.warn(`Klarna app API ${label} failed for ${KLARNA_APP_GRAPHQL_URL}: ${message}`);
-    return undefined;
-  }
-}
-
-export function parseKlarnaAppSections(
-  sections: KlarnaAppSection[],
-  generatedAt: string,
-  logger: Logger,
-): CashbackOffer[] {
-  const seen = new Set<string>();
-  const offers: CashbackOffer[] = [];
-
-  for (const section of sections) {
-    for (const deal of section.deals ?? []) {
-      const key = deal.merchantName.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      if (typeof deal.cashbackAmount !== "number" || !Number.isFinite(deal.cashbackAmount) || deal.cashbackAmount <= 0) continue;
-      const pct = deal.cashbackAmount / 100;
-      const pctStr = Number.isInteger(pct) ? `${pct}` : `${pct}`.replace(".", ",");
-      const reward = deal.isUpTo ? `1-${pctStr} %` : `${pctStr} %`;
-
-      let domain: string | undefined;
-      try {
-        const url = new URL(deal.dealUrl);
-        domain = url.hostname.replace(/^www\./, "");
-      } catch {
-        // skip
-      }
-
-      const searchQuery = encodeURIComponent(deal.merchantName);
-      offers.push({
-        provider: "klarna",
-        merchantName: deal.merchantName,
-        domains: domain ? [domain] : [],
-        reward,
-        sourceUrl: `https://www.klarna.com/no/store/?type=CASHBACK&search=${searchQuery}`,
-        activationUrl: deal.dealUrl,
-        terms: "Cashback i appen Klarna i kassen",
-        updatedAt: generatedAt,
-      });
-    }
-  }
-
-  logger.info(`Klarna app API yielded ${offers.length} unique offers`);
-  return offers;
 }

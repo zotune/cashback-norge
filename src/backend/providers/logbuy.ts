@@ -3,14 +3,17 @@
 import { CheerioCrawler, type CheerioCrawlingContext, Configuration, MemoryStorage } from "crawlee";
 import {
   type CashbackOffer,
+  type RewardCalculationRules,
   normalizeDomainInput,
   uniqueOffers,
   uniqueStrings,
 } from "../../shared/cashback.js";
-import { extractKrReward, extractPercentageReward } from "../../shared/reward.js";
+import { extractKrReward, extractUpToPercentageReward } from "../../shared/reward.js";
 import { lookupDomains, type DomainLookup } from "../domain-lookup.js";
+import { isNonMerchantHost } from "../merchant-domains.js";
 import type { Logger } from "../logger.js";
 import type { ProviderOverrides } from "../provider-overrides.js";
+import { extractCouponMinimumPurchase } from "./rabattkode.js";
 
 type LogbuyCheerio = CheerioCrawlingContext["$"];
 
@@ -25,6 +28,8 @@ export type CrawlLogbuyInput = {
   logger: Logger;
 };
 
+const ACCESS_TERMS = "Krever LogBuy-tilgang gjennom arbeidsgiver, organisasjon eller privat medlemskap.";
+
 const LABEL_LIST = "list";
 const LABEL_DETAIL = "detail";
 
@@ -33,6 +38,7 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
     slug: string;
     name: string;
     reward: string;
+    rewardCalculation?: RewardCalculationRules;
     fordeler: string;
   };
 
@@ -43,7 +49,9 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
   config.useStorageClient(storage);
 
   const crawler = new CheerioCrawler({
-    maxConcurrency: 3,
+    maxConcurrency: 2,
+    maxRequestRetries: 2,
+    requestHandlerTimeoutSecs: 30,
     maxRequestsPerCrawl: input.maxRequestsPerCrawl,
     requestHandler: async ({ $, request, enqueueLinks }) => {
       const label = request.label ?? LABEL_LIST;
@@ -65,7 +73,7 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
           if (!name) name = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
           deals.set(slug, { slug, name, reward: "", fordeler: "" });
-          detailUrls.push(`${LIST_URL}/${slug}-rabattkode`);
+          detailUrls.push(`${input.startUrl.replace(/\/+$/, "")}/${slug}-rabattkode`);
         });
 
         await enqueueLinks({
@@ -83,10 +91,16 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
         const entry = deals.get(slug);
         if (!entry) return;
 
-        // p.text-medium holds the precise discount description
+        // p.text-medium holds the headline of the benefit ("Opptil 30 %
+        // rabatt på Samsung-produkter"); the first rich-text list states the
+        // conditions ("15 % fast LogBuy-rabatt ved kjøp over 799 kr").
         const raw = $("p.text-medium").first().text().trim().replace(/\s+/g, " ");
-        const reward = extractPercentageReward(raw) || extractKrReward(raw);
-        if (reward) entry.reward = reward;
+        const benefitLines = $(".text-block__richtext").first().find("li").toArray()
+          .map((li) => $(li).text().replace(/\s+/g, " ").trim())
+          .filter((line) => line.length > 0);
+        entry.reward = parseLogbuyReward(raw, benefitLines);
+        const rewardCalculation = extractCouponMinimumPurchase([raw, ...benefitLines].join("\n"));
+        if (rewardCalculation !== undefined) entry.rewardCalculation = rewardCalculation;
 
         // Extract first and last FAQ answers
         const faqEls = $(".panel [itemprop='text']").toArray();
@@ -99,7 +113,11 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
             if (last && last !== first) faqParts.push(last);
           }
         }
-        if (faqParts.length > 0) entry.fordeler = faqParts.join("\n\n");
+        entry.fordeler = [
+          raw,
+          ...benefitLines.map((line) => `- ${line}`),
+          ...faqParts,
+        ].filter(Boolean).join("\n");
       }
     },
   }, config);
@@ -114,7 +132,10 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
 
   for (const deal of deals.values()) {
     // 1. Domain lookup by merchant name (cross-reference with Klarna/Trumf/etc.)
-    let domains = lookupDomains(input.domainLookup, deal.name);
+    // Other providers' affiliate links can leak tracking hosts into the
+    // name lookup (Hotels.com → jdoqocy.com); they are never the shop.
+    let domains = lookupDomains(input.domainLookup, deal.name)
+      .filter((domain) => !isNonMerchantHost(domain));
 
     // 2. Fall back to provider-overrides keyed by slug (e.g. "gymgrossisten")
     if (domains.length === 0) {
@@ -139,9 +160,10 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
       merchantName: deal.name,
       domains: uniqueStrings(domains),
       reward: deal.reward,
+      ...(deal.rewardCalculation === undefined ? {} : { rewardCalculation: deal.rewardCalculation }),
       sourceUrl,
       activationUrl: sourceUrl,
-      terms: deal.fordeler || "Krever LogBuy-tilgang gjennom din arbeidsgiver.",
+      terms: [deal.fordeler, ACCESS_TERMS].filter(Boolean).join("\n\n"),
       updatedAt: input.generatedAt,
     });
   }
@@ -149,4 +171,17 @@ export async function crawlLogbuy(input: CrawlLogbuyInput): Promise<CashbackOffe
   input.logger.info(`LogBuy: resolved ${lookedUp} via lookup, ${overrideCount} via override`);
   input.logger.info(`LogBuy: produced ${offers.length} offers`);
   return uniqueOffers(offers);
+}
+
+/**
+ * The headline's own rate, keeping «opptil». A headline that names a
+ * discount without a public rate ("Rabatt på drivstoff hos Circle K") is
+ * "Rabatt", never an invented amount.
+ */
+export function parseLogbuyReward(headline: string, benefitLines: string[] = []): string {
+  for (const text of [headline, ...benefitLines]) {
+    const reward = extractUpToPercentageReward(text) || extractKrReward(text, { totalsum: false });
+    if (reward) return reward;
+  }
+  return /\b(?:rabatt\w*|reduserte\s+priser|medlemspris\w*)\b/i.test([headline, ...benefitLines].join(" ")) ? "Rabatt" : "";
 }

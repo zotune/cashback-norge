@@ -199,7 +199,10 @@ function formatRewardNumber(value: number): string {
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 3).trim()}...`;
+  // Cut at a word boundary; never leave half a word in the tooltip.
+  const cut = value.slice(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
 function uniquePreserveOrder(values: string[]): string[] {

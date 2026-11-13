@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import {
   type CashbackOffer,
   normalizeDomainInput,
+  parseUrl,
   stripHtml,
   uniqueOffers,
   uniqueStrings,
@@ -13,6 +14,7 @@ import {
   formatPercentageReward,
 } from "../../shared/reward.js";
 import type { Logger } from "../logger.js";
+import { isAffiliateTrackingUrl } from "../merchant-domains.js";
 
 const API_URL = "https://www.partner-ads.com/no/programoversigt_xml.php";
 const ENV_KEY = "PARTNER_ADS_API_KEY";
@@ -233,6 +235,8 @@ function decodeXml(value: string): string {
 function extractDomain(programUrl: string): string | undefined {
   if (!programUrl) return undefined;
 
+  const parsedUrl = parseUrl(programUrl.includes("://") ? programUrl : `https://${programUrl}`);
+  if (parsedUrl !== undefined && isAffiliateTrackingUrl(parsedUrl)) return undefined;
   const domain = normalizeDomainInput(programUrl);
   if (!domain.includes(".") || domain === "partner-ads.com") {
     return undefined;
@@ -434,7 +438,10 @@ function cleanText(value: string): string {
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1).trim()}…`;
+  // Cut at a word boundary; never leave half a word in the tooltip.
+  const cut = value.slice(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
 function uniquePreserveOrder(values: string[]): string[] {
@@ -450,11 +457,23 @@ function uniquePreserveOrder(values: string[]): string[] {
   return unique;
 }
 
+// Programme names often carry a tagline ("Nordhost - Hosting på norsk siden
+// 1999", "Utefugl.no - Fuglemat og utstyr for hage"). A suffix after a shop
+// domain, or one made of ordinary lowercase words, is a description; a name
+// part such as "Tropehagen Lade Arena" has no separator and is kept.
 function cleanMerchantName(value: string): string {
-  return value
+  const name = value
     .replace(/\s+/g, " ")
     .replace(/\s+\|\s+Partner-Ads$/i, "")
     .trim();
+  const match = name.match(/^(.+?)\s+[-–]\s+(.+)$/);
+  if (match?.[1] && match[2] && (
+    /\.[a-z]{2,3}$/i.test(match[1]) ||
+    /(?:^|\s)(?:og|på|for|med|til|siden|i|av)(?:\s|$)/.test(match[2])
+  )) {
+    return match[1].trim();
+  }
+  return name;
 }
 
 async function readResponseText(response: Response): Promise<string> {

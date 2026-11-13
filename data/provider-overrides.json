@@ -1,6 +1,8 @@
 {
   "sparelosen": {
-    "fjordkraft mobil": ["fjordkraft.no"]
+    "fjordkraft mobil": [
+      "fjordkraft.no"
+    ]
   },
   "trumf": {
     "bosch-trumf1": [
@@ -483,6 +485,51 @@
     ],
     "zooplus": [
       "zooplus.no"
+    ],
+    "aeg-reservedeler-og-tilbehor-trumf": [
+      "aeg.no"
+    ],
+    "avast-software-trumf": [
+      "avast.com"
+    ],
+    "bad-trumf": [
+      "bad.no"
+    ],
+    "edblad-trumf": [
+      "edblad.com"
+    ],
+    "electrolux-reservedeler-og-tilbehor-trumf": [
+      "electrolux.no"
+    ],
+    "evoride-trumf": [
+      "evoride.no"
+    ],
+    "follestad-trumf": [
+      "follestad.no"
+    ],
+    "fotono-trumf": [
+      "foto.no"
+    ],
+    "g-star-raw-trumf": [
+      "g-star.com"
+    ],
+    "holzweiler-trumf": [
+      "holzweileroslo.com"
+    ],
+    "jotex-trumf": [
+      "jotex.no"
+    ],
+    "kjell-and-co-trumf": [
+      "kjell.com"
+    ],
+    "moniker-trumf": [
+      "moniker.no"
+    ],
+    "moniker-man-trumf": [
+      "monikerman.no"
+    ],
+    "siemens-trumf": [
+      "siemens-home.bsh-group.com"
     ]
   },
   "klarna": {
@@ -582,101 +629,20 @@
     ]
   },
   "remember": {
-    "caroline-svedbom-direct-deals": [
-      "no.carolinesvedbom.com"
-    ],
-    "casall-direct-deals": [
-      "casallpro.com"
-    ],
-    "gant-direct-deals": [
-      "gant.no"
-    ],
-    "gardena-direct-deals": [
-      "gardena.com"
-    ],
-    "iittala-direct-deals": [
-      "iittala.com"
-    ],
-    "jamie-oliver-tefal-direct-deals": [
-      "tefal.no"
-    ],
-    "kalma-direct-deals": [
-      "kalmasweden.com"
-    ],
-    "kitchenaid-direct-deals": [
-      "kitchenaid.com"
-    ],
-    "lily--rose-direct-deals": [
-      "lilyandrose.com"
-    ],
-    "millie-notti-direct-deals": [
-      "mille-notti.com"
-    ],
-    "saddler-direct-deals": [
-      "saddler.com"
-    ],
-    "samsonite-direct-deals": [
-      "samsonite.no"
-    ],
-    "scanpan-direct-deals": [
-      "scanpan.eu"
-    ],
-    "smeg-direct-deals": [
-      "smeg.com"
-    ],
-    "sodastream-direct-deals": [
-      "sodastream.no"
-    ],
-    "softybag-direct-deals": [
-      "softybag.com"
-    ],
-    "steamery-direct-deals": [
-      "steamery.no"
-    ],
-    "tabber-direct-deals": [
-      "tabbersthlm.com"
-    ],
-    "wilfa-direct-deals": [
-      "wilfa.com"
-    ],
-    "zassenhaus-direct-deals": [
-      "zassenhaus-brandshop.com"
-    ],
-    "oakley-direct-deals": [
-      "oakley.com"
-    ],
     "topman": [
       "topshop.com"
     ],
     "urbanears": [
       "urbanears.com"
     ],
-    "versace-direct-deals": [
-      "versace.com"
-    ],
-    "ray-ban-direct-deals": [
-      "ray-ban.com"
-    ],
     "radisson-hotel-group": [
       "radissonhotels.com"
-    ],
-    "ortovox-direct-deals": [
-      "ortovox.com"
-    ],
-    "orrefors-direct-deals": [
-      "orrefors.com"
-    ],
-    "newport-direct-deals": [
-      "newport.se"
     ],
     "elektroimportoren.no": [
       "elektroimportoren.no"
     ],
     "ellos": [
       "ellos.no"
-    ],
-    "aarke-direct-deals": [
-      "aarke.com"
     ],
     "acer": [
       "store.acer.com"
@@ -696,9 +662,6 @@
     "bjorn-borg": [
       "bjornborg.com"
     ],
-    "bodum-direct-deals": [
-      "bodum.com"
-    ],
     "bose": [
       "bose.no"
     ],
@@ -712,20 +675,11 @@
       "climbing247.no",
       "addnature.no"
     ],
-    "design-house-stockholm-direct-deals": [
-      "designhousestockholm.com"
-    ],
     "dustin-home": [
       "dustin.no"
     ],
-    "eglo-direct-deals": [
-      "eglo.com"
-    ],
     "elon": [
       "elon.no"
-    ],
-    "eva-solo-direct-deals": [
-      "evasolo.com"
     ],
     "expedia": [
       "expedia.no"
@@ -744,12 +698,6 @@
     ],
     "obh-nordica": [
       "obhnordica.no"
-    ],
-    "obh-nordica-direct-deals": [
-      "obhnordica.no"
-    ],
-    "philips-direct-deals": [
-      "philips.no"
     ],
     "pyret--snackan": [
       "pyretosnackan.no"
@@ -771,6 +719,9 @@
     ],
     "vrbo": [
       "vrbo.com"
+    ],
+    "norton": [
+      "norton.com"
     ]
   },
   "sas": {
@@ -845,9 +796,8 @@
       "charlieshus.no"
     ],
     "christiania-glasmagasin": [
-      "christianiaglasmagasin.no",
       "cg.no",
-      "glasmagasinet.no"
+      "christianiaglasmagasin.no"
     ],
     "cyberghost-vpn": [
       "cyberghostvpn.com"
@@ -1209,17 +1159,71 @@
     ],
     "zoo.se-1": [
       "zoo.no"
+    ],
+    "aarke": [
+      "aarke.com"
+    ],
+    "badno": [
+      "bad.no"
+    ],
+    "calstop": [
+      "calstop.no"
+    ],
+    "cos": [
+      "cos.com"
+    ],
+    "dyrekassen": [
+      "dyrekassen.no"
+    ],
+    "etsy": [
+      "etsy.com"
+    ],
+    "expressvpn": [
+      "expressvpn.com"
+    ],
+    "fortum-strom": [
+      "fortum.com"
+    ],
+    "fotono": [
+      "foto.no"
+    ],
+    "guttelus": [
+      "guttelus.no"
+    ],
+    "j-lindeberg": [
+      "jlindeberg.com"
+    ],
+    "jotex": [
+      "jotex.no"
+    ],
+    "lopeshop": [
+      "loepeshop.no"
+    ],
+    "mulberry": [
+      "mulberry.com"
+    ],
+    "nelly.com": [
+      "nelly.com"
+    ],
+    "shark-gaming": [
+      "sharkgaming.no"
+    ],
+    "skinome": [
+      "skinome.com"
+    ],
+    "sonos": [
+      "sonos.com"
+    ],
+    "stockx": [
+      "stockx.com"
+    ],
+    "weekday": [
+      "weekday.com"
     ]
   },
   "tfbank": {
     "avis-f-inntil-20-rabatt-p-alle-bookinger": [
       "avis.no"
-    ],
-    "clarion-hotel-ernst": [
-      "strawberry.no"
-    ],
-    "the-social-bar-bistro-clarion-hotel-ernst": [
-      "strawberry.no"
     ],
     "berg-watches": [
       "bergwatches.no"
@@ -1285,6 +1289,10 @@
     ],
     "the-well": [
       "thewell.no"
+    ],
+    "piknik-i-parken": [
+      "pipfest.no",
+      "piknikiparken.no"
     ]
   },
   "bate": {
@@ -1296,6 +1304,9 @@
     ],
     "stavanger-oilers": [
       "oilers.no"
+    ],
+    "sola-strand-hotel": [
+      "solastrand.no"
     ]
   },
   "logbuy": {
@@ -1339,7 +1350,7 @@
       "hm.com"
     ],
     "hoka": [
-      "hoka.com"
+      "framsport.no"
     ],
     "interflora": [
       "interflora.no"
@@ -1354,7 +1365,7 @@
       "samsung.com"
     ],
     "strawberry": [
-      "strawberry.com"
+      "strawberry.no"
     ],
     "talkmore": [
       "talkmore.no"
@@ -1567,6 +1578,9 @@
     ],
     "rabatt-treningssenter": [
       "evofitness.no"
+    ],
+    "rabatt-hos-nextgentel": [
+      "nextgentel.no"
     ]
   },
   "studentkortet": {
@@ -1821,6 +1835,51 @@
     ],
     "beauty-mall": [
       "beautymall.no"
+    ],
+    "edblad": [
+      "edblad.com"
+    ],
+    "holzweiler": [
+      "holzweileroslo.com"
+    ],
+    "hostinger": [
+      "hostinger.com"
+    ],
+    "jotex": [
+      "jotex.no"
+    ],
+    "kaspersky": [
+      "kaspersky.com"
+    ],
+    "morild-norway": [
+      "morildnorway.no"
+    ],
+    "razer": [
+      "razer.com"
+    ],
+    "skinome": [
+      "skinome.com"
+    ],
+    "strikkia": [
+      "strikkia.no"
+    ],
+    "surfmore": [
+      "surfmore.no"
+    ],
+    "temu": [
+      "temu.com"
+    ],
+    "toennesen-1937": [
+      "tonnesen1937.no"
+    ],
+    "trapes-sko": [
+      "trapes.no"
+    ],
+    "xmind": [
+      "xmind.com"
+    ],
+    "nelly": [
+      "nelly.com"
     ]
   },
   "nettbonus": {
@@ -2101,7 +2160,7 @@
       "lufthansa.com"
     ],
     "christiania_glasmagasin": [
-      "glasmagasinet.no"
+      "cg.no"
     ],
     "alibaba": [
       "alibaba.com"
@@ -2223,10 +2282,37 @@
       "peppes.no"
     ]
   },
-  "spareborsen": {},
+  "spareborsen": {
+    "nordvpn": [
+      "nordvpn.com"
+    ],
+    "nordpass": [
+      "nordpass.com"
+    ],
+    "saily": [
+      "saily.com"
+    ],
+    "iherb": [
+      "iherb.com"
+    ],
+    "nespresso-nordic": [
+      "nespresso.com"
+    ]
+  },
   "rabble": {},
-  "dreams": {},
-  "utdanningibergen": {},
+  "dreams": {
+    "td342636": [
+      "barcelo.com"
+    ],
+    "td384381": [
+      "nespresso.com"
+    ]
+  },
+  "utdanningibergen": {
+    "eline-bang": [
+      "elinebang.no"
+    ]
+  },
   "unidays": {},
   "elkjop": {},
   "akademikerne": {
@@ -2256,12 +2342,35 @@
     ]
   },
   "vestbo": {
-    "kampanje.kongeparken.no": ["kongeparken.no"]
+    "kampanje.kongeparken.no": [
+      "kongeparken.no"
+    ]
   },
   "bbl": {},
-  "elbilforeningen": {},
-  "ys": {},
-  "lofavor": {},
+  "elbilforeningen": {
+    "aviloo": [
+      "aviloo.com"
+    ],
+    "miljoagentene": [
+      "miljoagentene.no"
+    ]
+  },
+  "ys": {
+    "gjensidige-forsikring": [
+      "gjensidige.no"
+    ],
+    "snapdrive": [
+      "snapdrive.no"
+    ],
+    "redningsselskapet": [
+      "rs.no"
+    ]
+  },
+  "lofavor": {
+    "legoland": [
+      "legoland.dk"
+    ]
+  },
   "gratisbursdag": {
     "godt brød": [
       "godtbrod.no"
@@ -2356,8 +2465,7 @@
     ],
     "christiania glassmagasin": [
       "cg.no",
-      "christianiaglasmagasin.no",
-      "glasmagasinet.no"
+      "christianiaglasmagasin.no"
     ],
     "lindex": [
       "lindex.com"
@@ -2447,6 +2555,80 @@
     ],
     "jernia": [
       "jernia.no"
+    ]
+  },
+  "tradedoubler": {
+    "384381": [
+      "nespresso.com"
+    ],
+    "396979": [
+      "nordpass.com"
+    ],
+    "396793": [
+      "nordvpn.com"
+    ],
+    "391464": [
+      "saily.com"
+    ]
+  },
+  "gratis": {
+    "bestselgerklubben": [
+      "bestselgerklubben.no"
+    ],
+    "bodøsalven": [
+      "bodosalven.no"
+    ],
+    "zentio": [
+      "zentio.no"
+    ],
+    "nordics co": [
+      "biotics.no"
+    ],
+    "romega": [
+      "romega.no"
+    ],
+    "arctic bioscience": [
+      "romega.no"
+    ],
+    "aime": [
+      "aime.no",
+      "nettbutikk.aime.no"
+    ],
+    "bokklubben månedens bok": [
+      "bokklubben.no"
+    ],
+    "disneyklubben": [
+      "disneyklubben.no"
+    ]
+  },
+  "gjerrigknark": {
+    "bestselgerklubben": [
+      "bestselgerklubben.no"
+    ],
+    "bodøsalven": [
+      "bodosalven.no"
+    ],
+    "zentio": [
+      "zentio.no"
+    ],
+    "nordics co": [
+      "biotics.no"
+    ],
+    "romega": [
+      "romega.no"
+    ],
+    "arctic bioscience": [
+      "romega.no"
+    ],
+    "aime": [
+      "aime.no",
+      "nettbutikk.aime.no"
+    ],
+    "bokklubben månedens bok": [
+      "bokklubben.no"
+    ],
+    "disneyklubben": [
+      "disneyklubben.no"
     ]
   }
 }

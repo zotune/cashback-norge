@@ -86,8 +86,15 @@ export async function fetchGratisbursdag(input: FetchGratisbursdagInput): Promis
     throw requestFailure ?? new Error("Gratis Bursdag: public offer catalogue not found or empty");
   }
 
-  const offers = catalogue.map((entry): CashbackOffer => {
+  const offers = catalogue.flatMap((entry): CashbackOffer[] => {
     const merchantName = clean(entry.brandName);
+    const otherStore = foreignLocation(entry);
+    if (otherStore !== undefined) {
+      // The source sometimes pastes another shop's text into an entry (Gnist
+      // listed "Alle Glid-butikker"). Such a row cannot be attributed reliably.
+      input.logger.warn(`Gratis Bursdag: skipping ${merchantName} (id ${entry.id}): source location names another store (${otherStore})`);
+      return [];
+    }
     // Explicit mappings take priority: a shared logo CDN or a fuzzy brand
     // match is not evidence that an offer applies to a merchant domain.
     const mappedDomains = input.overrides.gratisbursdag?.[merchantName.toLowerCase()];
@@ -96,18 +103,20 @@ export async function fetchGratisbursdag(input: FetchGratisbursdagInput): Promis
     if (domains.length === 0) {
       input.logger.warn(`Gratis Bursdag: no verified domain for ${merchantName}; keeping site listing only`);
     }
-    const rules = calculationRules(entry);
-    return {
+    const reward = birthdayReward(entry);
+    // Purchase conditions only apply to discounts, not to a free gift.
+    const rules = reward === "0 kr totalsum" ? undefined : calculationRules(entry);
+    return [{
       provider: "gratisbursdag",
       merchantName,
       domains,
-      reward: birthdayReward(entry),
+      reward,
       ...(rules === undefined ? {} : { rewardCalculation: rules }),
       sourceUrl: PAGE_URL,
       activationUrl: PAGE_URL,
       terms: birthdayTerms(entry),
       updatedAt: input.generatedAt,
-    };
+    }];
   });
   input.logger.info(`Gratis Bursdag: ${offers.length} birthday offers`);
   return uniqueOffers(offers);
@@ -149,8 +158,29 @@ function birthdayReward(entry: BirthdayOffer): string {
     const coupon = extractKrReward(`Rabatt: ${clean(entry.description)}`, { totalsum: false });
     if (coupon) return coupon;
   }
-  if (entry.offerType === "gratis") return "0 kr totalsum";
-  return clean(entry.offer) || "Bursdagsfordel";
+  // A voucher or discount without a stated amount stays a generic discount;
+  // never show the source's headline ("Verdikupong") as if it were a value.
+  if (/rabatt|avslag|kupong|gavekort|bonus|poeng|kode/i.test(benefit)) return "Rabatt";
+  // A named item without discount wording is a free gift, also when the source
+  // labels it "rabatt" (Meny: "får du valgfri is på bursdagen din").
+  if (entry.offerType === "gratis" || /\b(?:gratis|får du|mottar du)\b/i.test(clean(entry.description))) return "0 kr totalsum";
+  return "Rabatt";
+}
+
+// "Alle X-butikker" must name this brand; DNA's "Eurosko/DNA/Shoeday" is fine.
+function foreignLocation(entry: BirthdayOffer): string | undefined {
+  const brand = normalizeName(entry.brandName);
+  for (const location of entry.locations) {
+    const store = clean(location).match(/^alle\s+(.+?)(?:-|\s+)(?:butikker|restauranter|kafeer|sentre|klubber|kunder|apotek)$/i)?.[1];
+    if (store === undefined) continue;
+    const names = store.split("/").map(normalizeName).filter(Boolean);
+    if (names.length > 0 && !names.some((name) => name.includes(brand) || brand.includes(name))) return clean(location);
+  }
+  return undefined;
+}
+
+function normalizeName(value: string): string {
+  return clean(value).toLowerCase().replace(/[^a-z0-9æøå]/g, "");
 }
 
 function calculationRules(entry: BirthdayOffer): RewardCalculationRules | undefined {
