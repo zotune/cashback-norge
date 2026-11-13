@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         cashbacknorge.no
 // @namespace    https://cashbacknorge.no/
-// @version      1794578550
+// @version      1794579328
 // @description  Vis cashback-tilbud automatisk på norske nettbutikker
 // @author       zotune
 // @icon         https://cashbacknorge.no/favicon.png?v=quokka-1
@@ -1277,7 +1277,7 @@
   const GENERIC_SPEC_TOKENS = /* @__PURE__ */ new Set(["wifi5", "wifi6", "wifi7", "usb2", "usb3", "usb4", "hdmi2", "bt50"]);
   function readModelNumberTokens(text2) {
     const bareTokens = text2.split(/[^A-Za-z0-9]+/).map((token) => token.toLowerCase()).filter((token) => token.length >= 2 && /[a-z]/.test(token) && /\d/.test(token) && !isUnitLikeToken(token));
-    const joinedTokens = [...text2.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)].filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase())).map((match) => `${match[1]}${match[2]}`.toLowerCase()).filter((token) => !isUnitLikeToken(token));
+    const joinedTokens = [...text2.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)].filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase())).filter((match) => !isUnitLikeToken(`${match[2] ?? ""}${/^\s*([a-zæøå]+)/i.exec(text2.slice((match.index ?? 0) + match[0].length))?.[1] ?? ""}`.toLowerCase())).map((match) => `${match[1]}${match[2]}`.toLowerCase()).filter((token) => !isUnitLikeToken(token));
     return uniqueStrings$c([...bareTokens, ...joinedTokens]);
   }
   function isUnitLikeToken(token) {

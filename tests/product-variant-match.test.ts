@@ -66,3 +66,11 @@ test("a Tek.no test copied by another source takes Tek's current grade for the s
   assert.equal((await refreshTekCritic(copy, respond([item("1", "Roborock Qrevo 798", 8), item("2", "Roborock QR 798 Pro", 6)]))).score, 8);
   assert.equal((await refreshTekCritic({ ...copy, site: "Elkjøp" }, async () => { throw new Error("no request"); })).score, 9);
 });
+
+test("a quantity with its unit after a space is no model number («Gel Mask 100 ml» vs «Gelmask 100ml»)", async () => {
+  const { hasModelNumberConflict, hasProductVariantConflict } = await import("../src/shared/product-match.js");
+  assert.equal(hasModelNumberConflict("Lumene Nordic Hydra Hydrating Gel Mask 100 ml", "Lumene Nordic Fuktgivende Gelmask 100ml"), false);
+  assert.equal(hasProductVariantConflict({ searchTerm: "Lumene Nordic Hydra Hydrating Gel Mask 100 ml", packageQuantity: { amount: 100, unit: "ml" } }, "Lumene Nordic Fuktgivende Gelmask 50ml"), true);
+  // Real model numbers still conflict.
+  assert.equal(hasModelNumberConflict("Sony WH-1000XM6", "Sony WF-1000XM6"), true);
+});

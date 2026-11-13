@@ -382,6 +382,8 @@ function readModelNumberTokens(text: string): string[] {
   // "RAM 256GB" (tallresten er en enhet) er ikke modellnumre.
   const joinedTokens = [...text.matchAll(/\b([A-Za-z]{1,4})[-\s](\d[A-Za-z0-9]{2,})\b/g)]
     .filter((match) => !isUnitLikeToken((match[2] ?? "").toLowerCase()))
+    // "Gel Mask 100 ml": a quantity with its unit after a space is no "mask100" model.
+    .filter((match) => !isUnitLikeToken(`${match[2] ?? ""}${/^\s*([a-zæøå]+)/i.exec(text.slice((match.index ?? 0) + match[0].length))?.[1] ?? ""}`.toLowerCase()))
     .map((match) => `${match[1]}${match[2]}`.toLowerCase())
     .filter((token) => !isUnitLikeToken(token));
   return uniqueStrings([...bareTokens, ...joinedTokens]);
