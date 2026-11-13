@@ -1,0 +1,35 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?providers=obos,naf (OBOS 61, NAF 44, 100 butikker)",
+  "offers": "Avis: OBOS opptil 30 %, NAF 10–20 %; Dekkhotell Vianor: NAF 10–25 %, OBOS 5–20 %"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Medlem i OBOS og NAF? Se hvem som gir *mest.*",
+   "gap": 0.3
+  },
+  {
+   "id": "filter",
+   "line": "Velg medlemskapene dine i *filteret.* Da ser du bare fordelene du har."
+  },
+  {
+   "id": "avis",
+   "line": "Leiebil hos Avis: OBOS gir opptil *{30 %,|tretti prosent,}* NAF {10 til 20.|ti til tjue.}"
+  },
+  {
+   "id": "dekk",
+   "line": "Dekkhotell hos Vianor: her vinner *NAF,* med {10 til 25 %.|ti til tjuefem prosent.}"
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

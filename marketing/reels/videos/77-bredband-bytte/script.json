@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?tema=bredband (5 butikker)",
+  "offers": "Huseierne/NextGenTel «minimum 25 % rabatt på bredbånd»; NITO/NextGenTel «Opptil 37% på bredbånd»; NettBonus/Telia «Bredbånd: 300 kr» (annonselenke); SAS/Telia 2 000 poeng, nye kunder, mobilabonnement/mobilt/trådløst bredbånd, kunde i minst 3 mnd"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Bytter du *bredbånd?* Sjekk medlemskapet ditt først.",
+   "gap": 0.3
+  },
+  {
+   "id": "huseierne",
+   "line": "NextGenTel: minst *{25 %|tjuefem prosent}* rabatt med Huseierne."
+  },
+  {
+   "id": "nito",
+   "line": "Er du i NITO: opptil *{37 %.|trettisju prosent.}*"
+  },
+  {
+   "id": "telia",
+   "line": "Telia: *{300 kr|tre hundre kroner}* tilbake på bredbånd via NettBonus."
+  },
+  {
+   "id": "sas",
+   "line": "Eller {2 000|to tusen} EuroBonus-poeng på *trådløst* bredbånd."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

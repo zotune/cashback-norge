@@ -1,0 +1,39 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?provider=coop (8 butikker)",
+  "offers": "coop.no medlemsfordeler via Coop-provideren: Circle K 0,25–0,45 kr/l; Coop Hotellkupp 100 kr ekstra per natt (vintersalg); Mer 5–10 % ladebonus; Ving minst 600 kr per bestilling; YX og Best 0,45 kr/l"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Coop-medlem? Det gir mer enn *kjøpeutbytte.*",
+   "gap": 0.3
+  },
+  {
+   "id": "drivstoff",
+   "line": "Opptil *{45 øre|førtifem øre}* literen på drivstoff hos Circle K og YX."
+  },
+  {
+   "id": "hotell",
+   "line": "*{100 kr|Hundre kroner}* ekstra rabatt per natt med Coop Hotellkupp."
+  },
+  {
+   "id": "lading",
+   "line": "Lader du elbil? Opptil *{10 %|ti prosent}* bonus hos Mer."
+  },
+  {
+   "id": "ving",
+   "line": "Og alltid minst *{600 kr|seks hundre kroner}* rabatt på pakkereiser med Ving."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

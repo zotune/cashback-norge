@@ -1,0 +1,43 @@
+{
+ "voice": "nb-NO-PernilleNeural",
+ "rate": "+12%",
+ "maxPause": 0.22,
+ "gap": 0.15,
+ "tail": 1.6,
+ "sources": {
+  "checked": "2026-11-13",
+  "page": "https://cashbacknorge.no/?tema=gratis (58 butikker); tooltips fra Gratis.no/Gjerrigknark",
+  "verified": "norskluftambulanse.no/nodplakat: «Her kan du lage gratis nødplakater»; vy.no/gronn-reise: «Aviser, magasiner og lydbøker», gratis medlemskap. Apotek 1 og Plantasjen: kildens opplysninger (kontrollert av kilden 2024), ikke kontrollert av Cashback Norge"
+ },
+ "segments": [
+  {
+   "id": "hook",
+   "line": "Ting du får helt *gratis.* Ingen kjøp.",
+   "gap": 0.3
+  },
+  {
+   "id": "filter",
+   "line": "Trykk på filteret *Gratis* på Cashback Norge."
+  },
+  {
+   "id": "luft",
+   "line": "Norsk Luftambulanse sender deg en *nødplakat* med kart og GPS til hytta."
+  },
+  {
+   "id": "apotek",
+   "line": "Venter du barn? Apotek 1 har en gratis *babypakke.*"
+  },
+  {
+   "id": "vy",
+   "line": "I VY-appen leser du aviser og hører *lydbøker* uten å betale."
+  },
+  {
+   "id": "plant",
+   "line": "Og i Plantasjens kundeklubb får du ti *roser* på bursdagen."
+  },
+  {
+   "id": "cta",
+   "line": "Lenken ligger i *bio.*"
+  }
+ ]
+}

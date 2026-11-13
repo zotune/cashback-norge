@@ -33,6 +33,10 @@ const PLANS = {
   '69-stable-rabatter': { path: '/tilbud/', steps: [
     { search: 'saros 20 sonic', top: '.deal-row', shot: 'tilbud', boxes: { row: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary' } },
   ] },
+  '75-julegaver-tilbud': { path: '/tilbud/', steps: [
+    { click: '[data-group-pick="Jul"]', top: '.source-toggles', shot: 'jul', boxes: { chip: '[data-group-pick="Jul"]', count: '[data-ol="count"]', first: '.deal-row', second: '.deal-row >> nth=1', third: '.deal-row >> nth=2' } },
+    { click: '[data-toplist="saving"]', top: '.deal-row', shot: 'jul-prisfall', boxes: { first: '.deal-row', pricing: '.deal-row .deal-pricing', low: '.deal-row .deal-history-summary', second: '.deal-row >> nth=1', secondLow: '.deal-row >> nth=1 >> .deal-history-summary' } },
+  ] },
   '71-julemat-kundeaviser': { path: '/dagligvarer/', steps: [
     { sort: 'unit', search: 'pinnekjøtt', top: '.deal-row', shot: 'pinne', boxes: { first: '.deal-row', second: '.deal-row >> nth=1', last: '.deal-row >> nth=-1', search: '.search-wrap' } },
     { sort: 'unit', search: 'tynnribbe', top: '.deal-row', shot: 'ribbe', boxes: { first: '.deal-row', second: '.deal-row >> nth=1', days: '.deal-row .deal-validity' } },

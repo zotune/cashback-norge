@@ -1,6 +1,6 @@
 # Reels for cashbacknorge.no
 
-72 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 og video 68–73 13. nov. 2026.
+78 vertikale videoer (1080×1920, 30 fps, ca. 15–33 s) med norsk voiceover, karaoke-tekst og **ekte skjermbilder** fra cashbacknorge.no, userscriptet/utvidelsen og offentlige tilbudssider. Video 1–15 er hentet 6.–7. okt. 2026, video 16–20 19. okt. 2026, video 21–25 21. okt. 2026, video 26–30 23. okt. 2026, video 31–36 24. okt. 2026, video 37–39 25. okt. 2026 video 40–44 31. okt. 2026 video 45–54 2. nov. 2026 video 55–58 4. nov. 2026 video 59–62 8. nov. 2026 video 63–67 10. nov. 2026 og video 68–78 13. nov. 2026.
 
 | Fil | Tema | Krok (første sekund) |
 |---|---|---|
@@ -82,6 +82,12 @@
 | `out/70-instabank-nov-des.mp4` | Annonse for Instabank kredittkort: 3 % på netthandel i november og 3 % på alle kjøp i desember, maks 500 kr/mnd. 10 000 kr hver måned → 600 kr | «Black Week og jul? Samme kort, to måneder» |
 | `out/72-tilbud-laveste-na.mp4` | Tilbud: tre Black Week-tilbud hos Komplett på laveste registrerte pris (Saros 20 Sonic 7 490, Galaxy Watch8 1 690, WH-1000XM4 1 990). «Se etter grønt, ikke bare prosenten» | «Black Week 🏷️ Ekte tilbud?» |
 | `out/73-instabank-tilbud.mp4` | Annonse (Instabank): de samme tre tilbudene betalt med Instabank i november, 11 170 kr × 3 % = 335 kr | «Black Week-tilbud? +3 % i tillegg» |
+| `out/71-julemat-kundeaviser.mp4` | Dagligvarer: pinnekjøtt og tynnribbe sortert på kilopris (Obs 239 kr/kg mot 439 kr/kg; Joker 99 kr/kg; Coop Marked 109 kr/kg til 20. des). Kundeaviser uke 46 | «Pinnekjøtt: 239 eller 439 kr kiloen?» |
+| `out/74-gratis-ting.mp4` | Gratis-filteret: nødplakat (Norsk Luftambulanse), babypakke (Apotek 1), aviser og lydbøker i VY-appen, 10 roser (Plantasjen-klubben). Kilde Gratis.no/Gjerrigknark, ikke kontrollert av oss | «Helt gratis 🎁 Ingen kjøp» |
+| `out/75-julegaver-tilbud.mp4` | Tilbud, kategori Jul: Pukka-kalenderen 111 kr (−24,7 % til lavpris), NYX Bling Box 934 kr og Jurassic Park Minis 249 kr på laveste pris | «Julekalender 2026? Sjekk prisen først» |
+| `out/76-coop-medlem.mp4` | Coop-medlem: Circle K/YX opptil 45 øre/l, Hotellkupp 100 kr per natt, Mer opptil 10 % ladebonus, Ving minst 600 kr | «Coop-medlem? Mer enn kjøpeutbytte» |
+| `out/77-bredband-bytte.mp4` | Temafilter Bredbånd: NextGenTel minst 25 % (Huseierne) og opptil 37 % (NITO), Telia 300 kr via NettBonus (annonselenke) eller 2 000 EuroBonus-poeng | «Bytter du bredbånd? Sjekk medlemskapet» |
+| `out/78-medlemsfilter.mp4` | Filter på medlemskap (OBOS + NAF): Avis opptil 30 % med OBOS mot 10–20 % med NAF; dekkhotell hos Vianor 10–25 % med NAF mot 5–20 % med OBOS | «OBOS og NAF? Hvem gir mest?» |
 
 Hver video finnes også som `*-uten-musikk.mp4`. Bruk den hvis du vil legge på trendende lyd fra Instagram-biblioteket (gir ofte mer rekkevidde). Sett musikken til ca. 10–15 % volum.
 
