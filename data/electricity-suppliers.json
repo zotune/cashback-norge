@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-13T23:31:38.620Z",
+  "generatedAt": "2026-11-14T12:44:01.827Z",
   "source": "https://strom-api.forbrukerradet.no/products/grid/5?yearlyKwhConsumption=14400&norgespris=true&consumptionCode=35",
   "suppliers": [
     {
@@ -156,13 +156,6 @@
       "hostname": "hkraft.no",
       "supplierUrl": "https://hkraft.no/strom/prisliste-stromavtaler/",
       "evidence": "reported-pricelist"
-    },
-    {
-      "id": 10017,
-      "name": "Hurum Kraft AS",
-      "hostname": "hurumkraft.no",
-      "supplierUrl": "https://hurumkraft.no/vare-aktive-stromavtaler/",
-      "evidence": "verified-offer-page"
     },
     {
       "id": 10147,
