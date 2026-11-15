@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-14T12:44:01.827Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-15T13:10:34.992Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1118,7 +1118,8 @@
 {"id":26474,"canonicalId":"en_character_meowth_collection_box","name":"Deck Crafter’s Collection – Meowth ex","category":"collection","language":"en"},
 {"id":26482,"canonicalId":"en_mega_evolution_tin_dragonite","name":"Mega Evolution Tin (Dragonite)","category":"tin","setName":"Mega Evolution","language":"en"},
 {"id":26484,"canonicalId":"en_mega_evolution_tin_darkrai","name":"Mega Evolution Tin (Darkrai)","category":"tin","setName":"Mega Evolution","language":"en"},
-{"id":26590,"canonicalId":"en_character_mega_rayquaza_tournament_collection","name":"Mega Rayquaza ex Premium Tournament Collection","category":"collection","language":"en"}
+{"id":26590,"canonicalId":"en_character_mega_rayquaza_tournament_collection","name":"Mega Rayquaza ex Premium Tournament Collection","category":"collection","language":"en"},
+{"id":26601,"canonicalId":"en_xy_roaring_skies_booster_box","name":"Xy Roaring Skies Booster Box","category":"booster_box","language":"en"}
 ],"urls":{
 "24collectcards.no/products/pokemon-prismatic-evolutions-elite-trainer-box":3594,
 "24collectcards.no/products/pokemon-prismatic-evolutions-poster-collection":5364,
@@ -1561,6 +1562,7 @@
 "cardcenter.no/products/maks-1-per-pers-rip-and-ship-pitch-black-boosterpakke-bundle-1":12617,
 "cardcenter.no/products/maks-1-per-pers-rip-and-ship-storm-emeralda-bundle-1":15009,
 "cardcenter.no/products/maks-20-per-husstand-pokemon-delta-reign-boosterpakke":22035,
+"cardcenter.no/products/maks-3-per-pers-rip-and-ship-pokemon-roaring-skies-booster-box-break-lospakke":26601,
 "cardcenter.no/products/mask-of-change-japansk-boosterpakke":3781,
 "cardcenter.no/products/mega-brave-japansk-display-booster-box":3425,
 "cardcenter.no/products/mega-brave-japansk-display-booster-pack":3324,
@@ -2321,6 +2323,7 @@
 "csmegastore.no/i/10501425/pok%c3%a9mon-tcg-scarlet-violet-3-5-151-booster-bundle-pok85321":3351,
 "csmegastore.no/i/10979960/the-pok%c3%a9mon-tcg-scarlet-violet-4-paradox-rift-elite-trainer-box-iron-valiant":5180,
 "csmegastore.no/i/20761776/pok%c3%a9mon-display-booster-box-sv05-scarlet-violet-temporal-forces-36-boosters":3605,
+"csmegastore.no/i/20901082/pok%c3%a9mon-tcg-scarlet-violet-4-paradox-rift-booster-box-36-eks-boosterpakker":3611,
 "csmegastore.no/i/20959535/pok%c3%a9mon-stellar-crown-checklane-pok85788-assorted":5049,
 "csmegastore.no/i/20959536/pok%c3%a9mon-premium-checklane-blister-scarlet-violet-twilight-masquerade-pok85794-assorted":5452,
 "csmegastore.no/i/21434518/pok%c3%a9mon-stellar-crown-boosters-3-pack-latias-pok85907-assorted":3994,
@@ -3306,6 +3309,7 @@
 "littlemtcg.no/products/mega-dream-ex-booster-box-rip-ship":4499,
 "littlemtcg.no/products/pokemon-151-booster-bundle":3351,
 "littlemtcg.no/products/pokemon-151-booster-pack-jp":3328,
+"littlemtcg.no/products/pokemon-30th-celebration-booster-pack-en":12614,
 "littlemtcg.no/products/pokemon-30th-celebration-booster-pack-jp":13523,
 "littlemtcg.no/products/pokemon-abyss-eye-booster-pack":11962,
 "littlemtcg.no/products/pokemon-ascended-heroes-booster-pack":5534,
@@ -3319,6 +3323,8 @@
 "littlemtcg.no/products/pokemon-mega-dream-ex-booster-pack-rip-ship":3696,
 "littlemtcg.no/products/pokemon-mega-evolution-pitch-black-booster-box-case":11730,
 "littlemtcg.no/products/pokemon-mega-evolution-pitch-black-booster-bundle":12617,
+"littlemtcg.no/products/pokemon-ninja-spinner-booster-box-jp":10673,
+"littlemtcg.no/products/pokemon-ninja-spinner-booster-pack-jp":10684,
 "littlemtcg.no/products/pokemon-paradigm-trigger-japansk-booster-box-s12":4748,
 "littlemtcg.no/products/pokemon-prismatic-evolutions-booster-bundle":3334,
 "littlemtcg.no/products/pokemon-prismatic-evolutions-elite-trainer-box":3594,
@@ -6384,6 +6390,7 @@
 "sprell.no/product/pok%C3%A9mon-boks-med-to-boosterpakker---ascended-heroes--196214132658_no?code=196214132658":5534,
 "sprell.no/product/pok%C3%A9mon-booster-bundle---pitch-black--196214142671_no?code=196214142671":12617,
 "sprell.no/product/pok%C3%A9mon-booster-pakke-1-stk---chaos-rising--196214141032_no?code=196214141032":6377,
+"sprell.no/product/pok%C3%A9mon-booster-pakke-1-stk---delta-reign--196214144590_no?code=196214144590":22035,
 "sprell.no/product/pok%C3%A9mon-booster-pakke-1-stk---pitch-black--196214142886_no?code=196214142886":11731,
 "sprell.no/product/pok%C3%A9mon-deluxe-pin-collection---ascended-heroes-first-partners--196214131026_no?code=196214131026":5624,
 "sprell.no/product/pok%C3%A9mon-elite-trainer-box---30th-celebration--196214144828_no?code=196214144828":12985,
