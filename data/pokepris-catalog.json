@@ -1,4 +1,4 @@
-{"version":1,"generatedAt":"2026-11-15T13:10:34.992Z","source":"https://www.pokepris.no","products":[
+{"version":1,"generatedAt":"2026-11-16T14:19:11.082Z","source":"https://www.pokepris.no","products":[
 {"id":3311,"canonicalId":"en_upc_mega_charizard_x","name":"Mega Charizard X ex Ultra Premium Collection","category":"ultra_premium","language":"en"},
 {"id":3313,"canonicalId":"jp_inferno_x_booster_pack","name":"Inferno X Booster Pack [JP]","category":"booster_pack","language":"jp"},
 {"id":3314,"canonicalId":"en_phantasmal_flames_booster_pack","name":"Phantasmal Flames Booster Pack","category":"booster_pack","setName":"Phantasmal Flames","language":"en"},
@@ -1119,7 +1119,8 @@
 {"id":26482,"canonicalId":"en_mega_evolution_tin_dragonite","name":"Mega Evolution Tin (Dragonite)","category":"tin","setName":"Mega Evolution","language":"en"},
 {"id":26484,"canonicalId":"en_mega_evolution_tin_darkrai","name":"Mega Evolution Tin (Darkrai)","category":"tin","setName":"Mega Evolution","language":"en"},
 {"id":26590,"canonicalId":"en_character_mega_rayquaza_tournament_collection","name":"Mega Rayquaza ex Premium Tournament Collection","category":"collection","language":"en"},
-{"id":26601,"canonicalId":"en_xy_roaring_skies_booster_box","name":"Xy Roaring Skies Booster Box","category":"booster_box","language":"en"}
+{"id":26601,"canonicalId":"en_xy_roaring_skies_booster_box","name":"Xy Roaring Skies Booster Box","category":"booster_box","language":"en"},
+{"id":26604,"canonicalId":"en_delta_reign_elite_trainer_box_pokemon_center","name":"Delta Reign Elite Trainer Box (Pokémon Center)","category":"etb","setName":"Delta Reign","language":"en"}
 ],"urls":{
 "24collectcards.no/products/pokemon-prismatic-evolutions-elite-trainer-box":3594,
 "24collectcards.no/products/pokemon-prismatic-evolutions-poster-collection":5364,
@@ -1625,6 +1626,7 @@
 "cardcenter.no/products/pokemon-bright-fantasy-jumbo-booster-box":8367,
 "cardcenter.no/products/pokemon-bright-fantasy-slim-boosterpakke":8424,
 "cardcenter.no/products/pokemon-center-chaos-rising-elite-trainer-box":6373,
+"cardcenter.no/products/pokemon-center-eksklusiv-delta-reign-elite-trainer-box":26604,
 "cardcenter.no/products/pokemon-center-perfect-order-elite-trainer-box":5626,
 "cardcenter.no/products/pokemon-center-pitch-black-elite-trainer-box":6501,
 "cardcenter.no/products/pokemon-chaos-rising-1-pack-blister-toxel":6381,
@@ -2059,6 +2061,7 @@
 "cardero.no/products/pokemon-30th-celebration-ditto-premium-collection":13007,
 "cardero.no/products/pokemon-30th-celebration-figure-collection-mew":13008,
 "cardero.no/products/pokemon-30th-celebration-mini-tin":9021,
+"cardero.no/products/pokemon-30th-celebration-ultra-premium-collection-night-umbreon-ex":13006,
 "cardero.no/products/pokemon-brilliant-stars-booster-pack":3336,
 "cardero.no/products/pokemon-chaos-rising-booster-bundle":6374,
 "cardero.no/products/pokemon-chaos-rising-booster-pack-1":6377,
@@ -6340,6 +6343,7 @@
 "samleboden.no/products/mega-evolution-chaos-rising-booster-pack":6377,
 "samleboden.no/products/pitch-black-booster-bundle":12617,
 "samleboden.no/products/pokekon-slashing-legends-tin-zacian-ex":3738,
+"samleboden.no/products/pokemon-151-booster-bundle":3351,
 "samleboden.no/products/pokemon-151-booster-pakke-sendes-fra-uke-41":3333,
 "samleboden.no/products/pokemon-30th-celebration-2-pack-blister":12988,
 "samleboden.no/products/pokemon-30th-celebration-binder-collection":12993,
